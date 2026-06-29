@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -20,20 +21,15 @@ func TestStart_Hooks_DeclaresUserAccessibleRun(t *testing.T) {
 
 	var paramNames []string
 	var templateRequired bool
-	var payloadRequired bool
 	for _, param := range hook.Parameters {
 		paramNames = append(paramNames, param.Name)
 		if param.Name == "template" {
 			templateRequired = param.Required
 		}
-		if param.Name == "payload" {
-			payloadRequired = param.Required
-		}
 	}
 
-	assert.ElementsMatch(t, []string{"template", "payload"}, paramNames)
+	assert.ElementsMatch(t, []string{"template"}, paramNames)
 	assert.True(t, templateRequired, "template parameter must be required")
-	assert.False(t, payloadRequired, "payload parameter must be optional")
 }
 
 func TestStart_HandleHook_EmitsWithConfiguredPayload(t *testing.T) {
@@ -62,32 +58,6 @@ func TestStart_HandleHook_EmitsWithConfiguredPayload(t *testing.T) {
 	payload, ok := events.Payloads[0].Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "Hello, World!", payload["message"])
-}
-
-func TestStart_HandleHook_PayloadOverride(t *testing.T) {
-	s := &Start{}
-	events := &contexts.EventContext{}
-
-	config := map[string]any{
-		"templates": []any{
-			map[string]any{"name": "Hello", "payload": map[string]any{"message": "Hello, World!"}},
-		},
-	}
-
-	_, err := s.HandleHook(core.TriggerHookContext{
-		Name: HookRun,
-		Parameters: map[string]any{
-			"template": "Hello",
-			"payload":  map[string]any{"message": "Override"},
-		},
-		Configuration: config,
-		Events:        events,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, events.Payloads, 1)
-	payload := events.Payloads[0].Data.(map[string]any)
-	assert.Equal(t, "Override", payload["message"])
 }
 
 func TestStart_HandleHook_UnknownTemplateListsAvailable(t *testing.T) {
@@ -142,7 +112,67 @@ func TestStart_HandleHook_RejectsNoTemplatesConfigured(t *testing.T) {
 	assert.Contains(t, err.Error(), "no templates configured")
 }
 
-func TestStart_HandleHook_RejectsNilPayloadWithoutOverride(t *testing.T) {
+func TestStart_HandleHook_EmitsWithConfiguredParameters(t *testing.T) {
+	s := &Start{}
+	events := &contexts.EventContext{}
+
+	config := map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Hello",
+				"payload": map[string]any{"message": "Hello, World!"},
+				"parameters": []any{
+					map[string]any{"name": "message", "type": "string", "defaultString": "Hello, World!"},
+				},
+			},
+		},
+	}
+
+	result, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
+		Parameters:    map[string]any{"template": "Hello"},
+		Configuration: config,
+		Events:        events,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "Hello", result["template"])
+
+	require.Len(t, events.Payloads, 1)
+	payload, ok := events.Payloads[0].Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Hello, World!", payload["message"])
+}
+
+func TestStart_HandleHook_PrefersPayloadOverParameters(t *testing.T) {
+	s := &Start{}
+	events := &contexts.EventContext{}
+
+	config := map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Hello",
+				"payload": map[string]any{"message": "from payload"},
+				"parameters": []any{
+					map[string]any{"name": "message", "type": "string", "defaultString": "from parameters"},
+				},
+			},
+		},
+	}
+
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
+		Parameters:    map[string]any{"template": "Hello"},
+		Configuration: config,
+		Events:        events,
+	})
+
+	require.NoError(t, err)
+	payload := events.Payloads[0].Data.(map[string]any)
+	assert.Equal(t, "from payload", payload["message"])
+}
+
+func TestStart_HandleHook_RejectsNilPayload(t *testing.T) {
 	s := &Start{}
 	events := &contexts.EventContext{}
 
@@ -162,6 +192,49 @@ func TestStart_HandleHook_RejectsNilPayloadWithoutOverride(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no payload")
 	assert.Empty(t, events.Payloads)
+}
+
+func TestStart_Configuration_SelectParameterRequiresOptions(t *testing.T) {
+	s := &Start{}
+
+	err := configuration.ValidateConfiguration(s.Configuration(), map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Parameterized",
+				"payload": map[string]any{"provider": "x"},
+				"parameters": []any{
+					map[string]any{
+						"name": "provider",
+						"type": "select",
+					},
+				},
+			},
+		},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "options")
+}
+
+func TestStart_Configuration_NonSelectParameterDoesNotRequireOptions(t *testing.T) {
+	s := &Start{}
+
+	err := configuration.ValidateConfiguration(s.Configuration(), map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Parameterized",
+				"payload": map[string]any{"message": "hi"},
+				"parameters": []any{
+					map[string]any{
+						"name": "message",
+						"type": "string",
+					},
+				},
+			},
+		},
+	})
+
+	require.NoError(t, err)
 }
 
 func TestStart_HandleHook_RejectsUnknownHook(t *testing.T) {

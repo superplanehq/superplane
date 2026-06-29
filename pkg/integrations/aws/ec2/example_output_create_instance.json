@@ -1,0 +1,20 @@
+{
+  "data": {
+    "instanceId": "i-0abc1234567890def",
+    "instanceType": "t3.micro",
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "state": "running",
+    "name": "ephemeral-builder",
+    "keyName": "my-key",
+    "launchTime": "2026-05-21T12:00:00.000Z",
+    "privateIpAddress": "10.0.1.25",
+    "publicIpAddress": "54.198.10.42",
+    "privateDnsName": "ip-10-0-1-25.ec2.internal",
+    "publicDnsName": "ec2-54-198-10-42.compute-1.amazonaws.com",
+    "subnetId": "subnet-0abc1234567890def",
+    "vpcId": "vpc-0abc1234567890def",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-05-21T12:01:00Z",
+  "type": "aws.ec2.instance"
+}

@@ -1,5 +1,6 @@
 import React from "react";
 import { ComponentBase, type EventSection, type EventState } from "../componentBase";
+import type { DraftDiffStatus } from "@/lib/draftDiff";
 import type { ComponentActionsProps } from "../types/componentActions";
 import { type MetadataItem } from "../metadataList";
 
@@ -62,9 +63,10 @@ export interface CompositeProps extends ComponentActionsProps {
   isMissing?: boolean;
   error?: string;
   warning?: string;
-  paused?: boolean;
 
   onViewMoreEvents?: () => void;
+  dimBodyBelowHeader?: boolean;
+  draftDiffStatus?: DraftDiffStatus;
 }
 
 export const Composite: React.FC<CompositeProps> = ({
@@ -87,13 +89,9 @@ export const Composite: React.FC<CompositeProps> = ({
   isMissing = false,
   error,
   warning,
-  paused,
-  runDisabled,
-  runDisabledTooltip,
-  onEdit,
+  dimBodyBelowHeader,
+  draftDiffStatus,
   onDuplicate,
-  onDeactivate,
-  onTogglePause,
   onToggleView,
   onDelete,
   isCompactView,
@@ -204,12 +202,7 @@ export const Composite: React.FC<CompositeProps> = ({
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
       selected={selected}
-      runDisabled={runDisabled}
-      runDisabledTooltip={runDisabledTooltip}
-      onEdit={onEdit}
       onDuplicate={onDuplicate}
-      onDeactivate={onDeactivate}
-      onTogglePause={onTogglePause}
       onToggleView={onToggleView}
       onDelete={onDelete}
       isCompactView={isCompactView}
@@ -218,7 +211,8 @@ export const Composite: React.FC<CompositeProps> = ({
       customField={customField}
       error={error}
       warning={warning}
-      paused={paused}
+      dimBodyBelowHeader={dimBodyBelowHeader}
+      draftDiffStatus={draftDiffStatus}
     />
   );
 };

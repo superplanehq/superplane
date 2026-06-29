@@ -7,10 +7,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
 
@@ -21,9 +21,9 @@ func Test_DeleteNodeQueueItem_ReturnsErrorForInvalidCanvasID(t *testing.T) {
 	response, err := DeleteNodeQueueItem(context.Background(), r.Registry, "invalid-uuid", "node-1", uuid.New().String())
 	require.Error(t, err)
 	assert.Nil(t, response)
-	s, ok := status.FromError(err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, s.Code())
+	assert.Equal(t, codes.InvalidArgument, code)
 }
 
 func Test_DeleteNodeQueueItem_ReturnsErrorForInvalidItemID(t *testing.T) {
@@ -33,9 +33,9 @@ func Test_DeleteNodeQueueItem_ReturnsErrorForInvalidItemID(t *testing.T) {
 	response, err := DeleteNodeQueueItem(context.Background(), r.Registry, uuid.New().String(), "node-1", "bogus")
 	require.Error(t, err)
 	assert.Nil(t, response)
-	s, ok := status.FromError(err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, s.Code())
+	assert.Equal(t, codes.InvalidArgument, code)
 }
 
 func Test_DeleteNodeQueueItem(t *testing.T) {

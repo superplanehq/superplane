@@ -1,14 +1,18 @@
 package workers
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
@@ -44,7 +48,7 @@ func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	// Create a root event and a pending execution for the component node.
 	//
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 
 	//
 	// Have two workers call LockAndProcessNodeExecution concurrently on the same execution.
@@ -56,12 +60,12 @@ func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the execution concurrently.
 	//
 	go func() {
-		executor1 := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
+		executor1 := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
 		results <- executor1.LockAndProcessNodeExecution(execution.ID)
 	}()
 
 	go func() {
-		executor2 := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
+		executor2 := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
 		results <- executor2.LockAndProcessNodeExecution(execution.ID)
 	}()
 
@@ -103,7 +107,7 @@ func Test__NodeExecutor_DoesNotProcessExecutionForSoftDeletedOrganization(t *tes
 	)
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 
@@ -113,7 +117,7 @@ func Test__NodeExecutor_DoesNotProcessExecutionForSoftDeletedOrganization(t *tes
 		assert.NotEqual(t, execution.ID, pending.ID)
 	}
 
-	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
+	executor := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
 	err = executor.LockAndProcessNodeExecution(execution.ID)
 	assert.ErrorIs(t, err, ErrRecordLocked)
 
@@ -121,91 +125,6 @@ func Test__NodeExecutor_DoesNotProcessExecutionForSoftDeletedOrganization(t *tes
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStatePending, updatedExecution.State)
 	assert.Empty(t, updatedExecution.Result)
-}
-
-func Test__NodeExecutor_BlueprintNodeExecution(t *testing.T) {
-	r := support.Setup(t)
-
-	//
-	// Create a simple blueprint with a noop node
-	//
-	blueprint := support.CreateBlueprint(
-		t,
-		r.Organization.ID,
-		[]models.Node{
-			{
-				ID:   "noop1",
-				Type: models.NodeTypeComponent,
-				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
-			},
-		},
-		[]models.Edge{},
-		[]models.BlueprintOutputChannel{
-			{
-				Name:              "default",
-				NodeID:            "noop1",
-				NodeOutputChannel: "default",
-			},
-		},
-	)
-
-	//
-	// Create a canvas with a trigger and a blueprint node.
-	//
-	triggerNode := "trigger-1"
-	blueprintNode := "blueprint-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: triggerNode,
-				Type:   models.NodeTypeTrigger,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
-			},
-			{
-				NodeID: blueprintNode,
-				Type:   models.NodeTypeBlueprint,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
-			},
-		},
-		[]models.Edge{
-			{SourceID: triggerNode, TargetID: blueprintNode, Channel: "default"},
-		},
-	)
-
-	//
-	// Create a root event and a pending execution for the blueprint node.
-	//
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, blueprintNode, rootEvent.ID, rootEvent.ID, nil)
-
-	//
-	// Process the execution and verify the blueprint node creates a child execution
-	// and moves the parent execution to started state.
-	//
-	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
-	err := executor.LockAndProcessNodeExecution(execution.ID)
-	require.NoError(t, err)
-
-	// Verify parent execution moved to started state
-	parentExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeExecutionStateStarted, parentExecution.State)
-
-	// Verify child execution was created with pending state
-	childExecutions, err := models.FindChildExecutions(execution.ID, []string{
-		models.CanvasNodeExecutionStatePending,
-		models.CanvasNodeExecutionStateStarted,
-		models.CanvasNodeExecutionStateFinished,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, childExecutions, 1)
-	assert.Equal(t, models.CanvasNodeExecutionStatePending, childExecutions[0].State)
-	assert.Equal(t, rootEvent.ID, childExecutions[0].RootEventID)
-	assert.Equal(t, &execution.ID, childExecutions[0].ParentExecutionID)
 }
 
 func Test__NodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
@@ -257,13 +176,13 @@ func Test__NodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	// Create a root event and a pending execution for the approval node.
 	//
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, approvalNode, rootEvent.ID, rootEvent.ID, nil, approvalConfiguration)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, approvalNode, rootEvent.ID, rootEvent.ID, approvalConfiguration)
 
 	//
 	// Process the execution and verify the execution is started but NOT finished.
 	// The approval component doesn't call Pass() in Execute(), so it should remain in started state.
 	//
-	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
+	executor := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
 	err = executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
@@ -324,13 +243,13 @@ func Test__NodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	// Create a root event and a pending execution for the noop node.
 	//
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, noopNode, rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, noopNode, rootEvent.ID, rootEvent.ID)
 
 	//
 	// Process the execution and verify the execution is both started AND finished.
 	// The noop component calls Pass() in Execute(), which should finish the execution.
 	//
-	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
+	executor := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
 	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
@@ -339,90 +258,6 @@ func Test__NodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
 	assert.Equal(t, models.CanvasNodeExecutionResultPassed, updatedExecution.Result)
-}
-
-func Test__NodeExecutor_BlueprintNodeExecutionFailsWhenConfigurationCannotBeBuilt(t *testing.T) {
-	r := support.Setup(t)
-
-	//
-	// Create a blueprint with a noop node that has invalid configuration.
-	// The configuration references a variable that doesn't exist, which should
-	// cause the configuration builder to fail.
-	//
-	invalidConfiguration := map[string]any{
-		"invalid_field": "{{ .nonexistent_variable }}",
-	}
-
-	blueprint := support.CreateBlueprint(
-		t,
-		r.Organization.ID,
-		[]models.Node{
-			{
-				ID:            "noop1",
-				Type:          models.NodeTypeComponent,
-				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
-				Configuration: invalidConfiguration,
-			},
-		},
-		[]models.Edge{},
-		[]models.BlueprintOutputChannel{
-			{
-				Name:              "default",
-				NodeID:            "noop1",
-				NodeOutputChannel: "default",
-			},
-		},
-	)
-
-	//
-	// Create a canvas with a trigger and a blueprint node.
-	//
-	triggerNode := "trigger-1"
-	blueprintNode := "blueprint-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: triggerNode,
-				Type:   models.NodeTypeTrigger,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
-			},
-			{
-				NodeID: blueprintNode,
-				Type:   models.NodeTypeBlueprint,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
-			},
-		},
-		[]models.Edge{
-			{SourceID: triggerNode, TargetID: blueprintNode, Channel: "default"},
-		},
-	)
-
-	//
-	// Create a root event and a pending execution for the blueprint node.
-	//
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, blueprintNode, rootEvent.ID, rootEvent.ID, nil)
-
-	//
-	// Process the execution and verify it fails due to configuration build error.
-	// LockAndProcessNodeExecution should not return an error,
-	// since this isn't a runtime error, but a configuration error.
-	//
-	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
-	err := executor.LockAndProcessNodeExecution(execution.ID)
-	require.NoError(t, err)
-
-	//
-	// Verify the execution was marked as failed with an error reason.
-	//
-	failedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeExecutionStateFinished, failedExecution.State)
-	assert.Equal(t, models.CanvasNodeExecutionResultReasonError, failedExecution.ResultReason)
-	assert.Contains(t, failedExecution.ResultMessage, "error building configuration for execution of node")
 }
 
 func countConcurrentExecutionResults(t *testing.T, results []error) (successCount int, lockedCount int) {
@@ -437,4 +272,134 @@ func countConcurrentExecutionResults(t *testing.T, results []error) (successCoun
 		}
 	}
 	return successCount, lockedCount
+}
+
+func TestClassifyProcessError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "nil", err: nil, want: executorReasonNone},
+		{name: "locked", err: ErrRecordLocked, want: executorReasonLocked},
+		{name: "not found", err: gorm.ErrRecordNotFound, want: executorReasonNotFound},
+		{name: "deadlock", err: errors.New("ERROR: deadlock detected (SQLSTATE 40P01)"), want: executorReasonDeadlock},
+		{name: "pg deadlock code", err: &pgconn.PgError{Code: "40P01", Message: "deadlock detected"}, want: executorReasonDeadlock},
+		{name: "wrapped pg deadlock", err: fmt.Errorf("update execution: %w", &pgconn.PgError{Code: "40P01", Message: "deadlock detected"}), want: executorReasonDeadlock},
+		{name: "internal", err: errors.New("something else"), want: executorReasonInternal},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := classifyProcessError(tt.err); got != tt.want {
+				t.Fatalf("classifyProcessError() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClassifyExecutionFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		execution models.CanvasNodeExecution
+		want      string
+	}{
+		{
+			name: "passed execution",
+			execution: models.CanvasNodeExecution{
+				Result: models.CanvasNodeExecutionResultPassed,
+			},
+			want: executorReasonNone,
+		},
+		{
+			name: "component error",
+			execution: models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "request failed",
+			},
+			want: models.CanvasNodeExecutionResultReasonError,
+		},
+		{
+			name: "deadlock message",
+			execution: models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "ERROR: deadlock detected (SQLSTATE 40P01)",
+			},
+			want: executorReasonDeadlock,
+		},
+		{
+			name: "custom reason",
+			execution: models.CanvasNodeExecution{
+				Result:       models.CanvasNodeExecutionResultFailed,
+				ResultReason: "timeout",
+			},
+			want: "timeout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := classifyExecutionFailure(&tt.execution); got != tt.want {
+				t.Fatalf("classifyExecutionFailure() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClassifyAttemptFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		err       error
+		execution *models.CanvasNodeExecution
+		want      string
+	}{
+		{
+			name: "aborted transaction with deadlock result message",
+			err:  errors.New("ERROR: current transaction is aborted, commands ignored until end of transaction block"),
+			execution: &models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "ERROR: deadlock detected (SQLSTATE 40P01)",
+			},
+			want: executorReasonDeadlock,
+		},
+		{
+			name: "failed execution without process error",
+			execution: &models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "request failed",
+			},
+			want: models.CanvasNodeExecutionResultReasonError,
+		},
+		{
+			name: "process error takes precedence over execution state",
+			err:  gorm.ErrRecordNotFound,
+			execution: &models.CanvasNodeExecution{
+				Result:        models.CanvasNodeExecutionResultFailed,
+				ResultReason:  models.CanvasNodeExecutionResultReasonError,
+				ResultMessage: "ERROR: deadlock detected (SQLSTATE 40P01)",
+			},
+			want: executorReasonNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := classifyAttemptFailure(tt.err, tt.execution); got != tt.want {
+				t.Fatalf("classifyAttemptFailure() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

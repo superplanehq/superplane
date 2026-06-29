@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -34,8 +33,7 @@ func TestListExperimentalFeatures(t *testing.T) {
 			id, _ := f["id"].(string)
 			ids = append(ids, id)
 		}
-		assert.Contains(t, ids, "runner")
-		assert.Contains(t, ids, features.FeatureDashboards)
+		assert.Contains(t, ids, "claude_managed_agents")
 	})
 
 	t.Run("rejects unauthenticated requests", func(t *testing.T) {

@@ -237,6 +237,8 @@ type Capability struct {
 	Description    string                    `json:"description"`
 	Configuration  []configuration.Field     `json:"configuration"`
 	OutputChannels []OutputChannel           `json:"outputChannels"`
+	ExampleOutput  map[string]any            `json:"exampleOutput,omitempty"`
+	ExampleData    map[string]any            `json:"exampleData,omitempty"`
 }
 
 /*

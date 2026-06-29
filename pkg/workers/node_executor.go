@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -11,14 +12,15 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/renderedtext/go-tackle"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -33,6 +35,7 @@ var ErrRecordLocked = errors.New("record locked")
 type NodeExecutor struct {
 	encryptor      crypto.Encryptor
 	registry       *registry.Registry
+	gitProvider    gitprovider.Provider
 	authService    authorization.Authorization
 	baseURL        string
 	webhookBaseURL string
@@ -43,10 +46,11 @@ type NodeExecutor struct {
 	consumer    *tackle.Consumer
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
+		gitProvider:    gitProvider,
 		baseURL:        baseURL,
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
@@ -91,7 +95,9 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 
 					err := w.LockAndProcessNodeExecution(execution.ID)
 					if err == nil {
-						messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).Publish()
+						if publishErr := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); publishErr != nil {
+							w.logger.Errorf("Error publishing execution state: %v", publishErr)
+						}
 						return
 					}
 
@@ -112,9 +118,9 @@ func (w *NodeExecutor) StartRabbitMQConsumer(ctx context.Context) {
 	options := tackle.Options{
 		URL:            w.rabbitMQURL,
 		ConnectionName: w.Name(),
-		RemoteExchange: messages.CanvasExchange,
-		Service:        messages.CanvasExchange + "." + messages.CanvasExecutionRoutingKey + "." + w.Name(),
-		RoutingKey:     messages.CanvasExecutionRoutingKey,
+		RemoteExchange: messages.ExecutionsExchange,
+		Service:        messages.ExecutionsExchange + "." + messages.ExecutionPendingRoutingKey + "." + w.Name(),
+		RoutingKey:     messages.ExecutionPendingRoutingKey,
 	}
 
 	consumer := tackle.NewConsumer()
@@ -122,16 +128,16 @@ func (w *NodeExecutor) StartRabbitMQConsumer(ctx context.Context) {
 	w.consumer = consumer
 
 	for {
-		log.Infof("Connecting to RabbitMQ queue for %s events", messages.CanvasExecutionRoutingKey)
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.ExecutionPendingRoutingKey)
 
 		err := w.consumer.Start(&options, w.Consume)
 		if err != nil {
-			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasExecutionRoutingKey, err)
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.ExecutionPendingRoutingKey, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasExecutionRoutingKey)
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.ExecutionPendingRoutingKey)
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -152,7 +158,17 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 
 	err = w.LockAndProcessNodeExecution(executionID)
 	if err == nil {
-		messages.NewCanvasExecutionMessage(data.CanvasId, data.Id, data.NodeId).Publish()
+		workflowID, parseErr := uuid.Parse(data.CanvasId)
+		if parseErr != nil {
+			w.logger.Errorf("Error parsing canvas id: %v", parseErr)
+			return parseErr
+		}
+
+		if publishErr := messages.PublishCanvasExecutionByID(workflowID, executionID); publishErr != nil {
+			w.logger.Errorf("Error publishing execution state: %v", publishErr)
+			return publishErr
+		}
+
 		return nil
 	}
 
@@ -165,9 +181,42 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 }
 
 func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
+	//
+	// For every execution we process, we track the following metrics:
+	// - outcome: success, failed, skipped
+	// - reason: none, locked, deadlock, not_found, action_error, internal
+	// - component: the component name of the node
+	//
+	start := time.Now()
+	metricOutcome := executorOutcomeSuccess
+	metricReason := executorReasonNone
+	metricComponent := "unknown"
+	defer func() {
+		telemetry.RecordExecutorWorkerExecution(
+			context.Background(),
+			time.Since(start),
+			metricOutcome,
+			metricReason,
+			metricComponent,
+		)
+	}()
+
+	//
+	// We track the events produced by the component execution,
+	// so we can publish RabbitMQ messages for them.
+	//
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
+	}
+
+	//
+	// We also track whether memory was modified during the execution so we can
+	// broadcast a memory_updated event after the transaction commits.
+	//
+	var memoryChangedCanvasID uuid.UUID
+	onMemoryChanged := func(canvasID uuid.UUID) {
+		memoryChangedCanvasID = canvasID
 	}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -193,10 +242,32 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		execution, err := models.LockPendingNodeExecutionInActiveCanvas(tx, id)
 		if err != nil {
 			w.logger.Debugf("Execution %s already being processed - skipping", id.String())
+			metricOutcome = executorOutcomeSkipped
+			metricReason = executorReasonLocked
 			return ErrRecordLocked
 		}
 
-		return w.processNodeExecution(tx, execution, onNewEvents)
+		node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
+		if err != nil {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyAttemptFailure(err, nil)
+			return err
+		}
+
+		metricComponent = node.ComponentName()
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged)
+		if processErr != nil {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyAttemptFailure(processErr, execution)
+			return processErr
+		}
+
+		if execution.Result == models.CanvasNodeExecutionResultFailed {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyAttemptFailure(nil, execution)
+		}
+
+		return nil
 	})
 
 	if err != nil {
@@ -207,122 +278,19 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
+	if memoryChangedCanvasID != uuid.Nil {
+		if err := messages.NewCanvasMemoryUpdatedMessage(memoryChangedCanvasID.String()).PublishMemoryUpdated(); err != nil {
+			w.logger.Errorf("failed to publish canvas memory updated RabbitMQ message: %v", err)
+		}
+	}
+
 	return nil
 }
 
-func (w *NodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.CanvasNodeExecution, onNewEvents func([]models.CanvasEvent)) error {
-	node, err := models.FindCanvasNode(tx, execution.WorkflowID, execution.NodeID)
-	if err != nil {
-		return err
-	}
-
-	if node.Type == models.NodeTypeBlueprint {
-		return w.executeBlueprintNode(tx, execution, node)
-	}
-
-	return w.executeActionNode(tx, execution, node, onNewEvents)
-}
-
-func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode) error {
-	ref := node.Ref.Data()
-	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
-	if err != nil {
-		return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, "failed to find blueprint")
-	}
-
-	firstNode := blueprint.FindRootNode()
-	if firstNode == nil {
-		return fmt.Errorf("blueprint %s has no start node", blueprint.ID)
-	}
-
-	input, err := execution.GetInput(tx)
-	if err != nil {
-		return fmt.Errorf("error finding input: %v", err)
-	}
-
-	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
-	if err != nil {
-		return fmt.Errorf("error finding input event: %v", err)
-	}
-
-	//
-	// Build the configuration for the first node.
-	// If we have an error here, we should fail the execution,
-	// since this means the first node has improper configuration,
-	// and the user should be aware of this.
-	//
-	configBuilder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
-		WithNodeID(node.NodeID).
-		WithRootEvent(&execution.RootEventID).
-		WithPreviousExecution(&execution.ID).
-		ForBlueprintNode(node).
-		WithInput(map[string]any{inputEvent.NodeID: input})
-
-	configFields, err := w.configurationFieldsForBlueprintNode(tx, *firstNode)
-	if err != nil {
-		err = execution.FailInTransaction(
-			tx,
-			models.CanvasNodeExecutionResultReasonError,
-			fmt.Sprintf("error resolving configuration schema for execution of node %s: %v", firstNode.ID, err),
-		)
-		return nil
-	}
-	if len(configFields) > 0 {
-		configBuilder = configBuilder.WithConfigurationFields(configFields)
-	}
-
-	config, err := configBuilder.Build(firstNode.Configuration)
-
-	if err != nil {
-		err = execution.FailInTransaction(
-			tx,
-			models.CanvasNodeExecutionResultReasonError,
-			fmt.Sprintf("error building configuration for execution of node %s: %v", firstNode.ID, err),
-		)
-
-		return nil
-	}
-
-	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
-	if err != nil {
-		return fmt.Errorf("failed to create child execution: %w", err)
-	}
-
-	err = execution.StartInTransaction(tx)
-
-	return err
-}
-
-func (w *NodeExecutor) configurationFieldsForBlueprintNode(tx *gorm.DB, node models.Node) ([]configuration.Field, error) {
-	switch {
-	case node.Ref.Component != nil && node.Ref.Component.Name != "":
-		action, err := w.registry.GetAction(node.Ref.Component.Name)
-		if err != nil {
-			return nil, fmt.Errorf("component %s not found: %w", node.Ref.Component.Name, err)
-		}
-		return action.Configuration(), nil
-	case node.Ref.Trigger != nil && node.Ref.Trigger.Name != "":
-		trigger, err := w.registry.GetTrigger(node.Ref.Trigger.Name)
-		if err != nil {
-			return nil, fmt.Errorf("trigger %s not found: %w", node.Ref.Trigger.Name, err)
-		}
-		return trigger.Configuration(), nil
-	case node.Ref.Blueprint != nil && node.Ref.Blueprint.ID != "":
-		blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, node.Ref.Blueprint.ID)
-		if err != nil {
-			return nil, fmt.Errorf("blueprint %s not found: %w", node.Ref.Blueprint.ID, err)
-		}
-		return blueprint.Configuration, nil
-	default:
-		return nil, nil
-	}
-}
-
-func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) error {
+func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNodeExecution, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent), onMemoryChanged func(uuid.UUID)) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
-		nil,
 	)
 
 	err := execution.StartInTransaction(tx)
@@ -355,6 +323,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
+		WithIncomingEventID(&execution.EventID).
 		WithInput(map[string]any{inputEvent.NodeID: input})
 	if execution.PreviousExecutionID != nil {
 		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
@@ -377,11 +346,12 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
-		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
-		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
-		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
-		Expressions:    contexts.NewExpressionContext(builder),
+		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
+			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),
+		Files:       contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
+		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
+		Expressions: contexts.NewExpressionContext(builder),
 	}
 
 	if node.AppInstallationID != nil {
@@ -389,7 +359,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				logger.Errorf("integration %s not found", *node.AppInstallationID)
-				return execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, "integration not found")
+				return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, "integration not found")
 			}
 
 			logger.Errorf("failed to find integration: %v", err)
@@ -403,11 +373,96 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
 		logger.Errorf("failed to execute action: %v", err)
-		err = execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, err.Error())
-		return err
+		return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
 	}
 
 	logger.Info("Action executed successfully")
 
 	return tx.Save(execution).Error
+}
+
+const (
+	executorOutcomeSuccess = "success"
+	executorOutcomeFailed  = "failed"
+	executorOutcomeSkipped = "skipped"
+
+	executorReasonNone     = "none"
+	executorReasonLocked   = "locked"
+	executorReasonDeadlock = "deadlock"
+	executorReasonNotFound = "not_found"
+	executorReasonInternal = "internal"
+)
+
+func classifyProcessError(err error) string {
+	if err == nil {
+		return executorReasonNone
+	}
+
+	if errors.Is(err, ErrRecordLocked) {
+		return executorReasonLocked
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return executorReasonNotFound
+	}
+
+	if isDeadlockError(err) {
+		return executorReasonDeadlock
+	}
+
+	return executorReasonInternal
+}
+
+func classifyAttemptFailure(err error, execution *models.CanvasNodeExecution) string {
+	if err == nil {
+		if execution == nil {
+			return executorReasonNone
+		}
+		return classifyExecutionFailure(execution)
+	}
+
+	if reason := classifyProcessError(err); reason != executorReasonInternal {
+		return reason
+	}
+
+	if execution != nil {
+		if isDeadlockMessage(execution.ResultMessage) {
+			return executorReasonDeadlock
+		}
+		if execution.Result == models.CanvasNodeExecutionResultFailed {
+			return classifyExecutionFailure(execution)
+		}
+	}
+
+	return executorReasonInternal
+}
+
+func classifyExecutionFailure(execution *models.CanvasNodeExecution) string {
+	if execution.Result != models.CanvasNodeExecutionResultFailed {
+		return executorReasonNone
+	}
+
+	if isDeadlockMessage(execution.ResultMessage) {
+		return executorReasonDeadlock
+	}
+
+	return execution.ResultReason
+}
+
+func isDeadlockError(err error) bool {
+	for err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "40P01" {
+			return true
+		}
+		if isDeadlockMessage(err.Error()) {
+			return true
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
+}
+
+func isDeadlockMessage(message string) bool {
+	return strings.Contains(message, "deadlock detected") || strings.Contains(message, "40P01")
 }

@@ -1,5 +1,7 @@
 import type { CanvasFolderColor } from "@/hooks/useCanvasData";
 
+export const CANVAS_FOLDER_SECTION_SHELL_CLASS = "w-full rounded-2xl p-4";
+
 export const FOLDER_COLOR_OPTIONS: Record<
   CanvasFolderColor,
   { label: string; backgroundClass: string; swatchClass: string }

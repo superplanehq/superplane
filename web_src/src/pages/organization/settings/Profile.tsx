@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { meRegenerateToken } from "@/api-client/sdk.gen";
 import { Avatar } from "@/components/Avatar/avatar";
 import { Heading } from "@/components/Heading/heading";
@@ -12,7 +13,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
-import { useAccount } from "@/contexts/AccountContext";
+import { useAccount } from "@/contexts/useAccount";
 import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
 import { ChangePasswordDialog } from "./components/ChangePasswordDialog";
 
@@ -30,6 +31,10 @@ export function Profile() {
 
   const errorMessage =
     actionError || (meError instanceof Error ? meError.message : meError ? "Failed to load profile" : null);
+
+  useReportPageReady(!loading, {
+    failed: !!errorMessage,
+  });
 
   const handleRegenerateToken = async () => {
     try {

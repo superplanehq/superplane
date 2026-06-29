@@ -1,0 +1,42 @@
+{
+  "data": {
+    "id": 15384176893,
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "state": "success",
+    "context": "ci/build",
+    "description": "Build completed successfully",
+    "target_url": "https://github.com/acme-labs/snaketoy/actions/runs/123456789",
+    "created_at": "2026-01-16T17:56:16Z",
+    "updated_at": "2026-01-16T17:57:20Z",
+    "branches": [
+      {
+        "name": "main",
+        "commit": {
+          "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+          "url": "https://api.github.com/repos/acme-labs/snaketoy/commits/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+        },
+        "protected": true
+      }
+    ],
+    "commit": {
+      "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "html_url": "https://github.com/acme-labs/snaketoy/commit/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "commit": {
+        "message": "Add checkout validation"
+      }
+    },
+    "repository": {
+      "id": 101,
+      "name": "snaketoy",
+      "full_name": "acme-labs/snaketoy",
+      "html_url": "https://github.com/acme-labs/snaketoy"
+    },
+    "sender": {
+      "id": 583231,
+      "login": "octocat",
+      "html_url": "https://github.com/octocat"
+    }
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.status"
+}

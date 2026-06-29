@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -30,6 +31,7 @@ func Test__WebhookProvisioner_WithoutAppInstallation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
+	logger := logrus.NewEntry(logrus.New())
 	provisioner := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
 	webhookID := uuid.New()
 	webhook := models.Webhook{
@@ -41,7 +43,7 @@ func Test__WebhookProvisioner_WithoutAppInstallation(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	err := provisioner.LockAndProcessWebhook(webhook)
+	err := provisioner.LockAndProcessWebhook(logger, webhook)
 	require.NoError(t, err)
 
 	updatedWebhook, err := models.FindWebhook(webhookID)
@@ -54,6 +56,7 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
+	logger := logrus.NewEntry(logrus.New())
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
 	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
@@ -84,7 +87,7 @@ func Test__WebhookProvisioner_RetryOnError(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	err = provisioner.LockAndProcessWebhook(webhook)
+	err = provisioner.LockAndProcessWebhook(logger, webhook)
 	require.NoError(t, err)
 
 	updatedWebhook, err := models.FindWebhook(webhookID)
@@ -97,6 +100,7 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
+	logger := logrus.NewEntry(logrus.New())
 	provisioner := NewWebhookProvisioner("https://example.com", &BadEncryptor{}, r.Registry)
 
 	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
@@ -126,7 +130,7 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&webhook).Error)
 
-	err = provisioner.LockAndProcessWebhook(webhook)
+	err = provisioner.LockAndProcessWebhook(logger, webhook)
 	require.NoError(t, err)
 
 	updatedWebhook, err := models.FindWebhook(webhookID)
@@ -139,6 +143,7 @@ func Test__WebhookProvisioner_ConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
+	logger := logrus.NewEntry(logrus.New())
 	webhookID := uuid.New()
 	webhook := models.Webhook{
 		ID:         webhookID,
@@ -153,12 +158,12 @@ func Test__WebhookProvisioner_ConcurrentProcessing(t *testing.T) {
 
 	go func() {
 		worker1 := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
-		results <- worker1.LockAndProcessWebhook(webhook)
+		results <- worker1.LockAndProcessWebhook(logger, webhook)
 	}()
 
 	go func() {
 		worker2 := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
-		results <- worker2.LockAndProcessWebhook(webhook)
+		results <- worker2.LockAndProcessWebhook(logger, webhook)
 	}()
 
 	result1 := <-results

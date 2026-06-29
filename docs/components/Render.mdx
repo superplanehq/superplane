@@ -42,6 +42,8 @@ Note: **Plan requirement:** Render webhooks require a Professional plan or highe
 
 ## On Build
 
+**Trigger key:** `render.onBuild`
+
 The On Build trigger emits build-related Render events for one selected service.
 
 ### Use Cases
@@ -85,6 +87,8 @@ The default output emits payload data fields like `buildId`, `eventId`, `service
 <a id="on-deploy"></a>
 
 ## On Deploy
+
+**Trigger key:** `render.onDeploy`
 
 The On Deploy trigger emits deploy-related Render events for one selected service.
 
@@ -130,6 +134,8 @@ The default output emits payload data fields like `deployId`, `eventId`, `servic
 <a id="cancel-deploy"></a>
 
 ## Cancel Deploy
+
+**Component key:** `render.cancelDeploy`
 
 The Cancel Deploy component cancels an in-progress deploy for a Render service and waits for it to complete.
 
@@ -183,6 +189,8 @@ The Cancel Deploy component cancels an in-progress deploy for a Render service a
 
 ## Deploy
 
+**Component key:** `render.deploy`
+
 The Deploy component starts a new deploy for a Render service and waits for it to complete.
 
 ### Use Cases
@@ -235,6 +243,8 @@ The Deploy component starts a new deploy for a Render service and waits for it t
 
 ## Get Deploy
 
+**Component key:** `render.getDeploy`
+
 The Get Deploy component fetches a deploy for a Render service.
 
 ### Use Cases
@@ -282,6 +292,8 @@ Emits a `render.deploy` payload containing deploy fields like `deployId`, `statu
 
 ## Get Service
 
+**Component key:** `render.getService`
+
 The Get Service component fetches details for a Render service.
 
 ### Use Cases
@@ -327,6 +339,8 @@ Emits a `render.service` payload containing service fields like `serviceId`, `se
 
 ## Purge Cache
 
+**Component key:** `render.purgeCache`
+
 The Purge Cache component requests a build cache purge for a Render service.
 
 ### Use Cases
@@ -358,6 +372,8 @@ Emits a `render.cache.purge.requested` payload with `serviceId` and a `status` f
 <a id="rollback-deploy"></a>
 
 ## Rollback Deploy
+
+**Component key:** `render.rollbackDeploy`
 
 The Rollback Deploy component triggers a rollback deploy for a Render service and waits for it to complete.
 
@@ -412,6 +428,8 @@ The Rollback Deploy component triggers a rollback deploy for a Render service an
 
 ## Add Custom Domain
 
+**Component key:** `render.service.addCustomDomain`
+
 The Add Custom Domain component adds a custom domain to a Render service.
 
 ### Use Cases
@@ -454,6 +472,8 @@ Emits a `render.customDomain.added` payload with `id`, `name`, `serviceId`, and 
 
 ## Remove Custom Domain
 
+**Component key:** `render.service.removeCustomDomain`
+
 The Remove Custom Domain component removes a custom domain from a Render service.
 
 ### Use Cases
@@ -486,6 +506,8 @@ Emits a `render.customDomain.removed` payload with `name` and `serviceId`.
 <a id="update-env-var"></a>
 
 ## Update Env Var
+
+**Component key:** `render.updateEnvVar`
 
 The Update Env Var component updates a Render service environment variable.
 

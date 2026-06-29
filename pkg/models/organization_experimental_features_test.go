@@ -27,44 +27,44 @@ func Test__ExperimentalFeatures(t *testing.T) {
 		org, err := CreateOrganization("expfeat-enable", "")
 		require.NoError(t, err)
 
-		require.NoError(t, EnableExperimentalFeature(org.ID, "runner"))
+		require.NoError(t, EnableExperimentalFeature(org.ID, "exp-feature"))
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, []string{"runner"}, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{"exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
 
-		require.NoError(t, EnableExperimentalFeature(org.ID, "runner"))
+		require.NoError(t, EnableExperimentalFeature(org.ID, "exp-feature"))
 
 		reloaded, err = FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.Equal(t, []string{"runner"}, []string(reloaded.EnabledExperimentalFeatures))
+		assert.Equal(t, []string{"exp-feature"}, []string(reloaded.EnabledExperimentalFeatures))
 	})
 
 	t.Run("Disable removes the feature and is idempotent", func(t *testing.T) {
 		org, err := CreateOrganization("expfeat-disable", "")
 		require.NoError(t, err)
 
-		require.NoError(t, EnableExperimentalFeature(org.ID, "runner"))
-		require.NoError(t, DisableExperimentalFeature(org.ID, "runner"))
+		require.NoError(t, EnableExperimentalFeature(org.ID, "exp-feature"))
+		require.NoError(t, DisableExperimentalFeature(org.ID, "exp-feature"))
 
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
 		assert.Empty(t, []string(reloaded.EnabledExperimentalFeatures))
 
 		// Disabling again is a no-op.
-		require.NoError(t, DisableExperimentalFeature(org.ID, "runner"))
+		require.NoError(t, DisableExperimentalFeature(org.ID, "exp-feature"))
 	})
 
 	t.Run("Organization.HasExperimentalFeature respects enabled list", func(t *testing.T) {
 		org, err := CreateOrganization("expfeat-has", "")
 		require.NoError(t, err)
 
-		assert.False(t, org.HasExperimentalFeature("runner"))
+		assert.False(t, org.HasExperimentalFeature("exp-feature"))
 
-		require.NoError(t, EnableExperimentalFeature(org.ID, "runner"))
+		require.NoError(t, EnableExperimentalFeature(org.ID, "exp-feature"))
 		reloaded, err := FindOrganizationByID(org.ID.String())
 		require.NoError(t, err)
-		assert.True(t, reloaded.HasExperimentalFeature("runner"))
+		assert.True(t, reloaded.HasExperimentalFeature("exp-feature"))
 	})
 
 	t.Run("released features short-circuit to true regardless of stored list", func(t *testing.T) {
@@ -85,13 +85,13 @@ func Test__ExperimentalFeatures(t *testing.T) {
 		org, err := CreateOrganization("expfeat-load", "")
 		require.NoError(t, err)
 
-		ok, err := HasExperimentalFeature(org.ID, "runner")
+		ok, err := HasExperimentalFeature(org.ID, "exp-feature")
 		require.NoError(t, err)
 		assert.False(t, ok)
 
-		require.NoError(t, EnableExperimentalFeature(org.ID, "runner"))
+		require.NoError(t, EnableExperimentalFeature(org.ID, "exp-feature"))
 
-		ok, err = HasExperimentalFeature(org.ID, "runner")
+		ok, err = HasExperimentalFeature(org.ID, "exp-feature")
 		require.NoError(t, err)
 		assert.True(t, ok)
 	})

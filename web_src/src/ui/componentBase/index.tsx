@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
-import { AlertTriangle, Rabbit } from "lucide-react";
+import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
+import { calcRelativeTimeFromDiff, cn, resolveIcon } from "@/lib/utils";
+import { CircleAlert, Rabbit } from "lucide-react";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { EmptyState } from "../emptyState";
@@ -205,7 +206,6 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconColor?: string;
   title: string;
   showHeader?: boolean;
-  paused?: boolean;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
   hideMetadataList?: boolean;
@@ -232,6 +232,12 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   error?: string;
   warning?: string;
   canvasMode?: "live" | "edit";
+  /**
+   * When true, only the header (icon + title) is shown for expanded nodes; body is replaced with a neutral slate block.
+   * Used for contextual dimming (e.g. runs view non-participant nodes).
+   */
+  dimBodyBelowHeader?: boolean;
+  draftDiffStatus?: DraftDiffStatus;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -245,12 +251,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   collapsedBackground: _collapsedBackground,
   eventSections,
   selected = false,
-  runDisabled: _runDisabled,
-  runDisabledTooltip: _runDisabledTooltip,
-  onTogglePause,
-  onEdit: _onEdit,
   onDuplicate,
-  onDeactivate: _onDeactivate,
   onToggleView,
   onDelete,
   isCompactView,
@@ -265,8 +266,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   emptyStateProps,
   error,
   warning,
-  paused,
   canvasMode = "live",
+  dimBodyBelowHeader = false,
+  draftDiffStatus,
 }) => {
   const safeMetadata = Array.isArray(metadata) ? metadata : undefined;
   const safeSpecs = Array.isArray(specs) ? specs : undefined;
@@ -308,8 +310,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
       tone: "neutral" as const,
     };
   }, [canvasMode, emptyStateProps, emptyStatePurpose]);
-  const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
-  const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
   const ToggleViewIcon = React.useMemo(
@@ -332,27 +332,17 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`group relative flex flex-col outline-1 outline-slate-950/20 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
+        className={cn(
+          "group relative flex flex-col rounded-md w-[23rem]",
+          getDraftDiffOutlineClassName(draftDiffStatus),
+          !draftDiffStatus && hasError && "!outline-orange-500",
+          dimBodyBelowHeader ? "bg-slate-200" : "bg-white",
+        )}
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
         {showHeader ? (
           <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-            {onTogglePause && !hasError && (
-              <button
-                type="button"
-                data-testid="node-action-pause"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onTogglePause();
-                }}
-                className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800"
-              >
-                {paused ? <ResumeIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
-                <span>{paused ? "Resume" : "Pause"}</span>
-              </button>
-            )}
             {onDuplicate && (
               <button
                 type="button"
@@ -404,108 +394,99 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           title={title}
           isCompactView={isCompactView}
           statusBadgeColor={compactStatusBadgeColor}
+          mergeWithMutedBodyBelow={dimBodyBelowHeader}
         />
 
-        {hasBadge && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  data-testid="node-warning-badge"
-                  className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer"
-                >
-                  <AlertTriangle size={16} className="text-white" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs text-sm">{hasError ? safeError : safeWarning}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-
-        {paused && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  data-testid="node-paused-badge"
-                  className={`absolute -top-6 ${hasBadge ? "left-8" : "left-1"} bg-blue-500 rounded-t-md h-6 p-1 cursor-pointer`}
-                >
-                  <PauseIcon className="h-4 w-4 text-white" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs text-sm">Queued items will not be consumed.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-
-        {isCompactView ? null : (
+        {dimBodyBelowHeader ? (
+          !isCompactView ? (
+            <div className="min-h-28 w-full shrink-0 bg-slate-200 rounded-b-md" aria-hidden />
+          ) : null
+        ) : (
           <>
-            {!hideMetadataList && safeMetadata && safeMetadata.length > 0 && <MetadataList items={safeMetadata} />}
-
-            {safeSpecs && safeSpecs.length > 0 && (
-              <div className="px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1.5">
-                {safeSpecs.map((spec, index) => (
-                  <div key={index} className="flex items-center text-md text-gray-500">
-                    <div className="w-4 h-4 mr-2">
-                      {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
+            {hasBadge && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      data-testid="node-warning-badge"
+                      className="absolute -top-8 left-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-orange-500"
+                    >
+                      <CircleAlert className="h-4 w-4 text-white" />
                     </div>
-                    {spec.values ? (
-                      <SpecsTooltip
-                        specTitle={spec.tooltipTitle || spec.title}
-                        specValues={spec.values}
-                        hideCount={hideCount}
-                      >
-                        <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 rounded-md font-inter font-medium cursor-help">
-                          {hideCount ? "" : spec.values.length}{" "}
-                          {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
-                        </span>
-                      </SpecsTooltip>
-                    ) : spec.value !== undefined ? (
-                      <PayloadTooltip
-                        title={spec.tooltipTitle || spec.title}
-                        value={spec.value}
-                        contentType={spec.contentType || "json"}
-                      >
-                        <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
-                          {spec.title}
-                        </span>
-                      </PayloadTooltip>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">{hasError ? safeError : safeWarning}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
 
-            {safeCustomFieldPosition === "before" && renderedCustomField}
+            {isCompactView ? null : (
+              <>
+                {!hideMetadataList && safeMetadata && safeMetadata.length > 0 && <MetadataList items={safeMetadata} />}
 
-            {safeEventSections?.map((section, index) => (
-              <EventSectionDisplay
-                className={
-                  "pb-3" +
-                  (!!includeEmptyState || (!!renderedCustomField && safeCustomFieldPosition === "after")
-                    ? " border-b border-slate-950/20"
-                    : "")
-                }
-                key={index}
-                section={section}
-                index={index}
-                totalSections={safeEventSections.length}
-                stateMap={eventStateMap}
-                lastSection={
-                  index === safeEventSections.length - 1 &&
-                  !includeEmptyState &&
-                  !(renderedCustomField && safeCustomFieldPosition === "after")
-                }
-              />
-            ))}
+                {safeSpecs && safeSpecs.length > 0 && (
+                  <div className="px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1.5">
+                    {safeSpecs.map((spec, index) => (
+                      <div key={index} className="flex items-center text-md text-gray-500">
+                        <div className="w-4 h-4 mr-2">
+                          {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
+                        </div>
+                        {spec.values ? (
+                          <SpecsTooltip
+                            specTitle={spec.tooltipTitle || spec.title}
+                            specValues={spec.values}
+                            hideCount={hideCount}
+                          >
+                            <span className="text-[13px] underline underline-offset-3 decoration-dotted decoration-1 decoration-gray-500 rounded-md font-inter font-medium cursor-help">
+                              {hideCount ? "" : spec.values.length}{" "}
+                              {spec.title + (spec.values.length > 1 && !hideCount ? "s" : "")}
+                            </span>
+                          </SpecsTooltip>
+                        ) : spec.value !== undefined ? (
+                          <PayloadTooltip
+                            title={spec.tooltipTitle || spec.title}
+                            value={spec.value}
+                            contentType={spec.contentType || "json"}
+                          >
+                            <span className="text-[13px] bg-gray-500 px-2 py-0.5 rounded-md text-white font-mono font-medium cursor-help">
+                              {spec.title}
+                            </span>
+                          </PayloadTooltip>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-            {includeEmptyState && <EmptyState compact {...resolvedEmptyStateProps} />}
+                {safeCustomFieldPosition === "before" && renderedCustomField}
 
-            {safeCustomFieldPosition === "after" && renderedCustomField}
+                {safeEventSections?.map((section, index) => (
+                  <EventSectionDisplay
+                    className={
+                      "pb-3" +
+                      (!!includeEmptyState || (!!renderedCustomField && safeCustomFieldPosition === "after")
+                        ? " border-b border-slate-950/20"
+                        : "")
+                    }
+                    key={index}
+                    section={section}
+                    index={index}
+                    totalSections={safeEventSections.length}
+                    stateMap={eventStateMap}
+                    lastSection={
+                      index === safeEventSections.length - 1 &&
+                      !includeEmptyState &&
+                      !(renderedCustomField && safeCustomFieldPosition === "after")
+                    }
+                  />
+                ))}
+
+                {includeEmptyState && <EmptyState compact {...resolvedEmptyStateProps} />}
+
+                {safeCustomFieldPosition === "after" && renderedCustomField}
+              </>
+            )}
           </>
         )}
       </div>

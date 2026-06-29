@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { Fragment } from "react";
+import { appPath } from "@/lib/appPaths";
 import { INTEGRATION_INLINE_CODE_CLASSES } from "./lib";
 
 export type CapabilityIntegrationUsageGroup = {
@@ -70,11 +71,11 @@ export function UsageTab({ organizationId, workflowGroups }: UsageTabProps) {
                       <tr
                         key={group.canvasId}
                         className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                        onClick={() => window.open(`/${organizationId}/canvases/${group.canvasId}`, "_blank")}
+                        onClick={() => window.open(appPath(organizationId, group.canvasId), "_blank")}
                         onKeyDown={(event) => {
                           if (event.key !== "Enter" && event.key !== " ") return;
                           event.preventDefault();
-                          window.open(`/${organizationId}/canvases/${group.canvasId}`, "_blank");
+                          window.open(appPath(organizationId, group.canvasId), "_blank");
                         }}
                         tabIndex={0}
                         role="link"

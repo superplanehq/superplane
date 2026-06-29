@@ -58,13 +58,12 @@ export const IntegrationResourceFieldRenderer = ({
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
   // Check for multi - be explicit about truthiness since it's a boolean field
   const isMulti = Boolean(field.typeOptions?.resource?.multi);
-  const resourceParameters = field.typeOptions?.resource?.parameters ?? [];
-
   // Fixed vs Expression mode for single-select when expressions are allowed
   const initialIsExpression = allowExpressions && !isMulti && isExpressionValue(value);
   const [useExpressionMode, setUseExpressionMode] = useState(initialIsExpression);
 
   const additionalQueryParameters = useMemo(() => {
+    const resourceParameters = field.typeOptions?.resource?.parameters ?? [];
     if (!resourceParameters.length) return undefined;
     const parameters: Record<string, string> = {};
 
@@ -102,7 +101,7 @@ export const IntegrationResourceFieldRenderer = ({
     }
 
     return parameters;
-  }, [resourceParameters, allValues]);
+  }, [field.typeOptions?.resource?.parameters, allValues]);
 
   const {
     data: resources,

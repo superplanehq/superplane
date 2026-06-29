@@ -12,5 +12,6 @@ func TestMain(m *testing.M) {
 	ctx.Start()
 
 	code := m.Run()
+	ctx.Shutdown()
 	os.Exit(code)
 }

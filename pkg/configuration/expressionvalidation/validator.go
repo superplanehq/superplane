@@ -15,11 +15,17 @@ import (
 // unknown node references, function arity mistakes, and unresolved identifiers.
 // Returns nil for a valid expression.
 func ValidateExpression(raw string, knownNodeNames map[string]struct{}) error {
+	return ValidateExpressionWithExtraEnv(raw, knownNodeNames, nil)
+}
+
+// ValidateExpressionWithExtraEnv validates an expression body using the default
+// stub environment plus additional top-level variables provided in extraEnv.
+func ValidateExpressionWithExtraEnv(raw string, knownNodeNames map[string]struct{}, extraEnv map[string]any) error {
 	if err := validateExpressionAST(raw, knownNodeNames); err != nil {
 		return err
 	}
 
-	return compileWithStubEnv(strings.TrimSpace(raw), knownNodeNames)
+	return compileWithStubEnv(strings.TrimSpace(raw), knownNodeNames, extraEnv)
 }
 
 // ValidateBareExpression checks the same expression body but skips the strict
@@ -144,7 +150,7 @@ func checkMemoryCall(method string, args []ast.Node) error {
 	return nil
 }
 
-func compileWithStubEnv(body string, knownNodeNames map[string]struct{}) error {
+func compileWithStubEnv(body string, knownNodeNames map[string]struct{}, extraEnv map[string]any) error {
 	dollar := make(map[string]any, len(knownNodeNames))
 	for name := range knownNodeNames {
 		dollar[name] = map[string]any{}
@@ -154,7 +160,9 @@ func compileWithStubEnv(body string, knownNodeNames map[string]struct{}) error {
 	env := map[string]any{
 		"$":      dollar,
 		"memory": map[string]any{"find": memoryStub, "findFirst": memoryStub},
-		"config": map[string]any{},
+	}
+	for key, value := range extraEnv {
+		env[key] = value
 	}
 
 	opts := []expr.Option{

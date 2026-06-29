@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -90,7 +91,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			"http://localhost",
 		)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "template")
+		require.NotNil(t, errors.Unwrap(err))
+		assert.Contains(t, errors.Unwrap(err).Error(), "template")
 	})
 
 	t.Run("successful run persists event on default channel", func(t *testing.T) {
@@ -129,37 +131,418 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		assert.Equal(t, "Hello, World!", inner["message"])
 	})
 
-	t.Run("payload override replaces configured payload", func(t *testing.T) {
+	t.Run("run resolves template payload expressions", func(t *testing.T) {
+		expressionNodeID := "start-node-expression"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Timed",
+								"payload": map[string]any{
+									"generatedAt": `{{ now().Format("2006-01-02") }}`,
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
 		resp, err := InvokeNodeTriggerHook(
 			authedCtx,
 			r.AuthService,
 			r.Encryptor,
 			r.Registry,
 			r.Organization.ID,
-			canvas.ID,
-			triggerNodeID,
+			expressionCanvas.ID,
+			expressionNodeID,
 			"run",
-			map[string]any{
-				"template": "Hello World",
-				"payload":  map[string]any{"message": "Override"},
-			},
+			map[string]any{"template": "Timed"},
 			"http://localhost",
 		)
 		require.NoError(t, err)
 
-		events, err := models.ListCanvasEvents(canvas.ID, triggerNodeID, 1, nil)
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
 		result := resp.Result.AsMap()
-		assert.Equal(t, "Hello World", result["template"])
+		assert.Equal(t, "Timed", result["template"])
 
 		data, ok := events[0].Data.Data().(map[string]any)
 		require.True(t, ok)
 
 		inner, ok := data["data"].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, "Override", inner["message"])
+		generatedAt, ok := inner["generatedAt"].(string)
+		require.True(t, ok)
+		assert.NotContains(t, generatedAt, "{{")
+		assert.Regexp(t, `^\d{4}-\d{2}-\d{2}$`, generatedAt)
+	})
+
+	t.Run("run resolves plain now() expression", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-now"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Timed",
+								"payload": map[string]any{
+									"message": "{{ now() }}",
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{"template": "Timed"},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		message, ok := inner["message"].(string)
+		require.True(t, ok)
+		assert.NotContains(t, message, "{{")
+	})
+
+	t.Run("run resolves template payload expressions from JSON string payload", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-json"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name":    "Timed",
+								"payload": "{\n  \"generatedAt\": \"{{ now().Format(\"2006-01-02\") }}\"\n}",
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{"template": "Timed"},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		generatedAt, ok := inner["generatedAt"].(string)
+		require.True(t, ok)
+		assert.NotContains(t, generatedAt, "{{")
+		assert.Regexp(t, `^\d{4}-\d{2}-\d{2}$`, generatedAt)
+	})
+
+	t.Run("run resolves template payload expressions using hook parameters", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-parameters"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Parameterized",
+								"payload": map[string]any{
+									"message": `{{ parameters["message"] }}`,
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{
+				"template": "Parameterized",
+				"message":  "Hello from hook parameter",
+			},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Hello from hook parameter", inner["message"])
+	})
+
+	t.Run("run resolves template payload expressions using configured template parameter defaults", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-parameter-default"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Parameterized",
+								"payload": map[string]any{
+									"message": `{{ parameters["message"] }}`,
+								},
+								"parameters": []any{
+									map[string]any{
+										"name":          "message",
+										"type":          "string",
+										"defaultString": "Hello from configured defaults",
+									},
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{
+				"template": "Parameterized",
+			},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Hello from configured defaults", inner["message"])
+	})
+
+	t.Run("run resolves template payload expressions using select parameter defaults", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-select-default"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Parameterized",
+								"payload": map[string]any{
+									"provider": `{{ parameters["provider"] }}`,
+								},
+								"parameters": []any{
+									map[string]any{
+										"name":          "provider",
+										"type":          "select",
+										"defaultString": "openai",
+										"options": []any{
+											map[string]any{"label": "OpenAI", "value": "openai"},
+											map[string]any{"label": "Anthropic", "value": "anthropic"},
+										},
+									},
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{
+				"template": "Parameterized",
+			},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "openai", inner["provider"])
+	})
+
+	t.Run("run resolves template payload expressions using select hook parameter override", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-select-override"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Parameterized",
+								"payload": map[string]any{
+									"provider": `{{ parameters["provider"] }}`,
+								},
+								"parameters": []any{
+									map[string]any{
+										"name":          "provider",
+										"type":          "select",
+										"defaultString": "openai",
+										"options": []any{
+											map[string]any{"label": "OpenAI", "value": "openai"},
+											map[string]any{"label": "Anthropic", "value": "anthropic"},
+										},
+									},
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{
+				"template": "Parameterized",
+				"provider": "anthropic",
+			},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "anthropic", inner["provider"])
 	})
 
 	t.Run("non-trigger node -> error", func(t *testing.T) {

@@ -17,11 +17,16 @@ const (
 	CanvasRunResultPassed    = "passed"
 	CanvasRunResultFailed    = "failed"
 	CanvasRunResultCancelled = "cancelled"
+
+	// Used when locking rows to update non-key columns only, so concurrent child
+	// inserts referencing the row via FK are not blocked (PostgreSQL FOR NO KEY UPDATE).
+	lockingForUpdateNoKey = "NO KEY UPDATE"
 )
 
 type CanvasRun struct {
 	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	WorkflowID uuid.UUID
+	VersionID  uuid.UUID
 	State      string
 	Result     string
 	CreatedAt  *time.Time
@@ -75,7 +80,7 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 		return nil, err
 	}
 
-	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID)
+	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID, CanvasRunStateStarted, "")
 	if err != nil {
 		return nil, err
 	}
@@ -88,13 +93,24 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 	return run, nil
 }
 
-func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun, error) {
+func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, state, result string) (*CanvasRun, error) {
+	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	run := &CanvasRun{
 		WorkflowID: workflowID,
-		State:      CanvasRunStateStarted,
+		VersionID:  liveVersion.ID,
+		State:      state,
+		Result:     result,
 		CreatedAt:  &now,
 		UpdatedAt:  &now,
+	}
+
+	if state == CanvasRunStateFinished {
+		run.FinishedAt = &now
 	}
 
 	if err := tx.Create(run).Error; err != nil {
@@ -104,14 +120,37 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun
 	return run, nil
 }
 
+func ListStartedCanvasRuns(limit int) ([]CanvasRun, error) {
+	return ListStartedCanvasRunsInTransaction(database.Conn(), limit)
+}
+
+func ListStartedCanvasRunsInTransaction(tx *gorm.DB, limit int) ([]CanvasRun, error) {
+	var runs []CanvasRun
+	err := tx.
+		Where("state = ?", CanvasRunStateStarted).
+		Order("updated_at ASC").
+		Limit(limit).
+		Find(&runs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
 type CanvasRunFilters struct {
 	States  []string
 	Results []string
 }
 
 func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
+	return ListCanvasRunsInTransaction(database.Conn(), workflowID, limit, beforeTime, filters)
+}
+
+func ListCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
 	var runs []CanvasRun
-	query := database.Conn().
+	query := tx.
 		Where("workflow_id = ?", workflowID).
 		Order("created_at DESC").
 		Limit(limit)
@@ -131,8 +170,12 @@ func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filt
 }
 
 func CountCanvasRuns(workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
+	return CountCanvasRunsInTransaction(database.Conn(), workflowID, filters)
+}
+
+func CountCanvasRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
 	var count int64
-	query := database.Conn().
+	query := tx.
 		Model(&CanvasRun{}).
 		Where("workflow_id = ?", workflowID)
 
@@ -162,7 +205,7 @@ func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
 	}
 }
 
-func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
+func ListExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
 	if len(runIDs) == 0 {
 		return []CanvasNodeExecution{}, nil
 	}
@@ -171,7 +214,6 @@ func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID,
 	err := tx.
 		Where("workflow_id = ?", workflowID).
 		Where("run_id IN ?", runIDs).
-		Where("parent_execution_id IS NULL").
 		Order("created_at ASC").
 		Find(&executions).
 		Error
@@ -182,49 +224,13 @@ func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID,
 	return executions, nil
 }
 
-func MaybeFinalizeRunInTransaction(tx *gorm.DB, runID uuid.UUID) (bool, error) {
-	run, err := lockCanvasRunInTransaction(tx, runID)
-	if err != nil {
-		return false, err
-	}
-
-	if run.State == CanvasRunStateFinished {
-		return false, nil
-	}
-
-	openWork, err := findOpenCanvasRunWorkInTransaction(tx, runID)
-	if err != nil {
-		return false, err
-	}
-
-	if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
-		return false, touchCanvasRunInTransaction(tx, run)
-	}
-
-	result, err := calculateCanvasRunResultInTransaction(tx, runID)
-	if err != nil {
-		return false, err
-	}
-
-	now := time.Now()
-	err = tx.Model(run).
-		Updates(map[string]any{
-			"state":       CanvasRunStateFinished,
-			"result":      result,
-			"updated_at":  &now,
-			"finished_at": &now,
-		}).
-		Error
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
-func lockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
+func LockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
 	var run CanvasRun
 	err := tx.
+		// Run finalization checks for open child work before marking the run
+		// finished. Use FOR UPDATE, not FOR NO KEY UPDATE, so concurrent FK
+		// inserts for events, queue items, or executions cannot appear between
+		// the open-work check and the final state update.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ?", runID).
 		First(&run).
@@ -236,19 +242,14 @@ func lockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error
 	return &run, nil
 }
 
-func touchCanvasRunInTransaction(tx *gorm.DB, run *CanvasRun) error {
-	now := time.Now()
-	return tx.Model(run).Update("updated_at", &now).Error
-}
-
-type openCanvasRunWork struct {
+type OpenCanvasRunWork struct {
 	HasActiveExecutions bool
 	HasQueueItems       bool
 	HasPendingEvents    bool
 }
 
-func findOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*openCanvasRunWork, error) {
-	var result openCanvasRunWork
+func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanvasRunWork, error) {
+	var result OpenCanvasRunWork
 	err := tx.Raw(`
 		SELECT
 			EXISTS (
@@ -283,7 +284,7 @@ func findOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*openCanv
 	return &result, nil
 }
 
-func calculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string, error) {
+func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string, error) {
 	var result struct {
 		HasFailed    bool
 		HasCancelled bool

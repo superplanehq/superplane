@@ -116,7 +116,7 @@ func TestCountPendingEvents(t *testing.T) {
 		WorkflowID: steps.workflow.ID,
 		NodeID:     steps.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 		State:      models.CanvasEventStateRouted,
 	}
 
@@ -271,7 +271,7 @@ func (s *stuckQueueItemsTestSteps) CreateRootEvent() {
 		WorkflowID: s.workflow.ID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 		State:      models.CanvasEventStatePending,
 	}
 

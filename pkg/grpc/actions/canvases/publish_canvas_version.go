@@ -3,21 +3,20 @@ package canvases
 import (
 	"context"
 	"errors"
-
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -25,6 +24,7 @@ func PublishCanvasVersion(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
 	reg *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	canvasID string,
 	versionID string,
@@ -33,17 +33,17 @@ func PublishCanvasVersion(
 ) (*pb.PublishCanvasVersionResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	versionUUID, err := uuid.Parse(versionID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid version id")
 	}
 
 	organizationUUID := uuid.MustParse(organizationID)
@@ -51,29 +51,17 @@ func PublishCanvasVersion(
 
 	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-	}
-
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
-	}
-
-	changeManagementEnabled, modeErr := isChangeManagementEnabledForCanvas(canvas)
-	if modeErr != nil {
-		return nil, status.Errorf(codes.Internal, "failed to load change management setting: %v", modeErr)
-	}
-	if changeManagementEnabled {
-		return nil, status.Error(codes.FailedPrecondition, "change management is enabled for this canvas; create a change request instead")
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	publishedVersion, err := publishDraftVersionInTransaction(
-		ctx, encryptor, reg, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
+		ctx, encryptor, reg, gitProv, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
 	)
 	if err != nil {
-		if status.Code(err) != codes.Unknown {
+		if grpcerrors.Code(err) != codes.Unknown {
 			return nil, err
 		}
-		return nil, actions.ToStatus(err)
+		return nil, err
 	}
 
 	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); err != nil {
@@ -84,7 +72,7 @@ func PublishCanvasVersion(
 	}
 
 	return &pb.PublishCanvasVersionResponse{
-		Version: SerializeCanvasVersion(publishedVersion, organizationID),
+		Version: SerializeCanvasVersion(publishedVersion, organizationID, nil),
 	}, nil
 }
 
@@ -92,6 +80,7 @@ func publishDraftVersionInTransaction(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
 	reg *registry.Registry,
+	gitProv gitprovider.Provider,
 	organizationID string,
 	organizationUUID uuid.UUID,
 	canvasUUID uuid.UUID,
@@ -106,22 +95,31 @@ func publishDraftVersionInTransaction(
 		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
 		if findErr != nil {
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.NotFound, "version not found")
+				return grpcerrors.NotFound(findErr, "version not found")
 			}
 			return findErr
 		}
 
 		if version.State != models.CanvasVersionStateDraft {
-			return status.Error(codes.FailedPrecondition, "only draft versions can be published")
+			return grpcerrors.FailedPrecondition(nil, "only draft versions can be published")
 		}
 
 		if version.OwnerID == nil || *version.OwnerID != userUUID {
-			return status.Error(codes.PermissionDenied, "version owner mismatch")
+			return grpcerrors.PermissionDenied(nil, "version owner mismatch")
+		}
+
+		hasStaging, err := models.HasWorkflowStagingInTransaction(tx, version.ID)
+		if err != nil {
+			return err
+		}
+
+		if hasStaging {
+			return grpcerrors.FailedPrecondition(nil, "draft version has staged changes")
 		}
 
 		nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, version.Name)
 		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
-			return status.Error(codes.AlreadyExists, "Canvas with the same name already exists")
+			return grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
 		}
 		if nameErr != nil {
 			return nameErr
@@ -143,17 +141,12 @@ func publishDraftVersionInTransaction(
 				Encryptor:      encryptor,
 				AuthService:    authService,
 				WebhookBaseURL: webhookBaseURL,
+				GitProvider:    gitProv,
 			},
 		)
 		if err != nil {
 			log.Errorf("failed to publish canvas version: %v", err)
 			return err
-		}
-
-		refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, uuid.Nil)
-		if refreshErr != nil {
-			log.Errorf("failed to refresh open canvas change requests: %v", refreshErr)
-			return refreshErr
 		}
 
 		publishedVersion = version

@@ -5,19 +5,25 @@ import (
 	"errors"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
 func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrganizationResponse, error) {
-	organization, err := models.FindOrganizationByID(orgID)
+	var organization *models.Organization
+	err := telemetry.RunSpan(ctx, "organizations.load", func(ctx context.Context) error {
+		var loadErr error
+		organization, loadErr = models.FindOrganizationByIDInTransaction(database.DB(ctx), orgID)
+		return loadErr
+	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "organization not found")
+			return nil, grpcerrors.NotFound(err, "organization not found")
 		}
 
 		log.Errorf("Error describing organization %s: %v", orgID, err)
@@ -34,7 +40,6 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
 			},
 			Spec: &pb.Organization_Spec{
-				ChangeManagementEnabled:     &organization.ChangeManagementEnabled,
 				EnabledExperimentalFeatures: []string(organization.EnabledExperimentalFeatures),
 			},
 		},

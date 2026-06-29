@@ -84,7 +84,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
       <div
         ref={containerRef}
         onClick={() => setExpanded(true)}
-        className="my-4 rounded-lg border border-violet-200 bg-white p-3 shadow-sm overflow-x-auto cursor-pointer hover:border-violet-300 transition-colors [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
+        className="my-4 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 overflow-x-auto cursor-pointer hover:border-slate-300 transition-colors [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
       >
         <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: svg }} />
       </div>

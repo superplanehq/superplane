@@ -28,6 +28,11 @@ encode good taste into these files, the patterns, principles, and preferences th
 When developing a new component, ensure every statemap includes an explicit error state and a clear state resolution
 path. This applies to both implementation and Storybook coverage.
 
+## Managed Agent Tools
+
+When adding backend custom tools for managed agents, see [Agent Tools](agent-tools.md). App-related capabilities
+should usually be added as `superplane_app` actions rather than new top-level tools.
+
 ## Rule of Thumb
 
 If you wrote something manually, think about how we could extend and improve the project to automate this

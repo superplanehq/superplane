@@ -12,8 +12,14 @@
     <script>
       window.SUPERPLANE_SENTRY_DSN = "{{ .SentryDSN }}";
       window.SUPERPLANE_SENTRY_ENVIRONMENT = "{{ .SentryEnvironment }}";
-      window.SUPERPLANE_AGENT_ENABLED = {{ .AgentEnabled }}; // boolean literal
       window.SUPERPLANE_POSTHOG_KEY = "{{ .PostHogKey }}";
+      window.SUPERPLANE_DASH0_OTLP_ENDPOINT = "{{ .Dash0WebOTLPEndpoint }}";
+      window.SUPERPLANE_DASH0_AUTH_TOKEN = "{{ .Dash0WebAuthToken }}";
+      window.SUPERPLANE_DASH0_SERVICE_NAME = "{{ .Dash0WebServiceName }}";
+      window.SUPERPLANE_DASH0_ENVIRONMENT = "{{ .Dash0WebEnvironment }}";
+      window.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID = "{{ .SignupWaitlistHubSpotPortalID }}";
+      window.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID = "{{ .SignupWaitlistHubSpotFormID }}";
+      window.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_REGION = "{{ .SignupWaitlistHubSpotRegion }}";
     </script>
 
     <title>SuperPlane</title>

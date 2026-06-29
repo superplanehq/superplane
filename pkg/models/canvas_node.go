@@ -18,18 +18,58 @@ const (
 	CanvasNodeStateReady      = "ready"
 	CanvasNodeStateProcessing = "processing"
 	CanvasNodeStateError      = "error"
-	CanvasNodeStatePaused     = "paused"
 
 	NodeTypeTrigger   = "trigger"
 	NodeTypeComponent = "component"
-	NodeTypeBlueprint = "blueprint"
 	NodeTypeWidget    = "widget"
 )
+
+type Node struct {
+	ID             string         `json:"id"`
+	Name           string         `json:"name"`
+	Type           string         `json:"type"`
+	Ref            NodeRef        `json:"ref"`
+	Configuration  map[string]any `json:"configuration"`
+	Metadata       map[string]any `json:"metadata"`
+	Position       Position       `json:"position"`
+	IsCollapsed    bool           `json:"isCollapsed"`
+	IntegrationID  *string        `json:"integrationId,omitempty"`
+	ErrorMessage   *string        `json:"errorMessage,omitempty"`
+	WarningMessage *string        `json:"warningMessage,omitempty"`
+}
+
+type Position struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
+
+type NodeRef struct {
+	Component *ComponentRef `json:"component,omitempty"`
+	Trigger   *TriggerRef   `json:"trigger,omitempty"`
+	Widget    *WidgetRef    `json:"widget,omitempty"`
+}
+
+type ComponentRef struct {
+	Name string `json:"name"`
+}
+
+type TriggerRef struct {
+	Name string `json:"name"`
+}
+
+type WidgetRef struct {
+	Name string `json:"name"`
+}
+
+type Edge struct {
+	SourceID string `json:"source_id"`
+	TargetID string `json:"target_id"`
+	Channel  string `json:"channel"`
+}
 
 type CanvasNode struct {
 	WorkflowID        uuid.UUID `gorm:"primaryKey"`
 	NodeID            string    `gorm:"primaryKey"`
-	ParentNodeID      *string
 	Name              string
 	State             string
 	StateReason       *string
@@ -48,6 +88,19 @@ type CanvasNode struct {
 
 func (c *CanvasNode) TableName() string {
 	return "workflow_nodes"
+}
+
+func (c *CanvasNode) ComponentName() string {
+	ref := c.Ref.Data()
+	if ref.Component != nil && ref.Component.Name != "" {
+		return ref.Component.Name
+	}
+
+	if ref.Trigger != nil && ref.Trigger.Name != "" {
+		return ref.Trigger.Name
+	}
+
+	return "unknown"
 }
 
 var nodeIDSanitizer = regexp.MustCompile(`[^a-z0-9]`)
@@ -80,9 +133,6 @@ func NodeTypeName(node Node) string {
 	}
 	if node.Ref.Trigger != nil && node.Ref.Trigger.Name != "" {
 		return node.Ref.Trigger.Name
-	}
-	if node.Ref.Blueprint != nil && node.Ref.Blueprint.ID != "" {
-		return node.Ref.Blueprint.ID
 	}
 	if node.Ref.Widget != nil && node.Ref.Widget.Name != "" {
 		return node.Ref.Widget.Name
@@ -186,7 +236,7 @@ func ListCanvasNodesReady() ([]CanvasNode, error) {
 		Distinct().
 		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
 		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
-		Where("workflow_nodes.type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
+		Where("workflow_nodes.type = ?", NodeTypeComponent).
 		Where("workflow_nodes.deleted_at IS NULL")
 
 	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
@@ -222,7 +272,7 @@ func LockCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNo
 		Table("workflow_nodes").
 		Select("workflow_nodes.*").
 		Clauses(clause.Locking{
-			Strength: "UPDATE",
+			Strength: lockingForUpdateNoKey,
 			Table:    clause.Table{Name: "workflow_nodes"},
 			Options:  "SKIP LOCKED",
 		}).
@@ -246,7 +296,7 @@ func LockCanvasNodeForUpdate(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (
 	var node CanvasNode
 
 	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Clauses(clause.Locking{Strength: lockingForUpdateNoKey, Options: "SKIP LOCKED"}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeId).
 		First(&node).
@@ -257,19 +307,6 @@ func LockCanvasNodeForUpdate(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (
 	}
 
 	return &node, nil
-}
-
-func ResumeStateForNodeInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (string, error) {
-	runningCount, err := CountRunningExecutionsForNodeInTransaction(tx, workflowID, nodeID)
-	if err != nil {
-		return "", err
-	}
-
-	if runningCount > 0 {
-		return CanvasNodeStateProcessing, nil
-	}
-
-	return CanvasNodeStateReady, nil
 }
 
 func (c *CanvasNode) UpdateState(tx *gorm.DB, state string) error {

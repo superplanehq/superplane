@@ -109,7 +109,7 @@ export const rendererExamples: RendererExample[] = [
     source: "Basic field type",
     goType: "FieldTypeText",
     docsDescription:
-      "Use `text` when the value is still plain text, but users need a larger editor for prompts, long instructions, request bodies, or templates.",
+      "Use `text` for long-form plain text such as messages, prompts, or descriptions. It renders a lightweight multi-line editor (with `{{ }}` expression autocomplete), not a code editor. Set `typeOptions.text.language` when the value is code (see the Code example).",
     field: baseField({
       name: "promptBody",
       label: "Prompt body",
@@ -119,6 +119,28 @@ export const rendererExamples: RendererExample[] = [
     }),
     initialValue:
       "Summarize the latest deployment signal.\nInclude risks, rollback steps, and the next operator action.",
+    allowExpressions: true,
+  },
+  {
+    id: "text-code",
+    storyName: "TextFieldCode",
+    category: "Structured Content",
+    source: "Basic field type",
+    goType: "FieldTypeText",
+    docsDescription:
+      "Set `typeOptions.text.language` (e.g. `shell`, `python`, `json`) on a `text` field when the value is code. This renders the full Monaco editor with syntax highlighting, ideal for scripts, commands, and structured payloads.",
+    field: baseField({
+      name: "script",
+      label: "Script",
+      type: "text",
+      description: "Use for code such as scripts, commands, or JSON payloads where Monaco's editing helps.",
+      typeOptions: {
+        text: {
+          language: "shell",
+        },
+      },
+    }),
+    initialValue: 'echo "Deploying $SERVICE"\nkubectl rollout restart deployment/$SERVICE',
   },
   {
     id: "expression",

@@ -413,7 +413,7 @@ func (s *MergeTestSteps) CreateEvents() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     "start-node",
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
 
@@ -421,7 +421,7 @@ func (s *MergeTestSteps) CreateEvents() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode1.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(event1).Error)
 
@@ -429,7 +429,7 @@ func (s *MergeTestSteps) CreateEvents() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode2.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(event2).Error)
 
@@ -443,7 +443,7 @@ func (s *MergeTestSteps) CreateSingleEventForProcess1() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     "start-node",
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
 
@@ -451,7 +451,7 @@ func (s *MergeTestSteps) CreateSingleEventForProcess1() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode1.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(event1).Error)
 
@@ -464,7 +464,7 @@ func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
 		WorkflowID: s.Wf.ID,
 		NodeID:     "start-node",
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
 
@@ -472,7 +472,7 @@ func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode1.NodeID,
 		Channel:    "default",
-		Data:       datatypes.NewJSONType(data1),
+		Data:       models.NewJSONValue(data1),
 	}
 	require.NoError(s.t, s.Tx.Create(event1).Error)
 
@@ -480,7 +480,7 @@ func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode2.NodeID,
 		Channel:    "default",
-		Data:       datatypes.NewJSONType(data2),
+		Data:       models.NewJSONValue(data2),
 	}
 	require.NoError(s.t, s.Tx.Create(event2).Error)
 
@@ -525,7 +525,7 @@ func (s *MergeTestSteps) CreateSingleQueueItemForProcess1() {
 func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 	fmt.Println("Processing first event")
 
-	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, nil)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, nil, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -538,7 +538,7 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 	fmt.Println("Processing first event (expect finish)")
 
-	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, nil)
+	ctx1, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem1, nil, nil, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx1)
@@ -549,7 +549,7 @@ func (s *MergeTestSteps) ProcessFirstEventExpectFinish(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, nil)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, nil, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)
@@ -560,7 +560,7 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 func (s *MergeTestSteps) ProcessSecondEventExpectNoFinish(m *Merge) {
 	fmt.Println("Processing second event")
 
-	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, nil)
+	ctx2, err := contexts.BuildProcessQueueContext(http.DefaultClient, s.Tx, s.MergeNode, s.QueureItem2, nil, nil, nil)
 	assert.NoError(s.t, err)
 
 	execution, err := m.ProcessQueueItem(*ctx2)

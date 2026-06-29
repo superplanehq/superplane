@@ -18,14 +18,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudbuild"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/clouddns"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudsql"
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/monitoring"
+	gcpprometheus "github.com/superplanehq/superplane/pkg/integrations/gcp/prometheus"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/storage"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 func init() {
-	registry.RegisterIntegration("gcp", &GCP{})
+	registry.RegisterIntegrationWithWebhookHandler("gcp", &GCP{}, &WebhookHandler{})
 	compute.SetClientFactory(func(ctx core.ExecutionContext) (compute.Client, error) {
 		return gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	})
@@ -39,6 +43,18 @@ func init() {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	clouddns.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (clouddns.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	cloudsql.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudsql.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	storage.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (storage.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	monitoring.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (monitoring.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	gcpprometheus.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (gcpprometheus.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 }
@@ -102,7 +118,7 @@ func (g *GCP) Instructions() string {
 
 - ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
 - ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management)`
+- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics, ` + "`roles/cloudsql.admin`" + ` to manage Cloud SQL databases and instances, ` + "`roles/storage.admin`" + ` to manage Cloud Storage buckets)`
 }
 
 func (g *GCP) Configuration() []configuration.Field {
@@ -162,6 +178,19 @@ func (g *GCP) Configuration() []configuration.Field {
 func (g *GCP) Actions() []core.Action {
 	return []core.Action{
 		&compute.CreateVM{},
+		&compute.DeleteVMInstance{},
+		&compute.GetVMInstance{},
+		&compute.ManageVMInstancePower{},
+		&compute.UpdateVMInstanceType{},
+		&compute.GetVMInstanceMetrics{},
+		&compute.CreateImage{},
+		&compute.UpdateImage{},
+		&compute.DeleteImage{},
+		&compute.CreateStaticIP{},
+		&compute.DeleteStaticIP{},
+		&compute.ManageStaticIP{},
+		&compute.CreateLoadBalancer{},
+		&compute.DeleteLoadBalancer{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
@@ -176,6 +205,24 @@ func (g *GCP) Actions() []core.Action {
 		&clouddns.CreateRecord{},
 		&clouddns.DeleteRecord{},
 		&clouddns.UpdateRecord{},
+		&monitoring.CreateAlertingPolicy{},
+		&monitoring.GetAlertingPolicy{},
+		&monitoring.DeleteAlertingPolicy{},
+		&monitoring.UpdateAlertingPolicy{},
+		&monitoring.CreateSnooze{},
+		&monitoring.GetSnooze{},
+		&monitoring.ExpireSnooze{},
+		&cloudsql.CreateDatabase{},
+		&cloudsql.GetDatabase{},
+		&cloudsql.DeleteDatabase{},
+		&cloudsql.CreateInstance{},
+		&cloudsql.GetInstance{},
+		&cloudsql.DeleteInstance{},
+		&storage.CreateBucket{},
+		&storage.GetBucket{},
+		&storage.DeleteBucket{},
+		&gcpprometheus.Query{},
+		&gcpprometheus.QueryRange{},
 	}
 }
 
@@ -186,6 +233,7 @@ func (g *GCP) Triggers() []core.Trigger {
 		&artifactregistry.OnArtifactPush{},
 		&artifactregistry.OnArtifactAnalysis{},
 		&gcppubsub.OnMessage{},
+		&monitoring.OnAlert{},
 	}
 }
 
@@ -915,10 +963,14 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListMachineFamilyResources(reqCtx, client, p["zone"])
 	case compute.ResourceTypeMachineType:
 		return compute.ListMachineTypeResources(reqCtx, client, p["zone"], p["machineFamily"])
+	case compute.ResourceTypeInstanceMachineType:
+		return compute.ListMachineTypeResourcesForInstance(reqCtx, client, p["instance"])
 	case compute.ResourceTypePublicImages:
 		return compute.ListPublicImageResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeCustomImages:
 		return compute.ListCustomImageResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeImageStorageLocation:
+		return compute.ListImageStorageLocationResources(reqCtx, client)
 	case compute.ResourceTypeSnapshots:
 		return compute.ListSnapshotResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeDisks:
@@ -933,10 +985,24 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListSubnetworkResources(reqCtx, client, p["project"], p["region"])
 	case compute.ResourceTypeAddress:
 		return compute.ListAddressResources(reqCtx, client, p["project"], p["region"])
+	case compute.ResourceTypeStaticIP:
+		return compute.ListStaticIPResources(reqCtx, client, p["project"], p["instance"])
+	case compute.ResourceTypeInstanceGroup:
+		return compute.ListInstanceGroupResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeForwardingRule:
+		return compute.ListForwardingRuleResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeInstance:
+		return compute.ListInstanceResources(reqCtx, client, p["project"])
 	case clouddns.ResourceTypeManagedZone:
 		return clouddns.ListManagedZoneResources(reqCtx, client, p["projectId"])
+	case monitoring.ResourceTypeAlertPolicy:
+		return monitoring.ListAlertingPolicyResources(reqCtx, client)
+	case monitoring.ResourceTypeNotificationChannel:
+		return monitoring.ListNotificationChannelResources(reqCtx, client)
+	case monitoring.ResourceTypeSnooze:
+		return monitoring.ListSnoozeResources(reqCtx, client)
 	case cloudbuild.ResourceTypeTrigger:
 		return cloudbuild.ListTriggerResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeBuild:
@@ -963,6 +1029,16 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return gcppubsub.ListTopicResources(reqCtx, client)
 	case gcppubsub.ResourceTypeSubscription:
 		return gcppubsub.ListSubscriptionResources(reqCtx, client, p["topic"])
+	case cloudsql.ResourceTypeInstance:
+		return cloudsql.ListInstanceResources(reqCtx, client)
+	case cloudsql.ResourceTypeDatabase:
+		return cloudsql.ListDatabaseResources(reqCtx, client, p["instance"])
+	case cloudsql.ResourceTypeRegion:
+		return cloudsql.ListRegionResources(reqCtx, client)
+	case cloudsql.ResourceTypeTier:
+		return cloudsql.ListTierResources(reqCtx, client, p["region"])
+	case storage.ResourceTypeBucket:
+		return storage.ListBucketResources(reqCtx, client)
 	default:
 		return nil, nil
 	}

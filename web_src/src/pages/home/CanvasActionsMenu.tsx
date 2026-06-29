@@ -102,7 +102,7 @@ export function CanvasActionsMenu({
               <PermissionTooltip allowed={canUpdateCanvases} message="You don't have permission to update canvases.">
                 <DropdownMenuItem onClick={handleChangeName} disabled={!canUpdateCanvases}>
                   <Pencil size={16} />
-                  Change Name
+                  Rename
                 </DropdownMenuItem>
               </PermissionTooltip>
 
@@ -116,7 +116,7 @@ export function CanvasActionsMenu({
               <PermissionTooltip allowed={canDeleteCanvases} message="You don't have permission to delete canvases.">
                 <DropdownMenuItem onClick={openDialog} disabled={!canDeleteCanvases}>
                   <Trash2 size={16} />
-                  Delete Canvas
+                  Delete App
                 </DropdownMenuItem>
               </PermissionTooltip>
             </DropdownMenuContent>

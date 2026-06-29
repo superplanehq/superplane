@@ -7,11 +7,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestAgentSessionWebSocketRequiresManagedAgentsFeature(t *testing.T) {
+	// The managed-agents feature is released by default, so override the
+	// registry to keep it gated and exercise the forbidden path.
+	t.Cleanup(features.WithRegistryForTest([]features.Feature{
+		{ID: features.FeatureClaudeManagedAgents, Label: features.FeatureClaudeManagedAgents},
+	}))
+
 	r := support.Setup(t)
 	defer r.Close()
 	server, _, token := setupTestServer(r, t)

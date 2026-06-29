@@ -179,7 +179,7 @@ func createRootEvent(t *testing.T, canvasID uuid.UUID) *models.CanvasEvent {
 		WorkflowID: canvasID,
 		NodeID:     "trigger",
 		Channel:    "default",
-		Data:       datatypes.NewJSONType[any](map[string]any{"key": "value"}),
+		Data:       models.NewJSONValue(map[string]any{"key": "value"}),
 		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
 	}

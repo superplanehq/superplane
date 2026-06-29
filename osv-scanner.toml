@@ -1,0 +1,44 @@
+# License exceptions for OSS Guard / osv-scanner.
+# Keep in sync with scripts/license_finder.yml where applicable.
+
+[[PackageOverrides]]
+name = "@csstools/color-helpers"
+ecosystem = "npm"
+license.override = ["MIT"]
+reason = "Package is MIT-0 (MIT No Attribution); permissive and compatible with Apache-2.0."
+
+[[PackageOverrides]]
+name = "argparse"
+ecosystem = "npm"
+license.ignore = true
+reason = "Python-2.0 license; bundled tooling dependency, compatible with Apache-2.0."
+
+[[PackageOverrides]]
+name = "csv"
+ecosystem = "RubyGems"
+license.ignore = true
+reason = "Dual-licensed Ruby/BSD-2-Clause; Ruby gem used by license_finder tooling only."
+
+[[PackageOverrides]]
+name = "elkjs"
+ecosystem = "npm"
+license.ignore = true
+reason = "Eclipse Public License 2.0; layout library used at build time, compatible with project licensing policy."
+
+[[PackageOverrides]]
+name = "khroma"
+ecosystem = "npm"
+license.override = ["MIT"]
+reason = "MIT license per upstream repository; deps.dev reports UNKNOWN due to missing package.json license field."
+
+[[PackageOverrides]]
+name = "posthog-js"
+ecosystem = "npm"
+license.ignore = true
+reason = "License reported as SEE LICENSE IN LICENSE; dependency vetted for SuperPlane UI analytics use."
+
+[[PackageOverrides]]
+name = "stdlib"
+ecosystem = "Go"
+license.override = ["BSD-3-Clause"]
+reason = "Go stdlib is licensed under BSD-3-Clause, see https://go.dev/LICENSE"

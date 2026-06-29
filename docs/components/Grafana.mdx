@@ -61,6 +61,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Alert Firing
 
+**Trigger key:** `grafana.onAlertFiring`
+
 The On Alert Firing trigger starts a workflow when Grafana Unified Alerting sends a firing alert webhook.
 
 ### Setup
@@ -115,6 +117,8 @@ The trigger emits the full Grafana webhook payload, including:
 
 ## Add Incident Activity
 
+**Component key:** `grafana.addIncidentActivity`
+
 The Add Incident Activity component posts a user note to a Grafana IRM incident timeline.
 
 ### Configuration
@@ -145,6 +149,8 @@ Returns the created activity item.
 <a id="create-alert-rule"></a>
 
 ## Create Alert Rule
+
+**Component key:** `grafana.createAlertRule`
 
 The Create Alert Rule component creates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
 
@@ -282,6 +288,8 @@ Returns the created Grafana alert rule object, including identifiers and evaluat
 
 ## Create Annotation
 
+**Component key:** `grafana.createAnnotation`
+
 The Create Annotation component writes an annotation into Grafana, marking operational events on dashboard timelines.
 
 ### Use Cases
@@ -320,6 +328,8 @@ Returns the ID of the newly created annotation.
 <a id="create-http-synthetic-check"></a>
 
 ## Create HTTP Synthetic Check
+
+**Component key:** `grafana.createHttpSyntheticCheck`
 
 The Create HTTP Synthetic Check component creates an HTTP synthetic check in Grafana Synthetic Monitoring.
 
@@ -417,6 +427,8 @@ Returns the created Grafana synthetic check, including its ID and HTTP configura
 
 ## Create Silence
 
+**Component key:** `grafana.createSilence`
+
 The Create Silence component creates a new Alertmanager silence in Grafana, suppressing alert notifications that match the configured matchers during the specified time window.
 
 ### Use Cases
@@ -454,6 +466,8 @@ Returns the ID of the newly created silence.
 <a id="declare-drill"></a>
 
 ## Declare Drill
+
+**Component key:** `grafana.declareDrill`
 
 The Declare Drill component creates a new drill incident in Grafana IRM.
 
@@ -507,6 +521,8 @@ Returns the created Grafana IRM incident.
 
 ## Declare Incident
 
+**Component key:** `grafana.declareIncident`
+
 The Declare Incident component creates a new incident in Grafana IRM.
 
 ### Use Cases
@@ -558,6 +574,8 @@ Returns the created Grafana IRM incident.
 
 ## Delete Alert Rule
 
+**Component key:** `grafana.deleteAlertRule`
+
 The Delete Alert Rule component deletes a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
 
 ### Use Cases
@@ -592,6 +610,8 @@ Returns a confirmation object with the deleted alert rule UID, title, and deleti
 
 ## Delete Annotation
 
+**Component key:** `grafana.deleteAnnotation`
+
 The Delete Annotation component removes an annotation from Grafana by ID.
 
 ### Use Cases
@@ -625,6 +645,8 @@ Returns the annotation ID and a confirmation that the annotation was deleted.
 
 ## Delete HTTP Synthetic Check
 
+**Component key:** `grafana.deleteHttpSyntheticCheck`
+
 The Delete HTTP Synthetic Check component deletes an existing Grafana synthetic check.
 
 ### Configuration
@@ -653,6 +675,8 @@ Returns a compact confirmation payload for the deleted check.
 <a id="delete-silence"></a>
 
 ## Delete Silence
+
+**Component key:** `grafana.deleteSilence`
 
 The Delete Silence component expires an existing silence in Grafana Alertmanager.
 
@@ -685,6 +709,8 @@ Returns the silence ID and a confirmation that the silence was deleted.
 <a id="get-alert-rule"></a>
 
 ## Get Alert Rule
+
+**Component key:** `grafana.getAlertRule`
 
 The Get Alert Rule component fetches a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
 
@@ -811,6 +837,8 @@ Returns the full Grafana alert rule object, including title, folder, group, cond
 
 ## Get Dashboard
 
+**Component key:** `grafana.getDashboard`
+
 The Get Dashboard component fetches a Grafana dashboard using the Grafana Dashboards HTTP API.
 
 ### Use Cases
@@ -868,6 +896,8 @@ Returns the Grafana dashboard object, including title, slug, URL, folder, tags, 
 <a id="get-http-synthetic-check"></a>
 
 ## Get HTTP Synthetic Check
+
+**Component key:** `grafana.getHttpSyntheticCheck`
 
 The Get HTTP Synthetic Check component fetches a Grafana synthetic check and enriches it with best-effort operational metrics.
 
@@ -975,6 +1005,8 @@ Returns a combined payload containing:
 
 ## Get Incident
 
+**Component key:** `grafana.getIncident`
+
 The Get Incident component retrieves a single incident from Grafana IRM.
 
 ### Configuration
@@ -1016,6 +1048,8 @@ Returns the full Grafana IRM incident object.
 <a id="get-silence"></a>
 
 ## Get Silence
+
+**Component key:** `grafana.getSilence`
 
 The Get Silence component fetches the details of a single silence from Grafana Alertmanager using its ID.
 
@@ -1063,6 +1097,8 @@ Returns the silence object including ID, state, comment, matchers, start/end tim
 <a id="list-alert-rules"></a>
 
 ## List Alert Rules
+
+**Component key:** `grafana.listAlertRules`
 
 The List Alert Rules component lists Grafana-managed alert rules using the Alerting Provisioning HTTP API.
 
@@ -1113,6 +1149,8 @@ Returns an object containing the list of Grafana alert rule summaries, including
 <a id="list-annotations"></a>
 
 ## List Annotations
+
+**Component key:** `grafana.listAnnotations`
 
 The List Annotations component retrieves annotations from Grafana, optionally filtered by tag, dashboard, or time range.
 
@@ -1180,6 +1218,8 @@ Returns a list of annotation objects including ID, text, tags, time, and dashboa
 
 ## List Silences
 
+**Component key:** `grafana.listSilences`
+
 The List Silences component retrieves silences from Grafana Alertmanager.
 
 ### Use Cases
@@ -1231,6 +1271,8 @@ Returns a list of silence objects, each including ID, state, comment, matchers, 
 <a id="query-data-source"></a>
 
 ## Query Data Source
+
+**Component key:** `grafana.queryDataSource`
 
 The Query Data Source component executes a query against a Grafana data source using the Grafana Query API.
 
@@ -1298,6 +1340,8 @@ Returns the Grafana query API response JSON.
 <a id="query-logs"></a>
 
 ## Query Logs
+
+**Component key:** `grafana.queryLogs`
 
 The Query Logs component executes a LogQL query against a Loki-backed Grafana data source.
 
@@ -1378,6 +1422,8 @@ Returns the Grafana query API response containing matching log frames.
 <a id="query-traces"></a>
 
 ## Query Traces
+
+**Component key:** `grafana.queryTraces`
 
 The Query Traces component executes a TraceQL query against a Tempo-backed Grafana data source.
 
@@ -1463,6 +1509,8 @@ Returns the Grafana query API response containing matching trace frames.
 
 ## Render Panel
 
+**Component key:** `grafana.renderPanel`
+
 The Render Panel component constructs a Grafana image render URL for a dashboard panel using the Grafana Image Renderer.
 
 ### Use Cases
@@ -1501,6 +1549,8 @@ Returns the Grafana render URL along with the dashboard UID and panel.
 <a id="resolve-incident"></a>
 
 ## Resolve Incident
+
+**Component key:** `grafana.resolveIncident`
 
 The Resolve Incident component marks an existing Grafana IRM incident as resolved.
 
@@ -1545,6 +1595,8 @@ Returns the resolved Grafana IRM incident.
 <a id="update-alert-rule"></a>
 
 ## Update Alert Rule
+
+**Component key:** `grafana.updateAlertRule`
 
 The Update Alert Rule component updates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
 
@@ -1677,6 +1729,8 @@ Returns the updated Grafana alert rule object after the provisioning API applies
 
 ## Update HTTP Synthetic Check
 
+**Component key:** `grafana.updateHttpSyntheticCheck`
+
 The Update HTTP Synthetic Check component updates an existing Grafana Synthetic Monitoring HTTP check.
 
 ### Configuration
@@ -1759,6 +1813,8 @@ Returns the updated Grafana synthetic check.
 <a id="update-incident"></a>
 
 ## Update Incident
+
+**Component key:** `grafana.updateIncident`
 
 The Update Incident component updates supported fields on an existing Grafana IRM incident.
 

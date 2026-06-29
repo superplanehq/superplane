@@ -18,6 +18,7 @@ type AgentStreamRequest struct {
 	SessionID      string `json:"session_id"`
 	OrganizationID string `json:"organization_id"`
 	UserID         string `json:"user_id"`
+	LockRetryCount int    `json:"lock_retry_count,omitempty"`
 }
 
 func PublishAgentStreamRequested(req AgentStreamRequest) error {
@@ -60,4 +61,13 @@ type AgentMessage struct {
 	ToolName   string     `json:"toolName,omitempty"`
 	ToolStatus string     `json:"toolStatus,omitempty"`
 	CreatedAt  *time.Time `json:"createdAt,omitempty"`
+}
+
+// AgentOutcomeEventMessage carries outcome/grader lifecycle events.
+type AgentOutcomeEventMessage struct {
+	SessionID string `json:"sessionId"`
+	Event     string `json:"event"`
+	Iteration int    `json:"iteration"`
+	Passed    bool   `json:"passed,omitempty"`
+	Feedback  string `json:"feedback,omitempty"`
 }

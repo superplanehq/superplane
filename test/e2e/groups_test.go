@@ -11,9 +11,8 @@ import (
 )
 
 func TestGroups(t *testing.T) {
-	steps := &GroupsSteps{t: t}
-
 	t.Run("creating a new group", func(t *testing.T) {
+		steps := &GroupsSteps{t: t}
 		steps.start()
 		steps.visitCreateGroupPage()
 		steps.fillInCreateGroupForm("E2E Example Group")

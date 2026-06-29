@@ -274,4 +274,38 @@ func TestValidateNodeExpressions_Edge(t *testing.T) {
 			t.Fatalf("expected no errors, got %+v", errs)
 		}
 	})
+
+	t.Run("start template payload accepts parameters variable", func(t *testing.T) {
+		fields := []configuration.Field{
+			{
+				Name: "templates",
+				Type: configuration.FieldTypeList,
+				TypeOptions: &configuration.TypeOptions{
+					List: &configuration.ListTypeOptions{
+						ItemDefinition: &configuration.ListItemDefinition{
+							Type: configuration.FieldTypeObject,
+							Schema: []configuration.Field{
+								{
+									Name: "payload",
+									Type: configuration.FieldTypeObject,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := validateNodeExpressions("n1", "Start", map[string]any{
+			"templates": []any{
+				map[string]any{
+					"payload": map[string]any{
+						"message": `{{ parameters["message"] }}`,
+					},
+				},
+			},
+		}, fields, knownSet())
+		if len(errs) != 0 {
+			t.Fatalf("expected no errors, got %+v", errs)
+		}
+	})
 }

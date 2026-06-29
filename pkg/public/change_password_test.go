@@ -32,7 +32,7 @@ func setupChangePasswordTestServer(t *testing.T) (*Server, *support.ResourceRegi
 	r := support.Setup(t)
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, nil, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), r.GitProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 	server.RegisterWebRoutes("")
 
@@ -42,7 +42,7 @@ func setupChangePasswordTestServer(t *testing.T) (*Server, *support.ResourceRegi
 	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
 	require.NoError(t, err)
 
-	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	return server, r, token
@@ -54,11 +54,11 @@ func setupChangePasswordTestServerNoPassword(t *testing.T) (*Server, *support.Re
 	r := support.Setup(t)
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, nil, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), r.GitProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 	server.RegisterWebRoutes("")
 
-	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	return server, r, token
@@ -70,7 +70,7 @@ func setupChangePasswordTestServerLoginDisabled(t *testing.T) (*Server, *support
 	r := support.Setup(t)
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, nil, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), r.GitProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 	server.RegisterWebRoutes("")
 
@@ -80,7 +80,7 @@ func setupChangePasswordTestServerLoginDisabled(t *testing.T) (*Server, *support
 	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
 	require.NoError(t, err)
 
-	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	return server, r, token
@@ -339,7 +339,7 @@ func TestChangePassword_InvalidatesOldCookie(t *testing.T) {
 
 	// A freshly minted cookie with iat after password_changed_at is accepted.
 	signer := jwt.NewSigner("test-client-secret")
-	freshToken, err := signer.Generate(r.Account.ID.String(), time.Hour)
+	freshToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, check(freshToken))
 }

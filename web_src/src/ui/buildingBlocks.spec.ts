@@ -1,25 +1,31 @@
-import type { SuperplaneActionsAction } from "@/api-client";
 import { describe, expect, it } from "vitest";
 import { buildBuildingBlockCategories } from "./buildingBlocks";
 
 describe("buildBuildingBlockCategories", () => {
-  it("does not merge storybook mock blocks into live categories", () => {
-    const categories = buildBuildingBlockCategories([], [], []);
+  it("orders categories as Core, Runners, Debugging, then Memory", () => {
+    const categories = buildBuildingBlockCategories(
+      [],
+      [
+        { name: "deploy", label: "Deploy" },
+        { name: "runnerJS", label: "Run JavaScript" },
+        { name: "runnerBash", label: "Run Bash" },
+        { name: "runnerPython", label: "Run Python" },
+        { name: "runner", label: "Run Shell Commands" },
+        { name: "display", label: "Display" },
+        { name: "addmemory", label: "Add Memory" },
+      ],
+      [],
+    );
 
-    expect(categories).toEqual([]);
-  });
-
-  it("only returns blocks provided by live inputs", () => {
-    const component: SuperplaneActionsAction = {
-      name: "deploy",
-      label: "Deploy",
-      description: "Deploy the current release",
-    };
-
-    const categories = buildBuildingBlockCategories([], [component], []);
-
-    expect(categories).toHaveLength(1);
-    expect(categories[0]?.name).toBe("Core");
-    expect(categories[0]?.blocks.map((block) => block.name)).toEqual(["deploy"]);
+    expect(categories.map((category) => category.name)).toEqual(["Core", "Runners", "Debugging", "Memory"]);
+    expect(categories.find((category) => category.name === "Runners")?.blocks.map((block) => block.name)).toEqual([
+      "runner",
+      "runnerBash",
+      "runnerJS",
+      "runnerPython",
+    ]);
+    expect(categories.find((category) => category.name === "Core")?.blocks.map((block) => block.name)).toEqual([
+      "deploy",
+    ]);
   });
 });

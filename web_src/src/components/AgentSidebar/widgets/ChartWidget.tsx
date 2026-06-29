@@ -60,7 +60,7 @@ function XYChartWidget({ config }: { config: ChartConfig }) {
   const ChartComponent = type === "bar" ? BarChart : type === "area" ? AreaChart : LineChart;
 
   return (
-    <div className="my-4 rounded-lg border border-violet-200 bg-white p-3 shadow-sm">
+    <div className="my-4 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3">
       {title && <p className="text-xs font-medium text-slate-700 mb-2">{title}</p>}
       <ChartContainer config={chartConfig} className="h-[200px] w-full">
         <ChartComponent data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
@@ -119,7 +119,7 @@ function PieChartWidget({ config }: { config: ChartConfig }) {
   });
 
   return (
-    <div className="my-4 rounded-lg border border-violet-200 bg-white p-3 shadow-sm">
+    <div className="my-4 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3">
       {title && <p className="text-xs font-medium text-slate-700 mb-2">{title}</p>}
       <ChartContainer config={chartConfig} className="h-[200px] w-full">
         <PieChart>

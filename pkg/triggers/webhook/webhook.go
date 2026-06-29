@@ -1,7 +1,6 @@
 package webhook
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -299,7 +299,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	}
 
 	var parsedData any
-	err = json.Unmarshal(ctx.Body, &parsedData)
+	err = models.UnmarshalJSONValue(ctx.Body, &parsedData)
 	if err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}

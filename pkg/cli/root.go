@@ -10,8 +10,8 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	canvases "github.com/superplanehq/superplane/pkg/cli/commands/canvases"
-	events "github.com/superplanehq/superplane/pkg/cli/commands/events"
+	apps "github.com/superplanehq/superplane/pkg/cli/commands/apps"
+	drafts "github.com/superplanehq/superplane/pkg/cli/commands/apps/drafts"
 	executions "github.com/superplanehq/superplane/pkg/cli/commands/executions"
 	groups "github.com/superplanehq/superplane/pkg/cli/commands/groups"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
@@ -20,6 +20,7 @@ import (
 	organizations "github.com/superplanehq/superplane/pkg/cli/commands/organizations"
 	queue "github.com/superplanehq/superplane/pkg/cli/commands/queue"
 	roles "github.com/superplanehq/superplane/pkg/cli/commands/roles"
+	runs "github.com/superplanehq/superplane/pkg/cli/commands/runs"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	usage "github.com/superplanehq/superplane/pkg/cli/commands/usage"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -40,10 +41,11 @@ var RootCmd = &cobra.Command{
 	Use:   "superplane",
 	Short: "SuperPlane command line interface",
 	Long:  "SuperPlane CLI - Command line interface for the SuperPlane API\n\n" + core.AgentSkillsHelp(),
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if !Verbose {
 			log.SetOutput(io.Discard)
 		}
+		return ValidateEnvironmentContext()
 	},
 }
 
@@ -56,9 +58,10 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&OutputFormat, "output", "o", "", "output format: text|json|yaml (overrides config output)")
 
 	options := defaultBindOptions()
-	RootCmd.AddCommand(canvases.NewCommand(options))
+	RootCmd.AddCommand(apps.NewCommand(options))
+	RootCmd.AddCommand(drafts.NewCommand(options))
 	RootCmd.AddCommand(executions.NewCommand(options))
-	RootCmd.AddCommand(events.NewCommand(options))
+	RootCmd.AddCommand(runs.NewCommand(options))
 	RootCmd.AddCommand(groups.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))
 	RootCmd.AddCommand(integrations.NewCommand(options))
@@ -104,6 +107,10 @@ func defaultBindOptions() core.BindOptions {
 		NewAPIClient:        DefaultClient,
 		DefaultOutputFormat: GetOutputFormat,
 		NewConfigContext: func() core.ConfigContext {
+			if context, ok := GetEnvironmentContext(); ok {
+				return NewEnvironmentContext(context)
+			}
+
 			context, ok := GetCurrentContext()
 			if !ok {
 				return nil
@@ -115,6 +122,10 @@ func defaultBindOptions() core.BindOptions {
 }
 
 func GetAPIURL() string {
+	if context, ok := GetEnvironmentContext(); ok {
+		return context.URL
+	}
+
 	if currentContext, ok := GetCurrentContext(); ok {
 		return currentContext.URL
 	}
@@ -123,6 +134,10 @@ func GetAPIURL() string {
 }
 
 func GetAPIToken() string {
+	if context, ok := GetEnvironmentContext(); ok {
+		return context.APIToken
+	}
+
 	if currentContext, ok := GetCurrentContext(); ok {
 		return currentContext.APIToken
 	}

@@ -1,234 +1,101 @@
-import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
+import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Palette, Plus, Search } from "lucide-react";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { Palette } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { CreateCanvasModal } from "../../components/CreateCanvasModal";
+import { Navigate, useParams } from "react-router-dom";
 import { Heading } from "../../components/Heading/heading";
-import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
-import { useAccount } from "../../contexts/AccountContext";
-import { usePermissions } from "@/contexts/PermissionsContext";
-import { PermissionTooltip } from "@/components/PermissionGate";
-import {
-  CANVAS_FOLDER_COLORS,
-  DEFAULT_CANVAS_FOLDER_COLOR,
-  useCanvasFolders,
-  useCanvases,
-  type CanvasFolderColor,
-} from "../../hooks/useCanvasData";
-import { Button } from "@/components/ui/button";
-import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
-import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
+import { useAccount } from "../../contexts/useAccount";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
+import { CanvasToolbar } from "./CanvasToolbar";
+import { EditAppModal } from "./EditAppModal";
+import { HomePageShell } from "./HomePageShell";
+import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
-
-const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
-
-function asCanvasFolderColor(value?: string): CanvasFolderColor {
-  return CANVAS_FOLDER_COLORS.includes(value as CanvasFolderColor)
-    ? (value as CanvasFolderColor)
-    : DEFAULT_CANVAS_FOLDER_COLOR;
-}
-
-function toCanvasCardData(canvas: CanvasesCanvas, formatDate: (value?: string) => string): CanvasCardData | null {
-  const metadata = canvas.metadata;
-  if (!metadata) {
-    return null;
-  }
-
-  const { id, name, createdBy } = metadata;
-  const createdByName = createdBy?.name;
-  if (!id || !name || !createdByName) {
-    return null;
-  }
-
-  return {
-    id,
-    name,
-    description: metadata.description,
-    createdAt: formatDate(metadata.createdAt),
-    canvasFolderId: metadata.folderId || undefined,
-    createdBy: { name: createdByName },
-    nodes: canvas.spec?.nodes || [],
-    edges: canvas.spec?.edges || [],
-  };
-}
+import { useEditApp } from "./useEditApp";
+import { useHomePageCanvasList } from "./useHomePageCanvasList";
 
 export function HomePage() {
   usePageTitle(["Home"]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const canvasModalState = useCreateCanvasModalState();
 
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-
   const {
-    data: canvasesData = [],
-    isLoading: canvasesLoading,
-    error: canvasesApiError,
-  } = useCanvases(organizationId || "");
-  const {
-    data: canvasFoldersData = [],
-    isLoading: canvasFoldersLoading,
-    error: canvasFoldersApiError,
-  } = useCanvasFolders(organizationId || "");
+    editingCanvas,
+    openEdit,
+    closeEdit,
+    saveApp,
+    isSaving: isEditAppSaving,
+    isOpen: isEditAppModalOpen,
+  } = useEditApp();
 
-  const canvasError =
-    canvasesApiError || canvasFoldersApiError ? "Failed to fetch canvases. Please try again later." : null;
-  const canCreateCanvases = canAct("canvases", "create");
+  const { canvases, canvasFolders, filteredCanvases, isLoading, isFetching, canvasError } = useHomePageCanvasList(
+    organizationId,
+    searchQuery,
+  );
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
-  const formatDate = (value?: string) => {
-    if (!value) return "Unknown";
-    return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
-
-  const canvases: CanvasCardData[] = (canvasesData || [])
-    .map((canvas: CanvasesCanvas) => toCanvasCardData(canvas, formatDate))
-    .filter((canvas): canvas is CanvasCardData => canvas !== null)
-    .sort(compareByName);
-
-  const canvasFolders: CanvasFolderData[] = (canvasFoldersData || [])
-    .map((folder: CanvasFoldersCanvasFolder) => ({
-      id: folder.metadata?.id || "",
-      title: folder.spec?.title || "",
-      backgroundColor: asCanvasFolderColor(folder.spec?.backgroundColor),
-      canvasIds: folder.spec?.canvases?.map((canvas) => canvas.id || "").filter(Boolean) || [],
-    }))
-    .filter((folder) => folder.id && folder.title);
-
-  const filteredCanvases = canvases.filter((canvas) => {
-    const normalizedQuery = searchQuery.toLowerCase();
-    return (
-      canvas.name.toLowerCase().includes(normalizedQuery) || canvas.description?.toLowerCase().includes(normalizedQuery)
-    );
+  const isHomePageLoading = isLoading || (isFetching && canvases.length === 0 && canvasFolders.length === 0);
+  useReportPageReady(!isHomePageLoading && !!account && !!organizationId, {
+    canvas_count: canvases.length,
+    folder_count: canvasFolders.length,
+    failed: !!canvasError,
   });
 
-  const isLoading = canvasesLoading || canvasFoldersLoading;
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
-        <p className="ml-3 text-gray-500">Loading...</p>
-      </div>
-    );
+  if (isHomePageLoading) {
+    return <LoadingView />;
   }
 
   if (!account || !organizationId) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">Unable to load user information</p>
-      </div>
-    );
+    return <ErrorView />;
+  }
+
+  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError) {
+    return <Navigate to={`/${organizationId}/apps/new`} replace />;
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
-      <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
-        <OrganizationMenuButton organizationId={organizationId} />
-      </header>
-      <main className="w-full h-full flex flex-column flex-grow-1">
-        <div className="bg-slate-100 w-full flex-grow-1">
-          <div className="mx-auto w-full max-w-6xl p-8">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <Heading level={2} className="!text-2xl mb-1">
-                  Canvases
-                </Heading>
-                <Text className="text-gray-800 dark:text-gray-400">
-                  Overview of all mapped automations across your organization.
-                </Text>
-              </div>
-            </div>
+    <HomePageShell>
+      <div className="mx-auto w-full max-w-6xl p-8">
+        <Header />
 
-            <div className="mb-6">
-              <CanvasToolbar
-                organizationId={organizationId}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                canCreateCanvases={canCreateCanvases}
-                permissionsLoading={permissionsLoading}
-              />
-            </div>
+        <div className="mb-6">
+          <CanvasToolbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+        </div>
 
-            {canvasError ? (
-              <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
-                <Text>{canvasError}</Text>
-              </div>
-            ) : (
-              <Content
-                filteredCanvases={filteredCanvases}
-                canvasFolders={canvasFolders}
-                organizationId={organizationId}
-                searchQuery={searchQuery}
-                onEditCanvas={canvasModalState.onOpenEdit}
-                canUpdateCanvases={canUpdateCanvases}
-                canDeleteCanvases={canDeleteCanvases}
-                permissionsLoading={permissionsLoading}
-              />
-            )}
+        {canvasError ? (
+          <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
+            <Text>{canvasError}</Text>
           </div>
-        </div>
-      </main>
-
-      <CreateCanvasModal {...canvasModalState} />
-    </div>
-  );
-}
-
-interface CanvasToolbarProps {
-  organizationId: string;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  canCreateCanvases: boolean;
-  permissionsLoading: boolean;
-}
-
-function CanvasToolbar({
-  organizationId,
-  searchQuery,
-  setSearchQuery,
-  canCreateCanvases,
-  permissionsLoading,
-}: CanvasToolbarProps) {
-  const allowed = canCreateCanvases || permissionsLoading;
-
-  return (
-    <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
-      <PermissionTooltip allowed={allowed} message="You don't have permission to create canvases.">
-        {allowed ? (
-          <Button asChild>
-            <Link to={`/${organizationId}/canvases/new`} aria-label="Create new canvas">
-              <Plus className="h-4 w-4" />
-              New Canvas
-            </Link>
-          </Button>
         ) : (
-          <Button type="button" disabled>
-            <Plus className="h-4 w-4" />
-            New Canvas
-          </Button>
-        )}
-      </PermissionTooltip>
-
-      <div className="min-w-0 w-full sm:ml-auto sm:w-80">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <Input
-            placeholder="Filter canvases..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+          <Content
+            filteredCanvases={filteredCanvases}
+            canvasFolders={canvasFolders}
+            organizationId={organizationId}
+            searchQuery={searchQuery}
+            onEditCanvas={openEdit}
+            canUpdateCanvases={canUpdateCanvases}
+            canDeleteCanvases={canDeleteCanvases}
+            permissionsLoading={permissionsLoading}
           />
-        </div>
+        )}
       </div>
-    </div>
+
+      <EditAppModal
+        open={isEditAppModalOpen}
+        initialName={editingCanvas?.name ?? ""}
+        initialDescription={editingCanvas?.description}
+        isSaving={isEditAppSaving}
+        onClose={closeEdit}
+        onSave={saveApp}
+      />
+    </HomePageShell>
   );
 }
 
@@ -282,15 +149,17 @@ function Content({
       ))}
 
       {folderedLayout.unfiledCanvases.length > 0 ? (
-        <CanvasCardsGrid
-          canvases={folderedLayout.unfiledCanvases}
-          canvasFolders={canvasFolders}
-          organizationId={organizationId}
-          onEditCanvas={onEditCanvas}
-          canUpdateCanvases={canUpdateCanvases}
-          canDeleteCanvases={canDeleteCanvases}
-          permissionsLoading={permissionsLoading}
-        />
+        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-slate-950/5`}>
+          <CanvasCardsGrid
+            canvases={folderedLayout.unfiledCanvases}
+            canvasFolders={canvasFolders}
+            organizationId={organizationId}
+            onEditCanvas={onEditCanvas}
+            canUpdateCanvases={canUpdateCanvases}
+            canDeleteCanvases={canDeleteCanvases}
+            permissionsLoading={permissionsLoading}
+          />
+        </section>
       ) : null}
     </div>
   );
@@ -336,7 +205,7 @@ function CanvasesSearchEmptyState() {
     <div className="text-center py-12">
       <Palette className="mx-auto text-gray-400 mb-4" size={48} aria-hidden />
       <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
-        No canvases found
+        No apps found
       </Heading>
       <Text className="text-gray-500 dark:text-gray-400 mb-6">
         Nothing matches that filter, try another word or clear it
@@ -350,8 +219,40 @@ function CanvasesEmptyState() {
     <div className="text-center py-12">
       <Palette className="mx-auto text-gray-400 mb-4" size={48} aria-hidden />
       <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
-        No canvases yet
+        No apps yet
       </Heading>
+    </div>
+  );
+}
+
+function LoadingView() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
+      <p className="ml-3 text-gray-500">Loading...</p>
+    </div>
+  );
+}
+
+function ErrorView() {
+  return (
+    <div className="text-center py-8">
+      <p className="text-gray-500">Unable to load user information</p>
+    </div>
+  );
+}
+
+function Header() {
+  return (
+    <div className="mb-6 flex items-center justify-between">
+      <div>
+        <Heading level={2} className="!text-2xl mb-1">
+          Apps
+        </Heading>
+        <Text className="text-gray-800 dark:text-gray-400">
+          Overview of all mapped automations across your organization.
+        </Text>
+      </div>
     </div>
   );
 }

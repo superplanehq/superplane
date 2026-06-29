@@ -2,19 +2,287 @@
 title: "Jira"
 ---
 
-Manage and react to issues in Jira
+Manage issues in Jira
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Approve Workflow" href="#approve-workflow" description="Approve or decline a Jira Service Management request approval" />
+  <LinkCard title="Create Alert" href="#create-alert" description="Create a Jira Service Management Ops alert via the Alerts API" />
+  <LinkCard title="Create Heartbeat" href="#create-heartbeat" description="Create a Jira Service Management Operations heartbeat monitor" />
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a Jira Service Management incident via the Incidents API" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+  <LinkCard title="Delete Alert" href="#delete-alert" description="Delete a Jira Service Management Ops alert by id" />
+  <LinkCard title="Delete Heartbeat" href="#delete-heartbeat" description="Delete a Jira Service Management Operations heartbeat" />
+  <LinkCard title="Delete Incident" href="#delete-incident" description="Delete a Jira Service Management incident by issue id or issue key" />
+  <LinkCard title="Delete Issue" href="#delete-issue" description="Delete a Jira issue" />
+  <LinkCard title="Get Alert" href="#get-alert" description="Fetch a Jira Service Management Ops alert by alert id" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Fetch a Jira Service Management incident by issue id or issue key" />
+  <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Jira issue by its key" />
+  <LinkCard title="Get Workflow" href="#get-workflow" description="Get the Jira workflow bound to an issue, including its current status and reachable transitions" />
+  <LinkCard title="Ping Heartbeat" href="#ping-heartbeat" description="Send a ping to a Jira Service Management Operations heartbeat" />
+  <LinkCard title="Transition Issue" href="#transition-issue" description="Move a Jira issue to a reachable workflow status" />
+  <LinkCard title="Update Alert" href="#update-alert" description="Update, assign, add a note to, acknowledge, or close a Jira Service Management Ops alert" />
+  <LinkCard title="Update Heartbeat" href="#update-heartbeat" description="Update a Jira Service Management Operations heartbeat" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update fields on a Jira issue" />
 </CardGrid>
+
+## Instructions
+
+To connect Jira to SuperPlane:
+
+1. Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+2. Click **Create API token**, give it a recognizable label, and copy the generated token.
+3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like `https://your-domain.atlassian.net`.
+4. Paste the Atlassian account **Email** that owns the API token.
+5. Paste the generated **API Token**.
+
+<a id="approve-workflow"></a>
+
+## Approve Workflow
+
+**Component key:** `jira.approveWorkflow`
+
+The Approve Workflow component approves or declines a Jira Service Management request approval.
+
+### Use Cases
+
+- **Automated approval routing**: submit a JSM approval decision after external checks pass
+- **Escalation handling**: decline requests when a SuperPlane workflow detects a failed precondition
+- **Audit context**: add a customer request comment before submitting the approval decision
+
+### Configuration
+
+- **Issue Key**: JSM request issue key, for example `ITSM-123`.
+- **Decision**: Approve or decline.
+- **Approval Selector**: Choose the latest pending approval or pick a specific one from the list.
+- **Approval**: The pending approval to decide. Required when picking a specific approval.
+- **Comment**: Optional public customer request comment posted before the approval decision.
+
+### Output
+
+Returns the updated approval payload from Jira Service Management.
+
+### Notes
+
+- Requires the API token's user to be in the approver list.
+- This component only works on Jira Service Management customer requests, not standard Jira issues.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "approvers": [
+      {
+        "approver": {
+          "accountId": "5b10a2844c20165700ede21g",
+          "displayName": "Alice Example",
+          "emailAddress": "alice@example.com"
+        },
+        "approverDecision": "approved"
+      }
+    ],
+    "completedDate": {
+      "iso8601": "2026-01-19T13:15:00+0000",
+      "jira": "2026-01-19T13:15:00.000+0000"
+    },
+    "finalDecision": "approved",
+    "id": "1",
+    "name": "Manager approval"
+  },
+  "timestamp": "2026-01-19T13:15:00Z",
+  "type": "jira.approval"
+}
+```
+
+<a id="create-alert"></a>
+
+## Create Alert
+
+**Component key:** `jira.createAlert`
+
+The Create Alert component opens a new alert on Jira Service Management.
+
+### Use Cases
+
+- **Monitoring integrations**: Raise an alert from metrics or logs
+- **Automation**: Drive on-call notifications from workflows
+
+### Configuration
+
+- **Message** (required): Alert message text.
+- **Description**, **Note**, **Alias**, **Entity**, **Source** (optional): Standard Ops alert fields.
+- **Priority** (optional): Typically P1–P5; choose "Don't set" to omit.
+- **Tags** / **Actions** (optional): Lists of strings.
+- **Responders** / **Visible to** (optional): Rows with **id** and **type** (team, user, escalation, or schedule).
+- **Extra properties** (optional): JSON object merged into the API **extraProperties** field.
+
+### Output
+
+After the Ops API accepts create, SuperPlane waits for asynchronous processing via the alerts **request status** API, then **GET**s the resulting alert.
+
+The payload matches **Get Alert** (full Ops alert JSON: **id**, **message**, **status**, etc.).
+
+If Jira delays processing beyond the polling window the step fails — use **Get Alert** with the Ops request id noted in logs if Atlassian exposes it.
+
+### Notes
+
+- Requires Jira Service Management Ops permissions and API scopes for alerts on your Atlassian site; the integration stores your site **cloud id** during sync.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "acknowledged": false,
+    "actions": [],
+    "alias": "alias",
+    "count": 2,
+    "createdAt": "2026-01-19T12:00:00Z",
+    "description": "description",
+    "entity": "an entity",
+    "extraProperties": {},
+    "id": "439aa701-7cd6-4549-8992-d06650561222-1779166598474",
+    "integrationName": "",
+    "integrationType": "",
+    "lastOccuredAt": "2026-01-19T12:00:00Z",
+    "message": "message",
+    "owner": "",
+    "priority": "P2",
+    "responders": [],
+    "seen": false,
+    "services": [],
+    "snoozed": false,
+    "source": "source",
+    "status": "open",
+    "tags": [
+      "test-tag"
+    ],
+    "tinyId": "4",
+    "updatedAt": "2026-01-19T12:00:00Z"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.created"
+}
+```
+
+<a id="create-heartbeat"></a>
+
+## Create Heartbeat
+
+**Component key:** `jira.createHeartbeat`
+
+The Create Heartbeat component registers a new heartbeat in Jira Service Management Operations.
+
+### Use Cases
+
+- **Cron monitoring**: Register an expected ping interval for scheduled jobs or agents
+- **Infrastructure checks**: Create heartbeats when provisioning monitored systems
+- **Automation setup**: Pair with Ping Heartbeat in workflows that report liveness
+
+### Configuration
+
+- **Team**: JSM Operations team that owns the heartbeat
+- **Name** (required): Unique heartbeat name within the team
+- **Interval** (required): How often a ping is expected (minimum 1)
+- **Interval unit**: minutes, hours, or days
+- **Enabled**: Whether monitoring is active (defaults to enabled)
+- **Description**, **alert message**, **alert tags**, **alert priority**: Optional expiration alert settings
+
+### Output
+
+Returns the created heartbeat object from the JSM Operations API, including **name**, **interval**, **intervalUnit**, **enabled**, and **status**.
+
+### Notes
+
+- Requires Jira Service Management Operations (Premium) with heartbeats enabled on your site.
+- Re-sync the Jira integration so SuperPlane has your Atlassian cloud id.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertMessage": "The alert has been raised",
+    "alertPriority": "P3",
+    "alertTags": [
+      "tag1"
+    ],
+    "description": "my new heartbeat",
+    "enabled": true,
+    "interval": 1,
+    "intervalUnit": "minutes",
+    "name": "DNS checker",
+    "ownerTeamId": "b071f2e7-2159-4110-aa25-7718b2713ed5",
+    "status": "Pending"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.created"
+}
+```
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+**Component key:** `jira.createIncident`
+
+The Create Incident component opens a new incident in Jira Service Management.
+
+### Use Cases
+
+- **Alert-driven incidents**: Create an incident from a monitoring or ticketing workflow
+- **Cross-tool orchestration**: Open a JSM incident when another system reports an outage
+- **Responder assignment**: Pass responders and other fields supported by your service desk
+
+### Configuration
+
+- **Service desk**: Choose a Jira Service Management service desk (from your site via the JSM API)
+- **Request type**: Choose a request type on that service desk (lists after a service desk is selected)
+- **Summary** (required): Short title for the incident; sent as the Jira **summary** field (Jira requires this). You can set this directly, or supply summary only via **Additional fields**.
+- **Description** (optional): Plain text stored as Jira description (Atlassian Document Format).
+- **Due date** (optional): Jira **duedate** (use your site date format, typically YYYY-MM-DD).
+- **Priority** (optional): Jira priority **name** (for example Medium).
+- **Impact** (optional): Impact level from your Jira request type (options load after service desk and request type are selected).
+- **Urgency** (optional): Urgency level from your Jira request type (options load after service desk and request type are selected).
+- **Original estimate** (optional): Jira **timetracking.originalEstimate** (for example 2h, 1d).
+- **Custom fields** (optional): List of Jira field ids with JSON values—for affected services, pending reason, or any customfield_*; the value must be valid JSON (object or string) as Jira expects for that field type.
+- **Additional fields** (optional): JSON object merged into the API **fields** map (same pattern as other integrations such as Honeycomb **Fields JSON**).
+- **Update** (optional): JSON object for the Incidents API **update** property.
+- **Alert IDs** (optional): List of alert id strings to associate with the incident.
+
+### Output
+
+Returns **id** (numeric issue id), **key** (e.g. ITSM-30), and **self** (issue REST URL) from the create response.
+
+### Notes
+
+- Requires a Jira Cloud site with Jira Service Management and a synced SuperPlane Jira integration (cloud id is resolved automatically).
+- **Request types** must belong to Jira's **Incident management** work category; other request types (for example service requests) are hidden from the picker when Jira returns a practice field on request types. If your site uses an unrecognized practice value, contact support with a sample from GET /rest/servicedeskapi/servicedesk/&lbrace;serviceDeskId&rbrace;/requesttype/&lbrace;requestTypeId&rbrace; with expand=practice.
+- Field ids such as responders are site-specific; use **Custom fields** or **Additional fields** with values that match your JSM configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "10050",
+    "key": "ITSM-30",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10050"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.incident.created"
+}
+```
 
 <a id="create-issue"></a>
 
 ## Create Issue
+
+**Component key:** `jira.createIssue`
 
 The Create Issue component creates a new issue in Jira.
 
@@ -27,9 +295,11 @@ The Create Issue component creates a new issue in Jira.
 ### Configuration
 
 - **Project**: The Jira project to create the issue in
-- **Issue Type**: The type of issue (e.g. Task, Bug, Story)
+- **Issue Type**: The type of issue (scoped to the chosen project)
 - **Summary**: The issue summary/title
 - **Description**: Optional description text
+- **Assignee**: Optional Jira user to assign the issue to
+- **Status**: Optional initial status. Jira always creates issues in the workflow's initial state, so when this is set the component executes a transition immediately after create. The status must be reachable via a transition from the initial state.
 
 ### Output
 
@@ -37,17 +307,726 @@ Returns the created issue including:
 - **id**: The issue ID
 - **key**: The issue key (e.g. PROJ-123)
 - **self**: API URL for the issue
+- **fields**: Full issue fields after any status transition
 
 ### Example Output
 
 ```json
 {
   "data": {
+    "fields": {
+      "assignee": {
+        "accountId": "5b10a2844c20165700ede21g",
+        "displayName": "Alice Example",
+        "emailAddress": "alice@example.com"
+      },
+      "created": "2026-01-19T12:00:00.000+0000",
+      "issuetype": {
+        "name": "Bug"
+      },
+      "labels": [
+        "backend",
+        "p1"
+      ],
+      "priority": {
+        "name": "High"
+      },
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "reporter": {
+        "accountId": "5b10ac8d82e05b22cc7d4ef5",
+        "displayName": "Bob Example"
+      },
+      "status": {
+        "name": "To Do",
+        "statusCategory": {
+          "key": "new",
+          "name": "To Do"
+        }
+      },
+      "summary": "Investigate timeout on checkout flow",
+      "updated": "2026-01-19T12:00:00.000+0000"
+    },
     "id": "10001",
     "key": "PROJ-123",
     "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
   },
   "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.issue"
+}
+```
+
+<a id="delete-alert"></a>
+
+## Delete Alert
+
+**Component key:** `jira.deleteAlert`
+
+The Delete Alert component removes an alert from Jira Service Management.
+
+Deletion is processed asynchronously like other mutating Ops operations.
+
+### Configuration
+
+- **Alert**: Pick the Ops alert to delete from the integration resource list.
+
+### Output
+
+Includes the API acknowledgement (**requestId**, etc.) and **deleted**: true for workflow convenience.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertId": "439aa701-7cd6-4549-8992-d06650561222-1779166598474",
+    "deleted": true,
+    "requestId": "82e59857-e111-44a3-9f72-013783b94f52",
+    "result": "Request will be processed"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.deleted"
+}
+```
+
+<a id="delete-heartbeat"></a>
+
+## Delete Heartbeat
+
+**Component key:** `jira.deleteHeartbeat`
+
+The Delete Heartbeat component removes a heartbeat from Jira Service Management Operations.
+
+### Use Cases
+
+- **Decommissioning**: Remove heartbeats when systems are retired
+- **Test cleanup**: Delete heartbeats created during automation tests
+- **Lifecycle management**: Tear down monitoring when workflows are disabled
+
+### Configuration
+
+- **Team**: Team that owns the heartbeat
+- **Heartbeat**: Name of the heartbeat to delete
+
+### Output
+
+Confirms deletion with **deleted** set to true and the **name** of the removed heartbeat.
+
+### Notes
+
+- Requires Jira Service Management Operations with heartbeats enabled.
+- Deletion is permanent; recreate the heartbeat if needed.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "name": "DNS checker"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.deleted"
+}
+```
+
+<a id="delete-incident"></a>
+
+## Delete Incident
+
+**Component key:** `jira.deleteIncident`
+
+The Delete Incident component removes an incident from Jira Service Management.
+
+### Use Cases
+
+- **Automated cleanup**: Remove incidents created during tests or erroneous automation
+- **Lifecycle workflows**: Delete when a duplicate or mistaken incident is closed upstream
+
+### Configuration
+
+- **Project** (optional): Narrows the issue picker to one Jira project (up to 500 most recently updated issues in that project).
+- **Issue**: The incident issue to delete (issue key from Jira search).
+
+### Output
+
+Confirms deletion with **deleted** set to true.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.incident.deleted"
+}
+```
+
+<a id="delete-issue"></a>
+
+## Delete Issue
+
+**Component key:** `jira.deleteIssue`
+
+The Delete Issue component permanently removes an issue from Jira.
+
+### Use Cases
+
+- **Cleanup**: remove placeholder or duplicate issues created by automated flows
+- **CRUD completion**: pair with create/update flows for full lifecycle management
+
+### Configuration
+
+- **Project**: The Jira project the issue belongs to
+- **Issue Key**: The issue key (e.g. `PROJ-123`)
+- **Delete Subtasks**: Also delete the issue's subtasks (Jira returns an error if subtasks exist and this is false)
+
+### Output
+
+Returns the deleted issue's `id` and `key`, plus `deleted: true`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": "10001",
+    "key": "PROJ-123"
+  },
+  "timestamp": "2026-01-19T13:00:00Z",
+  "type": "jira.issueDeleted"
+}
+```
+
+<a id="get-alert"></a>
+
+## Get Alert
+
+**Component key:** `jira.getAlert`
+
+The Get Alert component returns full alert details from Jira Service Management.
+
+### Configuration
+
+- **Alert**: Pick a recent Ops alert from the integration resource list (same as Update / Delete Alert).
+
+### Output
+
+Payload type **jira.alert.fetched** with the alert object (message, status, priority, responders, tags, etc.).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "acknowledged": false,
+    "actions": [],
+    "alias": "alias",
+    "count": 3,
+    "createdAt": "2026-01-19T12:00:00Z",
+    "description": "description",
+    "entity": "entity",
+    "extraProperties": {},
+    "id": "20bfb3c4-ded8-4123-b9d2-c7840a0d4589-1779115726660",
+    "integrationName": "",
+    "integrationType": "",
+    "lastOccuredAt": "2026-01-19T12:00:00Z",
+    "message": "message",
+    "owner": "",
+    "priority": "P2",
+    "responders": [],
+    "seen": false,
+    "services": [],
+    "snoozed": false,
+    "source": "source",
+    "status": "open",
+    "tags": [],
+    "tinyId": "3",
+    "updatedAt": "2026-01-19T12:00:00Z"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.fetched"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+**Component key:** `jira.getIncident`
+
+The Get Incident component returns incident details from Jira Service Management.
+
+### Use Cases
+
+- **Enrichment**: Load incident DTO after an issue webhook or workflow step
+- **Status checks**: Read priority, status, responders, and affected services from JSM
+
+### Configuration
+
+- **Project** (optional): When set, the issue picker lists issues in that project (by project key), paged from Jira search (up to 500, most recently updated first). Leave empty to list issues updated in roughly the last 90 days across projects you can access (same cap and ordering).
+- **Issue**: Choose an issue by key (from Jira search). The stored value is the issue key; numeric ids still work when they are saved as the issue reference.
+
+### Output
+
+Payload type jira.incident.fetched with the incident object returned by Atlassian (summary, reporter, priority, status, responders, etc.).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "priority": {
+      "id": "1",
+      "name": "High"
+    },
+    "summary": "Example incident"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.incident.fetched"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+**Component key:** `jira.getIssue`
+
+The Get Issue component retrieves a Jira issue and its fields for downstream routing and inspection.
+
+### Use Cases
+
+- **Routing decisions**: inspect status, assignee, labels, or priority before branching
+- **Escalation context**: include issue details in notifications or downstream tickets
+- **Cross-tool sync**: enrich workflows that mirror Jira state into other systems
+
+### Configuration
+
+- **Project**: The Jira project the issue belongs to
+- **Issue Key**: The issue key (e.g. `PROJ-123`)
+- **Expand**: Optional comma-separated Jira expand values, such as `renderedFields,names`
+
+### Output
+
+Returns the Jira issue object including `id`, `key`, `self` and the full `fields` map.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "fields": {
+      "assignee": {
+        "accountId": "5b10a2844c20165700ede21g",
+        "displayName": "Alice Example",
+        "emailAddress": "alice@example.com"
+      },
+      "created": "2026-01-19T12:00:00.000+0000",
+      "issuetype": {
+        "name": "Bug"
+      },
+      "labels": [
+        "backend",
+        "p1"
+      ],
+      "priority": {
+        "name": "High"
+      },
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "reporter": {
+        "accountId": "5b10ac8d82e05b22cc7d4ef5",
+        "displayName": "Bob Example"
+      },
+      "status": {
+        "name": "In Progress",
+        "statusCategory": {
+          "key": "indeterminate",
+          "name": "In Progress"
+        }
+      },
+      "summary": "Investigate timeout on checkout flow",
+      "updated": "2026-01-19T12:30:00.000+0000"
+    },
+    "id": "10001",
+    "key": "PROJ-123",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.issue"
+}
+```
+
+<a id="get-workflow"></a>
+
+## Get Workflow
+
+**Component key:** `jira.getWorkflow`
+
+The Get Workflow component returns the Jira workflow that governs a given issue.
+
+### Use Cases
+
+- **State-machine introspection**: see every status in the workflow plus where the issue is right now
+- **Routing decisions**: branch on which transitions are currently reachable before running `transitionIssue`
+- **Operator dashboards**: render the workflow as a graph next to the issue
+
+### Configuration
+
+- **Project**: The Jira project the issue belongs to.
+- **Issue Key**: Jira issue key, for example `PROJ-123`.
+
+### Output
+
+Returns:
+
+- `workflowName` and `workflowSchemeName` — the workflow scheme assigned to the project and the workflow it routes the issue's type to.
+- `currentStatus` / `currentStatusId` — where the issue is now.
+- `statuses` — every status the workflow defines (with `isCurrent` set on the current one).
+- `availableTransitions` — transitions reachable from the issue's current state, each with the transition id, name, and target status.
+
+### Notes
+
+- Resolving the bound workflow goes `issue → project + issue type → workflow scheme → workflow`. Team-managed (next-gen) projects don't expose a workflow scheme; in that case `workflowName` and `statuses` are empty but `currentStatus` and `availableTransitions` are still populated.
+- The `availableTransitions` list reflects workflow rules, conditions, and the calling user's permissions — it is exactly what Jira would offer in the issue view.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "availableTransitions": [
+      {
+        "id": "21",
+        "name": "Stop progress",
+        "toStatus": "To Do",
+        "toStatusId": "10001"
+      },
+      {
+        "id": "31",
+        "name": "Resolve",
+        "toStatus": "Done",
+        "toStatusId": "10003"
+      }
+    ],
+    "currentStatus": "In Progress",
+    "currentStatusId": "10002",
+    "issueKey": "PROJ-123",
+    "issueType": "Task",
+    "projectKey": "PROJ",
+    "statuses": [
+      {
+        "category": "TODO",
+        "id": "10001",
+        "name": "To Do"
+      },
+      {
+        "category": "IN_PROGRESS",
+        "id": "10002",
+        "isCurrent": true,
+        "name": "In Progress"
+      },
+      {
+        "category": "DONE",
+        "id": "10003",
+        "name": "Done"
+      }
+    ],
+    "workflowName": "Software Simplified Workflow",
+    "workflowSchemeId": "101010",
+    "workflowSchemeName": "Default workflow scheme"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.workflow"
+}
+```
+
+<a id="ping-heartbeat"></a>
+
+## Ping Heartbeat
+
+**Component key:** `jira.pingHeartbeat`
+
+The Ping Heartbeat component reports that a monitored system is alive.
+
+### Use Cases
+
+- **Scheduled jobs**: Ping at the end of a cron workflow so JSM detects missed runs
+- **Deploy pipelines**: Confirm a service is up after deployment
+- **Agent check-ins**: Let automation prove an external process completed
+
+### Configuration
+
+- **Team**: Team that owns the heartbeat
+- **Heartbeat**: Heartbeat name to ping (from the team's heartbeat list)
+
+### Output
+
+Returns the API **message** (for example "PONG - Heartbeat received").
+
+### Notes
+
+- Requires Jira Service Management Operations with heartbeats enabled.
+- The heartbeat must already exist (use Create Heartbeat or configure it in JSM).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "message": "PONG - Heartbeat received"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.pinged"
+}
+```
+
+<a id="transition-issue"></a>
+
+## Transition Issue
+
+**Component key:** `jira.transitionIssue`
+
+The Transition Issue component moves a Jira issue through its workflow.
+
+### Use Cases
+
+- **Automated triage**: move issues into the next workflow status after a SuperPlane event
+- **Cross-tool state sync**: mirror status changes from incident or deployment systems
+- **Resolution automation**: close issues with a transition-scoped resolution and comment
+
+### Configuration
+
+- **Project**: Optional Jira project used to narrow the status picker.
+- **Issue Key**: Jira issue key, for example `PROJ-123`.
+- **Target Status**: Status to move the issue to. It must be reachable from the issue's current status.
+- **Comment**: Optional transition comment.
+- **Resolution**: Optional Jira resolution name to set during the transition.
+
+### Output
+
+Returns the refreshed Jira issue after the transition.
+
+### Notes
+
+- Jira does not allow direct status writes. This component finds an available transition whose target status matches the requested status.
+- Workflow conditions and validators still apply.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "fields": {
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "resolution": {
+        "name": "Done"
+      },
+      "status": {
+        "name": "Done",
+        "statusCategory": {
+          "key": "done",
+          "name": "Done"
+        }
+      },
+      "summary": "Investigate timeout on checkout flow",
+      "updated": "2026-01-19T13:00:00.000+0000"
+    },
+    "id": "10001",
+    "key": "PROJ-123",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+  },
+  "timestamp": "2026-01-19T13:00:00Z",
+  "type": "jira.issue"
+}
+```
+
+<a id="update-alert"></a>
+
+## Update Alert
+
+**Component key:** `jira.updateAlert`
+
+The Update Alert component runs updates on alerts on Jira Service Management.
+
+Toggle each optional subsection you need; untouched sections are not sent to Jira.
+
+### Optional updates
+
+- **Description** → updates alert description  
+- **Message** → updates alert message  
+- **Priority** → updates alert priority (omit with "Don't set")  
+- **Assignment** → assigns the alert to a Jira user (Atlassian account ID from the assignee picker)
+- **New note** → adds a new note  
+- **Update existing note** → updates existing note with nested **note id** + **note** text  
+- **Acknowledge alert** → acknowledges alert  
+- **Close alert** → closes alert
+
+After updates, SuperPlane polls the **last asynchronous** Ops response (when applicable) and emits a fresh **GET alert** payload like **Get Alert**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "acknowledged": true,
+    "actions": [],
+    "alias": "alias",
+    "count": 3,
+    "createdAt": "2026-01-19T12:00:00Z",
+    "description": "description",
+    "entity": "entity",
+    "extraProperties": {},
+    "id": "20bfb3c4-ded8-4123-b9d2-c7840a0d4589-1779115726660",
+    "integrationName": "",
+    "integrationType": "",
+    "lastOccuredAt": "2026-01-19T12:00:00Z",
+    "message": "message",
+    "owner": "",
+    "priority": "P5",
+    "responders": [],
+    "seen": false,
+    "services": [],
+    "snoozed": false,
+    "source": "source",
+    "status": "open",
+    "tags": [],
+    "tinyId": "3",
+    "updatedAt": "2026-01-19T12:00:00Z"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.updated"
+}
+```
+
+<a id="update-heartbeat"></a>
+
+## Update Heartbeat
+
+**Component key:** `jira.updateHeartbeat`
+
+The Update Heartbeat component changes settings on an existing JSM Operations heartbeat.
+
+### Use Cases
+
+- **Tune intervals**: Adjust expected ping frequency after operational changes
+- **Enable/disable monitoring**: Turn heartbeats on or off from automation
+- **Alert tuning**: Update expiration alert message, tags, or priority
+
+### Configuration
+
+- **Team** and **Heartbeat** (required): Identify the heartbeat to update
+- **Optional fields** use toggles: only enabled fields are sent to the Jira API
+- Heartbeat **name** cannot be changed (create a new heartbeat instead)
+
+### Output
+
+Returns the updated heartbeat object from the JSM Operations API.
+
+### Notes
+
+- Enable at least one optional field toggle before saving or running the node.
+- Requires Jira Service Management Operations with heartbeats enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertMessage": "The alert has been raised",
+    "alertPriority": "P3",
+    "alertTags": [
+      "tag1"
+    ],
+    "description": "my new heartbeat",
+    "enabled": true,
+    "interval": 5,
+    "intervalUnit": "minutes",
+    "name": "DNS checker",
+    "ownerTeamId": "b071f2e7-2159-4110-aa25-7718b2713ed5",
+    "status": "Responsive"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.updated"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+**Component key:** `jira.updateIssue`
+
+The Update Issue component updates fields on an existing Jira issue.
+
+### Use Cases
+
+- **Automated triage**: change status, priority, or assignee when a workflow processes the issue
+- **Cross-tool sync**: mirror state from another system into Jira
+- **Bulk relabeling**: apply labels based on workflow inputs
+
+### Configuration
+
+- **Project**: The Jira project the issue belongs to
+- **Issue Key**: The issue key (e.g. `PROJ-123`)
+- **Summary**, **Description**, **Issue Type**, **Assignee**, **Priority**, **Labels**: Optional fields to update. At least one must be supplied.
+- **Notify Users**: Whether to send notification emails (defaults to Jira's behaviour)
+
+### Output
+
+Returns the updated Jira issue as fetched after the update.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "fields": {
+      "assignee": {
+        "accountId": "5b10a2844c20165700ede21g",
+        "displayName": "Alice Example"
+      },
+      "issuetype": {
+        "name": "Bug"
+      },
+      "labels": [
+        "backend",
+        "p1",
+        "in-review"
+      ],
+      "priority": {
+        "name": "Medium"
+      },
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "status": {
+        "name": "In Review"
+      },
+      "summary": "Investigate timeout on checkout flow (updated)",
+      "updated": "2026-01-19T12:45:00.000+0000"
+    },
+    "id": "10001",
+    "key": "PROJ-123",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+  },
+  "timestamp": "2026-01-19T12:45:00Z",
   "type": "jira.issue"
 }
 ```

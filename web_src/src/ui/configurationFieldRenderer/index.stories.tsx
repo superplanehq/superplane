@@ -200,6 +200,7 @@ export const Catalog: Story = {
 
 export const StringField = createExampleStory("string");
 export const TextField = createExampleStory("text");
+export const TextFieldCode = createExampleStory("text-code");
 export const ExpressionField = createExampleStory("expression");
 export const XMLField = createExampleStory("xml");
 export const NumberField = createExampleStory("number");

@@ -1,12 +1,13 @@
 import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Bot, Copy, ArrowLeft } from "lucide-react";
@@ -36,6 +37,8 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
   const updateMutation = useUpdateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
   const regenerateTokenMutation = useRegenerateServiceAccountToken(organizationId);
+
+  useReportPageReady(!isLoading && !permissionsLoading && !!id);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");

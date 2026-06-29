@@ -2,49 +2,57 @@ package canvases
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"gorm.io/gorm"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizationID string, id string) (*pb.DescribeCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
-	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasID)
+	orgID := uuid.MustParse(organizationID)
+	db := database.DB(ctx)
+
+	canvas, err := loadCanvas(ctx, db, orgID, canvasID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			template, templateErr := models.FindCanvasTemplate(canvasID)
-			if templateErr != nil {
-				return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-			}
-			canvas = template
-		} else {
-			return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-		}
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	var user *models.User
 	if canvas.CreatedBy != nil {
-		user, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
+		err = telemetry.RunSpan(ctx, "canvases.load_creator", func(ctx context.Context) error {
+			var loadErr error
+			user, loadErr = models.FindMaybeDeletedUserByIDInTransaction(db, canvas.OrganizationID.String(), canvas.CreatedBy.String())
+			return loadErr
+		})
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	proto, err := SerializeCanvas(canvas, true, user)
+	liveVersion, err := loadLiveCanvasVersion(ctx, db, canvas)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load canvas spec")
+	}
+
+	canvasStatus, err := loadCanvasStatus(ctx, db, canvas.ID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load canvas status")
+	}
+
+	proto, err := serializeCanvas(ctx, canvas, liveVersion, user, canvasStatus)
 	if err != nil {
 		log.Errorf("failed to serialize canvas %s: %v", canvas.ID.String(), err)
-		return nil, status.Error(codes.Internal, "failed to serialize workflow")
+		return nil, grpcerrors.Internal(err, "failed to serialize workflow")
 	}
 
 	return &pb.DescribeCanvasResponse{

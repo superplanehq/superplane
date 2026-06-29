@@ -21,8 +21,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -38,7 +40,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
-	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -57,9 +58,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
-	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -67,7 +66,7 @@ import (
 
 const (
 	// Event payload can be up to 64k in size
-	MaxEventSize = 64 * 1024
+	MaxEventSize = config.MaxWebhookPayloadSize
 
 	// The size of the stage execution outputs can be up to 4k
 	MaxExecutionOutputsSize = 4 * 1024
@@ -79,6 +78,7 @@ type Server struct {
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
 	oidcProvider          oidc.Provider
+	gitProvider           git.Provider
 	authService           authorization.Authorization
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
@@ -139,11 +139,33 @@ func getOtelMetricRoute(ctx context.Context) string {
 	return route.pattern
 }
 
+func resolveCriticalHTTPRoute(r *http.Request) string {
+	route := getOtelMetricRoute(r.Context())
+	if route != "" {
+		return route
+	}
+
+	if r.Pattern != "" {
+		return r.Pattern
+	}
+
+	currentRoute := mux.CurrentRoute(r)
+	if currentRoute != nil {
+		routeTemplate, err := currentRoute.GetPathTemplate()
+		if err == nil {
+			return routeTemplate
+		}
+	}
+
+	return ""
+}
+
 func NewServer(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	jwtSigner *jwt.Signer,
 	oidcProvider oidc.Provider,
+	gitProvider git.Provider,
 	basePath string,
 	baseURL string,
 	webhooksBaseURL string,
@@ -167,6 +189,7 @@ func NewServer(
 		WebhooksBaseURL:       webhooksBaseURL,
 		BasePath:              basePath,
 		wsHub:                 ws.NewHub(),
+		gitProvider:           gitProvider,
 		authHandler:           authHandler,
 		isDev:                 appEnv == "development",
 		timeoutHandlerTimeout: 15 * time.Second,
@@ -235,12 +258,25 @@ func newGRPCGatewayMarshaler() runtime.Marshaler {
 	}
 }
 
-func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
+func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
+	if services == nil {
+		return fmt.Errorf("grpc services are required")
+	}
+
 	ctx := context.Background()
 
-	grpcGatewayMux := runtime.NewServeMux(
+	authorizer := authorization.NewGatewayAuthorizer(s.authService)
+
+	var grpcGatewayMux *runtime.ServeMux
+	grpcGatewayMux = runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
+		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
+		runtime.WithMiddlewares(
+			grpc.GatewayRecoveryMiddleware(),
+			grpc.GatewayAuthorizationMiddleware(grpcGatewayMux, authorizer),
+		),
+		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
 			/*
 			 * grpc-gateway annotates the matched HTTP path template in the request context.
@@ -257,79 +293,72 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		runtime.SetQueryParameterParser(&grpc.QueryParser{}),
 	)
 
-	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
-
-	err := pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err := pbUsers.RegisterUsersHandlerServer(ctx, grpcGatewayMux, services.Users)
 	if err != nil {
 		return err
 	}
 
-	err = pbGroups.RegisterGroupsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbGroups.RegisterGroupsHandlerServer(ctx, grpcGatewayMux, services.Groups)
 	if err != nil {
 		return err
 	}
 
-	err = pbRoles.RegisterRolesHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbRoles.RegisterRolesHandlerServer(ctx, grpcGatewayMux, services.Roles)
 	if err != nil {
 		return err
 	}
 
-	err = pbOrg.RegisterOrganizationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbOrg.RegisterOrganizationsHandlerServer(ctx, grpcGatewayMux, services.Organizations)
 	if err != nil {
 		return err
 	}
 
-	err = pbIntegrations.RegisterIntegrationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbIntegrations.RegisterIntegrationsHandlerServer(ctx, grpcGatewayMux, services.Integrations)
 	if err != nil {
 		return err
 	}
 
-	err = pbSecret.RegisterSecretsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbSecret.RegisterSecretsHandlerServer(ctx, grpcGatewayMux, services.Secrets)
 	if err != nil {
 		return err
 	}
 
-	err = pbMe.RegisterMeHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbMe.RegisterMeHandlerServer(ctx, grpcGatewayMux, services.Me)
 	if err != nil {
 		return err
 	}
 
-	err = pbActions.RegisterActionsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbActions.RegisterActionsHandlerServer(ctx, grpcGatewayMux, services.Actions)
 	if err != nil {
 		return err
 	}
 
-	err = pbTriggers.RegisterTriggersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbTriggers.RegisterTriggersHandlerServer(ctx, grpcGatewayMux, services.Triggers)
 	if err != nil {
 		return err
 	}
 
-	err = pbWidgets.RegisterWidgetsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbWidgets.RegisterWidgetsHandlerServer(ctx, grpcGatewayMux, services.Widgets)
 	if err != nil {
 		return err
 	}
 
-	err = pbBlueprints.RegisterBlueprintsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbCanvases.RegisterCanvasesHandlerServer(ctx, grpcGatewayMux, services.Canvases)
 	if err != nil {
 		return err
 	}
 
-	err = pbCanvases.RegisterCanvasesHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbCanvasFolders.RegisterCanvasFoldersHandlerServer(ctx, grpcGatewayMux, services.CanvasFolders)
 	if err != nil {
 		return err
 	}
 
-	err = pbCanvasFolders.RegisterCanvasFoldersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbServiceAccounts.RegisterServiceAccountsHandlerServer(ctx, grpcGatewayMux, services.ServiceAccounts)
 	if err != nil {
 		return err
 	}
 
-	err = pbServiceAccounts.RegisterServiceAccountsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
-	if err != nil {
-		return err
-	}
-
-	err = pbAgents.RegisterAgentsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbAgents.RegisterAgentsHandlerServer(ctx, grpcGatewayMux, services.Agents)
 	if err != nil {
 		return err
 	}
@@ -340,12 +369,29 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	}).Methods("GET")
 
 	s.Router.Handle(
-		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs",
-		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogStream)),
+		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
+		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
 	).Methods("GET")
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
+
+	//
+	// This is not part of the proto APIs and gRPC gateway route,
+	// because of how we need to handle the file streaming.
+	// There is no good way to handle that through the gRPC gateway,
+	// so we need to lift that endpoint here instead.
+	//
+	s.Router.Handle(
+		"/api/v1/canvases/{canvas_id}/repository/file",
+		orgAuthMiddleware(http.HandlerFunc(s.handleRepositoryFileDownload)),
+	).Methods(http.MethodGet)
+
+	s.Router.Handle(
+		"/api/v1/agents/chats/{chatId}/messages/{messageId}/images/{index}",
+		orgAuthMiddleware(http.HandlerFunc(s.handleAgentChatMessageImage)),
+	).Methods(http.MethodGet)
+
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
@@ -364,7 +410,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/actions").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
@@ -414,7 +459,7 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 			r2.Header.Set("x-Token-Scopes", string(scopes))
 		}
 
-		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
 }
 
@@ -431,7 +476,7 @@ func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) htt
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
 		r2.Header.Set("x-account-id", account.ID.String())
-		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
 }
 
@@ -515,6 +560,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 			next.ServeHTTP(w, withOtelMetricRoute(r))
 		})
 	})
+	r.Use(middleware.CriticalHTTPTraceMiddleware(resolveCriticalHTTPRoute))
 	r.Use(otelmux.Middleware(
 		"superplane-public-api",
 		otelmux.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
@@ -589,6 +635,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
+	accountRoute.HandleFunc("/apps/install/preview", s.appInstallPreview).Methods("GET")
+	accountRoute.HandleFunc("/apps/install", s.installApp).Methods("POST")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
@@ -602,6 +650,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
@@ -688,6 +737,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		integrationInstance.Capabilities,
 	)
 
+	logging.ForIntegration(*integrationInstance).WithField("source", "oauth_callback").Info("Integration operation may write secrets")
 	integration.HandleRequest(core.HTTPRequestContext{
 		Logger:           logging.ForIntegration(*integrationInstance),
 		Request:          r,
@@ -741,7 +791,11 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 
 	response, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
 	if err != nil {
-		log.Errorf("Error loading organization creation status for account %s: %v", account.ID, err)
+		// describeOrganizationCreationStatus already logs the underlying
+		// error with stage-specific structured fields, so we don't repeat
+		// the full error chain here.
+		log.WithField("account_id", account.ID.String()).
+			Error("failed to load organization creation status")
 		http.Error(w, "Failed to load organization creation status", http.StatusInternalServerError)
 		return
 	}
@@ -756,6 +810,10 @@ func (s *Server) describeOrganizationCreationStatus(
 ) (*organizationCreationStatusResponse, error) {
 	organizationCount, err := models.CountOrganizationsByBillingAccount(accountID)
 	if err != nil {
+		log.WithError(err).
+			WithField("account_id", accountID).
+			WithField("stage", "count_organizations").
+			Error("failed to count organizations for billing account")
 		return nil, fmt.Errorf("count organizations for account %s: %w", accountID, err)
 	}
 
@@ -775,6 +833,11 @@ func (s *Server) describeOrganizationCreationStatus(
 		&usagepb.AccountState{Organizations: int32(organizationCount + 1)},
 	)
 	if err != nil {
+		log.WithError(err).
+			WithField("account_id", accountID).
+			WithField("stage", "check_account_limits").
+			WithField("grpc_code", status.Code(err).String()).
+			Error("failed to check account organization creation limits")
 		return nil, fmt.Errorf("check account limits for account %s: %w", accountID, err)
 	}
 
@@ -807,10 +870,23 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 	}
 
 	if _, setupErr := s.usageService.SetupAccount(ctx, accountID); setupErr != nil && status.Code(setupErr) != codes.AlreadyExists {
+		log.WithError(setupErr).
+			WithField("account_id", accountID).
+			WithField("grpc_code", status.Code(setupErr).String()).
+			Error("failed to lazily provision account in usage service")
 		return nil, setupErr
 	}
 
-	return s.usageService.CheckAccountLimits(ctx, accountID, state)
+	response, err = s.usageService.CheckAccountLimits(ctx, accountID, state)
+	if err != nil {
+		log.WithError(err).
+			WithField("account_id", accountID).
+			WithField("grpc_code", status.Code(err).String()).
+			Error("failed to check account limits after lazy provisioning")
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
@@ -840,7 +916,10 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
 	if err != nil {
-		log.Errorf("Error checking organization creation status for account %s: %v", account.ID, err)
+		// describeOrganizationCreationStatus already logs the underlying
+		// error with stage-specific structured fields.
+		log.WithField("account_id", account.ID.String()).
+			Error("failed to check organization creation status before creating organization")
 		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
 		return
 	}
@@ -1097,10 +1176,15 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		newEvents = append(newEvents, events...)
 	}
 
+	touchedExecutions := map[uuid.UUID]uuid.UUID{}
+	recordExecution := func(workflowID, executionID uuid.UUID) {
+		touchedExecutions[executionID] = workflowID
+	}
+
 	var firstResponse *core.WebhookResponseBody
 
 	for _, node := range nodes {
-		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents)
+		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents, recordExecution)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
@@ -1115,6 +1199,12 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
+	for executionID, workflowID := range touchedExecutions {
+		if err := messages.PublishCanvasExecutionByID(workflowID, executionID); err != nil {
+			log.Errorf("error publishing execution state for %s: %v", executionID, err)
+		}
+	}
+
 	if firstResponse != nil {
 		if firstResponse.ContentType != "" {
 			w.Header().Set("Content-Type", firstResponse.ContentType)
@@ -1126,12 +1216,12 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	if node.Type == models.NodeTypeTrigger {
 		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
 	}
 
-	return s.executeActionNode(ctx, body, headers, node, onNewEvents)
+	return s.executeActionNode(ctx, body, headers, node, onNewEvents, recordExecution)
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
@@ -1169,7 +1259,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
 	action, err := s.registry.GetAction(ref.Component.Name)
 	if err != nil {
@@ -1207,6 +1297,10 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				return nil, err
 			}
 
+			if recordExecution != nil {
+				recordExecution(execution.WorkflowID, execution.ID)
+			}
+
 			return &core.ExecutionContext{
 				ID:             execution.ID,
 				WorkflowID:     execution.WorkflowID.String(),
@@ -1218,9 +1312,9 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 				Requests:       contexts.NewExecutionRequestContext(tx, execution),
-				Logger:         logging.ForExecution(execution, nil),
-				Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, execution.WorkflowID),
+				Logger:         logging.ForExecution(execution),
 				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
+				Files:          contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
 			}, nil
 		},
 	})

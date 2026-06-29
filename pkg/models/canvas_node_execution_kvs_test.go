@@ -127,7 +127,7 @@ func (s *CanvasNodeExecutionKVTestSteps) CreateEvent() {
 		WorkflowID: s.wf.ID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       JSONValue{},
 		State:      CanvasEventStatePending,
 	}
 	require.NoError(s.t, database.Conn().Create(s.rootEvent).Error)

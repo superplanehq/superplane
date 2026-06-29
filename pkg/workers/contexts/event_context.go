@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +19,7 @@ type EventContext struct {
 }
 
 func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) *EventContext {
-	return &EventContext{tx: tx, node: node, maxPayloadSize: DefaultMaxPayloadSize, onNewEvents: onNewEvents}
+	return &EventContext{tx: tx, node: node, maxPayloadSize: config.MaxPayloadSize(), onNewEvents: onNewEvents}
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
@@ -41,13 +41,13 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	now := time.Now()
 
 	//
-	// We use RawMessage here to avoid a second marshal when GORM persists the JSONType.
+	// We use RawMessage here to avoid a second marshal when GORM persists the JSON value.
 	//
 	event := models.CanvasEvent{
 		WorkflowID: s.node.WorkflowID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.NewJSONType[any](json.RawMessage(data)),
+		Data:       models.NewJSONValue(json.RawMessage(data)),
 		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
 	}

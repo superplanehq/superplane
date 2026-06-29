@@ -2,18 +2,18 @@ package organizations
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -28,12 +28,12 @@ func UpdateIntegrationSecret(
 ) (*pb.UpdateIntegrationSecretResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
 	}
 
 	id, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid integration ID")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid integration ID")
 	}
 
 	integration, err := models.FindIntegration(org, id)
@@ -47,7 +47,7 @@ func UpdateIntegrationSecret(
 	}
 
 	if !secret.Editable {
-		return nil, status.Errorf(codes.InvalidArgument, "secret %s is not editable", secretName)
+		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("secret %s is not editable", secretName))
 	}
 
 	setupProvider, err := registry.GetSetupProvider(integration.AppName)
@@ -55,6 +55,7 @@ func UpdateIntegrationSecret(
 		return nil, err
 	}
 
+	logrus.WithField("integration_id", integration.ID).WithField("source", "user_update").Info("Integration operation may write secrets")
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		setupStep, err := setupProvider.OnSecretUpdate(core.SecretUpdateContext{
 			SecretName:   secretName,
@@ -89,7 +90,7 @@ func UpdateIntegrationSecret(
 
 	if err != nil {
 		logrus.WithError(err).Error("failed to update integration parameter")
-		return nil, status.Errorf(codes.Internal, "failed to update integration secret: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to update integration secret")
 	}
 
 	proto, err := serializeIntegration(registry, integration, []models.CanvasNodeReference{})
@@ -114,5 +115,5 @@ func findSecret(integration *models.Integration, secretName string) (*models.Int
 		}
 	}
 
-	return nil, status.Errorf(codes.NotFound, "secret %s not found", secretName)
+	return nil, grpcerrors.NotFound(gorm.ErrRecordNotFound, fmt.Sprintf("secret %s not found", secretName))
 }

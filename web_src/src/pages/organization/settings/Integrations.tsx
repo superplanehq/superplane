@@ -2,6 +2,7 @@ import { Loader2, Plug, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import {
   useAvailableIntegrations,
   useConnectedIntegrations,
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -62,6 +63,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const createIntegrationMutation = useCreateIntegration(organizationId, "integrations_page");
 
   const isLoading = loadingAvailable || loadingInstalled;
+
+  useReportPageReady(!isLoading && !permissionsLoading);
+
   const integrationNames = useMemo(() => {
     return new Set(
       organizationIntegrations.map((integration) => integration.metadata?.name?.trim()).filter(Boolean) as string[],
@@ -128,7 +132,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       });
     });
 
-    return [...catalogByProvider.values()].sort((a, b) => a.providerLabel.localeCompare(b.providerLabel));
+    return [...catalogByProvider.values()].sort((a, b) => {
+      const aHasInstances = a.instances.length > 0;
+      const bHasInstances = b.instances.length > 0;
+      if (aHasInstances !== bHasInstances) {
+        return aHasInstances ? -1 : 1;
+      }
+      return a.providerLabel.localeCompare(b.providerLabel);
+    });
   }, [availableIntegrations, connectedInstancesByProvider]);
   const filteredIntegrationCatalog = useMemo(() => {
     const normalizedQuery = filterQuery.trim().toLowerCase();

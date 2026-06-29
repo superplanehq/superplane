@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "./dash0.ts";
 import "./index.css";
 import "@xyflow/react/dist/style.css";
 import App from "./App.tsx";

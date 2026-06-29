@@ -68,7 +68,7 @@ func handleRunState(workflowID string, runID string, wsHub *ws.Hub) error {
 		return fmt.Errorf("unknown run state: %s", run.State)
 	}
 
-	executions, err := models.ListParentExecutionsForRunsInTransaction(database.Conn(), workflowUUID, []uuid.UUID{runUUID})
+	executions, err := models.ListExecutionsForRunsInTransaction(database.Conn(), workflowUUID, []uuid.UUID{runUUID})
 	if err != nil {
 		return fmt.Errorf("failed to find run executions: %w", err)
 	}

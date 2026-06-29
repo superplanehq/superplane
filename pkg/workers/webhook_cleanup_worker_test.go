@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -20,13 +21,14 @@ func Test__WebhookCleanupWorker_DeletesWebhookWhenProviderCleanupFails(t *testin
 	r := support.Setup(t)
 	defer r.Close()
 
+	logger := logrus.NewEntry(logrus.New())
 	cleanupCalls := 0
 	worker, webhookID := setupWebhookCleanupWorker(t, r, func(ctx core.WebhookHandlerContext) error {
 		cleanupCalls++
 		return errors.New("provider unavailable")
 	})
 
-	err := worker.LockAndProcessWebhook(models.Webhook{ID: webhookID})
+	err := worker.LockAndProcessWebhook(logger, models.Webhook{ID: webhookID})
 	require.NoError(t, err)
 
 	assertWebhookHardDeleted(t, webhookID)

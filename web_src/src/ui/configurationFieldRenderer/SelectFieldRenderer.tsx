@@ -29,7 +29,7 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       </SelectTrigger>
       <SelectContent className="max-h-60">
         {selectOptions.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value ?? ""}>
+          <SelectItem key={opt.value} value={opt.value ?? ""} title={opt.description || undefined}>
             {opt.label}
           </SelectItem>
         ))}

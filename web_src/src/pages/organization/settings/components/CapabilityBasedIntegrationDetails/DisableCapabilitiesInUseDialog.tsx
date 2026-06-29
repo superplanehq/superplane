@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Link } from "@/components/Link/link";
+import { appPath } from "@/lib/appPaths";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Fragment } from "react";
 import {
@@ -47,7 +48,7 @@ function CanvasNamesUsedInSummary({
         <Fragment key={canvas.canvasId}>
           {index > 0 ? <span className="text-gray-500 dark:text-gray-400">, </span> : null}
           <Link
-            href={`/${organizationId}/canvases/${canvas.canvasId}`}
+            href={appPath(organizationId, canvas.canvasId)}
             target="_blank"
             rel="noopener noreferrer"
             style={CANVAS_LINK_UNDERLINE_STYLE}

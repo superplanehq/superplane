@@ -28,10 +28,12 @@ export default defineConfig(({ command }: { command: string }) => {
   const isProduction = process.env.APP_ENV === "production";
   const apiPort = process.env.API_PORT || process.env.PUBLIC_API_PORT || "8000";
   const devPort = Number.parseInt(process.env.VITE_DEV_PORT || "5173", 10);
+  const assetBaseUrl = process.env.VITE_ASSET_BASE_URL?.trim();
 
   return {
     plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
-    base: "/",
+    // Empty env vars are common in Docker ARG defaults; ?? alone would yield base: "".
+    base: assetBaseUrl ? assetBaseUrl : "/",
     server: {
       port: devPort,
       strictPort: true,

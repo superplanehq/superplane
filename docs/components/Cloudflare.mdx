@@ -54,50 +54,35 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-## Create a Cloudflare API Token
+To connect Cloudflare to SuperPlane:
 
-1. Open the [Cloudflare API Tokens page](https://dash.cloudflare.com/profile/api-tokens)
-2. Click **Create Token**
-3. Click **Get started** next to "Create Custom Token"
-4. Configure the token:
-   - **Token name**: SuperPlane Integration
-   - **Permissions** (click "+ Add more" to add each):
-     - Zone / Zone / Read
-     - Zone / DNS / Edit
-     - Zone / Cache Purge / Purge
-     - Zone / SSL and Certificates / Edit
-     - Zone / Single Redirect / Edit
-     - Zone / Origin Rules / Edit
-     - Zone / Workers Routes / Edit
-	 - Zone / Load Balancers / Edit
-     - Account / Workers KV Storage / Edit
-     - Account / Workers Scripts / Edit
-     - Account / Workers / Edit
-     - Account / Load Balancing: Monitors and Pools / Edit
-     - Account / Notifications / Edit
-     - Account / Account Settings / Edit
-     - Account / Cloudflare Tunnel / Edit
-   - **Zone Resources**: Include / All zones _(or select specific zones)_
-   - **Account Resources**: Include the account containing your load balancers
-5. Click **Continue to summary**, then **Create Token**
-6. Copy the token and paste it below
-
-## Find your Cloudflare Account ID
-
-The **Account ID** is required for KV storage, load balancing monitors/pools, Cloudflare Tunnels, and health alert webhooks.
-
-1. Open the [Cloudflare dashboard](https://dash.cloudflare.com/)
-2. Select the account that contains your load balancers
-3. In the account home page, copy the **Account ID** from the right sidebar
-4. Paste it into the **Account ID** field below
-
-Make sure this is the same account selected in **Account Resources** when creating the API token.
-
-> **Note**: The token is only shown once. Store it securely if needed elsewhere.
+1. In the [Cloudflare dashboard](https://dash.cloudflare.com/), open the account you want to connect, then go to **Manage Account → Account API Tokens** and click **Create Token → Create Custom Token**. Creating an account-owned token requires **Super Administrator** access on the Cloudflare account.
+2. Name the token and keep the first policy scoped to **Entire Account**. Select these permissions:
+   - **Developer Platform** → **Workers KV Storage** → **Edit**
+   - **Developer Platform** → **Workers Scripts** → **Edit**
+   - **Developer Platform** → **Workers** → **Edit**
+   - **Network Services** → **Account Load Balancers** → **Edit**
+   - **Network Services** → **Load Balancing: Monitors and Pools** → **Edit**
+   - **Account & Billing** → **Notifications** → **Edit**
+   - **Account & Billing** → **Account Settings** → **Edit**
+   - **Cloudflare One** → **Cloudflare Tunnel** → **Edit**
+3. Click **Add policy**. In the new policy, change the scope dropdown from **Entire Account** to **All Domains** or **Specified Domains** for only the domains SuperPlane should manage. The DNS and zone rows below are only available after switching this policy to a domain scope:
+   - **DNS & Zones** → **Zone** → **Read**
+   - **DNS & Zones** → **DNS** → **Edit**
+   - **Caching** → **Cache Purge** → **Purge**
+   - **SSL and Certificates** → **SSL and Certificates** → **Edit**
+   - **Rules & Configuration** → **Dynamic URL Redirects** → **Edit**
+   - **Rules & Configuration** → **Origin** → **Edit**
+   - **Developer Platform** → **Workers Routes** → **Edit**
+   - **Network Services** → **Zone Load Balancers** → **Edit**
+4. Optionally set an expiration date, review, create the token, and paste the generated token below. Cloudflare only shows the token once.
+5. Copy the **Account ID** from the same account's home page right sidebar and paste it into **Account ID** below.
 
 <a id="on-load-balancing-health-alert"></a>
 
 ## On Load Balancing Health Alert
+
+**Trigger key:** `cloudflare.onLoadBalancingHealthAlert`
 
 The On Load Balancing Health Alert trigger starts a workflow from Cloudflare Load Balancing health notifications.
 
@@ -153,6 +138,8 @@ The trigger **title** still prefers an origin name, then pool name, then load ba
 
 ## On Tunnel Health
 
+**Trigger key:** `cloudflare.onTunnelHealth`
+
 The On Tunnel Health trigger starts a workflow from Cloudflare `tunnel_health_event` notifications (Cloudflare Tunnel / cloudflared).
 
 ### Use Cases
@@ -204,6 +191,8 @@ The trigger **Payload** tab (and expressions such as `$.trigger.data`) use a mer
 
 ## Create DNS Record
 
+**Component key:** `cloudflare.createDnsRecord`
+
 The Create DNS Record component creates a DNS record in a Cloudflare zone.
 
 ### Use Cases
@@ -247,6 +236,8 @@ Emits the created DNS record on the default channel. If the zone is not found, t
 
 ## Create KV Namespace
 
+**Component key:** `cloudflare.createKVNamespace`
+
 The Create KV Namespace component creates a new Cloudflare Workers KV namespace.
 
 ### Use Cases
@@ -283,6 +274,8 @@ Returns the created namespace with its assigned ID and title.
 <a id="create-load-balancer"></a>
 
 ## Create Load Balancer
+
+**Component key:** `cloudflare.createLoadBalancer`
 
 The Create Load Balancer component creates a new Cloudflare Load Balancer attached to a zone.
 
@@ -347,6 +340,8 @@ Returns the created load balancer with its assigned ID and full configuration.
 
 ## Create Monitor
 
+**Component key:** `cloudflare.createMonitor`
+
 The Create Monitor component creates a Cloudflare Load Balancing health monitor.
 
 ### Use Cases
@@ -401,6 +396,8 @@ Emits the created monitor and, when configured, the attached pool.
 
 ## Create Origin Rule
 
+**Component key:** `cloudflare.createOriginRule`
+
 The Create Origin Rule component creates a Cloudflare origin rule that routes matching requests to a different origin server.
 
 ### Configuration
@@ -447,6 +444,8 @@ Emits the created origin rule on the default channel.
 <a id="create-pool"></a>
 
 ## Create Pool
+
+**Component key:** `cloudflare.createPool`
 
 The Create Pool component creates a new Cloudflare Load Balancer origin pool.
 
@@ -506,6 +505,8 @@ Returns the created origin pool with its assigned ID and full configuration.
 
 ## Create Tunnel
 
+**Component key:** `cloudflare.createTunnel`
+
 The Create Tunnel component provisions a Cloudflare Tunnel under your account.
 
 ### Use Cases
@@ -551,6 +552,8 @@ Returns the tunnel resource from the Cloudflare API, including its ID. When Clou
 
 ## Delete Certificate Pack
 
+**Component key:** `cloudflare.deleteCertificatePack`
+
 The Delete Certificate Pack component removes a custom SSL/TLS certificate pack from a Cloudflare zone.
 
 ### Use Cases
@@ -588,6 +591,8 @@ Emits the deleted pack ID, resolved zone ID, zone name when known from integrati
 <a id="delete-dns-record"></a>
 
 ## Delete DNS Record
+
+**Component key:** `cloudflare.deleteDnsRecord`
 
 The Delete DNS Record component removes a DNS record from a Cloudflare zone.
 
@@ -630,6 +635,8 @@ Emits the deleted DNS record (zoneId, recordId, record) on the default channel. 
 
 ## Delete KV Namespace
 
+**Component key:** `cloudflare.deleteKVNamespace`
+
 The Delete KV Namespace component permanently removes a Cloudflare Workers KV namespace and all of its key-value pairs.
 
 ### Use Cases
@@ -666,6 +673,8 @@ Emits a confirmation with the account ID, namespace ID, and a deleted flag.
 <a id="delete-kv-value"></a>
 
 ## Delete KV Value
+
+**Component key:** `cloudflare.deleteKVValue`
 
 The Delete KV Value component removes a key-value pair from a Cloudflare Workers KV namespace.
 
@@ -705,6 +714,8 @@ Emits a confirmation with the account ID, namespace ID, and key that was deleted
 
 ## Delete Load Balancer
 
+**Component key:** `cloudflare.deleteLoadBalancer`
+
 The Delete Load Balancer component permanently removes a Cloudflare Load Balancer from a zone.
 
 ### Use Cases
@@ -740,6 +751,8 @@ Emits a confirmation with the zone ID and load balancer ID of the deleted load b
 
 ## Delete Monitor
 
+**Component key:** `cloudflare.deleteMonitor`
+
 The Delete Monitor component removes a Cloudflare Load Balancing health monitor.
 
 ### Use Cases
@@ -774,6 +787,8 @@ Emits the deleted monitor ID and any references Cloudflare reported before delet
 <a id="delete-origin-rule"></a>
 
 ## Delete Origin Rule
+
+**Component key:** `cloudflare.deleteOriginRule`
 
 The Delete Origin Rule component removes a Cloudflare origin rule from a zone.
 
@@ -813,6 +828,8 @@ Emits the deleted origin rule on the default channel.
 
 ## Delete Pool
 
+**Component key:** `cloudflare.deletePool`
+
 The Delete Pool component permanently removes a Cloudflare Load Balancer origin pool.
 
 ### Use Cases
@@ -847,6 +864,8 @@ Emits a confirmation with the account ID and pool ID of the deleted pool.
 <a id="delete-tunnel"></a>
 
 ## Delete Tunnel
+
+**Component key:** `cloudflare.deleteTunnel`
 
 The Delete Tunnel component permanently removes a Cloudflare Tunnel.
 
@@ -883,6 +902,8 @@ Emits confirmation with the account ID and tunnel ID.
 
 ## Delete Worker
 
+**Component key:** `cloudflare.deleteWorker`
+
 The Delete Worker component removes a Worker script.
 
 ### Configuration
@@ -913,6 +934,8 @@ Emits the account ID and Worker Script that were deleted.
 <a id="deploy-worker"></a>
 
 ## Deploy Worker
+
+**Component key:** `cloudflare.deployWorker`
 
 The Deploy Worker component uploads a single-module Worker (`worker.js`) to a **Worker script name** in your account. When **Provision Worker if missing** is enabled (default), it first calls Cloudflare's Create Worker API so a **new** name works without a separate step. After upload, SuperPlane always creates a **deployment** so the new version serves 100% of traffic (`cloudflare.worker.deployed`).
 
@@ -964,6 +987,8 @@ Emits the account ID, script name, new version ID, and deployment object.
 
 ## Get KV Value
 
+**Component key:** `cloudflare.getKVValue`
+
 The Get KV Value component reads a value by key from a Cloudflare Workers KV namespace.
 
 ### Use Cases
@@ -999,6 +1024,8 @@ Returns the account ID, namespace ID, key, and the retrieved value string.
 <a id="get-load-balancer"></a>
 
 ## Get Load Balancer
+
+**Component key:** `cloudflare.getLoadBalancer`
 
 The Get Load Balancer component fetches the current state of a Cloudflare Load Balancer.
 
@@ -1046,6 +1073,8 @@ Returns the full load balancer configuration including pools, steering policy, a
 
 ## Get Monitor
 
+**Component key:** `cloudflare.getMonitor`
+
 The Get Monitor component fetches the current configuration of a Cloudflare Load Balancing health monitor.
 
 ### Use Cases
@@ -1092,6 +1121,8 @@ Returns the full monitor configuration including type, path, port, intervals, an
 <a id="get-pool"></a>
 
 ## Get Pool
+
+**Component key:** `cloudflare.getPool`
 
 The Get Pool component fetches the current state of a Cloudflare Load Balancer origin pool.
 
@@ -1144,6 +1175,8 @@ Returns the full pool configuration including its origins, enabled state, and he
 
 ## Get Tunnel
 
+**Component key:** `cloudflare.getTunnel`
+
 The Get Tunnel component fetches the current state of a Cloudflare Tunnel (cloudflared).
 
 ### Use Cases
@@ -1184,6 +1217,8 @@ Returns the tunnel object from the Cloudflare API (ID, name, status, config sour
 <a id="get-worker"></a>
 
 ## Get Worker
+
+**Component key:** `cloudflare.getWorker`
 
 The Get Worker component loads Workers script **settings** (bindings, compatibility, usage model, etc.) and the list of **deployments** (newest first per Cloudflare).
 
@@ -1230,6 +1265,8 @@ Emits `settings` and `deployments` for use in later workflow steps.
 <a id="order-certificate-pack"></a>
 
 ## Order Certificate Pack
+
+**Component key:** `cloudflare.orderCertificatePack`
 
 The Order Certificate Pack component orders an advanced SSL/TLS certificate pack for custom hostnames in a Cloudflare zone.
 
@@ -1280,6 +1317,8 @@ Emits the resolved zone ID, zone name when known from integration metadata, pack
 
 ## Purge Cache
 
+**Component key:** `cloudflare.purgeCache`
+
 The Purge Cache component clears cached content from the Cloudflare CDN.
 
 ### Use Cases
@@ -1325,6 +1364,8 @@ Emits the Cloudflare purge result ID, zone ID, zone name (when known from integr
 
 ## Put KV Value
 
+**Component key:** `cloudflare.putKVValue`
+
 The Put KV Value component writes a key-value pair to a Cloudflare Workers KV namespace.
 
 ### Use Cases
@@ -1362,6 +1403,8 @@ Emits a confirmation with the account ID, namespace ID, and key that was written
 <a id="update-dns-record"></a>
 
 ## Update DNS Record
+
+**Component key:** `cloudflare.updateDNSRecord`
 
 The Update DNS Record component updates an existing DNS record in a Cloudflare zone.
 
@@ -1406,6 +1449,8 @@ Emits the updated DNS record (id, type, name, content, proxied, ttl) on the defa
 <a id="update-load-balancer"></a>
 
 ## Update Load Balancer
+
+**Component key:** `cloudflare.updateLoadBalancer`
 
 The Update Load Balancer component modifies an existing Cloudflare Load Balancer.
 
@@ -1468,6 +1513,8 @@ Returns the updated load balancer configuration.
 
 ## Update Monitor
 
+**Component key:** `cloudflare.updateMonitor`
+
 The Update Monitor component modifies an existing Cloudflare Load Balancing health monitor.
 
 ### Use Cases
@@ -1518,6 +1565,8 @@ Returns the updated monitor configuration after the change is applied.
 
 ## Update Origin Rule
 
+**Component key:** `cloudflare.updateOriginRule`
+
 The Update Origin Rule component updates a Cloudflare origin rule, such as changing the origin host for matching requests.
 
 ### Configuration
@@ -1562,6 +1611,8 @@ Emits the updated origin rule on the default channel.
 <a id="update-pool"></a>
 
 ## Update Pool
+
+**Component key:** `cloudflare.updatePool`
 
 The Update Pool component modifies an existing Cloudflare Load Balancer origin pool.
 
@@ -1623,6 +1674,8 @@ Returns the updated origin pool configuration.
 
 ## Update Redirect Rule
 
+**Component key:** `cloudflare.updateRedirectRule`
+
 The Update Redirect Rule component modifies an existing redirect rule in a Cloudflare zone.
 
 ### Use Cases
@@ -1682,6 +1735,8 @@ Returns the updated redirect rule with all current configuration.
 <a id="update-worker-route"></a>
 
 ## Update Worker Route
+
+**Component key:** `cloudflare.updateWorkerRoute`
 
 The Update Worker Route component manages **zone routes** for Workers.
 

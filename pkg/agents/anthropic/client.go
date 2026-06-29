@@ -6,21 +6,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/agents"
 )
 
 const (
 	defaultBaseURL    = "https://api.anthropic.com/v1"
 	apiVersion        = "2023-06-01"
-	managedAgentsBeta = "managed-agents-2026-04-01"
+	managedAgentsBeta = "managed-agents-2026-04-01,files-api-2025-04-14"
 )
 
 type Config struct {
 	APIKey        string
 	AgentID       string
 	EnvironmentID string
+	Resources     []agents.FileResource
 	BaseURL       string // overridable for tests
 	HTTPClient    *http.Client
 }
@@ -66,7 +71,11 @@ func (c *Client) executeHTTP(ctx context.Context, method, path string, body any)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
-	c.setHeaders(req, body != nil)
+	contentType := ""
+	if body != nil {
+		contentType = "application/json"
+	}
+	c.setHeaders(req, contentType)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -79,7 +88,11 @@ func (c *Client) executeHTTP(ctx context.Context, method, path string, body any)
 		return nil, fmt.Errorf("read body: %w", err)
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("anthropic API %d: %s", resp.StatusCode, truncate(string(data), 500))
+		return nil, &apiError{
+			StatusCode: resp.StatusCode,
+			Path:       path,
+			Message:    truncate(string(data), 500),
+		}
 	}
 	return data, nil
 }
@@ -90,7 +103,7 @@ func (c *Client) openStream(ctx context.Context, path string) (io.ReadCloser, er
 	if err != nil {
 		return nil, fmt.Errorf("build stream request: %w", err)
 	}
-	c.setHeaders(req, false)
+	c.setHeaders(req, "")
 	req.Header.Set("Accept", "text/event-stream")
 
 	resp, err := c.streamClient.Do(req)
@@ -100,17 +113,171 @@ func (c *Client) openStream(ctx context.Context, path string) (io.ReadCloser, er
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return nil, fmt.Errorf("anthropic: stream returned %d: %s", resp.StatusCode, truncate(string(body), 500))
+		return nil, &apiError{
+			StatusCode: resp.StatusCode,
+			Path:       path,
+			Message:    truncate(string(body), 500),
+		}
 	}
 	return resp.Body, nil
 }
 
-func (c *Client) setHeaders(req *http.Request, hasBody bool) {
+type fileMetadata struct {
+	ID       string `json:"id"`
+	Filename string `json:"filename"`
+}
+
+type apiError struct {
+	StatusCode int
+	Path       string
+	Message    string
+}
+
+type agentMetadata struct {
+	System  string          `json:"system"`
+	Version int             `json:"version"`
+	Tools   json.RawMessage `json:"tools,omitempty"`
+}
+
+func (e *apiError) Error() string {
+	return fmt.Sprintf("anthropic API %d: %s", e.StatusCode, e.Message)
+}
+
+func (c *Client) getAgent(ctx context.Context, agentID string) (agentMetadata, error) {
+	data, err := c.executeHTTP(ctx, http.MethodGet, "/agents/"+url.PathEscape(agentID), nil)
+	if err != nil {
+		return agentMetadata{}, err
+	}
+
+	var agent agentMetadata
+	if err := json.Unmarshal(data, &agent); err != nil {
+		return agentMetadata{}, fmt.Errorf("decode agent: %w", err)
+	}
+
+	return agent, nil
+}
+
+func (c *Client) updateAgentSystemPrompt(ctx context.Context, agentID string, version int, prompt string) (agentMetadata, error) {
+	body := map[string]any{
+		"system":  prompt,
+		"version": version,
+		"tools":   defaultAgentTools(),
+	}
+	data, err := c.executeHTTP(ctx, http.MethodPost, "/agents/"+url.PathEscape(agentID), body)
+	if err != nil {
+		return agentMetadata{}, err
+	}
+
+	var agent agentMetadata
+	if err := json.Unmarshal(data, &agent); err != nil {
+		return agentMetadata{}, fmt.Errorf("decode agent: %w", err)
+	}
+
+	return agent, nil
+}
+
+func (c *Client) listFiles(ctx context.Context) ([]fileMetadata, error) {
+	var all []fileMetadata
+	afterID := ""
+
+	for {
+		query := url.Values{}
+		query.Set("limit", "1000")
+		if afterID != "" {
+			query.Set("after_id", afterID)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/files?"+query.Encode(), nil)
+		if err != nil {
+			return nil, fmt.Errorf("build files request: %w", err)
+		}
+		c.setHeaders(req, "")
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		var payload struct {
+			Data    []fileMetadata `json:"data"`
+			HasMore bool           `json:"has_more"`
+			LastID  string         `json:"last_id"`
+		}
+
+		err = decodeJSONResponse(resp, &payload)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, payload.Data...)
+		if !payload.HasMore || payload.LastID == "" {
+			return all, nil
+		}
+		afterID = payload.LastID
+	}
+}
+
+func (c *Client) uploadFileContent(ctx context.Context, content []byte, filename string) (fileMetadata, error) {
+	return c.uploadFileReader(ctx, bytes.NewReader(content), filename)
+}
+
+func (c *Client) uploadFileReader(ctx context.Context, file io.Reader, filename string) (fileMetadata, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return fileMetadata{}, fmt.Errorf("create multipart file: %w", err)
+	}
+	if _, err := io.Copy(part, file); err != nil {
+		return fileMetadata{}, fmt.Errorf("copy source file: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return fileMetadata{}, fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/files", &body)
+	if err != nil {
+		return fileMetadata{}, fmt.Errorf("build upload request: %w", err)
+	}
+	c.setHeaders(req, writer.FormDataContentType())
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fileMetadata{}, err
+	}
+
+	var metadata fileMetadata
+	if err := decodeJSONResponse(resp, &metadata); err != nil {
+		return fileMetadata{}, err
+	}
+	return metadata, nil
+}
+
+func decodeJSONResponse(resp *http.Response, out any) error {
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return &apiError{
+			StatusCode: resp.StatusCode,
+			Message:    truncate(string(data), 500),
+		}
+	}
+	if err := json.Unmarshal(data, out); err != nil {
+		return fmt.Errorf("decode body: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) setHeaders(req *http.Request, contentType string) {
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", apiVersion)
 	req.Header.Set("anthropic-beta", managedAgentsBeta)
-	if hasBody {
-		req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 }
 

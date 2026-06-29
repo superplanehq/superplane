@@ -192,6 +192,7 @@ func triggersFromCapabilities(capabilities []openapi_client.IntegrationsCapabili
 			Label:         capability.Label,
 			Description:   capability.Description,
 			Configuration: capability.Configuration,
+			ExampleData:   capability.ExampleData,
 		})
 	}
 	return triggers

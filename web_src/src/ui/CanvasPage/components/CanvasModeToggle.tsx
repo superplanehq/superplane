@@ -1,158 +1,185 @@
-import type React from "react";
+import { appPath } from "@/lib/appPaths";
+import { isNormalClick } from "@/lib/linkHelpers";
 import { cn } from "@/lib/utils";
+import { Link, useParams } from "react-router-dom";
 
-type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard";
+import type { DraftEditTabTone } from "@/pages/app/lib/draft-branch-edit-status";
+
+import { DraftChangeDots } from "./DraftChangeDots";
+
+export type CanvasMode = "version-live" | "console" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
-  onSelectRuns?: () => void;
-  onSelectDashboard?: () => void;
-  runsNotificationCount?: number;
+  onSelectConsole?: () => void;
+  onSelectMemory?: () => void;
+  onSelectFiles?: () => void;
   editing?: boolean;
-  hasDraft?: boolean;
+  hasCanvasUncommitted?: boolean;
+  hasCanvasCommitted?: boolean;
+  hasConsoleUncommitted?: boolean;
+  hasConsoleCommitted?: boolean;
+  hasFilesUncommitted?: boolean;
+  hasFilesCommitted?: boolean;
+  /** Edit-mode tab bar color aligned with draft status badges. */
+  editTabTone?: DraftEditTabTone;
+}
+
+const CANVAS_TAB = "canvas";
+const CONSOLE_TAB = "console";
+const MEMORY_TAB = "memory";
+const FILES_TAB = "files";
+
+const BASE_TAB_CLASSES =
+  "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50";
+
+const ACTIVE_CLASSES = "bg-background text-foreground shadow-sm";
+const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground";
+const EDITING_ACTIVE_CLASSES = "rounded-full bg-white text-slate-900 shadow-sm";
+
+const MODE_TO_TAB: Record<string, string> = {
+  console: CONSOLE_TAB,
+  memory: MEMORY_TAB,
+  files: FILES_TAB,
+};
+
+/** On normal clicks, prevent Link navigation and use the callback (which preserves query params via setSearchParams). */
+function handleTabClick(e: React.MouseEvent, isActive: boolean, callback: () => void) {
+  if (isNormalClick(e)) {
+    e.preventDefault();
+    if (!isActive) callback();
+  }
+}
+
+function modeToTab(mode: string): string {
+  return MODE_TO_TAB[mode] ?? CANVAS_TAB;
+}
+
+/** Edit-mode nav background tinted to match the draft status badges. */
+function editingNavClassName(tone: DraftEditTabTone): string {
+  if (tone === "uncommitted") return "bg-orange-50";
+  if (tone === "ready") return "bg-blue-50";
+  return "bg-slate-100";
+}
+
+/** Edit-mode inactive tab text tinted to match the draft status badges. */
+function editingInactiveClassName(tone: DraftEditTabTone): string {
+  if (tone === "uncommitted") return "bg-transparent text-orange-800/80 hover:text-orange-900 transition-none";
+  if (tone === "ready") return "bg-transparent text-blue-800/80 hover:text-blue-900 transition-none";
+  return "bg-transparent text-slate-600 hover:text-slate-900 transition-none";
+}
+
+function tabClasses(selected: string, value: string, editing: boolean, tone: DraftEditTabTone) {
+  const isActive = selected === value;
+  const stateClass = isActive
+    ? editing
+      ? EDITING_ACTIVE_CLASSES
+      : ACTIVE_CLASSES
+    : editing
+      ? editingInactiveClassName(tone)
+      : INACTIVE_CLASSES;
+  return cn(BASE_TAB_CLASSES, stateClass);
 }
 
 export function CanvasModeToggle({
   mode,
   onSelectLive,
-  onSelectRuns,
-  onSelectDashboard,
-  runsNotificationCount,
+  onSelectConsole,
+  onSelectMemory,
+  onSelectFiles,
   editing = false,
-  hasDraft = false,
+  hasCanvasUncommitted = false,
+  hasCanvasCommitted = false,
+  hasConsoleUncommitted = false,
+  hasConsoleCommitted = false,
+  hasFilesUncommitted = false,
+  hasFilesCommitted = false,
+  editTabTone = "neutral",
 }: CanvasModeToggleProps) {
-  const showRuns = !!onSelectRuns;
-  const showDashboard = !!onSelectDashboard;
-  const baseTrigger =
-    "h-full border-none px-3 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50";
-  const canvasActiveClassName =
-    editing || hasDraft
-      ? "bg-amber-50 text-amber-800 shadow-none ring-1 ring-inset ring-amber-200"
-      : "bg-sky-50 text-sky-700 shadow-none";
+  const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
+  const showConsole = Boolean(onSelectConsole);
+  const showMemory = Boolean(onSelectMemory);
+  const showFiles = Boolean(onSelectFiles);
+  const selected = modeToTab(mode);
+  const baseHref = organizationId && appId ? appPath(organizationId, appId) : "#";
+  const tabHref = (view?: string) => (view ? `${baseHref}?view=${view}` : baseHref);
 
   return (
-    <div className="inline-flex w-auto" aria-label="Canvas view" role="group">
-      <div className="flex h-8 w-fit gap-0 overflow-hidden rounded-sm border border-slate-300 bg-white/80 p-0">
-        {showDashboard && onSelectDashboard ? (
-          <DashboardModeTab
-            mode={mode}
-            onSelectDashboard={onSelectDashboard}
-            showRuns={showRuns}
-            baseTrigger={baseTrigger}
-          />
-        ) : null}
-        <ModeButton
-          isActive={mode === "version-live" || mode === "version-edit"}
-          activeClassName={canvasActiveClassName}
-          data-testid="canvas-view-mode-live"
-          aria-label={editing ? "Canvas (editing)" : hasDraft ? "Canvas (unpublished draft)" : "Canvas"}
-          onClick={() => {
-            if (mode !== "version-live" && mode !== "version-edit") void onSelectLive();
-          }}
-          className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
-        >
-          <span className="inline-flex items-center gap-1.5">
-            Canvas
-            {hasDraft ? (
-              <span
-                className="inline-flex h-1.5 w-1.5 rounded-full bg-orange-500"
-                aria-hidden="true"
-                data-testid="canvas-view-mode-live-draft-dot"
-              />
-            ) : null}
-          </span>
-        </ModeButton>
-        {showRuns && onSelectRuns ? (
-          <RunsModeTab
-            mode={mode}
-            onSelectRuns={onSelectRuns}
-            runsNotificationCount={runsNotificationCount}
-            baseTrigger={baseTrigger}
-          />
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function DashboardModeTab({
-  mode,
-  onSelectDashboard,
-  showRuns,
-  baseTrigger,
-}: {
-  mode: CanvasMode;
-  onSelectDashboard: () => void;
-  showRuns: boolean;
-  baseTrigger: string;
-}) {
-  return (
-    <>
-      <ModeButton
-        isActive={mode === "dashboard"}
-        data-testid="canvas-view-mode-dashboard"
-        aria-label="Dashboard"
-        onClick={() => {
-          if (mode !== "dashboard") void onSelectDashboard();
-        }}
-        className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
-      >
-        Dashboard
-      </ModeButton>
-      <div className="h-full w-px bg-slate-300" />
-    </>
-  );
-}
-
-function RunsModeTab({
-  mode,
-  onSelectRuns,
-  runsNotificationCount,
-  baseTrigger,
-}: {
-  mode: CanvasMode;
-  onSelectRuns: () => void;
-  runsNotificationCount?: number;
-  baseTrigger: string;
-}) {
-  return (
-    <>
-      <div className="h-full w-px bg-slate-300" />
-      <ModeButton
-        isActive={mode === "runs"}
-        data-testid="canvas-view-mode-runs"
-        aria-label="Runs"
-        onClick={() => {
-          if (mode !== "runs") void onSelectRuns();
-        }}
-        className={cn(baseTrigger, "rounded-sm rounded-bl-none rounded-tl-none")}
+    <nav
+      aria-label="Canvas view"
+      className={cn(
+        "inline-flex h-7 min-h-7 items-center justify-center gap-0 rounded-full p-1",
+        editing ? editingNavClassName(editTabTone) : "bg-slate-100",
+      )}
+    >
+      <Link
+        to={tabHref()}
+        onClick={(e) => handleTabClick(e, selected === CANVAS_TAB, () => void onSelectLive())}
+        className={tabClasses(selected, CANVAS_TAB, editing, editTabTone)}
+        data-testid="canvas-view-mode-live"
+        aria-label={editing ? "Canvas (editing)" : "Canvas"}
+        aria-current={selected === CANVAS_TAB ? "page" : undefined}
       >
         <span className="inline-flex items-center gap-1.5">
-          Runs
-          {runsNotificationCount != null && runsNotificationCount > 0 ? (
-            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-medium leading-none text-white">
-              {runsNotificationCount > 99 ? "99+" : runsNotificationCount}
-            </span>
-          ) : null}
+          Canvas
+          <DraftChangeDots
+            uncommitted={hasCanvasUncommitted}
+            committed={hasCanvasCommitted}
+            testIdPrefix="canvas-view-mode-live"
+          />
         </span>
-      </ModeButton>
-    </>
-  );
-}
-
-interface ModeButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  isActive: boolean;
-  activeClassName?: string;
-}
-
-function ModeButton({
-  isActive,
-  activeClassName = "bg-sky-50 text-sky-700 shadow-none",
-  className,
-  ...props
-}: ModeButtonProps) {
-  return (
-    <button type="button" aria-pressed={isActive} className={cn(isActive && activeClassName, className)} {...props} />
+      </Link>
+      {showConsole ? (
+        <Link
+          to={tabHref("console")}
+          onClick={(e) => handleTabClick(e, selected === CONSOLE_TAB, () => void onSelectConsole?.())}
+          className={tabClasses(selected, CONSOLE_TAB, editing, editTabTone)}
+          data-testid="canvas-view-mode-console"
+          aria-label="Console"
+          aria-current={selected === CONSOLE_TAB ? "page" : undefined}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            Console
+            <DraftChangeDots
+              uncommitted={hasConsoleUncommitted}
+              committed={hasConsoleCommitted}
+              testIdPrefix="canvas-view-mode-console"
+            />
+          </span>
+        </Link>
+      ) : null}
+      {showMemory ? (
+        <Link
+          to={tabHref("memory")}
+          onClick={(e) => handleTabClick(e, selected === MEMORY_TAB, () => void onSelectMemory?.())}
+          className={tabClasses(selected, MEMORY_TAB, editing, editTabTone)}
+          data-testid="canvas-view-mode-memory"
+          aria-label="Memory"
+          aria-current={selected === MEMORY_TAB ? "page" : undefined}
+        >
+          Memory
+        </Link>
+      ) : null}
+      {showFiles ? (
+        <Link
+          to={tabHref("files")}
+          onClick={(e) => handleTabClick(e, selected === FILES_TAB, () => void onSelectFiles?.())}
+          className={tabClasses(selected, FILES_TAB, editing, editTabTone)}
+          data-testid="canvas-view-mode-files"
+          aria-label="Files"
+          aria-current={selected === FILES_TAB ? "page" : undefined}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            Files
+            <DraftChangeDots
+              uncommitted={hasFilesUncommitted}
+              committed={hasFilesCommitted}
+              testIdPrefix="canvas-view-mode-files"
+            />
+          </span>
+        </Link>
+      ) : null}
+    </nav>
   );
 }

@@ -3,69 +3,61 @@ package authorization
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
-	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
-	"gorm.io/datatypes"
 )
 
-func TestDefaultResourceResolver(t *testing.T) {
-	t.Run("returns request id when available", func(t *testing.T) {
-		resourceIDs := defaultResourceResolver(&pbCanvases.DescribeCanvasRequest{Id: "canvas-123"})
+func TestResourceIDsFromPathParams(t *testing.T) {
+	t.Run("returns canvas id from canvas_id path param", func(t *testing.T) {
+		resourceIDs := resourceIDsFromPathParams(
+			map[string]string{"canvas_id": "canvas-123"},
+			[]string{CanvasIDPathParam},
+		)
 		require.Equal(t, []string{"canvas-123"}, resourceIDs)
 	})
 
-	t.Run("returns nil when request does not expose an id", func(t *testing.T) {
-		resourceIDs := defaultResourceResolver(&pbCanvases.ListCanvasesRequest{})
-		assert.Nil(t, resourceIDs)
-	})
-}
-
-func TestCanvasResourceResolver(t *testing.T) {
-	t.Run("returns canvas id when available", func(t *testing.T) {
-		resourceIDs := canvasResourceResolver(&pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"})
+	t.Run("returns id from id path param", func(t *testing.T) {
+		resourceIDs := resourceIDsFromPathParams(
+			map[string]string{"id": "canvas-123"},
+			[]string{IDPathParam},
+		)
 		require.Equal(t, []string{"canvas-123"}, resourceIDs)
 	})
 
-	t.Run("returns canvas id for list runs", func(t *testing.T) {
-		resourceIDs := canvasResourceResolver(&pbCanvases.ListRunsRequest{CanvasId: "canvas-123"})
-		require.Equal(t, []string{"canvas-123"}, resourceIDs)
-	})
-
-	t.Run("returns nil when request does not expose a canvas id", func(t *testing.T) {
-		resourceIDs := canvasResourceResolver(&pbCanvases.ListCanvasesRequest{})
+	t.Run("returns nil when path param is missing", func(t *testing.T) {
+		resourceIDs := resourceIDsFromPathParams(map[string]string{}, []string{CanvasIDPathParam})
 		assert.Nil(t, resourceIDs)
 	})
 }
 
 func TestCanvasAuthorizationRulesSeparateDraftAndLiveActions(t *testing.T) {
-	interceptor := NewAuthorizationInterceptor(nil)
+	rules := DefaultAuthorizationRules()
 
 	tests := []struct {
-		method string
+		route  HTTPRoute
 		action string
 	}{
-		{pbCanvases.Canvases_CreateCanvasVersion_FullMethodName, "update_version"},
-		{pbCanvases.Canvases_UpdateCanvasVersion_FullMethodName, "update_version"},
-		{pbCanvases.Canvases_ApplyCanvasVersionChangeset_FullMethodName, "update_version"},
-		{pbCanvases.Canvases_DeleteCanvasVersion_FullMethodName, "update_version"},
-		{pbCanvases.Canvases_PublishCanvasVersion_FullMethodName, "publish"},
-		{pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName, "publish"},
-		{pbCanvases.Canvases_UpdateCanvas_FullMethodName, "update"},
-		{pbCanvases.Canvases_DeleteCanvas_FullMethodName, "delete"},
+		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/canvases/{canvas_id}/versions"}, action: "read"},
+		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/repository/commits"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/files"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/discard"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/commit"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/auto-layout"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodPatch, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/publish"}, action: "publish"},
+		{route: HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{id}"}, action: "update"},
+		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{id}"}, action: "delete"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.method, func(t *testing.T) {
-			rule, ok := interceptor.rules[tt.method]
+		t.Run(tt.route.String(), func(t *testing.T) {
+			rule, ok := rules[tt.route]
 			require.True(t, ok)
 			assert.Equal(t, "canvases", rule.Resource)
 			assert.Equal(t, tt.action, rule.Action)
@@ -73,152 +65,97 @@ func TestCanvasAuthorizationRulesSeparateDraftAndLiveActions(t *testing.T) {
 	}
 }
 
-func TestHasRequiredScopedTokenPermission(t *testing.T) {
-	ruleWithDefaultResolver := AuthorizationRule{
-		Resource:         "canvases",
-		Action:           "read",
-		DomainType:       models.DomainTypeOrganization,
-		ResourceResolver: defaultResourceResolver,
+func TestHasRequiredScopedTokenPermissionForScopes(t *testing.T) {
+	ruleWithIDPathParam := AuthorizationRule{
+		Resource:           "canvases",
+		Action:             "read",
+		DomainType:         models.DomainTypeOrganization,
+		ResourcePathParams: []string{IDPathParam},
 	}
-	ruleWithCanvasResolver := AuthorizationRule{
-		Resource:         "canvases",
-		Action:           "read",
-		DomainType:       models.DomainTypeOrganization,
-		ResourceResolver: canvasResourceResolver,
+	ruleWithCanvasPathParam := AuthorizationRule{
+		Resource:           "canvases",
+		Action:             "read",
+		DomainType:         models.DomainTypeOrganization,
+		ResourcePathParams: []string{CanvasIDPathParam},
 	}
 
 	tests := []struct {
 		name        string
-		ctx         context.Context
-		req         any
+		scopes      string
+		pathParams  map[string]string
 		rule        AuthorizationRule
 		expectAllow bool
 	}{
 		{
-			name:        "allows request without metadata",
-			ctx:         context.Background(),
-			req:         &pbCanvases.ListCanvasesRequest{},
-			rule:        ruleWithDefaultResolver,
+			name:        "allows request without scoped token scopes",
+			scopes:      "",
+			pathParams:  map[string]string{},
+			rule:        ruleWithIDPathParam,
 			expectAllow: true,
 		},
 		{
-			name:        "allows request without scoped token scopes metadata",
-			ctx:         metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-user-id", "user-123")),
-			req:         &pbCanvases.ListCanvasesRequest{},
-			rule:        ruleWithDefaultResolver,
-			expectAllow: true,
-		},
-		{
-			name: "rejects malformed scoped token scopes metadata",
-			ctx: metadata.NewIncomingContext(
-				context.Background(),
-				metadata.Pairs("x-token-scopes", "not-json"),
-			),
-			req:         &pbCanvases.ListCanvasesRequest{},
-			rule:        ruleWithDefaultResolver,
+			name:        "rejects malformed scoped token scopes metadata",
+			scopes:      "not-json",
+			pathParams:  map[string]string{},
+			rule:        ruleWithIDPathParam,
 			expectAllow: false,
 		},
 		{
-			name: "allows matching permission without resource scoping",
-			ctx: metadata.NewIncomingContext(
-				context.Background(),
-				metadata.Pairs(
-					"x-token-scopes",
-					marshalScopes(t, []string{"canvases:read"}),
-				),
-			),
-			req:         &pbCanvases.ListCanvasesRequest{},
-			rule:        ruleWithDefaultResolver,
+			name:        "allows matching permission without resource scoping",
+			scopes:      marshalScopes(t, []string{"canvases:read"}),
+			pathParams:  map[string]string{},
+			rule:        ruleWithIDPathParam,
 			expectAllow: true,
 		},
 		{
-			name: "allows matching permission with default id resolver",
-			ctx: metadata.NewIncomingContext(
-				context.Background(),
-				metadata.Pairs(
-					"x-token-scopes",
-					marshalScopes(t, []string{"canvases:read:canvas-123"}),
-				),
-			),
-			req:         &pbCanvases.DescribeCanvasRequest{Id: "canvas-123"},
-			rule:        ruleWithDefaultResolver,
+			name:        "allows matching permission with id path param",
+			scopes:      marshalScopes(t, []string{"canvases:read:canvas-123"}),
+			pathParams:  map[string]string{"id": "canvas-123"},
+			rule:        ruleWithIDPathParam,
 			expectAllow: true,
 		},
 		{
-			name: "rejects resource scoped permission when request has no resolvable resource id",
-			ctx: metadata.NewIncomingContext(
-				context.Background(),
-				metadata.Pairs(
-					"x-token-scopes",
-					marshalScopes(t, []string{"canvases:read:canvas-123"}),
-				),
-			),
-			req:         &pbCanvases.ListCanvasesRequest{},
-			rule:        ruleWithDefaultResolver,
+			name:        "rejects resource scoped permission when path param is missing",
+			scopes:      marshalScopes(t, []string{"canvases:read:canvas-123"}),
+			pathParams:  map[string]string{},
+			rule:        ruleWithIDPathParam,
 			expectAllow: false,
 		},
 		{
-			name: "allows matching permission with canvas resolver",
-			ctx: metadata.NewIncomingContext(
-				context.Background(),
-				metadata.Pairs(
-					"x-token-scopes",
-					marshalScopes(t, []string{"canvases:read:canvas-123"}),
-				),
-			),
-			req:         &pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"},
-			rule:        ruleWithCanvasResolver,
+			name:        "allows matching permission with canvas path param",
+			scopes:      marshalScopes(t, []string{"canvases:read:canvas-123"}),
+			pathParams:  map[string]string{"canvas_id": "canvas-123"},
+			rule:        ruleWithCanvasPathParam,
 			expectAllow: true,
 		},
 		{
-			name: "rejects non matching permission with canvas resolver",
-			ctx: metadata.NewIncomingContext(
-				context.Background(),
-				metadata.Pairs(
-					"x-token-scopes",
-					marshalScopes(t, []string{"canvases:read:canvas-456"}),
-				),
-			),
-			req:         &pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"},
-			rule:        ruleWithCanvasResolver,
+			name:        "rejects non matching permission with canvas path param",
+			scopes:      marshalScopes(t, []string{"canvases:read:canvas-456"}),
+			pathParams:  map[string]string{"canvas_id": "canvas-123"},
+			rule:        ruleWithCanvasPathParam,
 			expectAllow: false,
 		},
 		{
-			name: "rejects permission with wrong action",
-			ctx: metadata.NewIncomingContext(
-				context.Background(),
-				metadata.Pairs(
-					"x-token-scopes",
-					marshalScopes(t, []string{"canvases:update"}),
-				),
-			),
-			req:         &pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"},
-			rule:        ruleWithCanvasResolver,
+			name:        "rejects permission with wrong action",
+			scopes:      marshalScopes(t, []string{"canvases:update"}),
+			pathParams:  map[string]string{"canvas_id": "canvas-123"},
+			rule:        ruleWithCanvasPathParam,
 			expectAllow: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			allowed := hasRequiredScopedTokenPermission(tt.ctx, tt.req, tt.rule)
+			allowed := hasRequiredScopedTokenPermissionForScopes(tt.scopes, tt.pathParams, tt.rule)
 			assert.Equal(t, tt.expectAllow, allowed)
 		})
 	}
 }
 
-func TestMetadataScopedTokenPermissions(t *testing.T) {
-	t.Run("returns nil when metadata does not include scoped token scopes", func(t *testing.T) {
-		permissions, err := metadataScopedTokenPermissions(metadata.Pairs("x-user-id", "user-123"))
-		require.NoError(t, err)
-		assert.Nil(t, permissions)
-	})
-
-	t.Run("parses scoped token scopes from metadata", func(t *testing.T) {
-		permissions, err := metadataScopedTokenPermissions(
-			metadata.Pairs(
-				"x-token-scopes",
-				marshalScopes(t, []string{"canvases:read:canvas-123"}),
-			),
+func TestPermissionsFromScopedTokenScopes(t *testing.T) {
+	t.Run("parses scoped token scopes", func(t *testing.T) {
+		permissions, err := permissionsFromScopedTokenScopes(
+			marshalScopes(t, []string{"canvases:read:canvas-123"}),
 		)
 
 		require.NoError(t, err)
@@ -229,34 +166,63 @@ func TestMetadataScopedTokenPermissions(t *testing.T) {
 	})
 }
 
+func TestGatewayAuthorizerSetsOrganizationContext(t *testing.T) {
+	authorizer := NewGatewayAuthorizer(allowingPermissionChecker{})
+	organizationID := "11111111-1111-4111-8111-111111111111"
+	r := httptestRequest(t, map[string]string{
+		"x-user-id":         "22222222-2222-4222-8222-222222222222",
+		"x-organization-id": organizationID,
+	})
+
+	ctx, err := authorizer.AuthorizeHTTP(
+		context.Background(),
+		r,
+		HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/canvases/{id}"},
+		map[string]string{"id": "canvas-123"},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, organizationID, ctx.Value(OrganizationContextKey))
+	assert.Equal(t, models.DomainTypeOrganization, ctx.Value(DomainTypeContextKey))
+	assert.Equal(t, organizationID, ctx.Value(DomainIdContextKey))
+	assert.Equal(t, "canvas-123", PathParamsFromContext(ctx)["id"])
+}
+
 func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
-	interceptor := NewAuthorizationInterceptor(nil)
-	routes := []string{
-		pbAgents.Agents_GetCanvasAgentChat_FullMethodName,
-		pbAgents.Agents_SendAgentChatMessage_FullMethodName,
-		pbAgents.Agents_ListAgentChatMessages_FullMethodName,
+	rules := DefaultAuthorizationRules()
+	routes := []HTTPRoute{
+		{Method: http.MethodGet, Pattern: "/api/v1/agents/canvases/{canvas_id}/chat"},
+		{Method: http.MethodPost, Pattern: "/api/v1/agents/chats/{chat_id}/messages"},
+		{Method: http.MethodGet, Pattern: "/api/v1/agents/chats/{chat_id}/messages"},
 	}
 
 	for _, route := range routes {
-		rule, ok := interceptor.rules[route]
-		require.True(t, ok)
+		rule, ok := rules[route]
+		require.True(t, ok, route.String())
 		assert.Equal(t, []string{features.FeatureClaudeManagedAgents}, rule.RequiredExperimentalFeatures)
 	}
 }
 
-func TestCheckRequiredExperimentalFeatures(t *testing.T) {
-	rule := AuthorizationRule{
-		RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/canvases/{id}"}]
+	require.True(t, ok)
+	assert.Equal(t, "canvases", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
+	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
+}
+
+func httptestRequest(t *testing.T, headers map[string]string) *http.Request {
+	t.Helper()
+
+	r, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
+	require.NoError(t, err)
+
+	for key, value := range headers {
+		r.Header.Set(key, value)
 	}
 
-	err := checkRequiredExperimentalFeatures(&models.Organization{}, rule)
-	require.Error(t, err)
-	assert.Equal(t, codes.PermissionDenied, status.Code(err))
-
-	err = checkRequiredExperimentalFeatures(&models.Organization{
-		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureClaudeManagedAgents},
-	}, rule)
-	require.NoError(t, err)
+	return r
 }
 
 func marshalScopes(t *testing.T, scopes []string) string {

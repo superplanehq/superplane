@@ -4,12 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -30,20 +27,17 @@ func init() {
 
 type Runner struct{}
 
-type EnvironmentVariable struct {
-	Name        string                     `json:"name" mapstructure:"name"`
-	ValueSource string                     `json:"valueSource" mapstructure:"valueSource"`
-	Value       *string                    `json:"value,omitempty" mapstructure:"value"`
-	Secret      configuration.SecretKeyRef `json:"secret,omitempty" mapstructure:"secret"`
+var dockerExecutionOnly = []configuration.VisibilityCondition{
+	{Field: "execution_mode", Values: []string{ExecutionModeDocker}},
 }
 
-type Spec struct {
-	Commands    string                `json:"commands" mapstructure:"commands"`
-	Environment []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
+var dockerImageCustomOnly = []configuration.VisibilityCondition{
+	{Field: "execution_mode", Values: []string{ExecutionModeDocker}},
+	{Field: "docker_image_preset", Values: []string{DockerImagePresetCustom}},
 }
 
 func (c *Runner) Name() string  { return "runner" }
-func (c *Runner) Label() string { return "Runner" }
+func (c *Runner) Label() string { return "Run Shell Commands" }
 func (c *Runner) Icon() string  { return "terminal" }
 func (c *Runner) Color() string { return "blue" }
 
@@ -67,13 +61,22 @@ func (c *Runner) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (c *Runner) Description() string {
-	return "Runs bash commands on a dedicated machine"
+	return "Runs shell commands on a fleet runner (host or Docker container)"
 }
 
 func (c *Runner) Documentation() string {
-	return `Runs bash commands on a dedicated machine.
+	return `Runs shell commands on a fleet runner.
+
+## Execution
+- **Host**: Commands run directly on the runner machine (Bash with a PTY).
+- **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via ` + "`docker exec`" + `. The image must include a usable ` + "`sleep`" + ` (common base images do).
 
 ## Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
+- **Custom container image**: Shown only for **Other**; use a normal reference (` + "`my.registry.example.com/org/repo:1.2.3`" + ` or ` + "`debian:bookworm-slim@sha256:…`" + `). Private registries require the runner to be configured with registry credentials.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
 - **Commands**: One or more shell commands, one per line.
 - **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
 
@@ -82,26 +85,104 @@ func (c *Runner) Documentation() string {
 - **Failed**: The commands finished with non-zero exit code.
 
 ## Structured result
-When the remote task writes valid JSON to **SUPERPLANE_RESULT_FILE** before exit, that object is returned as **result** on the finished event payload (alongside **status** and **exit_code**).
+If the completed broker task includes valid JSON in **result**, SuperPlane includes it on the ` + "`runner.finished`" + ` event payload next to **status** and **exit_code** (the exact shape depends on your runner / task implementation).
 `
 }
 
 func (c *Runner) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:     configurationFieldMachineType,
+			Label:    "Machine type",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: machineTypeSelectOptions,
+				},
+			},
+		},
+		{
+			Name:        "execution_mode",
+			Label:       "Execution mode",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false, // legacy nodes omit this; defaults applied in decodeRunnerSpec / normalizeExecutionMode
+			Default:     ExecutionModeHost,
+			Description: "Where the shell commands run: on the runner machine, or inside a container.",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{
+							Label:       "Host",
+							Value:       ExecutionModeHost,
+							Description: "Runs in a Bash session on the runner (PTY). Best when the workflow should use tools already installed on the runner.",
+						},
+						{
+							Label:       "Docker",
+							Value:       ExecutionModeDocker,
+							Description: "Runs in an isolated container started from the image below. The runner must have Docker and (for private registries) pull credentials.",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:                 "docker_image_preset",
+			Label:                "Container base image",
+			Type:                 configuration.FieldTypeSelect,
+			Required:             false,
+			Default:              "debian:bookworm-slim",
+			Description:          "Pick a common image, or choose Other to type your own registry reference.",
+			VisibilityConditions: dockerExecutionOnly,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Debian Bookworm (slim)", Value: "debian:bookworm-slim"},
+						{Label: "Ubuntu 24.04", Value: "ubuntu:24.04"},
+						{Label: "Alpine 3.20", Value: "alpine:3.20"},
+						{Label: "Node.js 22 (Bookworm)", Value: "node:22-bookworm"},
+						{Label: "Python 3.12 (slim)", Value: "python:3.12-slim"},
+						{Label: "Other (custom image)", Value: DockerImagePresetCustom},
+					},
+				},
+			},
+		},
+		{
+			Name:                 "docker_image",
+			Label:                "Custom container image",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			Placeholder:          "e.g. debian:bookworm-slim",
+			Description:          "Full OCI image reference when you chose Other above. Pin with a tag or digest for reproducible runs.",
+			VisibilityConditions: dockerImageCustomOnly,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "docker_image_preset", Values: []string{DockerImagePresetCustom}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				String: &configuration.StringTypeOptions{
+					MaxLength: intPtr(maxDockerImageReferenceChars),
+				},
+			},
+		},
+		{
 			Name:        "commands",
 			Label:       "Commands",
 			Type:        configuration.FieldTypeText,
 			Required:    true,
 			Placeholder: "echo \"Hello, World!\"",
-			Description: "One or more shell commands, one per line",
+			Description: "One shell command per line.",
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "shell",
+				},
+			},
 		},
 		{
 			Name:        "environment",
 			Label:       "Environment variables",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "Optional key/value pairs available to the commands",
+			Description: "Optional key/value pairs passed into the command environment",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Variable",
@@ -156,24 +237,38 @@ func (c *Runner) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "execution_timeout_seconds",
+			Label:       "Execution timeout (seconds)",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false, // legacy nodes omit this; 0 means DefaultExecutionTimeoutSeconds
+			Default:     DefaultExecutionTimeoutSeconds,
+			Description: "Hard time limit for the whole task, including image pull and command run. Defaults to 3600 seconds (1 hour).",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: intPtr(0),
+					Max: intPtr(maxExecutionTimeoutSecondsRequest),
+				},
+			},
+		},
 	}
 }
 
+func intPtr(v int) *int {
+	return &v
+}
+
 func (c *Runner) Setup(ctx core.SetupContext) error {
-	spec := Spec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return fmt.Errorf("decode configuration: %w", err)
-	}
-
-	if err := validateCommands(spec.Commands); err != nil {
+	spec, err := decodeRunnerSpec(ctx.Configuration)
+	if err != nil {
 		return err
 	}
 
-	if err := validateEnvironment(spec.Environment); err != nil {
+	if err := validateRunnerSpec(spec); err != nil {
 		return err
 	}
 
-	_, err := ctx.Webhook.Setup()
+	_, err = ctx.Webhook.Setup()
 	return err
 }
 
@@ -182,16 +277,12 @@ func (c *Runner) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, err
 }
 
 func (c *Runner) Execute(ctx core.ExecutionContext) error {
-	spec := Spec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return fmt.Errorf("decode configuration: %w", err)
-	}
-
-	if err := validateCommands(spec.Commands); err != nil {
+	spec, err := decodeRunnerSpec(ctx.Configuration)
+	if err != nil {
 		return err
 	}
 
-	if err := validateEnvironment(spec.Environment); err != nil {
+	if err := validateRunnerSpec(spec); err != nil {
 		return err
 	}
 
@@ -211,23 +302,23 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	taskID, err := broker.CreateTask(cmds, webhookURL, environment)
+	mode := normalizeExecutionMode(spec.ExecutionMode)
+	params := CreateTaskParams{
+		MachineType:    spec.MachineType,
+		Commands:       cmds,
+		WebhookURL:     webhookURL,
+		Environment:    environment,
+		ExecutionMode:  mode,
+		DockerImage:    resolvedDockerImageRef(spec),
+		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+	}
+
+	taskID, err := broker.CreateTask(params)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	params := map[string]any{"task_id": taskID}
-
-	err = ctx.ExecutionState.SetKV("task_id", taskID)
-	if err != nil {
-		return fmt.Errorf("set task id in kv: %w", err)
-	}
-
-	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
-		return fmt.Errorf("runner execution metadata: %w", err)
-	}
-
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, params, pollInterval)
+	return afterRunnerTaskCreated(ctx, taskID)
 }
 
 func (c *Runner) Hooks() []core.Hook {
@@ -237,107 +328,18 @@ func (c *Runner) Hooks() []core.Hook {
 func (c *Runner) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case hookActionPoll:
-		return c.handlePoll(ctx)
+		return pollBrokerTask(ctx, RunnerFinishedEventType)
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (c *Runner) handlePoll(ctx core.ActionHookContext) error {
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
-
-	taskID, ok := ctx.Parameters["task_id"].(string)
-	if !ok {
-		return fmt.Errorf("task_id is missing from parameters")
-	}
-
-	broker, err := NewBrokerClient(ctx.HTTP)
-	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
-	}
-
-	task, err := broker.FetchTaskStatus(taskID)
-	if err != nil {
-		ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
-		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
-	}
-
-	sink := taskLogFromBrokerTask(task)
-	if err := mergeRunnerTaskLog(ctx.Metadata, taskID, sink); err != nil {
-		ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
-	}
-
-	if task.IsInTerminalState() {
-		return c.processTaskStatus(ctx.ExecutionState, task)
-	}
-
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
-}
-
 func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	broker, err := NewBrokerClient(ctx.HTTP)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("new broker client: %w", err)
-	}
-
-	var raw map[string]any
-	if err := json.Unmarshal(ctx.Body, &raw); err != nil {
-		raw = nil
-	}
-
-	task, err := broker.ProcessWebhook(ctx.Body)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("process webhook: %w", err)
-	}
-
-	if !task.IsInTerminalState() {
-		ctx.Logger.Warn("runner: broker webhook received non-terminal state")
-	}
-
-	executionCtx, err := ctx.FindExecutionByKV("task_id", task.TaskID)
-	if err != nil {
-		return http.StatusNotFound, nil, nil
-	}
-
-	sink := taskLogFromBrokerTask(task)
-	if sink == nil {
-		sink = taskLogFromRawWebhook(raw)
-	}
-	if executionCtx.Metadata != nil {
-		if err := mergeRunnerTaskLog(executionCtx.Metadata, task.TaskID, sink); err != nil {
-			ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
-		}
-	}
-
-	err = c.processTaskStatus(executionCtx.ExecutionState, task)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("process task status: %w", err)
-	}
-
-	return http.StatusOK, nil, nil
+	return handleBrokerWebhook(ctx, RunnerFinishedEventType)
 }
 
 func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task) error {
-	if state.IsFinished() {
-		return nil
-	}
-
-	if !task.IsInTerminalState() {
-		return fmt.Errorf("task is not in terminal state")
-	}
-
-	channel := FailedOutputChannel
-	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
-		channel = PassedOutputChannel
-	}
-
-	out := map[string]any{"status": task.Status, "exit_code": task.effectiveExitCode()}
-	if v := brokerResultAsAny(task.Result); v != nil {
-		out["result"] = v
-	}
-	return state.Emit(channel, RunnerFinishedEventType, []any{out})
+	return processBrokerTaskStatus(state, task, RunnerFinishedEventType)
 }
 
 func brokerResultAsAny(raw json.RawMessage) any {
@@ -352,5 +354,8 @@ func brokerResultAsAny(raw json.RawMessage) any {
 	return v
 }
 
-func (c *Runner) Cancel(ctx core.ExecutionContext) error { return nil }
-func (c *Runner) Cleanup(ctx core.SetupContext) error    { return nil }
+func (c *Runner) Cancel(ctx core.ExecutionContext) error {
+	return cancelBrokerTask(ctx)
+}
+
+func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }

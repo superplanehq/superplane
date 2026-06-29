@@ -228,9 +228,7 @@ export function parseDefaultValues(configurationFields: ConfigurationField[]): R
             switch (fieldType) {
               case "number": {
                 const num = Number(defaultValue);
-                if (!isNaN(num)) {
-                  parsedValue = num;
-                }
+                parsedValue = isNaN(num) ? parsedValue : num;
                 break;
               }
               case "boolean": {
