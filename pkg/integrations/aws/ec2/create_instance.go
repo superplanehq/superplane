@@ -806,6 +806,12 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 				if err := ctx.Metadata.Set(metadata); err != nil {
 					return err
 				}
+				if createInstanceTimedOut(metadata, config.WaitForRunningTimeoutSeconds, now) {
+					return emitCreateInstanceFailure(
+						ctx.ExecutionState,
+						createInstanceFailurePayload(fmt.Errorf("timed out waiting for status checks on instance %s after %d seconds: %w", instance.InstanceID, config.WaitForRunningTimeoutSeconds, err), instance.InstanceID, instance.State),
+					)
+				}
 				if metadata.StatusPollErrors >= maxInstancePollErrors {
 					return emitCreateInstanceFailure(
 						ctx.ExecutionState,

@@ -717,6 +717,51 @@ func Test__CreateInstance__PollWaitsForStatusChecks(t *testing.T) {
 		assert.Contains(t, payload["error"], "giving up waiting for status checks")
 	})
 
+	t.Run("status check API errors after timeout -> emits failed", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				runningInstanceResponse(),
+				{
+					StatusCode: http.StatusServiceUnavailable,
+					Body: io.NopCloser(strings.NewReader(`
+						<ErrorResponse>
+							<Errors>
+								<Error>
+									<Code>ServiceUnavailable</Code>
+									<Message>try again</Message>
+								</Error>
+							</Errors>
+						</ErrorResponse>
+					`)),
+				},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.HandleHook(core.ActionHookContext{
+			Name: "poll",
+			Configuration: map[string]any{
+				"region":                       "us-east-1",
+				"waitForStatusChecks":          true,
+				"waitForRunningTimeoutSeconds": 1,
+			},
+			HTTP:        httpContext,
+			Integration: awsIntegrationContext(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: newCreateInstanceExecutionMetadata("i-abc123", time.Now().Add(-5*time.Second)),
+			},
+			Requests:       &contexts.RequestContext{},
+			ExecutionState: executionState,
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, createInstanceFailed, executionState.Channel)
+		payload := emittedPayloadData(t, executionState)
+		assert.Contains(t, payload["error"], "timed out waiting for status checks")
+		assert.Equal(t, "ServiceUnavailable", payload["awsErrorCode"])
+	})
+
 	t.Run("status checks not passed before timeout -> emits failed", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
