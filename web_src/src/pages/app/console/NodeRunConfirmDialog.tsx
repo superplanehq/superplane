@@ -140,7 +140,7 @@ export function NodeRunConfirmDialog({
             )}
           </DialogDescription>
         </DialogHeader>
-        <div className="min-w-0 space-y-3 text-xs" data-testid={`${testId}-body`}>
+        <div className="min-w-0 space-y-3 text-[13px]" data-testid={`${testId}-body`}>
           {!template ? (
             <p className="text-amber-700">This node does not declare any runnable Start template.</p>
           ) : (
@@ -165,11 +165,12 @@ export function NodeRunConfirmDialog({
           <SubmitErrorMessage error={submitError} testId={testId} />
         </div>
         <DialogFooter className="min-w-0">
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button type="button" variant="ghost" size="xs" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>
           <LoadingButton
             type="button"
+            size="xs"
             loading={submitting}
             loadingText="Running…"
             onClick={handleConfirm}

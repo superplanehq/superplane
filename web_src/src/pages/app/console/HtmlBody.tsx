@@ -14,7 +14,7 @@ import { interpolateMarkdownTemplate } from "./markdownInterpolation";
  * that survive the curated Tailwind safelist).
  */
 const HTML_ROOT_CLASSES =
-  "max-w-none text-sm text-slate-800 " +
+  "max-w-none text-[13px] text-slate-800 " +
   "[&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:leading-tight [&_h1:first-child]:mt-0 " +
   "[&_h2]:mb-1 [&_h2]:mt-1 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:leading-tight [&_h2:first-child]:mt-0 " +
   "[&_h3]:mb-0.5 [&_h3]:mt-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:leading-tight [&_h3:first-child]:mt-0 " +
