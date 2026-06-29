@@ -266,7 +266,7 @@ func Test__Client__CreateResponse(t *testing.T) {
 			http:    httpCtx,
 		}
 
-		resp, err := client.CreateResponse("gpt-4o", "Hi")
+		resp, err := client.CreateResponse(CreateResponseRequest{Model: "gpt-4o", Input: "Hi"})
 
 		require.NoError(t, err)
 		assert.Equal(t, "resp_123", resp.ID)
@@ -304,7 +304,7 @@ func Test__Client__CreateResponse(t *testing.T) {
 			http:    httpCtx,
 		}
 
-		_, err := client.CreateResponse("invalid-model", "Hi")
+		_, err := client.CreateResponse(CreateResponseRequest{Model: "invalid-model", Input: "Hi"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "400")
 	})

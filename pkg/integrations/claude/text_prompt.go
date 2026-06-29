@@ -1,8 +1,8 @@
 package claude
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/integrations/llmattach"
 )
 
 const MessagePayloadType = "claude.message"
@@ -63,6 +64,7 @@ func (c *TextPrompt) Documentation() string {
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
 - **Max Tokens**: (Optional) Limit the length of the generated response.
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0).
+- **Files**: (Optional) Attach files from the Files tab (images, PDFs, or text). They are uploaded to the Files API and sent alongside the prompt.
 
 ## Output
 
@@ -144,7 +146,7 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 			Label:       "Files",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "File paths from the Files tab to include as context in the prompt",
+			Description: "Files from the Files tab to attach to the prompt (images, PDFs, or text)",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "File path",
@@ -224,11 +226,17 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	// Build message content: file documents + user prompt
-	userContent, err := buildUserContent(ctx, spec)
+	// Read attached repository files and build the message content. Files are
+	// uploaded to the Files API and referenced by file_id; the prompt goes last.
+	attachments, err := llmattach.Read(ctx.Files, spec.Files)
 	if err != nil {
-		return fmt.Errorf("failed to build user content: %v", err)
+		return fmt.Errorf("failed to read attachments: %v", err)
 	}
+	userContent, fileIDs, err := buildUserContent(client, attachments, spec.Prompt)
+	if err != nil {
+		return err
+	}
+	defer cleanupFiles(client, fileIDs)
 
 	req := CreateMessageRequest{
 		Model:     spec.Model,
@@ -302,66 +310,44 @@ func extractMessageText(response *CreateMessageResponse) string {
 	return builder.String()
 }
 
-const maxFileSize = 100 * 1024      // 100KB per file
-const maxTotalFileSize = 500 * 1024 // 500KB total across all files
-
-// buildUserContent creates the message content for the user message.
-// When files are specified, it returns an array of content blocks
-// (documents + text prompt). Otherwise, it returns the prompt string.
-func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, error) {
-	if len(spec.Files) == 0 {
-		return spec.Prompt, nil
+// buildUserContent uploads each attachment to the Files API and builds the user
+// message content: an image/document block (referenced by file_id) per file,
+// followed by the prompt text. With no attachments it returns the prompt string.
+// The returned file IDs should be cleaned up after the request.
+func buildUserContent(client *Client, attachments []llmattach.Attachment, prompt string) (any, []string, error) {
+	if len(attachments) == 0 {
+		return prompt, nil, nil
 	}
 
-	if ctx.Files == nil {
-		return nil, fmt.Errorf("files configured but file access is not available in this execution context")
-	}
-
-	blocks := make([]ContentBlock, 0, len(spec.Files)+1)
-	totalSize := 0
-
-	for _, path := range spec.Files {
-		normalized, normErr := gitprovider.ValidateUserPath(path)
-		if normErr != nil {
-			return nil, fmt.Errorf("invalid file path %q: %w", path, normErr)
-		}
-		reader, err := ctx.Files.Read(normalized)
+	blocks := make([]ContentBlock, 0, len(attachments)+1)
+	fileIDs := make([]string, 0, len(attachments))
+	for _, att := range attachments {
+		fileID, err := client.UploadFile(bytes.NewReader(att.Data), att.Name)
 		if err != nil {
-			return nil, fmt.Errorf("read file %q: %w", path, err)
+			cleanupFiles(client, fileIDs)
+			return nil, nil, fmt.Errorf("upload file %q: %w", att.Name, err)
 		}
+		fileIDs = append(fileIDs, fileID)
 
-		data, err := io.ReadAll(io.LimitReader(reader, maxFileSize+1))
-		reader.Close()
-		if err != nil {
-			return nil, fmt.Errorf("read file %q: %w", path, err)
+		blockType := "document"
+		if att.IsImage() {
+			blockType = "image"
 		}
-
-		if len(data) > maxFileSize {
-			return nil, fmt.Errorf("file %q exceeds maximum size of %d bytes", path, maxFileSize)
-		}
-		totalSize += len(data)
-		if totalSize > maxTotalFileSize {
-			return nil, fmt.Errorf("total file size exceeds maximum of %d bytes", maxTotalFileSize)
-		}
-
-		mediaType := "text/plain"
 		blocks = append(blocks, ContentBlock{
-			Type: "document",
-			Source: &ContentBlockSource{
-				Type:      "text",
-				MediaType: mediaType,
-				Data:      string(data),
-			},
+			Type:   blockType,
+			Source: &ContentBlockSource{Type: "file", FileID: fileID},
 		})
 	}
 
-	// Add the user prompt as the final text block
-	blocks = append(blocks, ContentBlock{
-		Type: "text",
-		Text: spec.Prompt,
-	})
+	blocks = append(blocks, ContentBlock{Type: "text", Text: prompt})
+	return blocks, fileIDs, nil
+}
 
-	return blocks, nil
+// cleanupFiles best-effort deletes uploaded files after the request completes.
+func cleanupFiles(client *Client, fileIDs []string) {
+	for _, id := range fileIDs {
+		_ = client.DeleteFile(id)
+	}
 }
 
 func (c *TextPrompt) Hooks() []core.Hook {
