@@ -53,28 +53,44 @@
 
 ## Database Transaction Guidelines
 
-When working with database transactions, follow these rules to ensure data consistency:
+We are moving away from `database.Conn()` inside `pkg/models` and from the `FindX` / `FindXInTransaction` dual API. CI tracks remaining legacy usage via `make check.models.tx.debt`; do not add new `*InTransaction` definitions or `database.Conn()` call sites in `pkg/models`.
 
-- **NEVER** call `database.Conn()` inside a function that receives a `tx *gorm.DB` parameter
+**Why:**
 
-  - ❌ Bad: `func process(tx *gorm.DB) { user, _ := models.FindUser(id) }` where FindUser calls `database.Conn()`
-  - ✅ Good: `func process(tx *gorm.DB) { user, _ := models.FindUserInTransaction(tx, id) }`
+- Calling `database.Conn()` inside model code breaks transaction isolation when the caller already holds a `tx`
+- Conn wrappers plus `*InTransaction` methods duplicate API surface without adding behavior
 
-- **Always propagate** the transaction context through the entire call chain
+**Preferred pattern:** pass an explicit `*gorm.DB` as the first parameter. Callers outside `pkg/models` obtain it with `database.DB(ctx)` (request-scoped, attaches OpenTelemetry trace context).
 
-  - Pass `tx` as the first parameter to all functions that need database access
-  - If a model method is used within a transaction, create an `*InTransaction()` variant that accepts `tx`
+```go
+func FindCanvas(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
+    var canvas Canvas
+    err := tx.Where("organization_id = ? AND id = ?", orgID, id).First(&canvas).Error
+    if err != nil {
+        return nil, err
+    }
+    return &canvas, nil
+}
 
-- **Context constructors** must accept `tx *gorm.DB` if they perform database queries
+// Handler (no surrounding transaction):
+canvas, err := models.FindCanvas(database.DB(ctx), orgID, canvasID)
 
-  - ❌ Bad: `NewAuthContext(orgID, service)` that internally calls `database.Conn()`
-  - ✅ Good: `NewAuthContext(tx, orgID, service)` that uses the passed transaction
+// Inside an existing transaction:
+err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+    canvas, err := models.FindCanvas(tx, orgID, canvasID)
+    return err
+})
+```
 
-- **When creating new model methods**:
-  - Create both variants: `FindUser()` and `FindUserInTransaction(tx *gorm.DB)`
-  - The non-transaction variant should call the transaction variant: `return FindUserInTransaction(database.Conn(), ...)`
+Rules:
 
-**Why this matters**: Using `database.Conn()` inside transaction contexts breaks isolation, causes data inconsistency on rollback, and can lead to race conditions.
+- **NEVER** call `database.Conn()` inside `pkg/models` — pass the `*gorm.DB` from the caller instead
+- **NEVER** call a model function that uses `database.Conn()` internally while you already hold a `tx`
+- **Always propagate** the `*gorm.DB` through the entire call chain — pass it as the first parameter to functions that need database access
+- **Do not add** new `FindX` + `FindXInTransaction` pairs or conn wrappers; use a single function with an explicit `*gorm.DB` parameter
+- **Context constructors** that perform database queries must accept `tx *gorm.DB` as their first parameter
+
+When touching legacy `*InTransaction` or conn-wrapper code, migrate to the explicit-parameter pattern when practical and update the debt baseline with `make check.models.tx.debt.baseline.update`.
 
 ### Model file layout (`pkg/models`)
 
@@ -83,10 +99,9 @@ Order declarations in each model file as follows:
 1. **Struct** — package constants used by the model, then the struct type
 2. **Constructors** — `New…` functions that build values for the model (including name/ID helpers)
 3. **Getters** — methods on the struct (e.g. `TableName()`, computed accessors)
-4. **Conn wrappers** — functions that call `…InTransaction(database.Conn(), …)` (or start a transaction with `database.Conn().Transaction` when the whole operation must be atomic)
-5. **InTransaction methods** — functions whose first parameter is `tx *gorm.DB`
+4. **Database access** — functions whose first parameter is `tx *gorm.DB` (or `db *gorm.DB`)
 
-List all conn wrappers before all `…InTransaction` methods (sections 4 then 5). Place private helpers after the public API in the file.
+Place private helpers after the public API in the file.
 
 ## Cursor Cloud specific instructions
 

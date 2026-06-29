@@ -42,11 +42,13 @@ var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 var errSessionAlreadyReset = errors.New("agent session no longer streaming")
 
-var publishAgentRunFinished = func(session *models.AgentSession, evt agents.ProviderEvent) error {
+var publishAgentRunFinished = func(session *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
 	return messages.NewAgentRunFinishedMessage(
 		session.OrganizationID.String(),
 		session.ID.String(),
 		evt.Model,
+		idempotencyKey,
+		session.ID.String(),
 		evt.Usage.InputTokens,
 		evt.Usage.OutputTokens,
 		evt.Usage.TotalTokens,
@@ -55,11 +57,17 @@ var publishAgentRunFinished = func(session *models.AgentSession, evt agents.Prov
 	).Publish()
 }
 
-var publishAgentTokenUsageAsync = func(ctx context.Context, usageService usage.Service, session *models.AgentSession, evt agents.ProviderEvent) {
+var publishAgentTokenUsageAsync = func(
+	ctx context.Context,
+	usageService usage.Service,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+	idempotencyKey string,
+) {
 	go func() {
 		publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), agentTokenUsagePublishWait)
 		defer cancel()
-		publishPreparedAgentTokenUsage(publishCtx, usageService, session, evt)
+		publishPreparedAgentTokenUsage(publishCtx, usageService, session, evt, idempotencyKey)
 	}()
 }
 
@@ -575,7 +583,7 @@ func publishAgentTokenUsage(
 
 	publishEvent := evt
 	publishEvent.Usage = providerTokenUsage(deltaUsage)
-	publishAgentTokenUsageAsync(ctx, usageService, session, publishEvent)
+	publishAgentTokenUsageAsync(ctx, usageService, session, publishEvent, agentTokenUsageIdempotencyKey(session.ID, cumulativeUsage))
 }
 
 func retrieveAndPublishAgentTokenUsage(
@@ -608,7 +616,13 @@ func retrieveAndPublishAgentTokenUsage(
 	}()
 }
 
-func publishPreparedAgentTokenUsage(ctx context.Context, usageService usage.Service, session *models.AgentSession, evt agents.ProviderEvent) {
+func publishPreparedAgentTokenUsage(
+	ctx context.Context,
+	usageService usage.Service,
+	session *models.AgentSession,
+	evt agents.ProviderEvent,
+	idempotencyKey string,
+) {
 	if err := syncAgentTokenUsageOrganization(ctx, usageService, session.OrganizationID.String()); err != nil {
 		log.WithError(err).WithFields(log.Fields{
 			"session_id":      session.ID,
@@ -619,6 +633,7 @@ func publishPreparedAgentTokenUsage(ctx context.Context, usageService usage.Serv
 	log.WithFields(log.Fields{
 		"session_id":         session.ID,
 		"organization_id":    session.OrganizationID,
+		"idempotency_key":    idempotencyKey,
 		"model":              evt.Model,
 		"input_tokens":       evt.Usage.InputTokens,
 		"output_tokens":      evt.Usage.OutputTokens,
@@ -627,13 +642,26 @@ func publishPreparedAgentTokenUsage(ctx context.Context, usageService usage.Serv
 		"cache_write_tokens": evt.Usage.CacheWriteTokens,
 	}).Info("agent stream: publishing agent token usage")
 
-	if err := publishAgentRunFinished(session, evt); err != nil {
+	if err := publishAgentRunFinished(session, evt, idempotencyKey); err != nil {
 		log.WithError(err).WithFields(log.Fields{
 			"session_id":      session.ID,
 			"organization_id": session.OrganizationID,
+			"idempotency_key": idempotencyKey,
 		}).Warn("agent stream: failed to publish agent token usage")
 		return
 	}
+}
+
+func agentTokenUsageIdempotencyKey(sessionID uuid.UUID, cumulativeUsage models.AgentSessionTokenUsage) string {
+	return fmt.Sprintf(
+		"%s:%d:%d:%d:%d:%d",
+		sessionID,
+		cumulativeUsage.InputTokens,
+		cumulativeUsage.OutputTokens,
+		cumulativeUsage.CacheReadTokens,
+		cumulativeUsage.CacheWriteTokens,
+		cumulativeUsage.TotalTokens,
+	)
 }
 
 func agentSessionTokenUsage(usage *agents.TokenUsage) models.AgentSessionTokenUsage {

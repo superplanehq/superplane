@@ -89,7 +89,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	}
 
 	if input.IncludeIntegrations {
-		integrations, integrationsErr := listConnectedIntegrations(uuid.MustParse(session.OrganizationID))
+		integrations, integrationsErr := listConnectedIntegrations(ctx, uuid.MustParse(session.OrganizationID))
 		if integrationsErr != nil {
 			return readResult{}, integrationsErr
 		}
