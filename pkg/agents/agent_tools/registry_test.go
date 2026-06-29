@@ -27,7 +27,7 @@ func TestSchemaRevision_IsStableForRegisteredDefinitions(t *testing.T) {
 	second := SchemaRevision()
 
 	assert.Equal(t, first, second)
-	assert.Contains(t, first, "agent-tools-v1:")
+	assert.Contains(t, first, "agent-tools-v1.1:")
 }
 
 func TestRegistryExecuteCustomTool_DispatchesByToolName(t *testing.T) {
