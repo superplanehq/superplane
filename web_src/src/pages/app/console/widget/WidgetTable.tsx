@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
 import { applyTableWhere } from "./evalTableWhere";
-import { interpolate } from "./fieldPath";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
 import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
+import { resolveHref } from "./resolveHref";
 import { makeRowStyleResolver } from "./rowStyles";
 import { applyFilters, applySort } from "./widgetData";
 import { WidgetEmptyState } from "../WidgetEmptyState";
@@ -285,7 +285,7 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
     );
   }
   if (col.format === "link" || col.href) {
-    const href = col.href ? interpolate(col.href, row) : String(value ?? "");
+    const href = col.href ? resolveHref(col.href, row) : String(value ?? "");
     return (
       <td className="px-3 py-1.5">
         <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky-600 underline underline-offset-2">
