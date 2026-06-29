@@ -82,6 +82,16 @@ export function ColumnRow({
             ))}
           </SelectContent>
         </Select>
+        {col.format === "link" ? (
+          <Input
+            className="col-span-12 h-8"
+            value={col.href ?? ""}
+            onChange={(e) => onChange({ href: e.target.value || undefined })}
+            placeholder="link URL, e.g. {{ prUrl }} or https://github.com/org/repo/pull/{{ prNumber }}"
+            list={fieldOptions.length > 0 ? "table-href-field-options" : undefined}
+            data-testid="table-column-href"
+          />
+        ) : null}
       </div>
       <div className="flex shrink-0 items-start justify-end">
         <Button

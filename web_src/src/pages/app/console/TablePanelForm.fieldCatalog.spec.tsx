@@ -228,3 +228,62 @@ describe("TablePanelForm column field input", () => {
     expect(columns[0]?.format).toBe("duration");
   });
 });
+
+describe("TablePanelForm column href input", () => {
+  beforeAll(() => {
+    Element.prototype.scrollIntoView ??= () => {};
+  });
+
+  function makeWithColumn(kind: TablePanelContent["dataSource"]["kind"], column: WidgetTableColumn): TablePanelContent {
+    const base: TablePanelContent = {
+      title: "",
+      dataSource:
+        kind === "memory"
+          ? { kind: "memory", namespace: "" }
+          : kind === "executions"
+            ? { kind: "executions", limit: 50 }
+            : { kind: "runs", limit: 50 },
+      render: { kind: "table", columns: [column] },
+    };
+    return base;
+  }
+
+  it("only renders the href input when the column format is `link`", () => {
+    const view = render(<Harness initial={makeWithColumn("runs", { field: "status", format: "text" })} />);
+    expect(screen.queryByTestId("table-column-href")).toBeNull();
+    view.unmount();
+
+    render(<Harness initial={makeWithColumn("runs", { field: "status", format: "link" })} />);
+    expect(screen.getByTestId("table-column-href")).toBeInTheDocument();
+  });
+
+  it("writes typed values into the column's `href` and clears it when emptied", () => {
+    render(<Harness initial={makeWithColumn("runs", { field: "prNumber", format: "link" })} />);
+
+    const input = screen.getByTestId("table-column-href") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "{{ prUrl }}" } });
+
+    let columns = JSON.parse(screen.getByTestId("harness-columns").textContent ?? "[]") as Array<
+      Record<string, unknown>
+    >;
+    expect(columns[0]?.href).toBe("{{ prUrl }}");
+
+    fireEvent.change(input, { target: { value: "" } });
+    columns = JSON.parse(screen.getByTestId("harness-columns").textContent ?? "[]") as Array<Record<string, unknown>>;
+    expect(columns[0]?.href).toBeUndefined();
+  });
+
+  it("exposes a {{ field }}-wrapped datalist for picker suggestions when a catalog is available", () => {
+    render(<Harness initial={makeWithColumn("runs", { field: "prNumber", format: "link" })} />);
+
+    const input = screen.getByTestId("table-column-href") as HTMLInputElement;
+    expect(input.getAttribute("list")).toBe("table-href-field-options");
+
+    const datalist = document.getElementById("table-href-field-options");
+    expect(datalist).not.toBeNull();
+    const options = Array.from(datalist?.querySelectorAll("option") ?? []).map((opt) => opt.getAttribute("value"));
+    for (const expected of ["{{ status }}", "{{ payload }}", "{{ nodeName }}"]) {
+      expect(options).toContain(expected);
+    }
+  });
+});
