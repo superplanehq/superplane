@@ -482,7 +482,7 @@ func TestService_SendMessage_RewindsPriorMessagesAfterProviderSessionRecovery(t 
 		Role:       models.AgentMessageRoleTool,
 		ToolName:   "superplane_app",
 		ToolStatus: models.AgentToolStatusFinished,
-		Content:    `{"canvas_yaml":"very large details are compacted"}`,
+		Content:    `{"console_yaml":"very large details are compacted"}`,
 	}))
 
 	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "continue from there", nil)
@@ -724,7 +724,7 @@ func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "[Agent Mode: BUILD]")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Use 'superplane_app' action 'patch_draft'")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "'update_draft' for full graph or Console draft updates")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Console draft updates")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "create_draft' when 'read' returned live/no version_id")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ref/docs/prd/console-and-widgets.md")
 	assert.NotContains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
