@@ -433,6 +433,35 @@ func ListKeyPairs(ctx core.ListResourcesContext, resourceType string) ([]core.In
 	return resources, nil
 }
 
+func ListInstanceProfiles(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		region = "us-east-1"
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	profiles, err := client.ListInstanceProfiles()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list IAM instance profiles: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(profiles))
+	for _, profile := range profiles {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: profile.Name,
+			ID:   profile.Name,
+		})
+	}
+
+	return resources, nil
+}
+
 func ListAlarms(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {

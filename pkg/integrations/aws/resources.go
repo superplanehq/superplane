@@ -61,6 +61,9 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "ec2.keyPair":
 		return ec2.ListKeyPairs(ctx, resourceType)
 
+	case "iam.instanceProfile":
+		return ec2.ListInstanceProfiles(ctx, resourceType)
+
 	case "ec2.alarm":
 		return ec2.ListAlarms(ctx, resourceType)
 
