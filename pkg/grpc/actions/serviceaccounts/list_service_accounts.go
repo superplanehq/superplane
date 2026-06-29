@@ -4,7 +4,8 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 )
@@ -20,12 +21,13 @@ func ListServiceAccounts(ctx context.Context) (*pb.ListServiceAccountsResponse, 
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	users, err := models.FindServiceAccountsByOrganization(orgID)
+	db := database.DB(ctx)
+	users, err := models.FindServiceAccountsByOrganization(db, orgID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list service accounts")
 	}
 
-	creatorsByID, err := creatorsByIDForServiceAccounts(orgID, users)
+	creatorsByID, err := creatorsByIDForServiceAccounts(db, orgID, users)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list service accounts")
 	}
