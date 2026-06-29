@@ -30,6 +30,7 @@ type Server struct {
 
 	TaskNotify   *WaitHub
 	RunnerCancel *RunnerCancelHub
+	RunnerDrain  *RunnerDrainHub
 
 	TaskCloudWatchLogGroup        string
 	TaskCloudWatchLogStreamPrefix string
@@ -103,9 +104,16 @@ func (s *Server) getFleetTaskCounts(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not count tasks")
 		return
 	}
+	claimedRunnerIDs, err := s.Store.ClaimedRunnerIDsByFleet(r.Context(), id)
+	if err != nil {
+		s.logErr("claimed runner ids by fleet", err)
+		writeError(w, http.StatusInternalServerError, "could not load claimed runner ids")
+		return
+	}
 	writeJSON(w, http.StatusOK, api.FleetTaskCountsResponse{
-		Queued:  queued,
-		Claimed: claimed,
+		Queued:           queued,
+		Claimed:          claimed,
+		ClaimedRunnerIDs: claimedRunnerIDs,
 	})
 }
 
@@ -121,6 +129,52 @@ func (s *Server) deleteFleet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) drainRunners(w http.ResponseWriter, r *http.Request) {
+	var req api.DrainRunnersRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	req.FleetID = strings.TrimSpace(req.FleetID)
+	if req.FleetID == "" {
+		writeError(w, http.StatusBadRequest, "fleet_id required")
+		return
+	}
+	if len(req.RunnerIDs) == 0 {
+		writeError(w, http.StatusBadRequest, "runner_ids required")
+		return
+	}
+	if s.RunnerDrain == nil {
+		writeError(w, http.StatusServiceUnavailable, "runner drain unavailable")
+		return
+	}
+
+	statuses := s.RunnerDrain.Drain(req.FleetID, req.RunnerIDs)
+	if s.TaskNotify != nil {
+		s.TaskNotify.Notify()
+	}
+	if s.Log != nil {
+		drained, busy := drainStatusCounts(statuses)
+		s.Log.Info("runner_drain",
+			slog.String("fleet_id", req.FleetID),
+			slog.Int("drained_count", drained),
+			slog.Int("busy_count", busy))
+	}
+	writeJSON(w, http.StatusOK, api.DrainRunnersResponse{Runners: statuses})
+}
+
+func drainStatusCounts(statuses []api.DrainRunnerStatus) (drained int, busy int) {
+	for _, status := range statuses {
+		switch status.State {
+		case api.DrainRunnerStateDrained:
+			drained++
+		case api.DrainRunnerStateBusy:
+			busy++
+		}
+	}
+	return drained, busy
 }
 
 func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
@@ -251,11 +305,26 @@ func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
 		lease = 5 * time.Minute
 	}
 
+	runnerID := strings.TrimSpace(req.RunnerID)
+	if s.RunnerDrain != nil && !s.RunnerDrain.TryStartClaim(runnerID) {
+		writeJSON(w, http.StatusOK, api.ClaimTaskResponse{})
+		return
+	}
 	task, err := s.Store.ClaimTask(r.Context(), req.RunnerID, req.FleetID, lease)
 	if err != nil {
+		if s.RunnerDrain != nil {
+			s.RunnerDrain.FinishClaim(runnerID, "")
+		}
 		s.logErr("claim task", err)
 		writeError(w, http.StatusInternalServerError, "could not claim task")
 		return
+	}
+	if s.RunnerDrain != nil {
+		taskID := ""
+		if task != nil {
+			taskID = task.ID
+		}
+		s.RunnerDrain.FinishClaim(runnerID, taskID)
 	}
 	if task != nil {
 		s.recordTaskStartLatency(r.Context(), task)
@@ -373,6 +442,9 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 		s.logErr("complete task", err)
 		writeError(w, http.StatusInternalServerError, "could not complete task")
 		return
+	}
+	if s.RunnerDrain != nil {
+		s.RunnerDrain.CompleteTask(runnerID, id)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

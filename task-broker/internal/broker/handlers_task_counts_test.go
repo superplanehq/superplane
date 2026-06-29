@@ -26,9 +26,13 @@ func TestFleetTaskCountsHandler(t *testing.T) {
 
 	create := func(id string, status models.TaskStatus) {
 		t.Helper()
+		runnerID := ""
+		if status == models.StatusClaimed {
+			runnerID = "i-claimed"
+		}
 		if err := st.CreateTask(ctx, &models.Task{
 			ID: id, FleetID: "fleet-a", Command: []string{"echo"},
-			WebhookURL: "https://example.com/h", Status: status, CreatedAt: now,
+			WebhookURL: "https://example.com/h", Status: status, CreatedAt: now, RunnerID: runnerID,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -59,6 +63,9 @@ func TestFleetTaskCountsHandler(t *testing.T) {
 		}
 		if got.Queued != 2 || got.Claimed != 1 {
 			t.Fatalf("counts: %#v", got)
+		}
+		if len(got.ClaimedRunnerIDs) != 1 || got.ClaimedRunnerIDs[0] != "i-claimed" {
+			t.Fatalf("claimed runner ids: %#v", got.ClaimedRunnerIDs)
 		}
 	})
 

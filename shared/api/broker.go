@@ -29,6 +29,29 @@ type FleetResponse struct {
 }
 
 type FleetTaskCountsResponse struct {
-	Queued  int `json:"queued"`
-	Claimed int `json:"claimed"`
+	Queued           int      `json:"queued"`
+	Claimed          int      `json:"claimed"`
+	ClaimedRunnerIDs []string `json:"claimed_runner_ids,omitempty"`
+}
+
+type DrainRunnersRequest struct {
+	FleetID   string   `json:"fleet_id"`
+	RunnerIDs []string `json:"runner_ids"`
+}
+
+type DrainRunnerState string
+
+const (
+	DrainRunnerStateDrained DrainRunnerState = "drained"
+	DrainRunnerStateBusy    DrainRunnerState = "busy"
+)
+
+type DrainRunnerStatus struct {
+	RunnerID     string           `json:"runner_id"`
+	State        DrainRunnerState `json:"state"`
+	ActiveTaskID string           `json:"active_task_id,omitempty"`
+}
+
+type DrainRunnersResponse struct {
+	Runners []DrainRunnerStatus `json:"runners"`
 }

@@ -74,6 +74,24 @@ func (s *PostgresStore) CountTasksByFleet(ctx context.Context, fleetID string) (
 	return int(queued), int(claimed), nil
 }
 
+func (s *PostgresStore) ClaimedRunnerIDsByFleet(ctx context.Context, fleetID string) ([]string, error) {
+	fleetID = strings.TrimSpace(fleetID)
+	if fleetID == "" {
+		return nil, fmt.Errorf("fleet_id required for claimed runner ids")
+	}
+	var runnerIDs []string
+	err := s.db.WithContext(ctx).
+		Model(&brokermodels.Task{}).
+		Distinct("runner_id").
+		Where("fleet_id = ? AND status = ? AND runner_id <> ''", fleetID, string(models.StatusClaimed)).
+		Order("runner_id ASC").
+		Pluck("runner_id", &runnerIDs).Error
+	if err != nil {
+		return nil, err
+	}
+	return runnerIDs, nil
+}
+
 func (s *PostgresStore) ClaimTask(ctx context.Context, runnerID, fleetID string, lease time.Duration) (*models.Task, error) {
 	fleetID = strings.TrimSpace(fleetID)
 	if fleetID == "" {

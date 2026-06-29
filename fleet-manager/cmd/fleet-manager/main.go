@@ -70,8 +70,8 @@ func main() {
 	brokerClient := brokerclient.New(cfg.TaskBrokerURL, cfg.TaskBrokerAuthToken)
 	registerBrokerFleets(ctx, log, brokerClient, cfg.Pools)
 
-	// Build one Launcher per pool. Headroom-enabled pools share the broker client
-	// (same broker URL + token across all pools in this FM process).
+	// Build one Launcher per pool. Launchers share the broker client so scale-down can
+	// avoid terminating EC2 instances that currently own claimed tasks.
 	launchers := make([]*ec2provision.Launcher, 0, len(cfg.Pools))
 	for _, p := range cfg.Pools {
 		poolCfg := cfg.ToPoolConfig(p)
@@ -82,9 +82,7 @@ func main() {
 				slog.Any("err", err))
 			os.Exit(1)
 		}
-		if p.Headroom > 0 {
-			l.BrokerClient = brokerClient
-		}
+		l.BrokerClient = brokerClient
 		l.Metrics = poolMetrics
 		launchers = append(launchers, l)
 	}

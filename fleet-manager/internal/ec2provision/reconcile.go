@@ -5,15 +5,23 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/superplane/runner/shared/api"
 )
 
 type instanceSnap struct {
 	id        string
 	launchUTC time.Time
+}
+
+type desiredCapacity struct {
+	want                     int
+	claimedRunnerIDs         []string
+	claimedRunnerIDsReliable bool
 }
 
 // RunReconcileLoop periodically reconciles every launcher's pool toward its target.
@@ -50,8 +58,8 @@ func tickAll(ctx context.Context, log *slog.Logger, launchers []*Launcher, tick 
 	}
 }
 
-// reconcileLauncher is the default per-launcher tick: bounded-timeout desiredWant +
-// Reconcile, logging on failure with the owning fleet id for cross-pool diagnostics.
+// reconcileLauncher is the default per-launcher tick: bounded-timeout desired capacity +
+// reconcile, logging on failure with the owning fleet id for cross-pool diagnostics.
 func reconcileLauncher(ctx context.Context, log *slog.Logger, l *Launcher) {
 	start := time.Now()
 	defer func() {
@@ -62,11 +70,11 @@ func reconcileLauncher(ctx context.Context, log *slog.Logger, l *Launcher) {
 
 	runCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	want := l.desiredWant(runCtx)
-	if err := l.Reconcile(runCtx, want); err != nil && log != nil {
+	desired := l.desiredCapacity(runCtx)
+	if err := l.reconcile(runCtx, desired.want, desired.claimedRunnerIDs, desired.claimedRunnerIDsReliable); err != nil && log != nil {
 		log.Warn("ec2 reconcile",
 			slog.String("fleet_id", l.Config.RunnerFleetID),
-			slog.Int("want", want),
+			slog.Int("want", desired.want),
 			slog.Any("err", err))
 	}
 }
@@ -88,8 +96,44 @@ func (l *Launcher) desiredWant(ctx context.Context) int {
 	return counts.Queued + counts.Claimed + l.Config.Headroom
 }
 
+func (l *Launcher) desiredCapacity(ctx context.Context) desiredCapacity {
+	if l.BrokerClient == nil {
+		return desiredCapacity{want: l.Config.HotInstanceCount}
+	}
+	counts, err := l.BrokerClient.FleetTaskCounts(ctx, l.Config.RunnerFleetID)
+	if err != nil {
+		if l.Log != nil {
+			l.Log.Warn("ec2 reconcile: broker task-counts failed, falling back to hot instance count without scale-down",
+				slog.Any("err", err),
+				slog.String("fleet_id", l.Config.RunnerFleetID),
+				slog.Int("fallback_want", l.Config.HotInstanceCount))
+		}
+		return desiredCapacity{want: l.Config.HotInstanceCount}
+	}
+	want := l.Config.HotInstanceCount
+	if l.Config.Headroom > 0 {
+		want = counts.Queued + counts.Claimed + l.Config.Headroom
+	}
+	return desiredCapacity{
+		want:                     want,
+		claimedRunnerIDs:         counts.ClaimedRunnerIDs,
+		claimedRunnerIDsReliable: true,
+	}
+}
+
 // Reconcile sweeps unhealthy runners, then scales pending+running tagged instances toward want.
 func (l *Launcher) Reconcile(ctx context.Context, want int) error {
+	return l.reconcile(ctx, want, nil, true)
+}
+
+// ReconcileKeepingClaimed sweeps unhealthy runners, then scales pending+running tagged
+// instances toward want without terminating EC2 instances that currently own claimed
+// broker tasks. EC2 runner_id is the instance id in fleet-managed user-data.
+func (l *Launcher) ReconcileKeepingClaimed(ctx context.Context, want int, claimedRunnerIDs []string) error {
+	return l.reconcile(ctx, want, claimedRunnerIDs, true)
+}
+
+func (l *Launcher) reconcile(ctx context.Context, want int, claimedRunnerIDs []string, scaleDownSafe bool) error {
 	if want < 0 {
 		return fmt.Errorf("negative hot instance count")
 	}
@@ -106,47 +150,142 @@ func (l *Launcher) Reconcile(ctx context.Context, want int) error {
 	}
 	l.observeInstanceSpinup(ctx, instances)
 
-	switch {
-	case have < want:
-		delta := want - have
-		for delta > 0 {
-			n := delta
-			if n > maxLaunch {
-				n = maxLaunch
-			}
-			_, err := l.Launch(ctx, n)
-			if err != nil {
-				return fmt.Errorf("launch: %w", err)
-			}
-			delta -= n
+	if have == want {
+		return nil
+	}
+	if have < want {
+		return l.launchAdditional(ctx, want-have)
+	}
+	return l.scaleDownExcess(ctx, instances, have, want, claimedRunnerIDs, scaleDownSafe)
+}
+
+func (l *Launcher) launchAdditional(ctx context.Context, delta int) error {
+	for delta > 0 {
+		count := delta
+		if count > maxLaunch {
+			count = maxLaunch
 		}
-	case have > want:
-		// Scale down by terminating *oldest* instances first. Terminating the newest first
-		// tended to kill VMs that had just booted and claimed work → PTY/read EIO and flaky tasks.
-		live := make([]instanceSnap, 0, len(instances))
-		for _, inst := range instances {
-			live = append(live, instanceSnap{id: inst.id, launchUTC: inst.launchUTC})
+		if _, err := l.Launch(ctx, count); err != nil {
+			return fmt.Errorf("launch: %w", err)
 		}
-		sort.Slice(live, func(i, j int) bool {
-			return live[i].launchUTC.Before(live[j].launchUTC)
-		})
-		remove := have - want
-		ids := make([]string, 0, remove)
-		for i := 0; i < remove && i < len(live); i++ {
-			ids = append(ids, live[i].id)
-		}
-		if len(ids) == 0 {
-			return nil
-		}
-		_, err := l.Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{InstanceIds: ids})
-		if err != nil {
-			return fmt.Errorf("terminate instances: %w", err)
-		}
-		if l.Log != nil {
-			l.Log.Info("ec2 terminating excess runners", slog.Int("count", len(ids)), slog.Any("instance_ids", ids))
-		}
+		delta -= count
 	}
 	return nil
+}
+
+func (l *Launcher) scaleDownExcess(ctx context.Context, instances []managedInstance, have, want int, claimedRunnerIDs []string, scaleDownSafe bool) error {
+	if !scaleDownSafe {
+		l.logUnsafeScaleDownSkipped(have, want)
+		return nil
+	}
+
+	// Scale down by terminating *oldest* safe instances first. Terminating the newest
+	// first tended to kill VMs that had just booted and claimed work.
+	remove := have - want
+	ids := selectExcessRunnerIDs(instances, claimedRunnerIDs, remove)
+	if len(ids) == 0 {
+		return nil
+	}
+
+	drainedIDs, err := l.drainTerminationCandidates(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("drain runners: %w", err)
+	}
+	if len(drainedIDs) == 0 {
+		l.logBusyScaleDownSkipped(have, want)
+		return nil
+	}
+
+	if _, err := l.Client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{InstanceIds: drainedIDs}); err != nil {
+		return fmt.Errorf("terminate instances: %w", err)
+	}
+	if l.Log != nil {
+		l.Log.Info("ec2 terminating excess runners", slog.Int("count", len(drainedIDs)), slog.Any("instance_ids", drainedIDs))
+	}
+	return nil
+}
+
+func (l *Launcher) logUnsafeScaleDownSkipped(have, want int) {
+	if l.Log == nil {
+		return
+	}
+	l.Log.Warn("ec2 scale-down skipped: claimed runner ids unavailable",
+		slog.Int("have", have),
+		slog.Int("want", want),
+		slog.String("fleet_id", l.Config.RunnerFleetID))
+}
+
+func (l *Launcher) logBusyScaleDownSkipped(have, want int) {
+	if l.Log == nil {
+		return
+	}
+	l.Log.Info("ec2 scale-down skipped: selected runners are busy",
+		slog.Int("have", have),
+		slog.Int("want", want),
+		slog.String("fleet_id", l.Config.RunnerFleetID))
+}
+
+func (l *Launcher) drainTerminationCandidates(ctx context.Context, ids []string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if l.BrokerClient == nil {
+		return ids, nil
+	}
+	resp, err := l.BrokerClient.DrainRunners(ctx, api.DrainRunnersRequest{
+		FleetID:   l.Config.RunnerFleetID,
+		RunnerIDs: ids,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	drained := make([]string, 0, len(resp.Runners))
+	busy := make([]string, 0)
+	for _, runner := range resp.Runners {
+		switch runner.State {
+		case api.DrainRunnerStateDrained:
+			drained = append(drained, runner.RunnerID)
+		case api.DrainRunnerStateBusy:
+			busy = append(busy, runner.RunnerID)
+		}
+	}
+	if l.Log != nil && len(busy) > 0 {
+		l.Log.Info("ec2 scale-down deferred busy runners",
+			slog.String("fleet_id", l.Config.RunnerFleetID),
+			slog.Any("runner_ids", busy))
+	}
+	return drained, nil
+}
+
+func selectExcessRunnerIDs(instances []managedInstance, claimedRunnerIDs []string, remove int) []string {
+	if remove <= 0 {
+		return nil
+	}
+	claimed := make(map[string]struct{}, len(claimedRunnerIDs))
+	for _, id := range claimedRunnerIDs {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			claimed[id] = struct{}{}
+		}
+	}
+
+	live := make([]instanceSnap, 0, len(instances))
+	for _, inst := range instances {
+		if _, protected := claimed[inst.id]; protected {
+			continue
+		}
+		live = append(live, instanceSnap{id: inst.id, launchUTC: inst.launchUTC})
+	}
+	sort.Slice(live, func(i, j int) bool {
+		return live[i].launchUTC.Before(live[j].launchUTC)
+	})
+
+	ids := make([]string, 0, remove)
+	for i := 0; i < remove && i < len(live); i++ {
+		ids = append(ids, live[i].id)
+	}
+	return ids
 }
 
 func (l *Launcher) listManagedLive(ctx context.Context) ([]instanceSnap, error) {

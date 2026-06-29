@@ -60,6 +60,7 @@ func main() {
 	ws.Log = log
 	hub := broker.NewWaitHub()
 	cancelHub := broker.NewRunnerCancelHub()
+	drainHub := broker.NewRunnerDrainHub()
 	srv := &broker.Server{
 		Store:                         st,
 		Webhook:                       ws,
@@ -67,6 +68,7 @@ func main() {
 		Metrics:                       brokerMetrics,
 		TaskNotify:                    hub,
 		RunnerCancel:                  cancelHub,
+		RunnerDrain:                   drainHub,
 		TaskCloudWatchLogGroup:        strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_GROUP")),
 		TaskCloudWatchLogStreamPrefix: strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_STREAM_PREFIX")),
 		TaskCloudWatchRegion:          strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_REGION")),
