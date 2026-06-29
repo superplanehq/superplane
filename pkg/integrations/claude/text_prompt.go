@@ -211,8 +211,14 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	if _, err := decodeOutputSchema(spec.OutputSchema); err != nil {
+	schema, err := decodeOutputSchema(spec.OutputSchema)
+	if err != nil {
 		return err
+	}
+	if schema != nil {
+		if err := validateClaudeOutputSchema(schema, ""); err != nil {
+			return err
+		}
 	}
 
 	return nil

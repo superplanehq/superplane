@@ -97,6 +97,36 @@ func TestTextPrompt_Setup(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "Object missing additionalProperties:false",
+			config: map[string]interface{}{
+				"model":  "claude-3-opus",
+				"prompt": "Hello",
+				"outputSchema": map[string]any{
+					"type":       "object",
+					"properties": map[string]any{"name": map[string]any{"type": "string"}},
+					"required":   []any{"name"},
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "Optional field allowed (Claude permits, unlike OpenAI strict)",
+			config: map[string]interface{}{
+				"model":  "claude-3-opus",
+				"prompt": "Hello",
+				"outputSchema": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"name": map[string]any{"type": "string"},
+						"age":  map[string]any{"type": "number"},
+					},
+					"required":             []any{"name"},
+					"additionalProperties": false,
+				},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
