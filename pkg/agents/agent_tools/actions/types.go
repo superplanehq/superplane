@@ -10,7 +10,6 @@ type Input struct {
 	UseDraft            *bool             `json:"use_draft,omitempty"`
 	IncludeConsole      bool              `json:"include_console,omitempty"`
 	IncludeIntegrations bool              `json:"include_integrations,omitempty"`
-	CanvasYAML          string            `json:"canvas_yaml,omitempty"`
 	ConsoleYAML         string            `json:"console_yaml,omitempty"`
 	PatchOperations     []PatchOperation  `json:"patch_operations,omitempty"`
 	AutoLayout          *AutoLayoutInput  `json:"auto_layout,omitempty"`

@@ -794,11 +794,11 @@ func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
 }
 
 func TestStreamEvents_ParsesCustomToolInputLargerThanDefaultScannerLimit(t *testing.T) {
-	canvasYAML := strings.Repeat("x", 70*1024)
+	consoleYAML := strings.Repeat("x", 70*1024)
 	input := map[string]any{
-		"action":      "update_draft",
-		"version_id":  "draft-version",
-		"canvas_yaml": canvasYAML,
+		"action":       "patch_draft",
+		"version_id":   "draft-version",
+		"console_yaml": consoleYAML,
 	}
 	event := map[string]any{
 		"id":    "evt_custom",
@@ -830,7 +830,7 @@ func TestStreamEvents_ParsesCustomToolInputLargerThanDefaultScannerLimit(t *test
 	assert.Equal(t, agents.ProviderEventCustomToolUseStarted, received[0].Type)
 	require.NotNil(t, received[0].CustomToolUse)
 	assert.Equal(t, "evt_custom", received[0].CustomToolUse.ID)
-	assert.Contains(t, received[0].CustomToolUse.Input, canvasYAML)
+	assert.Contains(t, received[0].CustomToolUse.Input, consoleYAML)
 	assert.Equal(t, agents.ProviderEventCustomToolResultsRequired, received[1].Type)
 }
 

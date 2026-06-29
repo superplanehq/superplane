@@ -774,9 +774,6 @@ func customToolInputSummary(input string) log.Fields {
 	if action, ok := payload["action"].(string); ok && strings.TrimSpace(action) != "" {
 		fields["tool_action"] = strings.TrimSpace(action)
 	}
-	if canvasYAML, ok := payload["canvas_yaml"].(string); ok {
-		fields["canvas_yaml_bytes"] = len(canvasYAML)
-	}
 	if consoleYAML, ok := payload["console_yaml"].(string); ok {
 		fields["console_yaml_bytes"] = len(consoleYAML)
 	}

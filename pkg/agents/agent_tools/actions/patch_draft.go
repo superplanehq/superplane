@@ -27,9 +27,11 @@ type patchDraftAction struct {
 }
 
 type patchDraftTarget struct {
-	organizationID uuid.UUID
-	draft          *models.CanvasVersion
-	changeset      *changesets.CanvasChangeset
+	organizationID  uuid.UUID
+	draft           *models.CanvasVersion
+	changeset       *changesets.CanvasChangeset
+	consoleYAML     string
+	autoLayoutInput *AutoLayoutInput
 }
 
 type stagedDraftCanvas struct {
@@ -58,12 +60,12 @@ func (a patchDraftAction) Execute(ctx context.Context, session agents.AgentSessi
 		return updateResult{}, err
 	}
 
-	patched, err := a.applyPatchToStagedCanvas(target, stagedCanvas, input.AutoLayout)
+	patched, err := a.applyPatchToStagedCanvas(target, stagedCanvas)
 	if err != nil {
 		return updateResult{}, err
 	}
 
-	if err := stagePatchedDraftYAML(ctx, session, target.draft, patched); err != nil {
+	if err := stagePatchedDraftFiles(ctx, session, target, patched); err != nil {
 		return updateResult{}, err
 	}
 
@@ -96,10 +98,22 @@ func resolvePatchDraftTarget(session agents.AgentSessionContext, input Input) (p
 		return patchDraftTarget{}, err
 	}
 
+	consoleYAML := strings.TrimSpace(input.ConsoleYAML)
+	if changeset == nil && consoleYAML == "" && input.AutoLayout == nil {
+		return patchDraftTarget{}, fmt.Errorf("patch_operations, console_yaml, or auto_layout is required for patch_draft")
+	}
+	if consoleYAML != "" {
+		if err := canvasRepository.ValidateConsoleYAML(input.ConsoleYAML); err != nil {
+			return patchDraftTarget{}, err
+		}
+	}
+
 	return patchDraftTarget{
-		organizationID: organizationID,
-		draft:          draft,
-		changeset:      changeset,
+		organizationID:  organizationID,
+		draft:           draft,
+		changeset:       changeset,
+		consoleYAML:     input.ConsoleYAML,
+		autoLayoutInput: input.AutoLayout,
 	}, nil
 }
 
@@ -136,7 +150,6 @@ func (a patchDraftAction) readStagedDraftCanvas(ctx context.Context, session age
 func (a patchDraftAction) applyPatchToStagedCanvas(
 	target patchDraftTarget,
 	stagedCanvas stagedDraftCanvas,
-	autoLayoutInput *AutoLayoutInput,
 ) (*models.CanvasVersion, error) {
 	patchedDraft := *target.draft
 	patchedDraft.Name = stagedCanvas.name
@@ -144,13 +157,16 @@ func (a patchDraftAction) applyPatchToStagedCanvas(
 	patchedDraft.Nodes = stagedCanvas.nodes
 	patchedDraft.Edges = stagedCanvas.edges
 
-	patcher := changesets.NewCanvasPatcher(database.Conn(), target.organizationID, a.deps.Registry, &patchedDraft)
-	if err := patcher.ApplyChangeset(target.changeset, nil); err != nil {
-		return nil, fmt.Errorf("apply patch changeset: %w", err)
+	patched := &patchedDraft
+	if target.changeset != nil {
+		patcher := changesets.NewCanvasPatcher(database.Conn(), target.organizationID, a.deps.Registry, &patchedDraft)
+		if err := patcher.ApplyChangeset(target.changeset, nil); err != nil {
+			return nil, fmt.Errorf("apply patch changeset: %w", err)
+		}
+		patched = patcher.GetVersion()
 	}
 
-	patched := patcher.GetVersion()
-	autoLayout := resolvePatchDraftAutoLayout(autoLayoutInput, target.changeset, stagedCanvas.edges, patched.Nodes)
+	autoLayout := resolvePatchDraftAutoLayout(target.autoLayoutInput, target.changeset, stagedCanvas.edges, patched.Nodes)
 	if autoLayout != nil {
 		nodes, edges, err := canvasLayout.ApplyLayout(patched.Nodes, patched.Edges, autoLayout)
 		if err != nil {
@@ -163,23 +179,36 @@ func (a patchDraftAction) applyPatchToStagedCanvas(
 	return patched, nil
 }
 
-func stagePatchedDraftYAML(ctx context.Context, session agents.AgentSessionContext, draft *models.CanvasVersion, patched *models.CanvasVersion) error {
-	patchedYAML, err := serializePatchedDraftYAML(patched, session.CanvasID)
-	if err != nil {
-		return fmt.Errorf("serialize patched canvas yaml: %w", err)
+func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionContext, target patchDraftTarget, patched *models.CanvasVersion) error {
+	operations := make([]*pb.CanvasRepositoryFileOperation, 0, 2)
+	if target.changeset != nil || target.autoLayoutInput != nil {
+		patchedYAML, err := serializePatchedDraftYAML(patched, session.CanvasID)
+		if err != nil {
+			return fmt.Errorf("serialize patched canvas yaml: %w", err)
+		}
+		operations = append(operations, &pb.CanvasRepositoryFileOperation{
+			Path:    canvasRepository.CanvasYAMLRepositoryPath,
+			Content: []byte(patchedYAML),
+		})
+	}
+	if strings.TrimSpace(target.consoleYAML) != "" {
+		operations = append(operations, &pb.CanvasRepositoryFileOperation{
+			Path:    canvasRepository.ConsoleYAMLRepositoryPath,
+			Content: []byte(target.consoleYAML),
+		})
+	}
+	if len(operations) == 0 {
+		return nil
 	}
 
 	if _, err := canvasRepository.StageRepositorySpecFileOperations(
 		ctx,
 		session.OrganizationID,
 		session.CanvasID,
-		draft.ID.String(),
-		[]*pb.CanvasRepositoryFileOperation{{
-			Path:    canvasRepository.CanvasYAMLRepositoryPath,
-			Content: []byte(patchedYAML),
-		}},
+		target.draft.ID.String(),
+		operations,
 	); err != nil {
-		return fmt.Errorf("stage patched canvas yaml: %w", err)
+		return fmt.Errorf("stage patched draft files: %w", err)
 	}
 
 	return nil
@@ -198,7 +227,7 @@ func newPatchDraftResult(session agents.AgentSessionContext, draft *models.Canva
 
 func buildDraftChangeset(operations []PatchOperation) (*changesets.CanvasChangeset, error) {
 	if len(operations) == 0 {
-		return nil, fmt.Errorf("patch_operations is required for patch_draft")
+		return nil, nil
 	}
 
 	changes := make([]*changesets.Change, 0, len(operations))
@@ -335,7 +364,7 @@ func resolvePatchDraftAutoLayout(
 	originalEdges []models.Edge,
 	finalNodes []models.Node,
 ) *pb.CanvasAutoLayout {
-	if input == nil || isEmptyAutoLayoutInput(input) {
+	if input == nil {
 		nodeIDs := defaultPatchDraftAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
 		if len(nodeIDs) == 0 {
 			return nil
@@ -346,7 +375,23 @@ func resolvePatchDraftAutoLayout(
 			NodeIds:   nodeIDs,
 		}
 	}
-	return resolveCustomToolAutoLayout(input, true)
+
+	if isEmptyAutoLayoutInput(input) {
+		nodeIDs := defaultPatchDraftAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
+		if len(nodeIDs) > 0 {
+			return &pb.CanvasAutoLayout{
+				Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+				Scope:     pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT,
+				NodeIds:   nodeIDs,
+			}
+		}
+		return &pb.CanvasAutoLayout{
+			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+			Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
+		}
+	}
+
+	return resolveToolAutoLayoutInput(input)
 }
 
 func isEmptyAutoLayoutInput(input *AutoLayoutInput) bool {
