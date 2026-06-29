@@ -3,12 +3,15 @@ package agenttools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 )
+
+const anthropicToolDescriptionLimit = 1024
 
 func TestRegistryDefinitions_ReturnsRegisteredToolsInStableOrder(t *testing.T) {
 	registry := NewRegistry(Dependencies{})
@@ -20,6 +23,21 @@ func TestRegistryDefinitions_ReturnsRegisteredToolsInStableOrder(t *testing.T) {
 	assert.Equal(t, ComponentSchemaAgentToolName, definitions[1].Name())
 	assert.NotEmpty(t, definitions[0].Description())
 	assert.NotEmpty(t, definitions[0].InputSchema())
+}
+
+func TestRegistryDefinitions_FitProviderDescriptionLimit(t *testing.T) {
+	registry := NewRegistry(Dependencies{})
+
+	for _, definition := range registry.Definitions() {
+		description := definition.Description()
+		require.NotEmpty(t, description)
+		assert.LessOrEqual(
+			t,
+			len(description),
+			anthropicToolDescriptionLimit,
+			fmt.Sprintf("%s description exceeds provider limit", definition.Name()),
+		)
+	}
 }
 
 func TestSchemaRevision_IsStableForRegisteredDefinitions(t *testing.T) {
