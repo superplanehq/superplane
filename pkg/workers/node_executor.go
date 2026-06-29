@@ -320,13 +320,23 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
+	secretResolver := contexts.NewRuntimeSecretResolver(tx, w.encryptor, models.DomainTypeOrganization, workflow.OrganizationID)
+
 	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
 		WithIncomingEventID(&execution.EventID).
-		WithInput(map[string]any{inputEvent.NodeID: input})
+		WithInput(map[string]any{inputEvent.NodeID: input}).
+		WithSecretResolver(secretResolver)
 	if execution.PreviousExecutionID != nil {
 		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
+	}
+
+	resolvedConfiguration, err := contexts.ResolveStoredConfiguration(builder, execution.Configuration.Data())
+	if err != nil {
+		logger.Errorf("failed to resolve runtime configuration: %v", err)
+		execState := contexts.NewExecutionStateContext(tx, execution, onNewEvents)
+		return execState.Fail(models.CanvasNodeExecutionResultReasonError, fmt.Sprintf("failed to resolve configuration: %v", err))
 	}
 
 	ctx := core.ExecutionContext{
@@ -338,7 +348,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		NodeName:       node.Name,
 		SourceNodeID:   inputEvent.NodeID,
 		BaseURL:        w.baseURL,
-		Configuration:  execution.Configuration.Data(),
+		Configuration:  resolvedConfiguration,
 		Data:           input,
 		HTTP:           w.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
