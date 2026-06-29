@@ -1,8 +1,8 @@
-import { defineConfig } from "vite";
-import type { ResolvedConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
 import * as path from "path";
+import type { ResolvedConfig } from "vite";
+import { defineConfig } from "vite";
 
 // Plugin that sets HMR port to be the same as server port
 // This is useful when you can't use WebSockets in your proxy
@@ -23,8 +23,7 @@ const setHmrPortFromPortPlugin = {
 };
 
 // https://vite.dev/config/
-export default defineConfig(({ command }: { command: string }) => {
-  const isDev = command !== "build";
+export default defineConfig(() => {
   const isProduction = process.env.APP_ENV === "production";
   const apiPort = process.env.API_PORT || process.env.PUBLIC_API_PORT || "8000";
   const devPort = Number.parseInt(process.env.VITE_DEV_PORT || "5173", 10);
@@ -78,7 +77,10 @@ export default defineConfig(({ command }: { command: string }) => {
       target: "es2020",
       outDir: "../pkg/web/assets/dist", // emit assets to pkg/web/assets/dist
       emptyOutDir: true,
-      sourcemap: isDev, // enable source map in dev build
+      // We need sourcemaps for sentry, even in production
+      // https://docs.sentry.io/platforms/javascript/sourcemaps/uploading/hosting-publicly/
+      // As we are open-source, this is completely safe.
+      sourcemap: true,
       manifest: false, // do not generate manifest.json
       // rollupOptions: {
       //   input: {
