@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -52,11 +53,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	}
 
 	var roles []*authorization.RoleDefinition
-	err = telemetry.RunSpan(ctx, "auth.load_user_roles", func(ctx context.Context) error {
-		var loadErr error
-		roles, loadErr = authService.GetUserRolesForOrg(ctx, userID, user.OrganizationID.String())
-		return loadErr
-	})
+	roles, err = loadUserRoles(ctx, authService, userID, user.OrganizationID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to get user roles")
 	}
@@ -86,11 +83,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	userProto.Permissions = permissions
 
 	var groups []string
-	err = telemetry.RunSpan(ctx, "auth.load_user_groups", func(ctx context.Context) error {
-		var loadErr error
-		groups, loadErr = authService.GetUserGroups(ctx, user.OrganizationID.String(), models.DomainTypeOrganization, userID)
-		return loadErr
-	})
+	groups, err = loadUserGroups(ctx, authService, userID, user.OrganizationID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to get user groups")
 	}
@@ -102,13 +95,11 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	}, nil
 }
 
-func loadUser(ctx context.Context, orgID, userID string) (*models.User, error) {
-	var user *models.User
-	err := telemetry.RunSpan(ctx, "auth.load_user", func(ctx context.Context) error {
-		var loadErr error
-		user, loadErr = models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
-		return loadErr
-	})
+func loadUser(ctx context.Context, orgID, userID string) (user *models.User, err error) {
+	ctx, done := telemetry.Span(ctx, "auth.load_user")
+	defer done(&err)
+
+	user, err = models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "user not found")
@@ -118,4 +109,18 @@ func loadUser(ctx context.Context, orgID, userID string) (*models.User, error) {
 	}
 
 	return user, nil
+}
+
+func loadUserRoles(ctx context.Context, authService authorization.Authorization, userID string, organizationID uuid.UUID) (roles []*authorization.RoleDefinition, err error) {
+	ctx, done := telemetry.Span(ctx, "auth.load_user_roles")
+	defer done(&err)
+
+	return authService.GetUserRolesForOrg(ctx, userID, organizationID.String())
+}
+
+func loadUserGroups(ctx context.Context, authService authorization.Authorization, userID string, organizationID uuid.UUID) (groups []string, err error) {
+	ctx, done := telemetry.Span(ctx, "auth.load_user_groups")
+	defer done(&err)
+
+	return authService.GetUserGroups(ctx, organizationID.String(), models.DomainTypeOrganization, userID)
 }

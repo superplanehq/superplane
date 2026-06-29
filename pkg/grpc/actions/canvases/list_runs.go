@@ -3,6 +3,8 @@ package canvases
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -23,24 +25,12 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		return nil, err
 	}
 
-	db := database.DB(ctx)
-
-	var runs []models.CanvasRun
-	err = telemetry.RunSpan(ctx, "runs.list", func(ctx context.Context) error {
-		var listErr error
-		runs, listErr = models.ListCanvasRunsInTransaction(database.DB(ctx), canvasID, int(limit), beforeTime, filters)
-		return listErr
-	})
+	runs, err := listCanvasRuns(ctx, canvasID, int(limit), beforeTime, filters)
 	if err != nil {
 		return nil, err
 	}
 
-	var count int64
-	err = telemetry.RunSpan(ctx, "runs.count", func(ctx context.Context) error {
-		var countErr error
-		count, countErr = models.CountCanvasRunsInTransaction(database.DB(ctx), canvasID, filters)
-		return countErr
-	})
+	count, err := countCanvasRuns(ctx, canvasID, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -50,22 +40,12 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		runIDs[i] = run.ID
 	}
 
-	var rootEventsByRunID map[string]models.CanvasEvent
-	err = telemetry.RunSpan(ctx, "runs.load_root_events", func(ctx context.Context) error {
-		var loadErr error
-		rootEventsByRunID, loadErr = listRootEventsForRuns(ctx, canvasID, runIDs)
-		return loadErr
-	})
+	rootEventsByRunID, err := loadRootEventsForRunsSpan(ctx, canvasID, runIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	var executions []models.CanvasNodeExecution
-	err = telemetry.RunSpan(ctx, "runs.load_executions", func(ctx context.Context) error {
-		var loadErr error
-		executions, loadErr = models.ListExecutionsForRunsInTransaction(db, canvasID, runIDs)
-		return loadErr
-	})
+	executions, err := listExecutionsForRuns(ctx, canvasID, runIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -249,21 +229,46 @@ func serializeCanvasRuns(
 	runs []models.CanvasRun,
 	rootEventsByRunID map[string]models.CanvasEvent,
 	executionsByRunID map[string][]models.CanvasNodeExecution,
-) ([]*pb.CanvasRun, error) {
-	var serialized []*pb.CanvasRun
-	err := telemetry.RunSpan(ctx, "runs.serialize", func(ctx context.Context) error {
-		var serErr error
-		serialized, serErr = SerializeCanvasRuns(runs, rootEventsByRunID, executionsByRunID)
+) (serialized []*pb.CanvasRun, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.serialize")
+	defer done(&err)
 
-		if span := trace.SpanFromContext(ctx); span.IsRecording() {
-			span.SetAttributes(attribute.Int("runs.count", len(runs)))
-		}
-
-		return serErr
-	})
+	serialized, err = SerializeCanvasRuns(runs, rootEventsByRunID, executionsByRunID)
 	if err != nil {
 		return nil, err
 	}
 
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(attribute.Int("runs.count", len(runs)))
+	}
+
 	return serialized, nil
+}
+
+func listCanvasRuns(ctx context.Context, canvasID uuid.UUID, limit int, beforeTime *time.Time, filters models.CanvasRunFilters) (runs []models.CanvasRun, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.list")
+	defer done(&err)
+
+	return models.ListCanvasRunsInTransaction(database.DB(ctx), canvasID, limit, beforeTime, filters)
+}
+
+func countCanvasRuns(ctx context.Context, canvasID uuid.UUID, filters models.CanvasRunFilters) (count int64, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.count")
+	defer done(&err)
+
+	return models.CountCanvasRunsInTransaction(database.DB(ctx), canvasID, filters)
+}
+
+func loadRootEventsForRunsSpan(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (events map[string]models.CanvasEvent, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.load_root_events")
+	defer done(&err)
+
+	return listRootEventsForRuns(ctx, canvasID, runIDs)
+}
+
+func listExecutionsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (executions []models.CanvasNodeExecution, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.load_executions")
+	defer done(&err)
+
+	return models.ListExecutionsForRunsInTransaction(database.DB(ctx), canvasID, runIDs)
 }

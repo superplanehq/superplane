@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 const organizationPermissionCacheTTL = 15 * time.Minute
@@ -62,6 +64,10 @@ type organizationPermissionChecker interface {
 }
 
 func checkOrganizationPermission(ctx context.Context, auth organizationPermissionChecker, userID, orgID, resource, action string) (bool, error) {
+	var err error
+	ctx, done := telemetry.Span(ctx, "auth.check_organization_permission")
+	defer done(&err)
+
 	if allowed, ok := cachedOrganizationPermissionAllowed(userID, orgID, resource, action); ok && allowed {
 		return true, nil
 	}
