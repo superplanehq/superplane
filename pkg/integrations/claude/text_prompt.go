@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,12 +25,14 @@ type TextPromptSpec struct {
 	MaxTokens     int      `json:"maxTokens"`
 	Temperature   *float64 `json:"temperature"`
 	Files         []string `json:"files"`
+	OutputSchema  any      `json:"outputSchema"`
 }
 
 type MessagePayload struct {
 	ID         string                 `json:"id"`
 	Model      string                 `json:"model"`
 	Text       string                 `json:"text"`
+	Parsed     any                    `json:"parsed,omitempty"`
 	Usage      *MessageUsage          `json:"usage,omitempty"`
 	StopReason string                 `json:"stopReason,omitempty"`
 	Response   *CreateMessageResponse `json:"response"`
@@ -63,6 +66,7 @@ func (c *TextPrompt) Documentation() string {
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
 - **Max Tokens**: (Optional) Limit the length of the generated response.
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0).
+- **Structured Output Schema**: (Optional) A JSON Schema that constrains the response to JSON, returned on the parsed output. Root must be an object and every object must set additionalProperties:false.
 
 ## Output
 
@@ -71,6 +75,7 @@ Returns a payload containing:
 - **usage**: Input and output token counts.
 - **stopReason**: Why the generation ended (e.g., "end_turn", "max_tokens").
 - **model**: The specific model version used.
+- **parsed**: When a Structured Output Schema is set, the response parsed into an object (only on a normal end_turn completion).
 
 ## Notes
 
@@ -154,6 +159,16 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "outputSchema",
+			Label:       "Structured Output Schema",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Togglable:   true,
+			Default:     map[string]any{},
+			Description: "JSON Schema for the response. When set, Claude returns JSON conforming to this schema, available on the `parsed` output field. The root must be an object and every object must set `additionalProperties: false`.",
+			Placeholder: `{"type":"object","properties":{},"required":[],"additionalProperties":false}`,
+		},
 	}
 }
 
@@ -196,6 +211,10 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		}
 	}
 
+	if _, err := decodeOutputSchema(spec.OutputSchema); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -217,6 +236,11 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 
 	if spec.MaxTokens < 1 {
 		return fmt.Errorf("maxTokens must be at least 1")
+	}
+
+	schema, err := decodeOutputSchema(spec.OutputSchema)
+	if err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -246,6 +270,12 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		req.System = spec.SystemMessage
 	}
 
+	if schema != nil {
+		req.OutputConfig = &OutputConfig{
+			Format: &OutputFormat{Type: "json_schema", Schema: schema},
+		}
+	}
+
 	response, err := client.CreateMessage(req)
 	if err != nil {
 		return err
@@ -260,6 +290,16 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		Usage:      &response.Usage,
 		StopReason: response.StopReason,
 		Response:   response,
+	}
+
+	// When a schema is configured, parse the model's JSON text into a structured
+	// object. Only trust the output on a normal completion (end_turn); a refusal
+	// or truncation (max_tokens) may not conform to the schema.
+	if schema != nil && response.StopReason == "end_turn" && text != "" {
+		var parsed any
+		if err := json.Unmarshal([]byte(text), &parsed); err == nil {
+			payload.Parsed = parsed
+		}
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -283,6 +323,28 @@ func (c *TextPrompt) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 
 func (c *TextPrompt) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+// decodeOutputSchema normalizes the optional structured-output JSON schema from
+// the component configuration. It returns a nil map when no schema is configured
+// (field absent, or toggled on but empty). The schema must be a JSON object; a
+// string value (e.g. an expression) is rejected because the schema cannot be
+// templated.
+func decodeOutputSchema(raw any) (map[string]any, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	schema, ok := raw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("outputSchema must be a JSON object (expressions are not supported in the schema)")
+	}
+	if len(schema) == 0 {
+		return nil, nil
+	}
+	if t, _ := schema["type"].(string); t != "object" {
+		return nil, fmt.Errorf("outputSchema root must have \"type\": \"object\"")
+	}
+	return schema, nil
 }
 
 func extractMessageText(response *CreateMessageResponse) string {
