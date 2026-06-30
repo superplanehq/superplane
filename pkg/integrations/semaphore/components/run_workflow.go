@@ -29,7 +29,6 @@ const (
 	semaphoreOIDCTokenDuration = time.Hour
 
 	semaphoreClaimAppID        = "app_id"
-	semaphoreClaimCanvasID     = "canvas_id"
 	semaphoreClaimNodeID       = "node_id"
 	semaphoreClaimExecutionID  = "execution_id"
 	semaphoreClaimComponent    = "component"
@@ -604,7 +603,6 @@ func (r *RunWorkflow) signOIDCToken(ctx core.ExecutionContext, spec RunWorkflowS
 
 	claims := map[string]any{
 		semaphoreClaimAppID:       ctx.OrganizationID,
-		semaphoreClaimCanvasID:    ctx.WorkflowID,
 		semaphoreClaimNodeID:      ctx.NodeID,
 		semaphoreClaimExecutionID: ctx.ID.String(),
 		semaphoreClaimComponent:   r.Name(),
