@@ -649,14 +649,14 @@ func getDraftStatus(canvasID uuid.UUID) string {
 	if err != nil {
 		return noActiveDraftStatus
 	}
-	if !wasRecentlyPublished(latestPublished.PublishedAt) {
+	if !wasRecentlyPublished(latestPublished.CreatedAt) {
 		return noActiveDraftStatus
 	}
 
 	return fmt.Sprintf(
-		"[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
+		"[Draft Status]\nNo active drafts. The last commit on main was %s at %s. Your changes are live.",
 		latestPublished.ID.String(),
-		latestPublished.PublishedAt.UTC().Format(time.RFC3339),
+		latestPublished.CreatedAt.UTC().Format(time.RFC3339),
 	)
 }
 
@@ -748,7 +748,7 @@ func appendDraftSnapshotStatus(builder *strings.Builder, draft *models.CanvasVer
 	}
 
 	builder.WriteString(fmt.Sprintf("owned_draft_version_id: %s\n", draft.ID.String()))
-	builder.WriteString(fmt.Sprintf("owned_draft_display_name: %s\n", draft.DisplayName))
+	builder.WriteString(fmt.Sprintf("owned_draft_display_name: %s\n", draft.GitBranch))
 	return "draft", true
 }
 

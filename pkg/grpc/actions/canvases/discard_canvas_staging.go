@@ -13,23 +13,24 @@ func DiscardCanvasStaging(
 	organizationID string,
 	canvasID string,
 	versionID string,
+	branchName string,
 	paths []string,
 ) (*pb.DiscardCanvasStagingResponse, error) {
-	canvas, version, _, err := loadOwnedDraftVersion(ctx, organizationID, canvasID, versionID)
+	canvas, branch, headVersion, userUUID, err := loadBranchForStaging(ctx, organizationID, canvasID, branchName, versionID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := models.DiscardWorkflowStaging(version.ID, paths); err != nil {
+	if err := models.DiscardWorkflowStaging(branch.ID, userUUID, paths); err != nil {
 		return nil, grpcerrors.Internal(err, "failed to discard staging")
 	}
 
-	state, _, err := stagingSummaryForVersion(version.ID)
+	state, _, err := stagingSummaryForBranch(branch.ID, userUUID)
 	if err != nil {
 		return nil, err
 	}
 
-	publishStagingUpdated(canvas.ID, version.ID)
+	publishStagingUpdated(canvas.ID, headVersion.ID)
 
 	return &pb.DiscardCanvasStagingResponse{StagingSummary: state}, nil
 }

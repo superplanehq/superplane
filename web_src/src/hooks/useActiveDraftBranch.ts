@@ -30,13 +30,16 @@ export function clearLastDraftBranch(canvasId: string): void {
 }
 
 /**
- * Selects the draft to open when entering edit mode: always the most recently
- * updated draft (the "latest", first on the list). Stored-branch and owner
- * preferences were intentionally dropped so the Edit button is predictable.
+ * Default branch when entering edit mode: main, or the first available branch.
  */
 export function pickDefaultDraftBranch(branches: CanvasesCanvasVersion[]): CanvasesCanvasVersion | null {
   if (branches.length === 0) {
     return null;
+  }
+
+  const mainBranch = branches.find((branch) => draftBranchName(branch) === "main");
+  if (mainBranch) {
+    return mainBranch;
   }
 
   return (

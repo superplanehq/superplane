@@ -18,7 +18,7 @@ import (
 const MaxCanvasVersionLimit = 50
 
 func ListCanvasVersions(ctx context.Context, organizationID string, canvasID string) (*pb.ListCanvasVersionsResponse, error) {
-	return ListCanvasVersionsPaginated(ctx, organizationID, canvasID, 0, nil, pb.CanvasVersion_STATE_UNSPECIFIED)
+	return ListCanvasVersionsPaginated(ctx, organizationID, canvasID, 0, nil, pb.CanvasVersion_STATE_UNSPECIFIED, "")
 }
 
 func ListCanvasVersionsPaginated(
@@ -28,8 +28,9 @@ func ListCanvasVersionsPaginated(
 	limit uint32,
 	before *timestamppb.Timestamp,
 	state pb.CanvasVersion_State,
+	branchName string,
 ) (*pb.ListCanvasVersionsResponse, error) {
-	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	_, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
@@ -49,13 +50,16 @@ func ListCanvasVersionsPaginated(
 	}
 
 	if state == pb.CanvasVersion_STATE_DRAFT {
-		return listDraftCanvasVersions(ctx, organizationID, canvasUUID, uuid.MustParse(userID), limit, before)
+		return listBranchHeadVersions(ctx, organizationID, canvasUUID, limit, before)
 	}
 
 	limit = getCanvasVersionLimit(limit)
 	beforeTime := getBefore(before)
+	if branchName == "" {
+		branchName = models.CanvasGitBranchMain
+	}
 
-	publishedVersions, publishedCount, err := listPublishedCanvasVersions(ctx, canvasUUID, int(limit), beforeTime)
+	publishedVersions, publishedCount, err := listBranchCommits(ctx, canvasUUID, branchName, int(limit), beforeTime)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
@@ -114,11 +118,11 @@ func getLastCanvasVersionTimestamp(versions []models.CanvasVersion) *timestamppb
 	}
 
 	lastVersion := versions[len(versions)-1]
-	if lastVersion.PublishedAt == nil {
+	if lastVersion.CreatedAt == nil {
 		return nil
 	}
 
-	return timestamppb.New(*lastVersion.PublishedAt)
+	return timestamppb.New(*lastVersion.CreatedAt)
 }
 
 func getLastDraftCanvasVersionTimestamp(versions []models.CanvasVersion) *timestamppb.Timestamp {
@@ -134,22 +138,44 @@ func getLastDraftCanvasVersionTimestamp(versions []models.CanvasVersion) *timest
 	return timestamppb.New(*lastVersion.UpdatedAt)
 }
 
-func listPublishedCanvasVersions(ctx context.Context, canvasUUID uuid.UUID, limit int, beforeTime *time.Time) (versions []models.CanvasVersion, count int64, err error) {
-	ctx, done := telemetry.Span(ctx, "canvases.list_published_versions")
+func listBranchCommits(ctx context.Context, canvasUUID uuid.UUID, branchName string, limit int, beforeTime *time.Time) (versions []models.CanvasVersion, count int64, err error) {
+	ctx, done := telemetry.Span(ctx, "canvases.list_branch_commits")
 	defer done(&err)
 
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		var txErr error
-		versions, txErr = models.ListPublishedCanvasVersionsInTransaction(tx, canvasUUID, limit, beforeTime)
+		versions, txErr = models.ListBranchCommitsInTransaction(tx, canvasUUID, branchName, limit, beforeTime)
 		if txErr != nil {
 			return txErr
 		}
 
-		count, txErr = models.CountPublishedCanvasVersionsInTransaction(tx, canvasUUID)
+		count, txErr = models.CountBranchCommitsInTransaction(tx, canvasUUID, branchName)
 		return txErr
 	})
 
 	return versions, count, err
+}
+
+func listBranchHeadVersions(
+	ctx context.Context,
+	organizationID string,
+	canvasID uuid.UUID,
+	limit uint32,
+	before *timestamppb.Timestamp,
+) (*pb.ListCanvasVersionsResponse, error) {
+	_ = limit
+	_ = before
+	branchVersions, err := models.ListAllDraftBranchVersionsForCanvas(canvasID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list branches")
+	}
+
+	protoVersions := serializeCanvasVersions(ctx, branchVersions, organizationID)
+
+	return &pb.ListCanvasVersionsResponse{
+		Versions:   protoVersions,
+		TotalCount: uint32(len(protoVersions)),
+	}, nil
 }
 
 func listDraftCanvasVersionsInTransaction(ctx context.Context, canvasID, ownerID uuid.UUID, limit int, beforeTime *time.Time) (versions []models.CanvasVersion, count int64, err error) {

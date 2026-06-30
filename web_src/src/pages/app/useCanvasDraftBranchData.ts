@@ -2,11 +2,12 @@ import type { CanvasesCanvasVersion } from "@/api-client";
 import { useQueries } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
-import { canvasKeys, useListDraftBranches } from "@/hooks/useCanvasData";
+import { canvasKeys, useListCanvasBranches } from "@/hooks/useCanvasData";
 import { useActiveDraftBranch } from "@/hooks/useActiveDraftBranch";
 import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
+import { branchHeadVersionId, branchName, pickDefaultCanvasBranch, sortCanvasBranches } from "@/lib/canvas-branches";
 import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
-import { isDraftVersion, sortDraftVersionsDesc } from "./lib/canvas-versions";
+import { isDraftVersion } from "./lib/canvas-versions";
 
 type UseCanvasDraftBranchQueriesOptions = {
   organizationId?: string;
@@ -22,23 +23,52 @@ export function useCanvasDraftBranchQueries({
   searchParams,
   setSearchParams,
 }: UseCanvasDraftBranchQueriesOptions) {
-  const { data: draftBranchesRaw = [] } = useListDraftBranches(organizationId!, canvasId!, true);
-  const draftBranches = useMemo(() => sortDraftVersionsDesc(draftBranchesRaw), [draftBranchesRaw]);
+  const { data: canvasBranchesRaw = [], isFetched: canvasBranchesFetched } = useListCanvasBranches(
+    organizationId!,
+    canvasId!,
+    true,
+  );
+  const canvasBranches = useMemo(() => sortCanvasBranches(canvasBranchesRaw), [canvasBranchesRaw]);
+
+  const branchHeadVersionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const branch of canvasBranches) {
+      const versionId = branchHeadVersionId(branch);
+      if (versionId) {
+        ids.add(versionId);
+      }
+    }
+    return Array.from(ids);
+  }, [canvasBranches]);
+
   const draftVersionQueries = useQueries({
-    queries: draftBranches
-      .map((branch) => draftVersionId(branch))
-      .filter((versionId) => !!versionId)
-      .map((versionId) => ({
-        queryKey: canvasKeys.versionDetail(canvasId!, versionId),
-        queryFn: async () => fetchCanvasVersionWithSpec(canvasId!, versionId),
-        enabled: !!organizationId && !!canvasId && !!versionId,
-      })),
+    queries: branchHeadVersionIds.map((versionId) => ({
+      queryKey: canvasKeys.versionDetail(canvasId!, versionId),
+      queryFn: async () => fetchCanvasVersionWithSpec(canvasId!, versionId),
+      enabled: !!organizationId && !!canvasId && !!versionId,
+    })),
   });
+
   const draftVersionsFromBranches = useMemo(
     () =>
       draftVersionQueries.map((query) => query.data).filter((version): version is CanvasesCanvasVersion => !!version),
     [draftVersionQueries],
   );
+
+  const draftBranches = useMemo(() => {
+    const byBranchName = new Map<string, CanvasesCanvasVersion>();
+    for (const version of draftVersionsFromBranches) {
+      const name = draftBranchName(version);
+      if (name) {
+        byBranchName.set(name, version);
+      }
+    }
+
+    return canvasBranches
+      .map((branch) => byBranchName.get(branchName(branch)))
+      .filter((version): version is CanvasesCanvasVersion => !!version);
+  }, [canvasBranches, draftVersionsFromBranches]);
+
   const {
     activeBranch,
     activeBranchMeta,
@@ -51,9 +81,21 @@ export function useCanvasDraftBranchQueries({
     setSearchParams,
     draftBranches,
   });
-  const startEditingDefaultDraft = useMemo(() => pickDefaultDraftBranchForCanvas(), [pickDefaultDraftBranchForCanvas]);
+
+  const startEditingDefaultBranch = useMemo(() => pickDefaultCanvasBranch(canvasBranches), [canvasBranches]);
+  const startEditingDefaultDraft = useMemo(() => {
+    const defaultBranch = startEditingDefaultBranch;
+    if (!defaultBranch) {
+      return pickDefaultDraftBranchForCanvas();
+    }
+
+    const branchVersion = draftBranches.find((version) => draftBranchName(version) === branchName(defaultBranch));
+    return branchVersion ?? pickDefaultDraftBranchForCanvas();
+  }, [draftBranches, pickDefaultDraftBranchForCanvas, startEditingDefaultBranch]);
 
   return {
+    canvasBranches,
+    canvasBranchesFetched,
     draftBranches,
     draftVersionsFromBranches,
     activeBranch,
@@ -61,6 +103,7 @@ export function useCanvasDraftBranchQueries({
     activateBranch,
     exitToLive,
     startEditingDefaultDraft,
+    startEditingDefaultBranch,
   };
 }
 

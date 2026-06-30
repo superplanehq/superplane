@@ -13,7 +13,7 @@ describe("draft-branch-edit-status", () => {
     expect(resolveDraftBranchEditStatus(false, true)).toBe("ready");
     expect(resolveDraftBranchEditStatus(false, false)).toBe("no-changes");
     expect(draftEditTabToneFromStaging(true, true)).toBe("uncommitted");
-    expect(draftEditTabToneFromStaging(false, true)).toBe("ready");
+    expect(draftEditTabToneFromStaging(false, true)).toBe("neutral");
     expect(draftEditTabToneFromStaging(false, false)).toBe("neutral");
   });
 

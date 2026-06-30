@@ -35,4 +35,17 @@ describe("applyVersionSelectionSearchParams", () => {
     expect(next.get("view")).toBeNull();
     expect(next.get("version")).toBe("published-version");
   });
+
+  it("preserves branch in URL when editing live branch head", () => {
+    const next = applyVersionSelectionSearchParams(new URLSearchParams("view=versions"), {
+      isCurrentLive: true,
+      versionID: "live-version",
+      branchName: "main",
+      preserveBranchOnLive: true,
+    });
+
+    expect(next.get("view")).toBeNull();
+    expect(next.get("version")).toBeNull();
+    expect(next.get("branch")).toBe("main");
+  });
 });

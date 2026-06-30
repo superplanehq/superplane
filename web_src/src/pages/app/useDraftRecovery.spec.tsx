@@ -105,7 +105,10 @@ describe("useDraftRecovery", () => {
     expect(ensureDraftVersionExists).toHaveBeenCalledWith(expect.any(QueryClient), "org-1", "canvas-1", "draft-1");
     expect(registerIgnoredCanvasUpdatedEcho).toHaveBeenCalledTimes(1);
     expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("draft-1");
-    expect(publishCanvasVersionMutation.mutateAsync).toHaveBeenCalledWith("draft-1");
+    expect(publishCanvasVersionMutation.mutateAsync).toHaveBeenCalledWith({
+      versionId: "draft-1",
+      commitMessage: undefined,
+    });
     expect(refreshLatestLiveCanvasData).toHaveBeenCalledWith({
       liveVersionId: "draft-1",
       skipDraftBranchRefetch: true,
@@ -186,7 +189,10 @@ describe("useDraftRecovery", () => {
       await result.current.handlePublishVersion();
     });
 
-    expect(publishCanvasVersionMutation.mutateAsync).toHaveBeenCalledWith("draft-2");
+    expect(publishCanvasVersionMutation.mutateAsync).toHaveBeenCalledWith({
+      versionId: "draft-2",
+      commitMessage: undefined,
+    });
     expect(recoverIfDraftMissing).toHaveBeenCalledWith(
       expect.objectContaining({
         error: publishError,

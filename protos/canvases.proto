@@ -136,9 +136,32 @@ service Canvases {
       get: "/api/v1/canvases/{canvas_id}/versions"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List canvas versions";
-      description: "Lists all versions for a canvas";
+      summary: "List canvas commits";
+      description: "Lists commits for a canvas branch (defaults to main)";
       tags: "CanvasVersion";
+    };
+  }
+
+  rpc ListCanvasBranches(ListCanvasBranchesRequest) returns (ListCanvasBranchesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/branches"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas branches";
+      description: "Lists all branches for a canvas";
+      tags: "CanvasBranch";
+    };
+  }
+
+  rpc CreateCanvasBranch(CreateCanvasBranchRequest) returns (CreateCanvasBranchResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/branches"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create canvas branch";
+      description: "Creates a new branch from an existing branch head";
+      tags: "CanvasBranch";
     };
   }
 
@@ -527,6 +550,7 @@ message StageCanvasRepositoryFileRequest {
   string version_id = 2;
   // canvas.yaml/console.yaml additions, updates, or deletions to stage verbatim.
   repeated CanvasRepositoryFileOperation operations = 3;
+  string branch_name = 4;
 }
 
 message StageCanvasRepositoryFileResponse {
@@ -547,6 +571,34 @@ message ListCanvasVersionsRequest {
   uint32 limit = 2;
   google.protobuf.Timestamp before = 3;
   CanvasVersion.State state = 4;
+  string branch_name = 5;
+}
+
+message ListCanvasBranchesRequest {
+  string canvas_id = 1;
+}
+
+message ListCanvasBranchesResponse {
+  repeated CanvasBranch branches = 1;
+}
+
+message CreateCanvasBranchRequest {
+  string canvas_id = 1;
+  string name = 2;
+  optional string source_branch = 3;
+}
+
+message CreateCanvasBranchResponse {
+  CanvasBranch branch = 1;
+}
+
+message CanvasBranch {
+  string id = 1;
+  string canvas_id = 2;
+  string name = 3;
+  string head_version_id = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
 }
 
 message ListCanvasVersionsResponse {
@@ -586,6 +638,7 @@ message DeleteCanvasVersionResponse {}
 message PublishCanvasVersionRequest {
   string canvas_id = 1;
   string version_id = 2;
+  string commit_message = 3;
 }
 
 message PublishCanvasVersionResponse {
@@ -597,6 +650,7 @@ message DiscardCanvasStagingRequest {
   string version_id = 2;
   // Optional per-file revert. When empty, all staged files are discarded.
   repeated string paths = 3;
+  string branch_name = 4;
 }
 
 message DiscardCanvasStagingResponse {
@@ -606,6 +660,9 @@ message DiscardCanvasStagingResponse {
 message CommitCanvasStagingRequest {
   string canvas_id = 1;
   string version_id = 2;
+  string branch_name = 3;
+  string commit_message = 4;
+  optional string new_branch_name = 5;
 }
 
 message CommitCanvasStagingResponse {
@@ -698,6 +755,8 @@ message CanvasVersion {
     string description = 9;
     string branch_name = 10;
     string display_name = 11;
+    string commit_message = 12;
+    string commit_sha = 13;
   }
 
   Metadata metadata = 1;

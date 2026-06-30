@@ -1,27 +1,25 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn } from "@/lib/utils";
+import { formatCommitMessage, formatCommitSha } from "@/pages/app/lib/canvas-versions";
 import { useCallback } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { formatVersionLabel, formatVersionTimestamp } from "@/pages/app/lib/canvas-versions";
 import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 export function VersionRow({
   version,
   isActive = false,
-  isCurrentLive = false,
-  isFirstCanvasVersion = false,
+  isBranchHead = false,
   rowTestId,
   onUseVersion,
 }: {
   version: CanvasesCanvasVersion;
   isActive?: boolean;
-  isCurrentLive?: boolean;
-  isFirstCanvasVersion?: boolean;
+  isBranchHead?: boolean;
   rowTestId?: string;
   onUseVersion: (versionID: string) => void;
 }) {
-  const { versionID, ownerName, versionLabel, timestamp } = deriveVersionRowFields(version, isFirstCanvasVersion);
+  const { versionID, commitMessage, commitSha, timestamp } = deriveCommitRowFields(version);
 
   const handleRowActivate = useCallback(() => {
     onUseVersion(versionID);
@@ -40,6 +38,8 @@ export function VersionRow({
     return null;
   }
 
+  const ariaLabel = commitSha ? `${commitSha} ${commitMessage}` : commitMessage;
+
   return (
     <div
       data-testid={rowTestId}
@@ -48,23 +48,25 @@ export function VersionRow({
       tabIndex={0}
       onClick={handleRowActivate}
       onKeyDown={handleRowKeyDown}
-      aria-label={`Preview ${versionLabel}`}
-      title={`${versionLabel} · ${ownerName}`}
+      aria-label={ariaLabel}
+      title={ariaLabel}
     >
-      <span
-        className={cn(
-          "min-w-0 flex-1 truncate text-xs",
-          isActive ? "font-semibold text-sky-900" : "font-medium text-slate-900",
-        )}
-      >
-        {versionLabel}
-      </span>
-      {isCurrentLive ? (
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        {commitSha ? <span className="font-mono text-[11px] font-medium text-slate-600">{commitSha}</span> : null}
+        <span
+          className={cn(
+            "min-w-0 truncate text-xs",
+            isActive ? "font-semibold text-sky-900" : "font-medium text-slate-900",
+          )}
+        >
+          {commitMessage}
+        </span>
+      </div>
+      {isBranchHead ? (
         <span className="shrink-0 rounded bg-sky-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-800">
-          Current
+          HEAD
         </span>
       ) : null}
-      <span className="max-w-[40%] shrink-0 truncate text-[11px] text-slate-500">{ownerName}</span>
       {timestamp ? (
         <TimeAgo date={timestamp} includeAgo={false} className="shrink-0 text-xs tabular-nums text-slate-500" />
       ) : null}
@@ -72,12 +74,12 @@ export function VersionRow({
   );
 }
 
-function deriveVersionRowFields(version: CanvasesCanvasVersion, isFirstCanvasVersion: boolean) {
+function deriveCommitRowFields(version: CanvasesCanvasVersion) {
   return {
     versionID: version.metadata?.id ?? "",
-    ownerName: version.metadata?.owner?.name || "Unknown owner",
-    versionLabel: isFirstCanvasVersion ? "v1" : formatVersionTimestamp(version) || formatVersionLabel(version),
-    timestamp: version.metadata?.publishedAt || version.metadata?.updatedAt || version.metadata?.createdAt,
+    commitMessage: formatCommitMessage(version),
+    commitSha: formatCommitSha(version),
+    timestamp: version.metadata?.createdAt || version.metadata?.updatedAt,
   };
 }
 

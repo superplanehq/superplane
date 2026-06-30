@@ -73,14 +73,8 @@ func validatedOwnedDraftVersion(canvasID, userID, versionID uuid.UUID) (*models.
 	if err != nil {
 		return nil, fmt.Errorf("load draft version %s: %w", versionID, err)
 	}
-	if draft.State != models.CanvasVersionStateDraft {
-		return nil, fmt.Errorf("draft version %s is not a draft", versionID)
-	}
-	if !models.IsRegisteredDraftVersion(draft) {
-		return nil, fmt.Errorf("draft version %s is not a registered draft branch", versionID)
-	}
-	if !models.IsUserOwnedDraftVersion(draft, userID) {
-		return nil, fmt.Errorf("draft version %s does not belong to the current user", versionID)
+	if draft.GitBranch == models.CanvasGitBranchMain {
+		return nil, fmt.Errorf("version %s is on main, not a branch", versionID)
 	}
 	return draft, nil
 }

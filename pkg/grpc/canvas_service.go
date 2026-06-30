@@ -80,7 +80,21 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 
 func (s *CanvasService) ListCanvasVersions(ctx context.Context, req *pb.ListCanvasVersionsRequest) (*pb.ListCanvasVersionsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvasVersionsPaginated(ctx, organizationID, req.CanvasId, req.Limit, req.Before, req.State)
+	return canvases.ListCanvasVersionsPaginated(ctx, organizationID, req.CanvasId, req.Limit, req.Before, req.State, req.GetBranchName())
+}
+
+func (s *CanvasService) ListCanvasBranches(ctx context.Context, req *pb.ListCanvasBranchesRequest) (*pb.ListCanvasBranchesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasBranches(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) CreateCanvasBranch(ctx context.Context, req *pb.CreateCanvasBranchRequest) (*pb.CreateCanvasBranchResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	sourceBranch := ""
+	if req.SourceBranch != nil {
+		sourceBranch = *req.SourceBranch
+	}
+	return canvases.CreateCanvasBranch(ctx, organizationID, req.CanvasId, req.GetName(), sourceBranch)
 }
 
 func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {
@@ -112,6 +126,7 @@ func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.Publis
 		organizationID,
 		req.CanvasId,
 		req.VersionId,
+		req.GetCommitMessage(),
 		s.webhookBaseURL,
 		s.authService,
 	)
@@ -342,6 +357,7 @@ func (s *CanvasService) StageCanvasRepositoryFile(ctx context.Context, req *pb.S
 		organizationID,
 		req.CanvasId,
 		req.VersionId,
+		req.GetBranchName(),
 		req.Operations,
 	)
 	if err != nil {
@@ -352,11 +368,15 @@ func (s *CanvasService) StageCanvasRepositoryFile(ctx context.Context, req *pb.S
 
 func (s *CanvasService) DiscardCanvasStaging(ctx context.Context, req *pb.DiscardCanvasStagingRequest) (*pb.DiscardCanvasStagingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.DiscardCanvasStaging(ctx, organizationID, req.CanvasId, req.VersionId, req.Paths)
+	return canvases.DiscardCanvasStaging(ctx, organizationID, req.CanvasId, req.VersionId, req.GetBranchName(), req.Paths)
 }
 
 func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitCanvasStagingRequest) (*pb.CommitCanvasStagingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	newBranchName := ""
+	if req.NewBranchName != nil {
+		newBranchName = *req.NewBranchName
+	}
 	return canvases.CommitCanvasStaging(
 		ctx,
 		s.gitProvider,
@@ -366,6 +386,9 @@ func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitC
 		organizationID,
 		req.CanvasId,
 		req.VersionId,
+		req.GetBranchName(),
+		req.GetCommitMessage(),
+		newBranchName,
 		s.webhookBaseURL,
 		s.authService,
 	)

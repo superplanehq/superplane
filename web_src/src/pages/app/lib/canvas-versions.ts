@@ -1,4 +1,5 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
+import { shortCommitSha } from "@/lib/canvas-branches";
 
 export function isPublishedVersion(version: CanvasesCanvasVersion): boolean {
   return version.metadata?.state === "STATE_PUBLISHED";
@@ -12,6 +13,25 @@ export function sortPublishedVersionsDesc(versions: CanvasesCanvasVersion[]): Ca
   return versions
     .filter(isPublishedVersion)
     .sort((a, b) => versionSortValue(b.metadata?.publishedAt) - versionSortValue(a.metadata?.publishedAt));
+}
+
+export function sortBranchCommitsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {
+  return versions
+    .slice()
+    .sort(
+      (a, b) =>
+        versionSortValue(b.metadata?.createdAt || b.metadata?.updatedAt) -
+        versionSortValue(a.metadata?.createdAt || a.metadata?.updatedAt),
+    );
+}
+
+export function formatCommitMessage(version?: CanvasesCanvasVersion | null): string {
+  const message = version?.metadata?.commitMessage?.trim();
+  return message || "Update canvas";
+}
+
+export function formatCommitSha(version?: CanvasesCanvasVersion | null): string | undefined {
+  return shortCommitSha(version?.metadata?.commitSha);
 }
 
 export function sortDraftVersionsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {

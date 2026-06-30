@@ -118,7 +118,7 @@ func CanvasVersionToConsoleYML(canvasVersion *CanvasVersion) ([]byte, error) {
 		Kind:       ConsoleKind,
 		Metadata: ConsoleYAMLMetadata{
 			CanvasID: canvasVersion.WorkflowID.String(),
-			Name:     canvasVersion.Name,
+			Name:     canvasVersion.GitBranch,
 		},
 		Spec: ConsoleYAMLSpec{
 			Panels: normalizeConsolePanelsForExport(canvasVersion.ConsolePanels.Data()),

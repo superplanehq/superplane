@@ -14,6 +14,9 @@ type ResolveFilesHeaderVersionActionsArgs = {
   resetDraftDisabled: boolean;
   resetDraftDisabledTooltip?: string;
   hasUnpublishedDraftChanges: boolean;
+  publishVersionLabel?: string;
+  allowDiscard?: boolean;
+  allowPublish?: boolean;
 };
 
 export function resolveFilesHeaderVersionActions({
@@ -24,15 +27,18 @@ export function resolveFilesHeaderVersionActions({
   resetDraftDisabled,
   resetDraftDisabledTooltip,
   hasUnpublishedDraftChanges,
+  publishVersionLabel = "Publish",
+  allowDiscard = false,
+  allowPublish = false,
 }: ResolveFilesHeaderVersionActionsArgs) {
   return {
-    onPublishVersion: handlePublishVersion,
-    onDiscardVersion: handleResetDraftChanges,
+    onPublishVersion: allowPublish ? handlePublishVersion : undefined,
+    onDiscardVersion: allowDiscard ? handleResetDraftChanges : undefined,
     publishVersionDisabled,
     publishVersionDisabledTooltip,
     hasUnpublishedDraftChanges,
     discardVersionDisabled: resetDraftDisabled,
     discardVersionDisabledTooltip: resetDraftDisabledTooltip,
-    publishVersionLabel: "Publish",
+    publishVersionLabel,
   };
 }

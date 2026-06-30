@@ -3,6 +3,8 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -10,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -28,9 +29,16 @@ func PublishCanvasVersion(
 	organizationID string,
 	canvasID string,
 	versionID string,
+	commitMessage string,
 	webhookBaseURL string,
 	authService authorization.Authorization,
 ) (*pb.PublishCanvasVersionResponse, error) {
+	_ = encryptor
+	_ = reg
+	_ = gitProv
+	_ = webhookBaseURL
+	_ = authService
+
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -54,8 +62,13 @@ func PublishCanvasVersion(
 		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
-	publishedVersion, err := publishDraftVersionInTransaction(
-		ctx, encryptor, reg, gitProv, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
+	publishedVersion, err := mergeBranchToMainInTransaction(
+		ctx,
+		organizationUUID,
+		canvasUUID,
+		versionUUID,
+		userUUID,
+		commitMessage,
 	)
 	if err != nil {
 		if grpcerrors.Code(err) != codes.Unknown {
@@ -72,8 +85,82 @@ func PublishCanvasVersion(
 	}
 
 	return &pb.PublishCanvasVersionResponse{
-		Version: SerializeCanvasVersion(publishedVersion, organizationID, nil),
+		Version: SerializeCanvasVersion(publishedVersion, organizationID, nil, canvas),
 	}, nil
+}
+
+func mergeBranchToMainInTransaction(
+	ctx context.Context,
+	organizationUUID uuid.UUID,
+	canvasUUID uuid.UUID,
+	sourceVersionUUID uuid.UUID,
+	userUUID uuid.UUID,
+	commitMessage string,
+) (*models.CanvasVersion, error) {
+	_ = ctx
+	var publishedVersion *models.CanvasVersion
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		sourceVersion, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, sourceVersionUUID)
+		if findErr != nil {
+			if errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return grpcerrors.NotFound(findErr, "version not found")
+			}
+			return findErr
+		}
+
+		if sourceVersion.GitBranch == models.CanvasGitBranchMain {
+			publishedVersion = sourceVersion
+			return nil
+		}
+
+		branch, branchErr := models.FindWorkflowBranch(tx, canvasUUID, sourceVersion.GitBranch)
+		if branchErr != nil {
+			return branchErr
+		}
+
+		hasStaging, err := models.HasWorkflowStagingInTransaction(tx, branch.ID, userUUID)
+		if err != nil {
+			return err
+		}
+		if hasStaging {
+			return grpcerrors.FailedPrecondition(nil, "branch has uncommitted staged changes")
+		}
+
+		created, createErr := models.CreateCommitOnBranch(tx, models.CreateCommitInput{
+			WorkflowID:    canvasUUID,
+			BranchName:    models.CanvasGitBranchMain,
+			OwnerID:       userUUID,
+			CommitMessage: resolvedMergeCommitMessage(commitMessage, sourceVersion.GitBranch),
+			Nodes:         append([]models.Node(nil), sourceVersion.Nodes...),
+			Edges:         append([]models.Edge(nil), sourceVersion.Edges...),
+			ConsolePanels: sourceVersion.ConsolePanels.Data(),
+			ConsoleLayout: sourceVersion.ConsoleLayout.Data(),
+		})
+		if createErr != nil {
+			return createErr
+		}
+
+		if err := models.DeleteWorkflowBranch(tx, canvasUUID, sourceVersion.GitBranch); err != nil {
+			return err
+		}
+
+		publishedVersion = created
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return publishedVersion, nil
+}
+
+func resolvedMergeCommitMessage(requestedMessage, branchName string) string {
+	if trimmed := strings.TrimSpace(requestedMessage); trimmed != "" {
+		return trimmed
+	}
+	return "Merge branch '" + branchName + "'"
 }
 
 func publishDraftVersionInTransaction(
@@ -89,73 +176,5 @@ func publishDraftVersionInTransaction(
 	authService authorization.Authorization,
 	webhookBaseURL string,
 ) (*models.CanvasVersion, error) {
-	var publishedVersion *models.CanvasVersion
-
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
-		if findErr != nil {
-			if errors.Is(findErr, gorm.ErrRecordNotFound) {
-				return grpcerrors.NotFound(findErr, "version not found")
-			}
-			return findErr
-		}
-
-		if version.State != models.CanvasVersionStateDraft {
-			return grpcerrors.FailedPrecondition(nil, "only draft versions can be published")
-		}
-
-		if version.OwnerID == nil || *version.OwnerID != userUUID {
-			return grpcerrors.PermissionDenied(nil, "version owner mismatch")
-		}
-
-		hasStaging, err := models.HasWorkflowStagingInTransaction(tx, version.ID)
-		if err != nil {
-			return err
-		}
-
-		if hasStaging {
-			return grpcerrors.FailedPrecondition(nil, "draft version has staged changes")
-		}
-
-		nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, version.Name)
-		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
-			return grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
-		}
-		if nameErr != nil {
-			return nameErr
-		}
-
-		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
-		if err != nil {
-			return err
-		}
-
-		err = publishCanvasVersionInTransaction(
-			ctx,
-			tx,
-			liveVersion,
-			version,
-			changesets.CanvasPublisherOptions{
-				Registry:       reg,
-				OrgID:          organizationUUID,
-				Encryptor:      encryptor,
-				AuthService:    authService,
-				WebhookBaseURL: webhookBaseURL,
-				GitProvider:    gitProv,
-			},
-		)
-		if err != nil {
-			log.Errorf("failed to publish canvas version: %v", err)
-			return err
-		}
-
-		publishedVersion = version
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return publishedVersion, nil
+	return mergeBranchToMainInTransaction(ctx, organizationUUID, canvasUUID, versionUUID, userUUID, "")
 }

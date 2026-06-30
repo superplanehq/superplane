@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -42,28 +43,17 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 	}
 
 	userUUID := uuid.MustParse(userID)
-	if version.State == models.CanvasVersionStatePublished {
-		return &pb.DescribeCanvasVersionResponse{
-			Version: SerializeCanvasVersionMetadata(version, organizationID, nil),
-		}, nil
-	}
-
-	canAccess := false
-	if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
-		canAccess = true
-	}
-
-	if !canAccess {
-		return nil, grpcerrors.PermissionDenied(nil, "version is not visible in current flow")
-	}
-
-	state, _, err := stagingSummaryForVersion(version.ID)
-	if err != nil {
-		return nil, err
+	branch, branchErr := models.FindWorkflowBranch(database.DB(ctx), canvas.ID, version.GitBranch)
+	var stagingSummary *pb.StagingSummary
+	if branchErr == nil {
+		state, _, summaryErr := stagingSummaryForBranch(branch.ID, userUUID)
+		if summaryErr == nil {
+			stagingSummary = state
+		}
 	}
 
 	return &pb.DescribeCanvasVersionResponse{
 		Version:        SerializeCanvasVersionMetadata(version, organizationID, nil),
-		StagingSummary: state,
+		StagingSummary: stagingSummary,
 	}, nil
 }

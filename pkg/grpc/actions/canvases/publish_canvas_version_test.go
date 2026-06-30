@@ -24,7 +24,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			context.Background(),
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), uuid.New().String(), uuid.New().String(),
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -37,7 +37,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), "invalid-id", uuid.New().String(),
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -50,7 +50,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), uuid.New().String(), "invalid-id",
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -63,7 +63,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), uuid.New().String(), uuid.New().String(),
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -81,7 +81,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), canvasID, canvas.LiveVersionID.String(),
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -103,7 +103,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), canvasID, draftVersionID,
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -130,7 +130,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), canvasID, draftVersionID,
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -150,7 +150,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), canvasID, uuid.New().String(),
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -167,7 +167,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), canvasID, draftVersionID,
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, resp.Version)
@@ -208,7 +208,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), canvasID, draftVersionID,
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		require.NoError(t, err)
 
@@ -237,7 +237,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), canvasID, draftVersionID,
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, resp.Version)
@@ -277,7 +277,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), canvasID, draftVersionID,
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		require.NoError(t, err)
 
@@ -316,7 +316,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			ctx,
 			r.Encryptor, r.Registry, r.GitProvider,
 			r.Organization.ID.String(), canvas.ID.String(), draftVersionID,
-			testWebhookBaseURL, r.AuthService,
+			"", testWebhookBaseURL, r.AuthService,
 		)
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)

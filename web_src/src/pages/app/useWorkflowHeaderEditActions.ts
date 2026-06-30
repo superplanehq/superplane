@@ -15,12 +15,14 @@ interface WorkflowStartupActionsConfig {
   canvas: CanvasesCanvas | null | undefined;
   handlePlaceholderAdd?: PlaceholderAddHandler;
   searchParams: URLSearchParams;
+  /** True once branch metadata (or live version id) is available for entering edit. */
+  editEntryReady?: boolean;
 }
 
 interface WorkflowHeaderEditActionsConfig {
   isRunInspectionMode: boolean;
   handleClearRunInspection: () => void;
-  handleToggleEditMode: () => Promise<void>;
+  handleToggleEditMode: () => Promise<boolean>;
   setRunDetailNodeId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
   startup?: WorkflowStartupActionsConfig;
@@ -74,24 +76,29 @@ export function useWorkflowHeaderEditActions({
 
 function useAutoEditMode(
   startup: WorkflowStartupActionsConfig | undefined,
-  handleToggleEditMode: () => Promise<void>,
+  handleToggleEditMode: () => Promise<boolean>,
   setRunDetailNodeId: (value: string | null) => void,
   setSearchParams: SetURLSearchParams,
 ) {
   const triggeredRef = useRef(false);
+  const canvasId = startup?.canvas?.metadata?.id;
   const hasEditableVersion = startup?.hasEditableVersion ?? false;
   const canUpdateCanvas = startup?.canUpdateCanvas ?? false;
   const canvasLoaded = Boolean(startup?.canvas);
+  const editEntryReady = startup?.editEntryReady ?? true;
   const searchParams = startup?.searchParams;
+
+  useEffect(() => {
+    triggeredRef.current = false;
+  }, [canvasId]);
 
   useEffect(() => {
     if (triggeredRef.current) return;
     if (!searchParams || searchParams.get("edit") !== "1") return;
     if (!canvasLoaded) return;
+    if (!editEntryReady) return;
     if (hasEditableVersion) return;
     if (!canUpdateCanvas) return;
-
-    triggeredRef.current = true;
 
     void (async () => {
       if (searchParams.get("run")) {
@@ -100,7 +107,12 @@ function useAutoEditMode(
         await Promise.resolve();
       }
 
-      await handleToggleEditMode();
+      const enteredEditMode = await handleToggleEditMode();
+      if (!enteredEditMode) {
+        return;
+      }
+
+      triggeredRef.current = true;
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);
@@ -117,6 +129,7 @@ function useAutoEditMode(
     hasEditableVersion,
     canUpdateCanvas,
     canvasLoaded,
+    editEntryReady,
     handleToggleEditMode,
   ]);
 }

@@ -14,7 +14,12 @@ import type { RefreshLatestLiveCanvasDataOptions } from "./useRefreshLatestLiveC
 
 type DraftSpec = CanvasesCanvas["spec"] | null;
 type SetSearchParams = ReturnType<typeof useSearchParams>[1];
-type PublishMutation = { mutateAsync: (versionId: string) => Promise<unknown> };
+type PublishMutation = {
+  mutateAsync: (input: {
+    versionId: string;
+    commitMessage?: string;
+  }) => Promise<{ data?: { version?: { metadata?: { id?: string } } } } | undefined>;
+};
 
 type UseDraftRecoveryOptions = {
   organizationId?: string;
@@ -105,55 +110,59 @@ export function useDraftRecovery({
     [organizationId, canvasId, queryClient, recoverFromMissingDraft],
   );
 
-  const handlePublishVersion = useCallback(async () => {
-    if (!organizationId || !canvasId || !activeCanvasVersionId) {
-      return;
-    }
-
-    setIsPreparingVersionAction(true);
-    try {
-      const result = await publishDraftVersionAndExit({
-        organizationId,
-        canvasId,
-        activeCanvasVersionIdRef,
-        queryClient,
-        ensureVersionActionDraftReady,
-        publishCanvasVersionMutation,
-        registerIgnoredCanvasUpdatedEcho,
-        registerIgnoredCanvasVersionUpdatedEcho,
-        runExitDraftToLive,
-        recoverFromMissingDraft,
-      });
-      if (result.status === "published") {
-        showSuccessToast("Version published");
+  const handlePublishVersion = useCallback(
+    async (commitMessage?: string) => {
+      if (!organizationId || !canvasId || !activeCanvasVersionId) {
         return;
       }
-      if (result.status === "failed") {
-        if (await recoverIfDraftMissing(result.error, result.versionIdToPublish)) {
+
+      setIsPreparingVersionAction(true);
+      try {
+        const result = await publishDraftVersionAndExit({
+          organizationId,
+          canvasId,
+          activeCanvasVersionIdRef,
+          commitMessage,
+          queryClient,
+          ensureVersionActionDraftReady,
+          publishCanvasVersionMutation,
+          registerIgnoredCanvasUpdatedEcho,
+          registerIgnoredCanvasVersionUpdatedEcho,
+          runExitDraftToLive,
+          recoverFromMissingDraft,
+        });
+        if (result.status === "published") {
+          showSuccessToast("Version published");
           return;
         }
-        showErrorToast(
-          getUsageLimitToastMessage(result.error, getApiErrorMessage(result.error, "Failed to publish version")),
-        );
+        if (result.status === "failed") {
+          if (await recoverIfDraftMissing(result.error, result.versionIdToPublish)) {
+            return;
+          }
+          showErrorToast(
+            getUsageLimitToastMessage(result.error, getApiErrorMessage(result.error, "Failed to publish version")),
+          );
+        }
+      } finally {
+        setIsPreparingVersionAction(false);
       }
-    } finally {
-      setIsPreparingVersionAction(false);
-    }
-  }, [
-    organizationId,
-    canvasId,
-    activeCanvasVersionId,
-    activeCanvasVersionIdRef,
-    queryClient,
-    ensureVersionActionDraftReady,
-    publishCanvasVersionMutation,
-    setIsPreparingVersionAction,
-    registerIgnoredCanvasUpdatedEcho,
-    registerIgnoredCanvasVersionUpdatedEcho,
-    runExitDraftToLive,
-    recoverFromMissingDraft,
-    recoverIfDraftMissing,
-  ]);
+    },
+    [
+      organizationId,
+      canvasId,
+      activeCanvasVersionId,
+      activeCanvasVersionIdRef,
+      queryClient,
+      ensureVersionActionDraftReady,
+      publishCanvasVersionMutation,
+      setIsPreparingVersionAction,
+      registerIgnoredCanvasUpdatedEcho,
+      registerIgnoredCanvasVersionUpdatedEcho,
+      runExitDraftToLive,
+      recoverFromMissingDraft,
+      recoverIfDraftMissing,
+    ],
+  );
 
   return { handlePublishVersion, recoverFromMissingDraft, recoverIfDraftMissing };
 }

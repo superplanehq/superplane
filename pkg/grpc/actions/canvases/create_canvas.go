@@ -127,6 +127,7 @@ func CreateCanvasWithSeedFiles(
 		OrganizationID: organizationID,
 		LiveVersionID:  &versionID,
 		Name:           name,
+		Description:    pbCanvas.Metadata.Description,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
@@ -150,23 +151,25 @@ func CreateCanvasWithSeedFiles(
 		}
 
 		//
-		// Create new empty canvas version record
+		// Create initial commit on main branch
 		//
 		emptyVersion := models.CanvasVersion{
-			ID:          versionID,
-			WorkflowID:  canvasID,
-			OwnerID:     &createdBy,
-			State:       models.CanvasVersionStatePublished,
-			Name:        name,
-			Description: pbCanvas.Metadata.Description,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
-			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:            versionID,
+			WorkflowID:    canvasID,
+			OwnerID:       &createdBy,
+			Nodes:         datatypes.NewJSONSlice([]models.Node{}),
+			Edges:         datatypes.NewJSONSlice([]models.Edge{}),
+			GitBranch:     models.CanvasGitBranchMain,
+			CommitMessage: "Initial commit",
+			CreatedAt:     &now,
+			UpdatedAt:     &now,
 		}
 
 		if err := tx.Create(&emptyVersion).Error; err != nil {
+			return err
+		}
+
+		if _, err := models.CreateWorkflowBranch(tx, canvasID, models.CanvasGitBranchMain, &versionID); err != nil {
 			return err
 		}
 

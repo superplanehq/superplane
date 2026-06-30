@@ -506,6 +506,20 @@ CREATE TABLE public.webhooks (
 
 
 --
+-- Name: workflow_branches; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_branches (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    name text NOT NULL,
+    head_version_id uuid,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: workflow_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -641,14 +655,13 @@ CREATE TABLE public.workflow_runs (
 
 CREATE TABLE public.workflow_staged_files (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    version_id uuid NOT NULL,
-    organization_id uuid NOT NULL,
     path text NOT NULL,
     content text DEFAULT ''::text NOT NULL,
     deleted boolean DEFAULT false NOT NULL,
     updated_by uuid,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    base_head_sha character varying(40) NOT NULL
+    branch_id uuid NOT NULL,
+    user_id uuid NOT NULL
 );
 
 
@@ -660,21 +673,15 @@ CREATE TABLE public.workflow_versions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
     owner_id uuid,
-    published_at timestamp without time zone,
     nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    state character varying(32) NOT NULL,
-    name character varying(128) DEFAULT ''::character varying NOT NULL,
-    description text DEFAULT ''::text NOT NULL,
     console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
-    display_name text DEFAULT ''::text NOT NULL,
     commit_sha character varying(40) DEFAULT ''::character varying NOT NULL,
     git_branch text NOT NULL,
-    materialization_status character varying(32) NOT NULL,
-    materialization_error text NOT NULL
+    commit_message text DEFAULT ''::text NOT NULL
 );
 
 
@@ -692,7 +699,7 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     live_version_id uuid NOT NULL,
     folder_id uuid,
-    next_draft_display_number integer DEFAULT 1 NOT NULL
+    description text DEFAULT ''::text NOT NULL
 );
 
 
@@ -1040,6 +1047,22 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_branches workflow_branches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_branches
+    ADD CONSTRAINT workflow_branches_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_branches workflow_branches_workflow_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_branches
+    ADD CONSTRAINT workflow_branches_workflow_id_name_key UNIQUE (workflow_id, name);
+
+
+--
 -- Name: workflow_events workflow_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1096,19 +1119,19 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: workflow_staged_files workflow_staged_files_branch_id_user_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_staged_files
+    ADD CONSTRAINT workflow_staged_files_branch_id_user_id_path_key UNIQUE (branch_id, user_id, path);
+
+
+--
 -- Name: workflow_staged_files workflow_staged_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
     ADD CONSTRAINT workflow_staged_files_pkey PRIMARY KEY (id);
-
-
---
--- Name: workflow_staged_files workflow_staged_files_version_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staged_files_version_id_path_key UNIQUE (version_id, path);
 
 
 --
@@ -1374,6 +1397,13 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 
 
 --
+-- Name: idx_workflow_branches_workflow_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_branches_workflow_id ON public.workflow_branches USING btree (workflow_id);
+
+
+--
 -- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1521,10 +1551,10 @@ CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btre
 
 
 --
--- Name: idx_workflow_staged_files_version_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_staged_files_branch_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_staged_files_version_id ON public.workflow_staged_files USING btree (version_id);
+CREATE INDEX idx_workflow_staged_files_branch_user ON public.workflow_staged_files USING btree (branch_id, user_id);
 
 
 --
@@ -1532,13 +1562,6 @@ CREATE INDEX idx_workflow_staged_files_version_id ON public.workflow_staged_file
 --
 
 CREATE INDEX idx_workflow_versions_commit_sha ON public.workflow_versions USING btree (workflow_id, commit_sha) WHERE ((commit_sha)::text <> ''::text);
-
-
---
--- Name: idx_workflow_versions_draft_git_branch; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_workflow_versions_draft_git_branch ON public.workflow_versions USING btree (workflow_id, git_branch) WHERE ((state)::text = 'draft'::text);
 
 
 --
@@ -1821,6 +1844,22 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
+-- Name: workflow_branches workflow_branches_head_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_branches
+    ADD CONSTRAINT workflow_branches_head_version_id_fkey FOREIGN KEY (head_version_id) REFERENCES public.workflow_versions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_branches workflow_branches_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_branches
+    ADD CONSTRAINT workflow_branches_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1981,11 +2020,11 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
--- Name: workflow_staged_files workflow_staged_files_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_staged_files workflow_staged_files_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staged_files_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_staged_files_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.workflow_branches(id) ON DELETE CASCADE;
 
 
 --
@@ -1997,11 +2036,11 @@ ALTER TABLE ONLY public.workflow_staged_files
 
 
 --
--- Name: workflow_staged_files workflow_staged_files_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_staged_files workflow_staged_files_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staged_files_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_staged_files_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -2068,7 +2107,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260624035629	f
+20260630205020	f
 \.
 
 

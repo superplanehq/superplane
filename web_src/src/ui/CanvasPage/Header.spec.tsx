@@ -61,7 +61,7 @@ function renderHeader(
   mode: "version-live",
   options?: {
     isEditing?: boolean;
-    activeDraftBranchLabel?: string;
+    isEditSessionActive?: boolean;
     onExitEditMode?: () => void;
     canvasName?: string;
   },
@@ -76,7 +76,7 @@ function renderHeader(
               canvasName={options && "canvasName" in options ? options.canvasName : "Test Canvas"}
               mode={mode}
               isEditing={options?.isEditing}
-              activeDraftBranchLabel={options?.activeDraftBranchLabel}
+              isEditSessionActive={options?.isEditSessionActive ?? options?.isEditing}
               onEnterEditMode={vi.fn()}
               onExitEditMode={options?.onExitEditMode}
               toolSidebarState={toolSidebarState}
@@ -101,14 +101,12 @@ describe("Header", () => {
     expect(() => renderHeader("version-live", { canvasName: undefined })).not.toThrow();
   });
 
-  it("shows the active draft label and exit control in edit mode", () => {
+  it("shows the exit control in edit mode", () => {
     renderHeader("version-live", {
       isEditing: true,
-      activeDraftBranchLabel: "Draft #1",
       onExitEditMode: vi.fn(),
     });
 
-    expect(screen.getByTestId("active-draft-branch-chip")).toHaveTextContent("Editing: Draft #1");
     expect(screen.getByTestId("canvas-exit-edit-button")).toHaveAttribute("aria-label", "Exit edit");
     expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
   });

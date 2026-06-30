@@ -4,24 +4,22 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"strings"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
-	"io"
-	"strings"
+	"gorm.io/gorm"
 )
 
-// CommitCanvasStaging durably persists staged repository files for a draft
-// version. Spec files (canvas.yaml/console.yaml) are parsed into the
-// workflow_versions row (the same validated path as the interim repository-files
-// commit); all other staged files are committed to the canvas git repository.
-// Staging rows are cleared afterwards.
 func CommitCanvasStaging(
 	ctx context.Context,
 	gitProvider gitprovider.Provider,
@@ -31,16 +29,18 @@ func CommitCanvasStaging(
 	organizationID string,
 	canvasID string,
 	versionID string,
+	branchName string,
+	commitMessage string,
+	newBranchName string,
 	webhookBaseURL string,
 	authService authorization.Authorization,
-	commitMessages ...string,
 ) (*pb.CommitCanvasStagingResponse, error) {
-	canvas, version, userUUID, err := loadOwnedDraftVersion(ctx, organizationID, canvasID, versionID)
+	canvas, branch, headVersion, userUUID, err := loadBranchForStaging(ctx, organizationID, canvasID, branchName, versionID)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := models.ListWorkflowStaging(version.ID)
+	rows, err := models.ListWorkflowStaging(branch.ID, userUUID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}
@@ -55,9 +55,54 @@ func CommitCanvasStaging(
 			return nil, snapshotErr
 		}
 
-		if err := commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userUUID.String(), resolvedStagingCommitMessage(commitMessages...), gitOps); err != nil {
+		message := resolvedStagingCommitMessage(commitMessage)
+		if err := commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userUUID.String(), message, gitOps); err != nil {
 			return nil, err
 		}
+	}
+
+	targetBranchName := branch.Name
+	if strings.TrimSpace(newBranchName) != "" {
+		targetBranchName = strings.TrimSpace(newBranchName)
+	}
+
+	stagingBranchID := branch.ID
+
+	var committed *models.CanvasVersion
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		message := resolvedStagingCommitMessage(commitMessage)
+		if targetBranchName != branch.Name {
+			createdBranch, createErr := models.CreateWorkflowBranch(tx, canvas.ID, targetBranchName, nil)
+			if createErr != nil {
+				return createErr
+			}
+			branch = createdBranch
+		}
+
+		var createErr error
+		committed, createErr = models.CreateCommitOnBranch(tx, models.CreateCommitInput{
+			WorkflowID:    canvas.ID,
+			BranchName:    targetBranchName,
+			OwnerID:       userUUID,
+			CommitMessage: message,
+			Nodes:         append([]models.Node(nil), headVersion.Nodes...),
+			Edges:         append([]models.Edge(nil), headVersion.Edges...),
+			ConsolePanels: headVersion.ConsolePanels.Data(),
+			ConsoleLayout: headVersion.ConsoleLayout.Data(),
+		})
+		if createErr != nil {
+			return createErr
+		}
+
+		return nil
+	})
+	if err != nil {
+		if len(gitRevertOps) > 0 {
+			if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userUUID.String(), gitRevertOps); revertErr != nil {
+				log.Errorf("failed to revert git commit after commit failure for canvas %s: %v", canvasID, revertErr)
+			}
+		}
+		return nil, grpcerrors.Internal(err, "failed to create commit")
 	}
 
 	if len(specOps) > 0 {
@@ -68,37 +113,28 @@ func CommitCanvasStaging(
 			registry,
 			organizationID,
 			canvasID,
-			versionID,
+			committed.ID.String(),
 			webhookBaseURL,
 			authService,
 			nil,
 			false,
 			specOps,
 		); err != nil {
-			if len(gitRevertOps) > 0 {
-				if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userUUID.String(), gitRevertOps); revertErr != nil {
-					log.Errorf(
-						"failed to revert git commit after spec apply failure for canvas %s version %s: %v",
-						canvasID,
-						versionID,
-						revertErr,
-					)
-				}
-			}
 			return nil, err
 		}
+
+		updated, reloadErr := models.FindCanvasVersion(canvas.ID, committed.ID)
+		if reloadErr != nil {
+			return nil, grpcerrors.Internal(reloadErr, "failed to load committed version")
+		}
+		committed = updated
 	}
 
-	if err := models.DiscardWorkflowStaging(version.ID, nil); err != nil {
+	if err := models.DiscardWorkflowStaging(stagingBranchID, userUUID, nil); err != nil {
 		return nil, grpcerrors.Internal(err, "failed to clear staging")
 	}
 
-	committed, err := models.FindCanvasVersion(version.WorkflowID, version.ID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to reload version")
-	}
-
-	state, _, err := stagingSummaryForVersion(version.ID)
+	state, _, err := stagingSummaryForBranch(stagingBranchID, userUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,11 +145,6 @@ func CommitCanvasStaging(
 	}, nil
 }
 
-// stagedCommitOperations splits staging rows into spec operations (canvas.yaml /
-// console.yaml, applied to the version row) and git operations (every other
-// path, committed to the repository). Deleted spec rows are skipped — a draft
-// keeps its committed spec when a staged spec file is removed — while deleted
-// git rows become repository delete operations.
 func stagedCommitOperations(rows []models.WorkflowStaging) (specOps, gitOps []*pb.CanvasRepositoryFileOperation) {
 	specContentByPath := map[string]string{}
 	for _, row := range rows {
@@ -146,8 +177,6 @@ func stagedCommitOperations(rows []models.WorkflowStaging) (specOps, gitOps []*p
 	return specOps, gitOps
 }
 
-// commitStagedGitFiles commits the non-spec staged files to the canvas git
-// repository, authored by the committing user.
 func commitStagedGitFiles(
 	ctx context.Context,
 	gitProvider gitprovider.Provider,
@@ -171,8 +200,6 @@ func commitStagedGitFiles(
 		return grpcerrors.Internal(err, "failed to find user")
 	}
 
-	// Commit on top of the current branch head. Staging does not track a head
-	// SHA per file, so resolve it just before committing.
 	headSHA, err := gitProvider.Head(ctx, repository.RepoID, "")
 	if err != nil {
 		return grpcerrors.Internal(err, "failed to resolve repository head")
@@ -312,5 +339,5 @@ func resolvedStagingCommitMessage(messages ...string) string {
 			return trimmed
 		}
 	}
-	return "Update files"
+	return "Update canvas"
 }

@@ -24,6 +24,7 @@ type UseAppDraftStagingDataOptions = {
   suppressUnpublishedDraftDiscard: boolean;
   registerIgnoredCanvasVersionUpdatedEcho: (savingVersionId?: string) => () => void;
   getConsoleMutationGeneration: () => number;
+  activeBranchName?: string;
 };
 
 export function useAppDraftStagingData({
@@ -44,6 +45,7 @@ export function useAppDraftStagingData({
   suppressUnpublishedDraftDiscard,
   registerIgnoredCanvasVersionUpdatedEcho,
   getConsoleMutationGeneration,
+  activeBranchName,
 }: UseAppDraftStagingDataOptions) {
   const canvasVersionStagingQuery = useCanvasVersionStaging(
     canvasId,
@@ -68,7 +70,7 @@ export function useAppDraftStagingData({
     latestDraftVersion,
     committedBaselines,
   });
-  const commitCanvasStagingMutation = useCommitCanvasStaging(canvasId, activeCanvasVersionId);
+  const commitCanvasStagingMutation = useCommitCanvasStaging(canvasId, activeCanvasVersionId, activeBranchName);
   const discardCanvasStagingMutation = useDiscardCanvasStaging(canvasId, activeCanvasVersionId);
 
   const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({

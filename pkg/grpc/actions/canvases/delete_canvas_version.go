@@ -22,7 +22,7 @@ func DeleteCanvasVersion(
 	canvasID string,
 	versionID string,
 ) (*pb.DeleteCanvasVersionResponse, error) {
-	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	_, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
@@ -46,7 +46,6 @@ func DeleteCanvasVersion(
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
-	userUUID := uuid.MustParse(userID)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
@@ -57,26 +56,18 @@ func DeleteCanvasVersion(
 			return findErr
 		}
 
-		if version.State != models.CanvasVersionStateDraft {
-			return grpcerrors.FailedPrecondition(nil, "only draft versions can be discarded")
+		if version.GitBranch == models.CanvasGitBranchMain {
+			return grpcerrors.FailedPrecondition(nil, "cannot delete main branch commits directly")
 		}
 
-		if !models.IsRegisteredDraftVersion(version) {
-			return grpcerrors.FailedPrecondition(nil, "version is not a registered draft branch")
-		}
-
-		if version.OwnerID == nil || *version.OwnerID != userUUID {
-			return grpcerrors.PermissionDenied(nil, "version owner mismatch")
-		}
-
-		return tx.Delete(version).Error
+		return models.DeleteWorkflowBranch(tx, canvasUUID, version.GitBranch)
 	})
 	if err != nil {
 		if grpcerrors.Code(err) != codes.Unknown {
 			return nil, err
 		}
-		log.WithError(err).Error("failed to delete canvas version")
-		return nil, grpcerrors.Internal(err, "failed to delete canvas version")
+		log.WithError(err).Error("failed to delete canvas branch")
+		return nil, grpcerrors.Internal(err, "failed to delete canvas branch")
 	}
 
 	if err := messages.PublishVersionDeleted(canvas.ID.String(), versionUUID.String()); err != nil {

@@ -5,18 +5,24 @@ import { ensureDraftVersionExists } from "@/hooks/useCanvasData";
 
 import type { RefreshLatestLiveCanvasDataOptions } from "../useRefreshLatestLiveCanvasData";
 
-type PublishMutation = { mutateAsync: (versionId: string) => Promise<unknown> };
+type PublishMutation = {
+  mutateAsync: (input: {
+    versionId: string;
+    commitMessage?: string;
+  }) => Promise<{ data?: { version?: { metadata?: { id?: string } } } } | undefined>;
+};
 
 export type PublishDraftVersionAndExitResult =
   | { status: "not-ready" }
   | { status: "missing"; versionIdToPublish: string }
-  | { status: "published"; versionIdToPublish: string }
+  | { status: "published"; versionIdToPublish: string; publishedVersionId?: string }
   | { status: "failed"; versionIdToPublish: string; error: unknown };
 
 export async function executePublishDraftVersion({
   organizationId,
   canvasId,
   versionIdToPublish,
+  commitMessage,
   queryClient,
   publishCanvasVersionMutation,
   registerIgnoredCanvasUpdatedEcho,
@@ -25,11 +31,12 @@ export async function executePublishDraftVersion({
   organizationId: string;
   canvasId: string;
   versionIdToPublish: string;
+  commitMessage?: string;
   queryClient: QueryClient;
   publishCanvasVersionMutation: PublishMutation;
   registerIgnoredCanvasUpdatedEcho?: () => () => void;
   registerIgnoredCanvasVersionUpdatedEcho?: (versionId?: string) => () => void;
-}): Promise<"missing" | "published"> {
+}): Promise<"missing" | { status: "published"; publishedVersionId?: string }> {
   const draftExists = await ensureDraftVersionExists(queryClient, organizationId, canvasId, versionIdToPublish);
   if (!draftExists) {
     return "missing";
@@ -37,21 +44,23 @@ export async function executePublishDraftVersion({
 
   const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho?.();
   const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho?.(versionIdToPublish);
+  let publishResponse: Awaited<ReturnType<PublishMutation["mutateAsync"]>>;
   try {
-    await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
+    publishResponse = await publishCanvasVersionMutation.mutateAsync({ versionId: versionIdToPublish, commitMessage });
   } catch (error) {
     releaseCanvasUpdatedEcho?.();
     releaseCanvasVersionUpdatedEcho?.();
     throw error;
   }
 
-  return "published";
+  return { status: "published", publishedVersionId: publishResponse?.data?.version?.metadata?.id };
 }
 
 export async function publishDraftVersionAndExit({
   organizationId,
   canvasId,
   activeCanvasVersionIdRef,
+  commitMessage,
   queryClient,
   ensureVersionActionDraftReady,
   publishCanvasVersionMutation,
@@ -63,6 +72,7 @@ export async function publishDraftVersionAndExit({
   organizationId: string;
   canvasId: string;
   activeCanvasVersionIdRef: MutableRefObject<string>;
+  commitMessage?: string;
   queryClient: QueryClient;
   ensureVersionActionDraftReady: (errorMessage: string) => Promise<boolean>;
   publishCanvasVersionMutation: PublishMutation;
@@ -86,6 +96,7 @@ export async function publishDraftVersionAndExit({
       organizationId,
       canvasId,
       versionIdToPublish,
+      commitMessage,
       queryClient,
       publishCanvasVersionMutation,
       registerIgnoredCanvasUpdatedEcho,
@@ -96,11 +107,12 @@ export async function publishDraftVersionAndExit({
       return { status: "missing", versionIdToPublish };
     }
 
+    const liveVersionId = publishResult.publishedVersionId ?? versionIdToPublish;
     await runExitDraftToLive(versionIdToPublish, {
-      liveVersionId: versionIdToPublish,
+      liveVersionId,
       skipDraftBranchRefetch: true,
     });
-    return { status: "published", versionIdToPublish };
+    return { status: "published", versionIdToPublish, publishedVersionId: publishResult.publishedVersionId };
   } catch (error) {
     return { status: "failed", versionIdToPublish, error };
   }

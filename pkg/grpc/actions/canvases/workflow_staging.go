@@ -2,8 +2,9 @@ package canvases
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -12,86 +13,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"gorm.io/gorm"
-	"strings"
 )
 
-// publishStagingUpdated notifies other tabs/replicas that a draft version's
-// staging layer changed so they can refetch staged caches. Failures are logged
-// but never block the staging write.
 func publishStagingUpdated(canvasID, versionID uuid.UUID) {
 	if err := messages.NewCanvasVersionUpdatedMessage(canvasID.String(), versionID.String()).PublishStagingUpdated(); err != nil {
 		log.Errorf("failed to publish canvas staging updated RabbitMQ message: %v", err)
 	}
 }
 
-// loadOwnedDraftVersion resolves the canvas and draft version for a staging
-// write/commit/discard, enforcing that the caller owns the registered draft.
-func loadOwnedDraftVersion(
-	ctx context.Context,
-	organizationID string,
-	canvasID string,
-	versionID string,
-) (*models.Canvas, *models.CanvasVersion, uuid.UUID, error) {
-	userID, ok := authentication.GetUserIdFromMetadata(ctx)
-	if !ok {
-		return nil, nil, uuid.Nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-
-	organizationUUID, err := uuid.Parse(organizationID)
-	if err != nil {
-		return nil, nil, uuid.Nil, grpcerrors.InvalidArgument(nil, "invalid organization_id")
-	}
-
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, nil, uuid.Nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
-	}
-
-	versionUUID, err := uuid.Parse(versionID)
-	if err != nil {
-		return nil, nil, uuid.Nil, grpcerrors.InvalidArgument(err, "invalid version id")
-	}
-
-	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, uuid.Nil, grpcerrors.NotFound(err, "canvas not found")
-		}
-		return nil, nil, uuid.Nil, grpcerrors.Internal(err, "failed to load canvas")
-	}
-
-	version, err := models.FindCanvasVersion(canvas.ID, versionUUID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, uuid.Nil, grpcerrors.NotFound(err, "version not found")
-		}
-		return nil, nil, uuid.Nil, grpcerrors.Internal(err, "failed to load version")
-	}
-
-	userUUID := uuid.MustParse(userID)
-	if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
-		return nil, nil, uuid.Nil, err
-	}
-
-	return canvas, version, userUUID, nil
-}
-
-// ensureStagedReadAllowed restricts effective staged reads to the draft owner.
-// Staging rows can outlive a draft's edit session; without this check any org
-// reader could pass ?stage=true and read someone else's uncommitted work.
-func ensureStagedReadAllowed(ctx context.Context, version *models.CanvasVersion) error {
-	userID, ok := authentication.GetUserIdFromMetadata(ctx)
-	if !ok {
-		return grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-
-	return ensureVersionIsOwnedRegisteredDraft(uuid.MustParse(userID), version)
-}
-
-// buildStagingSummary reports the uncommitted spec edits held in workflow_staged_files
-// for a draft version so the UI can drive its orange/blue indicators.
-func buildStagingSummary(versionID uuid.UUID, rows []models.WorkflowStaging) *pb.StagingSummary {
+func buildStagingSummary(branchID uuid.UUID, rows []models.WorkflowStaging) *pb.StagingSummary {
 	state := &pb.StagingSummary{}
 	if len(rows) == 0 {
 		return state
@@ -102,16 +32,13 @@ func buildStagingSummary(versionID uuid.UUID, rows []models.WorkflowStaging) *pb
 		paths = append(paths, row.Path)
 	}
 
-	base := versionID.String()
+	base := branchID.String()
 	state.HasStaging = true
 	state.StagedPaths = paths
 	state.BaseVersionId = &base
 	return state
 }
 
-// effectiveSpecYAML returns the YAML the UI should edit for a draft path:
-// staged content when present, the materialized version row otherwise, and an
-// empty string when the path is staged as deleted.
 func effectiveSpecYAML(
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
@@ -139,24 +66,18 @@ func effectiveSpecYAML(
 	}
 }
 
-// StageRepositorySpecFileOperations stores repository file edits in
-// workflow_staged_files verbatim, leaving workflow_versions untouched until commit.
-// Both spec files (canvas.yaml/console.yaml, committed into the version row) and
-// arbitrary repository files (committed to git) are accepted; the path kind is
-// resolved at commit time.
 func StageRepositorySpecFileOperations(
 	ctx context.Context,
 	organizationID string,
 	canvasID string,
 	versionID string,
+	branchName string,
 	operations []*pb.CanvasRepositoryFileOperation,
 ) (*pb.StagingSummary, error) {
-	canvas, version, userUUID, err := loadOwnedDraftVersion(ctx, organizationID, canvasID, versionID)
+	canvas, branch, headVersion, userUUID, err := loadBranchForStaging(ctx, organizationID, canvasID, branchName, versionID)
 	if err != nil {
 		return nil, err
 	}
-
-	organizationUUID := canvas.OrganizationID
 
 	for _, operation := range operations {
 		if operation == nil {
@@ -173,73 +94,64 @@ func StageRepositorySpecFileOperations(
 		}
 
 		if operation.GetDelete() {
-			if err := models.MarkWorkflowStagingPathDeleted(version.ID, organizationUUID, normalized, "", &userUUID); err != nil {
+			if err := models.MarkWorkflowStagingPathDeleted(branch.ID, userUUID, normalized, &userUUID); err != nil {
 				return nil, grpcerrors.Internal(err, "failed to stage deletion")
 			}
 			continue
 		}
 
 		if _, err := models.UpsertWorkflowStagingPath(
-			version.ID,
-			organizationUUID,
+			branch.ID,
+			userUUID,
 			normalized,
 			string(operation.GetContent()),
-			"",
 			&userUUID,
 		); err != nil {
 			return nil, grpcerrors.Internal(err, "failed to stage")
 		}
 	}
 
-	rows, err := models.ListWorkflowStaging(version.ID)
+	rows, err := models.ListWorkflowStaging(branch.ID, userUUID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}
 
-	publishStagingUpdated(canvas.ID, version.ID)
+	publishStagingUpdated(canvas.ID, headVersion.ID)
 
-	return buildStagingSummary(version.ID, rows), nil
+	return buildStagingSummary(branch.ID, rows), nil
 }
 
-// stagingSummaryForVersion returns the StagingSummary for a version, used by reads
-// to drive draft indicators without a dedicated list endpoint.
-func stagingSummaryForVersion(versionID uuid.UUID) (*pb.StagingSummary, []models.WorkflowStaging, error) {
-	rows, err := models.ListWorkflowStaging(versionID)
+func stagingSummaryForBranch(branchID, userID uuid.UUID) (*pb.StagingSummary, []models.WorkflowStaging, error) {
+	rows, err := models.ListWorkflowStaging(branchID, userID)
 	if err != nil {
 		return nil, nil, grpcerrors.Internal(err, "failed to load staging")
 	}
-	return buildStagingSummary(versionID, rows), rows, nil
+	return buildStagingSummary(branchID, rows), rows, nil
 }
 
-// ReadStagedRepositoryFile returns the staged content for an arbitrary (non-spec)
-// repository file on a draft version. found=false means there is no staging row
-// for the path, so the caller should fall back to the committed git content.
-// deleted=true means the file is staged for deletion.
+func stagingSummaryForVersion(versionID uuid.UUID) (*pb.StagingSummary, []models.WorkflowStaging, error) {
+	_ = versionID
+	return &pb.StagingSummary{}, nil, nil
+}
+
 func ReadStagedRepositoryFile(
 	ctx context.Context,
 	organizationID string,
 	canvasID string,
 	versionID string,
+	branchName string,
 	path string,
 ) (content string, found bool, deleted bool, err error) {
-	if strings.TrimSpace(versionID) == "" {
+	if strings.TrimSpace(versionID) == "" && strings.TrimSpace(branchName) == "" {
 		return "", false, false, nil
 	}
 
-	_, version, err := loadRepositorySpecVersionForRead(ctx, organizationID, canvasID, versionID)
+	_, branch, _, userUUID, err := loadBranchForStaging(ctx, organizationID, canvasID, branchName, versionID)
 	if err != nil {
 		return "", false, false, err
 	}
 
-	if version.State != models.CanvasVersionStateDraft {
-		return "", false, false, nil
-	}
-
-	if err := ensureStagedReadAllowed(ctx, version); err != nil {
-		return "", false, false, err
-	}
-
-	_, rows, err := stagingSummaryForVersion(version.ID)
+	_, rows, err := stagingSummaryForBranch(branch.ID, userUUID)
 	if err != nil {
 		return "", false, false, err
 	}
@@ -256,4 +168,27 @@ func ReadStagedRepositoryFile(
 	}
 
 	return "", false, false, nil
+}
+
+func ensureStagedReadAllowed(ctx context.Context, branchID uuid.UUID) error {
+	_, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+	_ = branchID
+	return nil
+}
+
+// Legacy adapter used by older call sites during POC transition.
+func loadOwnedDraftVersion(
+	ctx context.Context,
+	organizationID string,
+	canvasID string,
+	versionID string,
+) (*models.Canvas, *models.CanvasVersion, uuid.UUID, error) {
+	canvas, _, headVersion, userUUID, err := loadBranchForStaging(ctx, organizationID, canvasID, "", versionID)
+	if err != nil {
+		return nil, nil, uuid.Nil, err
+	}
+	return canvas, headVersion, userUUID, nil
 }

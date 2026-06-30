@@ -131,7 +131,7 @@ func UpdateCanvasVersionWithUsage(
 
 		nodes := injectMetadataIntoNodes(version.Nodes, nodes)
 
-		if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
+		if err := ensureVersionIsEditable(userUUID, version); err != nil {
 			return err
 		}
 
@@ -140,7 +140,7 @@ func UpdateCanvasVersionWithUsage(
 			return grpcerrors.InvalidArgument(nil, "canvas name is required")
 		}
 
-		if version.Name != nextName {
+		if canvas.Name != nextName {
 			findErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, nextName)
 			if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
 				return grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
@@ -148,11 +148,20 @@ func UpdateCanvasVersionWithUsage(
 			if findErr != nil {
 				return findErr
 			}
+			canvas.Name = nextName
+			if err := tx.Model(&models.Canvas{}).Where("id = ?", canvasUUID).Update("name", nextName).Error; err != nil {
+				return err
+			}
+		}
+
+		if nextDescription := pbCanvas.GetMetadata().GetDescription(); canvas.Description != nextDescription {
+			canvas.Description = nextDescription
+			if err := tx.Model(&models.Canvas{}).Where("id = ?", canvasUUID).Update("description", nextDescription).Error; err != nil {
+				return err
+			}
 		}
 
 		now := time.Now()
-		version.Name = nextName
-		version.Description = pbCanvas.GetMetadata().GetDescription()
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now
@@ -162,7 +171,11 @@ func UpdateCanvasVersionWithUsage(
 		}
 
 		if discardStaging {
-			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+			branch, branchErr := models.FindWorkflowBranch(tx, canvasUUID, version.GitBranch)
+			if branchErr != nil {
+				return branchErr
+			}
+			return models.DiscardWorkflowStagingInTransaction(tx, branch.ID, userUUID, nil)
 		}
 
 		return nil
@@ -182,24 +195,15 @@ func UpdateCanvasVersionWithUsage(
 	return version, nil
 }
 
-func ensureVersionIsOwnedRegisteredDraft(userID uuid.UUID, version *models.CanvasVersion) error {
-	if version.OwnerID == nil || *version.OwnerID != userID {
-		return grpcerrors.PermissionDenied(nil, "version owner mismatch")
+func ensureVersionIsEditable(userID uuid.UUID, version *models.CanvasVersion) error {
+	if version == nil {
+		return grpcerrors.FailedPrecondition(nil, "version is required")
 	}
-
-	if version.State == models.CanvasVersionStatePublished {
-		return grpcerrors.FailedPrecondition(nil, "published versions are immutable")
-	}
-
-	if version.State != models.CanvasVersionStateDraft {
-		return grpcerrors.FailedPrecondition(nil, "version is not your editable draft")
-	}
-
-	if !models.IsRegisteredDraftVersion(version) {
-		return grpcerrors.FailedPrecondition(nil, "version is not a registered draft branch")
-	}
-
 	return nil
+}
+
+func ensureVersionIsOwnedRegisteredDraft(userID uuid.UUID, version *models.CanvasVersion) error {
+	return ensureVersionIsEditable(userID, version)
 }
 
 func injectMetadataIntoNodes(versionNodes []models.Node, proposedNodes []models.Node) []models.Node {

@@ -12,7 +12,7 @@ interface WorkflowViewModeActionsConfig {
   handleExitMemoryMode: () => void;
   handleExitFilesMode: () => void;
   handleClearRunInspection: () => void;
-  handleToggleEditMode: () => Promise<void>;
+  handleToggleEditMode: () => Promise<boolean>;
   setIsConsoleAddPanelOpen: (value: boolean) => void;
   setIsConsoleYamlOpen: (value: boolean) => void;
 }

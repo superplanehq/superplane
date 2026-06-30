@@ -15,7 +15,7 @@ func summarizeCanvasVersion(canvas *models.Canvas, version *models.CanvasVersion
 		return summary
 	}
 	if summary.CanvasName == "" {
-		summary.CanvasName = version.Name
+		summary.CanvasName = version.GitBranch
 	}
 	summary.NodeCount = len(version.Nodes)
 	summary.EdgeCount = len(version.Edges)

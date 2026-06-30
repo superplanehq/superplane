@@ -80,7 +80,11 @@ func UpdateConsole(
 		newVersion = v
 
 		if discardStaging {
-			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+			branch, branchErr := models.FindWorkflowBranch(tx, canvas.ID, version.GitBranch)
+			if branchErr != nil {
+				return branchErr
+			}
+			return models.DiscardWorkflowStagingInTransaction(tx, branch.ID, userUUID, nil)
 		}
 
 		return nil

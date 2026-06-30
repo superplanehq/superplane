@@ -75,7 +75,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	if draft != nil {
 		result.Draft = &draftResult{
 			VersionID:   draft.ID.String(),
-			DisplayName: draft.DisplayName,
+			DisplayName: draft.GitBranch,
 			BranchName:  draft.GitBranch,
 		}
 	}
@@ -126,7 +126,7 @@ func (a readAction) summarize(organizationID string, canvas *models.Canvas, vers
 		name = canvas.Name
 	}
 	if name == "" && version != nil {
-		name = version.Name
+		name = version.GitBranch
 	}
 	return summarizeParsedCanvas(name, nodes, edges)
 }

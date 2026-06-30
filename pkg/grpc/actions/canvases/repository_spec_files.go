@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -99,19 +100,21 @@ func readRepositorySpecFile(
 	}
 
 	if stage {
-		if version.State != models.CanvasVersionStateDraft {
-			stage = false
-		} else if err := ensureStagedReadAllowed(ctx, version); err != nil {
-			return "", err
+		userID, ok := authentication.GetUserIdFromMetadata(ctx)
+		if !ok {
+			return "", grpcerrors.Unauthenticated(nil, "user not authenticated")
 		}
-	}
-
-	if stage {
-		_, rows, stagingErr := stagingSummaryForVersion(version.ID)
-		if stagingErr != nil {
-			return "", stagingErr
+		branch, branchErr := models.FindWorkflowBranch(database.DB(ctx), canvas.ID, version.GitBranch)
+		if branchErr == nil {
+			if err := ensureStagedReadAllowed(ctx, branch.ID); err != nil {
+				return "", err
+			}
+			_, rows, stagingErr := stagingSummaryForBranch(branch.ID, uuid.MustParse(userID))
+			if stagingErr != nil {
+				return "", stagingErr
+			}
+			return effectiveSpecYAML(canvas, version, organizationID, rows, normalized)
 		}
-		return effectiveSpecYAML(canvas, version, organizationID, rows, normalized)
 	}
 
 	switch normalized {

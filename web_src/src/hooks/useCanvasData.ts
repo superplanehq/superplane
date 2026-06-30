@@ -15,6 +15,7 @@ import {
   canvasesCreateCanvasVersion,
   canvasesDeleteCanvasVersion,
   canvasesListCanvasVersions,
+  canvasesListCanvasBranches,
   canvasesDeleteCanvas,
   canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
@@ -114,13 +115,20 @@ async function applyCanvasStagingAutoLayout(canvasId: string, versionId: string,
   );
 }
 
-// commitCanvasStaging parses the staged spec files into the draft version row
-// and clears staging.
-async function commitCanvasStaging(canvasId: string, versionId: string) {
+// commitCanvasStaging creates a new commit from staged changes on a branch.
+async function commitCanvasStaging(
+  canvasId: string,
+  versionId: string,
+  input: { branchName?: string; commitMessage?: string; newBranchName?: string } = {},
+) {
   await canvasesCommitCanvasStaging(
     withOrganizationHeader({
       path: { canvasId, versionId },
-      body: {},
+      body: {
+        branchName: input.branchName,
+        commitMessage: input.commitMessage,
+        newBranchName: input.newBranchName,
+      },
     }),
   );
 }
@@ -139,7 +147,7 @@ async function stageCommitSpecOperations(
   if (autoLayout && touchesCanvasYaml) {
     await applyCanvasStagingAutoLayout(canvasId, versionId, autoLayout);
   }
-  await commitCanvasStaging(canvasId, versionId);
+  await commitCanvasStaging(canvasId, versionId, { commitMessage: "Update canvas" });
 }
 
 export type CanvasConsoleData = {
@@ -182,6 +190,8 @@ export const canvasKeys = {
   versions: () => [...canvasKeys.all, "versions"] as const,
   versionList: (canvasId: string) => [...canvasKeys.versions(), canvasId] as const,
   versionHistory: (canvasId: string) => [...canvasKeys.versions(), canvasId, "history"] as const,
+  branchCommits: (canvasId: string, branchName: string) =>
+    [...canvasKeys.versions(), canvasId, "branchCommits", branchName] as const,
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
   versionDetail: (canvasId: string, versionId: string) =>
     [...canvasKeys.versionDetails(), canvasId, versionId] as const,
@@ -195,6 +205,7 @@ export const canvasKeys = {
   versionStaging: (canvasId: string, versionId: string) =>
     [...canvasKeys.versions(), "staging", canvasId, versionId] as const,
   draftBranches: (canvasId: string) => [...canvasKeys.all, "draftBranches", canvasId] as const,
+  branches: (canvasId: string) => [...canvasKeys.all, "branches", canvasId] as const,
   nodeExecutions: () => [...canvasKeys.all, "nodeExecutions"] as const,
   nodeExecution: (canvasId: string, nodeId: string, states?: string[], limit?: number) =>
     [
@@ -448,6 +459,44 @@ export const useInfiniteCanvasLiveVersions = (
     },
     initialPageParam: undefined as string | undefined,
     enabled: enabled && !!organizationId && !!canvasId,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useInfiniteBranchCommits = (
+  organizationId: string,
+  canvasId: string,
+  branchName: string,
+  enabled: boolean = true,
+  limit: number = 50,
+) => {
+  const normalizedBranchName = branchName.trim() || "main";
+
+  return useInfiniteQuery({
+    queryKey: canvasKeys.branchCommits(canvasId, normalizedBranchName),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const response = await canvasesListCanvasVersions(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: {
+            limit,
+            branchName: normalizedBranchName,
+            ...(pageParam ? { before: pageParam } : {}),
+          },
+        }),
+      );
+      return response.data;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((acc, page) => acc + (page?.versions?.length || 0), 0);
+      const totalCount = lastPage?.totalCount || 0;
+
+      if (loadedCount >= totalCount) return undefined;
+      if (!lastPage?.hasNextPage) return undefined;
+      return lastPage?.lastTimestamp || undefined;
+    },
+    initialPageParam: undefined as string | undefined,
+    enabled: enabled && !!organizationId && !!canvasId && !!normalizedBranchName,
     refetchOnWindowFocus: false,
   });
 };
@@ -883,6 +932,21 @@ export const useUpdateCanvasFolderMembership = (organizationId: string) => {
   });
 };
 
+export const useListCanvasBranches = (organizationId: string, canvasId: string, enabled = true) => {
+  return useQuery({
+    queryKey: canvasKeys.branches(canvasId),
+    queryFn: async () => {
+      const response = await canvasesListCanvasBranches(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      return response.data?.branches ?? [];
+    },
+    enabled: enabled && !!organizationId && !!canvasId,
+  });
+};
+
 export const useListDraftBranches = (organizationId: string, canvasId: string, enabled = true) => {
   return useQuery({
     queryKey: canvasKeys.draftBranches(canvasId),
@@ -1005,14 +1069,21 @@ export const useDeleteDraftBranch = (canvasId: string) => {
 };
 
 export const usePublishCanvasVersion = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async (versionId: string) => {
+    mutationFn: async ({ versionId, commitMessage }: { versionId: string; commitMessage?: string }) => {
       return await canvasesPublishCanvasVersion(
         withOrganizationHeader({
           path: { canvasId, versionId },
-          body: {},
+          body: { commitMessage },
         }),
       );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: canvasKeys.branches(canvasId) });
+      void queryClient.invalidateQueries({ queryKey: [...canvasKeys.versions(), canvasId, "branchCommits"] });
+      void queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
     },
   });
 };
@@ -2030,16 +2101,19 @@ export const useStageCanvasSpecFiles = (canvasId: string, versionId: string) => 
   });
 };
 
-// useCommitCanvasStaging parses staged spec files into the draft version row and
-// clears staging.
-export const useCommitCanvasStaging = (canvasId: string, versionId: string) => {
+// useCommitCanvasStaging creates a commit from staged spec files on a branch.
+export const useCommitCanvasStaging = (canvasId: string, versionId: string, branchName?: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (input?: { commitMessage?: string; newBranchName?: string }) => {
       const response = await canvasesCommitCanvasStaging(
         withOrganizationHeader({
           path: { canvasId, versionId },
-          body: {},
+          body: {
+            branchName,
+            commitMessage: input?.commitMessage,
+            newBranchName: input?.newBranchName,
+          },
         }),
       );
       return response.data;
@@ -2049,11 +2123,10 @@ export const useCommitCanvasStaging = (canvasId: string, versionId: string) => {
         canvasKeys.versionStaging(canvasId, versionId),
         data?.stagingSummary ?? { hasStaging: false, stagedPaths: [] },
       );
-      // Committing staged edits only changes the draft version, not the live
-      // canvas, so we skip invalidating canvasKeys.detail to avoid a
-      // DescribeCanvas refetch while staying in edit mode. Version detail,
-      // canvas.yaml, and console caches are refreshed once from useDraftStagingActions.
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.branches(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+      queryClient.invalidateQueries({ queryKey: [...canvasKeys.versions(), canvasId, "branchCommits"] });
     },
   });
 };

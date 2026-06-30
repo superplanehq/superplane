@@ -8,7 +8,13 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { executeResetStaging } from "./lib/reset-staging-flow";
 
-type CommitMutation = { mutateAsync: () => Promise<unknown> };
+type CommitMutation = {
+  mutateAsync: (input?: {
+    commitMessage?: string;
+    newBranchName?: string;
+  }) => Promise<{ version?: CanvasesCanvasVersion } | undefined>;
+};
+type CommitStagingInput = { commitMessage: string; newBranchName?: string };
 type DiscardMutation = { mutateAsync: (input: undefined) => Promise<unknown> };
 
 async function runDraftStagingAction(
@@ -72,53 +78,61 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
   const [commitStagingPending, setCommitStagingPending] = useState(false);
   const [resetStagingPending, setResetStagingPending] = useState(false);
 
-  const handleCommitStaging = useCallback(async () => {
-    if (!hasEditableVersion || !activeCanvasVersionId) {
-      return;
-    }
-
-    try {
-      await runDraftStagingAction(setCommitStagingPending, setIsPreparingVersionAction, async () => {
-        const committed = await executeCommitStaging({
-          organizationId,
-          canvasId,
-          activeCanvasVersionId,
-          queryClient,
-          commitCanvasStagingMutation,
-          consoleMutationGenerationRef,
-          draftCanvasSpecsRef,
-          setDraftCanvasSpec,
-          setStagingResetNonce,
-          ensureVersionActionDraftReady,
-          flushRepositoryFileStaging,
-          registerIgnoredCanvasVersionUpdatedEcho,
-        });
-        if (committed) {
-          showSuccessToast("Changes committed");
-        }
-      });
-    } catch (error) {
-      if (!(await recoverIfDraftMissingOption?.(error, activeCanvasVersionId))) {
-        showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
+  const handleCommitStaging = useCallback(
+    async (input: CommitStagingInput): Promise<CanvasesCanvasVersion | null> => {
+      if (!hasEditableVersion || !activeCanvasVersionId) {
+        return null;
       }
-    }
-  }, [
-    activeCanvasVersionId,
-    canvasId,
-    commitCanvasStagingMutation,
-    consoleMutationGenerationRef,
-    draftCanvasSpecsRef,
-    ensureVersionActionDraftReady,
-    flushRepositoryFileStaging,
-    hasEditableVersion,
-    organizationId,
-    queryClient,
-    recoverIfDraftMissingOption,
-    registerIgnoredCanvasVersionUpdatedEcho,
-    setDraftCanvasSpec,
-    setIsPreparingVersionAction,
-    setStagingResetNonce,
-  ]);
+
+      try {
+        let committedVersion: CanvasesCanvasVersion | null = null;
+        await runDraftStagingAction(setCommitStagingPending, setIsPreparingVersionAction, async () => {
+          committedVersion = await executeCommitStaging({
+            organizationId,
+            canvasId,
+            activeCanvasVersionId,
+            queryClient,
+            commitCanvasStagingMutation,
+            commitMessage: input.commitMessage,
+            newBranchName: input.newBranchName,
+            consoleMutationGenerationRef,
+            draftCanvasSpecsRef,
+            setDraftCanvasSpec,
+            setStagingResetNonce,
+            ensureVersionActionDraftReady,
+            flushRepositoryFileStaging,
+            registerIgnoredCanvasVersionUpdatedEcho,
+          });
+          if (committedVersion) {
+            showSuccessToast("Changes committed");
+          }
+        });
+        return committedVersion;
+      } catch (error) {
+        if (!(await recoverIfDraftMissingOption?.(error, activeCanvasVersionId))) {
+          showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
+        }
+        return null;
+      }
+    },
+    [
+      activeCanvasVersionId,
+      canvasId,
+      commitCanvasStagingMutation,
+      consoleMutationGenerationRef,
+      draftCanvasSpecsRef,
+      ensureVersionActionDraftReady,
+      flushRepositoryFileStaging,
+      hasEditableVersion,
+      organizationId,
+      queryClient,
+      recoverIfDraftMissingOption,
+      registerIgnoredCanvasVersionUpdatedEcho,
+      setDraftCanvasSpec,
+      setIsPreparingVersionAction,
+      setStagingResetNonce,
+    ],
+  );
 
   const handleResetStaging = useCallback(async () => {
     if (!hasEditableVersion || !activeCanvasVersionId) {

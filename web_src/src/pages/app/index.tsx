@@ -42,6 +42,7 @@ import {
   useEventExecutions,
   useDescribeRun,
   useInfiniteCanvasRuns,
+  useInfiniteBranchCommits,
   useInfiniteCanvasLiveVersions,
   useTriggers,
   useUpdateCanvasVersion,
@@ -51,8 +52,10 @@ import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useCanvasDraftResync } from "@/hooks/useCanvasDraftResync";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
-import { draftBranchName, draftDisplayName, draftVersionId } from "@/lib/draftVersion";
+import { draftBranchName, draftVersionId } from "@/lib/draftVersion";
+import { branchHeadVersionId, branchName as getCanvasBranchName, CANVAS_MAIN_BRANCH } from "@/lib/canvas-branches";
 import { applyVersionSelectionSearchParams, resolveBranchNameForVersion } from "./canvasVersionBranchNavigation";
+import { exitDraftToLive } from "./lib/exit-draft-to-live";
 import { buildAutocompleteExampleObj } from "./buildAutocompleteExampleObj";
 import { DeleteDraftBranchDialog } from "./DeleteDraftBranchDialog";
 import { useCanvasDraftBranchActions } from "./useCanvasDraftBranchActions";
@@ -72,6 +75,8 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import type { CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
+import { CommitBranchModal } from "@/ui/CanvasPage/components/CommitBranchModal";
+import { MergeBranchModal } from "@/ui/CanvasPage/components/MergeBranchModal";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -99,7 +104,7 @@ import {
   isDraftVersion,
   isPublishedVersion,
   sortDraftVersionsDesc,
-  sortPublishedVersionsDesc,
+  sortBranchCommitsDesc,
 } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
@@ -282,11 +287,16 @@ export function AppPage() {
   // sidebar visible even when previewing the current/old version (not editing a
   // draft), and ends only when the user explicitly exits.
   const [editSessionActive, setEditSessionActive] = useState(false);
+  const editSessionActiveRef = useRef(false);
+  useEffect(() => {
+    editSessionActiveRef.current = editSessionActive;
+  }, [editSessionActive]);
   // Distinguishes "user deliberately selected Current version from the sidebar"
   // (session stays open) from "landed back on live because the draft was
   // published/discarded" (session must close). Both states look identical in
   // terms of active-version state (no selected version), so we can't derive it.
   const previewingCurrentVersionRef = useRef(false);
+  const previousActiveBranchRef = useRef<string | null>(null);
   const publishCanvasVersionMutation = usePublishCanvasVersion(canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
@@ -320,13 +330,15 @@ export function AppPage() {
     refetchOnMount: false,
   });
   const {
+    canvasBranches,
+    canvasBranchesFetched,
     draftBranches,
     draftVersionsFromBranches,
     activeBranch,
     activeBranchMeta,
     activateBranch,
     exitToLive,
-    startEditingDefaultDraft,
+    startEditingDefaultBranch,
   } = useCanvasDraftBranchQueries({
     organizationId,
     canvasId,
@@ -335,6 +347,8 @@ export function AppPage() {
     setSearchParams,
   });
   const [isCreatingDraftBranch, setIsCreatingDraftBranch] = useState(false);
+  const [commitModalOpen, setCommitModalOpen] = useState(false);
+  const [mergeModalOpen, setMergeModalOpen] = useState(false);
   const deleteDraftBranchMutation = useDeleteDraftBranch(canvasId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
@@ -357,12 +371,8 @@ export function AppPage() {
     canvasVersions.forEach(addVersion);
     paginatedVersions.forEach(addVersion);
     draftVersionsFromBranches.forEach(addVersion);
-    return Array.from(versionMap.values()).filter((version) => {
-      if (isPublishedVersion(version)) return true;
-      return version.metadata?.owner?.id === currentUserId;
-    });
-  }, [canvasVersions, paginatedVersions, currentUserId, draftVersionsFromBranches]);
-  const liveVersions = useMemo(() => sortPublishedVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
+    return Array.from(versionMap.values());
+  }, [canvasVersions, paginatedVersions, draftVersionsFromBranches]);
   const selectableVersionsById = useMemo(() => {
     const indexedVersions = new Map<string, CanvasesCanvasVersion>();
     visibleCanvasVersions.forEach((version) => {
@@ -373,8 +383,6 @@ export function AppPage() {
     return indexedVersions;
   }, [visibleCanvasVersions]);
   const draftVersions = useMemo(() => sortDraftVersionsDesc(draftVersionsFromBranches), [draftVersionsFromBranches]);
-  const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
-  const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
   const effectiveLiveCanvasVersionId = useMemo(() => {
     if (liveCanvasVersionId) {
@@ -388,6 +396,11 @@ export function AppPage() {
 
     return canvasVersions.find(isPublishedVersion)?.metadata?.id;
   }, [liveCanvasVersionId, paginatedVersions, canvasVersions]);
+  const mainBranchHeadVersionId = useMemo(() => {
+    const mainBranch = canvasBranches.find((branch) => getCanvasBranchName(branch) === CANVAS_MAIN_BRANCH);
+    return mainBranch ? branchHeadVersionId(mainBranch) : "";
+  }, [canvasBranches]);
+  const editEntryReady = canvasBranchesFetched && Boolean(mainBranchHeadVersionId || effectiveLiveCanvasVersionId);
   const activeCanvasVersionId = activeCanvasVersion?.metadata?.id || "";
   const {
     data: loadedCanvasVersion,
@@ -410,7 +423,7 @@ export function AppPage() {
   const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
   const draftSpecToRender = draftCanvasSpec ?? selectedCanvasVersion?.spec ?? null;
   useEffect(() => {
-    if (!isViewingDraftVersion || !activeCanvasVersionId) {
+    if ((!isViewingDraftVersion && !(editSessionActive && activeCanvasVersionId)) || !activeCanvasVersionId) {
       return;
     }
     const preservedDraftSpec = draftCanvasSpecsRef.current.get(activeCanvasVersionId);
@@ -423,9 +436,19 @@ export function AppPage() {
       draftCanvasSpecsRef.current.set(activeCanvasVersionId, nextDraftSpec);
     }
     setDraftCanvasSpec(nextDraftSpec);
-  }, [isViewingDraftVersion, activeCanvasVersionId, selectedCanvasVersion?.metadata?.id, selectedCanvasVersion?.spec]);
+  }, [
+    isViewingDraftVersion,
+    editSessionActive,
+    activeCanvasVersionId,
+    selectedCanvasVersion?.metadata?.id,
+    selectedCanvasVersion?.spec,
+  ]);
   useEffect(() => {
-    if (!isViewingDraftVersion || !activeCanvasVersionId || !liveCanvas?.spec) {
+    if (
+      (!isViewingDraftVersion && !(editSessionActive && activeCanvasVersionId)) ||
+      !activeCanvasVersionId ||
+      !liveCanvas?.spec
+    ) {
       return;
     }
     if (!draftCanvasSpec && !selectedCanvasVersion?.spec) {
@@ -453,6 +476,7 @@ export function AppPage() {
     });
   }, [
     isViewingDraftVersion,
+    editSessionActive,
     activeCanvasVersionId,
     liveCanvas?.spec,
     liveCanvasVersion?.spec,
@@ -461,11 +485,17 @@ export function AppPage() {
   ]);
 
   const canvas = useMemo(() => {
-    // Edit mode is self-contained: spec + name/description come from the draft
-    // version's repository files (canvas.yaml), so it renders without the
+    const renderFromBranchEdit = editSessionActive && !!activeCanvasVersionId;
+    // Edit mode is self-contained: spec + name/description come from the branch
+    // head's repository files (canvas.yaml), so it renders without the
     // DescribeCanvas response. `liveCanvas` is only reused opportunistically.
-    if (isViewingDraftVersion) {
-      if (!draftSpecToRender) return null;
+    if (isViewingDraftVersion || renderFromBranchEdit) {
+      if (!draftSpecToRender) {
+        if (liveCanvas) {
+          return liveCanvas;
+        }
+        return null;
+      }
       return {
         ...(liveCanvas ?? {}),
         metadata: {
@@ -481,18 +511,58 @@ export function AppPage() {
     const versionSpec = selectedCanvasVersion?.spec;
     if (!versionSpec) return liveCanvas;
     return { ...liveCanvas, spec: versionSpec };
-  }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender, canvasId]);
-  const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
-  const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
-  // Editing a draft always implies an active edit session; previewing the
-  // current/old version from the sidebar keeps the session open until the user
-  // explicitly exits.
-  useEffect(() => {
-    if (isEditing) {
-      previewingCurrentVersionRef.current = false;
-      setEditSessionActive(true);
+  }, [
+    liveCanvas,
+    selectedCanvasVersion,
+    isViewingDraftVersion,
+    draftSpecToRender,
+    canvasId,
+    editSessionActive,
+    activeCanvasVersionId,
+  ]);
+  const { resolvedActiveBranch } = useResolvedActiveDraftBranch({
+    canvasId,
+    activeBranch,
+    activeBranchMeta,
+    draftBranches,
+    activeCanvasVersionId,
+    selectedCanvasVersion,
+    hasEditableVersion: editSessionActive && !!activeCanvasVersionId,
+    activateBranch,
+  });
+
+  const activeBranchHeadVersionId = useMemo(() => {
+    const branchKey = resolvedActiveBranch || activeBranch;
+    if (!branchKey) {
+      return "";
     }
-  }, [isEditing]);
+
+    const branch = canvasBranches.find((item) => getCanvasBranchName(item) === branchKey);
+    return branch ? branchHeadVersionId(branch) : "";
+  }, [activeBranch, canvasBranches, resolvedActiveBranch]);
+
+  const activeBranchForCommits = resolvedActiveBranch || activeBranch || "main";
+  const branchCommitsQuery = useInfiniteBranchCommits(
+    organizationId!,
+    canvasId!,
+    activeBranchForCommits,
+    editSessionActive,
+  );
+  const branchCommits = useMemo(
+    () => sortBranchCommitsDesc((branchCommitsQuery.data?.pages || []).flatMap((page) => page?.versions || [])),
+    [branchCommitsQuery.data?.pages],
+  );
+  const hasMoreBranchCommits = branchCommitsQuery.hasNextPage || false;
+  const isLoadingMoreBranchCommits = branchCommitsQuery.isFetchingNextPage;
+
+  const isEditingBranchHead =
+    editSessionActive &&
+    !!activeCanvasVersionId &&
+    !!activeBranchHeadVersionId &&
+    activeCanvasVersionId === activeBranchHeadVersionId;
+  const isEditing = isEditingBranchHead;
+  const hasEditableVersion = isEditingBranchHead;
+
   // Close the edit session once we return to the live canvas for a reason other
   // than deliberately previewing the current version (e.g. after publishing or
   // discarding a draft). Previewing an older published version keeps the session
@@ -501,21 +571,22 @@ export function AppPage() {
     if (!editSessionActive || isEditing || isCreatingDraftBranch) {
       return;
     }
+    // Branch head metadata can lag behind activating the edit target on a fresh canvas.
+    if (activeCanvasVersionId && !activeBranchHeadVersionId) {
+      return;
+    }
     if (!isViewingLiveVersion || previewingCurrentVersionRef.current) {
       return;
     }
     setEditSessionActive(false);
-  }, [editSessionActive, isEditing, isCreatingDraftBranch, isViewingLiveVersion]);
-  const { resolvedActiveBranchMeta, resolvedActiveBranch } = useResolvedActiveDraftBranch({
-    canvasId,
-    activeBranch,
-    activeBranchMeta,
-    draftBranches,
+  }, [
+    activeBranchHeadVersionId,
     activeCanvasVersionId,
-    selectedCanvasVersion,
-    hasEditableVersion,
-    activateBranch,
-  });
+    editSessionActive,
+    isEditing,
+    isCreatingDraftBranch,
+    isViewingLiveVersion,
+  ]);
 
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [canvasFitAllNonce, setCanvasFitAllNonce] = useState(0);
@@ -1023,13 +1094,10 @@ export function AppPage() {
     handleEffectiveConsoleChange,
     handleLocalFilesStagingChange,
     hasStagingChanges,
-    draftBranchEditStatusByVersionId,
     editTabTone,
     hasUncommittedCanvasDraftChanges,
     hasUncommittedConsoleDraftChanges,
     hasUncommittedFilesDraftChanges,
-    hasCommittedCanvasDraftChanges,
-    hasCommittedConsoleDraftChanges,
     hasFilesStagingChanges,
   } = useAppDraftStagingData({
     organizationId: organizationId!,
@@ -1049,6 +1117,7 @@ export function AppPage() {
     suppressUnpublishedDraftDiscard,
     registerIgnoredCanvasVersionUpdatedEcho,
     getConsoleMutationGeneration: () => consoleMutationGenerationRef.current,
+    activeBranchName: resolvedActiveBranch || activeBranch || undefined,
   });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
@@ -3459,11 +3528,20 @@ export function AppPage() {
     },
   );
 
+  const handleOpenCommitModal = useCallback(() => {
+    if (!hasEditableVersion) {
+      return;
+    }
+    setCommitModalOpen(true);
+  }, [hasEditableVersion]);
+
   const activateCanvasVersionForEditing = useCallback(
     (versionID: string, version: CanvasesCanvasVersion) => {
       if (!organizationId || !canvasId) {
         return false;
       }
+
+      const inEditSession = editSessionActiveRef.current || editSessionActive;
 
       const isPublished = isPublishedVersion(version);
       const isOwnedDraft = !isPublished && version.metadata?.owner?.id === currentUserId;
@@ -3471,12 +3549,18 @@ export function AppPage() {
       const isCurrentLive =
         (!!effectiveLiveCanvasVersionId && versionId === effectiveLiveCanvasVersionId) ||
         (!!liveCanvasVersionId && versionId === liveCanvasVersionId);
-      if (!isOwnedDraft && !isPublished) {
-        showErrorToast("You can only use your edit version or published live history");
+      const branchNameForVersion = resolveBranchNameForVersion(versionID, version, draftBranches);
+      const isBranchHead =
+        !!branchNameForVersion &&
+        canvasBranches.some(
+          (branch) => getCanvasBranchName(branch) === branchNameForVersion && branchHeadVersionId(branch) === versionId,
+        );
+      if (!isOwnedDraft && !isPublished && !isBranchHead) {
+        showErrorToast("You can only edit branch heads or published history");
         return false;
       }
 
-      if (isCurrentLive) {
+      if (isCurrentLive && !inEditSession) {
         draftCreationSessionRef.current += 1;
       }
 
@@ -3487,36 +3571,46 @@ export function AppPage() {
         draftCanvasSpecsRef.current.set(previousDraftVersionId, draftCanvasSpec);
       }
 
-      if (!isCurrentLive) {
+      if (!isCurrentLive || inEditSession) {
         void queryClient.cancelQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       }
 
-      activeCanvasVersionIdRef.current = isCurrentLive ? "" : versionID;
+      const keepVersionActive = inEditSession || !isCurrentLive;
+      activeCanvasVersionIdRef.current = keepVersionActive ? versionID : "";
 
-      if (isCurrentLive) {
-        setDraftCanvasSpec(null);
-        setActiveCanvasVersion(null);
-      } else {
+      if (keepVersionActive) {
         setDraftCanvasSpec(version.spec ?? null);
         setActiveCanvasVersion(version);
+      } else {
+        setDraftCanvasSpec(null);
+        setActiveCanvasVersion(null);
       }
 
       lastAppliedVersionSnapshotRef.current = "";
       setLastSavedWorkflowSnapshot(null);
 
       const branchName = resolveBranchNameForVersion(versionID, version, draftBranches);
+      const branchNameFromCanvas =
+        branchName ||
+        getCanvasBranchName(canvasBranches.find((item) => branchHeadVersionId(item) === versionId) ?? {}) ||
+        "";
       setSearchParams((current) =>
         applyVersionSelectionSearchParams(current, {
           isCurrentLive,
           versionID,
-          branchName,
+          branchName: branchNameFromCanvas,
+          preserveBranchOnLive: isCurrentLive && inEditSession,
         }),
       );
 
-      if (isCurrentLive) {
+      if (isCurrentLive && inEditSession) {
+        if (branchNameFromCanvas) {
+          activateBranch(branchNameFromCanvas);
+        }
+      } else if (isCurrentLive) {
         exitToLive();
-      } else if (branchName) {
-        activateBranch(branchName);
+      } else if (branchNameFromCanvas) {
+        activateBranch(branchNameFromCanvas);
       } else if (isPublished) {
         exitToLive();
       }
@@ -3558,6 +3652,8 @@ export function AppPage() {
       setLastSavedWorkflowSnapshot,
       draftCanvasSpec,
       draftBranches,
+      canvasBranches,
+      editSessionActive,
       activateBranch,
       exitToLive,
     ],
@@ -3569,7 +3665,10 @@ export function AppPage() {
         return;
       }
 
-      const version = selectableVersionsById.get(versionID);
+      const version =
+        selectableVersionsById.get(versionID) ??
+        branchCommits.find((item) => item.metadata?.id === versionID) ??
+        (liveCanvasVersion?.metadata?.id === versionID ? liveCanvasVersion : undefined);
       if (!version) {
         showErrorToast("Version not found");
         return;
@@ -3577,7 +3676,113 @@ export function AppPage() {
 
       activateCanvasVersionForEditing(versionID, version);
     },
-    [activateCanvasVersionForEditing, canvasId, organizationId, selectableVersionsById],
+    [
+      activateCanvasVersionForEditing,
+      branchCommits,
+      canvasId,
+      liveCanvasVersion,
+      organizationId,
+      selectableVersionsById,
+    ],
+  );
+
+  const handleSelectBranch = useCallback(
+    (branchKey: string) => {
+      const branch = canvasBranches.find((item) => getCanvasBranchName(item) === branchKey);
+      const headVersionId = branch ? branchHeadVersionId(branch) : "";
+      if (!headVersionId) {
+        showErrorToast("Branch has no commits yet");
+        return;
+      }
+
+      previewingCurrentVersionRef.current =
+        headVersionId === effectiveLiveCanvasVersionId || headVersionId === liveCanvasVersionId;
+
+      activateBranch(branchKey);
+      handleUseVersion(headVersionId);
+    },
+    [activateBranch, canvasBranches, effectiveLiveCanvasVersionId, handleUseVersion, liveCanvasVersionId],
+  );
+
+  const finishEditSessionToLive = useCallback(
+    async (liveVersionId: string) => {
+      editSessionActiveRef.current = false;
+      setEditSessionActive(false);
+      previewingCurrentVersionRef.current = false;
+      previousActiveBranchRef.current = null;
+      await exitDraftToLive({
+        versionId: activeCanvasVersionIdRef.current || liveVersionId,
+        options: { liveVersionId, skipDraftBranchRefetch: true },
+        activeCanvasVersionIdRef,
+        draftCanvasSpecsRef,
+        setActiveCanvasVersion,
+        setDraftCanvasSpec,
+        canvasId,
+        queryClient,
+        exitToLive,
+        setSearchParams,
+        refreshLatestLiveCanvasData,
+      });
+    },
+    [
+      canvasId,
+      draftCanvasSpecsRef,
+      exitToLive,
+      queryClient,
+      refreshLatestLiveCanvasData,
+      setActiveCanvasVersion,
+      setDraftCanvasSpec,
+      setSearchParams,
+    ],
+  );
+
+  const handleCommitFromModal = useCallback(
+    async (input: { commitMessage: string; newBranchName?: string }) => {
+      const committedVersion = await handleCommitStaging(input);
+      setCommitModalOpen(false);
+      if (!committedVersion?.metadata?.id || !organizationId || !canvasId) {
+        return;
+      }
+
+      const newVersionId = committedVersion.metadata.id;
+      const branchName =
+        committedVersion.metadata.branchName ||
+        input.newBranchName ||
+        resolvedActiveBranch ||
+        activeBranch ||
+        CANVAS_MAIN_BRANCH;
+
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.branches(canvasId) });
+      await queryClient.invalidateQueries({ queryKey: [...canvasKeys.versions(), canvasId, "branchCommits"] });
+
+      if (branchName === CANVAS_MAIN_BRANCH && !input.newBranchName) {
+        await finishEditSessionToLive(newVersionId);
+        return;
+      }
+
+      if (input.newBranchName) {
+        activateBranch(input.newBranchName);
+      } else if (branchName) {
+        activateBranch(branchName);
+      }
+
+      const versionWithSpec = (await fetchCanvasVersionWithSpec(canvasId, newVersionId)) ?? committedVersion;
+      previewingCurrentVersionRef.current = true;
+      editSessionActiveRef.current = true;
+      setEditSessionActive(true);
+      activateCanvasVersionForEditing(newVersionId, versionWithSpec);
+    },
+    [
+      activateBranch,
+      activateCanvasVersionForEditing,
+      activeBranch,
+      canvasId,
+      finishEditSessionToLive,
+      handleCommitStaging,
+      organizationId,
+      queryClient,
+      resolvedActiveBranch,
+    ],
   );
 
   const handleSeeCurrentVersion = useCallback(() => {
@@ -3637,9 +3842,6 @@ export function AppPage() {
     draftVersionToDelete,
     setDraftVersionToDelete,
     draftVersionToDeleteName,
-    handleContinueDraftBranch,
-    handleCreateDraftBranch,
-    handleDeleteDraftBranch,
     confirmDeleteDraftVersion,
     requestDeleteActiveDraft,
   } = useCanvasDraftBranchActions({
@@ -3669,91 +3871,148 @@ export function AppPage() {
     if (isCreatingDraftBranch) {
       return;
     }
-    if (!searchParams.get("branch") && !hasEditableVersion) {
+
+    const branchName = activeBranch;
+    if (!branchName) {
       return;
     }
 
-    const branchVersionId = activeBranchMeta ? draftVersionId(activeBranchMeta) : "";
-    if (!branchVersionId || activeCanvasVersionId === branchVersionId) {
+    const branchFromCanvas = canvasBranches.find((item) => getCanvasBranchName(item) === branchName);
+    const branchVersionId = branchFromCanvas ? branchHeadVersionId(branchFromCanvas) : "";
+    if (!branchVersionId) {
       return;
     }
 
-    const selectedVersion = activeCanvasVersionId ? selectableVersionsById.get(activeCanvasVersionId) : null;
-    if (selectedVersion && isPublishedVersion(selectedVersion)) {
+    if (activeCanvasVersionId === branchVersionId) {
       return;
     }
 
-    // When already editing a draft, prefer the active version and sync branch metadata to match.
-    if (hasEditableVersion && activeCanvasVersionId && selectableVersionsById.has(activeCanvasVersionId)) {
-      const branchName = resolveBranchNameForVersion(
-        activeCanvasVersionId,
-        selectableVersionsById.get(activeCanvasVersionId)!,
-        draftBranches,
-      );
-      if (branchName && branchName !== activeBranch) {
-        activateBranch(branchName);
-      }
+    const branchChanged = previousActiveBranchRef.current !== branchName;
+    previousActiveBranchRef.current = branchName;
+
+    // During an edit session, only snap to branch head when switching branches —
+    // not when the user is previewing an older commit on the same branch.
+    if (editSessionActive && !branchChanged) {
       return;
     }
 
-    if (selectableVersionsById.has(branchVersionId)) {
+    if (!editSessionActive && !searchParams.get("branch") && !hasEditableVersion) {
+      return;
+    }
+
+    if (
+      selectableVersionsById.has(branchVersionId) ||
+      branchCommits.some((item) => item.metadata?.id === branchVersionId)
+    ) {
       handleUseVersion(branchVersionId);
     }
   }, [
     isCreatingDraftBranch,
     activeBranch,
-    activeBranchMeta,
     activeCanvasVersionId,
-    draftBranches,
+    branchCommits,
+    canvasBranches,
+    editSessionActive,
     hasEditableVersion,
     searchParams,
     selectableVersionsById,
-    activateBranch,
     handleUseVersion,
   ]);
 
-  const handleToggleEditMode = useCallback(async () => {
+  const handleToggleEditMode = useCallback(async (): Promise<boolean> => {
     if (!organizationId || !canvasId) {
-      return;
+      return false;
     }
 
     if (!canUpdateCanvas) {
       showErrorToast("You don't have permission to edit this canvas");
-      return;
+      return false;
     }
 
-    if (hasEditableVersion) {
+    if (hasEditableVersion || editSessionActive) {
       if (!effectiveLiveCanvasVersionId) {
         showErrorToast("No live version available");
-        return;
+        return false;
       }
+      editSessionActiveRef.current = false;
       setEditSessionActive(false);
-      exitToLive();
-      handleUseVersion(effectiveLiveCanvasVersionId);
-      return;
+      await finishEditSessionToLive(effectiveLiveCanvasVersionId);
+      return true;
     }
 
+    editSessionActiveRef.current = true;
+    setEditSessionActive(true);
     setSuppressUnpublishedDraftDiscard(false);
+    hasSyncedVersionFromURLRef.current = true;
 
-    const defaultDraft = startEditingDefaultDraft ?? draftBranches[0];
-    const defaultDraftVersionId = defaultDraft ? draftVersionId(defaultDraft) : "";
-    if (defaultDraftVersionId) {
-      handleUseVersion(defaultDraftVersionId);
-      return;
+    const defaultBranchName = startEditingDefaultBranch ? getCanvasBranchName(startEditingDefaultBranch) : "main";
+    const headVersionIdFromBranch = startEditingDefaultBranch ? branchHeadVersionId(startEditingDefaultBranch) : "";
+    const headVersionId =
+      mainBranchHeadVersionId || headVersionIdFromBranch || effectiveLiveCanvasVersionId || liveCanvasVersionId || "";
+
+    previewingCurrentVersionRef.current =
+      defaultBranchName === CANVAS_MAIN_BRANCH ||
+      (!!headVersionId && (headVersionId === effectiveLiveCanvasVersionId || headVersionId === liveCanvasVersionId));
+
+    if (defaultBranchName) {
+      previousActiveBranchRef.current = null;
+      activateBranch(defaultBranchName);
     }
 
-    await handleCreateVersion();
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("version");
+        if (defaultBranchName) {
+          next.set("branch", defaultBranchName);
+        }
+        return clearComponentSidebarSearchParams(next);
+      },
+      { replace: true },
+    );
+
+    if (!headVersionId) {
+      editSessionActiveRef.current = false;
+      setEditSessionActive(false);
+      showErrorToast("Canvas is still loading. Try again in a moment.");
+      return false;
+    }
+
+    let versionForEdit =
+      selectableVersionsById.get(headVersionId) ??
+      branchCommits.find((item) => item.metadata?.id === headVersionId) ??
+      (liveCanvasVersion?.metadata?.id === headVersionId ? liveCanvasVersion : undefined);
+
+    if (!versionForEdit && organizationId && canvasId) {
+      versionForEdit = (await fetchCanvasVersionWithSpec(canvasId, headVersionId)) ?? undefined;
+    }
+
+    if (!versionForEdit) {
+      editSessionActiveRef.current = false;
+      setEditSessionActive(false);
+      showErrorToast("Failed to load the branch head for editing");
+      return false;
+    }
+
+    activateCanvasVersionForEditing(headVersionId, versionForEdit);
+    return true;
   }, [
     organizationId,
     canvasId,
     canUpdateCanvas,
     hasEditableVersion,
     effectiveLiveCanvasVersionId,
-    draftBranches,
-    startEditingDefaultDraft,
-    handleUseVersion,
-    handleCreateVersion,
-    exitToLive,
+    liveCanvasVersionId,
+    liveCanvasVersion,
+    mainBranchHeadVersionId,
+    startEditingDefaultBranch,
+    activateCanvasVersionForEditing,
+    editSessionActive,
+    finishEditSessionToLive,
+    activateBranch,
+    selectableVersionsById,
+    branchCommits,
+    setSearchParams,
   ]);
 
   const exitEditableVersionForRunInspection = useCallback(() => {
@@ -3941,27 +4200,26 @@ export function AppPage() {
     handleToggleEditMode,
     setRunDetailNodeId,
     setSearchParams,
-    startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
+    startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams, editEntryReady },
   });
 
   // Ends the edit session: closes the versions sidebar and returns to the live
   // canvas (which restores events/runs). Works whether editing a draft or
   // previewing a version from the sidebar.
   const handleExitEditSession = useCallback(() => {
+    editSessionActiveRef.current = false;
     setEditSessionActive(false);
     clearRunInspectionForEdit();
+    previewingCurrentVersionRef.current = false;
     if (effectiveLiveCanvasVersionId) {
-      handleUseVersion(effectiveLiveCanvasVersionId);
-    } else {
-      exitToLive();
+      void finishEditSessionToLive(effectiveLiveCanvasVersionId);
+      return;
     }
-  }, [clearRunInspectionForEdit, effectiveLiveCanvasVersionId, handleUseVersion, exitToLive]);
-
-  const handleCreateDraftBranchFromSidebar = useCallback(async () => {
-    clearRunInspectionForEdit();
-    await Promise.resolve();
-    await handleCreateDraftBranch();
-  }, [clearRunInspectionForEdit, handleCreateDraftBranch]);
+    activeCanvasVersionIdRef.current = "";
+    setActiveCanvasVersion(null);
+    setDraftCanvasSpec(null);
+    exitToLive();
+  }, [clearRunInspectionForEdit, effectiveLiveCanvasVersionId, exitToLive, finishEditSessionToLive]);
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -4012,6 +4270,34 @@ export function AppPage() {
 
     requestDeleteActiveDraft();
   }, [organizationId, canvasId, canUpdateCanvas, hasEditableVersion, activeCanvasVersionId, requestDeleteActiveDraft]);
+
+  const finishMergeOrPublish = useCallback(
+    async (commitMessage?: string) => {
+      editSessionActiveRef.current = false;
+      setEditSessionActive(false);
+      previewingCurrentVersionRef.current = false;
+      previousActiveBranchRef.current = null;
+      setMergeModalOpen(false);
+      await handlePublishVersion(commitMessage);
+    },
+    [handlePublishVersion],
+  );
+
+  const handleMergeOrPublishVersion = useCallback(() => {
+    const branchName = resolvedActiveBranch || activeBranch || CANVAS_MAIN_BRANCH;
+    if (branchName === CANVAS_MAIN_BRANCH) {
+      void finishMergeOrPublish();
+      return;
+    }
+    setMergeModalOpen(true);
+  }, [resolvedActiveBranch, activeBranch, finishMergeOrPublish]);
+
+  const handleMergeFromModal = useCallback(
+    async ({ commitMessage }: { commitMessage: string }) => {
+      await finishMergeOrPublish(commitMessage);
+    },
+    [finishMergeOrPublish],
+  );
 
   const buildYamlExportPayload = useCallback(
     (workflow: CanvasesCanvas | null | undefined, canvasNodes?: CanvasNode[]) =>
@@ -4292,22 +4578,20 @@ export function AppPage() {
   });
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
+  const activeBranchNameForEdit = resolvedActiveBranch || activeBranch || CANVAS_MAIN_BRANCH;
+  const isMainEditBranch = activeBranchNameForEdit === CANVAS_MAIN_BRANCH;
   const filesHeaderVersionActions = resolveFilesHeaderVersionActions({
-    handlePublishVersion,
+    handlePublishVersion: handleMergeOrPublishVersion,
     handleResetDraftChanges,
     publishVersionDisabled,
     publishVersionDisabledTooltip,
     resetDraftDisabled,
     resetDraftDisabledTooltip,
     hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
+    publishVersionLabel: isMainEditBranch ? "Publish" : "Merge",
+    allowDiscard: editSessionActive && !isMainEditBranch && isEditing && !hasStagingChanges,
+    allowPublish: editSessionActive && isEditing && !hasStagingChanges && hasDraftDiffVersusLive,
   });
-
-  const activeDraftBranchLabel =
-    isEditing && resolvedActiveBranchMeta
-      ? draftDisplayName(resolvedActiveBranchMeta) || draftBranchName(resolvedActiveBranchMeta) || undefined
-      : isEditing && resolvedActiveBranch
-        ? resolvedActiveBranch
-        : undefined;
 
   const showRunsSidebar =
     isCanvasWorkflowTab(headerMode) &&
@@ -4349,24 +4633,19 @@ export function AppPage() {
   const toolSidebarVersionsContent = renderCanvasVersionsSidebarPanel({
     isOpen: showVersionsSidebar,
     scrollPersistenceKey: canvasId,
-    liveCanvasVersionId: effectiveLiveCanvasVersionId,
-    liveCanvasVersion,
+    branchHeadVersionId: activeBranchHeadVersionId,
     selectedCanvasVersion,
-    liveVersions,
+    branchCommits,
     canUpdateCanvas,
     canvasDeletedRemotely,
     onUseVersion: handleUseVersionFromVersionPanel,
-    onLoadMoreLiveVersions: hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined,
-    loadMoreLiveVersionsDisabled: !hasMoreLiveVersions || isLoadingMoreLiveVersions,
-    loadMoreLiveVersionsPending: isLoadingMoreLiveVersions,
-    draftBranches,
-    activeDraftBranch: resolvedActiveBranch,
-    draftBranchEditStatusByVersionId,
-    onOpenDraftBranch: handleContinueDraftBranch,
-    onCreateDraftBranch: handleCreateDraftBranchFromSidebar,
-    createDraftBranchPending: isCreatingDraftBranch,
-    onDeleteDraftBranch: handleDeleteDraftBranch,
-    deleteDraftBranchPending: deleteDraftBranchMutation.isPending,
+    onLoadMoreBranchCommits: hasMoreBranchCommits ? () => branchCommitsQuery.fetchNextPage() : undefined,
+    loadMoreBranchCommitsDisabled: !hasMoreBranchCommits || isLoadingMoreBranchCommits,
+    loadMoreBranchCommitsPending: isLoadingMoreBranchCommits,
+    canvasBranches,
+    activeBranchName: resolvedActiveBranch || activeBranch || "main",
+    onSelectBranch: handleSelectBranch,
+    branchSelectorDisabled: commitStagingPending || resetStagingPending || isPreparingVersionAction,
   });
 
   return (
@@ -4525,7 +4804,6 @@ export function AppPage() {
           filesHeaderActionsSlotId={filesHeaderActionsSlotId}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          activeDraftBranchLabel={activeDraftBranchLabel}
           {...draftChangeIndicators}
           {...filesHeaderVersionActions}
           hasStagingChanges={isEditing && hasStagingChanges}
@@ -4533,10 +4811,8 @@ export function AppPage() {
           hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
           hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
           hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
-          hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
-          hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
           hasFilesStagingChanges={isEditing && hasFilesStagingChanges}
-          onCommitStaging={handleCommitStaging}
+          onCommitStaging={handleOpenCommitModal}
           commitStagingPending={commitStagingPending}
           resetStagingPending={resetStagingPending}
           onResetStaging={handleResetStaging}
@@ -4598,6 +4874,20 @@ export function AppPage() {
         deletePending={deleteDraftBranchMutation.isPending}
         onConfirm={() => void confirmDeleteDraftVersion()}
         onClose={() => setDraftVersionToDelete(null)}
+      />
+      <CommitBranchModal
+        open={commitModalOpen}
+        onOpenChange={setCommitModalOpen}
+        currentBranchName={resolvedActiveBranch || activeBranch || "main"}
+        pending={commitStagingPending}
+        onSubmit={handleCommitFromModal}
+      />
+      <MergeBranchModal
+        open={mergeModalOpen}
+        onOpenChange={setMergeModalOpen}
+        sourceBranchName={resolvedActiveBranch || activeBranch || "branch"}
+        pending={publishCanvasVersionMutation.isPending || isPreparingVersionAction}
+        onSubmit={handleMergeFromModal}
       />
       <IntegrationCreateDialog
         open={!!integrationDialogName}

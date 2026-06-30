@@ -226,12 +226,7 @@ export interface CanvasPageProps {
   hasUncommittedCanvasDraftChanges?: boolean;
   hasUncommittedConsoleDraftChanges?: boolean;
   hasUncommittedFilesDraftChanges?: boolean;
-  hasCommittedCanvasDraftChanges?: boolean;
-  hasCommittedConsoleDraftChanges?: boolean;
-  hasCommittedFilesDraftChanges?: boolean;
   editTabTone?: "uncommitted" | "ready" | "neutral";
-  activeDraftBranchLabel?: string;
-  activeDraftBranchShortSha?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1357,12 +1352,7 @@ function CanvasPage(props: CanvasPageProps) {
           hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
           hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
           hasUncommittedFilesDraftChanges={props.hasUncommittedFilesDraftChanges}
-          hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
-          hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
-          hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
           editTabTone={props.editTabTone}
-          activeDraftBranchLabel={props.activeDraftBranchLabel}
-          activeDraftBranchShortSha={props.activeDraftBranchShortSha}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           toolSidebarState={toolSidebarState}
           runsSidebarState={runsSidebarState}
@@ -1835,12 +1825,7 @@ function CanvasContentHeader({
   hasUncommittedCanvasDraftChanges,
   hasUncommittedConsoleDraftChanges,
   hasUncommittedFilesDraftChanges,
-  hasCommittedCanvasDraftChanges,
-  hasCommittedConsoleDraftChanges,
-  hasCommittedFilesDraftChanges,
   editTabTone,
-  activeDraftBranchLabel,
-  activeDraftBranchShortSha,
   showCanvasSettingsMenu,
   toolSidebarState,
   runsSidebarState,
@@ -1897,12 +1882,7 @@ function CanvasContentHeader({
   hasUncommittedCanvasDraftChanges?: boolean;
   hasUncommittedConsoleDraftChanges?: boolean;
   hasUncommittedFilesDraftChanges?: boolean;
-  hasCommittedCanvasDraftChanges?: boolean;
-  hasCommittedConsoleDraftChanges?: boolean;
-  hasCommittedFilesDraftChanges?: boolean;
   editTabTone?: "uncommitted" | "ready" | "neutral";
-  activeDraftBranchLabel?: string;
-  activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
   runsSidebarState: CanvasRunsSidebarState;
@@ -1951,12 +1931,7 @@ function CanvasContentHeader({
       hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
       hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
       hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
-      hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
-      hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
-      hasCommittedFilesDraftChanges={hasCommittedFilesDraftChanges}
       editTabTone={editTabTone}
-      activeDraftBranchLabel={activeDraftBranchLabel}
-      activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       toolSidebarState={toolSidebarState}
       runsSidebarState={runsSidebarState}

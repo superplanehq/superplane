@@ -88,19 +88,7 @@ func updateCanvasInTransaction(
 		return err
 	}
 
-	liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasID)
-	if err != nil {
-		return err
-	}
-
-	changed, err := applyCanvasLiveVersionUpdates(
-		tx,
-		organizationUUID,
-		canvasID,
-		liveVersion,
-		name,
-		description,
-	)
+	changed, err := applyCanvasMetadataUpdates(tx, organizationUUID, canvasID, lockedCanvas, name, description)
 	if err != nil {
 		return err
 	}
@@ -109,21 +97,20 @@ func updateCanvasInTransaction(
 		return nil
 	}
 
-	return saveCanvasMetadataUpdate(tx, lockedCanvas, liveVersion)
+	return saveCanvasMetadataUpdate(tx, lockedCanvas)
 }
 
 func lockCanvasForUpdate(tx *gorm.DB, organizationUUID, canvasID uuid.UUID) (*models.Canvas, error) {
 	lockedCanvas := &models.Canvas{}
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
-		// This locks workflows directly, so select only columns that physically
-		// exist on workflows; metadata fields are projected from live versions.
 		Select(
 			"id",
 			"organization_id",
 			"live_version_id",
 			"folder_id",
 			"name",
+			"description",
 			"created_by",
 			"created_at",
 			"updated_at",
@@ -140,20 +127,20 @@ func lockCanvasForUpdate(tx *gorm.DB, organizationUUID, canvasID uuid.UUID) (*mo
 	return lockedCanvas, nil
 }
 
-func applyCanvasLiveVersionUpdates(
+func applyCanvasMetadataUpdates(
 	tx *gorm.DB,
 	organizationUUID uuid.UUID,
 	canvasID uuid.UUID,
-	liveVersion *models.CanvasVersion,
+	canvas *models.Canvas,
 	name *string,
 	description *string,
 ) (bool, error) {
-	nameChanged, err := applyCanvasNameUpdate(tx, organizationUUID, canvasID, liveVersion, name)
+	nameChanged, err := applyCanvasNameUpdate(tx, organizationUUID, canvasID, canvas, name)
 	if err != nil {
 		return false, err
 	}
 
-	descriptionChanged := applyCanvasDescriptionUpdate(liveVersion, description)
+	descriptionChanged := applyCanvasDescriptionUpdate(canvas, description)
 
 	return nameChanged || descriptionChanged, nil
 }
@@ -162,7 +149,7 @@ func applyCanvasNameUpdate(
 	tx *gorm.DB,
 	organizationUUID uuid.UUID,
 	canvasID uuid.UUID,
-	liveVersion *models.CanvasVersion,
+	canvas *models.Canvas,
 	name *string,
 ) (bool, error) {
 	if name == nil {
@@ -182,32 +169,26 @@ func applyCanvasNameUpdate(
 		return false, nameErr
 	}
 
-	if liveVersion.Name == nextName {
+	if canvas.Name == nextName {
 		return false, nil
 	}
 
-	liveVersion.Name = nextName
+	canvas.Name = nextName
 	return true, nil
 }
 
-func applyCanvasDescriptionUpdate(liveVersion *models.CanvasVersion, description *string) bool {
-	if description == nil || liveVersion.Description == *description {
+func applyCanvasDescriptionUpdate(canvas *models.Canvas, description *string) bool {
+	if description == nil || canvas.Description == *description {
 		return false
 	}
 
-	liveVersion.Description = *description
+	canvas.Description = *description
 	return true
 }
 
-func saveCanvasMetadataUpdate(tx *gorm.DB, lockedCanvas *models.Canvas, liveVersion *models.CanvasVersion) error {
+func saveCanvasMetadataUpdate(tx *gorm.DB, lockedCanvas *models.Canvas) error {
 	now := time.Now()
-	liveVersion.UpdatedAt = &now
-	lockedCanvas.Name = liveVersion.Name
 	lockedCanvas.UpdatedAt = &now
-
-	if err := tx.Save(liveVersion).Error; err != nil {
-		return err
-	}
 
 	if err := tx.Save(lockedCanvas).Error; err != nil {
 		return mapCanvasNameUniqueConstraintError(err)

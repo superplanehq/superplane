@@ -39,7 +39,7 @@ func (createDraftAction) Execute(_ context.Context, session agents.AgentSessionC
 		Action:    createDraftActionName,
 		CanvasID:  session.CanvasID,
 		VersionID: draft.ID.String(),
-		Draft:     draftResult{VersionID: draft.ID.String(), DisplayName: draft.DisplayName, BranchName: draft.GitBranch},
+		Draft:     draftResult{VersionID: draft.ID.String(), DisplayName: draft.GitBranch, BranchName: draft.GitBranch},
 		Summary:   summarizeCanvasVersion(nil, draft),
 	}, nil
 }

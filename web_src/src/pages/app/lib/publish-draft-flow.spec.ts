@@ -38,7 +38,10 @@ describe("publishDraftVersionAndExit", () => {
       recoverFromMissingDraft: vi.fn(),
     });
 
-    expect(publishCanvasVersionMutation.mutateAsync).toHaveBeenCalledWith("draft-2");
+    expect(publishCanvasVersionMutation.mutateAsync).toHaveBeenCalledWith({
+      versionId: "draft-2",
+      commitMessage: undefined,
+    });
     expect(result).toEqual({
       status: "failed",
       versionIdToPublish: "draft-2",

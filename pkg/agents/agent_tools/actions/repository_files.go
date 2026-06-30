@@ -138,6 +138,7 @@ func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessio
 			session.OrganizationID,
 			session.CanvasID,
 			versionID,
+			"",
 			path,
 		)
 		if err != nil {
@@ -204,6 +205,7 @@ func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionC
 		session.OrganizationID,
 		session.CanvasID,
 		draft.ID.String(),
+		draft.GitBranch,
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Content: []byte(input.Content)}},
 	)
 	if err != nil {
@@ -241,6 +243,7 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 		session.OrganizationID,
 		session.CanvasID,
 		draft.ID.String(),
+		draft.GitBranch,
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Delete: true}},
 	)
 	if err != nil {
@@ -288,9 +291,11 @@ func (a commitFilesAction) Execute(ctx context.Context, session agents.AgentSess
 		session.OrganizationID,
 		session.CanvasID,
 		draft.ID.String(),
+		draft.GitBranch,
+		strings.TrimSpace(input.Message),
+		"",
 		a.deps.WebhookBaseURL,
 		a.deps.AuthService,
-		strings.TrimSpace(input.Message),
 	)
 	if err != nil {
 		return fileCommitResult{}, err
@@ -302,7 +307,7 @@ func (a commitFilesAction) Execute(ctx context.Context, session agents.AgentSess
 		VersionID: draft.ID.String(),
 		Draft: draftResult{
 			VersionID:   draft.ID.String(),
-			DisplayName: draft.DisplayName,
+			DisplayName: draft.GitBranch,
 			BranchName:  draft.GitBranch,
 		},
 		StagingSummary: serializeStagingSummary(response.GetStagingSummary()),

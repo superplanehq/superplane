@@ -11,10 +11,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
-// ApplyCanvasAutoLayout lays out the effective staged canvas.yaml for a draft
-// version and re-stages the positioned result. The laid-out YAML stays in the
-// staging layer; callers read it back through the repository file GET with
-// ?stage=true, keeping YAML out of RPC responses.
 func ApplyCanvasAutoLayout(
 	ctx context.Context,
 	organizationID string,
@@ -26,12 +22,12 @@ func ApplyCanvasAutoLayout(
 		return nil, grpcerrors.InvalidArgument(nil, "auto_layout is required")
 	}
 
-	canvas, version, userUUID, err := loadOwnedDraftVersion(ctx, organizationID, canvasID, versionID)
+	canvas, branch, version, userUUID, err := loadBranchForStaging(ctx, organizationID, canvasID, "", versionID)
 	if err != nil {
 		return nil, err
 	}
 
-	_, rows, err := stagingSummaryForVersion(version.ID)
+	_, rows, err := stagingSummaryForBranch(branch.ID, userUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -71,17 +67,16 @@ func ApplyCanvasAutoLayout(
 	}
 
 	if _, err := models.UpsertWorkflowStagingPath(
-		version.ID,
-		canvas.OrganizationID,
+		branch.ID,
+		userUUID,
 		CanvasYAMLRepositoryPath,
 		positionedYAML,
-		"",
 		&userUUID,
 	); err != nil {
 		return nil, grpcerrors.Internal(err, "failed to stage canvas layout")
 	}
 
-	state, _, err := stagingSummaryForVersion(version.ID)
+	state, _, err := stagingSummaryForBranch(branch.ID, userUUID)
 	if err != nil {
 		return nil, err
 	}

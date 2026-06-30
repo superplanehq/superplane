@@ -79,12 +79,7 @@ export interface HeaderProps {
   hasUncommittedCanvasDraftChanges?: boolean;
   hasUncommittedConsoleDraftChanges?: boolean;
   hasUncommittedFilesDraftChanges?: boolean;
-  hasCommittedCanvasDraftChanges?: boolean;
-  hasCommittedConsoleDraftChanges?: boolean;
-  hasCommittedFilesDraftChanges?: boolean;
   editTabTone?: "uncommitted" | "ready" | "neutral";
-  activeDraftBranchLabel?: string;
-  activeDraftBranchShortSha?: string;
   /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
@@ -108,8 +103,6 @@ export function Header(props: HeaderProps) {
         onEnterEditMode={props.onEnterEditMode}
         enterEditModeDisabled={props.enterEditModeDisabled}
         enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
-        activeDraftBranchLabel={props.activeDraftBranchLabel}
-        activeDraftBranchShortSha={props.activeDraftBranchShortSha}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
       />
 
@@ -130,8 +123,6 @@ interface PageHeaderBarProps {
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
-  activeDraftBranchLabel?: string;
-  activeDraftBranchShortSha?: string;
 }
 
 function PageHeader({
@@ -145,8 +136,6 @@ function PageHeader({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
-  activeDraftBranchLabel,
-  activeDraftBranchShortSha,
   showCanvasSettingsMenu = true,
 }: PageHeaderBarProps) {
   const {
@@ -182,22 +171,11 @@ function PageHeader({
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
         {inEditSession ? (
-          <div className="flex items-center">
-            {activeDraftBranchLabel ? (
-              <span
-                className="hidden text-[13px] font-medium text-slate-600 sm:inline"
-                data-testid="active-draft-branch-chip"
-              >
-                Editing: {activeDraftBranchLabel}
-                {activeDraftBranchShortSha ? ` @ ${activeDraftBranchShortSha}` : ""}
-              </span>
-            ) : null}
-            <EditModeTopHeaderActions
-              onExitEditMode={onExitEditMode}
-              exitEditModeDisabled={exitEditModeDisabled}
-              exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-            />
-          </div>
+          <EditModeTopHeaderActions
+            onExitEditMode={onExitEditMode}
+            exitEditModeDisabled={exitEditModeDisabled}
+            exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+          />
         ) : null}
         {!inEditSession && onEnterEditMode ? (
           <LiveModeTopHeaderActions
@@ -215,7 +193,7 @@ function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle = shouldShowCanvasViewModeToggle(props);
   const canvasViewMode = getCanvasViewMode(props.mode);
   const editing = props.isEditing ?? false;
-  const editTabTone = props.editTabTone ?? (editing ? (props.hasStagingChanges ? "uncommitted" : "ready") : "neutral");
+  const editTabTone = props.editTabTone ?? (editing && props.hasStagingChanges ? "uncommitted" : "neutral");
 
   return (
     <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3">
@@ -236,11 +214,8 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectFiles={props.onSelectFiles}
               editing={editing}
               hasCanvasUncommitted={!!props.hasUncommittedCanvasDraftChanges}
-              hasCanvasCommitted={!!props.hasCommittedCanvasDraftChanges}
               hasConsoleUncommitted={!!props.hasUncommittedConsoleDraftChanges}
-              hasConsoleCommitted={!!props.hasCommittedConsoleDraftChanges}
               hasFilesUncommitted={!!props.hasUncommittedFilesDraftChanges}
-              hasFilesCommitted={!!props.hasCommittedFilesDraftChanges}
               editTabTone={editTabTone}
             />
           ) : null}

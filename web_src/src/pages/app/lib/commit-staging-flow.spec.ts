@@ -27,6 +27,7 @@ describe("executeCommitStaging", () => {
       activeCanvasVersionId: "version-1",
       queryClient,
       commitCanvasStagingMutation,
+      commitMessage: "Update canvas",
       consoleMutationGenerationRef: { current: 0 },
       draftCanvasSpecsRef,
       setDraftCanvasSpec,

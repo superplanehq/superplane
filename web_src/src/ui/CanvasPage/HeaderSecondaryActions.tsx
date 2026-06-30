@@ -175,13 +175,15 @@ function EditModePublishDiscardActions({
           disabledTooltip={discardVersionDisabledTooltip}
         />
       ) : null}
-      <PublishVersionButton
-        onPublish={() => onPublishVersion?.()}
-        label={publishVersionLabel || "Publish"}
-        disabled={publishVersionDisabled || !onPublishVersion}
-        publishVersionDisabled={!!publishVersionDisabled}
-        publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-      />
+      {onPublishVersion ? (
+        <PublishVersionButton
+          onPublish={() => onPublishVersion()}
+          label={publishVersionLabel || "Publish"}
+          disabled={!!publishVersionDisabled}
+          publishVersionDisabled={!!publishVersionDisabled}
+          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+        />
+      ) : null}
     </div>
   );
 }

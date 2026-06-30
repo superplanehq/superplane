@@ -13,44 +13,44 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
+func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User, canvas *models.Canvas) *pb.CanvasVersion {
 	var owner *pb.UserRef
 	if version.OwnerID != nil {
 		owner = canvasVersionOwnerRef(organizationID, version.OwnerID.String(), ownersByID)
 	}
 
-	state := pb.CanvasVersion_STATE_UNSPECIFIED
-	switch version.State {
-	case models.CanvasVersionStateDraft:
+	state := pb.CanvasVersion_STATE_PUBLISHED
+	if version.GitBranch != models.CanvasGitBranchMain {
 		state = pb.CanvasVersion_STATE_DRAFT
-	case models.CanvasVersionStatePublished:
-		state = pb.CanvasVersion_STATE_PUBLISHED
-	case models.CanvasVersionStateSnapshot:
-		state = pb.CanvasVersion_STATE_SNAPSHOT
+	}
+
+	canvasName := ""
+	canvasDescription := ""
+	if canvas != nil {
+		canvasName = canvas.Name
+		canvasDescription = canvas.Description
 	}
 
 	metadata := &pb.CanvasVersion_Metadata{
-		Id:          version.ID.String(),
-		CanvasId:    version.WorkflowID.String(),
-		Owner:       owner,
-		State:       state,
-		Name:        version.Name,
-		Description: version.Description,
+		Id:            version.ID.String(),
+		CanvasId:      version.WorkflowID.String(),
+		Owner:         owner,
+		State:         state,
+		Name:          canvasName,
+		Description:   canvasDescription,
+		BranchName:    version.GitBranch,
+		DisplayName:   version.GitBranch,
+		CommitMessage: version.CommitMessage,
+		CommitSha:     version.CommitSHA,
 	}
 
-	if version.PublishedAt != nil {
-		metadata.PublishedAt = timestamppb.New(*version.PublishedAt)
-	}
 	if version.CreatedAt != nil {
 		metadata.CreatedAt = timestamppb.New(*version.CreatedAt)
+		metadata.PublishedAt = timestamppb.New(*version.CreatedAt)
 	}
 	if version.UpdatedAt != nil {
 		metadata.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
-	if models.IsRegisteredDraftVersion(version) {
-		metadata.BranchName = version.GitBranch
-	}
-	metadata.DisplayName = version.DisplayName
 
 	return &pb.CanvasVersion{
 		Metadata: metadata,
@@ -62,7 +62,7 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 }
 
 func SerializeCanvasVersionMetadata(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
-	full := SerializeCanvasVersion(version, organizationID, ownersByID)
+	full := SerializeCanvasVersion(version, organizationID, ownersByID, nil)
 	return &pb.CanvasVersion{
 		Metadata: full.GetMetadata(),
 	}
@@ -123,7 +123,7 @@ func serializeCanvasVersions(ctx context.Context, versions []models.CanvasVersio
 
 	protoVersions := make([]*pb.CanvasVersion, 0, len(versions))
 	for i := range versions {
-		protoVersions = append(protoVersions, SerializeCanvasVersion(&versions[i], organizationID, ownersByID))
+		protoVersions = append(protoVersions, SerializeCanvasVersion(&versions[i], organizationID, ownersByID, nil))
 	}
 
 	if span := trace.SpanFromContext(ctx); span.IsRecording() {

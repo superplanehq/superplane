@@ -8,7 +8,7 @@ function renderWorkflowHeaderEditActions(overrides: Partial<Parameters<typeof us
   const config = {
     isRunInspectionMode: false,
     handleClearRunInspection: vi.fn(),
-    handleToggleEditMode: vi.fn().mockResolvedValue(undefined),
+    handleToggleEditMode: vi.fn().mockResolvedValue(true),
     setRunDetailNodeId: vi.fn(),
     setSearchParams: vi.fn() as unknown as SetURLSearchParams,
     ...overrides,
@@ -66,7 +66,7 @@ describe("useWorkflowHeaderEditActions", () => {
   });
 
   it("auto edit mode removes only the edit param from the current URL", async () => {
-    const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
+    const handleToggleEditMode = vi.fn().mockResolvedValue(true);
     const setSearchParams = vi.fn();
     const searchParams = new URLSearchParams("edit=1&version=draft-version&branch=drafts%2Fabc");
 
@@ -82,6 +82,7 @@ describe("useWorkflowHeaderEditActions", () => {
           canUpdateCanvas: true,
           canvas: { metadata: { id: "canvas-1" }, spec: {} },
           searchParams,
+          editEntryReady: true,
         },
       }),
     );
@@ -99,7 +100,7 @@ describe("useWorkflowHeaderEditActions", () => {
   });
 
   it("auto edit mode clears run inspection before entering edit mode", async () => {
-    const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
+    const handleToggleEditMode = vi.fn().mockResolvedValue(true);
     const setSearchParams = vi.fn();
     const setRunDetailNodeId = vi.fn();
     const searchParams = new URLSearchParams("edit=1&run=run-123");
@@ -110,6 +111,7 @@ describe("useWorkflowHeaderEditActions", () => {
     });
     handleToggleEditMode.mockImplementation(async () => {
       callOrder.push("toggleEditMode");
+      return true;
     });
 
     renderHook(() =>
@@ -124,6 +126,7 @@ describe("useWorkflowHeaderEditActions", () => {
           canUpdateCanvas: true,
           canvas: { metadata: { id: "canvas-1" }, spec: {} },
           searchParams,
+          editEntryReady: true,
         },
       }),
     );
@@ -144,5 +147,69 @@ describe("useWorkflowHeaderEditActions", () => {
     const clearEditUpdater = setSearchParams.mock.calls[1]?.[0] as (current: URLSearchParams) => URLSearchParams;
     const clearedEdit = clearEditUpdater(new URLSearchParams("edit=1"));
     expect(clearedEdit.get("edit")).toBeNull();
+  });
+
+  it("waits for edit entry prerequisites before auto edit mode runs", async () => {
+    const handleToggleEditMode = vi.fn().mockResolvedValue(true);
+    const setSearchParams = vi.fn();
+    const searchParams = new URLSearchParams("edit=1");
+
+    const { rerender } = renderHook(
+      ({ editEntryReady }) =>
+        useWorkflowHeaderEditActions({
+          isRunInspectionMode: false,
+          handleClearRunInspection: vi.fn(),
+          handleToggleEditMode,
+          setRunDetailNodeId: vi.fn(),
+          setSearchParams: setSearchParams as unknown as SetURLSearchParams,
+          startup: {
+            hasEditableVersion: false,
+            canUpdateCanvas: true,
+            canvas: { metadata: { id: "canvas-1" }, spec: {} },
+            searchParams,
+            editEntryReady,
+          },
+        }),
+      { initialProps: { editEntryReady: false } },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(handleToggleEditMode).not.toHaveBeenCalled();
+
+    rerender({ editEntryReady: true });
+
+    await waitFor(() => {
+      expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not consume edit=1 when entering edit fails", async () => {
+    const handleToggleEditMode = vi.fn().mockResolvedValue(false);
+    const setSearchParams = vi.fn();
+    const searchParams = new URLSearchParams("edit=1");
+
+    renderHook(() =>
+      useWorkflowHeaderEditActions({
+        isRunInspectionMode: false,
+        handleClearRunInspection: vi.fn(),
+        handleToggleEditMode,
+        setRunDetailNodeId: vi.fn(),
+        setSearchParams: setSearchParams as unknown as SetURLSearchParams,
+        startup: {
+          hasEditableVersion: false,
+          canUpdateCanvas: true,
+          canvas: { metadata: { id: "canvas-1" }, spec: {} },
+          searchParams,
+          editEntryReady: true,
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
+    });
+    expect(setSearchParams).not.toHaveBeenCalled();
   });
 });

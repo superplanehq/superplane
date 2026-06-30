@@ -152,8 +152,6 @@ func (a patchDraftAction) applyPatchToStagedCanvas(
 	stagedCanvas stagedDraftCanvas,
 ) (*models.CanvasVersion, error) {
 	patchedDraft := *target.draft
-	patchedDraft.Name = stagedCanvas.name
-	patchedDraft.Description = stagedCanvas.description
 	patchedDraft.Nodes = stagedCanvas.nodes
 	patchedDraft.Edges = stagedCanvas.edges
 
@@ -206,6 +204,7 @@ func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionCont
 		session.OrganizationID,
 		session.CanvasID,
 		target.draft.ID.String(),
+		target.draft.GitBranch,
 		operations,
 	); err != nil {
 		return fmt.Errorf("stage patched draft files: %w", err)
@@ -219,9 +218,9 @@ func newPatchDraftResult(session agents.AgentSessionContext, draft *models.Canva
 		Action:     patchDraftActionName,
 		CanvasID:   session.CanvasID,
 		VersionID:  draft.ID.String(),
-		Draft:      draftResult{VersionID: draft.ID.String(), DisplayName: draft.DisplayName, BranchName: draft.GitBranch},
+		Draft:      draftResult{VersionID: draft.ID.String(), DisplayName: draft.GitBranch, BranchName: draft.GitBranch},
 		NodeIssues: collectNodeIssues(patched.Nodes),
-		Summary:    summarizeParsedCanvas(patched.Name, patched.Nodes, patched.Edges),
+		Summary:    summarizeParsedCanvas("", patched.Nodes, patched.Edges),
 	}
 }
 
@@ -473,8 +472,8 @@ func defaultPatchDraftAutoLayoutNodeIDs(
 func serializePatchedDraftYAML(version *models.CanvasVersion, canvasID string) (string, error) {
 	positioned := &pb.CanvasVersion{
 		Metadata: &pb.CanvasVersion_Metadata{
-			Name:        version.Name,
-			Description: version.Description,
+			Name:        version.GitBranch,
+			Description: "",
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: grpcactions.NodesToProto(version.Nodes),

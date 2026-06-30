@@ -1,11 +1,11 @@
 import type {
-  CanvasesCanvasVersion,
+  CanvasesCanvasBranch,
   CanvasesCanvasRun,
+  CanvasesCanvasVersion,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
-import type { DraftBranchEditStatus } from "@/pages/app/lib/draft-branch-edit-status";
 import type { ReactNode } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 
@@ -38,24 +38,19 @@ export interface CanvasRunsSidebarPanelConfig {
 export interface CanvasVersionsSidebarPanelConfig {
   isOpen: boolean;
   scrollPersistenceKey?: string;
-  liveCanvasVersionId?: string;
-  liveCanvasVersion?: CanvasesCanvasVersion | null;
+  branchHeadVersionId?: string;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
-  liveVersions: CanvasesCanvasVersion[];
+  branchCommits: CanvasesCanvasVersion[];
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
-  onLoadMoreLiveVersions?: () => void;
-  loadMoreLiveVersionsDisabled?: boolean;
-  loadMoreLiveVersionsPending?: boolean;
-  draftBranches?: CanvasesCanvasVersion[];
-  activeDraftBranch?: string | null;
-  draftBranchEditStatusByVersionId?: Map<string, DraftBranchEditStatus>;
-  onOpenDraftBranch?: (branchName: string) => void;
-  onCreateDraftBranch?: () => void;
-  createDraftBranchPending?: boolean;
-  onDeleteDraftBranch?: (versionId: string) => void;
-  deleteDraftBranchPending?: boolean;
+  onLoadMoreBranchCommits?: () => void;
+  loadMoreBranchCommitsDisabled?: boolean;
+  loadMoreBranchCommitsPending?: boolean;
+  canvasBranches?: CanvasesCanvasBranch[];
+  activeBranchName?: string;
+  onSelectBranch?: (branchName: string) => void;
+  branchSelectorDisabled?: boolean;
 }
 
 export function renderCanvasRunsSidebarPanel(config: CanvasRunsSidebarPanelConfig): ReactNode {
