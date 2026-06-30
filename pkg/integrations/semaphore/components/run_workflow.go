@@ -28,7 +28,7 @@ const (
 	semaphoreOIDCTokenAudience = "semaphore"
 	semaphoreOIDCTokenDuration = time.Hour
 
-	semaphoreClaimOrgID        = "org_id"
+	semaphoreClaimAppID        = "app_id"
 	semaphoreClaimCanvasID     = "canvas_id"
 	semaphoreClaimNodeID       = "node_id"
 	semaphoreClaimExecutionID  = "execution_id"
@@ -135,7 +135,7 @@ In protected Semaphore jobs (production deploys, artifact uploads), verify ` + "
 
 ` + "```bash" + `
 superplane oidc verify \
-  --claim org_id=eb3aca82-3864-4f76-b1d6-f670c297f136 \
+  --claim app_id=eb3aca82-3864-4f76-b1d6-f670c297f136 \
   --claim pipeline_file=.semaphore/production/deploy.yml \
   --claim node_id=deploy-production
 ` + "```" + `
@@ -598,8 +598,12 @@ func (r *RunWorkflow) finish(ctx core.ActionHookContext) error {
 }
 
 func (r *RunWorkflow) signOIDCToken(ctx core.ExecutionContext, spec RunWorkflowSpec, metadata RunWorkflowNodeMetadata) (string, error) {
+	if ctx.OIDC == nil {
+		return "", fmt.Errorf("oidc signer unavailable")
+	}
+
 	claims := map[string]any{
-		semaphoreClaimOrgID:       ctx.OrganizationID,
+		semaphoreClaimAppID:       ctx.OrganizationID,
 		semaphoreClaimCanvasID:    ctx.WorkflowID,
 		semaphoreClaimNodeID:      ctx.NodeID,
 		semaphoreClaimExecutionID: ctx.ID.String(),
@@ -633,20 +637,19 @@ func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflo
 		parameters[param.Name] = param.Value
 	}
 
-	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID.String()
+	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID
 	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
 
 	if !spec.InjectOidcToken {
 		return parameters, nil
 	}
 
-	if ctx.OIDC == nil {
-		return nil, fmt.Errorf("OIDC provider is not configured")
-	}
-
 	token, err := r.signOIDCToken(ctx, spec, metadata)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign OIDC execution token: %w", err)
+		if ctx.Logger != nil {
+			ctx.Logger.Errorf("failed to sign OIDC execution token: %v", err)
+		}
+		return nil, fmt.Errorf("failed to sign OIDC execution token")
 	}
 
 	parameters[oidcTokenParameterName] = token
