@@ -1,4 +1,9 @@
 import * as Sentry from "@sentry/react";
+import {
+  DASH0_TELEMETRY_CONSOLE_IGNORE,
+  shouldDropDash0TelemetryBreadcrumb,
+  shouldDropDash0TelemetryEvent,
+} from "@/sentryDash0Filters";
 
 interface SentryWindow extends Window {
   SUPERPLANE_SENTRY_DSN?: string;
@@ -18,6 +23,13 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment,
+    ignoreErrors: [DASH0_TELEMETRY_CONSOLE_IGNORE],
+    beforeSend(event) {
+      return shouldDropDash0TelemetryEvent(event) ? null : event;
+    },
+    beforeBreadcrumb(breadcrumb) {
+      return shouldDropDash0TelemetryBreadcrumb(breadcrumb) ? null : breadcrumb;
+    },
     integrations: [
       Sentry.captureConsoleIntegration({
         levels: ["warn", "error"],
