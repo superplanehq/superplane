@@ -74,7 +74,6 @@ export default defineConfig(({ command }: { command: string }) => {
       },
     },
     build: {
-      commonjsOptions: { transformMixedEsModules: true },
       target: "es2020",
       outDir: "../pkg/web/assets/dist", // emit assets to pkg/web/assets/dist
       emptyOutDir: true,
