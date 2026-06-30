@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	jwtLib "github.com/golang-jwt/jwt/v4"
+	jwtLib "github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

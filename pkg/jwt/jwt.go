@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type Signer struct {
@@ -25,9 +25,9 @@ func (s *Signer) Generate(subject string, duration time.Duration) (string, error
 func (s *Signer) GenerateWithClaims(duration time.Duration, extraClaims map[string]string) (string, error) {
 	now := time.Now()
 	claims := jwt.MapClaims{
-		"iat": now.Unix(),
-		"nbf": now.Unix(),
-		"exp": now.Add(duration).Unix(),
+		"iat": jwt.NewNumericDate(now),
+		"nbf": jwt.NewNumericDate(now),
+		"exp": jwt.NewNumericDate(now.Add(duration)),
 	}
 
 	for k, v := range extraClaims {
@@ -49,47 +49,38 @@ func (s *Signer) GenerateWithClaims(duration time.Duration, extraClaims map[stri
 }
 
 func (s *Signer) Validate(tokenString, subject string) error {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 
 		return []byte(s.Secret), nil
 	})
-
 	if err != nil {
 		return err
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		epochSeconds := time.Now().Unix()
-		if !claims.VerifyExpiresAt(epochSeconds, true) {
-			return errors.New("missing exp")
-		}
-
-		if !claims.VerifyNotBefore(epochSeconds, true) {
-			return errors.New("missing nbf")
-		}
-
-		if claims["sub"] != subject {
-			return errors.New("subject is invalid")
-		}
-
-		return nil
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return errors.New("invalid token")
 	}
 
-	return errors.New("invalid token")
+	sub, _ := claims["sub"].(string)
+	if sub != subject {
+		return errors.New("subject is invalid")
+	}
+
+	return nil
 }
 
 // ValidateAndGetClaims validates a JWT token and returns the claims
 func (s *Signer) ValidateAndGetClaims(tokenString string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(s.Secret), nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -101,13 +92,6 @@ func (s *Signer) ValidateAndGetClaims(tokenString string) (jwt.MapClaims, error)
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
 		return nil, fmt.Errorf("invalid token claims")
-	}
-
-	// Check expiration
-	if exp, ok := claims["exp"].(float64); ok {
-		if time.Now().Unix() > int64(exp) {
-			return nil, fmt.Errorf("token expired")
-		}
 	}
 
 	return claims, nil

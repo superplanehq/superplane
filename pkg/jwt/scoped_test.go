@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	gojwt "github.com/golang-jwt/jwt/v4"
+	gojwt "github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ func TestGenerateAndValidateScopedToken(t *testing.T) {
 	}, time.Minute)
 	require.NoError(t, err)
 
-	parsedToken, err := gojwt.Parse(token, func(token *gojwt.Token) (interface{}, error) {
+	parsedToken, err := gojwt.Parse(token, func(token *gojwt.Token) (any, error) {
 		return []byte(signer.Secret), nil
 	})
 	require.NoError(t, err)
@@ -47,7 +47,7 @@ func TestGenerateAndValidateScopedToken(t *testing.T) {
 		[]string{"canvases:read:canvas-123", "org:read"},
 		claims.Scopes,
 	)
-	assert.True(t, claims.VerifyAudience(ScopedTokenAudience, true))
+	assert.Equal(t, ScopedTokenAudience, claims.Audience)
 	assert.NotNil(t, claims.ExpiresAt)
 }
 
@@ -83,7 +83,7 @@ func TestValidateScopedTokenRejectsWrongTokenType(t *testing.T) {
 
 	_, err = signer.ValidateScopedToken(tokenString)
 	require.Error(t, err)
-	assert.Equal(t, "invalid token_type", err.Error())
+	assert.ErrorContains(t, err, "invalid token_type")
 }
 
 func TestPermissionsFromScopes(t *testing.T) {

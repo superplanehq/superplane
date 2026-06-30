@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	gojwt "github.com/golang-jwt/jwt/v4"
+	gojwt "github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -187,7 +187,8 @@ func ValidateLiveLogStreamToken(tokenString, brokerTaskID, secret string) error 
 	}
 
 	claims := &LiveLogStreamTokenClaims{}
-	token, err := gojwt.ParseWithClaims(tokenString, claims, func(token *gojwt.Token) (any, error) {
+	parser := gojwt.NewParser(gojwt.WithAudience(LiveLogStreamTokenAudience))
+	token, err := parser.ParseWithClaims(tokenString, claims, func(token *gojwt.Token) (any, error) {
 		if _, ok := token.Method.(*gojwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
@@ -201,9 +202,6 @@ func ValidateLiveLogStreamToken(tokenString, brokerTaskID, secret string) error 
 	}
 	if claims.Purpose != LiveLogStreamTokenPurpose {
 		return fmt.Errorf("invalid purpose")
-	}
-	if !claims.VerifyAudience(LiveLogStreamTokenAudience, true) {
-		return fmt.Errorf("invalid audience")
 	}
 	if strings.TrimSpace(claims.TaskID) != brokerTaskID {
 		return fmt.Errorf("task id mismatch")
