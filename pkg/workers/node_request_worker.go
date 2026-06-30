@@ -181,12 +181,18 @@ func (w *NodeRequestWorker) invokeTriggerHook(logger *log.Entry, tx *gorm.DB, re
 		return fmt.Errorf("failed to find hook: %v", err)
 	}
 
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("workflow not found: %w", err)
+	}
+
 	resolvedConfiguration, err := contexts.NewNodeConfigurationBuilder(tx, node.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithExpressionVariables(map[string]any{
 			"parameters": spec.InvokeAction.Parameters,
 		}).
 		WithConfigurationFields(hookProvider.Configuration()).
+		WithSecretResolver(contexts.NewRuntimeSecretResolver(tx, w.encryptor, models.DomainTypeOrganization, workflow.OrganizationID)).
 		Build(contexts.WithoutRunTitleConfiguration(node.Configuration.Data()))
 	if err != nil {
 		return fmt.Errorf("failed to resolve trigger configuration: %w", err)
@@ -348,10 +354,42 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		return fmt.Errorf("workflow not found: %w", err)
 	}
 
+	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
+	if err != nil {
+		return fmt.Errorf("input event not found: %w", err)
+	}
+
+	//
+	// Build a runtime-mode configuration builder so secrets() placeholders
+	// (left intact by the deferred queue build) are resolved fresh on every
+	// hook invocation - including HTTP retries that re-enter via the
+	// retryRequest hook with the stored execution configuration.
+	//
+	// The incoming event payload is supplied via WithInput so placeholders
+	// that were fully deferred at queue time (because they mix secrets() with
+	// $ node references in a single block) still resolve their $ references
+	// correctly when the hook runs.
+	//
+	secretResolver := contexts.NewRuntimeSecretResolver(tx, w.encryptor, models.DomainTypeOrganization, workflow.OrganizationID)
+	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+		WithNodeID(node.NodeID).
+		WithRootEvent(&execution.RootEventID).
+		WithIncomingEventID(&execution.EventID).
+		WithInput(map[string]any{inputEvent.NodeID: inputEvent.Data.Data()}).
+		WithSecretResolver(secretResolver)
+	if execution.PreviousExecutionID != nil {
+		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
+	}
+
+	resolvedConfiguration, err := contexts.ResolveStoredConfiguration(builder, execution.Configuration.Data())
+	if err != nil {
+		return fmt.Errorf("failed to resolve configuration: %w", err)
+	}
+
 	logger = logging.WithExecution(logger, execution)
 	hookCtx := core.ActionHookContext{
 		Name:           spec.InvokeAction.ActionName,
-		Configuration:  execution.Configuration.Data(),
+		Configuration:  resolvedConfiguration,
 		Parameters:     spec.InvokeAction.Parameters,
 		HTTP:           w.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
