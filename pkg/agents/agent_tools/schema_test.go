@@ -55,11 +55,13 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 		"node_executions",
 		"node_queue_items",
 		"node_events",
+		"runner_logs",
 	}, resourceSchema.Enum)
 	assert.Contains(t, schema.Properties, "namespace")
 	assert.Contains(t, schema.Properties, "node_id")
 	assert.Contains(t, schema.Properties, "event_id")
 	assert.Contains(t, schema.Properties, "execution_id")
+	assert.Contains(t, schema.Properties, "run_id")
 	assert.Contains(t, schema.Properties, "path")
 	assert.Contains(t, schema.Properties, "paths")
 	assert.Contains(t, schema.Properties, "content")
@@ -68,6 +70,7 @@ func TestAppAgentToolSchemaIncludesRuntimeReadAction(t *testing.T) {
 	assert.Contains(t, schema.Properties["path"].Description, "AGENTS.md")
 	assert.Contains(t, schema.Properties["content"].Description, "write_file")
 	assert.Contains(t, schema.Properties["message"].Description, "commit_files")
+	assert.Contains(t, schema.Properties["run_id"].Description, "runner_logs")
 }
 
 func TestAppAgentToolSchemaUsesPatchDraftForDraftUpdates(t *testing.T) {
