@@ -56,7 +56,7 @@ func TestRunWorkflowBuildParametersIncludesOIDCToken(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Equal(t, executionID.String(), parameters["SUPERPLANE_EXECUTION_ID"])
+	require.Equal(t, executionID, parameters["SUPERPLANE_EXECUTION_ID"])
 	require.Equal(t, "canvas-123", parameters["SUPERPLANE_CANVAS_ID"])
 	require.Equal(t, "bar", parameters["FOO"])
 	require.Equal(t, "test-token", parameters["SUPERPLANE_OIDC_TOKEN"])
@@ -73,7 +73,7 @@ func TestRunWorkflowBuildParametersSkipsOIDCWhenDisabled(t *testing.T) {
 		OIDC: &testOIDCProvider{},
 	}, RunWorkflowSpec{}, RunWorkflowNodeMetadata{})
 	require.NoError(t, err)
-	require.Equal(t, executionID.String(), parameters["SUPERPLANE_EXECUTION_ID"])
+	require.Equal(t, executionID, parameters["SUPERPLANE_EXECUTION_ID"])
 	require.NotContains(t, parameters, "SUPERPLANE_OIDC_TOKEN")
 }
 
@@ -88,7 +88,7 @@ func TestRunWorkflowBuildParametersFailsWhenOIDCUnavailable(t *testing.T) {
 		InjectOidcToken: true,
 	}, RunWorkflowNodeMetadata{})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "OIDC provider is not configured")
+	require.Equal(t, "failed to sign OIDC execution token", err.Error())
 }
 
 func TestRunWorkflowBuildParametersFailsWhenSigningFails(t *testing.T) {
@@ -107,5 +107,5 @@ func TestRunWorkflowBuildParametersFailsWhenSigningFails(t *testing.T) {
 		PipelineFile:    ".semaphore/deploy.yml",
 	}, RunWorkflowNodeMetadata{})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to sign OIDC execution token")
+	require.Equal(t, "failed to sign OIDC execution token", err.Error())
 }
