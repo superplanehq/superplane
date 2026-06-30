@@ -335,6 +335,73 @@ func (c *secretsCallCollector) Visit(node *ast.Node) {
 	}
 }
 
+// validateSecretKeyReferences ensures that every statically-known
+// secrets("name").key reference in the expression points at a key that
+// actually exists in the resolved secret. It uses the provided resolver
+// (memoized by the caller) so each secret is fetched at most once. Dynamic key
+// lookups (e.g. secrets("name")[someVar]) cannot be checked statically and are
+// left for normal evaluation. Parse failures are ignored so the real compile
+// error surfaces during evaluation.
+func validateSecretKeyReferences(expression string, resolveSecret func(string) (map[string]string, error)) error {
+	tree, err := parser.Parse(expression)
+	if err != nil {
+		return nil
+	}
+
+	collector := &secretKeyReferenceCollector{}
+	ast.Walk(&tree.Node, collector)
+
+	for _, reference := range collector.references {
+		values, err := resolveSecret(reference.name)
+		if err != nil {
+			return err
+		}
+		if _, ok := values[reference.key]; !ok {
+			return fmt.Errorf("secret %q has no key %q", reference.name, reference.key)
+		}
+	}
+
+	return nil
+}
+
+type secretKeyReference struct {
+	name string
+	key  string
+}
+
+type secretKeyReferenceCollector struct {
+	references []secretKeyReference
+}
+
+func (c *secretKeyReferenceCollector) Visit(node *ast.Node) {
+	member, ok := (*node).(*ast.MemberNode)
+	if !ok {
+		return
+	}
+
+	call, ok := member.Node.(*ast.CallNode)
+	if !ok {
+		return
+	}
+
+	id, ok := call.Callee.(*ast.IdentifierNode)
+	if !ok || id.Value != "secrets" || len(call.Arguments) != 1 {
+		return
+	}
+
+	name, ok := call.Arguments[0].(*ast.StringNode)
+	if !ok {
+		return
+	}
+
+	property, ok := member.Property.(*ast.StringNode)
+	if !ok {
+		return
+	}
+
+	c.references = append(c.references, secretKeyReference{name: name.Value, key: property.Value})
+}
+
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
 	return b.ResolveExpressionWithExtraVariables(expression, b.expressionVariables)
 }
@@ -364,6 +431,42 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 			return "", fmt.Errorf("variable %q is reserved", key)
 		}
 		env[key] = value
+	}
+
+	//
+	// resolveSecret memoizes secret resolution for the lifetime of this single
+	// evaluation, so the static key-existence check below and the secrets()
+	// calls executed by the VM hit the database (and decrypt) at most once per
+	// distinct secret name.
+	//
+	resolvedSecrets := map[string]map[string]string{}
+	resolveSecret := func(name string) (map[string]string, error) {
+		if cached, ok := resolvedSecrets[name]; ok {
+			return cached, nil
+		}
+		if b.secretResolver == nil {
+			return nil, fmt.Errorf("secrets() is not available in this context")
+		}
+		values, err := b.secretResolver.Resolve(name)
+		if err != nil {
+			return nil, err
+		}
+		resolvedSecrets[name] = values
+		return values, nil
+	}
+
+	//
+	// Fail fast when an expression references a secret key that does not
+	// exist (e.g. secrets("api").token where the secret has no "token" key).
+	// expr returns the zero value (an empty string) for a missing map key, so
+	// without this check a typo'd key would silently produce a blank token or
+	// credential. Only statically-known keys are validated; dynamic lookups
+	// fall through to normal evaluation.
+	//
+	if b.secretResolver != nil {
+		if err := validateSecretKeyReferences(expression, resolveSecret); err != nil {
+			return "", err
+		}
 	}
 
 	exprOptions := []expr.Option{
@@ -402,10 +505,7 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 			if !ok {
 				return nil, fmt.Errorf("secrets() argument must be a string")
 			}
-			if b.secretResolver == nil {
-				return nil, fmt.Errorf("secrets() is not available in this context")
-			}
-			return b.secretResolver.Resolve(name)
+			return resolveSecret(name)
 		}),
 	}
 

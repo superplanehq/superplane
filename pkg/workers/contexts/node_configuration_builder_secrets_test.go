@@ -99,16 +99,52 @@ func TestNodeConfigurationBuilder_RuntimePhase_MissingSecretReturnsError(t *test
 	assert.Contains(t, err.Error(), "not found")
 }
 
-func TestNodeConfigurationBuilder_RuntimePhase_MissingKeyReturnsEmptyString(t *testing.T) {
+func TestNodeConfigurationBuilder_RuntimePhase_MissingKeyFails(t *testing.T) {
+	//
+	// A reference to a key the secret does not define must fail the run
+	// instead of silently resolving to an empty string, which would otherwise
+	// send a blank token or credential downstream.
+	//
 	resolver := &fakeSecretResolver{
 		values: map[string]map[string]string{"api": {"token": "abc"}},
 	}
 
-	out, err := newSecretsBuilder(resolver).Build(map[string]any{
+	_, err := newSecretsBuilder(resolver).Build(map[string]any{
 		"value": `prefix-{{ secrets("api").missing }}-suffix`,
 	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `secret "api" has no key "missing"`)
+	assert.NotContains(t, err.Error(), "abc")
+}
+
+func TestNodeConfigurationBuilder_RuntimePhase_MissingKeyFailsForBareExpression(t *testing.T) {
+	//
+	// Bare-expression fields (If, Filter, Merge stop-if, Loop until) route
+	// through ResolveExpression and must reject missing keys too.
+	//
+	resolver := &fakeSecretResolver{
+		values: map[string]map[string]string{"api": {"token": "abc"}},
+	}
+
+	_, err := newSecretsBuilder(resolver).ResolveExpression(`secrets("api").missing == "x"`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `secret "api" has no key "missing"`)
+}
+
+func TestNodeConfigurationBuilder_RuntimePhase_ResolvesSecretOncePerEvaluation(t *testing.T) {
+	//
+	// The static key-existence check and the VM evaluation must share a single
+	// resolution per secret name, so repeating the same secret in one
+	// expression does not hit the resolver twice.
+	//
+	resolver := &fakeSecretResolver{
+		values: map[string]map[string]string{"api": {"token": "abc"}},
+	}
+
+	out, err := newSecretsBuilder(resolver).ResolveExpression(`secrets("api").token + secrets("api").token`)
 	require.NoError(t, err)
-	assert.Equal(t, "prefix--suffix", out["value"])
+	assert.Equal(t, "abcabc", out)
+	assert.Equal(t, []string{"api"}, resolver.calls)
 }
 
 func TestNodeConfigurationBuilder_RuntimePhase_WholeSecretMapIsRejected(t *testing.T) {
