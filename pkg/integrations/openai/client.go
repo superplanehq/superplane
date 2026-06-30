@@ -7,8 +7,10 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"path/filepath"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -137,13 +139,30 @@ func (c *Client) CreateResponse(req CreateResponseRequest) (*OpenAIResponse, err
 
 // UploadFile uploads a file to the OpenAI Files API with the given purpose
 // ("vision" for images, "user_data" for documents) and returns its file id.
-func (c *Client) UploadFile(content io.Reader, filename, purpose string) (string, error) {
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+// createFormFile is like multipart.Writer.CreateFormFile but lets the caller set
+// the part's Content-Type. The stdlib helper hardcodes application/octet-stream,
+// which causes the provider to store the file with the wrong media type instead
+// of the detected one.
+func createFormFile(w *multipart.Writer, fieldname, filename, contentType string) (io.Writer, error) {
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+		quoteEscaper.Replace(fieldname), quoteEscaper.Replace(filename)))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	h.Set("Content-Type", contentType)
+	return w.CreatePart(h)
+}
+
+func (c *Client) UploadFile(content io.Reader, filename, purpose, contentType string) (string, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	if err := writer.WriteField("purpose", purpose); err != nil {
 		return "", fmt.Errorf("write purpose field: %w", err)
 	}
-	part, err := writer.CreateFormFile("file", filepath.Base(filename))
+	part, err := createFormFile(writer, "file", filepath.Base(filename), contentType)
 	if err != nil {
 		return "", fmt.Errorf("create multipart file: %w", err)
 	}

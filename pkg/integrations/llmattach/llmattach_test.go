@@ -73,6 +73,13 @@ func TestRead_UnsupportedType(t *testing.T) {
 	}
 }
 
+func TestRead_EmptyFile(t *testing.T) {
+	files := &fakeFiles{data: map[string][]byte{"README.md": {}}}
+	if _, err := Read(files, []string{"README.md"}); err == nil {
+		t.Error("expected error for empty file")
+	}
+}
+
 func TestRead_SizeLimit(t *testing.T) {
 	files := &fakeFiles{data: map[string][]byte{"big.txt": make([]byte, MaxFileSize+1)}}
 	if _, err := Read(files, []string{"big.txt"}); err == nil {

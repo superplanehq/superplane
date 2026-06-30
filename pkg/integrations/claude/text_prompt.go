@@ -322,7 +322,7 @@ func buildUserContent(client *Client, attachments []llmattach.Attachment, prompt
 	blocks := make([]ContentBlock, 0, len(attachments)+1)
 	fileIDs := make([]string, 0, len(attachments))
 	for _, att := range attachments {
-		fileID, err := client.UploadFile(bytes.NewReader(att.Data), att.Name)
+		fileID, err := client.UploadFile(bytes.NewReader(att.Data), att.Name, att.Mime)
 		if err != nil {
 			cleanupFiles(client, fileIDs)
 			return nil, nil, fmt.Errorf("upload file %q: %w", att.Name, err)

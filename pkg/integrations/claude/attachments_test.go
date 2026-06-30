@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"testing"
@@ -28,6 +30,30 @@ func (f *fakeFiles) Read(path string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("not found: %s", path)
 	}
 	return io.NopCloser(bytes.NewReader(b)), nil
+}
+
+// uploadPartContentType parses the multipart upload body and returns the
+// Content-Type header of the "file" part.
+func uploadPartContentType(t *testing.T, req *http.Request) string {
+	t.Helper()
+	_, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+	if err != nil {
+		t.Fatalf("parse upload Content-Type: %v", err)
+	}
+	mr := multipart.NewReader(req.Body, params["boundary"])
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("read multipart part: %v", err)
+		}
+		if part.FormName() == "file" {
+			return part.Header.Get("Content-Type")
+		}
+	}
+	return ""
 }
 
 func TestTextPrompt_Attachments(t *testing.T) {
@@ -67,6 +93,11 @@ func TestTextPrompt_Attachments(t *testing.T) {
 	}
 	if up.Header.Get("anthropic-beta") != "files-api-2025-04-14" {
 		t.Errorf("upload missing files beta header")
+	}
+	// The multipart file part must carry the detected MIME type, otherwise the
+	// provider stores the file as application/octet-stream and rejects it.
+	if ct := uploadPartContentType(t, up); ct != "image/png" {
+		t.Errorf("upload file part Content-Type = %q, want image/png", ct)
 	}
 
 	// 2. message references the uploaded file via an image block + file_id

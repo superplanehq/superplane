@@ -75,6 +75,9 @@ func Read(files core.RepositoryFilesContext, paths []string) ([]Attachment, erro
 		if err != nil {
 			return nil, fmt.Errorf("read file %q: %w", path, err)
 		}
+		if len(data) == 0 {
+			return nil, fmt.Errorf("file %q is empty and cannot be attached", path)
+		}
 		if len(data) > MaxFileSize {
 			return nil, fmt.Errorf("file %q exceeds the maximum attachment size of %d bytes", path, MaxFileSize)
 		}

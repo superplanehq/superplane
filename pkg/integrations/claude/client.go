@@ -7,8 +7,10 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"path/filepath"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -175,10 +177,27 @@ func requestReferencesFiles(req CreateMessageRequest) bool {
 }
 
 // UploadFile uploads a file to the Anthropic Files API and returns its file_id.
-func (c *Client) UploadFile(content io.Reader, filename string) (string, error) {
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+// createFormFile is like multipart.Writer.CreateFormFile but lets the caller set
+// the part's Content-Type. The stdlib helper hardcodes application/octet-stream,
+// which causes the provider to store (and later reject) the file with the wrong
+// media type instead of the detected one.
+func createFormFile(w *multipart.Writer, fieldname, filename, contentType string) (io.Writer, error) {
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+		quoteEscaper.Replace(fieldname), quoteEscaper.Replace(filename)))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	h.Set("Content-Type", contentType)
+	return w.CreatePart(h)
+}
+
+func (c *Client) UploadFile(content io.Reader, filename, contentType string) (string, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
-	part, err := writer.CreateFormFile("file", filepath.Base(filename))
+	part, err := createFormFile(writer, "file", filepath.Base(filename), contentType)
 	if err != nil {
 		return "", fmt.Errorf("create multipart file: %w", err)
 	}
