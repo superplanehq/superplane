@@ -112,24 +112,23 @@ func ownersByIDForCanvasVersions(ctx context.Context, orgID string, versions []m
 }
 
 func serializeCanvasVersions(ctx context.Context, versions []models.CanvasVersion, organizationID string) []*pb.CanvasVersion {
-	var protoVersions []*pb.CanvasVersion
-	_ = telemetry.RunSpan(ctx, "canvases.serialize_versions", func(ctx context.Context) error {
-		ownersByID, err := ownersByIDForCanvasVersions(ctx, organizationID, versions)
-		if err != nil {
-			ownersByID = nil
-		}
+	var err error
+	ctx, done := telemetry.Span(ctx, "canvases.serialize_versions")
+	defer done(&err)
 
-		protoVersions = make([]*pb.CanvasVersion, 0, len(versions))
-		for i := range versions {
-			protoVersions = append(protoVersions, SerializeCanvasVersion(&versions[i], organizationID, ownersByID))
-		}
+	ownersByID, ownersErr := ownersByIDForCanvasVersions(ctx, organizationID, versions)
+	if ownersErr != nil {
+		ownersByID = nil
+	}
 
-		if span := trace.SpanFromContext(ctx); span.IsRecording() {
-			span.SetAttributes(attribute.Int("canvases.version_count", len(versions)))
-		}
+	protoVersions := make([]*pb.CanvasVersion, 0, len(versions))
+	for i := range versions {
+		protoVersions = append(protoVersions, SerializeCanvasVersion(&versions[i], organizationID, ownersByID))
+	}
 
-		return nil
-	})
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(attribute.Int("canvases.version_count", len(versions)))
+	}
 
 	return protoVersions
 }

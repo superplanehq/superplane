@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import useWebSocket from "react-use-websocket";
+import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,

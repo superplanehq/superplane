@@ -27,6 +27,7 @@ import (
 const (
 	ec2ServiceName                    = "ec2"
 	ssmServiceName                    = "ssm"
+	iamServiceName                    = "iam"
 	elbServiceName                    = "elasticloadbalancing"
 	cloudWatchServiceName             = "monitoring"
 	ssmTargetPrefix                   = "AmazonSSM."
@@ -40,6 +41,7 @@ const (
 	ResourceTypePublicIPv4Pool        = "ec2.publicIpv4Pool"
 	ResourceTypeCustomerOwnedIPv4Pool = "ec2.customerOwnedIpv4Pool"
 	ResourceTypeIpamPool              = "ec2.ipamPool"
+	ResourceTypeIAMInstanceProfile    = "iam.instanceProfile"
 	maxPublicImagesPerOS              = 200
 	defaultUbuntuImages               = 12
 	defaultDebianImages               = 8
@@ -60,21 +62,23 @@ type Instance struct {
 }
 
 type InstanceDetails struct {
-	RequestID        string `json:"requestId,omitempty" mapstructure:"requestId"`
-	InstanceID       string `json:"instanceId" mapstructure:"instanceId"`
-	InstanceType     string `json:"instanceType" mapstructure:"instanceType"`
-	ImageID          string `json:"imageId" mapstructure:"imageId"`
-	State            string `json:"state" mapstructure:"state"`
-	Name             string `json:"name" mapstructure:"name"`
-	KeyName          string `json:"keyName,omitempty" mapstructure:"keyName"`
-	LaunchTime       string `json:"launchTime,omitempty" mapstructure:"launchTime"`
-	PrivateIPAddress string `json:"privateIpAddress,omitempty" mapstructure:"privateIpAddress"`
-	PublicIPAddress  string `json:"publicIpAddress,omitempty" mapstructure:"publicIpAddress"`
-	PrivateDNSName   string `json:"privateDnsName,omitempty" mapstructure:"privateDnsName"`
-	PublicDNSName    string `json:"publicDnsName,omitempty" mapstructure:"publicDnsName"`
-	SubnetID         string `json:"subnetId,omitempty" mapstructure:"subnetId"`
-	VpcID            string `json:"vpcId,omitempty" mapstructure:"vpcId"`
-	Region           string `json:"region" mapstructure:"region"`
+	RequestID        string       `json:"requestId,omitempty" mapstructure:"requestId"`
+	InstanceID       string       `json:"instanceId" mapstructure:"instanceId"`
+	InstanceType     string       `json:"instanceType" mapstructure:"instanceType"`
+	ImageID          string       `json:"imageId" mapstructure:"imageId"`
+	State            string       `json:"state" mapstructure:"state"`
+	Name             string       `json:"name" mapstructure:"name"`
+	KeyName          string       `json:"keyName,omitempty" mapstructure:"keyName"`
+	LaunchTime       string       `json:"launchTime,omitempty" mapstructure:"launchTime"`
+	PrivateIPAddress string       `json:"privateIpAddress,omitempty" mapstructure:"privateIpAddress"`
+	PublicIPAddress  string       `json:"publicIpAddress,omitempty" mapstructure:"publicIpAddress"`
+	PrivateDNSName   string       `json:"privateDnsName,omitempty" mapstructure:"privateDnsName"`
+	PublicDNSName    string       `json:"publicDnsName,omitempty" mapstructure:"publicDnsName"`
+	SubnetID         string       `json:"subnetId,omitempty" mapstructure:"subnetId"`
+	VpcID            string       `json:"vpcId,omitempty" mapstructure:"vpcId"`
+	AvailabilityZone string       `json:"availabilityZone,omitempty" mapstructure:"availabilityZone"`
+	Region           string       `json:"region" mapstructure:"region"`
+	Tags             []common.Tag `json:"tags,omitempty" mapstructure:"tags"`
 }
 
 type Subnet struct {
@@ -107,13 +111,45 @@ type RunInstancesInput struct {
 	Name                     string
 	AssociatePublicIPAddress bool
 	RootVolume               *RootVolumeConfig
+	AdditionalBlockDevices   []BlockDeviceConfig
+	IAMInstanceProfile       string
+	Tags                     []common.Tag
 }
 
 type RootVolumeConfig struct {
-	DeviceName string
-	VolumeSize int
-	VolumeType string
-	Iops       int
+	DeviceName          string
+	VolumeSize          int
+	VolumeType          string
+	Iops                int
+	DeleteOnTermination bool
+	Encrypted           bool
+	KmsKeyID            string
+}
+
+type BlockDeviceConfig struct {
+	DeviceName          string
+	VolumeSize          int
+	VolumeType          string
+	Iops                int
+	DeleteOnTermination bool
+	Encrypted           bool
+	KmsKeyID            string
+}
+
+type InstanceProfile struct {
+	Name string `json:"name" mapstructure:"name"`
+	Arn  string `json:"arn" mapstructure:"arn"`
+}
+
+type InstanceStatusDetails struct {
+	InstanceID     string
+	InstanceStatus string
+	SystemStatus   string
+	InstanceState  string
+}
+
+func (s InstanceStatusDetails) OK() bool {
+	return s.InstanceStatus == "ok" && s.SystemStatus == "ok"
 }
 
 type InstanceTypeInfo struct {
@@ -512,31 +548,27 @@ func (c *Client) RunInstances(input RunInstancesInput) (*RunInstancesOutput, err
 		params.Set("UserData", base64.StdEncoding.EncodeToString([]byte(userData)))
 	}
 
-	name := strings.TrimSpace(input.Name)
-	if name != "" {
-		params.Set("TagSpecification.1.ResourceType", "instance")
-		params.Set("TagSpecification.1.Tag.1.Key", "Name")
-		params.Set("TagSpecification.1.Tag.1.Value", name)
+	instanceProfile := strings.TrimSpace(input.IAMInstanceProfile)
+	if instanceProfile != "" {
+		if strings.HasPrefix(instanceProfile, "arn:") {
+			params.Set("IamInstanceProfile.Arn", instanceProfile)
+		} else {
+			params.Set("IamInstanceProfile.Name", instanceProfile)
+		}
 	}
 
-	if input.RootVolume != nil {
-		deviceName := strings.TrimSpace(input.RootVolume.DeviceName)
-		if deviceName == "" {
-			deviceName = "/dev/xvda"
-		}
+	if len(input.Tags) > 0 {
+		setRunInstancesTags(params, input.Tags)
+	}
 
-		params.Set("BlockDeviceMapping.1.DeviceName", deviceName)
-		params.Set("BlockDeviceMapping.1.Ebs.DeleteOnTermination", "true")
-		if input.RootVolume.VolumeSize > 0 {
-			params.Set("BlockDeviceMapping.1.Ebs.VolumeSize", fmt.Sprintf("%d", input.RootVolume.VolumeSize))
-		}
-		volumeType := strings.TrimSpace(input.RootVolume.VolumeType)
-		if volumeType != "" {
-			params.Set("BlockDeviceMapping.1.Ebs.VolumeType", volumeType)
-		}
-		if input.RootVolume.Iops > 0 {
-			params.Set("BlockDeviceMapping.1.Ebs.Iops", fmt.Sprintf("%d", input.RootVolume.Iops))
-		}
+	blockDeviceIndex := 1
+	if input.RootVolume != nil {
+		setBlockDeviceMapping(params, blockDeviceIndex, BlockDeviceConfig(*input.RootVolume))
+		blockDeviceIndex++
+	}
+	for _, blockDevice := range input.AdditionalBlockDevices {
+		setBlockDeviceMapping(params, blockDeviceIndex, blockDevice)
+		blockDeviceIndex++
 	}
 
 	response := runInstancesResponse{}
@@ -555,6 +587,53 @@ func (c *Client) RunInstances(input RunInstancesInput) (*RunInstancesOutput, err
 		Region:     c.region,
 		State:      instance.stateName(),
 	}, nil
+}
+
+func setRunInstancesTags(params url.Values, tags []common.Tag) {
+	resourceTypes := []string{"instance", "volume"}
+	for resourceIndex, resourceType := range resourceTypes {
+		tagSpecPrefix := fmt.Sprintf("TagSpecification.%d", resourceIndex+1)
+		params.Set(tagSpecPrefix+".ResourceType", resourceType)
+		tagIndex := 1
+		for _, tag := range tags {
+			key := strings.TrimSpace(tag.Key)
+			if key == "" {
+				continue
+			}
+			prefix := fmt.Sprintf("%s.Tag.%d", tagSpecPrefix, tagIndex)
+			params.Set(prefix+".Key", key)
+			params.Set(prefix+".Value", strings.TrimSpace(tag.Value))
+			tagIndex++
+		}
+	}
+}
+
+func setBlockDeviceMapping(params url.Values, index int, device BlockDeviceConfig) {
+	deviceName := strings.TrimSpace(device.DeviceName)
+	if deviceName == "" {
+		deviceName = "/dev/xvda"
+	}
+
+	prefix := fmt.Sprintf("BlockDeviceMapping.%d", index)
+	params.Set(prefix+".DeviceName", deviceName)
+	params.Set(prefix+".Ebs.DeleteOnTermination", fmt.Sprintf("%t", device.DeleteOnTermination))
+	if device.VolumeSize > 0 {
+		params.Set(prefix+".Ebs.VolumeSize", fmt.Sprintf("%d", device.VolumeSize))
+	}
+	volumeType := strings.TrimSpace(device.VolumeType)
+	if volumeType != "" {
+		params.Set(prefix+".Ebs.VolumeType", volumeType)
+	}
+	if device.Iops > 0 {
+		params.Set(prefix+".Ebs.Iops", fmt.Sprintf("%d", device.Iops))
+	}
+	if device.Encrypted {
+		params.Set(prefix+".Ebs.Encrypted", "true")
+	}
+	kmsKeyID := strings.TrimSpace(device.KmsKeyID)
+	if kmsKeyID != "" {
+		params.Set(prefix+".Ebs.KmsKeyId", kmsKeyID)
+	}
 }
 
 func (c *Client) DescribeInstance(instanceID string) (*InstanceDetails, error) {
@@ -578,6 +657,64 @@ func (c *Client) DescribeInstance(instanceID string) (*InstanceDetails, error) {
 		Code:    "InvalidInstanceID.NotFound",
 		Message: fmt.Sprintf("instance not found: %s", instanceID),
 	}
+}
+
+func (c *Client) DescribeInstanceStatus(instanceID string) (*InstanceStatusDetails, error) {
+	params := url.Values{}
+	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
+	params.Set("IncludeAllInstances", "true")
+
+	response := describeInstanceStatusResponse{}
+	if err := c.postForm("DescribeInstanceStatus", params, &response); err != nil {
+		return nil, err
+	}
+
+	for _, status := range response.Statuses {
+		if status.InstanceID == strings.TrimSpace(instanceID) {
+			return &InstanceStatusDetails{
+				InstanceID:     status.InstanceID,
+				InstanceStatus: strings.TrimSpace(status.InstanceStatus.Status),
+				SystemStatus:   strings.TrimSpace(status.SystemStatus.Status),
+				InstanceState:  strings.TrimSpace(status.InstanceState.Name),
+			}, nil
+		}
+	}
+
+	return &InstanceStatusDetails{InstanceID: strings.TrimSpace(instanceID)}, nil
+}
+
+func (c *Client) ListInstanceProfiles() ([]InstanceProfile, error) {
+	profiles := []InstanceProfile{}
+	marker := ""
+
+	for {
+		params := url.Values{}
+		if marker != "" {
+			params.Set("Marker", marker)
+		}
+
+		response := listInstanceProfilesResponse{}
+		if err := c.postIAMForm("ListInstanceProfiles", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, profile := range response.Result.InstanceProfiles {
+			profiles = append(profiles, InstanceProfile{
+				Name: strings.TrimSpace(profile.Name),
+				Arn:  strings.TrimSpace(profile.Arn),
+			})
+		}
+
+		if !response.Result.IsTruncated {
+			break
+		}
+		marker = strings.TrimSpace(response.Result.Marker)
+		if marker == "" {
+			break
+		}
+	}
+
+	return profiles, nil
 }
 
 func (c *Client) TerminateInstances(instanceIDs ...string) (*TerminateInstancesOutput, error) {
@@ -1631,6 +1768,10 @@ func (c *Client) postForm(action string, params url.Values, out any) error {
 	return c.postSignedForm(ec2ServiceName, ec2APIVersion, action, params, out)
 }
 
+func (c *Client) postIAMForm(action string, params url.Values, out any) error {
+	return c.postSignedFormToEndpoint(iamServiceName, "2010-05-08", action, params, "https://iam.amazonaws.com/", "us-east-1", out)
+}
+
 func (c *Client) postSSMJSON(action string, payload any, out any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -1679,6 +1820,11 @@ func (c *Client) postSSMJSON(action string, payload any, out any) error {
 }
 
 func (c *Client) postSignedForm(service, version, action string, params url.Values, out any) error {
+	endpoint := fmt.Sprintf("https://%s.%s.amazonaws.com/", service, c.region)
+	return c.postSignedFormToEndpoint(service, version, action, params, endpoint, c.region, out)
+}
+
+func (c *Client) postSignedFormToEndpoint(service, version, action string, params url.Values, endpoint, signingRegion string, out any) error {
 	if params == nil {
 		params = url.Values{}
 	}
@@ -1687,14 +1833,13 @@ func (c *Client) postSignedForm(service, version, action string, params url.Valu
 	params.Set("Version", version)
 
 	body := []byte(params.Encode())
-	endpoint := fmt.Sprintf("https://%s.%s.amazonaws.com/", service, c.region)
 	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(string(body)))
 	if err != nil {
 		return fmt.Errorf("failed to build request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
-	if err := c.signRequest(req, body, service); err != nil {
+	if err := c.signRequestInRegion(req, body, service, signingRegion); err != nil {
 		return err
 	}
 
@@ -1728,9 +1873,13 @@ func (c *Client) postSignedForm(service, version, action string, params url.Valu
 }
 
 func (c *Client) signRequest(req *http.Request, payload []byte, service string) error {
+	return c.signRequestInRegion(req, payload, service, c.region)
+}
+
+func (c *Client) signRequestInRegion(req *http.Request, payload []byte, service string, region string) error {
 	hash := sha256.Sum256(payload)
 	payloadHash := hex.EncodeToString(hash[:])
-	return c.signer.SignHTTP(context.Background(), *c.credentials, req, payloadHash, service, c.region, time.Now())
+	return c.signer.SignHTTP(context.Background(), *c.credentials, req, payloadHash, service, region, time.Now())
 }
 
 func nameTag(tags []xmlTag) string {
@@ -1784,6 +1933,21 @@ type describeInstancesResponse struct {
 	RequestID    string           `xml:"requestId"`
 	Reservations []xmlReservation `xml:"reservationSet>item"`
 	NextToken    string           `xml:"nextToken"`
+}
+
+type describeInstanceStatusResponse struct {
+	Statuses []xmlInstanceStatus `xml:"instanceStatusSet>item"`
+}
+
+type xmlInstanceStatus struct {
+	InstanceID     string              `xml:"instanceId"`
+	InstanceState  xmlState            `xml:"instanceState"`
+	InstanceStatus xmlStatusCheckState `xml:"instanceStatus"`
+	SystemStatus   xmlStatusCheckState `xml:"systemStatus"`
+}
+
+type xmlStatusCheckState struct {
+	Status string `xml:"status"`
 }
 
 type describeImagesResponse struct {
@@ -1897,20 +2061,21 @@ func ownerIDFromImageLocation(imageLocation string) string {
 }
 
 type xmlInstance struct {
-	InstanceID       string   `xml:"instanceId"`
-	InstanceType     string   `xml:"instanceType"`
-	ImageID          string   `xml:"imageId"`
-	KeyName          string   `xml:"keyName"`
-	LaunchTime       string   `xml:"launchTime"`
-	PrivateDNSName   string   `xml:"privateDnsName"`
-	PrivateIPAddress string   `xml:"privateIpAddress"`
-	PublicDNSName    string   `xml:"dnsName"`
-	PublicIPAddress  string   `xml:"ipAddress"`
-	SubnetID         string   `xml:"subnetId"`
-	VpcID            string   `xml:"vpcId"`
-	State            xmlState `xml:"instanceState"`
-	CurrentState     xmlState `xml:"currentState"`
-	Tags             []xmlTag `xml:"tagSet>item"`
+	InstanceID       string               `xml:"instanceId"`
+	InstanceType     string               `xml:"instanceType"`
+	ImageID          string               `xml:"imageId"`
+	KeyName          string               `xml:"keyName"`
+	LaunchTime       string               `xml:"launchTime"`
+	PrivateDNSName   string               `xml:"privateDnsName"`
+	PrivateIPAddress string               `xml:"privateIpAddress"`
+	PublicDNSName    string               `xml:"dnsName"`
+	PublicIPAddress  string               `xml:"ipAddress"`
+	SubnetID         string               `xml:"subnetId"`
+	VpcID            string               `xml:"vpcId"`
+	Placement        xmlInstancePlacement `xml:"placement"`
+	State            xmlState             `xml:"instanceState"`
+	CurrentState     xmlState             `xml:"currentState"`
+	Tags             []xmlTag             `xml:"tagSet>item"`
 }
 
 func (instance xmlInstance) stateName() string {
@@ -1923,6 +2088,10 @@ func (instance xmlInstance) stateName() string {
 
 type xmlState struct {
 	Name string `xml:"name"`
+}
+
+type xmlInstancePlacement struct {
+	AvailabilityZone string `xml:"availabilityZone"`
 }
 
 type xmlTag struct {
@@ -2086,6 +2255,21 @@ type describeKeyPairsResponse struct {
 	KeyPairs []xmlKeyPair `xml:"keySet>item"`
 }
 
+type listInstanceProfilesResponse struct {
+	Result xmlListInstanceProfilesResult `xml:"ListInstanceProfilesResult"`
+}
+
+type xmlListInstanceProfilesResult struct {
+	InstanceProfiles []xmlInstanceProfile `xml:"InstanceProfiles>member"`
+	IsTruncated      bool                 `xml:"IsTruncated"`
+	Marker           string               `xml:"Marker"`
+}
+
+type xmlInstanceProfile struct {
+	Name string `xml:"InstanceProfileName"`
+	Arn  string `xml:"Arn"`
+}
+
 type xmlKeyPair struct {
 	KeyName   string `xml:"keyName"`
 	KeyPairID string `xml:"keyPairId"`
@@ -2168,7 +2352,9 @@ func instanceDetailsFromXML(instance xmlInstance, region, requestID string) *Ins
 		PublicDNSName:    instance.PublicDNSName,
 		SubnetID:         instance.SubnetID,
 		VpcID:            instance.VpcID,
+		AvailabilityZone: instance.Placement.AvailabilityZone,
 		Region:           region,
+		Tags:             tagsFromXML(instance.Tags),
 	}
 }
 
@@ -2191,8 +2377,18 @@ func instanceDetailsToMap(instance *InstanceDetails) map[string]any {
 		"publicDnsName":    instance.PublicDNSName,
 		"subnetId":         instance.SubnetID,
 		"vpcId":            instance.VpcID,
+		"availabilityZone": instance.AvailabilityZone,
 		"region":           instance.Region,
+		"tags":             instance.Tags,
 	}
+}
+
+func tagsFromXML(tags []xmlTag) []common.Tag {
+	result := make([]common.Tag, 0, len(tags))
+	for _, tag := range tags {
+		result = append(result, common.Tag{Key: tag.Key, Value: tag.Value})
+	}
+	return result
 }
 
 type imageOSDefinition struct {
