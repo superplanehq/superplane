@@ -22,6 +22,23 @@ const PipelineStateDone = "done"
 const PipelineResultPassed = "passed"
 const PollInterval = 5 * time.Minute
 
+const oidcTokenParameterName = "SUPERPLANE_OIDC_TOKEN"
+
+const (
+	semaphoreOIDCTokenAudience = "semaphore"
+	semaphoreOIDCTokenDuration = time.Hour
+
+	semaphoreClaimOrgID        = "org_id"
+	semaphoreClaimCanvasID     = "canvas_id"
+	semaphoreClaimNodeID       = "node_id"
+	semaphoreClaimExecutionID  = "execution_id"
+	semaphoreClaimComponent    = "component"
+	semaphoreClaimProjectID    = "project_id"
+	semaphoreClaimPipelineFile = "pipeline_file"
+	semaphoreClaimRef          = "ref"
+	semaphoreClaimCommitSha    = "commit_sha"
+)
+
 type RunWorkflow struct{}
 
 type RunWorkflowNodeMetadata struct {
@@ -52,11 +69,12 @@ type Project struct {
 }
 
 type RunWorkflowSpec struct {
-	Project      string      `json:"project"`
-	Ref          string      `json:"ref"`
-	PipelineFile string      `json:"pipelineFile"`
-	CommitSha    string      `json:"commitSha"`
-	Parameters   []Parameter `json:"parameters"`
+	Project         string      `json:"project"`
+	Ref             string      `json:"ref"`
+	PipelineFile    string      `json:"pipelineFile"`
+	CommitSha       string      `json:"commitSha"`
+	InjectOidcToken bool        `json:"injectOidcToken"`
+	Parameters      []Parameter `json:"parameters"`
 }
 
 type Parameter struct {
@@ -101,6 +119,7 @@ func (r *RunWorkflow) Documentation() string {
 - **Ref**: Git reference to run the workflow on (branch, tag, or commit SHA)
 - **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
 - **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
+- **Inject OIDC token**: When enabled, adds a signed ` + "`SUPERPLANE_OIDC_TOKEN`" + ` workflow parameter for CI verification
 
 ## Injected Parameters
 
@@ -108,7 +127,7 @@ SuperPlane automatically adds these workflow parameters when triggering Semaphor
 
 - ` + "`SUPERPLANE_EXECUTION_ID`" + `: The SuperPlane node execution ID
 - ` + "`SUPERPLANE_CANVAS_ID`" + `: The SuperPlane canvas ID
-- ` + "`SUPERPLANE_OIDC_TOKEN`" + `: A signed OIDC token attesting this workflow was triggered by a specific SuperPlane canvas node
+- ` + "`SUPERPLANE_OIDC_TOKEN`" + `: When **Inject OIDC token** is enabled, a signed token attesting this workflow was triggered by a specific canvas node
 
 ## Verifying Triggers in CI
 
@@ -191,6 +210,12 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 			Name:  "commitSha",
 			Label: "Commit SHA",
 			Type:  configuration.FieldTypeString,
+		},
+		{
+			Name:        "injectOidcToken",
+			Label:       "Inject OIDC token",
+			Type:        configuration.FieldTypeBool,
+			Description: "Add a signed SUPERPLANE_OIDC_TOKEN workflow parameter for CI verification",
 		},
 		{
 			Name:  "parameters",
@@ -572,6 +597,36 @@ func (r *RunWorkflow) finish(ctx core.ActionHookContext) error {
 	return nil
 }
 
+func (r *RunWorkflow) signOIDCToken(ctx core.ExecutionContext, spec RunWorkflowSpec, metadata RunWorkflowNodeMetadata) (string, error) {
+	claims := map[string]any{
+		semaphoreClaimOrgID:       ctx.OrganizationID,
+		semaphoreClaimCanvasID:    ctx.WorkflowID,
+		semaphoreClaimNodeID:      ctx.NodeID,
+		semaphoreClaimExecutionID: ctx.ID.String(),
+		semaphoreClaimComponent:   r.Name(),
+	}
+
+	if metadata.Project != nil && metadata.Project.ID != "" {
+		claims[semaphoreClaimProjectID] = metadata.Project.ID
+	}
+	if spec.PipelineFile != "" {
+		claims[semaphoreClaimPipelineFile] = spec.PipelineFile
+	}
+	if spec.Ref != "" {
+		claims[semaphoreClaimRef] = spec.Ref
+	}
+	if spec.CommitSha != "" {
+		claims[semaphoreClaimCommitSha] = spec.CommitSha
+	}
+
+	return ctx.OIDC.Sign(
+		fmt.Sprintf("execution:%s", ctx.ID),
+		semaphoreOIDCTokenDuration,
+		semaphoreOIDCTokenAudience,
+		claims,
+	)
+}
+
 func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflowSpec, metadata RunWorkflowNodeMetadata) (map[string]any, error) {
 	parameters := make(map[string]any)
 	for _, param := range spec.Parameters {
@@ -580,6 +635,10 @@ func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflo
 
 	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID.String()
 	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
+
+	if !spec.InjectOidcToken {
+		return parameters, nil
+	}
 
 	if ctx.OIDC == nil {
 		return nil, fmt.Errorf("OIDC provider is not configured")

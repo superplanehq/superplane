@@ -44,9 +44,10 @@ func TestRunWorkflowBuildParametersIncludesOIDCToken(t *testing.T) {
 		NodeID:         "deploy",
 		OIDC:           &testOIDCProvider{},
 	}, RunWorkflowSpec{
-		PipelineFile: ".semaphore/deploy.yml",
-		Ref:          "refs/heads/main",
-		CommitSha:    "abc123",
+		InjectOidcToken: true,
+		PipelineFile:    ".semaphore/deploy.yml",
+		Ref:             "refs/heads/main",
+		CommitSha:       "abc123",
 		Parameters: []Parameter{
 			{Name: "FOO", Value: "bar"},
 		},
@@ -61,6 +62,21 @@ func TestRunWorkflowBuildParametersIncludesOIDCToken(t *testing.T) {
 	require.Equal(t, "test-token", parameters["SUPERPLANE_OIDC_TOKEN"])
 }
 
+func TestRunWorkflowBuildParametersSkipsOIDCWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	runWorkflow := RunWorkflow{}
+	executionID := uuid.New()
+
+	parameters, err := runWorkflow.buildParameters(core.ExecutionContext{
+		ID:   executionID,
+		OIDC: &testOIDCProvider{},
+	}, RunWorkflowSpec{}, RunWorkflowNodeMetadata{})
+	require.NoError(t, err)
+	require.Equal(t, executionID.String(), parameters["SUPERPLANE_EXECUTION_ID"])
+	require.NotContains(t, parameters, "SUPERPLANE_OIDC_TOKEN")
+}
+
 func TestRunWorkflowBuildParametersFailsWhenOIDCUnavailable(t *testing.T) {
 	t.Parallel()
 
@@ -68,7 +84,9 @@ func TestRunWorkflowBuildParametersFailsWhenOIDCUnavailable(t *testing.T) {
 
 	_, err := runWorkflow.buildParameters(core.ExecutionContext{
 		ID: uuid.New(),
-	}, RunWorkflowSpec{}, RunWorkflowNodeMetadata{})
+	}, RunWorkflowSpec{
+		InjectOidcToken: true,
+	}, RunWorkflowNodeMetadata{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "OIDC provider is not configured")
 }
@@ -85,7 +103,8 @@ func TestRunWorkflowBuildParametersFailsWhenSigningFails(t *testing.T) {
 		NodeID:         "deploy",
 		OIDC:           &failingOIDCProvider{},
 	}, RunWorkflowSpec{
-		PipelineFile: ".semaphore/deploy.yml",
+		InjectOidcToken: true,
+		PipelineFile:    ".semaphore/deploy.yml",
 	}, RunWorkflowNodeMetadata{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to sign OIDC execution token")
