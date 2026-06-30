@@ -99,7 +99,7 @@ The database model follows a hierarchical structure that enables multi-tenancy a
 - Stores workflow graph structure, node configurations, and metadata
 - Versioning is always enabled: users edit draft versions through a stage → commit → publish loop. Canvas/console/files edits autosave into `workflow_staged_files`; **Commit** materializes them onto the draft version row; **Publish** promotes the committed draft to live
 - Edit paths:
-  - **Web UI and agent tools** stage canvas/console/files edits into `workflow_staged_files`, then require **Commit** before **Publish**. Agent reads serve the effective staged content and agent `update_draft` writes go through the same staging layer, so agent edits appear as the user's pending staged changes
+  - **Web UI and agent tools** stage canvas/console/files edits into `workflow_staged_files`, then require **Commit** before **Publish**. Agent reads serve the effective staged content and agent `patch_draft` writes go through the same staging layer, so agent edits appear as the user's pending staged changes
   - **CLI** commits directly to the draft version row via `CommitCanvasRepositoryFiles`, discarding any pending staging in the same transaction; it never reads or writes `workflow_staged_files`
 - Users can publish committed draft versions directly. Uncommitted staging must be committed first.
 

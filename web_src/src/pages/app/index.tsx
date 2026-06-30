@@ -83,7 +83,6 @@ import { deriveConsoleNodeStatuses } from "./console/deriveNodeStatuses";
 import { useConsoleModeActions } from "./console/useConsoleModeActions";
 import { useConsoleTriggerNode } from "./console/useConsoleTriggerNode";
 import { WorkflowPageModeOverlays } from "./WorkflowPageModeOverlays";
-import { CanvasYamlModal } from "./CanvasYamlModal";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useFilesModeActions } from "./files/useFilesModeActions";
 import { resolveFilesHeaderVersionActions, useFilesHeaderState } from "./files/useFilesHeaderState";
@@ -116,7 +115,6 @@ import { resolveExecutionErrors } from "./mappers/dash0";
 import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
-import { useCanvasYaml } from "./useCanvasYaml";
 import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
@@ -616,7 +614,6 @@ export function AppPage() {
   const isReadOnly = !canActOnCanvas || !hasEditableVersion;
   /** Hide draft Discard after a publish flow until the user enters edit mode again. */
   const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
-  const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
   /**
    * Track if we've already done the initial fit to view.
    * This ref persists across re-renders to prevent viewport changes on save.
@@ -4022,11 +4019,6 @@ export function AppPage() {
     [],
   );
 
-  const getYamlExportPayload = useCallback(
-    (canvasNodes: CanvasNode[]) => buildYamlExportPayload(canvas, canvasNodes),
-    [buildYamlExportPayload, canvas],
-  );
-
   const { onCancelExecution } = useCancelExecutionHandler({
     canvasId: canvasId!,
     canvas,
@@ -4115,20 +4107,6 @@ export function AppPage() {
     },
     [canvasNodesById],
   );
-
-  const { modalProps: canvasYamlModalProps } = useCanvasYaml({
-    canvasId: canvasId!,
-    organizationId: organizationId!,
-    open: isYamlViewModalOpen,
-    onOpenChange: setIsYamlViewModalOpen,
-    isImporting: hasLocalSaveActivity,
-    nodes,
-    getYamlExportPayload,
-    canvas,
-    isReadOnly,
-    handleSaveWorkflow,
-    onWorkflowImported: applyLocalWorkflowUpdate,
-  });
 
   const appFiles = useMemo(
     () =>
@@ -4545,7 +4523,6 @@ export function AppPage() {
           onSelectConsole={handleSelectConsoleMode}
           onSelectFiles={handleSelectFilesMode}
           filesHeaderActionsSlotId={filesHeaderActionsSlotId}
-          onYamlOpen={() => setIsYamlViewModalOpen(true)}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           activeDraftBranchLabel={activeDraftBranchLabel}
@@ -4605,7 +4582,6 @@ export function AppPage() {
           </div>
         ) : null}
       </div>
-      <CanvasYamlModal {...canvasYamlModalProps} />
       {yamlDiffModal}
       {canvasConsoleVersionDiff.consoleYamlDiffModal}
       <CanvasPageModals

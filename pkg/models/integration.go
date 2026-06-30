@@ -120,9 +120,9 @@ func CreateIntegration(id, orgID uuid.UUID, appName string, installationName str
 	return &integration, nil
 }
 
-func ListIntegrations(orgID uuid.UUID) ([]Integration, error) {
+func ListIntegrations(db *gorm.DB, orgID uuid.UUID) ([]Integration, error) {
 	var integrations []Integration
-	err := database.Conn().Where("organization_id = ?", orgID).Find(&integrations).Error
+	err := db.Where("organization_id = ?", orgID).Find(&integrations).Error
 	if err != nil {
 		return nil, err
 	}

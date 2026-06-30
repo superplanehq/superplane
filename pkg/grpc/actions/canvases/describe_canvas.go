@@ -11,7 +11,15 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"gorm.io/gorm"
 )
+
+func loadCanvasCreator(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (user *models.User, err error) {
+	ctx, done := telemetry.Span(ctx, "canvases.load_creator")
+	defer done(&err)
+
+	return models.FindMaybeDeletedUserByIDInTransaction(db.WithContext(ctx), canvas.OrganizationID.String(), canvas.CreatedBy.String())
+}
 
 func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizationID string, id string) (*pb.DescribeCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
@@ -29,11 +37,7 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 
 	var user *models.User
 	if canvas.CreatedBy != nil {
-		err = telemetry.RunSpan(ctx, "canvases.load_creator", func(ctx context.Context) error {
-			var loadErr error
-			user, loadErr = models.FindMaybeDeletedUserByIDInTransaction(db, canvas.OrganizationID.String(), canvas.CreatedBy.String())
-			return loadErr
-		})
+		user, err = loadCanvasCreator(ctx, db, canvas)
 		if err != nil {
 			return nil, err
 		}

@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 188,
-  "maxAllowedDatabaseConnCalls": 213,
+  "maxAllowedInTransactionDefinitions": 185,
+  "maxAllowedDatabaseConnCalls": 209,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -149,7 +149,6 @@
     "pkg/models/organization.go:ListOrganizationsPendingUsageLimitsRefreshInTransaction",
     "pkg/models/organization.go:EnableExperimentalFeatureInTransaction",
     "pkg/models/organization.go:DisableExperimentalFeatureInTransaction",
-    "pkg/models/organization_invite_link.go:FindInviteLinkByOrganizationIDInTransaction",
     "pkg/models/organization_invite_link.go:FindInviteLinkByTokenInTransaction",
     "pkg/models/organization_invite_link.go:CreateInviteLinkInTransaction",
     "pkg/models/repository.go:FindRepositoryInTransaction",
@@ -170,8 +169,6 @@
     "pkg/models/user.go:RestoreInTransaction",
     "pkg/models/user.go:ClearTokenHashesForAccountInTransaction",
     "pkg/models/user.go:CreateUserInTransaction",
-    "pkg/models/user.go:FindServiceAccountsByOrganizationInTransaction",
-    "pkg/models/user.go:FindUsersByIDsInOrganizationInTransaction",
     "pkg/models/user.go:FindMaybeDeletedUserByIDInTransaction",
     "pkg/models/user.go:ListActiveUsersByIDInTransaction",
     "pkg/models/user.go:FindActiveUserByIDInTransaction",
@@ -307,7 +304,6 @@
     "pkg/models/email_settings.go:DeleteEmailSettings:database.Conn()#1",
     "pkg/models/integration.go:ListIntegrationSecrets:database.Conn()#1",
     "pkg/models/integration.go:CreateIntegration:database.Conn()#1",
-    "pkg/models/integration.go:ListIntegrations:database.Conn()#1",
     "pkg/models/integration.go:CountIntegrationsByOrganization:database.Conn()#1",
     "pkg/models/integration.go:ListIntegrationNodeReferences:database.Conn()#1",
     "pkg/models/integration.go:FindUnscopedIntegration:database.Conn()#1",
@@ -340,7 +336,6 @@
     "pkg/models/organization.go:ListOrganizationsPendingUsageLimitsRefresh:database.Conn()#1",
     "pkg/models/organization.go:EnableExperimentalFeature:database.Conn()#1",
     "pkg/models/organization.go:DisableExperimentalFeature:database.Conn()#1",
-    "pkg/models/organization_invite_link.go:FindInviteLinkByOrganizationID:database.Conn()#1",
     "pkg/models/organization_invite_link.go:FindInviteLinkByToken:database.Conn()#1",
     "pkg/models/organization_invite_link.go:CreateInviteLink:database.Conn()#1",
     "pkg/models/organization_invite_link.go:SaveInviteLink:database.Conn()#1",
@@ -373,8 +368,6 @@
     "pkg/models/user.go:Restore:database.Conn()#1",
     "pkg/models/user.go:UpdateTokenHash:database.Conn()#1",
     "pkg/models/user.go:CreateUser:database.Conn()#1",
-    "pkg/models/user.go:FindServiceAccountsByOrganization:database.Conn()#1",
-    "pkg/models/user.go:FindUsersByIDsInOrganization:database.Conn()#1",
     "pkg/models/user.go:FindUnscopedUserByID:database.Conn()#1",
     "pkg/models/user.go:FindUsersByIDs:database.Conn()#1",
     "pkg/models/user.go:FindHumanUsersByIDs:database.Conn()#1",
@@ -406,5 +399,5 @@
     "pkg/models/workflow_staging.go:HasWorkflowStaging:database.Conn()#1",
     "pkg/models/workflow_staging.go:FindWorkflowStagingPath:database.Conn()#1"
   ],
-  "updatedAt": "2026-06-24T10:57:43Z"
+  "updatedAt": "2026-06-27T13:08:33Z"
 }

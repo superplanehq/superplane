@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+const MaxWebhookPayloadSize = 64 * 1024
+
 func RabbitMQURL() (string, error) {
 	URL := os.Getenv("RABBITMQ_URL")
 	if URL == "" {

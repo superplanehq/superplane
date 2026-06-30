@@ -316,34 +316,6 @@ describe("CanvasPage connection drop", () => {
     expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
   });
 
-  it("opens the canvas YAML modal without switching to the Files tab", async () => {
-    const onYamlOpen = vi.fn();
-    const onSelectFiles = vi.fn();
-
-    render(
-      <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          headerMode="version-live"
-          nodes={[]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing={true}
-          activeCanvasVersionId="draft-version"
-          onYamlOpen={onYamlOpen}
-          onSelectFiles={onSelectFiles}
-        />
-      </MemoryRouter>,
-    );
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("canvas-yaml-button"));
-    });
-
-    expect(onYamlOpen).toHaveBeenCalledTimes(1);
-    expect(onSelectFiles).not.toHaveBeenCalled();
-  });
-
   it("loads node run data only while the component sidebar is open in live mode", async () => {
     const loadSidebarData = vi.fn();
     const getSidebarData = vi.fn(() => ({
