@@ -431,7 +431,8 @@ func TestAppAgentTool_ListResources(t *testing.T) {
 		Registry:    r.Registry,
 		AuthService: r.AuthService,
 	})
-	result, err := registry.Execute(context.Background(), agents.AgentSessionContext{
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
 		UserID:         r.User.String(),
@@ -475,7 +476,8 @@ func TestAppAgentTool_CreateDraftCreatesAnotherDraftBranch(t *testing.T) {
 		WebhookBaseURL: "https://hooks.example.test",
 	})
 
-	result, err := registry.Execute(context.Background(), agents.AgentSessionContext{
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: r.Organization.ID.String(),
 		UserID:         r.User.String(),
@@ -625,8 +627,9 @@ func TestAppAgentTool_ReadUsesProvidedDraftVersionID(t *testing.T) {
 		UserID:         r.User.String(),
 		CanvasID:       canvas.ID.String(),
 	}, Input{
-		Action:    "read",
-		VersionID: firstDraft.ID.String(),
+		Action:            "read",
+		VersionID:         firstDraft.ID.String(),
+		IncludeCanvasYAML: true,
 	})
 
 	require.NoError(t, err)
@@ -637,6 +640,54 @@ func TestAppAgentTool_ReadUsesProvidedDraftVersionID(t *testing.T) {
 	require.NotNil(t, read.Draft)
 	assert.Equal(t, firstDraft.ID.String(), read.Draft.VersionID)
 	assert.Equal(t, "draft: first\n", read.CanvasYAML)
+	assert.Equal(t, len("draft: first\n"), read.CanvasYAMLBytes)
+}
+
+func TestAppAgentTool_ReadOmitsCanvasYAMLByDefault(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	draft, err := models.CreateDraftBranchFromLive(canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+
+	updatedBy := r.User
+	_, err = models.UpsertWorkflowStagingPath(
+		draft.ID,
+		r.Organization.ID,
+		canvasRepository.CanvasYAMLRepositoryPath,
+		"draft: compact\n",
+		"",
+		&updatedBy,
+	)
+	require.NoError(t, err)
+
+	registry := NewDefaultRegistry(Dependencies{
+		Encryptor:      r.Encryptor,
+		Registry:       r.Registry,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "https://hooks.example.test",
+	})
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:    "read",
+		VersionID: draft.ID.String(),
+	})
+
+	require.NoError(t, err)
+	read, ok := result.(readResult)
+	require.True(t, ok)
+	assert.Empty(t, read.CanvasYAML)
+	assert.True(t, read.CanvasYAMLOmitted)
+	assert.Equal(t, len("draft: compact\n"), read.CanvasYAMLBytes)
+	assert.Equal(t, "draft", read.Source)
+	assert.Equal(t, draft.ID.String(), read.VersionID)
 }
 
 func TestAppAgentTool_ReadUseDraftFalseIgnoresDraftVersionID(t *testing.T) {
@@ -673,9 +724,10 @@ func TestAppAgentTool_ReadUseDraftFalseIgnoresDraftVersionID(t *testing.T) {
 		UserID:         r.User.String(),
 		CanvasID:       canvas.ID.String(),
 	}, Input{
-		Action:    "read",
-		UseDraft:  &useDraft,
-		VersionID: draft.ID.String(),
+		Action:            "read",
+		UseDraft:          &useDraft,
+		VersionID:         draft.ID.String(),
+		IncludeCanvasYAML: true,
 	})
 
 	require.NoError(t, err)
