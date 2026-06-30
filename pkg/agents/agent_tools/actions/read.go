@@ -64,12 +64,17 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	}
 
 	result := readResult{
-		Action:     "read",
-		CanvasID:   session.CanvasID,
-		Source:     source,
-		VersionID:  versionID,
-		Summary:    a.summarize(session.OrganizationID, canvas, version, source, canvasYAML),
-		CanvasYAML: canvasYAML,
+		Action:            "read",
+		CanvasID:          session.CanvasID,
+		Source:            source,
+		VersionID:         versionID,
+		Summary:           a.summarize(session.OrganizationID, canvas, version, source, canvasYAML),
+		CanvasYAMLBytes:   len(canvasYAML),
+		CanvasYAMLOmitted: !input.IncludeCanvasYAML,
+	}
+
+	if input.IncludeCanvasYAML {
+		result.CanvasYAML = canvasYAML
 	}
 
 	if draft != nil {
