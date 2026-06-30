@@ -77,7 +77,8 @@ export default defineConfig(({ command }: { command: string }) => {
       target: "es2020",
       outDir: "../pkg/web/assets/dist", // emit assets to pkg/web/assets/dist
       emptyOutDir: true,
-      sourcemap: isDev, // enable source map in dev build
+      // Launchpad CDN builds set VITE_ASSET_BASE_URL; .map files are public on R2 for Sentry.
+      sourcemap: Boolean(assetBaseUrl) || isDev,
       manifest: false, // do not generate manifest.json
       // rollupOptions: {
       //   input: {
