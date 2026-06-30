@@ -14,7 +14,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type RSAProvider struct {
@@ -82,10 +82,10 @@ func (s *RSAProvider) Sign(subject string, duration time.Duration, audience stri
 	now := time.Now()
 	claims := jwt.MapClaims{
 		"iss": s.issuer,
-		"iat": now.Unix(),
-		"nbf": now.Unix(),
-		"exp": now.Add(duration).Unix(),
 		"sub": subject,
+		"iat": jwt.NewNumericDate(now),
+		"nbf": jwt.NewNumericDate(now),
+		"exp": jwt.NewNumericDate(now.Add(duration)),
 	}
 
 	if audience != "" {

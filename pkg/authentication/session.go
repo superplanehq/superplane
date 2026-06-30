@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	jwtLib "github.com/golang-jwt/jwt/v4"
+	jwtLib "github.com/golang-jwt/jwt/v5"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
