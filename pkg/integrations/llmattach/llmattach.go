@@ -41,6 +41,18 @@ func (a Attachment) IsPDF() bool {
 	return a.Mime == "application/pdf"
 }
 
+// UploadMIME returns the MIME type to send when uploading to a provider Files
+// API. Images and PDFs keep their detected type; every other (text) type is
+// normalized to text/plain. Providers accept only PDF and plaintext as document
+// content (e.g. Anthropic rejects text/markdown), and to the model any text file
+// is just plaintext anyway.
+func (a Attachment) UploadMIME() string {
+	if a.IsImage() || a.IsPDF() {
+		return a.Mime
+	}
+	return "text/plain"
+}
+
 func supported(mimeType string) bool {
 	return strings.HasPrefix(mimeType, "image/") ||
 		mimeType == "application/pdf" ||

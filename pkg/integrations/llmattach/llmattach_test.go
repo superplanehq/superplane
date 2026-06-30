@@ -53,6 +53,22 @@ func TestRead_ClassifiesTypes(t *testing.T) {
 	}
 }
 
+func TestUploadMIME(t *testing.T) {
+	cases := map[string]string{
+		"image/png":       "image/png",
+		"image/jpeg":      "image/jpeg",
+		"application/pdf": "application/pdf",
+		"text/markdown":   "text/plain",
+		"text/csv":        "text/plain",
+		"text/plain":      "text/plain",
+	}
+	for detected, want := range cases {
+		if got := (Attachment{Mime: detected}).UploadMIME(); got != want {
+			t.Errorf("UploadMIME(%q) = %q, want %q", detected, got, want)
+		}
+	}
+}
+
 func TestRead_EmptyPaths(t *testing.T) {
 	atts, err := Read(nil, nil)
 	if err != nil || atts != nil {
