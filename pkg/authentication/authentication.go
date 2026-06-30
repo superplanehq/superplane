@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	jwtLib "github.com/golang-jwt/jwt/v4"
+	jwtLib "github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
@@ -824,8 +824,8 @@ func (a *Handler) generateMagicLinkToken(email, code string) (string, error) {
 	token := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, jwtLib.MapClaims{
 		"email": email,
 		"code":  code,
-		"iat":   now.Unix(),
-		"exp":   now.Add(magicCodeTTL).Unix(),
+		"iat":   jwtLib.NewNumericDate(now),
+		"exp":   jwtLib.NewNumericDate(now.Add(magicCodeTTL)),
 		"type":  "magic_link",
 	})
 

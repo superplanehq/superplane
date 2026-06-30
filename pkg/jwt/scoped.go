@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	gojwt "github.com/golang-jwt/jwt/v4"
+	gojwt "github.com/golang-jwt/jwt/v5"
 )
 
 const ScopedTokenType = "scoped"
@@ -28,6 +28,63 @@ type Permission struct {
 	ResourceType string   `json:"resourceType"`
 	Action       string   `json:"action"`
 	Resources    []string `json:"resources,omitempty"`
+}
+
+func (c ScopedTokenClaims) GetExpirationTime() (*gojwt.NumericDate, error) {
+	return c.ExpiresAt, nil
+}
+
+func (c ScopedTokenClaims) GetIssuedAt() (*gojwt.NumericDate, error) {
+	return c.IssuedAt, nil
+}
+
+func (c ScopedTokenClaims) GetNotBefore() (*gojwt.NumericDate, error) {
+	return c.NotBefore, nil
+}
+
+func (c ScopedTokenClaims) GetIssuer() (string, error) {
+	return "", nil
+}
+
+func (c ScopedTokenClaims) GetSubject() (string, error) {
+	return c.Subject, nil
+}
+
+func (c ScopedTokenClaims) GetAudience() (gojwt.ClaimStrings, error) {
+	if strings.TrimSpace(c.Audience) == "" {
+		return gojwt.ClaimStrings{}, nil
+	}
+
+	return gojwt.ClaimStrings{c.Audience}, nil
+}
+
+func (c ScopedTokenClaims) Validate() error {
+	if c.TokenType != ScopedTokenType {
+		return fmt.Errorf("invalid token_type")
+	}
+
+	if strings.TrimSpace(c.Subject) == "" {
+		return fmt.Errorf("subject is required")
+	}
+
+	if strings.TrimSpace(c.OrgID) == "" {
+		return fmt.Errorf("org_id is required")
+	}
+
+	if strings.TrimSpace(c.Purpose) == "" {
+		return fmt.Errorf("purpose is required")
+	}
+
+	scopes := normalizeScopedTokenValues(c.Scopes)
+	if len(scopes) == 0 {
+		return fmt.Errorf("at least one scope is required")
+	}
+
+	if len(PermissionsFromScopes(scopes)) == 0 {
+		return fmt.Errorf("at least one scope is required")
+	}
+
+	return nil
 }
 
 func (s *Signer) GenerateScopedToken(claims ScopedTokenClaims, duration time.Duration) (string, error) {
@@ -69,7 +126,9 @@ func (s *Signer) GenerateScopedToken(claims ScopedTokenClaims, duration time.Dur
 }
 
 func (s *Signer) ValidateScopedToken(tokenString string) (*ScopedTokenClaims, error) {
-	token, err := gojwt.ParseWithClaims(tokenString, &ScopedTokenClaims{}, func(token *gojwt.Token) (any, error) {
+	claims := &ScopedTokenClaims{}
+	parser := gojwt.NewParser(gojwt.WithAudience(ScopedTokenAudience))
+	token, err := parser.ParseWithClaims(tokenString, claims, func(token *gojwt.Token) (any, error) {
 		if _, ok := token.Method.(*gojwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
@@ -80,67 +139,17 @@ func (s *Signer) ValidateScopedToken(tokenString string) (*ScopedTokenClaims, er
 		return nil, err
 	}
 
-	claims, ok := token.Claims.(*ScopedTokenClaims)
-	if !ok || !token.Valid {
+	if !token.Valid {
 		return nil, fmt.Errorf("invalid token")
 	}
 
-	if claims.TokenType != ScopedTokenType {
-		return nil, fmt.Errorf("invalid token_type")
-	}
-
-	if !claims.VerifyAudience(ScopedTokenAudience, true) {
-		return nil, fmt.Errorf("invalid audience")
-	}
-
-	subject := strings.TrimSpace(claims.Subject)
-	if subject == "" {
-		return nil, fmt.Errorf("subject is required")
-	}
-
-	orgID := strings.TrimSpace(claims.OrgID)
-	if orgID == "" {
-		return nil, fmt.Errorf("org_id is required")
-	}
-
-	purpose := strings.TrimSpace(claims.Purpose)
-	if purpose == "" {
-		return nil, fmt.Errorf("purpose is required")
-	}
-
-	scopes := normalizeScopedTokenValues(claims.Scopes)
-	if len(scopes) == 0 {
-		return nil, fmt.Errorf("at least one scope is required")
-	}
-
-	if len(PermissionsFromScopes(scopes)) == 0 {
-		return nil, fmt.Errorf("at least one scope is required")
-	}
-
-	claims.Subject = subject
+	claims.Subject = strings.TrimSpace(claims.Subject)
 	claims.Audience = strings.TrimSpace(claims.Audience)
-	claims.OrgID = orgID
-	claims.Purpose = purpose
-	claims.Scopes = scopes
+	claims.OrgID = strings.TrimSpace(claims.OrgID)
+	claims.Purpose = strings.TrimSpace(claims.Purpose)
+	claims.Scopes = normalizeScopedTokenValues(claims.Scopes)
 
 	return claims, nil
-}
-
-func (c ScopedTokenClaims) Valid() error {
-	return gojwt.RegisteredClaims{
-		Subject:   c.Subject,
-		ExpiresAt: c.ExpiresAt,
-		NotBefore: c.NotBefore,
-		IssuedAt:  c.IssuedAt,
-	}.Valid()
-}
-
-func (c ScopedTokenClaims) VerifyAudience(cmp string, req bool) bool {
-	if c.Audience == "" {
-		return !req
-	}
-
-	return c.Audience == cmp
 }
 
 func normalizeScopedTokenValues(values []string) []string {
