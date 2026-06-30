@@ -759,7 +759,11 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 	})
 
 	integrationInstance.Capabilities = capabilityCtx.States()
-	err = database.Conn().Save(&integrationInstance).Error
+
+	err = database.Conn().Model(&models.Integration{ID: integrationInstance.ID}).Select("capabilities").Updates(map[string]any{
+		"capabilities": integrationInstance.Capabilities,
+		"updated_at":   time.Now(),
+	}).Error
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
 		return
