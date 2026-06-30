@@ -281,24 +281,16 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 			return match
 		}
 
+		//
+		// ResolveExpression rejects expressions that resolve to a whole
+		// secret map (secrets("name") without a key), so a decrypted secret
+		// can never be formatted into the output here. See the guard in
+		// ResolveExpressionWithExtraVariables.
+		//
 		value, e := b.ResolveExpression(matches[1])
 		if e != nil {
 			err = e
 			return ""
-		}
-
-		//
-		// Guard against bulk secret exposure: an expression that calls
-		// secrets() must select a specific key (e.g. secrets("api").token).
-		// If it resolves to the secret map itself, generic string conversion
-		// would embed every decrypted key and value into the output (URL,
-		// header, payload, log, ...). Reject it instead of formatting it.
-		//
-		if injectsSecret {
-			if _, isMap := asAnyMap(value); isMap {
-				err = fmt.Errorf("secrets() must select a specific key (for example secrets(\"name\").key); embedding the entire secret is not allowed")
-				return ""
-			}
 		}
 
 		return formatTemplateValue(value)
@@ -425,6 +417,23 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 	output, err := expr.Run(vm, env)
 	if err != nil {
 		return "", fmt.Errorf("expression evaluation failed: %w", err)
+	}
+
+	//
+	// Guard against bulk secret exposure for bare-expression callers (If,
+	// Filter, Merge stop-if, Loop until, ...). An expression that calls
+	// secrets() must select a specific key (e.g. secrets("api").token); if it
+	// resolves to the secret map itself, callers that format the non-boolean
+	// result with %v would persist every decrypted key/value into the
+	// execution failure message. Reject it before it leaves this function so
+	// the secret never reaches a log, payload, or stored error. The template
+	// path (ResolveTemplateExpressions) routes through here too, so this is
+	// the single place the rule is enforced.
+	//
+	if expressionInjectsSecret(expression) {
+		if _, isMap := asAnyMap(output); isMap {
+			return "", fmt.Errorf("secrets() must select a specific key (for example secrets(\"name\").key); embedding the entire secret is not allowed")
+		}
 	}
 
 	return output, nil

@@ -136,6 +136,33 @@ func TestNodeConfigurationBuilder_RuntimePhase_WholeSecretMapIsRejected(t *testi
 	}
 }
 
+func TestNodeConfigurationBuilder_RuntimePhase_BareExpressionRejectsWholeSecretMap(t *testing.T) {
+	//
+	// Bare-expression fields (If, Filter, Merge stop-if, Loop until) evaluate
+	// through ResolveExpression rather than ResolveTemplateExpressions. A
+	// whole-secret-map expression (secrets("api") without a key) must be
+	// rejected here too, otherwise components format the non-boolean result
+	// with %v and persist the decrypted secret in their failure message.
+	//
+	resolver := &fakeSecretResolver{
+		values: map[string]map[string]string{"api": {"token": "supersecret", "key": "anotherone"}},
+	}
+	builder := newSecretsBuilder(resolver)
+
+	_, err := builder.ResolveExpression(`secrets("api")`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "secrets() must select a specific key")
+	assert.NotContains(t, err.Error(), "supersecret")
+	assert.NotContains(t, err.Error(), "anotherone")
+
+	//
+	// Selecting a specific key still works through the bare-expression path.
+	//
+	out, err := builder.ResolveExpression(`secrets("api").token`)
+	require.NoError(t, err)
+	assert.Equal(t, "supersecret", out)
+}
+
 func TestNodeConfigurationBuilder_NoResolver_SecretsCallErrors(t *testing.T) {
 	//
 	// If a placeholder containing secrets() somehow reaches a builder with no
