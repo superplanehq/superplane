@@ -17,6 +17,7 @@ import (
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
 	members "github.com/superplanehq/superplane/pkg/cli/commands/members"
+	oidc "github.com/superplanehq/superplane/pkg/cli/commands/oidc"
 	organizations "github.com/superplanehq/superplane/pkg/cli/commands/organizations"
 	queue "github.com/superplanehq/superplane/pkg/cli/commands/queue"
 	roles "github.com/superplanehq/superplane/pkg/cli/commands/roles"
@@ -66,6 +67,7 @@ func init() {
 	RootCmd.AddCommand(index.NewCommand(options))
 	RootCmd.AddCommand(integrations.NewCommand(options))
 	RootCmd.AddCommand(members.NewCommand(options))
+	RootCmd.AddCommand(oidc.NewCommand(options))
 	RootCmd.AddCommand(organizations.NewCommand(options))
 	RootCmd.AddCommand(queue.NewCommand(options))
 	RootCmd.AddCommand(roles.NewCommand(options))
