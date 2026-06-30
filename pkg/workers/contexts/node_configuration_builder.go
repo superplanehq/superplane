@@ -242,7 +242,8 @@ func asAnyMap(value any) (map[string]any, bool) {
 }
 
 func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string) (any, error) {
-	if !expressionRegex.MatchString(expression) {
+	matches := expressionRegex.FindAllStringIndex(expression, -1)
+	if len(matches) == 0 {
 		return expression, nil
 	}
 
@@ -410,20 +411,29 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		executionChainNodeIDs = append(executionChainNodeIDs, rootEvent.NodeID)
 	}
 
-	refToNodeID, err := b.resolveNodeRefs(referencedNodes, executionChainNodeIDs)
+	nodeRefs, err := b.resolveNodeRefs(referencedNodes, executionChainNodeIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	chainRefs := populateFromInputOrRoot(messageChain, inputMap, rootEvent, refToNodeID)
+	for _, nodeRef := range nodeRefs.unresolved {
+		messageChain[nodeRef] = nil
+	}
+
+	chainRefs := populateFromInputOrRoot(messageChain, inputMap, rootEvent, nodeRefs.byRef)
 
 	if len(chainRefs) == 0 {
-		b.injectConfigIntoMessageChain(messageChain, refToNodeID, executionByNodeID)
+		b.injectConfigIntoMessageChain(messageChain, nodeRefs.byRef, executionByNodeID)
 		return messageChain, nil
 	}
 
 	if b.previousExecutionID == nil {
-		return nil, fmt.Errorf("node name %s not found in execution chain", firstChainRef(chainRefs))
+		for nodeRef := range chainRefs {
+			messageChain[nodeRef] = nil
+		}
+
+		b.injectConfigIntoMessageChain(messageChain, nodeRefs.byRef, executionByNodeID)
+		return messageChain, nil
 	}
 
 	err = b.populateFromExecutions(messageChain, chainRefs, executionByNodeID)
@@ -431,7 +441,7 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		return nil, err
 	}
 
-	b.injectConfigIntoMessageChain(messageChain, refToNodeID, executionByNodeID)
+	b.injectConfigIntoMessageChain(messageChain, nodeRefs.byRef, executionByNodeID)
 	return messageChain, nil
 }
 
@@ -553,13 +563,6 @@ func (b *NodeConfigurationBuilder) injectConfigIntoMessageChain(
 	}
 }
 
-func firstChainRef(chainRefs map[string]string) string {
-	for nodeRef := range chainRefs {
-		return nodeRef
-	}
-	return ""
-}
-
 func extractInputMap(input any) map[string]any {
 	if inputMap, ok := input.(map[string]any); ok {
 		return inputMap
@@ -649,6 +652,8 @@ func normalizeJSONNumber(value json.Number) any {
 
 func formatTemplateValue(value any) string {
 	switch v := value.(type) {
+	case nil:
+		return "null"
 	case float32:
 		return strconv.FormatFloat(float64(v), 'f', -1, 32)
 	case float64:
@@ -658,10 +663,15 @@ func formatTemplateValue(value any) string {
 	}
 }
 
-func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionChainNodeIDs []string) (map[string]string, error) {
+type resolvedNodeRefs struct {
+	byRef      map[string]string
+	unresolved []string
+}
+
+func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionChainNodeIDs []string) (resolvedNodeRefs, error) {
 	nodes, err := models.FindCanvasNodesInTransaction(b.tx, b.workflowID)
 	if err != nil {
-		return nil, err
+		return resolvedNodeRefs{}, err
 	}
 
 	nameToNodeID := make(map[string]string, len(nodes))
@@ -693,10 +703,10 @@ func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionC
 		executionChainOrder[nodeID] = i
 	}
 
-	refToNodeID := make(map[string]string, len(nodeRefs))
+	resolved := resolvedNodeRefs{byRef: make(map[string]string, len(nodeRefs))}
 	for _, nodeRef := range nodeRefs {
 		if nodeID, ok := nameToNodeID[nodeRef]; ok {
-			refToNodeID[nodeRef] = nodeID
+			resolved.byRef[nodeRef] = nodeID
 			continue
 		}
 
@@ -714,17 +724,17 @@ func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionC
 			}
 
 			if closestNodeID != "" {
-				refToNodeID[nodeRef] = closestNodeID
+				resolved.byRef[nodeRef] = closestNodeID
 				continue
 			}
 
-			return nil, fmt.Errorf("node name %s is not unique and none of the matching nodes are in the execution chain", nodeRef)
+			return resolvedNodeRefs{}, fmt.Errorf("node name %s is not unique and none of the matching nodes are in the execution chain", nodeRef)
 		}
 
-		return nil, fmt.Errorf("node name %s not found in execution chain", nodeRef)
+		resolved.unresolved = append(resolved.unresolved, nodeRef)
 	}
 
-	return refToNodeID, nil
+	return resolved, nil
 }
 
 func (b *NodeConfigurationBuilder) fetchRootEvent() (*models.CanvasEvent, error) {
