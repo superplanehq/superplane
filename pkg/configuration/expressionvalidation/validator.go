@@ -136,6 +136,15 @@ func checkTopLevelCall(name string, args []ast.Node) error {
 				return fmt.Errorf("previous() depth must be an integer literal")
 			}
 		}
+	case "secrets":
+		if len(args) != 1 {
+			return fmt.Errorf("secrets() takes exactly one argument (secret name), got %d", len(args))
+		}
+		switch args[0].(type) {
+		case *ast.StringNode, *ast.IdentifierNode, *ast.MemberNode, *ast.CallNode:
+		default:
+			return fmt.Errorf("secrets() argument must be a string")
+		}
 	}
 	return nil
 }
@@ -173,6 +182,7 @@ func compileWithStubEnv(body string, knownNodeNames map[string]struct{}, extraEn
 		exprruntime.DateFunctionOption(),
 		expr.Function("root", func(params ...any) (any, error) { return nil, nil }),
 		expr.Function("previous", func(params ...any) (any, error) { return nil, nil }),
+		expr.Function("secrets", func(params ...any) (any, error) { return map[string]string{}, nil }),
 	}
 
 	if _, err := expr.Compile(body, opts...); err != nil {
