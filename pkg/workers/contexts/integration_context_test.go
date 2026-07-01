@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 )
 
@@ -78,12 +80,142 @@ func Test__IntegrationContext_ScheduleResync(t *testing.T) {
 	})
 }
 
+// Test__IntegrationContext_ScheduleActionCall covers the de-duplication that
+// fixes issue #5386: integration-level action calls must keep at most one pending
+// request per (installation, action, parameters), collapsing self-rescheduling
+// or duplicate chains while preserving legitimately distinct calls.
+func Test__IntegrationContext_ScheduleActionCall(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+
+	pendingActions := func(actionName string) int64 {
+		var count int64
+		require.NoError(t, database.Conn().
+			Model(&models.IntegrationRequest{}).
+			Where("app_installation_id = ? AND state = ? AND type = ?",
+				integration.ID, models.IntegrationRequestStatePending, models.IntegrationRequestTypeInvokeAction).
+			Where("spec->'invoke_action'->>'action_name' = ?", actionName).
+			Count(&count).Error)
+		return count
+	}
+
+	t.Run("rejects short interval", func(t *testing.T) {
+		err := ctx.ScheduleActionCall("refresh", map[string]any{}, 500*time.Millisecond)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "interval must be bigger than 1s")
+	})
+
+	t.Run("same action and parameters keeps a single pending request", func(t *testing.T) {
+		for i := 0; i < 4; i++ {
+			require.NoError(t, ctx.ScheduleActionCall("refresh", map[string]any{}, time.Second))
+			require.Equal(t, int64(1), pendingActions("refresh"),
+				"scheduling the same (action, params) must keep exactly one pending request (#5386)")
+		}
+	})
+
+	t.Run("different parameters are preserved as separate requests", func(t *testing.T) {
+		require.NoError(t, ctx.ScheduleActionCall("provision", map[string]any{"region": "us-east-1"}, time.Second))
+		require.NoError(t, ctx.ScheduleActionCall("provision", map[string]any{"region": "eu-west-1"}, time.Second))
+		require.Equal(t, int64(2), pendingActions("provision"),
+			"distinct parameters must remain separate pending requests")
+
+		//
+		// Re-scheduling one of them dedups only its own (action, params) pair.
+		//
+		require.NoError(t, ctx.ScheduleActionCall("provision", map[string]any{"region": "us-east-1"}, time.Second))
+		require.Equal(t, int64(2), pendingActions("provision"))
+	})
+
+	t.Run("collapses accumulated chains for the same action", func(t *testing.T) {
+		//
+		// Seed several orphaned pending requests directly, simulating the runaway
+		// accumulation from issue #5386.
+		//
+		now := time.Now()
+		for i := 0; i < 5; i++ {
+			require.NoError(t, integration.CreateActionRequest(database.Conn(), "drain", map[string]any{}, &now))
+		}
+		require.Equal(t, int64(5), pendingActions("drain"))
+
+		require.NoError(t, ctx.ScheduleActionCall("drain", map[string]any{}, time.Second))
+		require.Equal(t, int64(1), pendingActions("drain"),
+			"a new schedule must collapse all accumulated chains of the same action to one (#5386)")
+	})
+}
+
+// Test__IntegrationContext_ScheduleActionCall_ConcurrentSchedulingDoesNotDuplicate
+// guards the concurrency case behind #5386: the worker processes due requests in
+// parallel, so the primitive must still converge to a single pending request when
+// many goroutines reschedule the same (action, params) at once. Without the
+// per-installation lock, the concurrent complete+create transactions each insert a
+// successor the others cannot see and the count stays above one.
+func Test__IntegrationContext_ScheduleActionCall_ConcurrentSchedulingDoesNotDuplicate(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("installation"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	ctx := NewIntegrationContext(database.Conn(), nil, integration, r.Encryptor, r.Registry, nil)
+
+	//
+	// Seed several accumulated chains, then reschedule them from many goroutines
+	// at once, mirroring the parallel worker processing that caused the bug.
+	//
+	now := time.Now()
+	for i := 0; i < 8; i++ {
+		require.NoError(t, integration.CreateActionRequest(database.Conn(), "refreshAccessToken", map[string]any{}, &now))
+	}
+
+	const concurrency = 8
+	var wg sync.WaitGroup
+	errs := make(chan error, concurrency)
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- ctx.ScheduleActionCall("refreshAccessToken", map[string]any{}, time.Second)
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+
+	var count int64
+	require.NoError(t, database.Conn().
+		Model(&models.IntegrationRequest{}).
+		Where("app_installation_id = ? AND state = ? AND type = ?",
+			integration.ID, models.IntegrationRequestStatePending, models.IntegrationRequestTypeInvokeAction).
+		Where("spec->'invoke_action'->>'action_name' = ?", "refreshAccessToken").
+		Count(&count).Error)
+	require.Equal(t, int64(1), count, "concurrent scheduling must converge to a single pending request (#5386)")
+}
+
 func Test__IntegrationContext_RequestWebhook_ReplacesWebhookOnConfigChange(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
-	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
 		CompareConfigFunc: func(a, b any) (bool, error) {
 			return reflect.DeepEqual(a, b), nil
 		},
@@ -158,8 +290,8 @@ func Test__IntegrationContext_RequestWebhook_ReuseWebhookOnResave(t *testing.T) 
 
 	// CompareConfig always returns true — this is the Elastic/Prometheus/SendGrid model
 	// where all triggers for the integration share one webhook.
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
-	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
 		CompareConfigFunc: func(a, b any) (bool, error) {
 			return true, nil
 		},
@@ -233,8 +365,8 @@ func Test__IntegrationContext_RequestWebhook_MergesExistingWebhookConfig(t *test
 	r := support.Setup(t)
 	defer r.Close()
 
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{})
-	r.Registry.WebhookHandlers["dummy"] = support.NewDummyWebhookHandler(support.DummyWebhookHandlerOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
 		CompareConfigFunc: func(a, b any) (bool, error) {
 			return true, nil
 		},
@@ -337,9 +469,9 @@ func Test__IntegrationContext_ListSubscriptions_UsesOnEventsCallback(t *testing.
 	defer r.Close()
 
 	triggerName := "dummy.subscription-trigger"
-	r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		Triggers: []core.Trigger{
-			support.NewDummyIntegrationTrigger(support.DummyIntegrationTriggerOptions{
+			impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{
 				Name: triggerName,
 				OnIntegrationMessage: func(ctx core.IntegrationMessageContext) error {
 					return ctx.Events.Emit("test.payload", map[string]any{"message": ctx.Message})

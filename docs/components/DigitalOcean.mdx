@@ -19,6 +19,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Database" href="#create-database" description="Create a new managed database instance in DigitalOcean" />
   <LinkCard title="Create Database Cluster" href="#create-database-cluster" description="Create a new database cluster" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
+  <LinkCard title="Create GPU Droplet" href="#create-gpu-droplet" description="Create a new DigitalOcean GPU Droplet" />
   <LinkCard title="Create Knowledge Base" href="#create-knowledge-base" description="Create a DigitalOcean Gradient AI knowledge base with one or more data sources" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer with forwarding rules and targets" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
@@ -28,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Data Source" href="#delete-data-source" description="Remove a data source from a DigitalOcean Gradient AI knowledge base" />
   <LinkCard title="Delete Database" href="#delete-database" description="Delete an existing database instance from DigitalOcean" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
+  <LinkCard title="Delete GPU Droplet" href="#delete-gpu-droplet" description="Delete a DigitalOcean GPU Droplet by ID" />
   <LinkCard title="Delete Knowledge Base" href="#delete-knowledge-base" description="Delete a DigitalOcean Gradient AI knowledge base and optionally its OpenSearch database" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
   <LinkCard title="Delete Object" href="#delete-object" description="Delete an object from DigitalOcean Spaces Object Storage" />
@@ -40,6 +42,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Database Cluster" href="#get-database-cluster" description="Retrieve details of a specific database cluster" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
+  <LinkCard title="Get GPU Droplet" href="#get-gpu-droplet" description="Fetch details of a DigitalOcean GPU Droplet by ID" />
   <LinkCard title="Get Knowledge Base" href="#get-knowledge-base" description="Retrieve detailed information about a DigitalOcean Gradient AI knowledge base" />
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Index Knowledge Base" href="#index-knowledge-base" description="Start an indexing job for a DigitalOcean Gradient AI knowledge base and wait for it to complete" />
@@ -48,6 +51,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run Evaluation" href="#run-evaluation" description="Run a Gradient AI evaluation test case against an agent and report pass or fail" />
   <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
   <LinkCard title="Update App" href="#update-app" description="Update a DigitalOcean App Platform application's configuration, environment, and deployment settings" />
+  <LinkCard title="Update GPU Droplet" href="#update-gpu-droplet" description="Rename or upsize a DigitalOcean GPU Droplet" />
   <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
 </CardGrid>
 
@@ -74,6 +78,8 @@ Create an [Access Key ID & Secret Access Key](https://cloud.digitalocean.com/spa
 <a id="add-data-source"></a>
 
 ## Add Data Source
+
+**Component key:** `digitalocean.addDataSource`
 
 The Add Data Source component adds a new data source to an existing knowledge base on the DigitalOcean Gradient AI Platform.
 
@@ -136,6 +142,8 @@ When indexing is enabled, the output also includes:
 
 ## Assign Reserved IP
 
+**Component key:** `digitalocean.assignReservedIP`
+
 The Assign Reserved IP component assigns or unassigns a DigitalOcean Reserved IP to a droplet.
 
 ### Use Cases
@@ -189,6 +197,8 @@ Returns the action result including:
 
 ## Attach Knowledge Base
 
+**Component key:** `digitalocean.attachKnowledgeBase`
+
 The Attach Knowledge Base component connects a knowledge base to an existing Gradient AI agent, enabling the agent to use it for retrieval-augmented generation (RAG).
 
 ### Use Cases
@@ -224,6 +234,8 @@ Returns confirmation of the attachment including:
 <a id="copy-object"></a>
 
 ## Copy Object
+
+**Component key:** `digitalocean.copyObject`
 
 The Copy Object component copies an object from one location to another within DigitalOcean Spaces. When **Delete Source** is enabled, the source object is deleted after a successful copy, effectively moving the object.
 
@@ -284,6 +296,8 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
 <a id="create-alert-policy"></a>
 
 ## Create Alert Policy
+
+**Component key:** `digitalocean.createAlertPolicy`
 
 The Create Alert Policy component creates a monitoring alert policy that triggers notifications when droplet metrics cross defined thresholds.
 
@@ -357,6 +371,8 @@ Returns the created alert policy including:
 <a id="create-app"></a>
 
 ## Create App
+
+**Component key:** `digitalocean.createApp`
 
 The Create App component provisions a new application on DigitalOcean's App Platform from a GitHub, GitLab, or Bitbucket repository.
 The component requires that you have connected your Git provider in your DigitalOcean account and granted access to the repository you want to deploy.
@@ -460,6 +476,8 @@ Returns the created app including:
 
 ## Create DNS Record
 
+**Component key:** `digitalocean.createDNSRecord`
+
 The Create DNS Record component creates a new DNS record for a domain managed by DigitalOcean.
 
 ### Use Cases
@@ -515,6 +533,8 @@ Returns the created DNS record including:
 
 ## Create Database
 
+**Component key:** `digitalocean.createDatabase`
+
 The Create Database component adds a new database to an existing DigitalOcean Managed Database cluster.
 
 ### Use Cases
@@ -557,6 +577,8 @@ Returns the created database including:
 <a id="create-database-cluster"></a>
 
 ## Create Database Cluster
+
+**Component key:** `digitalocean.createDatabaseCluster`
 
 The Create Database Cluster component provisions a new DigitalOcean Managed Database cluster and waits until it is online.
 
@@ -625,6 +647,8 @@ Returns the created database cluster including:
 <a id="create-droplet"></a>
 
 ## Create Droplet
+
+**Component key:** `digitalocean.createDroplet`
 
 The Create Droplet component creates a new droplet in DigitalOcean.
 
@@ -695,9 +719,90 @@ Returns the created droplet object including:
 }
 ```
 
+<a id="create-gpu-droplet"></a>
+
+## Create GPU Droplet
+
+**Component key:** `digitalocean.createGPUDroplet`
+
+The Create GPU Droplet component creates a new GPU-powered droplet in DigitalOcean.
+
+### Use Cases
+
+- **AI/ML workloads**: Provision GPU-powered instances for training and inference
+- **High-performance computing**: Spin up GPU instances for compute-intensive tasks
+- **Rendering workloads**: Create GPU droplets for 3D rendering pipelines
+
+### Configuration
+
+- **Name**: The hostname for the GPU droplet (required, supports expressions)
+- **Region**: Region slug where the GPU droplet will be created (required, only shows GPU-capable regions)
+- **Size**: GPU size slug for the droplet (required, only shows GPU sizes)
+- **Image Type**: Choose between a pre-configured one-click application or a base OS image (required)
+- **One-Click Application**: Pre-configured GPU-optimized applications like ML-in-a-Box (with PyTorch, TensorFlow, CUDA), CUDA Toolkit, and other marketplace apps (shown when Image Type is "One-Click Application")
+- **Base OS Image**: GPU-compatible base operating systems including Ubuntu, Debian, Rocky Linux, and Fedora (shown when Image Type is "Base OS Image")
+- **SSH Keys**: SSH keys to add to the droplet. Must have been added to the DigitalOcean team. (optional)
+- **Tags**: Tags to apply to the droplet (optional)
+- **User Data**: Cloud-init user data script (optional)
+- **Backups**: Enable automated backups for the droplet (optional)
+- **IPv6**: Enable IPv6 networking on the droplet (optional)
+- **Monitoring**: Enable DigitalOcean monitoring agent on the droplet (optional)
+- **VPC**: UUID of the VPC to create the droplet in (optional)
+
+### Output
+
+Returns the created GPU droplet object including:
+- **id**: Droplet ID
+- **name**: Droplet hostname
+- **status**: Current droplet status
+- **region**: Region information
+- **size_slug**: GPU size identifier
+- **networks**: Network information including IP addresses
+
+### Example Output
+
+```json
+{
+  "data": {
+    "disk": 720,
+    "id": 412345678,
+    "image": {
+      "id": 98765,
+      "name": "GPU H100 Base - Ubuntu 22.04",
+      "slug": "gpu-h100-base-ubuntu-22-04"
+    },
+    "memory": 245760,
+    "name": "my-gpu-droplet",
+    "networks": {
+      "v4": [
+        {
+          "ip_address": "143.198.100.50",
+          "type": "public"
+        }
+      ]
+    },
+    "region": {
+      "name": "Toronto 1",
+      "slug": "tor1"
+    },
+    "size_slug": "gpu-h100x1-80gb",
+    "status": "active",
+    "tags": [
+      "gpu",
+      "ml-training"
+    ],
+    "vcpus": 20
+  },
+  "timestamp": "2026-03-12T21:10:00.000000000Z",
+  "type": "digitalocean.gpuDroplet.created"
+}
+```
+
 <a id="create-knowledge-base"></a>
 
 ## Create Knowledge Base
+
+**Component key:** `digitalocean.createKnowledgeBase`
 
 The Create Knowledge Base component creates a new knowledge base on the DigitalOcean Gradient AI Platform, ready for use with AI agents via retrieval-augmented generation (RAG).
 
@@ -763,6 +868,8 @@ Returns the created knowledge base including:
 <a id="create-load-balancer"></a>
 
 ## Create Load Balancer
+
+**Component key:** `digitalocean.createLoadBalancer`
 
 The Create Load Balancer component creates a new load balancer in DigitalOcean and waits until it is active.
 
@@ -836,6 +943,8 @@ Returns the created load balancer object including:
 
 ## Create Snapshot
 
+**Component key:** `digitalocean.createSnapshot`
+
 The Create Snapshot component creates a point-in-time snapshot of a DigitalOcean Droplet.
 
 ### Use Cases
@@ -885,6 +994,8 @@ Returns the snapshot details including:
 
 ## Delete Alert Policy
 
+**Component key:** `digitalocean.deleteAlertPolicy`
+
 The Delete Alert Policy component permanently removes a monitoring alert policy from your DigitalOcean account.
 
 ### Use Cases
@@ -922,6 +1033,8 @@ Returns information about the deleted policy:
 <a id="delete-app"></a>
 
 ## Delete App
+
+**Component key:** `digitalocean.deleteApp`
 
 The Delete App component removes a DigitalOcean App Platform application.
 
@@ -961,6 +1074,8 @@ Returns confirmation of the deleted app including:
 <a id="delete-dns-record"></a>
 
 ## Delete DNS Record
+
+**Component key:** `digitalocean.deleteDNSRecord`
 
 The Delete DNS Record component permanently removes a DNS record from a DigitalOcean-managed domain.
 
@@ -1005,6 +1120,8 @@ Returns information about the deleted record:
 
 ## Delete Data Source
 
+**Component key:** `digitalocean.deleteDataSource`
+
 The Delete Data Source component removes a data source from an existing knowledge base on the DigitalOcean Gradient AI Platform.
 
 ### How it works
@@ -1043,6 +1160,8 @@ Returns the deleted data source details:
 <a id="delete-database"></a>
 
 ## Delete Database
+
+**Component key:** `digitalocean.deleteDatabase`
 
 The Delete Database component permanently removes a database from a DigitalOcean Managed Database cluster.
 
@@ -1090,6 +1209,8 @@ Returns information about the deleted database:
 
 ## Delete Droplet
 
+**Component key:** `digitalocean.deleteDroplet`
+
 The Delete Droplet component permanently deletes a droplet from your DigitalOcean account.
 
 ### Use Cases
@@ -1127,9 +1248,54 @@ Returns information about the deleted droplet:
 }
 ```
 
+<a id="delete-gpu-droplet"></a>
+
+## Delete GPU Droplet
+
+**Component key:** `digitalocean.deleteGPUDroplet`
+
+The Delete GPU Droplet component permanently deletes a GPU droplet from your DigitalOcean account.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary GPU droplets after training or inference tasks
+- **Cost optimization**: Automatically tear down expensive GPU infrastructure when not in use
+- **Automated workflows**: Delete GPU droplets as part of ML pipeline cleanup
+- **Environment management**: Remove ephemeral GPU environments after testing
+
+### Configuration
+
+- **Droplet**: The GPU droplet to delete (required, supports expressions)
+
+### Output
+
+Returns information about the deleted GPU droplet:
+- **dropletId**: The ID of the GPU droplet that was deleted
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- All data on the GPU droplet will be lost
+- The droplet will be shut down if it's running before deletion
+- Any snapshots of the GPU droplet will remain in your account
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dropletId": 957784760
+  },
+  "timestamp": "2026-03-12T21:25:45.688697002Z",
+  "type": "digitalocean.gpuDroplet.deleted"
+}
+```
+
 <a id="delete-knowledge-base"></a>
 
 ## Delete Knowledge Base
+
+**Component key:** `digitalocean.deleteKnowledgeBase`
 
 The Delete Knowledge Base component removes a knowledge base from the DigitalOcean Gradient AI Platform.
 
@@ -1180,6 +1346,8 @@ Returns confirmation of the deletion including:
 
 ## Delete Load Balancer
 
+**Component key:** `digitalocean.deleteLoadBalancer`
+
 The Delete Load Balancer component permanently deletes a load balancer from your DigitalOcean account.
 
 ### Use Cases
@@ -1218,6 +1386,8 @@ Returns information about the deleted load balancer:
 <a id="delete-object"></a>
 
 ## Delete Object
+
+**Component key:** `digitalocean.deleteObject`
 
 The Delete Object component permanently removes an object from a DigitalOcean Spaces bucket.
 
@@ -1265,6 +1435,8 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
 
 ## Delete Snapshot
 
+**Component key:** `digitalocean.deleteSnapshot`
+
 The Delete Snapshot component deletes a DigitalOcean snapshot image.
 
 ### Use Cases
@@ -1299,6 +1471,8 @@ Returns confirmation of the deleted snapshot including:
 <a id="detach-knowledge-base"></a>
 
 ## Detach Knowledge Base
+
+**Component key:** `digitalocean.detachKnowledgeBase`
 
 The Detach Knowledge Base component removes a knowledge base from an existing Gradient AI agent.
 
@@ -1335,6 +1509,8 @@ Returns confirmation of the detachment including:
 <a id="get-alert-policy"></a>
 
 ## Get Alert Policy
+
+**Component key:** `digitalocean.getAlertPolicy`
 
 The Get Alert Policy component retrieves the full details of a monitoring alert policy.
 
@@ -1392,6 +1568,8 @@ Returns the alert policy object including:
 <a id="get-app"></a>
 
 ## Get App
+
+**Component key:** `digitalocean.getApp`
 
 The Get App component retrieves detailed information about a specific DigitalOcean App Platform application.
 
@@ -1587,6 +1765,8 @@ Returns the app object including:
 
 ## Get Cluster Configuration
 
+**Component key:** `digitalocean.getClusterConfiguration`
+
 The Get Cluster Configuration component retrieves the active configuration for a DigitalOcean Managed Database cluster.
 
 ### Use Cases
@@ -1635,6 +1815,8 @@ Returns the cluster configuration including:
 <a id="get-database"></a>
 
 ## Get Database
+
+**Component key:** `digitalocean.getDatabase`
 
 The Get Database component retrieves a managed database from a DigitalOcean cluster and enriches it with cluster context.
 
@@ -1700,6 +1882,8 @@ Returns the requested database enriched with cluster details, including:
 
 ## Get Database Cluster
 
+**Component key:** `digitalocean.getDatabaseCluster`
+
 The Get Database Cluster component retrieves the details of an existing DigitalOcean Managed Database cluster.
 
 ### Use Cases
@@ -1761,6 +1945,8 @@ Returns the database cluster including:
 <a id="get-droplet"></a>
 
 ## Get Droplet
+
+**Component key:** `digitalocean.getDroplet`
 
 The Get Droplet component retrieves detailed information about a specific droplet.
 
@@ -1834,6 +2020,8 @@ Returns the droplet object including:
 
 ## Get Droplet Metrics
 
+**Component key:** `digitalocean.getDropletMetrics`
+
 The Get Droplet Metrics component retrieves CPU usage, memory utilization, and network bandwidth metrics for a droplet over a specified lookback window.
 
 > **Note:** Monitoring is only available for droplets that had monitoring enabled during creation. Droplets created without monitoring will not report metrics.
@@ -1889,9 +2077,88 @@ All metric values are rounded to two decimal places.
 }
 ```
 
+<a id="get-gpu-droplet"></a>
+
+## Get GPU Droplet
+
+**Component key:** `digitalocean.getGPUDroplet`
+
+The Get GPU Droplet component retrieves detailed information about a specific GPU droplet.
+
+### Use Cases
+
+- **Status checks**: Verify GPU droplet state before performing operations
+- **Information retrieval**: Get current IP addresses, GPU configuration, and status
+- **Pre-flight validation**: Check GPU droplet exists before operations like snapshot or power management
+- **Monitoring**: Track GPU droplet configuration and network details
+
+### Configuration
+
+- **Droplet**: The GPU droplet to retrieve (required, supports expressions)
+
+### Output
+
+Returns the GPU droplet object including:
+- **id**: Droplet ID
+- **name**: Droplet hostname
+- **status**: Current droplet status (new, active, off, archive)
+- **memory**: RAM in MB
+- **vcpus**: Number of virtual CPUs
+- **disk**: Disk size in GB
+- **region**: Region information
+- **image**: Image information
+- **size_slug**: GPU size identifier
+- **networks**: Network information including IP addresses
+- **tags**: Applied tags
+
+### Example Output
+
+```json
+{
+  "data": {
+    "disk": 720,
+    "id": 412345678,
+    "image": {
+      "id": 98765,
+      "name": "GPU H100 Base - Ubuntu 22.04",
+      "slug": "gpu-h100-base-ubuntu-22-04"
+    },
+    "memory": 245760,
+    "name": "my-gpu-droplet",
+    "networks": {
+      "v4": [
+        {
+          "ip_address": "143.198.100.50",
+          "type": "public"
+        },
+        {
+          "ip_address": "10.132.0.5",
+          "type": "private"
+        }
+      ]
+    },
+    "region": {
+      "name": "Toronto 1",
+      "slug": "tor1"
+    },
+    "size_slug": "gpu-h100x1-80gb",
+    "status": "active",
+    "tags": [
+      "gpu",
+      "ml-training"
+    ],
+    "vcpus": 20
+  },
+  "timestamp": "2026-03-12T21:13:32.946693411Z",
+  "type": "digitalocean.gpuDroplet.fetched"
+}
+```
+
 <a id="get-knowledge-base"></a>
 
 ## Get Knowledge Base
+
+**Component key:** `digitalocean.getKnowledgeBase`
 
 The Get Knowledge Base component retrieves comprehensive information about an existing knowledge base on the DigitalOcean Gradient AI Platform.
 
@@ -1982,6 +2249,8 @@ Returns the full knowledge base object including:
 
 ## Get Object
 
+**Component key:** `digitalocean.getObject`
+
 The Get Object component retrieves an object and its metadata from a DigitalOcean Spaces bucket.
 
 ### Prerequisites
@@ -2050,6 +2319,8 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
 
 ## Index Knowledge Base
 
+**Component key:** `digitalocean.indexKnowledgeBase`
+
 The Index Knowledge Base component triggers a new indexing job on an existing knowledge base and polls until it completes.
 
 ### How it works
@@ -2101,6 +2372,8 @@ Returns the completed indexing job details:
 <a id="manage-droplet-power"></a>
 
 ## Manage Droplet Power
+
+**Component key:** `digitalocean.manageDropletPower`
 
 The Manage Droplet Power component performs power management operations on a droplet.
 
@@ -2162,6 +2435,8 @@ Returns the action result including:
 
 ## Put Object
 
+**Component key:** `digitalocean.putObject`
+
 The Put Object component uploads a text-based object to a DigitalOcean Spaces bucket.
 
 ### Prerequisites
@@ -2220,6 +2495,8 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
 <a id="run-evaluation"></a>
 
 ## Run Evaluation
+
+**Component key:** `digitalocean.runEvaluation`
 
 The Run Evaluation component triggers a Gradient AI evaluation test case against an agent, waits for it to complete, and reports whether the agent passed or failed.
 
@@ -2346,6 +2623,8 @@ Returns the evaluation results including:
 
 ## Update Alert Policy
 
+**Component key:** `digitalocean.updateAlertPolicy`
+
 The Update Alert Policy component modifies an existing monitoring alert policy with new settings.
 
 > **Note:** Monitoring is only available for droplets that had monitoring enabled during creation. Droplets created without monitoring will not report metrics or trigger alerts.
@@ -2421,6 +2700,8 @@ Returns the updated alert policy including:
 <a id="update-app"></a>
 
 ## Update App
+
+**Component key:** `digitalocean.updateApp`
 
 The Update App component modifies an existing DigitalOcean App Platform application.
 
@@ -2512,9 +2793,92 @@ Returns the updated app including:
 }
 ```
 
+<a id="update-gpu-droplet"></a>
+
+## Update GPU Droplet
+
+**Component key:** `digitalocean.updateGPUDroplet`
+
+The Update GPU Droplet component allows renaming and upsizing an existing GPU droplet.
+
+### Use Cases
+
+- **Renaming**: Update the hostname of a GPU droplet
+- **Upsizing**: Scale up a GPU droplet to a larger GPU size for more compute power
+- **Combined updates**: Rename and upsize in a single operation
+
+### Configuration
+
+- **Droplet**: The GPU droplet to update (required, supports expressions)
+- **New Name**: The new hostname for the GPU droplet (optional, supports expressions)
+- **New GPU Size**: The new GPU size to upsize the droplet to (optional, only upsizing is supported)
+
+### Output
+
+Returns the updated GPU droplet object including:
+- **id**: Droplet ID
+- **name**: Updated droplet hostname
+- **status**: Current droplet status
+- **size_slug**: New GPU size identifier (if resized)
+- **region**: Region information
+- **networks**: Network information including IP addresses
+
+### Important Notes
+
+- At least one of **New Name** or **New GPU Size** must be provided
+- Only **upsizing** is supported — you cannot downsize a GPU droplet
+- The GPU droplet must be powered off before resizing
+- If both rename and resize are specified, rename is performed first
+- The component waits for each operation to complete before proceeding
+
+### Example Output
+
+```json
+{
+  "data": {
+    "disk": 2046,
+    "id": 412345678,
+    "image": {
+      "id": 98765,
+      "name": "GPU H100 Base - Ubuntu 22.04",
+      "slug": "gpu-h100-base-ubuntu-22-04"
+    },
+    "memory": 655360,
+    "name": "my-gpu-droplet-renamed",
+    "networks": {
+      "v4": [
+        {
+          "ip_address": "143.198.100.50",
+          "type": "public"
+        },
+        {
+          "ip_address": "10.132.0.5",
+          "type": "private"
+        }
+      ]
+    },
+    "region": {
+      "name": "Toronto 1",
+      "slug": "tor1"
+    },
+    "size_slug": "gpu-h100x8-640gb",
+    "status": "active",
+    "tags": [
+      "gpu",
+      "ml-training"
+    ],
+    "vcpus": 160
+  },
+  "timestamp": "2026-03-12T22:30:00.000000000Z",
+  "type": "digitalocean.gpuDroplet.updated"
+}
+```
+
 <a id="upsert-dns-record"></a>
 
 ## Upsert DNS Record
+
+**Component key:** `digitalocean.upsertDNSRecord`
 
 The Upsert DNS Record component idempotently creates or updates a DNS record for a DigitalOcean-managed domain.
 

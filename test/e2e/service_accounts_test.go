@@ -14,9 +14,8 @@ import (
 )
 
 func TestServiceAccounts(t *testing.T) {
-	steps := &serviceAccountSteps{t: t}
-
 	t.Run("creating a service account with viewer role", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.visitServiceAccountsPage()
 		steps.clickCreateServiceAccount()
@@ -30,6 +29,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("creating a service account with admin role", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.visitServiceAccountsPage()
 		steps.clickCreateServiceAccount()
@@ -43,21 +43,26 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("viewing service accounts in the list", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("list-test-bot", "For listing test")
 		steps.visitServiceAccountsPage()
 		steps.assertServiceAccountVisibleInList("list-test-bot")
+		steps.assertCreatorVisibleInListForServiceAccount("list-test-bot")
 	})
 
 	t.Run("navigating to service account detail", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("detail-test-bot", "For detail test")
 		steps.visitServiceAccountsPage()
 		steps.clickServiceAccountLink("detail-test-bot")
 		steps.assertOnDetailPage("detail-test-bot")
+		steps.assertCreatorOnDetailPage()
 	})
 
 	t.Run("editing a service account", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("edit-test-bot", "Original description")
 		steps.visitServiceAccountsPage()
@@ -70,6 +75,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("deleting a service account", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("delete-test-bot", "Will be deleted")
 		steps.visitServiceAccountsPage()
@@ -80,6 +86,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("regenerating a service account token", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("regen-test-bot", "Token regen test")
 		steps.visitServiceAccountsPage()
@@ -89,6 +96,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("viewer cannot create or manage service accounts", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("viewer-test-bot", "Viewer RBAC test")
 		steps.loginAsViewer()
@@ -179,7 +187,7 @@ func (s *serviceAccountSteps) dismissTokenModal() {
 
 func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, expectedRole string) {
 	orgID := s.session.OrgID.String()
-	serviceAccounts, err := models.FindServiceAccountsByOrganization(orgID)
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.DB(s.t.Context()), orgID)
 	require.NoError(s.t, err)
 
 	var found *models.User
@@ -211,6 +219,20 @@ func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, e
 
 func (s *serviceAccountSteps) assertServiceAccountVisibleInList(name string) {
 	s.session.AssertText(name)
+}
+
+func (s *serviceAccountSteps) assertCreatorVisibleInListForServiceAccount(name string) {
+	// Same row as the service account name should show the human who created it (e2e seed user).
+	row := s.session.Page().GetByRole("row", pw.PageGetByRoleOptions{Name: name})
+	require.NoError(s.t, row.GetByText("E2E User", pw.LocatorGetByTextOptions{Exact: pw.Bool(true)}).WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(10000),
+	}))
+}
+
+func (s *serviceAccountSteps) assertCreatorOnDetailPage() {
+	s.session.AssertText("Created by")
+	s.session.AssertText("E2E User")
 }
 
 func (s *serviceAccountSteps) clickServiceAccountLink(name string) {
@@ -258,7 +280,7 @@ func (s *serviceAccountSteps) submitEdit() {
 }
 
 func (s *serviceAccountSteps) assertServiceAccountNameInDB(name string) {
-	serviceAccounts, err := models.FindServiceAccountsByOrganization(s.session.OrgID.String())
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
 	require.NoError(s.t, err)
 
 	for _, sa := range serviceAccounts {
@@ -277,7 +299,7 @@ func (s *serviceAccountSteps) clickDeleteOnDetail() {
 }
 
 func (s *serviceAccountSteps) assertServiceAccountDeletedFromDB(name string) {
-	serviceAccounts, err := models.FindServiceAccountsByOrganization(s.session.OrgID.String())
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
 	require.NoError(s.t, err)
 
 	for _, sa := range serviceAccounts {

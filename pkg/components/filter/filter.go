@@ -14,7 +14,7 @@ import (
 const ComponentName = "filter"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &Filter{})
+	registry.RegisterAction(ComponentName, &Filter{})
 }
 
 type Spec struct {
@@ -117,14 +117,6 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Pass()
 }
 
-func (f *Filter) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (f *Filter) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("filter does not support actions")
-}
-
 func (f *Filter) Setup(ctx core.SetupContext) error {
 	return nil
 }
@@ -142,5 +134,13 @@ func (f *Filter) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 }
 
 func (f *Filter) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (f *Filter) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (f *Filter) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

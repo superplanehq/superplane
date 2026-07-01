@@ -41,13 +41,22 @@ type ContactPoint struct {
 	Name string `json:"name"`
 }
 
+type DataSourceMetricsRef struct {
+	UID string `json:"uid"`
+}
+
+type DataSourceJSONData struct {
+	Metrics *DataSourceMetricsRef `json:"metrics,omitempty"`
+}
+
 type DataSource struct {
-	ID        int    `json:"id"`
-	UID       string `json:"uid"`
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	URL       string `json:"url"`
-	IsDefault bool   `json:"isDefault"`
+	ID        int                `json:"id"`
+	UID       string             `json:"uid"`
+	Name      string             `json:"name"`
+	Type      string             `json:"type"`
+	URL       string             `json:"url"`
+	IsDefault bool               `json:"isDefault"`
+	JSONData  DataSourceJSONData `json:"jsonData"`
 }
 
 type Silence struct {

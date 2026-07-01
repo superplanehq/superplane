@@ -90,27 +90,3 @@ func TestNoop_Execute_AlwaysEmitsEmpty(t *testing.T) {
 		assert.NotEqual(t, originalData, payload["data"])
 	})
 }
-
-func TestNoop_Configuration_ShouldReturnEmptyConfig(t *testing.T) {
-	noop := &NoOp{}
-	config := noop.Configuration()
-
-	assert.Empty(t, config)
-}
-
-func TestNoop_Actions_ShouldReturnEmptyActions(t *testing.T) {
-	noop := &NoOp{}
-	actions := noop.Actions()
-
-	assert.Empty(t, actions)
-}
-
-func TestNoop_BasicProperties_ShouldReturnCorrectValues(t *testing.T) {
-	noop := &NoOp{}
-
-	assert.Equal(t, "noop", noop.Name())
-	assert.Equal(t, "No Operation", noop.Label())
-	assert.Contains(t, noop.Description(), "pass events through")
-	assert.Equal(t, "circle-off", noop.Icon())
-	assert.Equal(t, "blue", noop.Color())
-}

@@ -140,8 +140,8 @@ func (t *Teams) Configuration() []configuration.Field {
 	}
 }
 
-func (t *Teams) Components() []core.Component {
-	return []core.Component{
+func (t *Teams) Actions() []core.Action {
+	return []core.Action{
 		&SendTextMessage{},
 	}
 }
@@ -396,14 +396,6 @@ func (t *Teams) Cleanup(ctx core.IntegrationCleanupContext) error {
 	return nil
 }
 
-func (t *Teams) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (t *Teams) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
 // generateManifestZIP creates a Teams app manifest ZIP ready for upload to Teams Admin Center.
 func generateManifestZIP(appID, botName string) ([]byte, error) {
 	manifest := map[string]any{
@@ -604,4 +596,12 @@ func inRoundedRect(x, y, x0, y0, x1, y1, r int) bool {
 	}
 
 	return false
+}
+
+func (t *Teams) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (t *Teams) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

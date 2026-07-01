@@ -2,20 +2,23 @@ package actions
 
 import (
 	"encoding/json"
-	"slices"
-
+	"fmt"
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
+	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/protobuf/types/known/structpb"
+	"slices"
 )
 
 func ValidateUUIDs(ids ...string) error {
@@ -26,7 +29,7 @@ func ValidateUUIDsArray(ids []string) error {
 	for _, id := range ids {
 		_, err := uuid.Parse(id)
 		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "invalid UUID: %s", id)
+			return grpcerrors.InvalidArgument(nil, fmt.Sprintf("invalid UUID: %s", id))
 		}
 	}
 
@@ -74,6 +77,10 @@ func stringTypeOptionsToProto(opts *configuration.StringTypeOptions) *configpb.S
 		pbOpts.MaxLength = &maxLength
 	}
 
+	if opts.AllowExpressions != nil {
+		pbOpts.AllowExpressions = opts.AllowExpressions
+	}
+
 	return pbOpts
 }
 
@@ -110,6 +117,10 @@ func textTypeOptionsToProto(opts *configuration.TextTypeOptions) *configpb.TextT
 		pbOpts.MaxLength = &maxLength
 	}
 
+	if opts.Language != "" {
+		pbOpts.Language = &opts.Language
+	}
+
 	return pbOpts
 }
 
@@ -123,8 +134,9 @@ func selectTypeOptionsToProto(opts *configuration.SelectTypeOptions) *configpb.S
 	}
 	for i, opt := range opts.Options {
 		pbOpts.Options[i] = &configpb.SelectOption{
-			Label: opt.Label,
-			Value: opt.Value,
+			Label:       opt.Label,
+			Value:       opt.Value,
+			Description: opt.Description,
 		}
 	}
 	return pbOpts
@@ -136,12 +148,14 @@ func multiSelectTypeOptionsToProto(opts *configuration.MultiSelectTypeOptions) *
 	}
 
 	pbOpts := &configpb.MultiSelectTypeOptions{
-		Options: make([]*configpb.SelectOption, len(opts.Options)),
+		Options:       make([]*configpb.SelectOption, len(opts.Options)),
+		UseCheckboxes: opts.UseCheckboxes,
 	}
 	for i, opt := range opts.Options {
 		pbOpts.Options[i] = &configpb.SelectOption{
-			Label: opt.Label,
-			Value: opt.Value,
+			Label:       opt.Label,
+			Value:       opt.Value,
+			Description: opt.Description,
 		}
 	}
 	return pbOpts
@@ -170,6 +184,16 @@ func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListT
 		ItemDefinition: &configpb.ListItemDefinition{
 			Type: opts.ItemDefinition.Type,
 		},
+	}
+
+	if opts.Accordion {
+		accordion := true
+		pbOpts.Accordion = &accordion
+	}
+
+	if opts.Reorderable {
+		reorderable := true
+		pbOpts.Reorderable = &reorderable
 	}
 
 	if opts.MaxItems != nil {
@@ -248,8 +272,9 @@ func anyPredicateListTypeOptionsToProto(opts *configuration.AnyPredicateListType
 	}
 	for i, opt := range opts.Operators {
 		pbOpts.Operators[i] = &configpb.SelectOption{
-			Label: opt.Label,
-			Value: opt.Value,
+			Label:       opt.Label,
+			Value:       opt.Value,
+			Description: opt.Description,
 		}
 	}
 	return pbOpts
@@ -352,6 +377,10 @@ func protoToStringTypeOptions(pbOpts *configpb.StringTypeOptions) *configuration
 		opts.MaxLength = &maxLength
 	}
 
+	if pbOpts.AllowExpressions != nil {
+		opts.AllowExpressions = pbOpts.AllowExpressions
+	}
+
 	return opts
 }
 
@@ -387,6 +416,10 @@ func protoToTextTypeOptions(pbOpts *configpb.TextTypeOptions) *configuration.Tex
 		opts.MaxLength = &maxLength
 	}
 
+	if pbOpts.Language != nil {
+		opts.Language = *pbOpts.Language
+	}
+
 	return opts
 }
 
@@ -400,8 +433,9 @@ func protoToSelectTypeOptions(pbOpts *configpb.SelectTypeOptions) *configuration
 	}
 	for i, pbOpt := range pbOpts.Options {
 		opts.Options[i] = configuration.FieldOption{
-			Label: pbOpt.Label,
-			Value: pbOpt.Value,
+			Label:       pbOpt.Label,
+			Value:       pbOpt.Value,
+			Description: pbOpt.Description,
 		}
 	}
 	return opts
@@ -413,12 +447,14 @@ func protoToMultiSelectTypeOptions(pbOpts *configpb.MultiSelectTypeOptions) *con
 	}
 
 	opts := &configuration.MultiSelectTypeOptions{
-		Options: make([]configuration.FieldOption, len(pbOpts.Options)),
+		Options:       make([]configuration.FieldOption, len(pbOpts.Options)),
+		UseCheckboxes: pbOpts.UseCheckboxes,
 	}
 	for i, pbOpt := range pbOpts.Options {
 		opts.Options[i] = configuration.FieldOption{
-			Label: pbOpt.Label,
-			Value: pbOpt.Value,
+			Label:       pbOpt.Label,
+			Value:       pbOpt.Value,
+			Description: pbOpt.Description,
 		}
 	}
 	return opts
@@ -493,7 +529,9 @@ func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.Lis
 	}
 
 	opts := &configuration.ListTypeOptions{
-		ItemLabel: pbOpts.ItemLabel,
+		ItemLabel:   pbOpts.GetItemLabel(),
+		Accordion:   pbOpts.GetAccordion(),
+		Reorderable: pbOpts.GetReorderable(),
 		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},
@@ -575,8 +613,9 @@ func protoToAnyPredicateListTypeOptions(pbOpts *configpb.AnyPredicateListTypeOpt
 	}
 	for i, pbOpt := range pbOpts.Operators {
 		opts.Operators[i] = configuration.FieldOption{
-			Label: pbOpt.Label,
-			Value: pbOpt.Value,
+			Label:       pbOpt.Label,
+			Value:       pbOpt.Value,
+			Description: pbOpt.Description,
 		}
 	}
 	return opts
@@ -657,19 +696,21 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
 		var integrationID *string
-		if node.Integration != nil && node.Integration.Id != "" {
-			integrationID = &node.Integration.Id
+		if node.Integration != nil && node.Integration.Id != nil {
+			integrationID = node.Integration.Id
 		}
 
 		var errorMessage *string
-		if node.ErrorMessage != "" {
-			errorMessage = &node.ErrorMessage
+		if node.ErrorMessage != nil {
+			errorMessage = node.ErrorMessage
 		}
 
 		var warningMessage *string
-		if node.WarningMessage != "" {
-			warningMessage = &node.WarningMessage
+		if node.WarningMessage != nil {
+			warningMessage = node.WarningMessage
 		}
+
+		nodeType, nodeRef := ComponentToNodeTypeAndRef(node.Type, node.Component)
 
 		//
 		// NOTE: we do not include metadata in here,
@@ -679,8 +720,8 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 		result[i] = models.Node{
 			ID:             node.Id,
 			Name:           node.Name,
-			Type:           ProtoToNodeType(node.Type),
-			Ref:            ProtoToNodeRef(node),
+			Type:           nodeType,
+			Ref:            *nodeRef,
 			Configuration:  node.Configuration.AsMap(),
 			Position:       ProtoToPosition(node.Position),
 			IsCollapsed:    node.IsCollapsed,
@@ -689,7 +730,33 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			WarningMessage: warningMessage,
 		}
 	}
+
 	return result
+}
+
+func ComponentToNodeTypeAndRef(nodeType componentpb.Node_Type, component string) (string, *models.NodeRef) {
+	switch nodeType {
+	case componentpb.Node_TYPE_ACTION:
+		return models.NodeTypeComponent, &models.NodeRef{
+			Component: &models.ComponentRef{
+				Name: component,
+			},
+		}
+	case componentpb.Node_TYPE_TRIGGER:
+		return models.NodeTypeTrigger, &models.NodeRef{
+			Trigger: &models.TriggerRef{
+				Name: component,
+			},
+		}
+	case componentpb.Node_TYPE_WIDGET:
+		return models.NodeTypeWidget, &models.NodeRef{
+			Widget: &models.WidgetRef{
+				Name: component,
+			},
+		}
+	default:
+		return models.NodeTypeComponent, &models.NodeRef{}
+	}
 }
 
 func NodesToProto(nodes []models.Node) []*componentpb.Node {
@@ -704,27 +771,15 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 		}
 
 		if node.Ref.Component != nil {
-			result[i].Component = &componentpb.Node_ComponentRef{
-				Name: node.Ref.Component.Name,
-			}
-		}
-
-		if node.Ref.Blueprint != nil {
-			result[i].Blueprint = &componentpb.Node_BlueprintRef{
-				Id: node.Ref.Blueprint.ID,
-			}
+			result[i].Component = node.Ref.Component.Name
 		}
 
 		if node.Ref.Trigger != nil {
-			result[i].Trigger = &componentpb.Node_TriggerRef{
-				Name: node.Ref.Trigger.Name,
-			}
+			result[i].Component = node.Ref.Trigger.Name
 		}
 
 		if node.Ref.Widget != nil {
-			result[i].Widget = &componentpb.Node_WidgetRef{
-				Name: node.Ref.Widget.Name,
-			}
+			result[i].Component = node.Ref.Widget.Name
 		}
 
 		if node.Configuration != nil {
@@ -737,20 +792,33 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 
 		if node.IntegrationID != nil && *node.IntegrationID != "" {
 			result[i].Integration = &componentpb.IntegrationRef{
-				Id: *node.IntegrationID,
+				Id: node.IntegrationID,
 			}
 		}
 
 		if node.ErrorMessage != nil && *node.ErrorMessage != "" {
-			result[i].ErrorMessage = *node.ErrorMessage
+			result[i].ErrorMessage = node.ErrorMessage
 		}
 
 		if node.WarningMessage != nil && *node.WarningMessage != "" {
-			result[i].WarningMessage = *node.WarningMessage
+			result[i].WarningMessage = node.WarningMessage
 		}
 	}
 
 	return result
+}
+
+func NodeTypeToProto(nodeType string) componentpb.Node_Type {
+	switch nodeType {
+	case models.NodeTypeTrigger:
+		return componentpb.Node_TYPE_TRIGGER
+	case models.NodeTypeWidget:
+		return componentpb.Node_TYPE_WIDGET
+	case models.NodeTypeComponent:
+		return componentpb.Node_TYPE_ACTION
+	default:
+		return componentpb.Node_TYPE_ACTION
+	}
 }
 
 func ProtoToEdges(edges []*componentpb.Edge) []models.Edge {
@@ -780,7 +848,7 @@ func EdgesToProto(edges []models.Edge) []*componentpb.Edge {
 // FindShadowedNameWarnings detects nodes with duplicate names within connected components.
 // Only nodes that are connected (directly or transitively) and share the same name will be flagged.
 // Returns a map of node ID -> warning message.
-func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Edge) map[string]string {
+func FindShadowedNameWarnings(registry *registry.Registry, nodes []*componentpb.Node, edges []*componentpb.Edge) map[string]string {
 	warnings := make(map[string]string)
 
 	if len(nodes) == 0 {
@@ -792,9 +860,15 @@ func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Ed
 	nodeNameByID := make(map[string]string)
 
 	for _, node := range nodes {
-		if node.Type == componentpb.Node_TYPE_WIDGET {
+		nodeType, err := registry.ComponentType(node.Component)
+		if err != nil {
+			continue
+		}
+
+		if nodeType == models.NodeTypeWidget {
 			continue // Skip widgets
 		}
+
 		nodeIDs[node.Id] = true
 		nodeNameByID[node.Id] = node.Name
 	}
@@ -856,67 +930,6 @@ func FindShadowedNameWarnings(nodes []*componentpb.Node, edges []*componentpb.Ed
 	}
 
 	return warnings
-}
-
-func ProtoToNodeType(nodeType componentpb.Node_Type) string {
-	switch nodeType {
-	case componentpb.Node_TYPE_COMPONENT:
-		return models.NodeTypeComponent
-	case componentpb.Node_TYPE_BLUEPRINT:
-		return models.NodeTypeBlueprint
-	case componentpb.Node_TYPE_TRIGGER:
-		return models.NodeTypeTrigger
-	case componentpb.Node_TYPE_WIDGET:
-		return models.NodeTypeWidget
-	default:
-		return ""
-	}
-}
-
-func NodeTypeToProto(nodeType string) componentpb.Node_Type {
-	switch nodeType {
-	case models.NodeTypeBlueprint:
-		return componentpb.Node_TYPE_BLUEPRINT
-	case models.NodeTypeTrigger:
-		return componentpb.Node_TYPE_TRIGGER
-	case models.NodeTypeWidget:
-		return componentpb.Node_TYPE_WIDGET
-	default:
-		return componentpb.Node_TYPE_COMPONENT
-	}
-}
-
-func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
-	ref := models.NodeRef{}
-
-	switch node.Type {
-	case componentpb.Node_TYPE_COMPONENT:
-		if node.Component != nil {
-			ref.Component = &models.ComponentRef{
-				Name: node.Component.Name,
-			}
-		}
-	case componentpb.Node_TYPE_BLUEPRINT:
-		if node.Blueprint != nil {
-			ref.Blueprint = &models.BlueprintRef{
-				ID: node.Blueprint.Id,
-			}
-		}
-	case componentpb.Node_TYPE_TRIGGER:
-		if node.Trigger != nil {
-			ref.Trigger = &models.TriggerRef{
-				Name: node.Trigger.Name,
-			}
-		}
-	case componentpb.Node_TYPE_WIDGET:
-		if node.Widget != nil {
-			ref.Widget = &models.WidgetRef{
-				Name: node.Widget.Name,
-			}
-		}
-	}
-
-	return ref
 }
 
 func PositionToProto(position models.Position) *componentpb.Position {
@@ -1031,44 +1044,11 @@ func defaultValueFromProto(fieldType, defaultValue string) any {
 	}
 }
 
-func SerializeComponents(in []core.Component) []*componentpb.Component {
-	out := make([]*componentpb.Component, len(in))
-	for i, component := range in {
-		outputChannels := component.OutputChannels(nil)
-		channels := make([]*componentpb.OutputChannel, len(outputChannels))
-		for j, channel := range outputChannels {
-			channels[j] = &componentpb.OutputChannel{
-				Name: channel.Name,
-			}
-		}
-
-		configFields := component.Configuration()
-		configuration := make([]*configpb.Field, len(configFields))
-		for j, field := range configFields {
-			configuration[j] = ConfigurationFieldToProto(field)
-		}
-		exampleOutput, _ := structpb.NewStruct(component.ExampleOutput())
-
-		out[i] = &componentpb.Component{
-			Name:           component.Name(),
-			Label:          component.Label(),
-			Description:    component.Description(),
-			Icon:           component.Icon(),
-			Color:          component.Color(),
-			OutputChannels: channels,
-			Configuration:  configuration,
-			ExampleOutput:  exampleOutput,
-		}
-	}
-
-	return out
-}
-
 func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	out := make([]*triggerpb.Trigger, len(in))
 	for i, trigger := range in {
 		configFields := trigger.Configuration()
-		configFields = AppendGlobalTriggerFields(configFields)
+		configFields = AppendGlobalTriggerFields(trigger.Name(), configFields)
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
@@ -1088,21 +1068,27 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	return out
 }
 
-func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Field {
+func AppendGlobalTriggerFields(triggerName string, fields []configuration.Field) []configuration.Field {
 	if slices.ContainsFunc(fields, func(field configuration.Field) bool {
 		return field.Name == "customName"
 	}) {
 		return fields
 	}
 
-	fields = append(fields, configuration.Field{
+	runTitleField := configuration.Field{
 		Name:        "customName",
-		Label:       "Run title (optional)",
+		Label:       "Run title",
 		Type:        configuration.FieldTypeString,
 		Togglable:   true,
-		Description: "Optional run title template. Supports expressions like {{ $.data }}.",
-		Placeholder: "Deploy {{ $.repository.name }} @ {{ $.head_commit.id }}",
-	})
+		Description: "Give each run a dynamic title using expressions. Use root().data to access the trigger payload.",
+		Placeholder: "{{ root().data.foo }}",
+	}
+
+	if defaultTitle := defaultRunTitleExpression(triggerName); defaultTitle != "" {
+		runTitleField.Default = defaultTitle
+	}
+
+	fields = append(fields, runTitleField)
 
 	return fields
 }
@@ -1126,4 +1112,87 @@ func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {
 		}
 	}
 	return out
+}
+
+func SerializeActions(in []core.Action) []*actionpb.Action {
+	out := make([]*actionpb.Action, len(in))
+	for i, action := range in {
+		outputChannels := action.OutputChannels(nil)
+		channels := make([]*actionpb.OutputChannel, len(outputChannels))
+		for j, channel := range outputChannels {
+			channels[j] = &actionpb.OutputChannel{
+				Name: channel.Name,
+			}
+		}
+
+		configFields := action.Configuration()
+		configuration := make([]*configpb.Field, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = ConfigurationFieldToProto(field)
+		}
+		exampleOutput, _ := structpb.NewStruct(action.ExampleOutput())
+
+		out[i] = &actionpb.Action{
+			Name:           action.Name(),
+			Label:          action.Label(),
+			Description:    action.Description(),
+			Icon:           action.Icon(),
+			Color:          action.Color(),
+			OutputChannels: channels,
+			Configuration:  configuration,
+			ExampleOutput:  exampleOutput,
+		}
+	}
+	return out
+}
+
+func CapabilityTypeToProto(t string) integrationpb.CapabilityDefinition_Type {
+	switch t {
+	case string(core.IntegrationCapabilityTypeAction):
+		return integrationpb.CapabilityDefinition_TYPE_ACTION
+	case string(core.IntegrationCapabilityTypeTrigger):
+		return integrationpb.CapabilityDefinition_TYPE_TRIGGER
+	}
+	return integrationpb.CapabilityDefinition_TYPE_UNKNOWN
+}
+
+func ProtoToCapabilityType(t integrationpb.CapabilityDefinition_Type) string {
+	switch t {
+	case integrationpb.CapabilityDefinition_TYPE_ACTION:
+		return string(core.IntegrationCapabilityTypeAction)
+	case integrationpb.CapabilityDefinition_TYPE_TRIGGER:
+		return string(core.IntegrationCapabilityTypeTrigger)
+	}
+
+	return ""
+}
+
+func CapabilityStateToProto(t string) organizationpb.Integration_CapabilityState_State {
+	switch t {
+	case string(core.IntegrationCapabilityStateRequested):
+		return organizationpb.Integration_CapabilityState_STATE_REQUESTED
+	case string(core.IntegrationCapabilityStateEnabled):
+		return organizationpb.Integration_CapabilityState_STATE_ENABLED
+	case string(core.IntegrationCapabilityStateDisabled):
+		return organizationpb.Integration_CapabilityState_STATE_DISABLED
+	case string(core.IntegrationCapabilityStateAvailable):
+		return organizationpb.Integration_CapabilityState_STATE_AVAILABLE
+	}
+	return organizationpb.Integration_CapabilityState_STATE_UNAVAILABLE
+}
+
+func ProtoToCapabilityState(t organizationpb.Integration_CapabilityState_State) string {
+	switch t {
+	case organizationpb.Integration_CapabilityState_STATE_AVAILABLE:
+		return string(core.IntegrationCapabilityStateAvailable)
+	case organizationpb.Integration_CapabilityState_STATE_UNAVAILABLE:
+		return string(core.IntegrationCapabilityStateUnavailable)
+	case organizationpb.Integration_CapabilityState_STATE_REQUESTED:
+		return string(core.IntegrationCapabilityStateRequested)
+	case organizationpb.Integration_CapabilityState_STATE_ENABLED:
+		return string(core.IntegrationCapabilityStateEnabled)
+	case organizationpb.Integration_CapabilityState_STATE_DISABLED:
+		return string(core.IntegrationCapabilityStateDisabled)
+	}
+	return ""
 }

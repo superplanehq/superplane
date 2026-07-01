@@ -47,7 +47,7 @@ func (c *IntegrationSubscriptionContext) Configuration() any {
 func (c *IntegrationSubscriptionContext) SendMessage(message any) error {
 	switch c.subscription.NodeType {
 	case models.NodeTypeComponent:
-		return c.sendMessageToComponent(message)
+		return c.sendMessageToAction(message)
 
 	case models.NodeTypeTrigger:
 		return c.sendMessageToTrigger(message)
@@ -56,25 +56,25 @@ func (c *IntegrationSubscriptionContext) SendMessage(message any) error {
 	return fmt.Errorf("node type %s does not support messages", c.subscription.NodeType)
 }
 
-func (c *IntegrationSubscriptionContext) sendMessageToComponent(message any) error {
+func (c *IntegrationSubscriptionContext) sendMessageToAction(message any) error {
 	nodeRef := c.subscription.NodeRef.Data()
 	if nodeRef.Component == nil {
 		return fmt.Errorf("invalid component ref")
 	}
 
-	componentName := nodeRef.Component.Name
-	component, err := c.registry.GetComponent(componentName)
+	name := nodeRef.Component.Name
+	action, err := c.registry.GetAction(name)
 	if err != nil {
-		return fmt.Errorf("component %s not found", componentName)
+		return fmt.Errorf("action %s not found", name)
 	}
 
-	integrationComponent, ok := component.(core.IntegrationComponent)
+	integrationAction, ok := action.(core.IntegrationAction)
 	if !ok {
-		return fmt.Errorf("component %s is not an app component", componentName)
+		return fmt.Errorf("action %s is not an app action", name)
 	}
 
-	return integrationComponent.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:          c.registry.HTTPContext(),
+	return integrationAction.OnIntegrationMessage(core.IntegrationMessageContext{
+		HTTP:          c.registry.HTTPContextInTransaction(c.tx),
 		Configuration: c.node.Configuration.Data(),
 		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
@@ -105,7 +105,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:              c.registry.HTTPContext(),
+		HTTP:              c.registry.HTTPContextInTransaction(c.tx),
 		Configuration:     c.node.Configuration.Data(),
 		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
 		Integration:       c.integrationCtx,
@@ -139,14 +139,13 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		NodeID:         execution.NodeID,
 		NodeName:       c.node.Name,
 		Configuration:  execution.Configuration.Data(),
-		HTTP:           c.registry.HTTPContext(),
+		HTTP:           c.registry.HTTPContextInTransaction(c.tx),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),
 		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
 		ExecutionState: NewExecutionStateContext(c.tx, execution, c.onNewEvents),
 		Requests:       NewExecutionRequestContext(c.tx, execution),
 		Integration:    c.integrationCtx,
-		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),
-		Notifications:  NewNotificationContext(c.tx, c.integration.OrganizationID, execution.WorkflowID),
+		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution),
 		CanvasMemory:   NewCanvasMemoryContext(c.tx, execution.WorkflowID),
 	}, nil
 }

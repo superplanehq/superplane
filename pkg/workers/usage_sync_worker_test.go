@@ -32,7 +32,7 @@ func (s *fakeUsageSyncWorkerService) SetupAccount(context.Context, string) (*pb.
 	return &pb.SetupAccountResponse{}, nil
 }
 
-func (s *fakeUsageSyncWorkerService) SetupOrganization(context.Context, string, string) (*pb.SetupOrganizationResponse, error) {
+func (s *fakeUsageSyncWorkerService) SetupOrganization(context.Context, string, string, usage.SetupOrganizationDetails) (*pb.SetupOrganizationResponse, error) {
 	return &pb.SetupOrganizationResponse{}, nil
 }
 

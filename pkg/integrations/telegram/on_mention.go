@@ -146,11 +146,11 @@ func (t *OnMention) subscribe(ctx core.TriggerContext, metadata OnMentionMetadat
 	return &s, nil
 }
 
-func (t *OnMention) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnMention) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnMention) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnMention) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

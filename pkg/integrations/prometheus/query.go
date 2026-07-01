@@ -122,14 +122,6 @@ func (c *Query) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webhoo
 	return 200, nil, nil
 }
 
-func (c *Query) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *Query) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *Query) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -141,4 +133,12 @@ func (c *Query) Cleanup(ctx core.SetupContext) error {
 func sanitizeQueryConfiguration(config QueryConfiguration) QueryConfiguration {
 	config.Query = strings.TrimSpace(config.Query)
 	return config
+}
+
+func (c *Query) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *Query) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

@@ -456,7 +456,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 		}
 		requests := &contexts.RequestContext{}
 
-		_, pollErr := trigger.HandleAction(core.TriggerActionContext{
+		_, pollErr := trigger.HandleHook(core.TriggerHookContext{
 			Name: OnPipelineCompletedPollAction,
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
@@ -576,7 +576,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name: OnPipelineCompletedPollAction,
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:     "default",
@@ -630,7 +630,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name: OnPipelineCompletedPollAction,
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
@@ -689,7 +689,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name: OnPipelineCompletedPollAction,
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
@@ -743,7 +743,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name: OnPipelineCompletedPollAction,
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
@@ -798,7 +798,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name: OnPipelineCompletedPollAction,
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
@@ -848,7 +848,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name: OnPipelineCompletedPollAction,
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:     "default",
@@ -908,7 +908,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name: OnPipelineCompletedPollAction,
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:              "default",
@@ -964,7 +964,7 @@ func Test__OnPipelineCompleted__HandleWebhook(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name: OnPipelineCompletedPollAction,
 			Configuration: OnPipelineCompletedConfiguration{
 				OrgID:     "default",

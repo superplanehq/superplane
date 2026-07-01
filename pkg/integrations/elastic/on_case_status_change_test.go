@@ -219,7 +219,7 @@ func Test__OnCaseStatusChange__PollCaseStatus(t *testing.T) {
 		events := &contexts.EventContext{}
 		requests := &contexts.RequestContext{}
 
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
+		_, err := (&OnCaseStatusChange{}).HandleHook(core.TriggerHookContext{
 			Name:          pollCaseStatusAction,
 			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
 			HTTP:          httpCtx,
@@ -249,7 +249,7 @@ func Test__OnCaseStatusChange__PollCaseStatus(t *testing.T) {
 		events := &contexts.EventContext{}
 		requests := &contexts.RequestContext{}
 
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
+		_, err := (&OnCaseStatusChange{}).HandleHook(core.TriggerHookContext{
 			Name:          pollCaseStatusAction,
 			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
 			HTTP:          httpCtx,
@@ -271,7 +271,7 @@ func Test__OnCaseStatusChange__PollCaseStatus(t *testing.T) {
 		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z"}}
 		requests := &contexts.RequestContext{}
 
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
+		_, err := (&OnCaseStatusChange{}).HandleHook(core.TriggerHookContext{
 			Name:          pollCaseStatusAction,
 			Configuration: map[string]any{"cases": []string{"case-1"}},
 			HTTP:          httpCtx,
@@ -296,7 +296,7 @@ func Test__OnCaseStatusChange__PollCaseStatus(t *testing.T) {
 		events := &contexts.EventContext{}
 		requests := &contexts.RequestContext{}
 
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
+		_, err := (&OnCaseStatusChange{}).HandleHook(core.TriggerHookContext{
 			Name:          pollCaseStatusAction,
 			Configuration: map[string]any{"cases": []string{"case-2"}},
 			HTTP:          httpCtx,

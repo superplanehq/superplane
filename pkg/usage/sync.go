@@ -56,7 +56,7 @@ func syncOrganization(ctx context.Context, usageService Service, orgID string, f
 		return nil
 	}
 
-	accountID, err := resolveOrganizationBillingAccountID(orgID)
+	accountID, billingUser, err := resolveOrganizationBillingContext(orgID)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,11 @@ func syncOrganization(ctx context.Context, usageService Service, orgID string, f
 	}
 
 	setupStartedAt := time.Now()
-	response, err := usageService.SetupOrganization(ctx, orgID, accountID)
+	response, err := usageService.SetupOrganization(ctx, orgID, accountID, SetupOrganizationDetails{
+		CreatedByName:    billingUser.Name,
+		CreatedByEmail:   billingUser.GetEmail(),
+		OrganizationName: organization.Name,
+	})
 	if err == nil {
 		syncedAt := time.Now()
 		if response.GetLimits() != nil {
@@ -110,19 +114,19 @@ func syncOrganization(ctx context.Context, usageService Service, orgID string, f
 	return fmt.Errorf("set up usage organization %s: %w", orgID, err)
 }
 
-func resolveOrganizationBillingAccountID(orgID string) (string, error) {
-	billingUser, err := models.FindFirstHumanUserByOrganization(orgID)
+func resolveOrganizationBillingContext(orgID string) (accountID string, billingUser *models.User, err error) {
+	user, err := models.FindFirstHumanUserByOrganization(orgID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", ErrNoBillingAccountCandidate
+			return "", nil, ErrNoBillingAccountCandidate
 		}
 
-		return "", fmt.Errorf("find billing account candidate for organization %s: %w", orgID, err)
+		return "", nil, fmt.Errorf("find billing account candidate for organization %s: %w", orgID, err)
 	}
 
-	if billingUser.AccountID == nil {
-		return "", ErrNoBillingAccountCandidate
+	if user.AccountID == nil {
+		return "", nil, ErrNoBillingAccountCandidate
 	}
 
-	return billingUser.AccountID.String(), nil
+	return user.AccountID.String(), user, nil
 }

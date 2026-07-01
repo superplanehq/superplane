@@ -19,7 +19,10 @@ func newTriggersCommand(options core.BindOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "triggers",
 		Short: "List or describe available triggers",
-		Args:  cobra.NoArgs,
+		Long: `List or describe available triggers.
+
+Use -o json or -o yaml with --name to inspect nested schema fields, enum options, defaults, and conditions.`,
+		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringVar(&from, "from", "", "integration definition name")
 	cmd.Flags().StringVar(&name, "name", "", "trigger name")
@@ -133,7 +136,7 @@ func (c *triggersCommand) listTriggers(ctx core.CommandContext, from string) ([]
 			return nil, err
 		}
 
-		return integration.GetTriggers(), nil
+		return triggersFromCapabilities(integration.GetCapabilities()), nil
 	}
 
 	//
@@ -168,7 +171,7 @@ func findIntegrationTrigger(
 	integration openapi_client.IntegrationsIntegrationDefinition,
 	name string,
 ) (openapi_client.TriggersTrigger, error) {
-	for _, trigger := range integration.GetTriggers() {
+	for _, trigger := range triggersFromCapabilities(integration.GetCapabilities()) {
 		triggerName := trigger.GetName()
 		if triggerName == name || triggerName == fmt.Sprintf("%s.%s", integration.GetName(), name) {
 			return trigger, nil
@@ -176,4 +179,21 @@ func findIntegrationTrigger(
 	}
 
 	return openapi_client.TriggersTrigger{}, fmt.Errorf("trigger %q not found in integration %q", name, integration.GetName())
+}
+
+func triggersFromCapabilities(capabilities []openapi_client.IntegrationsCapabilityDefinition) []openapi_client.TriggersTrigger {
+	triggers := []openapi_client.TriggersTrigger{}
+	for _, capability := range capabilities {
+		if capability.GetType() != openapi_client.INTEGRATIONSCAPABILITYDEFINITIONTYPE_TYPE_TRIGGER {
+			continue
+		}
+		triggers = append(triggers, openapi_client.TriggersTrigger{
+			Name:          capability.Name,
+			Label:         capability.Label,
+			Description:   capability.Description,
+			Configuration: capability.Configuration,
+			ExampleData:   capability.ExampleData,
+		})
+	}
+	return triggers
 }

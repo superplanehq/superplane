@@ -101,11 +101,11 @@ func (m *OnMilestone) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (m *OnMilestone) Actions() []core.Action {
-	return []core.Action{}
+func (m *OnMilestone) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (m *OnMilestone) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (m *OnMilestone) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

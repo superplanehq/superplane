@@ -95,9 +95,7 @@ func TestUpsertRecord_Execute(t *testing.T) {
 				"values":       []string{"1.2.3.4"},
 			},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{},
-			},
+			Integration:    &contexts.IntegrationContext{},
 		})
 
 		require.Error(t, err)
@@ -139,7 +137,7 @@ func TestUpsertRecord_Execute(t *testing.T) {
 			Metadata:       metadata,
 			Requests:       requests,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -189,7 +187,7 @@ func TestUpsertRecord_Execute(t *testing.T) {
 			ExecutionState: execState,
 			HTTP:           httpContext,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

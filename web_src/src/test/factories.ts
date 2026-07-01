@@ -1,6 +1,6 @@
 import type {
   CanvasesCanvas,
-  SuperplaneComponentsEdge as ComponentsEdge,
+  ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -39,10 +39,10 @@ export function makeComponentsNode(overrides: Partial<ComponentsNode> = {}): Com
   return {
     id: "node-1",
     name: "Node 1",
-    type: "TYPE_COMPONENT",
+    type: "TYPE_ACTION",
     position: { x: 0, y: 0 },
     configuration: {},
-    component: { name: "noop" },
+    component: "noop",
     ...overrides,
   } as ComponentsNode;
 }

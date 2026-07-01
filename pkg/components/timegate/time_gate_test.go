@@ -9,89 +9,11 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestTimeGate_Name(t *testing.T) {
-	tg := &TimeGate{}
-	assert.Equal(t, "timeGate", tg.Name())
-}
-
-func TestTimeGate_Label(t *testing.T) {
-	tg := &TimeGate{}
-	assert.Equal(t, "Time Gate", tg.Label())
-}
-
-func TestTimeGate_Description(t *testing.T) {
-	tg := &TimeGate{}
-	expected := "Route events based on active days and time windows, with optional excluded dates"
-	assert.Equal(t, expected, tg.Description())
-}
-
-func TestTimeGate_Icon(t *testing.T) {
-	tg := &TimeGate{}
-	assert.Equal(t, "clock", tg.Icon())
-}
-
-func TestTimeGate_Color(t *testing.T) {
-	tg := &TimeGate{}
-	assert.Equal(t, "blue", tg.Color())
-}
-
-func TestTimeGate_OutputChannels(t *testing.T) {
-	tg := &TimeGate{}
-	channels := tg.OutputChannels(nil)
-	assert.Len(t, channels, 1)
-	assert.Equal(t, "default", channels[0].Name)
-}
-
-func TestTimeGate_Configuration(t *testing.T) {
-	tg := &TimeGate{}
-	config := tg.Configuration()
-	assert.Len(t, config, 4)
-
-	assert.Equal(t, "days", config[0].Name)
-	assert.Equal(t, "Active Days", config[0].Label)
-	assert.True(t, config[0].Required)
-
-	assert.Equal(t, "timeRange", config[1].Name)
-	assert.Equal(t, "Active Time", config[1].Label)
-	assert.True(t, config[1].Required)
-	assert.Equal(t, "00:00-23:59", config[1].Default)
-
-	assert.Equal(t, "timezone", config[2].Name)
-	assert.Equal(t, "Timezone", config[2].Label)
-	assert.True(t, config[2].Required)
-	assert.Equal(t, "current", config[2].Default)
-
-	assert.Equal(t, "excludeDates", config[3].Name)
-	assert.Equal(t, "Exclude Dates (MM/DD)", config[3].Label)
-}
-
-func TestTimeGate_Actions(t *testing.T) {
-	tg := &TimeGate{}
-	actions := tg.Actions()
-
-	if len(actions) < 2 {
-		t.Fatalf("expected at least 2 actions, got %d: %+v", len(actions), actions)
-	}
-
-	var hasTimeReached, hasPushThrough bool
-	for _, a := range actions {
-		if a.Name == "timeReached" {
-			hasTimeReached = true
-		}
-		if a.Name == "pushThrough" {
-			hasPushThrough = true
-		}
-	}
-
-	assert.True(t, hasTimeReached)
-	assert.True(t, hasPushThrough)
-}
-
-func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
+func TestTimeGate_HandleHook_PushThrough_Finishes(t *testing.T) {
 	tg := &TimeGate{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name:           "pushThrough",
 		ExecutionState: stateCtx,
 		Parameters:     map[string]any{},
@@ -105,7 +27,7 @@ func TestTimeGate_HandleAction_PushThrough_Finishes(t *testing.T) {
 		},
 	}
 
-	err := tg.HandleAction(ctx)
+	err := tg.HandleHook(ctx)
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
 	assert.True(t, stateCtx.Finished)

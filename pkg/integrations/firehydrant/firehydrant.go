@@ -60,8 +60,8 @@ func (f *FireHydrant) Configuration() []configuration.Field {
 	}
 }
 
-func (f *FireHydrant) Components() []core.Component {
-	return []core.Component{
+func (f *FireHydrant) Actions() []core.Action {
+	return []core.Action{
 		&CreateIncident{},
 	}
 }
@@ -105,10 +105,10 @@ func (f *FireHydrant) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (f *FireHydrant) Actions() []core.Action {
-	return []core.Action{}
+func (f *FireHydrant) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (f *FireHydrant) HandleAction(ctx core.IntegrationActionContext) error {
+func (f *FireHydrant) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

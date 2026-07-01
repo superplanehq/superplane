@@ -4,72 +4,57 @@ agent:
   machine:
     type: f1-standard-2
     os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: DOCKER_BUILDKIT
+      value: "1"
+  prologue:
+    commands:
+      - checkout
+      - mkdir -p tmp/go tmp/go-build
+      - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
+      - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
+      - make dev.up
+      - make dev.setup
+
 auto_cancel:
   running:
     when: branch != 'main'
   queued:
     when: branch != 'main'
 blocks:
-  - name: "License Check"
-    dependencies: []
-    run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
-    task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
-      prologue:
-        commands:
-          - checkout
-      jobs:
-        - name: Licence Check
-          commands:
-            - make test.license.check
-
   - name: "Backend Tests"
     dependencies: []
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
-      prologue:
-        commands:
-          - checkout
-          - mkdir -p tmp/go tmp/go-build
-          - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
-          - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
-          - make test.setup.build
-          - make test.setup.db
-          - make test.start
       jobs:
         - name: Lint
           commands:
             - make lint
+
         - name: Unit Tests
           commands:
             - make test.coverage.check
+
         - name: E2E Tests
           parallelism: 10
           commands:
             - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
-        - name: "Check: DB structure"
+
+        - name: Checks
           commands:
             - make check.db.structure
             - make check.db.migrations
-        - name: "Check: Components Docs"
-          commands:
             - make check.components.docs
-        - name: "Check: Go Format"
-          commands:
             - make check.format.go
-        - name: "Check: Example Payloads"
-          commands:
             - make check.example.payloads
-        - name: "Check: Generated Artifacts"
-          commands:
+            - make check.configuration.fields
+            - make check.grpc.actions.status
+            - make check.models.tx.debt
             - make check.generated.artifacts
+
       epilogue:
         always:
           commands:
@@ -78,76 +63,32 @@ blocks:
             - "cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go"
             - "cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build"
 
-  - name: "Agent Tests"
-    dependencies: []
-    run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'}) OR change_in('/agent/**/*.md', {default_branch: 'main'}) OR change_in('/agent/**/*.mdx', {default_branch: 'main'})"
-    task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
-      prologue:
-        commands:
-          - checkout
-          - make test.agent.setup
-      jobs:
-        - name: Unit Tests
-          commands:
-            - make test.agent.unit AGENT_TEST_TARGETS="tests --junitxml=junit-report.xml"
-        - name: Lint
-          commands:
-            - make -C agent lint
-        - name: Format Check
-          commands:
-            - make -C agent format.check
-        - name: Type Check
-          commands:
-            - make -C agent typecheck
-      epilogue:
-        always:
-          commands:
-            - "[ -f agent/junit-report.xml ] && test-results publish agent/junit-report.xml"
-
-  - name: "Frondend Tests"
+  - name: "Frontend Tests"
     dependencies: []
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
-      prologue:
-        commands:
-          - checkout
-          - sem-version node 20
-          - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-          - make gen.setup.ui
-          - cd web_src
-          - npm ci
-      epilogue:
-        always:
-          commands:
-            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
       jobs:
         - name: Check Build
           commands:
-            - npm run build
+            - make check.build.ui
 
         - name: Unit Tests
+          parallelism: 4
           commands:
-            - npm run test:coverage
+            - make check.test.ui.shard INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
 
         - name: Format Check
           commands:
-            - cd .. && make format.js.check
+            - make check.format.js
 
         - name: EsLint
           commands:
-            - npm run lint:budget
+            - make check.lint.ui
 
         - name: Knip (dead files check)
           commands:
-            - npm run lint:knip
+            - make check.lint.ui.knip
 
 after_pipeline:
   task:

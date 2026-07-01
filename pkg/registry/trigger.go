@@ -56,8 +56,8 @@ func (s *PanicableTrigger) Configuration() []configuration.Field {
 	return s.underlying.Configuration()
 }
 
-func (s *PanicableTrigger) Actions() []core.Action {
-	return s.underlying.Actions()
+func (s *PanicableTrigger) Hooks() []core.Hook {
+	return s.underlying.Hooks()
 }
 
 /*
@@ -88,17 +88,18 @@ func (s *PanicableTrigger) HandleWebhook(ctx core.WebhookRequestContext) (status
 	return s.underlying.HandleWebhook(ctx)
 }
 
-func (s *PanicableTrigger) HandleAction(ctx core.TriggerActionContext) (result map[string]any, err error) {
+func (s *PanicableTrigger) HandleHook(ctx core.TriggerHookContext) (result map[string]any, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			ctx.Logger.Errorf("Trigger %s panicked in HandleAction(%s): %v\nStack: %s",
+			ctx.Logger.Errorf("Trigger %s panicked in HandleHook(%s): %v\nStack: %s",
 				s.underlying.Name(), ctx.Name, r, debug.Stack())
 			result = nil
-			err = fmt.Errorf("trigger %s panicked in HandleAction(%s): %v",
+			err = fmt.Errorf("trigger %s panicked in HandleHook(%s): %v",
 				s.underlying.Name(), ctx.Name, r)
 		}
 	}()
-	return s.underlying.HandleAction(ctx)
+
+	return s.underlying.HandleHook(ctx)
 }
 
 func (s *PanicableTrigger) Cleanup(ctx core.TriggerContext) (err error) {

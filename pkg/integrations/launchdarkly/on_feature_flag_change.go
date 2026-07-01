@@ -163,12 +163,12 @@ func (t *OnFeatureFlagChange) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnFeatureFlagChange) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnFeatureFlagChange) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnFeatureFlagChange) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, fmt.Errorf("action %s not supported", ctx.Name)
+func (t *OnFeatureFlagChange) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnFeatureFlagChange) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

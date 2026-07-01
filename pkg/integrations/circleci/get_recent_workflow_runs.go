@@ -187,18 +187,18 @@ func (c *GetRecentWorkflowRuns) HandleWebhook(ctx core.WebhookRequestContext) (i
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetRecentWorkflowRuns) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetRecentWorkflowRuns) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetRecentWorkflowRuns) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *GetRecentWorkflowRuns) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetRecentWorkflowRuns) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetRecentWorkflowRuns) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

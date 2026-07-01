@@ -179,14 +179,6 @@ func (c *GetAlert) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "sentry.alertRule", []any{alertRule})
 }
 
-func (c *GetAlert) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetAlert) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -208,4 +200,12 @@ func decodeGetAlertConfiguration(input any) (GetAlertConfiguration, error) {
 	config.Project = strings.TrimSpace(config.Project)
 	config.AlertID = strings.TrimSpace(config.AlertID)
 	return config, nil
+}
+
+func (c *GetAlert) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetAlert) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

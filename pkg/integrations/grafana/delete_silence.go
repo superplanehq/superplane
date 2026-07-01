@@ -128,14 +128,6 @@ func (d *DeleteSilence) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteSilence) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteSilence) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (d *DeleteSilence) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -164,5 +156,13 @@ func validateDeleteSilenceSpec(spec DeleteSilenceSpec) error {
 	if strings.TrimSpace(spec.Silence) == "" {
 		return errors.New("silence is required")
 	}
+	return nil
+}
+
+func (d *DeleteSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteSilence) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

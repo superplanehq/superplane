@@ -1,0 +1,1512 @@
+package oci
+
+import (
+	"bytes"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"io"
+	"net/http"
+	neturl "net/url"
+	"strings"
+	"time"
+
+	"github.com/superplanehq/superplane/pkg/core"
+)
+
+const (
+	coreServicesHostTemplate    = "iaas.%s.oraclecloud.com"
+	identityHostTemplate        = "identity.%s.oraclecloud.com"
+	objectStorageHostTemplate   = "objectstorage.%s.oraclecloud.com"
+	coreServicesAPIVersion      = "20160918"
+	containerRegistryAPIVersion = "20160918"
+)
+
+// Client is an OCI REST API client that signs requests using OCI API Key authentication.
+type Client struct {
+	tenancyOCID string
+	userOCID    string
+	fingerprint string
+	privateKey  *rsa.PrivateKey
+	region      string
+	http        core.HTTPContext
+}
+
+type OCIAPIError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *OCIAPIError) Error() string {
+	return fmt.Sprintf("OCI API returned %d: %s", e.StatusCode, e.Body)
+}
+
+func NewClient(httpCtx core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
+	tenancyOCID, err := integration.GetConfig("tenancyOcid")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenancyOcid: %w", err)
+	}
+	userOCID, err := integration.GetConfig("userOcid")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get userOcid: %w", err)
+	}
+	fingerprint, err := integration.GetConfig("fingerprint")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fingerprint: %w", err)
+	}
+	privateKeyPEM, err := integration.GetConfig("privateKey")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get privateKey: %w", err)
+	}
+	region, err := integration.GetConfig("region")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get region: %w", err)
+	}
+
+	privateKey, err := parsePrivateKey(string(privateKeyPEM))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	return &Client{
+		tenancyOCID: string(tenancyOCID),
+		userOCID:    string(userOCID),
+		fingerprint: string(fingerprint),
+		privateKey:  privateKey,
+		region:      string(region),
+		http:        httpCtx,
+	}, nil
+}
+
+// ValidateCredentials validates the OCI credentials by fetching the current user.
+func (c *Client) ValidateCredentials() error {
+	host := fmt.Sprintf(identityHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/20160918/users/%s", host, c.userOCID)
+	_, err := c.doRequest(http.MethodGet, host, url, nil)
+	return err
+}
+
+// LaunchInstance starts a new OCI Compute instance.
+func (c *Client) LaunchInstance(req LaunchInstanceRequest) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances", host, coreServicesAPIVersion)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal launch instance request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// GetInstance retrieves a Compute instance by OCID.
+func (c *Client) GetInstance(instanceID string) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, neturl.PathEscape(instanceID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// ListInstances lists Compute instances in a compartment.
+func (c *Client) ListInstances(compartmentID string) ([]Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf(
+		"https://%s/%s/instances?compartmentId=%s&limit=1000",
+		host,
+		coreServicesAPIVersion,
+		neturl.QueryEscape(compartmentID),
+	)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instances []Instance
+	if err := json.Unmarshal(respBody, &instances); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instances: %w", err)
+	}
+
+	return instances, nil
+}
+
+// ListVNICAttachments lists VNIC attachments for an instance, used to find IP addresses.
+func (c *Client) ListVNICAttachments(compartmentID, instanceID string) ([]VNICAttachment, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/vnicAttachments?compartmentId=%s&instanceId=%s",
+		host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID), neturl.QueryEscape(instanceID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var attachments []VNICAttachment
+	if err := json.Unmarshal(respBody, &attachments); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal VNIC attachments: %w", err)
+	}
+
+	return attachments, nil
+}
+
+// GetVNIC retrieves a VNIC by OCID to obtain IP addresses.
+func (c *Client) GetVNIC(vnicID string) (*VNIC, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/vnics/%s", host, coreServicesAPIVersion, vnicID)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var vnic VNIC
+	if err := json.Unmarshal(respBody, &vnic); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal VNIC: %w", err)
+	}
+
+	return &vnic, nil
+}
+
+func (c *Client) ListCompartments() ([]Compartment, error) {
+	host := fmt.Sprintf(identityHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/compartments?compartmentId=%s&limit=1000", host, coreServicesAPIVersion, neturl.QueryEscape(c.tenancyOCID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var compartments []Compartment
+	if err := json.Unmarshal(respBody, &compartments); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal compartments: %w", err)
+	}
+
+	return compartments, nil
+}
+
+func (c *Client) ListAvailabilityDomains(compartmentID string) ([]AvailabilityDomain, error) {
+	host := fmt.Sprintf(identityHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/availabilityDomains?compartmentId=%s", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var ads []AvailabilityDomain
+	if err := json.Unmarshal(respBody, &ads); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal availability domains: %w", err)
+	}
+
+	return ads, nil
+}
+
+func (c *Client) ListShapes(compartmentID string) ([]Shape, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/shapes?compartmentId=%s&limit=100", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var shapes []Shape
+	if err := json.Unmarshal(respBody, &shapes); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal shapes: %w", err)
+	}
+
+	return shapes, nil
+}
+
+func (c *Client) ListImages(compartmentID, operatingSystem string) ([]Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	baseURL := fmt.Sprintf("https://%s/%s/images?compartmentId=%s&limit=100&sortBy=DISPLAYNAME&sortOrder=ASC",
+		host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
+	if operatingSystem != "" {
+		baseURL += "&operatingSystem=" + neturl.QueryEscape(operatingSystem)
+	}
+
+	var images []Image
+	page := ""
+	for {
+		url := baseURL
+		if page != "" {
+			url += "&page=" + neturl.QueryEscape(page)
+		}
+
+		respBody, headers, err := c.doRequestWithHeaders(http.MethodGet, host, url, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var pageImages []Image
+		if err := json.Unmarshal(respBody, &pageImages); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal images: %w", err)
+		}
+
+		images = append(images, pageImages...)
+		page = headerValue(headers, "opc-next-page")
+		if page == "" {
+			break
+		}
+	}
+
+	return images, nil
+}
+
+func (c *Client) CreateImage(req CreateImageRequest) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images", host, coreServicesAPIVersion)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create image request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) GetImage(imageID string) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) UpdateImage(imageID, displayName string) (*Image, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	body, err := json.Marshal(UpdateImageRequest{DisplayName: displayName})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update image request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPut, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var image Image
+	if err := json.Unmarshal(respBody, &image); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal image response: %w", err)
+	}
+
+	return &image, nil
+}
+
+func (c *Client) DeleteImage(imageID string) error {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/images/%s", host, coreServicesAPIVersion, neturl.PathEscape(imageID))
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+func (c *Client) GetObjectStorageNamespace() (string, error) {
+	host := fmt.Sprintf(objectStorageHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/n", host)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var namespace string
+	if err := json.Unmarshal(respBody, &namespace); err == nil {
+		return namespace, nil
+	}
+
+	return strings.Trim(strings.TrimSpace(string(respBody)), `"`), nil
+}
+
+func (c *Client) ListBuckets(namespaceName, compartmentID string) ([]Bucket, error) {
+	host := fmt.Sprintf(objectStorageHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/n/%s/b?compartmentId=%s&limit=1000",
+		host,
+		neturl.PathEscape(namespaceName),
+		neturl.QueryEscape(compartmentID),
+	)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var buckets []Bucket
+	if err := json.Unmarshal(respBody, &buckets); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal buckets: %w", err)
+	}
+
+	return buckets, nil
+}
+
+func (c *Client) ListObjects(namespaceName, bucketName string) ([]ObjectSummary, error) {
+	host := fmt.Sprintf(objectStorageHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/n/%s/b/%s/o?limit=1000",
+		host,
+		neturl.PathEscape(namespaceName),
+		neturl.PathEscape(bucketName),
+	)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ListObjectsResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal objects: %w", err)
+	}
+
+	return response.Objects, nil
+}
+
+func (c *Client) ListVCNs(compartmentID string) ([]VCN, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/vcns?compartmentId=%s&limit=100", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var vcns []VCN
+	if err := json.Unmarshal(respBody, &vcns); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal VCNs: %w", err)
+	}
+
+	return vcns, nil
+}
+
+func (c *Client) ListSubnets(compartmentID string, vcnID string) ([]Subnet, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	query := fmt.Sprintf("compartmentId=%s&limit=100", neturl.QueryEscape(compartmentID))
+	if vcnID != "" {
+		query += "&vcnId=" + neturl.QueryEscape(vcnID)
+	}
+	url := fmt.Sprintf("https://%s/%s/subnets?%s", host, coreServicesAPIVersion, query)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var subnets []Subnet
+	if err := json.Unmarshal(respBody, &subnets); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal subnets: %w", err)
+	}
+
+	return subnets, nil
+}
+
+func (c *Client) ListBlockVolumes(compartmentID string) ([]BlockVolume, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/volumes?compartmentId=%s&limit=100", host, coreServicesAPIVersion, neturl.QueryEscape(compartmentID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var volumes []BlockVolume
+	if err := json.Unmarshal(respBody, &volumes); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal block volumes: %w", err)
+	}
+
+	return volumes, nil
+}
+
+// doRequest signs and executes an HTTP request against the OCI API.
+func (c *Client) doRequest(method, host, url string, body io.Reader) ([]byte, error) {
+	respBody, _, err := c.doRequestWithHeaders(method, host, url, body)
+	return respBody, err
+}
+
+func (c *Client) doRequestWithHeaders(method, host, url string, body io.Reader) ([]byte, http.Header, error) {
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to read request body: %w", err)
+		}
+	}
+
+	includeBodyHeaders := method == http.MethodPost || method == http.MethodPut
+
+	var bodyReader io.Reader
+	if len(bodyBytes) > 0 || includeBodyHeaders {
+		bodyReader = bytes.NewReader(bodyBytes)
+	}
+
+	req, err := http.NewRequest(method, url, bodyReader)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to build request: %w", err)
+	}
+
+	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+	req.Header.Set("Host", host)
+
+	if includeBodyHeaders {
+		hash := sha256.Sum256(bodyBytes)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Length", fmt.Sprintf("%d", len(bodyBytes)))
+		req.Header.Set("x-content-sha256", base64.StdEncoding.EncodeToString(hash[:]))
+		req.ContentLength = int64(len(bodyBytes))
+	}
+
+	if err := c.signRequest(req, includeBodyHeaders); err != nil {
+		return nil, nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil, &OCIAPIError{
+			StatusCode: resp.StatusCode,
+			Body:       string(respBody),
+		}
+	}
+
+	return respBody, resp.Header, nil
+}
+
+func headerValue(headers http.Header, name string) string {
+	if value := headers.Get(name); value != "" {
+		return value
+	}
+
+	for key, values := range headers {
+		if strings.EqualFold(key, name) && len(values) > 0 {
+			return values[0]
+		}
+	}
+
+	return ""
+}
+
+// signRequest adds the OCI HTTP Signature Authorization header.
+// See: https://docs.oracle.com/en-us/iaas/Content/API/Concepts/signingrequests.htm
+func (c *Client) signRequest(req *http.Request, hasBody bool) error {
+	var headerNames []string
+	if hasBody {
+		headerNames = []string{"date", "(request-target)", "host", "content-length", "content-type", "x-content-sha256"}
+	} else {
+		headerNames = []string{"date", "(request-target)", "host"}
+	}
+
+	signingString := c.buildSigningString(req, headerNames)
+
+	h := sha256.New()
+	h.Write([]byte(signingString))
+	digest := h.Sum(nil)
+
+	signature, err := rsa.SignPKCS1v15(rand.Reader, c.privateKey, crypto.SHA256, digest)
+	if err != nil {
+		return fmt.Errorf("failed to sign request: %w", err)
+	}
+
+	encodedSig := base64.StdEncoding.EncodeToString(signature)
+	keyID := fmt.Sprintf("%s/%s/%s", c.tenancyOCID, c.userOCID, c.fingerprint)
+	authHeader := fmt.Sprintf(
+		`Signature version="1",keyId="%s",algorithm="rsa-sha256",headers="%s",signature="%s"`,
+		keyID,
+		strings.Join(headerNames, " "),
+		encodedSig,
+	)
+
+	req.Header.Set("Authorization", authHeader)
+	return nil
+}
+
+func (c *Client) buildSigningString(req *http.Request, headerNames []string) string {
+	var parts []string
+	for _, name := range headerNames {
+		switch name {
+		case "(request-target)":
+			target := strings.ToLower(req.Method) + " " + req.URL.RequestURI()
+			parts = append(parts, "(request-target): "+target)
+		default:
+			parts = append(parts, name+": "+req.Header.Get(name))
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func parsePrivateKey(pemData string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(pemData))
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM block from private key")
+	}
+
+	// Try PKCS8 first, then PKCS1.
+	if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
+		rsaKey, ok := key.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("parsed key is not an RSA private key")
+		}
+		return rsaKey, nil
+	}
+
+	rsaKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse RSA private key (tried PKCS8 and PKCS1): %w", err)
+	}
+
+	return rsaKey, nil
+}
+
+type LaunchInstanceRequest struct {
+	CompartmentID               string                       `json:"compartmentId"`
+	AvailabilityDomain          string                       `json:"availabilityDomain"`
+	DisplayName                 string                       `json:"displayName,omitempty"`
+	Shape                       string                       `json:"shape"`
+	SourceDetails               InstanceSourceDetails        `json:"sourceDetails"`
+	CreateVnicDetails           *CreateVnicDetails           `json:"createVnicDetails,omitempty"`
+	Metadata                    map[string]string            `json:"metadata,omitempty"`
+	ShapeConfig                 *InstanceShapeConfig         `json:"shapeConfig,omitempty"`
+	ShieldedInstanceConfig      *ShieldedInstanceConfig      `json:"shieldedInstanceConfig,omitempty"`
+	ConfidentialInstanceOptions *ConfidentialInstanceOptions `json:"confidentialInstanceOptions,omitempty"`
+}
+
+type InstanceSourceDetails struct {
+	SourceType          string   `json:"sourceType"`
+	ImageID             string   `json:"imageId"`
+	BootVolumeSizeInGBs *float64 `json:"bootVolumeSizeInGBs,omitempty"`
+	BootVolumeVpusPerGB *float64 `json:"bootVolumeVpusPerGB,omitempty"`
+}
+
+type CreateVnicDetails struct {
+	SubnetID string `json:"subnetId"`
+}
+
+type InstanceShapeConfig struct {
+	OCPUs       *float64 `json:"ocpus,omitempty"`
+	MemoryInGBs *float64 `json:"memoryInGBs,omitempty"`
+}
+
+type UpdateInstanceRequest struct {
+	DisplayName *string              `json:"displayName,omitempty"`
+	ShapeConfig *InstanceShapeConfig `json:"shapeConfig,omitempty"`
+}
+
+type ShieldedInstanceConfig struct {
+	IsSecureBootEnabled            bool `json:"isSecureBootEnabled"`
+	IsMeasuredBootEnabled          bool `json:"isMeasuredBootEnabled"`
+	IsTrustedPlatformModuleEnabled bool `json:"isTrustedPlatformModuleEnabled"`
+}
+
+type ConfidentialInstanceOptions struct {
+	IsEnabled bool `json:"isEnabled"`
+}
+
+type CreateImageRequest struct {
+	CompartmentID      string              `json:"compartmentId"`
+	DisplayName        string              `json:"displayName,omitempty"`
+	InstanceID         string              `json:"instanceId,omitempty"`
+	ImageSourceDetails *ImageSourceDetails `json:"imageSourceDetails,omitempty"`
+	FreeformTags       map[string]string   `json:"freeformTags,omitempty"`
+}
+
+type ImageSourceDetails struct {
+	SourceType      string `json:"sourceType"`
+	SourceImageType string `json:"sourceImageType,omitempty"`
+	SourceURI       string `json:"sourceUri,omitempty"`
+	NamespaceName   string `json:"namespaceName,omitempty"`
+	BucketName      string `json:"bucketName,omitempty"`
+	ObjectName      string `json:"objectName,omitempty"`
+}
+
+type UpdateImageRequest struct {
+	DisplayName string `json:"displayName"`
+}
+
+type Instance struct {
+	ID                 string `json:"id"`
+	DisplayName        string `json:"displayName"`
+	LifecycleState     string `json:"lifecycleState"`
+	Shape              string `json:"shape"`
+	AvailabilityDomain string `json:"availabilityDomain"`
+	CompartmentID      string `json:"compartmentId"`
+	Region             string `json:"region"`
+	TimeCreated        string `json:"timeCreated"`
+}
+
+type VNICAttachment struct {
+	VNICID         string `json:"vnicId"`
+	SubnetID       string `json:"subnetId"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+type VNIC struct {
+	ID        string `json:"id"`
+	PublicIP  string `json:"publicIp"`
+	PrivateIP string `json:"privateIp"`
+}
+
+type Compartment struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+type AvailabilityDomain struct {
+	Name          string `json:"name"`
+	CompartmentID string `json:"compartmentId"`
+}
+
+type Shape struct {
+	Shape string `json:"shape"`
+}
+
+type Image struct {
+	ID                     string            `json:"id"`
+	DisplayName            string            `json:"displayName"`
+	LifecycleState         string            `json:"lifecycleState"`
+	CompartmentID          string            `json:"compartmentId"`
+	BaseImageID            string            `json:"baseImageId"`
+	OperatingSystem        string            `json:"operatingSystem"`
+	OperatingSystemVersion string            `json:"operatingSystemVersion"`
+	LaunchMode             string            `json:"launchMode"`
+	SizeInMBs              int               `json:"sizeInMBs"`
+	TimeCreated            string            `json:"timeCreated"`
+	CreateImageAllowed     bool              `json:"createImageAllowed"`
+	FreeformTags           map[string]string `json:"freeformTags"`
+}
+
+type VCN struct {
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	CIDRBlock      string `json:"cidrBlock"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+type Subnet struct {
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	CIDRBlock      string `json:"cidrBlock"`
+	LifecycleState string `json:"lifecycleState"`
+	VcnID          string `json:"vcnId"`
+}
+
+type BlockVolume struct {
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	LifecycleState string `json:"lifecycleState"`
+	SizeInGBs      int    `json:"sizeInGBs"`
+}
+
+type Bucket struct {
+	Name          string `json:"name"`
+	CompartmentID string `json:"compartmentId"`
+	Namespace     string `json:"namespace"`
+}
+
+type ObjectSummary struct {
+	Name string `json:"name"`
+}
+
+type ListObjectsResponse struct {
+	Objects []ObjectSummary `json:"objects"`
+}
+
+type VolumeAttachment struct {
+	ID             string `json:"id"`
+	InstanceID     string `json:"instanceId"`
+	VolumeID       string `json:"volumeId"`
+	LifecycleState string `json:"lifecycleState"`
+	Device         string `json:"device"`
+}
+
+// --- OCI Functions Management API ---
+// Functions management host: functions.<region>.oci.oraclecloud.com
+// Functions API version: 20181201
+
+const functionsAPIVersion = "20181201"
+
+func (c *Client) functionsHost() string {
+	return fmt.Sprintf("functions.%s.oci.oraclecloud.com", c.region)
+}
+
+// FunctionApplication represents an OCI Functions application.
+type FunctionApplication struct {
+	ID             string            `json:"id"`
+	DisplayName    string            `json:"displayName"`
+	CompartmentID  string            `json:"compartmentId"`
+	SubnetIDs      []string          `json:"subnetIds"`
+	Shape          string            `json:"shape"`
+	LifecycleState string            `json:"lifecycleState"`
+	TimeCreated    string            `json:"timeCreated"`
+	FreeformTags   map[string]string `json:"freeformTags,omitempty"`
+}
+
+// FunctionResource represents an OCI Function within an application.
+type FunctionResource struct {
+	ID               string            `json:"id"`
+	DisplayName      string            `json:"displayName"`
+	ApplicationID    string            `json:"applicationId"`
+	Image            string            `json:"image"`
+	MemoryInMBs      int64             `json:"memoryInMBs"`
+	TimeoutInSeconds int               `json:"timeoutInSeconds"`
+	LifecycleState   string            `json:"lifecycleState"`
+	InvokeEndpoint   string            `json:"invokeEndpoint"`
+	TimeCreated      string            `json:"timeCreated"`
+	FreeformTags     map[string]string `json:"freeformTags,omitempty"`
+}
+
+// ListApplications lists Functions applications in a compartment.
+func (c *Client) ListApplications(compartmentID string) ([]FunctionApplication, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/applications?compartmentId=%s&limit=100",
+		host, functionsAPIVersion, neturl.QueryEscape(compartmentID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var items []FunctionApplication
+	if err := json.Unmarshal(respBody, &items); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal applications: %w", err)
+	}
+
+	return items, nil
+}
+
+// GetApplication retrieves a Functions application by OCID.
+func (c *Client) GetApplication(applicationID string) (*FunctionApplication, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/applications/%s", host, functionsAPIVersion, applicationID)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var app FunctionApplication
+	if err := json.Unmarshal(respBody, &app); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal application response: %w", err)
+	}
+
+	return &app, nil
+}
+
+// CreateApplication creates a new Functions application.
+func (c *Client) CreateApplication(compartmentID, displayName, shape string, subnetIDs []string, freeformTags map[string]string) (*FunctionApplication, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/applications", host, functionsAPIVersion)
+
+	body := map[string]any{
+		"compartmentId": compartmentID,
+		"displayName":   displayName,
+		"subnetIds":     subnetIDs,
+	}
+	if shape != "" {
+		body["shape"] = shape
+	}
+	if len(freeformTags) > 0 {
+		body["freeformTags"] = freeformTags
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create application request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var app FunctionApplication
+	if err := json.Unmarshal(respBody, &app); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal application response: %w", err)
+	}
+
+	return &app, nil
+}
+
+// DeleteApplication deletes a Functions application by OCID.
+func (c *Client) DeleteApplication(applicationID string) error {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/applications/%s", host, functionsAPIVersion, applicationID)
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// ListFunctions lists functions within an application.
+func (c *Client) ListFunctions(applicationID string) ([]FunctionResource, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/functions?applicationId=%s&limit=100",
+		host, functionsAPIVersion, neturl.QueryEscape(applicationID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var items []FunctionResource
+	if err := json.Unmarshal(respBody, &items); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal functions: %w", err)
+	}
+
+	return items, nil
+}
+
+// GetFunction retrieves a function by OCID.
+func (c *Client) GetFunction(functionID string) (*FunctionResource, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/functions/%s", host, functionsAPIVersion, functionID)
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var fn FunctionResource
+	if err := json.Unmarshal(respBody, &fn); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal function: %w", err)
+	}
+
+	return &fn, nil
+}
+
+// CreateFunctionInput holds all parameters for creating an OCI Function.
+type CreateFunctionInput struct {
+	ApplicationID                  string
+	DisplayName                    string
+	Image                          string
+	MemoryInMBs                    int64
+	TimeoutInSeconds               *int
+	TraceEnabled                   bool
+	SourceTriggerType              string // "" = omit, "NONE", "OCI_STREAMING"
+	ProvisionedConcurrencyStrategy string // "" = omit, "NONE", "CONSTANT"
+	ProvisionedConcurrencyCount    int
+	FreeformTags                   map[string]string
+}
+
+// CreateFunction deploys a new function within an application.
+func (c *Client) CreateFunction(input CreateFunctionInput) (*FunctionResource, error) {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/functions", host, functionsAPIVersion)
+
+	body := map[string]any{
+		"applicationId": input.ApplicationID,
+		"displayName":   input.DisplayName,
+		"image":         input.Image,
+		"memoryInMBs":   input.MemoryInMBs,
+	}
+	if input.TimeoutInSeconds != nil {
+		body["timeoutInSeconds"] = *input.TimeoutInSeconds
+	}
+	if input.TraceEnabled {
+		body["traceConfig"] = map[string]any{"isEnabled": true}
+	}
+	if input.SourceTriggerType != "" {
+		body["sourceTriggerConfig"] = map[string]any{"type": input.SourceTriggerType}
+	}
+	if input.ProvisionedConcurrencyStrategy != "" {
+		pc := map[string]any{"strategy": input.ProvisionedConcurrencyStrategy}
+		if input.ProvisionedConcurrencyStrategy == "CONSTANT" && input.ProvisionedConcurrencyCount > 0 {
+			pc["count"] = input.ProvisionedConcurrencyCount
+		}
+		body["provisionedConcurrencyConfig"] = pc
+	}
+	if len(input.FreeformTags) > 0 {
+		body["freeformTags"] = input.FreeformTags
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create function request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var fn FunctionResource
+	if err := json.Unmarshal(respBody, &fn); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal function response: %w", err)
+	}
+
+	return &fn, nil
+}
+
+// DeleteFunction removes a function by OCID.
+func (c *Client) DeleteFunction(functionID string) error {
+	host := c.functionsHost()
+	url := fmt.Sprintf("https://%s/%s/functions/%s", host, functionsAPIVersion, functionID)
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// InvokeFunction calls the function's invoke endpoint with an optional payload.
+// The invokeEndpoint field from GetFunction is the base host in the form
+// https://<hash>.call.<region>.oci.oraclecloud.com. The full invocation URL
+// is: <invokeEndpoint>/20181201/functions/<functionId>/actions/invoke
+func (c *Client) InvokeFunction(functionID string, payload []byte) ([]byte, int, error) {
+	fn, err := c.GetFunction(functionID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get function invoke endpoint: %w", err)
+	}
+	if fn.InvokeEndpoint == "" {
+		return nil, 0, fmt.Errorf("function %s has no invoke endpoint", functionID)
+	}
+
+	// Strip any trailing slash from the base endpoint before appending the path.
+	base := strings.TrimRight(fn.InvokeEndpoint, "/")
+	invokeURL := fmt.Sprintf("%s/%s/functions/%s/actions/invoke", base, functionsAPIVersion, functionID)
+	parsed, err := neturl.Parse(invokeURL)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse invoke endpoint: %w", err)
+	}
+	host := parsed.Host
+
+	var bodyReader io.Reader
+	if len(payload) > 0 {
+		bodyReader = bytes.NewReader(payload)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, invokeURL, bodyReader)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to build invoke request: %w", err)
+	}
+
+	// OCI HTTP signing for POST requires x-content-sha256, content-type, and
+	// content-length to be signed even when the body is empty.
+	hash := sha256.Sum256(payload)
+	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+	req.Header.Set("Host", host)
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("Content-Length", fmt.Sprintf("%d", len(payload)))
+	req.Header.Set("x-content-sha256", base64.StdEncoding.EncodeToString(hash[:]))
+
+	if err := c.signRequest(req, true); err != nil {
+		return nil, 0, fmt.Errorf("failed to sign invoke request: %w", err)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invoke HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("failed to read invoke response body: %w", err)
+	}
+
+	// Distinguish platform-level errors (auth, rate limit, infra) from
+	// legitimate function responses.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var ociErr struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(respBody, &ociErr) == nil && ociErr.Code != "" {
+			return nil, resp.StatusCode, fmt.Errorf("OCI platform error %d (%s): %s", resp.StatusCode, ociErr.Code, ociErr.Message)
+		}
+	}
+
+	return respBody, resp.StatusCode, nil
+}
+
+// AttachVolume attaches an existing block volume to a running instance using paravirtualised attachment.
+func (c *Client) AttachVolume(instanceID, volumeID string) (*VolumeAttachment, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/volumeAttachments", host, coreServicesAPIVersion)
+
+	body := map[string]any{
+		"instanceId": instanceID,
+		"volumeId":   volumeID,
+		"type":       "paravirtualized",
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal attach volume request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var attachment VolumeAttachment
+	if err := json.Unmarshal(respBody, &attachment); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal volume attachment response: %w", err)
+	}
+
+	return &attachment, nil
+}
+
+// UpdateInstance updates mutable Compute instance attributes.
+func (c *Client) UpdateInstance(instanceID string, req UpdateInstanceRequest) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances/%s", host, coreServicesAPIVersion, neturl.PathEscape(instanceID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update instance request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPut, host, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// InstanceAction performs a power lifecycle action on a Compute instance.
+func (c *Client) InstanceAction(instanceID, action string) (*Instance, error) {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf("https://%s/%s/instances/%s?action=%s", host, coreServicesAPIVersion, neturl.PathEscape(instanceID), neturl.QueryEscape(action))
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var instance Instance
+	if err := json.Unmarshal(respBody, &instance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal instance response: %w", err)
+	}
+
+	return &instance, nil
+}
+
+// TerminateInstance terminates a Compute instance, optionally preserving the boot volume.
+func (c *Client) TerminateInstance(instanceID string, preserveBootVolume bool) error {
+	host := fmt.Sprintf(coreServicesHostTemplate, c.region)
+	url := fmt.Sprintf(
+		"https://%s/%s/instances/%s?preserveBootVolume=%t",
+		host,
+		coreServicesAPIVersion,
+		neturl.PathEscape(instanceID),
+		preserveBootVolume,
+	)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// ONS (Notifications) types
+
+type ONSSubscription struct {
+	ID             string `json:"id"`
+	TopicID        string `json:"topicId"`
+	Protocol       string `json:"protocol"`
+	Endpoint       string `json:"endpoint"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+// CreateONSSubscription creates an HTTPS subscription on an OCI Notifications topic.
+func (c *Client) CreateONSSubscription(compartmentID, topicID, endpoint string) (*ONSSubscription, error) {
+	host := fmt.Sprintf("notification.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/subscriptions", host)
+
+	body := map[string]string{
+		"compartmentId": compartmentID,
+		"topicId":       topicID,
+		"protocol":      "CUSTOM_HTTPS",
+		"endpoint":      endpoint,
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal subscription request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var sub ONSSubscription
+	if err := json.Unmarshal(respBody, &sub); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal ONS subscription response: %w (body: %s)", err, string(respBody))
+	}
+
+	if sub.ID == "" {
+		return nil, fmt.Errorf("OCI returned an unexpected subscription response with no OCID (body: %s)", string(respBody))
+	}
+
+	return &sub, nil
+}
+
+// DeleteONSSubscription deletes an OCI Notifications subscription by its OCID.
+func (c *Client) DeleteONSSubscription(subscriptionID string) error {
+	host := fmt.Sprintf("notification.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/subscriptions/%s", host, subscriptionID)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// ONS topic types and methods
+
+type ONSTopic struct {
+	TopicID        string `json:"topicId"`
+	Name           string `json:"name"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+// CreateONSTopic creates a new OCI Notifications topic.
+func (c *Client) CreateONSTopic(compartmentID, name string) (*ONSTopic, error) {
+	host := fmt.Sprintf("notification.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/topics", host)
+
+	body := map[string]string{
+		"compartmentId": compartmentID,
+		"name":          name,
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal topic request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var topic ONSTopic
+	if err := json.Unmarshal(respBody, &topic); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal ONS topic: %w", err)
+	}
+
+	return &topic, nil
+}
+
+// DeleteONSTopic deletes an OCI Notifications topic by its OCID.
+// Deleting the topic also removes all its subscriptions.
+func (c *Client) DeleteONSTopic(topicID string) error {
+	host := fmt.Sprintf("notification.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/topics/%s", host, topicID)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// OCI Events rule types and methods
+
+type EventsRule struct {
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+type eventsRuleAction struct {
+	ActionType string `json:"actionType"`
+	TopicID    string `json:"topicId"`
+	IsEnabled  bool   `json:"isEnabled"`
+}
+
+type eventsRuleActions struct {
+	Actions []eventsRuleAction `json:"actions"`
+}
+
+type createEventsRuleRequest struct {
+	CompartmentID string            `json:"compartmentId"`
+	DisplayName   string            `json:"displayName"`
+	Description   string            `json:"description"`
+	IsEnabled     bool              `json:"isEnabled"`
+	Condition     string            `json:"condition"`
+	Actions       eventsRuleActions `json:"actions"`
+}
+
+// CreateEventsRule creates an OCI Events rule that routes matching events to an ONS topic.
+func (c *Client) CreateEventsRule(compartmentID, displayName, condition, topicID string) (*EventsRule, error) {
+	host := fmt.Sprintf("events.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/rules", host)
+
+	req := createEventsRuleRequest{
+		CompartmentID: compartmentID,
+		DisplayName:   displayName,
+		Description:   "Managed by SuperPlane",
+		IsEnabled:     true,
+		Condition:     condition,
+		Actions: eventsRuleActions{
+			Actions: []eventsRuleAction{
+				{ActionType: "ONS", TopicID: topicID, IsEnabled: true},
+			},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal events rule request: %w", err)
+	}
+
+	respBody, err := c.doRequest(http.MethodPost, host, url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	var rule EventsRule
+	if err := json.Unmarshal(respBody, &rule); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal events rule: %w", err)
+	}
+
+	return &rule, nil
+}
+
+// DeleteEventsRule deletes an OCI Events rule by its OCID.
+func (c *Client) DeleteEventsRule(ruleID string) error {
+	host := fmt.Sprintf("events.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/rules/%s", host, ruleID)
+
+	_, err := c.doRequest(http.MethodDelete, host, url, nil)
+	return err
+}
+
+// UpdateEventsRule updates the condition of an existing OCI Events rule.
+func (c *Client) UpdateEventsRule(ruleID, condition string) error {
+	host := fmt.Sprintf("events.%s.oraclecloud.com", c.region)
+	url := fmt.Sprintf("https://%s/20181201/rules/%s", host, ruleID)
+
+	body := map[string]any{
+		"condition": condition,
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("failed to marshal update events rule request: %w", err)
+	}
+
+	_, err = c.doRequest(http.MethodPut, host, url, bytes.NewReader(bodyBytes))
+	return err
+}
+
+func (c *Client) artifactsHost() string {
+	return fmt.Sprintf("artifacts.%s.oci.oraclecloud.com", c.region)
+}
+
+// ocirRegistryHost returns the OCIR registry hostname for the client's region.
+// OCIR uses 3-letter region keys (e.g. "fra", "iad") rather than the full
+// region identifier (e.g. "eu-frankfurt-1", "us-ashburn-1").
+func (c *Client) ocirRegistryHost() string {
+	if key, ok := regionToOCIRKey[c.region]; ok {
+		return fmt.Sprintf("%s.ocir.io", key)
+	}
+	// Fallback: use the full region identifier (works for newer regions).
+	return fmt.Sprintf("%s.ocir.io", c.region)
+}
+
+var regionToOCIRKey = map[string]string{
+	"us-ashburn-1":      "iad",
+	"us-phoenix-1":      "phx",
+	"us-chicago-1":      "ord",
+	"us-sanjose-1":      "sjc",
+	"ca-montreal-1":     "yul",
+	"ca-toronto-1":      "yyz",
+	"sa-saopaulo-1":     "gru",
+	"sa-vinhedo-1":      "vcp",
+	"sa-santiago-1":     "scl",
+	"uk-london-1":       "lhr",
+	"uk-cardiff-1":      "cwl",
+	"eu-frankfurt-1":    "fra",
+	"eu-amsterdam-1":    "ams",
+	"eu-madrid-1":       "mad",
+	"eu-paris-1":        "cdg",
+	"eu-stockholm-1":    "arn",
+	"eu-milan-1":        "lin",
+	"eu-zurich-1":       "zrh",
+	"ap-tokyo-1":        "nrt",
+	"ap-osaka-1":        "kix",
+	"ap-seoul-1":        "icn",
+	"ap-chuncheon-1":    "yny",
+	"ap-sydney-1":       "syd",
+	"ap-melbourne-1":    "mel",
+	"ap-mumbai-1":       "bom",
+	"ap-hyderabad-1":    "hyd",
+	"ap-singapore-1":    "sin",
+	"il-jerusalem-1":    "mtz",
+	"me-dubai-1":        "dxb",
+	"me-abudhabi-1":     "auh",
+	"me-jeddah-1":       "jed",
+	"af-johannesburg-1": "jnb",
+}
+
+// ContainerRepository represents an OCI Container Registry repository.
+type ContainerRepository struct {
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	CompartmentID  string `json:"compartmentId"`
+	LifecycleState string `json:"lifecycleState"`
+	ImageCount     int    `json:"imageCount"`
+}
+
+// ContainerImage represents a container image version in OCIR.
+type ContainerImage struct {
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	CompartmentID  string `json:"compartmentId"`
+	RepositoryID   string `json:"repositoryId"`
+	RepositoryName string `json:"repositoryName"`
+	Version        string `json:"version"`
+	LifecycleState string `json:"lifecycleState"`
+}
+
+// ListContainerRepositories lists container repositories in a compartment.
+func (c *Client) ListContainerRepositories(compartmentID string) ([]ContainerRepository, error) {
+	host := c.artifactsHost()
+	url := fmt.Sprintf("https://%s/%s/container/repositories?compartmentId=%s&limit=100",
+		host, containerRegistryAPIVersion, neturl.QueryEscape(compartmentID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Items []ContainerRepository `json:"items"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container repositories: %w", err)
+	}
+
+	return result.Items, nil
+}
+
+// ListContainerImages lists container images within a repository.
+func (c *Client) ListContainerImages(compartmentID, repositoryID string) ([]ContainerImage, error) {
+	host := c.artifactsHost()
+	url := fmt.Sprintf("https://%s/%s/container/images?compartmentId=%s&repositoryId=%s&limit=100",
+		host, containerRegistryAPIVersion, neturl.QueryEscape(compartmentID), neturl.QueryEscape(repositoryID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Items []ContainerImage `json:"items"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container images: %w", err)
+	}
+
+	return result.Items, nil
+}
+
+// GetOCIRNamespace returns the tenancy's OCIR (Container Registry) namespace.
+func (c *Client) GetOCIRNamespace(compartmentID string) (string, error) {
+	host := c.artifactsHost()
+	url := fmt.Sprintf("https://%s/%s/container/configuration?compartmentId=%s",
+		host, containerRegistryAPIVersion, neturl.QueryEscape(compartmentID))
+
+	respBody, err := c.doRequest(http.MethodGet, host, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get OCIR namespace: %w", err)
+	}
+
+	var result struct {
+		Namespace string `json:"namespace"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("failed to unmarshal container configuration: %w", err)
+	}
+
+	if result.Namespace == "" {
+		return "", fmt.Errorf("OCIR namespace is empty in container configuration response")
+	}
+
+	return result.Namespace, nil
+}
+
+// resolveApplicationName returns the display name for an application OCID,
+// falling back to the OCID itself on any error.
+func resolveApplicationName(ctx core.SetupContext, applicationID string) string {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return applicationID
+	}
+
+	app, err := client.GetApplication(applicationID)
+	if err != nil || app.DisplayName == "" {
+		return applicationID
+	}
+
+	return app.DisplayName
+}
+
+// resolveFunctionName returns the display name for a function OCID,
+// falling back to the OCID itself on any error.
+func resolveFunctionName(ctx core.SetupContext, functionID string) string {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return functionID
+	}
+
+	fn, err := client.GetFunction(functionID)
+	if err != nil || fn.DisplayName == "" {
+		return functionID
+	}
+
+	return fn.DisplayName
+}

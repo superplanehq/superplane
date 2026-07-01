@@ -45,7 +45,7 @@ export const GroupFieldRenderer = ({ value, onChange, domainId, allValues }: Gro
   if (!groups || groups.length === 0) {
     return (
       <div className="space-y-2">
-        <Select disabled>
+        <Select value="" disabled>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="No groups available" />
           </SelectTrigger>

@@ -129,11 +129,11 @@ func (t *OnTopicMessage) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnTopicMessage) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnTopicMessage) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnTopicMessage) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnTopicMessage) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

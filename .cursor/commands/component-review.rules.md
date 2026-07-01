@@ -96,9 +96,9 @@ The output channels shown in the UI include at least one channel (or rely on def
 - Static methods like `Configuration()`, `Label()`, `Name()` do not need to be unit tested.
 - Do not make dummy implementations of the `pkg/core` interfaces in unit tests. Use contexts already available in [test/support/contexts](https://github.com/superplanehq/superplane/blob/main/test/support/contexts/contexts.go) for that.
 - Tests cover validation failures and error handling paths.
-- For `Component` interface implementations, tests for `Setup()` and `Execute()` must be written. If the component has `Actions()`, they must be unit tested as well
-- For `Trigger` interface implementations, tests for `Setup()` and `HandleWebhook()` must be written. If the component has `Actions()`, they must be unit tested as well
-- For `Integration` interface implementations, tests for `Sync` must be written. If the component has `Actions()`, they must be unit tested as well
+- For `Component` interface implementations, tests for `Setup()` and `Execute()` must be written. If the component has `Hooks()`, they must be unit tested as well
+- For `Trigger` interface implementations, tests for `Setup()` and `HandleWebhook()` must be written. If the trigger has `Hooks()`, they must be unit tested as well
+- For `Integration` interface implementations, tests for `Sync` must be written. If the integration has `Hooks()`, they must be unit tested as well
 
 ### General principles
 

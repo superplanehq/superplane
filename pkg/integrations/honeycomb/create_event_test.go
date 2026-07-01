@@ -74,7 +74,6 @@ func Test__CreateEvent__Execute(t *testing.T) {
 				"managementKey": "keyid:secret",
 				"site":          "api.honeycomb.io",
 			},
-			Secrets: map[string]core.IntegrationSecret{},
 		}
 
 		err := component.Execute(core.ExecutionContext{
@@ -104,7 +103,7 @@ func Test__CreateEvent__Execute(t *testing.T) {
 				"managementKey": "keyid:secret",
 				"site":          "api.honeycomb.io",
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				secretNameIngestKey: {Name: secretNameIngestKey, Value: []byte("test-ingest-key")},
 			},
 		}
@@ -136,7 +135,7 @@ func Test__CreateEvent__Execute(t *testing.T) {
 				"managementKey": "keyid:secret",
 				"site":          "api.honeycomb.io",
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				secretNameIngestKey: {Name: secretNameIngestKey, Value: []byte("test-ingest-key")},
 			},
 		}
@@ -188,7 +187,7 @@ func Test__CreateEvent__Execute(t *testing.T) {
 				"managementKey": "keyid:secret",
 				"site":          "api.honeycomb.io",
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				secretNameIngestKey: {Name: secretNameIngestKey, Value: []byte("test-ingest-key")},
 			},
 		}

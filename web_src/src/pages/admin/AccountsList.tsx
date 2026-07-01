@@ -1,6 +1,7 @@
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
-import { useAccount } from "@/contexts/AccountContext";
+import { useAccount } from "@/contexts/useAccount";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { showErrorToast } from "@/lib/toast";
 import { Eye } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
@@ -151,6 +152,8 @@ const AccountsList: React.FC = () => {
       setSortDirection(field === "name" || field === "email" ? "asc" : "desc");
     }
   };
+
+  useReportPageReady(!loading || accounts.length > 0);
 
   if (loading && accounts.length === 0)
     return (

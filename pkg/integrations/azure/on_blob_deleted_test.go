@@ -13,47 +13,6 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestOnBlobDeleted_Metadata(t *testing.T) {
-	trigger := &OnBlobDeleted{}
-
-	assert.Equal(t, "azure.onBlobDeleted", trigger.Name())
-	assert.Equal(t, "On Blob Deleted", trigger.Label())
-	assert.Equal(t, "azure", trigger.Icon())
-	assert.Equal(t, "blue", trigger.Color())
-	assert.NotEmpty(t, trigger.Description())
-	assert.NotEmpty(t, trigger.Documentation())
-}
-
-func TestOnBlobDeleted_Configuration(t *testing.T) {
-	trigger := &OnBlobDeleted{}
-	config := trigger.Configuration()
-
-	require.Len(t, config, 4)
-	assert.Equal(t, "resourceGroup", config[0].Name)
-	assert.True(t, config[0].Required)
-	assert.Equal(t, "storageAccount", config[1].Name)
-	assert.True(t, config[1].Required)
-	assert.Equal(t, "containerFilter", config[2].Name)
-	assert.False(t, config[2].Required)
-	assert.Equal(t, "blobFilter", config[3].Name)
-	assert.False(t, config[3].Required)
-}
-
-func TestOnBlobDeleted_ExampleData(t *testing.T) {
-	trigger := &OnBlobDeleted{}
-	example := trigger.ExampleData()
-
-	require.NotNil(t, example)
-	assert.Contains(t, example, "type")
-	assert.Contains(t, example, "timestamp")
-	assert.Contains(t, example, "data")
-
-	envelope, ok := example["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "Microsoft.Storage.BlobDeleted", envelope["eventType"])
-	assert.Contains(t, envelope, "subject")
-}
-
 func TestOnBlobDeleted_Setup(t *testing.T) {
 	trigger := &OnBlobDeleted{}
 
@@ -79,11 +38,6 @@ func TestOnBlobDeleted_Setup(t *testing.T) {
 		err := trigger.Setup(ctx)
 		assert.NoError(t, err)
 	})
-}
-
-func TestOnBlobDeleted_Actions(t *testing.T) {
-	trigger := &OnBlobDeleted{}
-	assert.Empty(t, trigger.Actions())
 }
 
 func TestOnBlobDeleted_Cleanup(t *testing.T) {

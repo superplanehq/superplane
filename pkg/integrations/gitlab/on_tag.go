@@ -101,11 +101,11 @@ func (t *OnTag) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnTag) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnTag) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnTag) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnTag) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

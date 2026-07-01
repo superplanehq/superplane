@@ -15,14 +15,6 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestAzureIntegration_HandleAction(t *testing.T) {
-	integration := &AzureIntegration{}
-
-	err := integration.HandleAction(core.IntegrationActionContext{Name: "unknown-action"})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown action")
-}
-
 func TestAzureIntegration_ListResources(t *testing.T) {
 	integration := &AzureIntegration{}
 

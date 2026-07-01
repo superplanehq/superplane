@@ -145,14 +145,6 @@ func (c *GetSubscription) Execute(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *GetSubscription) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetSubscription) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetSubscription) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -162,5 +154,13 @@ func (c *GetSubscription) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *GetSubscription) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetSubscription) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetSubscription) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

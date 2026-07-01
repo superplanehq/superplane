@@ -255,18 +255,18 @@ func (c *UpdateDNSRecord) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (c *UpdateDNSRecord) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateDNSRecord) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *UpdateDNSRecord) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *UpdateDNSRecord) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateDNSRecord) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

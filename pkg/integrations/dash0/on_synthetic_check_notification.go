@@ -37,9 +37,7 @@ func (t *OnSyntheticCheckNotification) Documentation() string {
 
 ## Setup
 
-1. Configure the Dash0 integration in SuperPlane.
-2. Copy the webhook URL shown in the integration configuration.
-3. In Dash0, configure synthetic check notifications to send HTTP POST requests to that URL.
+Connect the Dash0 integration in SuperPlane. A webhook notification channel is created automatically in Dash0 with routing for all synthetic check notifications. Add this trigger to a workflow and publish the canvas to start receiving events.
 
 ## Event Data
 
@@ -107,11 +105,11 @@ func (t *OnSyntheticCheckNotification) Setup(ctx core.TriggerContext) error {
 	return ctx.Metadata.Set(metadata)
 }
 
-func (t *OnSyntheticCheckNotification) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnSyntheticCheckNotification) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnSyntheticCheckNotification) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnSyntheticCheckNotification) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

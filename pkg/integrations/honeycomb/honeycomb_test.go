@@ -143,7 +143,6 @@ func Test__Honeycomb__Sync(t *testing.T) {
 				"teamSlug":        "myteam",
 				"environmentSlug": "production",
 			},
-			Secrets: map[string]core.IntegrationSecret{},
 		}
 
 		environmentsBody := `{
@@ -216,12 +215,12 @@ func Test__Honeycomb__Sync(t *testing.T) {
 
 		assert.Len(t, httpCtx.Requests, 7)
 
-		cfgSecret, ok := integrationCtx.Secrets[secretNameConfigurationKey]
-		require.True(t, ok)
-		assert.Equal(t, []byte("cfg-secret-value"), cfgSecret.Value)
+		configurationKey, err := integrationCtx.Secrets().Get(secretNameConfigurationKey)
+		require.NoError(t, err)
+		assert.Equal(t, "cfg-secret-value", configurationKey)
 
-		ingestSecret, ok := integrationCtx.Secrets[secretNameIngestKey]
-		require.True(t, ok)
-		assert.Equal(t, []byte("ingestkey-idingest-secret-value"), ingestSecret.Value)
+		ingestKey, err := integrationCtx.Secrets().Get(secretNameIngestKey)
+		require.NoError(t, err)
+		assert.Equal(t, "ingestkey-idingest-secret-value", ingestKey)
 	})
 }

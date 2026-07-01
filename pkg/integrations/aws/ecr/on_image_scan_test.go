@@ -45,7 +45,7 @@ func Test__OnImageScan__Setup(t *testing.T) {
 					Rules: map[string]common.EventBridgeRuleMetadata{},
 				},
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -104,7 +104,7 @@ func Test__OnImageScan__Setup(t *testing.T) {
 					},
 				},
 			},
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -134,12 +134,12 @@ func Test__OnImageScan__Setup(t *testing.T) {
 	})
 }
 
-func Test__OnImageScan__HandleAction(t *testing.T) {
+func Test__OnImageScan__HandleHook(t *testing.T) {
 	trigger := &OnImageScan{}
 
 	t.Run("rule missing -> reschedules check", func(t *testing.T) {
 		requests := &contexts.RequestContext{}
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:     "checkRuleAvailability",
 			Logger:   logrus.NewEntry(logrus.New()),
 			Requests: requests,
@@ -178,7 +178,7 @@ func Test__OnImageScan__HandleAction(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:        "checkRuleAvailability",
 			Logger:      logrus.NewEntry(logrus.New()),
 			Requests:    requests,

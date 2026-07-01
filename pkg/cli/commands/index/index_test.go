@@ -21,18 +21,28 @@ const integrationsListResponse = `{
 			"label": "Slack",
 			"description": "Slack integration",
 			"configuration": [{"name": "token", "type": "string", "required": true}],
-			"components": [{"name": "slack.post-message"}],
-			"triggers": [{"name": "slack.message-received"}]
+			"capabilities": [
+				{
+					"type": "TYPE_ACTION",
+					"name": "slack.post-message",
+					"exampleOutput": {"channel": "C123", "ts": "1712345678.000100"}
+				},
+				{
+					"type": "TYPE_TRIGGER",
+					"name": "slack.message-received",
+					"exampleData": {"channel": "C123", "text": "hello"}
+				}
+			]
 		}
 	]
 }`
 
-const componentsListResponse = `{
-	"components": [
+const actionsListResponse = `{
+	"actions": [
 		{
 			"name": "http",
 			"label": "HTTP",
-			"description": "HTTP request component",
+			"description": "HTTP request action",
 			"configuration": [{"name": "url", "type": "string", "required": true}],
 			"exampleOutput": {"status": 200}
 		}
@@ -91,15 +101,15 @@ func TestIntegrationsListReturnsFullJSON(t *testing.T) {
 	require.Contains(t, raw, "slack")
 }
 
-// Components tests
+// Actions tests
 
-func TestComponentsListReturnsSummaryJSON(t *testing.T) {
-	server := newIndexServer(t, "GET", "/api/v1/components", componentsListResponse)
+func TestActionsListReturnsSummaryJSON(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/actions", actionsListResponse)
 	ctx, stdout := newIndexCommandContext(t, server, "json")
 	name := ""
 	from := ""
 	full := false
-	cmd := &componentsCommand{name: &name, from: &from, full: &full}
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
 
 	err := cmd.Execute(ctx)
 	require.NoError(t, err)
@@ -109,20 +119,20 @@ func TestComponentsListReturnsSummaryJSON(t *testing.T) {
 	require.Len(t, result, 1)
 	require.Equal(t, "http", result[0]["name"])
 	require.Equal(t, "HTTP", result[0]["label"])
-	require.Equal(t, "HTTP request component", result[0]["description"])
+	require.Equal(t, "HTTP request action", result[0]["description"])
 
 	raw := stdout.String()
 	require.NotContains(t, raw, "exampleOutput")
 	require.NotContains(t, raw, "url")
 }
 
-func TestComponentsListReturnsFullJSON(t *testing.T) {
-	server := newIndexServer(t, "GET", "/api/v1/components", componentsListResponse)
+func TestActionsListReturnsFullJSON(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/actions", actionsListResponse)
 	ctx, stdout := newIndexCommandContext(t, server, "json")
 	name := ""
 	from := ""
 	full := true
-	cmd := &componentsCommand{name: &name, from: &from, full: &full}
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
 
 	err := cmd.Execute(ctx)
 	require.NoError(t, err)
@@ -130,6 +140,65 @@ func TestComponentsListReturnsFullJSON(t *testing.T) {
 	raw := stdout.String()
 	require.Contains(t, raw, "url")
 	require.Contains(t, raw, "http")
+}
+
+func TestActionsDescribeIntegrationActionIncludesExamplePayload(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := "slack.post-message"
+	from := ""
+	full := false
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	out := stdout.String()
+	require.Contains(t, out, "Name: slack.post-message")
+	require.Contains(t, out, "Example Payload:")
+	require.Contains(t, out, `"channel": "C123"`)
+	require.Contains(t, out, `"ts": "1712345678.000100"`)
+}
+
+func TestRenderConfigurationTextOmitsNestedDetailsInTable(t *testing.T) {
+	var configuration []openapi_client.ConfigurationField
+	err := json.Unmarshal([]byte(`[
+		{
+			"name": "bootstrap",
+			"type": "object",
+			"required": false,
+			"description": "Execute script after the sandbox starts",
+			"typeOptions": {
+				"object": {
+					"schema": [
+						{
+							"name": "from",
+							"type": "select",
+							"required": true,
+							"typeOptions": {
+								"select": {
+									"options": [
+										{"label": "Inline Script", "value": "inline"},
+										{"label": "Repository File", "value": "file"}
+									]
+								}
+							}
+						}
+					]
+				}
+			}
+		}
+	]`), &configuration)
+	require.NoError(t, err)
+
+	stdout := bytes.NewBuffer(nil)
+	require.NoError(t, renderConfigurationText(stdout, configuration))
+
+	raw := stdout.String()
+	require.Contains(t, raw, "bootstrap")
+	require.Contains(t, raw, "object")
+	require.NotContains(t, raw, "Inline Script")
 }
 
 // Triggers tests
@@ -171,6 +240,208 @@ func TestTriggersListReturnsFullJSON(t *testing.T) {
 	raw := stdout.String()
 	require.Contains(t, raw, "schedule")
 	require.Contains(t, raw, "cron")
+}
+
+func TestTriggersDescribeIntegrationTriggerIncludesExamplePayload(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := "slack.message-received"
+	from := ""
+	full := false
+	cmd := &triggersCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	out := stdout.String()
+	require.Contains(t, out, "Name: slack.message-received")
+	require.Contains(t, out, "Example Payload:")
+	require.Contains(t, out, `"channel": "C123"`)
+	require.Contains(t, out, `"text": "hello"`)
+}
+
+func TestIntegrationsListTextOutput(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/integrations", integrationsListResponse)
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := ""
+	full := false
+	cmd := &integrationsCommand{name: &name, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+	out := stdout.String()
+	require.Contains(t, out, "slack")
+	require.Contains(t, out, "Slack")
+	require.Contains(t, out, "Slack integration")
+	require.Contains(t, out, "NAME")
+}
+
+func TestIntegrationsDescribeByNameTextOutput(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/integrations", integrationsListResponse)
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := "slack"
+	full := false
+	cmd := &integrationsCommand{name: &name, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+	out := stdout.String()
+	require.Contains(t, out, "Name: slack")
+	require.Contains(t, out, "Configuration:")
+	require.Contains(t, out, "Actions:")
+	require.Contains(t, out, "slack.post-message")
+	require.Contains(t, out, "Triggers:")
+	require.Contains(t, out, "slack.message-received")
+}
+
+func TestActionsListTextOutput(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/actions", actionsListResponse)
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := ""
+	from := ""
+	full := false
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+	out := stdout.String()
+	require.Contains(t, out, "NAME")
+	require.Contains(t, out, "http")
+	require.Contains(t, out, "HTTP")
+}
+
+func TestActionsListFromIntegrationTextOutput(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := ""
+	from := "slack"
+	full := false
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+	out := stdout.String()
+	require.Contains(t, out, "slack.post-message")
+}
+
+func TestActionsListFromIntegrationFullJSONIncludesExamplePayload(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "json")
+	name := ""
+	from := "slack"
+	full := true
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	raw := stdout.String()
+	require.Contains(t, raw, `"exampleOutput"`)
+	require.Contains(t, raw, `"ts": "1712345678.000100"`)
+}
+
+func TestActionsDescribeByNameTextOutput(t *testing.T) {
+	const describeHTTP = `{
+		"action": {
+			"name": "http",
+			"label": "HTTP",
+			"description": "HTTP request",
+			"outputChannels": [
+				{"name": "", "label": "Default", "description": ""},
+				{"name": "success", "label": "success", "description": "When the request succeeds"},
+				{"name": "plain", "label": "", "description": ""}
+			],
+			"configuration": [{"name": "url", "type": "string", "required": true, "description": "Endpoint URL"}],
+			"exampleOutput": {"status": 200, "body": "ok"}
+		}
+	}`
+	server := newIndexServer(t, "GET", "/api/v1/actions/http", describeHTTP)
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := "http"
+	from := ""
+	full := false
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+	out := stdout.String()
+	require.Contains(t, out, "Name: http")
+	require.Contains(t, out, "Output Channels:")
+	require.Contains(t, out, "(unnamed)")
+	require.Contains(t, out, "When the request succeeds")
+	require.Contains(t, out, "Configuration:")
+	require.Contains(t, out, "url")
+	require.Contains(t, out, "Example Payload:")
+	require.Contains(t, out, `"status": 200`)
+}
+
+func TestTriggersListTextOutput(t *testing.T) {
+	server := newIndexServer(t, "GET", "/api/v1/triggers", triggersListResponse)
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := ""
+	from := ""
+	full := false
+	cmd := &triggersCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+	out := stdout.String()
+	require.Contains(t, out, "cron")
+	require.Contains(t, out, "Cron")
+}
+
+func TestTriggersListFromIntegrationTextOutput(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := ""
+	from := "slack"
+	full := false
+	cmd := &triggersCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+	require.Contains(t, stdout.String(), "slack.message-received")
+}
+
+func TestTriggersListFromIntegrationFullJSONIncludesExamplePayload(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "json")
+	name := ""
+	from := "slack"
+	full := true
+	cmd := &triggersCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	raw := stdout.String()
+	require.Contains(t, raw, `"exampleData"`)
+	require.Contains(t, raw, `"text": "hello"`)
+}
+
+func TestTriggersDescribeByNameTextOutput(t *testing.T) {
+	const describeCron = `{
+		"trigger": {
+			"name": "cron",
+			"label": "Cron",
+			"description": "On a schedule",
+			"configuration": [{"name": "schedule", "type": "string", "required": true, "description": "Cron expr"}],
+			"exampleData": {"tick": true}
+		}
+	}`
+	server := newIndexServer(t, "GET", "/api/v1/triggers/cron", describeCron)
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := "cron"
+	from := ""
+	full := false
+	cmd := &triggersCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+	out := stdout.String()
+	require.Contains(t, out, "Name: cron")
+	require.Contains(t, out, "schedule")
+	require.Contains(t, out, "Example Payload:")
+	require.Contains(t, out, `"tick": true`)
 }
 
 // Helpers

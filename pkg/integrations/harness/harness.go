@@ -62,8 +62,8 @@ func (h *Harness) Configuration() []configuration.Field {
 	}
 }
 
-func (h *Harness) Components() []core.Component {
-	return []core.Component{
+func (h *Harness) Actions() []core.Action {
+	return []core.Action{
 		&RunPipeline{},
 	}
 }
@@ -185,10 +185,10 @@ func (h *Harness) ListResources(resourceType string, ctx core.ListResourcesConte
 	return []core.IntegrationResource{}, nil
 }
 
-func (h *Harness) Actions() []core.Action {
-	return []core.Action{}
+func (h *Harness) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (h *Harness) HandleAction(ctx core.IntegrationActionContext) error {
+func (h *Harness) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

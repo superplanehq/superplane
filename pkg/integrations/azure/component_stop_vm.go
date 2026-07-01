@@ -160,18 +160,18 @@ func (c *StopVMComponent) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *StopVMComponent) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *StopVMComponent) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("no actions defined for this component")
-}
-
 func (c *StopVMComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *StopVMComponent) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *StopVMComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *StopVMComponent) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

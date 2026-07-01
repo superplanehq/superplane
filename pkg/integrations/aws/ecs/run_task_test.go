@@ -482,12 +482,12 @@ func Test__RunTask__Execute(t *testing.T) {
 	})
 }
 
-func Test__RunTask__HandleAction(t *testing.T) {
+func Test__RunTask__HandleHook(t *testing.T) {
 	component := &RunTask{}
 
 	t.Run("timeout action before deadline -> reschedules timeout check", func(t *testing.T) {
 		requests := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: runTaskTimeoutAction,
 			Metadata: &contexts.MetadataContext{
 				Metadata: RunTaskExecutionMetadata{
@@ -528,7 +528,7 @@ func Test__RunTask__HandleAction(t *testing.T) {
 		}
 
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: runTaskTimeoutAction,
 			Metadata: &contexts.MetadataContext{
 				Metadata: RunTaskExecutionMetadata{
@@ -746,14 +746,14 @@ func Test__RunTask__OnIntegrationMessage(t *testing.T) {
 
 func setupIntegrationContext(eventBridge *common.EventBridgeMetadata) *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
-		Metadata: common.IntegrationMetadata{EventBridge: eventBridge},
-		Secrets:  map[string]core.IntegrationSecret{},
+		Metadata:       common.IntegrationMetadata{EventBridge: eventBridge},
+		CurrentSecrets: map[string]core.IntegrationSecret{},
 	}
 }
 
 func validIntegrationContext() *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 			"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 			"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

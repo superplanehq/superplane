@@ -11,11 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -28,7 +29,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
 				return nil
@@ -87,10 +88,10 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		_, err := DeleteIntegration(ctx, "invalid-uuid", uuid.NewString())
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid organization ID")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "invalid organization ID")
 	})
 
 	t.Run("invalid integration ID -> error", func(t *testing.T) {
@@ -99,10 +100,10 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		_, err := DeleteIntegration(ctx, r.Organization.ID.String(), "invalid-uuid")
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid integration ID")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "invalid integration ID")
 	})
 
 	t.Run("non-existent integration -> error", func(t *testing.T) {
@@ -111,17 +112,17 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		_, err := DeleteIntegration(ctx, r.Organization.ID.String(), uuid.NewString())
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "integration not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "integration not found")
 	})
 
 	t.Run("integration from different organization -> error", func(t *testing.T) {
 		//
 		// Register a test application
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
 				return nil
@@ -150,16 +151,16 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		_, err = DeleteIntegration(ctx, org2.ID.String(), integrationID)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("delete twice -> error on second attempt", func(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
 				return nil
@@ -188,17 +189,17 @@ func Test__DeleteIntegration(t *testing.T) {
 		//
 		_, err = DeleteIntegration(ctx, r.Organization.ID.String(), integrationID)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "integration not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "integration not found")
 	})
 
 	t.Run("delete modifies integration name to prevent name conflicts -> success", func(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
 				return nil

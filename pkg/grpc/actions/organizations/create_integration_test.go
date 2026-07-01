@@ -11,9 +11,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -44,10 +46,10 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.AlreadyExists, s.Code())
-		assert.Contains(t, s.Message(), fmt.Sprintf("an integration with the name %s already exists", name))
+		assert.Equal(t, codes.AlreadyExists, code)
+		assert.Contains(t, msg, fmt.Sprintf("an integration with the name %s already exists", name))
 	})
 
 	t.Run("reuse integration name after deletion -> success", func(t *testing.T) {
@@ -160,23 +162,21 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "nonexistent-app", name, appConfig)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "integration nonexistent-app not found")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "integration nonexistent-app not found")
 	})
 
 	t.Run("sync fails -> integration created in error state", func(t *testing.T) {
 		//
 		// Register a test integration that always fails on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(
-			support.DummyIntegrationOptions{
-				OnSync: func(ctx core.SyncContext) error {
-					return errors.New("oops")
-				},
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				return errors.New("oops")
 			},
-		)
+		})
 
 		name := support.RandomName("integration")
 		appConfig, err := structpb.NewStruct(map[string]interface{}{})
@@ -214,7 +214,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Register a test integration that succeeds on Sync
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
 				return nil
@@ -288,10 +288,8 @@ func Test__CreateIntegration(t *testing.T) {
 			appConfig,
 		)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.ResourceExhausted, s.Code())
-		assert.Equal(t, "organization integration limit exceeded", s.Message())
+		assert.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
+		assert.Equal(t, "organization integration limit exceeded", status.Convert(err).Message())
 		require.Len(t, service.checkOrganizationCalls, 1)
 		assert.Equal(t, int32(integrationCount+1), service.checkOrganizationCalls[0].state.Integrations)
 	})

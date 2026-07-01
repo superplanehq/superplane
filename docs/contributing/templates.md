@@ -89,7 +89,7 @@ spec:
   nodes:
     - id: "unique-node-id"
       name: "Display Name"
-      type: "TYPE_TRIGGER" # or TYPE_COMPONENT, TYPE_WIDGET
+      type: "TYPE_TRIGGER" # or TYPE_ACTION, TYPE_WIDGET
       configuration: {}
       position:
         x: 100
@@ -106,7 +106,7 @@ spec:
 **Nodes** define the individual steps in the workflow:
 - `id`: Unique identifier for the node (used in edges)
 - `name`: Display name shown in the UI
-- `type`: Node type (`TYPE_TRIGGER`, `TYPE_COMPONENT`, or `TYPE_WIDGET`)
+- `type`: Node type (`TYPE_TRIGGER`, `TYPE_ACTION`, or `TYPE_WIDGET`)
 - `configuration`: Component-specific configuration
 - `position`: X and Y coordinates for canvas layout
 - `trigger`, `component`, or `widget`: Type-specific configuration
@@ -127,10 +127,10 @@ spec:
 2. **Restart the server**
    - Templates are automatically loaded when the server starts
    - Stop your local development server
-   - Run `make dev.start` to restart
+   - Run `make dev.up` then `make dev.server` to restart
 
 3. **Verify the template**
-   - Navigate to your local SuperPlane instance (typically http://localhost:8000 when using `make dev.start`)
+   - Navigate to your local SuperPlane instance (typically http://localhost:8000 when using `make dev.server` after `make dev.up`)
    - Click "Create Canvas" or similar action
    - Your template should appear in the template selection list
 

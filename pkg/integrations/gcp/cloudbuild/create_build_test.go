@@ -342,7 +342,7 @@ func TestCreateBuildPollSuccess(t *testing.T) {
 	}}
 	executionStateCtx := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           createBuildPollAction,
 		Configuration:  map[string]any{"steps": `[{"name":"golang:1.22"}]`},
 		Metadata:       metadataCtx,
@@ -386,7 +386,7 @@ func TestCreateBuildPollFailureEmitsFailedChannel(t *testing.T) {
 	}}
 	executionStateCtx := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 
-	err := component.HandleAction(core.ActionContext{
+	err := component.HandleHook(core.ActionHookContext{
 		Name:           createBuildPollAction,
 		Configuration:  map[string]any{"steps": `[{"name":"golang:1.22"}]`},
 		Metadata:       metadataCtx,

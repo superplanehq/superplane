@@ -10,11 +10,11 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestWait_HandleAction_PushThrough(t *testing.T) {
+func TestWait_HandleHook_PushThrough(t *testing.T) {
 	w := &Wait{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name:           "pushThrough",
 		ExecutionState: stateCtx,
 		Metadata:       &contexts.MetadataContext{},
@@ -23,41 +23,41 @@ func TestWait_HandleAction_PushThrough(t *testing.T) {
 		Parameters:     map[string]any{},
 	}
 
-	err := w.HandleAction(ctx)
+	err := w.HandleHook(ctx)
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
 	assert.True(t, stateCtx.IsFinished())
 }
 
-func TestWait_HandleAction_TimeReached(t *testing.T) {
+func TestWait_HandleHook_TimeReached(t *testing.T) {
 	w := &Wait{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name:           "timeReached",
 		ExecutionState: stateCtx,
 		Metadata:       &contexts.MetadataContext{},
 		Parameters:     map[string]any{},
 	}
 
-	err := w.HandleAction(ctx)
+	err := w.HandleHook(ctx)
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
 	assert.True(t, stateCtx.Finished)
 }
 
-func TestWait_HandleAction_Unknown(t *testing.T) {
+func TestWait_HandleHook_Unknown(t *testing.T) {
 	w := &Wait{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name:           "unknown",
 		ExecutionState: stateCtx,
 		Metadata:       &contexts.MetadataContext{},
 		Parameters:     map[string]any{},
 	}
 
-	err := w.HandleAction(ctx)
+	err := w.HandleHook(ctx)
 	assert.Error(t, err)
 	assert.False(t, stateCtx.Passed)
 	assert.False(t, stateCtx.Finished)
@@ -464,7 +464,7 @@ func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
 	w := &Wait{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name:           "timeReached",
 		ExecutionState: stateCtx,
 		Metadata: &contexts.MetadataContext{
@@ -472,7 +472,7 @@ func TestWait_HandleTimeReached_CompletionOutput(t *testing.T) {
 		},
 	}
 
-	err := w.HandleAction(ctx)
+	err := w.HandleHook(ctx)
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
 	assert.True(t, stateCtx.Finished)
@@ -494,7 +494,7 @@ func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 	w := &Wait{}
 
 	stateCtx := &contexts.ExecutionStateContext{}
-	ctx := core.ActionContext{
+	ctx := core.ActionHookContext{
 		Name:           "pushThrough",
 		ExecutionState: stateCtx,
 		Auth: &contexts.AuthContext{
@@ -508,7 +508,7 @@ func TestWait_HandlePushThrough_CompletionOutput(t *testing.T) {
 		},
 	}
 
-	err := w.HandleAction(ctx)
+	err := w.HandleHook(ctx)
 	assert.NoError(t, err)
 	assert.True(t, stateCtx.Passed)
 	assert.True(t, stateCtx.Finished)

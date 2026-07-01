@@ -36,7 +36,6 @@ func Test__ServiceNow__Sync(t *testing.T) {
 			Configuration: map[string]any{
 				"instanceUrl": "https://dev12345.service-now.com",
 			},
-			Secrets: map[string]core.IntegrationSecret{},
 		}
 
 		err := s.Sync(core.SyncContext{
@@ -114,7 +113,6 @@ func Test__ServiceNow__Sync(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{},
 			Configuration: map[string]any{
 				"instanceUrl":  "https://dev12345.service-now.com",
 				"clientId":     clientID,
@@ -163,7 +161,6 @@ func Test__ServiceNow__Sync(t *testing.T) {
 		}
 
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{},
 			Configuration: map[string]any{
 				"instanceUrl":  "https://dev12345.service-now.com",
 				"clientId":     clientID,
@@ -183,9 +180,9 @@ func Test__ServiceNow__Sync(t *testing.T) {
 		assert.Equal(t, "https://dev12345.service-now.com/oauth_token.do", httpContext.Requests[0].URL.String())
 		assert.Equal(t, "https://dev12345.service-now.com/api/now/table/incident?sysparm_limit=1", httpContext.Requests[1].URL.String())
 
-		secret, ok := integrationCtx.Secrets[OAuthAccessToken]
-		require.True(t, ok)
-		assert.Equal(t, []byte("access-123"), secret.Value)
+		secret, err := integrationCtx.Secrets().Get(OAuthAccessToken)
+		require.NoError(t, err)
+		assert.Equal(t, "access-123", secret)
 
 		require.Len(t, integrationCtx.ResyncRequests, 1)
 		assert.Equal(t, 900*time.Second, integrationCtx.ResyncRequests[0])

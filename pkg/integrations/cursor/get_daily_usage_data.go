@@ -239,14 +239,6 @@ func (c *GetDailyUsageData) Execute(ctx core.ExecutionContext) error {
 
 }
 
-func (c *GetDailyUsageData) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetDailyUsageData) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetDailyUsageData) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
@@ -256,5 +248,13 @@ func (c *GetDailyUsageData) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *GetDailyUsageData) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetDailyUsageData) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetDailyUsageData) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

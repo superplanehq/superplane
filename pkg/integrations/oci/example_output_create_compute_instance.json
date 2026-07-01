@@ -1,0 +1,16 @@
+{
+  "data": {
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
+    "displayName": "test-instance-12",
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "lifecycleState": "RUNNING",
+    "privateIp": "10.0.0.17",
+    "publicIp": "192.0.2.1",
+    "region": "eu-frankfurt-1",
+    "shape": "VM.Standard.E2.1.Micro",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:31:58.249783188Z",
+  "type": "oci.computeInstanceCreated"
+}

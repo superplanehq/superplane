@@ -158,14 +158,6 @@ func (c *DeleteQueue) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DeleteQueue) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DeleteQueue) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DeleteQueue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -175,5 +167,13 @@ func (c *DeleteQueue) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *DeleteQueue) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *DeleteQueue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteQueue) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

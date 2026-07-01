@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -22,7 +23,7 @@ const ChannelNameFound = "found"
 const ChannelNameNotFound = "notFound"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &ReadMemory{})
+	registry.RegisterAction(ComponentName, &ReadMemory{})
 }
 
 type ReadMemory struct{}
@@ -69,7 +70,12 @@ func (c *ReadMemory) Documentation() string {
 ## Output Channels
 
 - **Found**: At least one matching memory row was found
-- **Not Found**: No matching memory rows were found`
+- **Not Found**: No matching memory rows were found
+
+## Limits
+
+- When **Emit Mode** is ` + "`oneByOne`" + `, at most ` + fmt.Sprintf("%d", config.MaxEmitCount()) + ` events are emitted per execution.
+- Self-hosted deployments can raise this cap with the ` + "`SUPERPLANE_MAX_EMIT_COUNT`" + ` environment variable.`
 
 }
 
@@ -227,6 +233,9 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 	}
 
 	payloads := buildPayloads(spec, matches, values)
+	if len(payloads) > config.MaxEmitCount() {
+		return fmt.Errorf("found %d matches; Read Memory supports emitting at most %d events per execution", len(payloads), config.MaxEmitCount())
+	}
 
 	return ctx.ExecutionState.Emit(
 		channel,
@@ -311,16 +320,14 @@ func buildPayloads(spec Spec, matches map[string]any, values []any) []any {
 		payloads := make([]any, 0, len(values))
 		for i, value := range values {
 			payloads = append(payloads, map[string]any{
-				"data": map[string]any{
-					"namespace":  spec.Namespace,
-					"matches":    matches,
-					"resultMode": spec.ResultMode,
-					"emitMode":   spec.EmitMode,
-					"values":     []any{value},
-					"count":      1,
-					"index":      i,
-					"totalCount": len(values),
-				},
+				"namespace":  spec.Namespace,
+				"matches":    matches,
+				"resultMode": spec.ResultMode,
+				"emitMode":   spec.EmitMode,
+				"values":     []any{value},
+				"count":      1,
+				"index":      i,
+				"totalCount": len(values),
 			})
 		}
 		return payloads
@@ -328,28 +335,18 @@ func buildPayloads(spec Spec, matches map[string]any, values []any) []any {
 
 	return []any{
 		map[string]any{
-			"data": map[string]any{
-				"namespace":  spec.Namespace,
-				"matches":    matches,
-				"resultMode": spec.ResultMode,
-				"emitMode":   spec.EmitMode,
-				"values":     values,
-				"count":      len(values),
-			},
+			"namespace":  spec.Namespace,
+			"matches":    matches,
+			"resultMode": spec.ResultMode,
+			"emitMode":   spec.EmitMode,
+			"values":     values,
+			"count":      len(values),
 		},
 	}
 }
 
 func (c *ReadMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
-}
-
-func (c *ReadMemory) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *ReadMemory) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("readMemory does not support actions")
 }
 
 func (c *ReadMemory) Cancel(ctx core.ExecutionContext) error {
@@ -361,5 +358,13 @@ func (c *ReadMemory) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 }
 
 func (c *ReadMemory) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *ReadMemory) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ReadMemory) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

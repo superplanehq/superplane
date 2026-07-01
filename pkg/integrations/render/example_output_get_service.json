@@ -5,6 +5,14 @@
     "type": "web_service",
     "dashboardUrl": "https://dashboard.render.com/web/srv-cukouhrtq21c73e9scng",
     "suspended": "not_suspended",
+    "customDomains": [
+      {
+        "id": "cdm-abc123xyz456",
+        "name": "app.example.com",
+        "serviceId": "srv-cukouhrtq21c73e9scng",
+        "verificationStatus": "verified"
+      }
+    ],
     "createdAt": "2026-02-05T15:00:00.000000Z",
     "updatedAt": "2026-02-05T16:00:00.000000Z"
   },

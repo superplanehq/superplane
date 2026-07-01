@@ -249,18 +249,18 @@ func (p *PutObject) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, 
 	return ctx.DefaultProcessing()
 }
 
-func (p *PutObject) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (p *PutObject) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (p *PutObject) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (p *PutObject) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (p *PutObject) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (p *PutObject) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

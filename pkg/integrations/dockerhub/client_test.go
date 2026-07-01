@@ -23,7 +23,7 @@ func Test__DockerHub__NewClient(t *testing.T) {
 
 	t.Run("valid configuration -> client created", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				accessTokenSecretName: {Name: accessTokenSecretName, Value: []byte("token")},
 			},
 		}
@@ -52,7 +52,7 @@ func Test__DockerHub__ListRepositories(t *testing.T) {
 	}
 
 	integrationCtx := &contexts.IntegrationContext{
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			accessTokenSecretName: {Name: accessTokenSecretName, Value: []byte("token")},
 		},
 	}

@@ -31,7 +31,7 @@ func Test_AuthMethodFromMetadata(t *testing.T) {
 
 func Test_TokenSourceFromIntegration(t *testing.T) {
 	t.Run("no credentials returns error", func(t *testing.T) {
-		ctx := &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}}
+		ctx := &contexts.IntegrationContext{}
 		_, err := TokenSourceFromIntegration(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no GCP credentials found")
@@ -39,7 +39,7 @@ func Test_TokenSourceFromIntegration(t *testing.T) {
 
 	t.Run("WIF with access token returns token source", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				SecretNameAccessToken: {Name: SecretNameAccessToken, Value: []byte("wif-access-token")},
 			},
 			Metadata: map[string]any{"authMethod": AuthMethodWIF},
@@ -56,7 +56,7 @@ func Test_TokenSourceFromIntegration(t *testing.T) {
 	t.Run("WIF with expired token in metadata returns error", func(t *testing.T) {
 		expired := time.Now().Add(-time.Hour).Format(time.RFC3339)
 		ctx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				SecretNameAccessToken: {Name: SecretNameAccessToken, Value: []byte("tok")},
 			},
 			Metadata: map[string]any{
@@ -71,7 +71,7 @@ func Test_TokenSourceFromIntegration(t *testing.T) {
 
 	t.Run("service account key with invalid JSON returns error", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				SecretNameServiceAccountKey: {Name: SecretNameServiceAccountKey, Value: []byte(`{invalid`)},
 			},
 			Metadata: map[string]any{"authMethod": AuthMethodServiceAccountKey},
@@ -85,7 +85,7 @@ func Test_TokenSourceFromIntegration(t *testing.T) {
 func Test_CredentialsFromIntegration(t *testing.T) {
 	t.Run("delegates to TokenSource and returns credentials", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				SecretNameAccessToken: {Name: SecretNameAccessToken, Value: []byte("tok")},
 			},
 			Metadata: map[string]any{"authMethod": AuthMethodWIF},
@@ -97,7 +97,7 @@ func Test_CredentialsFromIntegration(t *testing.T) {
 	})
 
 	t.Run("error from TokenSource is propagated", func(t *testing.T) {
-		ctx := &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}}
+		ctx := &contexts.IntegrationContext{}
 		_, err := CredentialsFromIntegration(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no GCP credentials found")

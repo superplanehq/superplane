@@ -249,18 +249,18 @@ func evalRunState(status string) string {
 	return lower
 }
 
-func (r *RunEvaluation) Actions() []core.Action {
-	return []core.Action{
+func (r *RunEvaluation) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (r *RunEvaluation) HandleAction(ctx core.ActionContext) error {
+func (r *RunEvaluation) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	if ctx.ExecutionState.IsFinished() {
@@ -297,7 +297,7 @@ func (r *RunEvaluation) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (r *RunEvaluation) handleCompleted(ctx core.ActionContext, client *Client, meta evalRunMetadata) error {
+func (r *RunEvaluation) handleCompleted(ctx core.ActionHookContext, client *Client, meta evalRunMetadata) error {
 	results, err := client.GetEvaluationRunResults(meta.EvalRunUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get evaluation run results: %v", err)
@@ -320,7 +320,7 @@ func (r *RunEvaluation) handleCompleted(ctx core.ActionContext, client *Client, 
 	)
 }
 
-func (r *RunEvaluation) emitFailed(ctx core.ActionContext, meta evalRunMetadata, run *EvaluationRun, errorDesc string) error {
+func (r *RunEvaluation) emitFailed(ctx core.ActionHookContext, meta evalRunMetadata, run *EvaluationRun, errorDesc string) error {
 	output := buildEvalOutput(meta, run, nil)
 	output["errorDescription"] = errorDesc
 

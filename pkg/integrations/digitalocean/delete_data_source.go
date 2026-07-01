@@ -187,18 +187,18 @@ func (d *DeleteDataSource) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteDataSource) Actions() []core.Action {
-	return []core.Action{
+func (d *DeleteDataSource) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (d *DeleteDataSource) HandleAction(ctx core.ActionContext) error {
+func (d *DeleteDataSource) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	if ctx.ExecutionState.IsFinished() {

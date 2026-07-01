@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -30,12 +28,12 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent("approval", &Approval{})
+	registry.RegisterAction("approval", &Approval{})
 }
 
 /*
  * Configuration for the component.
- * Filled when the component is added to a blueprint/workflow.
+ * Filled when the component is added to a workflow.
  */
 type Config struct {
 	Items []Item `json:"items" mapstructure:"items"`
@@ -125,7 +123,7 @@ func (m *Metadata) hasGivenInputInAnyRecord(user *core.User) bool {
 	})
 }
 
-func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) error {
+func (m *Metadata) Approve(record *Record, index int, ctx core.ActionHookContext) error {
 	user := ctx.Auth.AuthenticatedUser()
 	if m.hasGivenInputInAnyRecord(user) {
 		return fmt.Errorf("user has already approved/rejected another requirement")
@@ -148,7 +146,7 @@ func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) er
 	return nil
 }
 
-func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) error {
+func (m *Metadata) Reject(record *Record, index int, ctx core.ActionHookContext) error {
 	user := ctx.Auth.AuthenticatedUser()
 	if m.hasGivenInputInAnyRecord(user) {
 		return fmt.Errorf("user has already approved/rejected another requirement")
@@ -180,7 +178,7 @@ func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) err
 	return nil
 }
 
-func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error {
+func (m *Metadata) validateAction(record *Record, ctx core.ActionHookContext) error {
 	authenticatedUser := ctx.Auth.AuthenticatedUser()
 	switch record.Type {
 	case ItemTypeAnyone:
@@ -332,7 +330,7 @@ func (a *Approval) Documentation() string {
 
 1. When the Approval component executes, it creates approval requirements based on the configured approvers
 2. The workflow pauses and waits for all required approvals
-3. Approvers receive notifications and can approve or reject from the workflow UI
+3. Approvers can approve or reject from the workflow UI
 4. Once all approvals are collected, the workflow continues:
    - **Approved channel**: All required approvers approved
    - **Rejected channel**: At least one approver rejected
@@ -514,23 +512,14 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 		)
 	}
 
-	if ctx.Notifications != nil {
-		if err := a.notifyApprovers(ctx, executionMetadata); err != nil {
-			if ctx.Logger != nil {
-				ctx.Logger.Warnf("failed to send approval notification: %v", err)
-			}
-		}
-	}
-
 	return nil
 }
 
-func (a *Approval) Actions() []core.Action {
-	return []core.Action{
+func (a *Approval) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "approve",
-			Description:    "Approve this execution",
-			UserAccessible: true,
+			Name: "approve",
+			Type: core.HookTypeUser,
 			Parameters: []configuration.Field{
 				{
 					Name:        "index",
@@ -549,9 +538,8 @@ func (a *Approval) Actions() []core.Action {
 			},
 		},
 		{
-			Name:           "reject",
-			Description:    "Reject this approval requirement",
-			UserAccessible: true,
+			Name: "reject",
+			Type: core.HookTypeUser,
 			Parameters: []configuration.Field{
 				{
 					Name:        "index",
@@ -572,7 +560,7 @@ func (a *Approval) Actions() []core.Action {
 	}
 }
 
-func (a *Approval) HandleAction(ctx core.ActionContext) error {
+func (a *Approval) HandleHook(ctx core.ActionHookContext) error {
 	var err error
 	var metadata *Metadata
 	switch ctx.Name {
@@ -635,7 +623,7 @@ func (a *Approval) HandleAction(ctx core.ActionContext) error {
 	)
 }
 
-func (a *Approval) handleApprove(ctx core.ActionContext) (*Metadata, error) {
+func (a *Approval) handleApprove(ctx core.ActionHookContext) (*Metadata, error) {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
@@ -683,7 +671,7 @@ func getActionIndex(parameters map[string]any, max int) (int, error) {
 	return index, nil
 }
 
-func (a *Approval) handleReject(ctx core.ActionContext) (*Metadata, error) {
+func (a *Approval) handleReject(ctx core.ActionHookContext) (*Metadata, error) {
 	var metadata Metadata
 	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
 	if err != nil {
@@ -709,70 +697,6 @@ func (a *Approval) Cancel(ctx core.ExecutionContext) error {
 
 func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
-}
-
-func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata) error {
-	url := fmt.Sprintf(
-		"%s/%s/canvases/%s?sidebar=1&node=%s",
-		strings.TrimRight(ctx.BaseURL, "/"),
-		ctx.OrganizationID,
-		ctx.WorkflowID,
-		ctx.NodeID,
-	)
-
-	title := fmt.Sprintf("Approval required: %s — %s", ctx.CanvasName, ctx.NodeName)
-	body := fmt.Sprintf(
-		"An approval is waiting for you.\n\nCanvas: %s\nApproval: %s",
-		ctx.CanvasName,
-		ctx.NodeName,
-	)
-
-	receivers := core.NotificationReceivers{}
-	emailSet := map[string]struct{}{}
-	groupSet := map[string]struct{}{}
-	roleSet := map[string]struct{}{}
-
-	for _, record := range metadata.Records {
-		if record.State != StatePending {
-			continue
-		}
-
-		switch record.Type {
-		case ItemTypeAnyone:
-			roleSet[models.RoleOrgViewer] = struct{}{}
-			roleSet[models.RoleOrgAdmin] = struct{}{}
-			roleSet[models.RoleOrgOwner] = struct{}{}
-
-		case ItemTypeUser:
-			if record.User != nil && record.User.Email != "" {
-				emailSet[record.User.Email] = struct{}{}
-			}
-
-		case ItemTypeRole:
-			if record.RoleRef != nil && record.RoleRef.Name != "" {
-				roleSet[record.RoleRef.Name] = struct{}{}
-			}
-
-		case ItemTypeGroup:
-			if record.GroupRef != nil && record.GroupRef.Name != "" {
-				groupSet[record.GroupRef.Name] = struct{}{}
-			}
-		}
-	}
-
-	receivers.Emails = mapKeys(emailSet)
-	receivers.Groups = mapKeys(groupSet)
-	receivers.Roles = mapKeys(roleSet)
-
-	return ctx.Notifications.Send(title, body, url, "Open approval", receivers)
-}
-
-func mapKeys(input map[string]struct{}) []string {
-	result := make([]string, 0, len(input))
-	for key := range input {
-		result = append(result, key)
-	}
-	return result
 }
 
 func (a *Approval) Cleanup(ctx core.SetupContext) error {

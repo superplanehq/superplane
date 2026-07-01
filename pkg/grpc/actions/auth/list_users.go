@@ -6,10 +6,9 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/users"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -21,17 +20,17 @@ func ListUsers(
 	authService authorization.Authorization,
 ) (*pb.ListUsersResponse, error) {
 	if domainType != models.DomainTypeOrganization {
-		return nil, status.Error(codes.InvalidArgument, "domain type must be organization")
+		return nil, grpcerrors.InvalidArgument(nil, "domain type must be organization")
 	}
 
 	users, err := models.ListAllActiveUsersInOrganization(domainID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch users")
+		return nil, grpcerrors.Internal(err, "failed to fetch users")
 	}
 
 	accountProviders, err := models.FindUserAccountProviders(users)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch account providers")
+		return nil, grpcerrors.Internal(err, "failed to fetch account providers")
 	}
 
 	protoUsers := usersToProto(users, accountProviders)
@@ -44,7 +43,7 @@ func ListUsers(
 	//
 	// Get all role definitions
 	//
-	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, domainID)
+	roleDefinitions, err := authService.GetAllRoleDefinitions(ctx, domainType, domainID)
 	if err != nil {
 		return nil, err
 	}
@@ -56,14 +55,14 @@ func ListUsers(
 
 	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "role not found")
+		return nil, grpcerrors.NotFound(err, "role not found")
 	}
 
 	//
 	// For each role, get all users for it
 	//
 	for _, roleDef := range roleDefinitions {
-		userIDs, err := authService.GetOrgUsersForRole(roleDef.Name, domainID)
+		userIDs, err := authService.GetOrgUsersForRole(ctx, roleDef.Name, domainID)
 		if err != nil {
 			continue
 		}

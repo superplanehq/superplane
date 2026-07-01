@@ -57,7 +57,7 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 					panic(recovered)
 				}
 
-				if status >= http.StatusInternalServerError {
+				if shouldCaptureHTTPError(status) {
 					captureHTTPError(r, status)
 				}
 			}()
@@ -79,6 +79,32 @@ func captureHTTPPanic(r *http.Request, status int, recovered any) {
 		hub.Recover(recovered)
 		hub.Flush(2 * time.Second)
 	})
+}
+
+// shouldCaptureHTTPError reports whether a response status code represents a
+// server-side error worth forwarding to Sentry.
+//
+// We only capture true server errors (5xx) and deliberately skip status codes
+// that indicate the client sent an unsupported request rather than a real
+// server bug. In particular:
+//
+//   - 501 Not Implemented is returned by grpc-gateway when a path exists but
+//     the HTTP method has no mapping (e.g. POST /api/v1/triggers/start when
+//     only GET /api/v1/triggers/{name} is defined). Those requests are caused
+//     by clients hitting the wrong endpoint and should not create Sentry
+//     issues.
+//   - 505 HTTP Version Not Supported is likewise a client-caused mismatch.
+func shouldCaptureHTTPError(status int) bool {
+	if status < http.StatusInternalServerError {
+		return false
+	}
+
+	switch status {
+	case http.StatusNotImplemented, http.StatusHTTPVersionNotSupported:
+		return false
+	}
+
+	return true
 }
 
 func captureHTTPError(r *http.Request, status int) {
@@ -131,4 +157,12 @@ func (lrw *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) 
 		return nil, nil, fmt.Errorf("the ResponseWriter doesn't support hijacking")
 	}
 	return hijacker.Hijack()
+}
+
+// Flush implements [http.Flusher] so streaming handlers (e.g. NDJSON live logs) work
+// when this wrapper is the outermost [http.ResponseWriter] seen by the handler.
+func (lrw *loggingResponseWriter) Flush() {
+	if f, ok := lrw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }

@@ -1,0 +1,10 @@
+{
+  "type": "grafana.syntheticCheck.deleted",
+  "timestamp": "2026-04-15T10:35:30Z",
+  "data": {
+    "syntheticCheck": "101",
+    "job": "API health check",
+    "target": "https://api.example.com/health",
+    "deleted": true
+  }
+}

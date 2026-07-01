@@ -16,7 +16,7 @@ const (
 
 // pollChangeUntilSynced runs when the pollChange action is invoked. It fetches the
 // change status; if INSYNC it emits the result and finishes, otherwise schedules another poll.
-func pollChangeUntilSynced(ctx core.ActionContext) error {
+func pollChangeUntilSynced(ctx core.ActionHookContext) error {
 	var meta RecordChangePollMetadata
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil {
 		return fmt.Errorf("failed to decode poll metadata: %w", err)

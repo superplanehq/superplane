@@ -213,8 +213,11 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		payload := launchAgentWebhookPayload{
 			ID:      "agent-123",
 			Status:  "FINISHED",
-			PrURL:   "https://github.com/org/repo/pull/42",
 			Summary: "Fixed the bug",
+			Target: &launchAgentWebhookTarget{
+				PrURL:      "https://github.com/org/repo/pull/42",
+				BranchName: "cursor/agent-abc123",
+			},
 		}
 		body, _ := json.Marshal(payload)
 		signature := generateSignature(body, secret)
@@ -260,6 +263,11 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		updatedMetadata := metadataCtx.Metadata.(LaunchAgentExecutionMetadata)
 		assert.Equal(t, "FINISHED", updatedMetadata.Agent.Status)
 		assert.Equal(t, "https://github.com/org/repo/pull/42", updatedMetadata.Target.PrURL)
+		require.Len(t, executionStateCtx.Payloads, 1)
+		payloadData := executionStateCtx.Payloads[0].(map[string]any)["data"].(LaunchAgentOutputPayload)
+		assert.Equal(t, "FINISHED", payloadData.Status)
+		assert.Equal(t, "https://github.com/org/repo/pull/42", payloadData.PrURL)
+		assert.Equal(t, "Fixed the bug", payloadData.Summary)
 	})
 
 	t.Run("failed agent webhook", func(t *testing.T) {
@@ -305,6 +313,91 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 
 		// Verify emit was called on default channel
 		assert.Equal(t, LaunchAgentDefaultChannel, executionStateCtx.Channel)
+	})
+
+	t.Run("terminal webhook refreshes missing summary and pr url from agent status", func(t *testing.T) {
+		secret := "test-secret"
+		payload := launchAgentWebhookPayload{
+			ID:     "agent-123",
+			Status: "FINISHED",
+			Target: &launchAgentWebhookTarget{
+				BranchName: "cursor/agent-abc123",
+			},
+		}
+		body, _ := json.Marshal(payload)
+		signature := generateSignature(body, secret)
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id": "agent-123",
+						"status": "FINISHED",
+						"summary": "Fixed the bug",
+						"target": {
+							"branchName": "cursor/agent-abc123",
+							"prUrl": "https://github.com/org/repo/pull/42"
+						}
+					}`)),
+				},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"launchAgentKey": "test-key",
+			},
+		}
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: LaunchAgentExecutionMetadata{
+				Agent: &AgentMetadata{
+					ID:     "agent-123",
+					Status: "RUNNING",
+				},
+				Target: &TargetMetadata{
+					BranchName: "cursor/agent-abc123",
+				},
+			},
+		}
+		executionStateCtx := &contexts.ExecutionStateContext{
+			KVs: map[string]string{
+				"agent_id": "agent-123",
+			},
+		}
+
+		webhookCtx := core.WebhookRequestContext{
+			Body:        body,
+			Headers:     http.Header{LaunchAgentWebhookSignatureHeader: []string{signature}},
+			Webhook:     &contexts.NodeWebhookContext{Secret: secret},
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return &core.ExecutionContext{
+					HTTP:           httpContext,
+					Integration:    integrationCtx,
+					Metadata:       metadataCtx,
+					ExecutionState: executionStateCtx,
+					Logger:         logrus.NewEntry(logrus.New()),
+				}, nil
+			},
+		}
+
+		status, _, err := c.HandleWebhook(webhookCtx)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, status)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://api.cursor.com/v0/agents/agent-123", httpContext.Requests[0].URL.String())
+
+		updatedMetadata := metadataCtx.Metadata.(LaunchAgentExecutionMetadata)
+		assert.Equal(t, "Fixed the bug", updatedMetadata.Agent.Summary)
+		assert.Equal(t, "https://github.com/org/repo/pull/42", updatedMetadata.Target.PrURL)
+
+		require.Len(t, executionStateCtx.Payloads, 1)
+		payloadData := executionStateCtx.Payloads[0].(map[string]any)["data"].(LaunchAgentOutputPayload)
+		assert.Equal(t, "FINISHED", payloadData.Status)
+		assert.Equal(t, "https://github.com/org/repo/pull/42", payloadData.PrURL)
+		assert.Equal(t, "Fixed the bug", payloadData.Summary)
+		assert.Equal(t, "cursor/agent-abc123", payloadData.BranchName)
 	})
 
 	t.Run("missing agent ID -> bad request", func(t *testing.T) {

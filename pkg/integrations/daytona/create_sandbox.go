@@ -60,6 +60,48 @@ func (c *CreateSandbox) Documentation() string {
 - **Code testing**: Test untrusted code without affecting your infrastructure
 - **Development environments**: Create ephemeral development environments
 
+## Common Pattern
+
+Use this pattern when you want to create a sandbox, run one or more commands in it, and delete it when the flow is done.
+
+1. Add a **Create Sandbox** node. Its output includes the sandbox ID that downstream nodes need:
+` + "```json" + `
+{
+  "data": {
+    "id": "sandbox-abc123def456",
+    "state": "started"
+  },
+  "type": "daytona.sandbox"
+}
+` + "```" + `
+
+2. Connect an **Execute Command** node immediately after **Create Sandbox** and set **Sandbox** to:
+` + "```text" + `
+{{ previous().data.id }}
+` + "```" + `
+
+3. **Execute Command** returns the command result, not the sandbox ID:
+` + "```json" + `
+{
+  "data": {
+    "exitCode": 0,
+    "result": "npm test\nPASS\n",
+    "timeout": false
+  },
+  "type": "daytona.command.response"
+}
+` + "```" + `
+
+4. If you add more command nodes, reference the original create node by name so every command uses the same sandbox:
+` + "```text" + `
+{{ $["Create Sandbox"].data.id }}
+` + "```" + `
+
+5. Add **Delete Sandbox** at the end of the flow and use the same sandbox reference:
+` + "```text" + `
+{{ $["Create Sandbox"].data.id }}
+` + "```" + `
+
 ## Configuration
 
 - **Snapshot**: Base environment snapshot (optional, uses default if not specified)
@@ -229,20 +271,20 @@ func (c *CreateSandbox) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UU
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateSandbox) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (c *CreateSandbox) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (c *CreateSandbox) HandleAction(ctx core.ActionContext) error {
+func (c *CreateSandbox) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return c.poll(ctx)
 	}
 	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (c *CreateSandbox) poll(ctx core.ActionContext) error {
+func (c *CreateSandbox) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

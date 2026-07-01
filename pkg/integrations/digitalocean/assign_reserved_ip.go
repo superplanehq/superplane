@@ -201,18 +201,18 @@ func (a *AssignReservedIP) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid
 	return ctx.DefaultProcessing()
 }
 
-func (a *AssignReservedIP) Actions() []core.Action {
-	return []core.Action{
+func (a *AssignReservedIP) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (a *AssignReservedIP) HandleAction(ctx core.ActionContext) error {
+func (a *AssignReservedIP) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name != "poll" {
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	if ctx.ExecutionState.IsFinished() {

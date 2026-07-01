@@ -169,18 +169,18 @@ func (d *DeleteObject) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUI
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteObject) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteObject) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (d *DeleteObject) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (d *DeleteObject) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (d *DeleteObject) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteObject) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

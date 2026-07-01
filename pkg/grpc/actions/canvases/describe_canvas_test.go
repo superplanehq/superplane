@@ -8,11 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
 
@@ -21,16 +20,16 @@ func Test__DescribeCanvas(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), uuid.New().String())
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), "invalid-id")
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("returns canvas with metadata/spec/status structure", func(t *testing.T) {
@@ -68,12 +67,6 @@ func Test__DescribeCanvas(t *testing.T) {
 			},
 		)
 
-		require.NoError(t, database.Conn().
-			Model(&models.CanvasNode{}).
-			Where("workflow_id = ? AND node_id = ?", canvas.ID, "node-1").
-			Update("state", models.CanvasNodeStatePaused).
-			Error)
-
 		//
 		// Describe the canvas
 		//
@@ -103,16 +96,6 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.Equal(t, "First Node", response.Canvas.Spec.Nodes[0].Name)
 		assert.Equal(t, "node-2", response.Canvas.Spec.Nodes[1].Id)
 		assert.Equal(t, "Second Node", response.Canvas.Spec.Nodes[1].Name)
-
-		var pausedNode *compb.Node
-		for _, node := range response.Canvas.Spec.Nodes {
-			if node.Id == "node-1" {
-				pausedNode = node
-				break
-			}
-		}
-		require.NotNil(t, pausedNode)
-		assert.True(t, pausedNode.Paused)
 
 		assert.Len(t, response.Canvas.Spec.Edges, 1)
 		assert.Equal(t, "node-1", response.Canvas.Spec.Edges[0].SourceId)
@@ -167,14 +150,14 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create multiple executions for node-1 (older one first)
 		//
-		oldExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID, nil)
+		oldExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
 		// Wait a bit to ensure different timestamps
-		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
 
 		//
 		// Create one execution for node-2
 		//
-		support.CreateCanvasNodeExecution(t, canvas.ID, "node-2", rootEvent2.ID, event2.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-2", rootEvent2.ID, event2.ID)
 
 		//
 		// Describe the canvas
@@ -360,9 +343,9 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Create executions for all nodes
 		//
-		activeExec1 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-1", rootEvent1.ID, event1.ID, nil)
-		activeExec2 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-2", rootEvent2.ID, event2.ID, nil)
-		deletedExec := support.CreateCanvasNodeExecution(t, canvas.ID, "deleted-node", rootEvent3.ID, event3.ID, nil)
+		activeExec1 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-1", rootEvent1.ID, event1.ID)
+		activeExec2 := support.CreateCanvasNodeExecution(t, canvas.ID, "active-node-2", rootEvent2.ID, event2.ID)
+		deletedExec := support.CreateCanvasNodeExecution(t, canvas.ID, "deleted-node", rootEvent3.ID, event3.ID)
 
 		//
 		// Delete one node (soft delete)

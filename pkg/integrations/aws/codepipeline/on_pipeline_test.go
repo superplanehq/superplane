@@ -151,12 +151,12 @@ func Test__OnPipeline__Setup(t *testing.T) {
 	})
 }
 
-func Test__OnPipeline__HandleAction(t *testing.T) {
+func Test__OnPipeline__HandleHook(t *testing.T) {
 	trigger := &OnPipeline{}
 
 	t.Run("unknown action -> error", func(t *testing.T) {
-		_, err := trigger.HandleAction(core.TriggerActionContext{
-			Name:        "unknown-action",
+		_, err := trigger.HandleHook(core.TriggerHookContext{
+			Name:        "unknown-hook",
 			Logger:      logrus.NewEntry(logrus.New()),
 			Requests:    &contexts.RequestContext{},
 			Metadata:    &contexts.MetadataContext{},
@@ -164,7 +164,7 @@ func Test__OnPipeline__HandleAction(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		assert.EqualError(t, err, "unknown action: unknown-action")
+		assert.EqualError(t, err, "unknown hook: unknown-hook")
 	})
 
 	t.Run("rule still missing -> re-schedules same action", func(t *testing.T) {
@@ -182,7 +182,7 @@ func Test__OnPipeline__HandleAction(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:        "checkRuleAvailability",
 			Logger:      logrus.NewEntry(logrus.New()),
 			Requests:    requests,
@@ -215,7 +215,7 @@ func Test__OnPipeline__HandleAction(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:        "checkRuleAvailability",
 			Logger:      logrus.NewEntry(logrus.New()),
 			Requests:    requests,

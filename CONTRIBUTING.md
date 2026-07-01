@@ -50,17 +50,18 @@ cd superplane
 
 ### Setting Up the Development Environment
 
-Once inside the cloned repository, set up your local environment and start
-the app with:
+Once inside the cloned repository, bring up Docker, install dependencies and
+migrations, then start the development server:
 
 ```sh
-make dev.setup     # Install dependencies, create the database, etc.
-make dev.start     # Start the development server (UI at http://localhost:8000)
+make dev.up        # Build images and start containers (Postgres, RabbitMQ, app shell, …)
+make dev.setup     # Codegen, Go + JS deps, database create/migrate (run inside the app container)
+make dev.server    # Start air + Vite (UI at http://localhost:8000)
 ```
 
-These commands will spin up all required services in Docker containers.
+After the first setup, run `make dev.up` when the stack is not running, then `make dev.server` to start air and Vite (use `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you need a fresh `npm install`, codegen, or migrations.
 
-When the process completes, you can access the SuperPlane at [http://localhost:8000](http://localhost:8000).
+When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
 ## Additional Development Resources
 

@@ -59,6 +59,138 @@
     :why: 
     :versions: []
     :when: 2025-12-23 00:00:00.000000000 Z
+- - :permit
+  - Python-2.0
+  - :who: 
+    :why: 
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :permit
+  - CC-BY-4.0
+  - :who: 
+    :why: 
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :permit
+  - BlueOak-1.0.0
+  - :who: 
+    :why: 
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :permit
+  - Eclipse Public License 2.0
+  - :who: 
+    :why: 
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :permit
+  - Eclipse 2.0
+  - :who: 
+    :why: 
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :permit
+  - CC0-1.0
+  - :who: 
+    :why: 
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :permit
+  - CC0 1.0 Universal
+  - :who: 
+    :why: 
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - "@csstools/color-helpers"
+  - :who: SuperPlane maintainers
+    :why: MIT; transitive CSS tooling dependency, compatible with Apache-2.0 project license.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - argparse
+  - :who: SuperPlane maintainers
+    :why: Python-2.0 license; bundled tooling dependency, compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - caniuse-lite
+  - :who: SuperPlane maintainers
+    :why: CC-BY-4.0 data (browser compatibility metadata); attribution-style license acceptable for build-time use.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - csv
+  - :who: SuperPlane maintainers
+    :why: Dual-licensed Ruby/BSD-2-Clause; Ruby gem used by license_finder tooling only.
+    :versions: []
+    :when: 2026-06-10 00:00:00.000000000 Z
+- - :approve
+  - khroma
+  - :who: SuperPlane maintainers
+    :why: MIT license per upstream repository; npm metadata omits the license field.
+    :versions: []
+    :when: 2026-06-10 00:00:00.000000000 Z
+- - :approve
+  - chownr
+  - :who: SuperPlane maintainers
+    :why: BlueOak-1.0.0; permissive license compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - elkjs
+  - :who: SuperPlane maintainers
+    :why: Eclipse Public License 2.0; layout library used at build time, compatible with project licensing policy.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - jackspeak
+  - :who: SuperPlane maintainers
+    :why: BlueOak-1.0.0; permissive license compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - language-subtag-registry
+  - :who: SuperPlane maintainers
+    :why: CC0 1.0 Universal; public-domain dedication, compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - package-json-from-dist
+  - :who: SuperPlane maintainers
+    :why: BlueOak-1.0.0; permissive license compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - path-scurry
+  - :who: SuperPlane maintainers
+    :why: BlueOak-1.0.0; permissive license compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - posthog-js
+  - :who: SuperPlane maintainers
+    :why: License reported as SEE LICENSE IN LICENSE; dependency vetted for SuperPlane UI analytics use.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - robust-predicates
+  - :who: SuperPlane maintainers
+    :why: The Unlicense; transitive mermaid/d3 geometry dependency, permissive and compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-15 00:00:00.000000000 Z
+- - :approve
+  - tar
+  - :who: SuperPlane maintainers
+    :why: BlueOak-1.0.0; permissive license compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
+- - :approve
+  - yallist
+  - :who: SuperPlane maintainers
+    :why: BlueOak-1.0.0; permissive license compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-13 00:00:00.000000000 Z
 - - :approve
   - gopkg.in/dnaeon/go-vcr.v2
   - :who: Igor Sarcevic

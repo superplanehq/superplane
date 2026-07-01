@@ -9,10 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -25,7 +26,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
 				return nil
@@ -56,7 +57,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		assert.Equal(t, integrationID, describeResponse.Integration.Metadata.Id)
 		assert.Equal(t, name, describeResponse.Integration.Metadata.Name)
-		assert.Equal(t, "dummy", describeResponse.Integration.Spec.IntegrationName)
+		assert.Equal(t, "dummy", describeResponse.Integration.Metadata.IntegrationName)
 		assert.Equal(t, models.IntegrationStateReady, describeResponse.Integration.Status.State)
 	})
 
@@ -66,10 +67,10 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		_, err := DescribeIntegration(ctx, r.Registry, "invalid-uuid", uuid.NewString())
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid organization ID")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "invalid organization ID")
 	})
 
 	t.Run("invalid integration ID -> error", func(t *testing.T) {
@@ -78,10 +79,10 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		_, err := DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), "invalid-uuid")
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid integration ID")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "invalid integration ID")
 	})
 
 	t.Run("non-existent integration -> error", func(t *testing.T) {
@@ -97,7 +98,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Register a test integration
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
 				return nil
@@ -132,7 +133,7 @@ func Test__DescribeIntegration(t *testing.T) {
 		//
 		// Register a test application
 		//
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
 				return nil

@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import type React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@xyflow/react", () => ({
@@ -7,17 +8,22 @@ vi.mock("@xyflow/react", () => ({
     id,
     className,
     style,
+    children,
   }: {
     type: string;
     id?: string;
     className?: string;
     style?: { pointerEvents?: string };
+    children?: React.ReactNode;
   }) => (
     <div
       data-testid={`handle-${type}-${id || "default"}`}
-      data-highlighted={className === "highlighted" ? "true" : "false"}
+      data-highlighted={className?.includes("highlighted") ? "true" : "false"}
       data-pointer-events={style?.pointerEvents || "auto"}
-    />
+      data-class-name={className}
+    >
+      {children}
+    </div>
   ),
   Position: {
     Left: "left",
@@ -166,11 +172,191 @@ describe("Block fallback rendering", () => {
             iconSlug: "box",
             collapsed: false,
           },
+          _allEdges: [
+            {
+              source: "component-node",
+              sourceHandle: "default",
+              target: "next-node",
+            },
+            {
+              source: "prev-node",
+              sourceHandle: "default",
+              target: "component-node",
+            },
+          ],
         }}
       />,
     );
 
     expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-pointer-events", "none");
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
+  });
+
+  it("shows an append connector button for end nodes in edit mode", () => {
+    const onAppendFromNode = vi.fn();
+
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="end-node"
+        onAppendFromNode={onAppendFromNode}
+        data={{
+          label: "End node",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "End node",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [{ source: "prev-node", sourceHandle: "default", target: "end-node" }],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add next component" }));
+
+    expect(onAppendFromNode).toHaveBeenCalledWith("end-node", "default");
+  });
+
+  it("highlights the append connector source handle during compatible connection drags", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="end-node"
+        data={{
+          label: "End node",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "End node",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _connectingFrom: {
+            nodeId: "target-node",
+            handleType: "target",
+          },
+          _allEdges: [{ source: "prev-node", sourceHandle: "default", target: "end-node" }],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-highlighted", "true");
+  });
+
+  it("shows append connector buttons for unconnected output channels", () => {
+    const onAppendFromNode = vi.fn();
+
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="router-node"
+        onAppendFromNode={onAppendFromNode}
+        data={{
+          label: "Router",
+          state: "pending",
+          type: "component",
+          outputChannels: ["success", "failure"],
+          component: {
+            title: "Router",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [{ source: "router-node", sourceHandle: "success", target: "success-node" }],
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Add next component (success)" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add next component (failure)" }));
+
+    expect(onAppendFromNode).toHaveBeenCalledWith("router-node", "failure");
+  });
+
+  it("keeps node body content visible and fades opacity during edge-hover dimming", () => {
+    const { container } = render(
+      <Block
+        canvasMode="edit"
+        data={{
+          label: "Dimmed Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          _hasHighlightedNodes: true,
+          _isHighlighted: false,
+          component: {
+            title: "Dimmed Component",
+            iconSlug: "box",
+            collapsed: false,
+            includeEmptyState: true,
+            emptyStateProps: {
+              title: "Waiting for the first run",
+              purpose: "runtime",
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Ready to run...")).toBeInTheDocument();
+    expect(container.firstChild).toHaveClass("opacity-30");
+  });
+
+  it("blanks node body content only for runs-style participant dimming", () => {
+    const { container } = render(
+      <Block
+        canvasMode="edit"
+        data={{
+          label: "Run Context Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          _hasHighlightedNodes: true,
+          _isHighlighted: false,
+          _dimBodyBelowHeader: true,
+          component: {
+            title: "Run Context Component",
+            iconSlug: "box",
+            collapsed: false,
+            includeEmptyState: true,
+            emptyStateProps: {
+              title: "Waiting for the first run",
+              purpose: "runtime",
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("Ready to run...")).not.toBeInTheDocument();
+    expect(container.firstChild).not.toHaveClass("opacity-30");
+  });
+
+  it("keeps note content visible during runs-style participant dimming", () => {
+    const { container } = render(
+      <Block
+        canvasMode="live"
+        data={{
+          label: "Run Context Note",
+          state: "pending",
+          type: "annotation",
+          _hasHighlightedNodes: true,
+          _isHighlighted: false,
+          _dimBodyBelowHeader: true,
+          annotation: {
+            title: "Run Context Note",
+            annotationText: "Important context for this workflow",
+            annotationColor: "yellow",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Important context for this workflow")).toBeInTheDocument();
+    expect(container.firstChild).not.toHaveClass("opacity-30");
   });
 });

@@ -120,18 +120,18 @@ func (c *GetLatestPipeline) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetLatestPipeline) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetLatestPipeline) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetLatestPipeline) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *GetLatestPipeline) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetLatestPipeline) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetLatestPipeline) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

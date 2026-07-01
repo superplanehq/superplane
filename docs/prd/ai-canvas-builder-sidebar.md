@@ -57,9 +57,8 @@ This increases time-to-value and can block users before they execute their first
 
 - Add a new tab in the Components sidebar: **AI Builder**.
 - The existing Components tab remains unchanged.
-- The AI Builder tab is visible only when Agent Mode is enabled in Organization Settings.
-- When Agent Mode is disabled, the AI Builder tab is hidden from the sidebar.
-- If prerequisites are missing (for example API key not configured), show a setup CTA and clear message.
+- The AI Builder tab is visible only when the agent feature is enabled for the deployment.
+- When the agent feature is disabled, the AI Builder tab is hidden from the sidebar.
 
 ### AI Builder Chat Experience
 
@@ -150,8 +149,8 @@ This increases time-to-value and can block users before they execute their first
 
 ## Acceptance Criteria
 
-1. If Agent Mode is enabled in Organization Settings, users can see and open the **AI Builder** tab.
-2. If Agent Mode is disabled in Organization Settings, users do not see the **AI Builder** tab.
+1. If the agent feature is enabled for the deployment, users can see and open the **AI Builder** tab.
+2. If the agent feature is disabled for the deployment, users do not see the **AI Builder** tab.
 3. Users can submit a natural-language prompt and receive a response tied to current canvas context.
 4. When applicable, the system returns a structured proposal preview of canvas operations.
 5. Users can apply a valid proposal and observe expected canvas updates.

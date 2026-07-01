@@ -6,31 +6,30 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func CreateGroup(ctx context.Context, domainType, domainID string, group *pb.Group, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
 	if group == nil {
-		return nil, status.Error(codes.InvalidArgument, "group must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "group must be specified")
 	}
 
 	if group.Metadata == nil {
-		return nil, status.Error(codes.InvalidArgument, "group metadata must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "group metadata must be specified")
 	}
 
 	if group.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "group spec must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "group spec must be specified")
 	}
 
 	if group.Metadata.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "group name must be specified")
 	}
 
 	if group.Spec.Role == "" {
-		return nil, status.Error(codes.InvalidArgument, "role must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "role must be specified")
 	}
 
 	var displayName string
@@ -46,7 +45,7 @@ func CreateGroup(ctx context.Context, domainType, domainID string, group *pb.Gro
 	err := authService.CreateGroup(domainID, domainType, group.Metadata.Name, group.Spec.Role, displayName, description)
 	if err != nil {
 		log.Errorf("failed to create group %s with role %s in domain %s: %v", group.Metadata.Name, group.Spec.Role, domainID, err)
-		return nil, status.Error(codes.Internal, "failed to create group")
+		return nil, grpcerrors.Internal(err, "failed to create group")
 	}
 
 	log.Infof("created group %s with role %s in domain %s (type: %s)", group.Metadata.Name, group.Spec.Role, domainID, domainType)

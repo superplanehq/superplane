@@ -7,6 +7,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -153,7 +154,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		installationMetadata, err := models.GetInstallationMetadataInTransaction(tx)
+		installationMetadata, err := models.GetInstallationMetadata(tx)
 		if err != nil {
 			return err
 		}
@@ -161,7 +162,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		installationMetadata.AllowPrivateNetworkAccess = req.AllowPrivateNetworkAccess
 		installationMetadata.UpdatedAt = time.Now()
 
-		return models.UpdateInstallationMetadataInTransaction(tx, installationMetadata)
+		return models.UpdateInstallationMetadata(tx, installationMetadata)
 	})
 
 	if err != nil {
@@ -185,22 +186,11 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
 	}
 
-	token, err := s.jwt.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := authentication.IssueAccountSession(w, r, s.jwt, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate account token for owner: %v", err)
 		http.Error(w, "Failed to create owner session", http.StatusInternalServerError)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(24 * time.Hour.Seconds()),
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(SetupOwnerResponse{

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { usePermissions } from "@/contexts/usePermissions";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Badge } from "../../../components/Badge/badge";
 import { Icon } from "../../../components/Icon";
@@ -73,6 +74,11 @@ export function Members({ organizationId }: MembersProps) {
   const resetInviteLinkMutation = useResetOrganizationInviteLink(organizationId);
 
   const error = usersError || rolesError;
+
+  useReportPageReady(!loadingMembers && !loadingRoles && !permissionsLoading, {
+    failed: !!error,
+  });
+
   const ownerIds = useMemo(() => {
     const ids = users
       .filter((user) => user.status?.roles?.some((role) => role.roleName === "org_owner"))

@@ -325,18 +325,18 @@ func (g *GetDropletMetrics) ProcessQueueItem(ctx core.ProcessQueueContext) (*uui
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetDropletMetrics) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *GetDropletMetrics) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (g *GetDropletMetrics) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (g *GetDropletMetrics) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (g *GetDropletMetrics) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetDropletMetrics) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

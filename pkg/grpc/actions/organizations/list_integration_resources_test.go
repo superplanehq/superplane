@@ -10,10 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__ListIntegrationResources(t *testing.T) {
@@ -30,7 +31,7 @@ func Test__ListIntegrationResources(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.NotFound, status.Code(err))
+		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
 
 	t.Run("missing integration implementation returns failed precondition", func(t *testing.T) {
@@ -53,7 +54,7 @@ func Test__ListIntegrationResources(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	})
 
 	t.Run("pending integration returns empty resources", func(t *testing.T) {
@@ -99,11 +100,11 @@ func Test__ListIntegrationResources(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	})
 
 	t.Run("integration list failure returns failed precondition", func(t *testing.T) {
-		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 				return nil, errors.New("boom")
 			},
@@ -128,6 +129,6 @@ func Test__ListIntegrationResources(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	})
 }

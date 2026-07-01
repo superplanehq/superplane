@@ -6,72 +6,34 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+func newLogger() *logrus.Entry {
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+	return logrus.NewEntry(logger)
+}
+
 func Test__Jira__Sync(t *testing.T) {
 	j := &Jira{}
 
-	t.Run("no baseUrl -> error", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
+	t.Run("valid credentials -> ready + populated projects", func(t *testing.T) {
+		appCtx := newAuthorizedIntegration()
 
-		err := j.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
-		})
-
-		require.ErrorContains(t, err, "baseUrl is required")
-	})
-
-	t.Run("no email -> error", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "",
-				"apiToken": "test-token",
-			},
-		}
-
-		err := j.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
-		})
-
-		require.ErrorContains(t, err, "email is required")
-	})
-
-	t.Run("no apiToken -> error", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "",
-			},
-		}
-
-		err := j.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			Integration:   appCtx,
-		})
-
-		require.ErrorContains(t, err, "apiToken is required")
-	})
-
-	t.Run("successful sync -> ready", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"accountId":"123"}`)),
+					Body:       io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"cloudId":"35273b54-3f06-40d2-880f-dd28cf6daafa"}`)),
 				},
 				{
 					StatusCode: http.StatusOK,
@@ -80,25 +42,27 @@ func Test__Jira__Sync(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
 		err := j.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			HTTP:          httpContext,
-			Integration:   appCtx,
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Logger:      newLogger(),
 		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", appCtx.State)
+
+		meta, ok := appCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		require.NotNil(t, meta.User)
+		assert.Equal(t, "acct-1", meta.User.AccountID)
+		assert.Equal(t, "35273b54-3f06-40d2-880f-dd28cf6daafa", meta.CloudID)
+		require.Len(t, meta.Projects, 1)
+		assert.Equal(t, "TEST", meta.Projects[0].Key)
 	})
 
-	t.Run("auth failure -> error", func(t *testing.T) {
+	t.Run("invalid credentials -> error", func(t *testing.T) {
+		appCtx := newAuthorizedIntegration()
+
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -108,21 +72,31 @@ func Test__Jira__Sync(t *testing.T) {
 			},
 		}
 
+		err := j.Sync(core.SyncContext{
+			HTTP:        httpContext,
+			Integration: appCtx,
+			Logger:      newLogger(),
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "verifying Jira credentials")
+	})
+
+	t.Run("missing site URL -> error", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "invalid-token",
+				"email":    testEmail,
+				"apiToken": testAPIToken,
 			},
 		}
 
 		err := j.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			HTTP:          httpContext,
-			Integration:   appCtx,
+			HTTP:        &contexts.HTTPContext{},
+			Integration: appCtx,
+			Logger:      newLogger(),
 		})
 
 		require.Error(t, err)
-		assert.NotEqual(t, "ready", appCtx.State)
+		assert.Contains(t, err.Error(), "site URL")
 	})
 }

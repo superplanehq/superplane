@@ -1,0 +1,659 @@
+package components
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
+)
+
+const PayloadType = "semaphore.workflow.finished"
+const PassedOutputChannel = "passed"
+const FailedOutputChannel = "failed"
+const PipelineStateDone = "done"
+const PipelineResultPassed = "passed"
+const PollInterval = 5 * time.Minute
+
+const oidcAssertionParameterName = "SUPERPLANE_OIDC_ASSERTION"
+
+const (
+	semaphoreOIDCTokenAudience = "semaphore"
+	semaphoreOIDCTokenDuration = time.Hour
+
+	semaphoreClaimAppID        = "app_id"
+	semaphoreClaimOrgID        = "org_id"
+	semaphoreClaimNodeID       = "node_id"
+	semaphoreClaimExecutionID  = "execution_id"
+	semaphoreClaimComponent    = "component"
+	semaphoreClaimProjectID    = "project_id"
+	semaphoreClaimPipelineFile = "pipeline_file"
+	semaphoreClaimRef          = "ref"
+	semaphoreClaimCommitSha    = "commit_sha"
+)
+
+type RunWorkflow struct{}
+
+type RunWorkflowNodeMetadata struct {
+	Project *Project `json:"project" mapstructure:"project"`
+}
+
+type RunWorkflowExecutionMetadata struct {
+	Workflow *WorkflowMetadata `json:"workflow" mapstructure:"workflow"`
+	Pipeline *PipelineMetadata `json:"pipeline" mapstructure:"pipeline"`
+	Extra    map[string]any    `json:"extra,omitempty" mapstructure:"extra,omitempty"`
+}
+
+type WorkflowMetadata struct {
+	ID  string `json:"id"`
+	URL string `json:"url"`
+}
+
+type PipelineMetadata struct {
+	ID     string `json:"id"`
+	State  string `json:"state"`
+	Result string `json:"result"`
+}
+
+type Project struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type RunWorkflowSpec struct {
+	Project          string      `json:"project"`
+	Ref              string      `json:"ref"`
+	PipelineFile     string      `json:"pipelineFile"`
+	CommitSha        string      `json:"commitSha"`
+	AddOidcAssertion bool        `json:"addOidcAssertion"`
+	Parameters       []Parameter `json:"parameters"`
+}
+
+type Parameter struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+func (r *RunWorkflow) Name() string {
+	return "semaphore.runWorkflow"
+}
+
+func (r *RunWorkflow) Label() string {
+	return "Run Workflow"
+}
+
+func (r *RunWorkflow) Description() string {
+	return "Run Semaphore workflow"
+}
+
+func (r *RunWorkflow) Documentation() string {
+	return `The Run Workflow component triggers a Semaphore CI/CD workflow and waits for it to complete.
+
+## Use Cases
+
+- **CI/CD orchestration**: Trigger builds and deployments from SuperPlane workflows
+- **Pipeline automation**: Run Semaphore pipelines as part of workflow automation
+- **Multi-stage deployments**: Coordinate complex deployment pipelines
+- **Workflow chaining**: Chain multiple Semaphore workflows together
+
+## How It Works
+
+1. Creates and starts a Semaphore workflow with the specified pipeline file and parameters
+2. Waits for the pipeline to complete (monitored via webhook and polling)
+3. Routes execution based on pipeline result:
+   - **Passed channel**: Pipeline completed successfully
+   - **Failed channel**: Pipeline failed or was cancelled
+
+## Configuration
+
+- **Project**: Select the Semaphore project containing the workflow
+- **Pipeline File**: Path to the pipeline YAML file (e.g., ` + "`.semaphore/pipeline.yml`" + `)
+- **Ref**: Git reference to run the workflow on (branch, tag, or commit SHA)
+- **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
+- **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
+- **Add OIDC assertion**: Send ` + "`SUPERPLANE_OIDC_ASSERTION`" + ` so CI can confirm this run was triggered by SuperPlane
+
+## Injected Parameters
+
+SuperPlane automatically adds these workflow parameters when triggering Semaphore:
+
+- ` + "`SUPERPLANE_EXECUTION_ID`" + `: The SuperPlane node execution ID
+- ` + "`SUPERPLANE_CANVAS_ID`" + `: The SuperPlane canvas ID
+- ` + "`SUPERPLANE_OIDC_ASSERTION`" + `: When **Add OIDC assertion** is enabled, a signed OIDC assertion attesting this workflow was triggered by SuperPlane
+
+## Verifying Triggers in CI
+
+To verify that a Semaphore job was triggered by SuperPlane, verify ` + "`SUPERPLANE_OIDC_ASSERTION`" + ` before running any steps. 
+Check every claim your policy depends on. For example:
+
+` + "```bash" + `
+superplane oidc verify \
+  --audience semaphore \
+  --claim org_id=eb3aca82-3864-4f76-b1d6-f670c297f136 \
+  --claim app_id=c4d5e6f7-8901-4234-a567-890123456789 \
+  --claim pipeline_file=.semaphore/production/deploy.yml \
+  --claim node_id=deploy-production
+` + "```" + `
+
+The command reads the token from the environment, fetches JWKS from your SuperPlane instance, and verifies the signature. 
+
+## Output Channels
+
+- **Passed**: Emitted when pipeline completes successfully
+- **Failed**: Emitted when pipeline fails or is cancelled
+
+## Notes
+
+- The component automatically sets up webhook monitoring for pipeline completion
+- Falls back to polling if webhook doesn't arrive
+- Can be cancelled, which will stop the running Semaphore workflow`
+}
+
+func (r *RunWorkflow) Icon() string {
+	return "workflow"
+}
+
+func (r *RunWorkflow) Color() string {
+	return "gray"
+}
+
+func (r *RunWorkflow) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{
+		{
+			Name:  PassedOutputChannel,
+			Label: "Passed",
+		},
+		{
+			Name:  FailedOutputChannel,
+			Label: "Failed",
+		},
+	}
+}
+
+func (r *RunWorkflow) Configuration() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:     "project",
+			Label:    "Project",
+			Type:     configuration.FieldTypeIntegrationResource,
+			Required: true,
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "project",
+					UseNameAsValue: true,
+				},
+			},
+		},
+		{
+			Name:        "pipelineFile",
+			Label:       "Pipeline file",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Placeholder: "e.g. .semaphore/semaphore.yml",
+		},
+		{
+			Name:     "ref",
+			Label:    "Pipeline file location",
+			Type:     configuration.FieldTypeGitRef,
+			Required: true,
+		},
+		{
+			Name:  "commitSha",
+			Label: "Commit SHA",
+			Type:  configuration.FieldTypeString,
+		},
+		{
+			Name:  "parameters",
+			Label: "Parameters",
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Parameter",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:     "name",
+								Label:    "Name",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+							{
+								Name:     "value",
+								Label:    "Value",
+								Type:     configuration.FieldTypeString,
+								Required: true,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "addOidcAssertion",
+			Label:       "Add OIDC assertion",
+			Type:        configuration.FieldTypeBool,
+			Description: "Send a signed JWT assertion so Semaphore can confirm this run was triggered by SuperPlane",
+		},
+	}
+}
+
+func (r *RunWorkflow) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	return ctx.DefaultProcessing()
+}
+
+func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
+	config := RunWorkflowSpec{}
+	err := mapstructure.Decode(ctx.Configuration, &config)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.Project == "" {
+		return fmt.Errorf("project is required")
+	}
+
+	metadata := RunWorkflowNodeMetadata{}
+	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	//
+	// If this is the same project, nothing to do.
+	//
+	if metadata.Project != nil && (config.Project == metadata.Project.ID || config.Project == metadata.Project.Name) {
+		return nil
+	}
+
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	project, err := client.GetProject(config.Project)
+	if err != nil {
+		return fmt.Errorf("error finding project %s: %v", config.Project, err)
+	}
+
+	err = ctx.Metadata.Set(RunWorkflowNodeMetadata{
+		Project: &Project{
+			ID:   project.Metadata.ProjectID,
+			Name: project.Metadata.ProjectName,
+			URL:  fmt.Sprintf("%s/projects/%s", string(client.OrgURL), project.Metadata.ProjectID),
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("error setting metadata: %v", err)
+	}
+
+	ctx.Integration.RequestWebhook(common.WebhookConfiguration{
+		Project: project.Metadata.ProjectName,
+	})
+
+	return nil
+}
+
+func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
+	spec := RunWorkflowSpec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	metadata := RunWorkflowNodeMetadata{}
+	err = mapstructure.Decode(ctx.NodeMetadata.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	parameters, err := r.buildParameters(ctx, spec, metadata)
+	if err != nil {
+		return fmt.Errorf("failed to build workflow parameters: %w", err)
+	}
+
+	params := map[string]any{
+		"project_id":    metadata.Project.ID,
+		"reference":     spec.Ref,
+		"pipeline_file": spec.PipelineFile,
+		"parameters":    parameters,
+	}
+
+	if spec.CommitSha != "" {
+		params["commit_sha"] = spec.CommitSha
+	}
+
+	response, err := client.RunWorkflow(params)
+	if err != nil {
+		return fmt.Errorf("error running workflow: %v", err)
+	}
+
+	ctx.Logger.Infof("New workflow created - workflow=%s, pipeline=%s", response.WorkflowID, response.PipelineID)
+
+	ctx.Metadata.Set(RunWorkflowExecutionMetadata{
+		Workflow: &WorkflowMetadata{
+			ID:  response.WorkflowID,
+			URL: fmt.Sprintf("%s/workflows/%s", string(client.OrgURL), response.WorkflowID),
+		},
+		Pipeline: &PipelineMetadata{
+			ID: response.PipelineID,
+		},
+	})
+
+	//
+	// This is what allows the component to associate a semaphore webhook
+	// for a pipeline finishing to a SuperPlane execution.
+	//
+	err = ctx.ExecutionState.SetKV("pipeline", response.PipelineID)
+	if err != nil {
+		return err
+	}
+
+	//
+	// We still set up the poller to check for pipeline finishing,
+	// just in case something wrong happens with the update through the webhook.
+	//
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
+}
+
+func (r *RunWorkflow) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
+func (r *RunWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	signature := ctx.Headers.Get("X-Semaphore-Signature-256")
+	if signature == "" {
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
+	}
+
+	signature = strings.TrimPrefix(signature, "sha256=")
+	if signature == "" {
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
+	}
+
+	secret, err := ctx.Webhook.GetSecret()
+	if err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("error authenticating request")
+	}
+
+	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
+		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
+	}
+
+	var payload map[string]any
+	err = json.Unmarshal(ctx.Body, &payload)
+	if err != nil {
+		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
+	}
+
+	pipelineData, ok := payload["pipeline"].(map[string]any)
+	if !ok {
+		return http.StatusBadRequest, nil, fmt.Errorf("pipeline data missing from webhook payload")
+	}
+
+	pipelineID, _ := pipelineData["id"].(string)
+	if pipelineID == "" {
+		return http.StatusBadRequest, nil, fmt.Errorf("pipeline id missing from webhook payload")
+	}
+
+	pipelineState, _ := pipelineData["state"].(string)
+	pipelineResult, _ := pipelineData["result"].(string)
+
+	ctx.Logger.Infof("Received webhook for pipeline %s (state=%s, result=%s)", pipelineID, pipelineState, pipelineResult)
+
+	executionCtx, err := ctx.FindExecutionByKV("pipeline", pipelineID)
+
+	//
+	// We will receive hooks for pipelines that weren't started by SuperPlane,
+	// so we just ignore them.
+	//
+	if err != nil {
+		ctx.Logger.Infof("No execution found for pipeline %s: %v", pipelineID, err)
+		return http.StatusOK, nil, nil
+	}
+
+	metadata := RunWorkflowExecutionMetadata{}
+	err = mapstructure.Decode(executionCtx.Metadata.Get(), &metadata)
+	if err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("error decoding metadata: %v", err)
+	}
+
+	//
+	// Already finished, do not do anything.
+	//
+	if metadata.Pipeline.State == PipelineStateDone {
+		ctx.Logger.Infof("Pipeline %s already marked as done, skipping", pipelineID)
+		return http.StatusOK, nil, nil
+	}
+
+	metadata.Pipeline.State = pipelineState
+	metadata.Pipeline.Result = pipelineResult
+	err = executionCtx.Metadata.Set(metadata)
+	if err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("error setting metadata: %v", err)
+	}
+
+	if metadata.Workflow != nil && metadata.Workflow.URL != "" {
+		workflowData, ok := payload["workflow"].(map[string]any)
+		if !ok {
+			workflowData = map[string]any{}
+			payload["workflow"] = workflowData
+		}
+		workflowData["url"] = metadata.Workflow.URL
+	}
+
+	if metadata.Pipeline.Result == PipelineResultPassed {
+		err = executionCtx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{payload})
+	} else {
+		err = executionCtx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
+	}
+
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+
+	ctx.Logger.Infof("Pipeline %s finished with result=%s, emitted to channel", pipelineID, pipelineResult)
+	return http.StatusOK, nil, nil
+}
+
+func (r *RunWorkflow) Hooks() []core.Hook {
+	return []core.Hook{
+		{
+			Name: "poll",
+			Type: core.HookTypeInternal,
+		},
+		{
+			Name: "finish",
+			Type: core.HookTypeUser,
+			Parameters: []configuration.Field{
+				{
+					Name:     "data",
+					Type:     configuration.FieldTypeObject,
+					Required: false,
+					Default:  map[string]any{},
+				},
+			},
+		},
+	}
+}
+
+func (r *RunWorkflow) HandleHook(ctx core.ActionHookContext) error {
+	switch ctx.Name {
+	case "poll":
+		return r.poll(ctx)
+	case "finish":
+		return r.finish(ctx)
+	}
+
+	return fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (r *RunWorkflow) poll(ctx core.ActionHookContext) error {
+	spec := RunWorkflowSpec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	metadata := RunWorkflowExecutionMetadata{}
+	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
+	if err != nil {
+		return err
+	}
+
+	//
+	// If the pipeline already finished, we don't need to do anything.
+	//
+	if metadata.Pipeline.State == PipelineStateDone {
+		return nil
+	}
+
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	pipeline, err := client.GetPipeline(metadata.Pipeline.ID)
+	if err != nil {
+		return err
+	}
+
+	//
+	// If not finished, poll again in 1min.
+	//
+	if pipeline.State != PipelineStateDone {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
+	}
+
+	metadata.Pipeline.State = pipeline.State
+	metadata.Pipeline.Result = pipeline.Result
+	err = ctx.Metadata.Set(metadata)
+	if err != nil {
+		return err
+	}
+
+	payload := map[string]any{
+		"pipeline": pipeline,
+	}
+	if metadata.Workflow != nil && metadata.Workflow.URL != "" {
+		payload["workflow"] = map[string]any{
+			"url": metadata.Workflow.URL,
+		}
+	}
+
+	if pipeline.Result == PipelineResultPassed {
+		return ctx.ExecutionState.Emit(PassedOutputChannel, PayloadType, []any{payload})
+	}
+
+	return ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
+}
+
+func (r *RunWorkflow) finish(ctx core.ActionHookContext) error {
+	metadata := RunWorkflowExecutionMetadata{}
+	err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
+	if err != nil {
+		return err
+	}
+
+	if metadata.Pipeline.State == PipelineStateDone {
+		return fmt.Errorf("pipeline already finished")
+	}
+
+	data, ok := ctx.Parameters["data"]
+	if !ok {
+		data = map[string]any{}
+	}
+
+	dataMap, ok := data.(map[string]any)
+	if !ok {
+		return fmt.Errorf("data is invalid")
+	}
+
+	metadata.Extra = dataMap
+	err = ctx.Metadata.Set(metadata)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *RunWorkflow) signOIDCToken(ctx core.ExecutionContext, spec RunWorkflowSpec, metadata RunWorkflowNodeMetadata) (string, error) {
+	if ctx.OIDC == nil {
+		return "", fmt.Errorf("oidc signer unavailable")
+	}
+
+	claims := map[string]any{
+		semaphoreClaimAppID:       ctx.WorkflowID,
+		semaphoreClaimOrgID:       ctx.OrganizationID,
+		semaphoreClaimNodeID:      ctx.NodeID,
+		semaphoreClaimExecutionID: ctx.ID.String(),
+		semaphoreClaimComponent:   r.Name(),
+	}
+
+	if metadata.Project != nil && metadata.Project.ID != "" {
+		claims[semaphoreClaimProjectID] = metadata.Project.ID
+	}
+	if spec.PipelineFile != "" {
+		claims[semaphoreClaimPipelineFile] = spec.PipelineFile
+	}
+	if spec.Ref != "" {
+		claims[semaphoreClaimRef] = spec.Ref
+	}
+	if spec.CommitSha != "" {
+		claims[semaphoreClaimCommitSha] = spec.CommitSha
+	}
+
+	return ctx.OIDC.Sign(
+		fmt.Sprintf("execution:%s", ctx.ID),
+		semaphoreOIDCTokenDuration,
+		semaphoreOIDCTokenAudience,
+		claims,
+	)
+}
+
+func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflowSpec, metadata RunWorkflowNodeMetadata) (map[string]any, error) {
+	parameters := make(map[string]any)
+	for _, param := range spec.Parameters {
+		parameters[param.Name] = param.Value
+	}
+
+	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID
+	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
+
+	if !spec.AddOidcAssertion {
+		return parameters, nil
+	}
+
+	token, err := r.signOIDCToken(ctx, spec, metadata)
+	if err != nil {
+		ctx.Logger.Errorf("failed to sign OIDC execution token: %v", err)
+		return nil, fmt.Errorf("failed to sign OIDC execution token")
+	}
+
+	parameters[oidcAssertionParameterName] = token
+
+	return parameters, nil
+}
+
+func (r *RunWorkflow) Cleanup(ctx core.SetupContext) error {
+	return nil
+}

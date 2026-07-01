@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	registry.RegisterComponent("timeGate", &TimeGate{})
+	registry.RegisterAction("timeGate", &TimeGate{})
 }
 
 type TimeGate struct{}
@@ -239,31 +239,31 @@ func (tg *TimeGate) validateSpec(spec Spec) error {
 	return nil
 }
 
-func (tg *TimeGate) Actions() []core.Action {
-	return []core.Action{
+func (tg *TimeGate) Hooks() []core.Hook {
+	return []core.Hook{
 		{
 			Name: "timeReached",
+			Type: core.HookTypeInternal,
 		},
 		{
-			Name:           "pushThrough",
-			Description:    "Push Through",
-			UserAccessible: true,
+			Name: "pushThrough",
+			Type: core.HookTypeUser,
 		},
 	}
 }
 
-func (tg *TimeGate) HandleAction(ctx core.ActionContext) error {
+func (tg *TimeGate) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "timeReached":
 		return tg.HandleTimeReached(ctx)
 	case "pushThrough":
 		return tg.HandlePushThrough(ctx)
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (tg *TimeGate) HandleTimeReached(ctx core.ActionContext) error {
+func (tg *TimeGate) HandleTimeReached(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -275,7 +275,7 @@ func (tg *TimeGate) HandleTimeReached(ctx core.ActionContext) error {
 	)
 }
 
-func (tg *TimeGate) HandlePushThrough(ctx core.ActionContext) error {
+func (tg *TimeGate) HandlePushThrough(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

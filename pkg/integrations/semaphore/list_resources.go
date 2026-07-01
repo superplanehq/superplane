@@ -1,18 +1,21 @@
 package semaphore
 
-import "github.com/superplanehq/superplane/pkg/core"
+import (
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
+)
 
 func (s *Semaphore) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "project" {
 		return []core.IntegrationResource{}, nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
 
-	projects, err := client.listProjects()
+	projects, err := client.ListProjects()
 	if err != nil {
 		return nil, err
 	}

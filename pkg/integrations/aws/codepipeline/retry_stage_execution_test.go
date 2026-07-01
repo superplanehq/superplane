@@ -117,7 +117,7 @@ func Test__RetryStageExecution__Execute(t *testing.T) {
 				"pipelineExecution": "old-exec-123",
 				"retryMode":         "FAILED_ACTIONS",
 			},
-			Integration:    &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
+			Integration:    &contexts.IntegrationContext{},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		})
 		require.ErrorContains(t, err, "AWS session credentials are missing")
@@ -144,7 +144,7 @@ func Test__RetryStageExecution__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			Integration: &contexts.IntegrationContext{
-				Secrets: validSecrets(),
+				CurrentSecrets: validSecrets(),
 			},
 		})
 
@@ -174,7 +174,7 @@ func Test__RetryStageExecution__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			ExecutionState: execState,
 			Integration: &contexts.IntegrationContext{
-				Secrets: validSecrets(),
+				CurrentSecrets: validSecrets(),
 			},
 		})
 

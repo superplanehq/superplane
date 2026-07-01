@@ -163,14 +163,6 @@ func (c *UpdateService) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *UpdateService) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateService) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateService) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -204,4 +196,12 @@ func (c *UpdateService) normalizeConfig(config UpdateServiceConfiguration) Updat
 	config.ServiceMutationConfiguration = config.ServiceMutationConfiguration.normalize()
 	config.Service = strings.TrimSpace(config.Service)
 	return config
+}
+
+func (c *UpdateService) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateService) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

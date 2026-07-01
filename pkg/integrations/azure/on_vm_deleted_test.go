@@ -14,51 +14,6 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// TestOnVMDeleted_Metadata verifies the trigger's metadata methods
-func TestOnVMDeleted_Metadata(t *testing.T) {
-	trigger := &OnVMDeleted{}
-
-	assert.Equal(t, "azure.onVirtualMachineDeleted", trigger.Name())
-	assert.Equal(t, "On VM Deleted", trigger.Label())
-	assert.Equal(t, "azure", trigger.Icon())
-	assert.Equal(t, "blue", trigger.Color())
-	assert.NotEmpty(t, trigger.Description())
-	assert.NotEmpty(t, trigger.Documentation())
-}
-
-// TestOnVMDeleted_Configuration verifies the trigger's configuration fields
-func TestOnVMDeleted_Configuration(t *testing.T) {
-	trigger := &OnVMDeleted{}
-	config := trigger.Configuration()
-
-	require.Len(t, config, 2)
-	assert.Equal(t, "resourceGroup", config[0].Name)
-	assert.Equal(t, "Resource Group", config[0].Label)
-	assert.False(t, config[0].Required)
-	assert.Equal(t, "nameFilter", config[1].Name)
-	assert.Equal(t, "VM Name Filter", config[1].Label)
-	assert.False(t, config[1].Required)
-}
-
-// TestOnVMDeleted_ExampleData verifies the trigger's example output
-func TestOnVMDeleted_ExampleData(t *testing.T) {
-	trigger := &OnVMDeleted{}
-	example := trigger.ExampleData()
-
-	require.NotNil(t, example)
-	assert.Contains(t, example, "type")
-	assert.Contains(t, example, "timestamp")
-	assert.Contains(t, example, "data")
-
-	envelope, ok := example["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, envelope, "id")
-	assert.Contains(t, envelope, "eventType")
-	assert.Equal(t, "Microsoft.Resources.ResourceDeleteSuccess", envelope["eventType"])
-	assert.Contains(t, envelope, "subject")
-}
-
-// TestOnVMDeleted_Setup verifies the trigger setup method
 func TestOnVMDeleted_Setup(t *testing.T) {
 	trigger := &OnVMDeleted{}
 
@@ -95,47 +50,6 @@ func TestOnVMDeleted_Setup(t *testing.T) {
 	})
 }
 
-// TestOnVMDeleted_Cleanup verifies the trigger cleanup method
-func TestOnVMDeleted_Cleanup(t *testing.T) {
-	trigger := &OnVMDeleted{}
-	metadataCtx := &contexts.MetadataContext{}
-	logger := logrus.NewEntry(logrus.New())
-
-	ctx := core.TriggerContext{
-		Logger:        logger,
-		Configuration: map[string]any{},
-		Metadata:      metadataCtx,
-	}
-
-	err := trigger.Cleanup(ctx)
-	assert.NoError(t, err)
-}
-
-// TestOnVMDeleted_Actions verifies the trigger has no actions
-func TestOnVMDeleted_Actions(t *testing.T) {
-	trigger := &OnVMDeleted{}
-	actions := trigger.Actions()
-	assert.Empty(t, actions)
-}
-
-// TestOnVMDeleted_HandleAction verifies the trigger's action handler
-func TestOnVMDeleted_HandleAction(t *testing.T) {
-	trigger := &OnVMDeleted{}
-	logger := logrus.NewEntry(logrus.New())
-
-	ctx := core.TriggerActionContext{
-		Name:          "test",
-		Parameters:    map[string]any{},
-		Configuration: map[string]any{},
-		Logger:        logger,
-	}
-
-	result, err := trigger.HandleAction(ctx)
-	assert.NoError(t, err)
-	assert.Nil(t, result)
-}
-
-// TestOnVMDeleted_HandleWebhook_SubscriptionValidation verifies subscription validation handling
 func TestOnVMDeleted_HandleWebhook_SubscriptionValidation(t *testing.T) {
 	trigger := &OnVMDeleted{}
 

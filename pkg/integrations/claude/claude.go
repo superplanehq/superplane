@@ -6,6 +6,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/claude/runagent"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -48,9 +49,10 @@ func (i *Claude) Configuration() []configuration.Field {
 	}
 }
 
-func (i *Claude) Components() []core.Component {
-	return []core.Component{
+func (i *Claude) Actions() []core.Action {
+	return []core.Action{
 		&TextPrompt{},
+		&runagent.RunAgent{},
 	}
 }
 
@@ -123,10 +125,10 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 	return resources, nil
 }
 
-func (i *Claude) Actions() []core.Action {
-	return []core.Action{}
+func (i *Claude) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (i *Claude) HandleAction(ctx core.IntegrationActionContext) error {
+func (i *Claude) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

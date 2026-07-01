@@ -51,6 +51,27 @@ func TestWidgetsCommandExecuteDescribeJSON(t *testing.T) {
 	require.Contains(t, stdout.String(), `"label": "Annotation"`)
 }
 
+func TestWidgetsCommandExecuteDescribeText(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/api/v1/widgets/annotation", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"widget":{"name":"annotation","label":"Annotation","description":"Canvas note"}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	ctx, stdout := newWidgetsCommandContextForTest(t, server, "text")
+	name := "annotation"
+	command := widgetsCommand{name: &name}
+
+	err := command.Execute(ctx)
+	require.NoError(t, err)
+	out := stdout.String()
+	require.Contains(t, out, "Name: annotation")
+	require.Contains(t, out, "Label: Annotation")
+	require.Contains(t, out, "Description: Canvas note")
+}
+
 func TestWidgetsCommandExecuteListYAML(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)

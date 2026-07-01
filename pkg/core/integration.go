@@ -42,9 +42,9 @@ type Integration interface {
 	Configuration() []configuration.Field
 
 	/*
-	 * The list of components exposed by the integration.
+	 * The list of actions exposed by the integration.
 	 */
-	Components() []Component
+	Actions() []Action
 
 	/*
 	 * The list of triggers exposed by the integration.
@@ -62,15 +62,10 @@ type Integration interface {
 	Cleanup(ctx IntegrationCleanupContext) error
 
 	/*
-	 * The list of actions exposed by the integration.
+	 * Allows integrations to define and execute  hooks.
 	 */
-	Actions() []Action
-
-	/*
-	 * Execute an action - defined in Actions() -
-	 * on the integration.
-	 */
-	HandleAction(ctx IntegrationActionContext) error
+	Hooks() []Hook
+	HandleHook(ctx IntegrationHookContext) error
 
 	/*
 	 * List resources of a given type.
@@ -116,13 +111,13 @@ type WebhookHandlerContext struct {
 	Webhook     WebhookContext
 }
 
-type IntegrationComponent interface {
+type IntegrationAction interface {
 
 	/*
-	 * IntegrationComponent inherits all the methods from Component interface,
-	 * and adds a couple more, which are only applicable to app components.
+	 * IntegrationAction inherits all the methods from Action interface,
+	 * and adds a couple more, which are only applicable to app actions.
 	 */
-	Component
+	Action
 
 	OnIntegrationMessage(ctx IntegrationMessageContext) error
 }
@@ -190,21 +185,17 @@ type IntegrationCleanupContext struct {
 	Integration    IntegrationContext
 }
 
-type IntegrationActionContext struct {
-	Name            string
-	Parameters      any
-	Configuration   any
-	WebhooksBaseURL string
-	Logger          *logrus.Entry
-	Requests        RequestContext
-	Integration     IntegrationContext
-	HTTP            HTTPContext
-}
-
 /*
  * IntegrationContext allows components to access integration information.
  */
 type IntegrationContext interface {
+
+	//
+	// Whether the integration is using the legacy setup flow.
+	//
+	LegacySetup() bool
+	Properties() IntegrationPropertyStorage
+	Secrets() IntegrationSecretStorage
 
 	//
 	// Control the metadata and config of the integration
@@ -279,14 +270,16 @@ type BrowserAction struct {
 }
 
 type HTTPRequestContext struct {
-	Logger          *logrus.Entry
-	Request         *http.Request
-	Response        http.ResponseWriter
-	OrganizationID  string
-	BaseURL         string
-	WebhooksBaseURL string
-	HTTP            HTTPContext
-	Integration     IntegrationContext
+	Logger           *logrus.Entry
+	Request          *http.Request
+	Response         http.ResponseWriter
+	OrganizationID   string
+	BaseURL          string
+	WebhooksBaseURL  string
+	HTTP             HTTPContext
+	Integration      IntegrationContext
+	Capabilities     CapabilityContext
+	IntegrationSetup IntegrationSetupContext
 }
 
 /*

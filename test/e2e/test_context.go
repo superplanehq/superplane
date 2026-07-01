@@ -9,9 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	pw "github.com/playwright-community/playwright-go"
+	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/server"
 	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 type TestContext struct {
@@ -22,28 +25,26 @@ type TestContext struct {
 	viteCmd   *exec.Cmd
 
 	baseURL string
+
+	AgentProvider *support.TestAgentProvider
 }
 
 func NewTestContext(t *testing.M) *TestContext {
-	return &TestContext{timeoutMs: 10000}
+	return &TestContext{timeoutMs: 15000}
 }
 
 func (s *TestContext) Start() {
 	os.Setenv("DB_NAME", "superplane_test")
 	os.Setenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/superplane_test")
 	os.Setenv("START_PUBLIC_API", "yes")
-	os.Setenv("START_INTERNAL_API", "yes")
-	os.Setenv("INTERNAL_API_PORT", "50052")
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
 	os.Setenv("START_WEB_SERVER", "yes")
 	os.Setenv("WEB_BASE_PATH", "")
-	os.Setenv("START_GRPC_GATEWAY", "yes")
-	os.Setenv("GRPC_SERVER_ADDR", "127.0.0.1:50052")
 	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
 	os.Setenv("START_CONSUMERS", "yes")
 	os.Setenv("START_EVENT_ROUTER", "yes")
+	os.Setenv("START_RUN_FINALIZER", "yes")
 	os.Setenv("START_NODE_EXECUTOR", "yes")
-	os.Setenv("START_BLUEPRINT_NODE_EXECUTOR", "yes")
 	os.Setenv("START_NODE_QUEUE_WORKER", "yes")
 	os.Setenv("START_NODE_REQUEST_WORKER", "yes")
 	os.Setenv("START_WEBHOOK_PROVISIONER", "yes")
@@ -54,17 +55,36 @@ func (s *TestContext) Start() {
 	os.Setenv("OIDC_KEYS_PATH", "../../test/fixtures/oidc-keys")
 	os.Setenv("PUBLIC_API_PORT", "8001")
 	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
+	os.Setenv("VITE_DEV_HOST", "127.0.0.1")
 	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
+	os.Setenv("ALLOWED_WS_ORIGINS", "http://127.0.0.1:8001")
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
+
+	s.AgentProvider = support.NewAgentProvider()
+	s.ResetAgentProvider()
+	server.SetAgentProviderForTests(s.AgentProvider)
 
 	s.startVite()
 	s.startAppServer()
 	s.startPlaywright()
 	s.launchBrowser()
 	s.setUpNavigationLogger()
+}
+
+func (s *TestContext) ResetAgentProvider() {
+	s.AgentProvider.Reset()
+	s.AgentProvider.SetSendMessageEvents(agentTurnCompletedEvent())
+	s.AgentProvider.SetDefineOutcomeEvents(agentTurnCompletedEvent())
+}
+
+func agentTurnCompletedEvent() agents.ProviderEvent {
+	return agents.ProviderEvent{
+		ProviderEventID: "e2e-turn-completed-" + uuid.NewString(),
+		Type:            agents.ProviderEventTurnCompleted,
+	}
 }
 
 func (s *TestContext) startPlaywright() {
@@ -86,13 +106,6 @@ func (s *TestContext) launchBrowser() {
 		Viewport: &pw.Size{
 			Width:  2560,
 			Height: 1440,
-		},
-		RecordVideo: &pw.RecordVideo{
-			Dir: "/app/tmp/videos",
-			Size: &pw.Size{
-				Width:  2560,
-				Height: 1440,
-			},
 		},
 	})
 	if err != nil {
@@ -230,6 +243,11 @@ func (s *TestContext) NewSession(t *testing.T) *session.TestSession {
 	p.OnResponse(func(resp pw.Response) {
 		if status := resp.Status(); status >= 400 {
 			t.Logf("[Browser Logs] %d %s", status, resp.URL())
+			if strings.Contains(resp.URL(), "/repository/commits") {
+				if body, err := resp.Text(); err == nil && body != "" {
+					t.Logf("[Browser Logs] response body: %s", body)
+				}
+			}
 		}
 	})
 

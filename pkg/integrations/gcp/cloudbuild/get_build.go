@@ -131,8 +131,6 @@ func (c *GetBuild) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(getBuildOutputChannel, getBuildPayloadType, []any{result})
 }
 
-func (c *GetBuild) Actions() []core.Action                  { return nil }
-func (c *GetBuild) HandleAction(_ core.ActionContext) error { return nil }
 func (c *GetBuild) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -140,4 +138,12 @@ func (c *GetBuild) Cancel(_ core.ExecutionContext) error { return nil }
 func (c *GetBuild) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *GetBuild) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (c *GetBuild) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetBuild) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

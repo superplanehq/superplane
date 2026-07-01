@@ -126,14 +126,6 @@ func (c *ExpireSilence) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return http.StatusOK, nil, nil
 }
 
-func (c *ExpireSilence) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *ExpireSilence) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *ExpireSilence) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -145,4 +137,12 @@ func (c *ExpireSilence) Cleanup(ctx core.SetupContext) error {
 func sanitizeExpireSilenceConfiguration(config ExpireSilenceConfiguration) ExpireSilenceConfiguration {
 	config.Silence = strings.TrimSpace(config.Silence)
 	return config
+}
+
+func (c *ExpireSilence) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ExpireSilence) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

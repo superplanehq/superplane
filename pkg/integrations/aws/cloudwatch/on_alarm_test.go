@@ -85,12 +85,12 @@ func Test__OnAlarm__Setup(t *testing.T) {
 	})
 }
 
-func Test__OnAlarm__HandleAction(t *testing.T) {
+func Test__OnAlarm__HandleHook(t *testing.T) {
 	trigger := &OnAlarm{}
 
 	t.Run("rule missing -> reschedules check", func(t *testing.T) {
 		requests := &contexts.RequestContext{}
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:     "checkRuleAvailability",
 			Logger:   logrus.NewEntry(logrus.New()),
 			Requests: requests,
@@ -129,7 +129,7 @@ func Test__OnAlarm__HandleAction(t *testing.T) {
 			},
 		}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:        "checkRuleAvailability",
 			Logger:      logrus.NewEntry(logrus.New()),
 			Requests:    requests,

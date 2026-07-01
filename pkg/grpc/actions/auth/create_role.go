@@ -6,30 +6,29 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func CreateRole(ctx context.Context, domainType string, domainID string, role *pb.Role, authService authorization.Authorization) (*pb.CreateRoleResponse, error) {
 	if role == nil {
-		return nil, status.Error(codes.InvalidArgument, "role must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "role must be specified")
 	}
 
 	if role.Metadata == nil {
-		return nil, status.Error(codes.InvalidArgument, "role metadata must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "role metadata must be specified")
 	}
 
 	if role.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "role spec must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "role spec must be specified")
 	}
 
 	if role.Metadata.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "role name must be specified")
 	}
 
 	if role.Spec.Permissions == nil {
-		return nil, status.Error(codes.InvalidArgument, "role permissions must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "role permissions must be specified")
 	}
 
 	permissions := make([]*authorization.Permission, len(role.Spec.Permissions))
@@ -43,7 +42,7 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 
 	for _, permission := range permissions {
 		if !authService.IsValidPermission(domainType, permission) {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid permission: %s %s", permission.Resource, permission.Action))
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("invalid permission: %s %s", permission.Resource, permission.Action))
 		}
 	}
 
@@ -68,10 +67,10 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 	}
 
 	if role.Spec.InheritedRole != nil && role.Spec.InheritedRole.Metadata != nil && role.Spec.InheritedRole.Metadata.Name != "" {
-		inheritedRoleDef, err := authService.GetRoleDefinition(role.Spec.InheritedRole.Metadata.Name, domainType, domainID)
+		inheritedRoleDef, err := authService.GetRoleDefinition(ctx, role.Spec.InheritedRole.Metadata.Name, domainType, domainID)
 		if err != nil {
 			log.Errorf("failed to get inherited role %s: %v", role.Spec.InheritedRole.Metadata.Name, err)
-			return nil, status.Error(codes.InvalidArgument, "inherited role not found")
+			return nil, grpcerrors.InvalidArgument(nil, "inherited role not found")
 		}
 		roleDefinition.InheritsFrom = inheritedRoleDef
 	}
@@ -79,7 +78,7 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 	err := authService.CreateCustomRole(domainID, roleDefinition)
 	if err != nil {
 		log.Errorf("failed to create role %s: %v", role.Metadata.Name, err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcerrors.Internal(err, "failed to create role")
 	}
 
 	log.Infof("created custom role %s in domain %s (%s)", role.Metadata.Name, domainID, domainType)

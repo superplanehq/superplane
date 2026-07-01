@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -21,16 +21,16 @@ func Test__DeleteCanvas(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := DeleteCanvas(context.Background(), r.Registry, r.Organization.ID, uuid.New().String())
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		_, err := DeleteCanvas(context.Background(), r.Registry, r.Organization.ID, "invalid-id")
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("canvas is soft deleted, data remains until cleanup", func(t *testing.T) {
@@ -62,7 +62,7 @@ func Test__DeleteCanvas(t *testing.T) {
 
 		event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 		event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
-		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event1.ID, event2.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event1.ID, event2.ID)
 		support.CreateQueueItem(t, canvas.ID, "node-1", event1.ID, event2.ID)
 
 		//
@@ -90,9 +90,8 @@ func Test__DeleteCanvas(t *testing.T) {
 		_, err = models.FindCanvas(r.Organization.ID, canvas.ID)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
-		// But the workflow should still exist when queried with Unscoped
-		var canvasUnscoped models.Canvas
-		err = database.Conn().Unscoped().Where("id = ?", canvas.ID).First(&canvasUnscoped).Error
+		// But the workflow should still exist when queried with Unscoped.
+		canvasUnscoped, err := models.FindUnscopedCanvas(canvas.ID)
 		require.NoError(t, err)
 		assert.NotNil(t, canvasUnscoped.DeletedAt)
 

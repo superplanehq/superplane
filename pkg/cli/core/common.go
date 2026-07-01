@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
+	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -78,16 +79,23 @@ func ResolveOrganizationID(ctx CommandContext) (string, error) {
 	return me.User.GetOrganizationId(), nil
 }
 
-func ResolveCanvasID(ctx CommandContext, canvasID string) (string, error) {
-	canvasID = strings.TrimSpace(canvasID)
-	if canvasID != "" {
-		return canvasID, nil
+func ResolveAppID(ctx CommandContext, appID string) (string, error) {
+	appID = strings.TrimSpace(appID)
+	if appID != "" {
+		return appID, nil
 	}
 
-	activeCanvas := strings.TrimSpace(ctx.Config.GetActiveCanvas())
-	if activeCanvas == "" {
-		return "", fmt.Errorf("canvas id is required; pass --canvas-id or set one with \"superplane canvases active\"")
+	activeApp := strings.TrimSpace(ctx.Config.GetActiveApp())
+	if activeApp == "" {
+		return "", fmt.Errorf("app id is required; pass --app-id or set one with \"superplane apps active\"")
 	}
 
-	return activeCanvas, nil
+	return activeApp, nil
+}
+
+// BindAppIDFlag registers --app-id and a deprecated --canvas-id alias.
+func BindAppIDFlag(cmd *cobra.Command, dest *string, usage string) {
+	cmd.Flags().StringVar(dest, "app-id", "", usage)
+	cmd.Flags().StringVar(dest, "canvas-id", "", usage)
+	_ = cmd.Flags().MarkDeprecated("canvas-id", "use --app-id")
 }

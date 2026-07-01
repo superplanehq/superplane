@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,20 +27,33 @@ import (
 )
 
 type NodeQueueWorker struct {
-	registry  *registry.Registry
-	semaphore *semaphore.Weighted
-	logger    *log.Entry
+	registry    *registry.Registry
+	gitProvider gitprovider.Provider
+	semaphore   *semaphore.Weighted
+	logger      *log.Entry
 
-	rabbitMQURL string
-	consumer    *tackle.Consumer
+	rabbitMQURL               string
+	queueItemConsumer         *tackle.Consumer
+	executionFinishedConsumer *tackle.Consumer
 }
 
-func NewNodeQueueWorker(registry *registry.Registry, rabbitMQURL string) *NodeQueueWorker {
+func NewNodeQueueWorker(registry *registry.Registry, gitProvider gitprovider.Provider, rabbitMQURL string) *NodeQueueWorker {
+	logger := log.WithFields(log.Fields{"worker": "NodeQueueWorker"})
+
+	queueItemConsumer := tackle.NewConsumer()
+	queueItemConsumer.SetLogger(logging.NewTackleLogger(logger))
+
+	executionFinishedConsumer := tackle.NewConsumer()
+	executionFinishedConsumer.SetLogger(logging.NewTackleLogger(logger))
+
 	return &NodeQueueWorker{
-		registry:    registry,
-		rabbitMQURL: rabbitMQURL,
-		semaphore:   semaphore.NewWeighted(25),
-		logger:      log.WithFields(log.Fields{"worker": "NodeQueueWorker"}),
+		registry:                  registry,
+		gitProvider:               gitProvider,
+		rabbitMQURL:               rabbitMQURL,
+		semaphore:                 semaphore.NewWeighted(25),
+		logger:                    logger,
+		queueItemConsumer:         queueItemConsumer,
+		executionFinishedConsumer: executionFinishedConsumer,
 	}
 }
 
@@ -48,19 +62,28 @@ func (w *NodeQueueWorker) Name() string {
 }
 
 func (w *NodeQueueWorker) Start(ctx context.Context) {
-	go w.StartRabbitMQConsumer(ctx)
+	go w.startConsumerLoop(
+		ctx,
+		w.queueItemConsumer,
+		messages.CanvasExchange+"."+messages.CanvasQueueItemCreatedRoutingKey+"."+w.Name(),
+		messages.CanvasExchange,
+		messages.CanvasQueueItemCreatedRoutingKey,
+		w.ConsumeQueueItemCreated,
+	)
+
+	go w.startConsumerLoop(
+		ctx,
+		w.executionFinishedConsumer,
+		messages.ExecutionsExchange+"."+messages.ExecutionFinishedRoutingKey+"."+w.Name(),
+		messages.ExecutionsExchange,
+		messages.ExecutionFinishedRoutingKey,
+		w.ConsumeExecutionFinished,
+	)
 
 	//
-	// Differently from the other workers, the NodeQueueWorker needs to be
-	// aware of two things: queue items being created and nodes becoming ready.
+	// Slow safety-net poll in case RabbitMQ is not working.
 	//
-	// Since we don't have events for nodes becoming ready, we need to poll still,
-	// so we cannot decrease this interval yet.
-	//
-	// Once we have events for nodes becoming ready,
-	// we can make this worker react to both events.
-	//
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -84,9 +107,10 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 				}
 
 				go func(node models.CanvasNode) {
+					attemptStart := time.Now()
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessNode(logger, node); err != nil {
+					if err := w.LockAndProcessNode(logger, node, attemptStart); err != nil {
 						logger.Errorf("Error processing: %v", err)
 					}
 				}(node)
@@ -97,35 +121,56 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *NodeQueueWorker) StartRabbitMQConsumer(ctx context.Context) {
+func (w *NodeQueueWorker) startConsumerLoop(
+	ctx context.Context,
+	consumer *tackle.Consumer,
+	serviceName string,
+	exchangeName string,
+	routingKey string,
+	handler func(tackle.Delivery) error,
+) {
 	options := tackle.Options{
 		URL:            w.rabbitMQURL,
 		ConnectionName: w.Name(),
-		RemoteExchange: messages.CanvasExchange,
-		Service:        messages.CanvasExchange + "." + messages.CanvasQueueItemCreatedRoutingKey + "." + w.Name(),
-		RoutingKey:     messages.CanvasQueueItemCreatedRoutingKey,
+		RemoteExchange: exchangeName,
+		Service:        serviceName,
+		RoutingKey:     routingKey,
 	}
 
-	consumer := tackle.NewConsumer()
-	consumer.SetLogger(logging.NewTackleLogger(w.logger))
-	w.consumer = consumer
-
 	for {
-		log.Infof("Connecting to RabbitMQ queue for %s events", messages.CanvasQueueItemCreatedRoutingKey)
+		if ctx.Err() != nil {
+			return
+		}
 
-		err := w.consumer.Start(&options, w.Consume)
+		log.Infof("Connecting to RabbitMQ queue for %s events", routingKey)
+
+		err := consumer.Start(&options, handler)
+		if ctx.Err() != nil {
+			return
+		}
+
 		if err != nil {
-			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasQueueItemCreatedRoutingKey, err)
-			time.Sleep(5 * time.Second)
+			w.logger.Errorf("Error consuming messages from %s: %v", routingKey, err)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
 			continue
 		}
 
-		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasQueueItemCreatedRoutingKey)
-		time.Sleep(5 * time.Second)
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", routingKey)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
 	}
 }
 
-func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
+func (w *NodeQueueWorker) ConsumeQueueItemCreated(delivery tackle.Delivery) error {
+	start := time.Now()
+
 	data := &pb.CanvasNodeQueueItemMessage{}
 	err := proto.Unmarshal(delivery.Body(), data)
 	if err != nil {
@@ -139,28 +184,73 @@ func (w *NodeQueueWorker) Consume(delivery tackle.Delivery) error {
 		return err
 	}
 
-	node, err := models.FindCanvasNode(database.Conn(), canvasID, data.NodeId)
+	return w.tryProcessReadyNode(canvasID, data.NodeId, start)
+}
+
+func (w *NodeQueueWorker) ConsumeExecutionFinished(delivery tackle.Delivery) error {
+	start := time.Now()
+
+	data := &pb.CanvasNodeExecutionMessage{}
+	err := proto.Unmarshal(delivery.Body(), data)
+	if err != nil {
+		w.logger.Errorf("Error unmarshaling canvas execution finished message: %v", err)
+		return err
+	}
+
+	canvasID, err := uuid.Parse(data.CanvasId)
+	if err != nil {
+		w.logger.Errorf("Error parsing canvas id: %v", err)
+		return err
+	}
+
+	return w.tryProcessReadyNode(canvasID, data.NodeId, start)
+}
+
+func (w *NodeQueueWorker) tryProcessReadyNode(canvasID uuid.UUID, nodeID string, attemptStart time.Time) error {
+	node, err := models.FindCanvasNode(database.Conn(), canvasID, nodeID)
 	if err != nil {
 		w.logger.Errorf("Error finding canvas node: %v", err)
 		return err
 	}
 
 	//
-	// New queue item created for a node that is not ready, we should skip it.
+	// Node is not ready yet, skip it. For queue-item-created messages this happens
+	// when a new item arrives while the node is still executing. For
+	// execution-finished messages this can happen if another worker has already
+	// moved the node into a non-ready state.
 	//
 	if node.State != models.CanvasNodeStateReady {
 		w.logger.Infof("Node %s is not ready, skipping", node.NodeID)
+		telemetry.RecordQueueWorkerNodeProcessing(
+			context.Background(),
+			time.Since(attemptStart),
+			executorOutcomeSkipped,
+			executorReasonNone,
+		)
 		return nil
 	}
 
-	//
-	// Node is ready for processing, let's lock it and process it.
-	//
 	logger := logging.WithNode(w.logger, *node)
-	return w.LockAndProcessNode(logger, *node)
+	return w.LockAndProcessNode(logger, *node, attemptStart)
 }
 
-func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode) error {
+func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.CanvasNode, attemptStart time.Time) error {
+	//
+	// For every node we process, we track the following metrics:
+	// - outcome: success, failed, skipped
+	// - reason: none, locked, deadlock, not_found, internal
+	//
+	metricOutcome := executorOutcomeSuccess
+	metricReason := executorReasonNone
+	defer func() {
+		telemetry.RecordQueueWorkerNodeProcessing(
+			context.Background(),
+			time.Since(attemptStart),
+			metricOutcome,
+			metricReason,
+		)
+	}()
+
 	var executionIDs []*uuid.UUID
 	var queueItem *models.CanvasNodeQueueItem
 
@@ -173,11 +263,19 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		n, err := models.LockCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
 			logger.Info("Node already being processed - skipping")
+			metricOutcome = executorOutcomeSkipped
+			metricReason = executorReasonLocked
 			return nil
 		}
 
 		executionIDs, queueItem, err = w.processNode(tx, logger, n, onNewEvents)
-		return err
+		if err != nil {
+			metricOutcome = executorOutcomeFailed
+			metricReason = classifyProcessError(err)
+			return err
+		}
+
+		return nil
 	})
 
 	if err == nil {
@@ -187,11 +285,9 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 					continue
 				}
 
-				messages.NewCanvasExecutionMessage(
-					node.WorkflowID.String(),
-					executionID.String(),
-					node.NodeID,
-				).Publish()
+				if err := messages.PublishCanvasExecutionByID(node.WorkflowID, *executionID); err != nil {
+					logger.Errorf("Error publishing execution state: %v", err)
+				}
 			}
 		}
 
@@ -224,12 +320,14 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	logger = logging.WithQueueItem(logger, *queueItem)
 	logger.Info("Processing queue item")
 
-	configFields, err := w.configurationFieldsForNode(tx, node)
+	configFields, err := w.configurationFieldsForNode(node)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContext(), tx, node, queueItem, configFields, onNewEvents)
+	repoFiles := contexts.NewRepositoryFilesContext(w.gitProvider, queueItem.WorkflowID)
+
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), tx, node, queueItem, configFields, onNewEvents, repoFiles)
 	if err != nil {
 
 		//
@@ -250,7 +348,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		// we create a failed execution and delete the queue item.
 		//
 		logger.Errorf("Error building configuration for node execution: %v", configErr.Error())
-		executions, err := w.handleNodeConfigurationError(tx, logger, configErr)
+		executions, err := w.handleNodeConfigurationError(tx, configErr, onNewEvents)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -266,20 +364,19 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		 * the processing.
 		 */
 		executionID, err = w.processComponentNode(ctx, node)
-	case models.NodeTypeBlueprint:
-		/*
-		 * For blueprint nodes, use the default processing logic.
-		 * Blueprint nodes do not have custom processing logic.
-		 */
-		executionID, err = ctx.DefaultProcessing()
 	default:
 		return nil, nil, fmt.Errorf("unsupported node type: %s", node.Type)
+	}
+
+	if errors.Is(err, core.ErrQueueItemDeferred) {
+		logger.Info("Queue item deferred")
+		return nil, nil, nil
 	}
 
 	return []*uuid.UUID{executionID}, queueItem, err
 }
 
-func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.CanvasNode) ([]configuration.Field, error) {
+func (w *NodeQueueWorker) configurationFieldsForNode(node *models.CanvasNode) ([]configuration.Field, error) {
 	ref := node.Ref.Data()
 	switch node.Type {
 	case models.NodeTypeComponent:
@@ -287,23 +384,12 @@ func (w *NodeQueueWorker) configurationFieldsForNode(tx *gorm.DB, node *models.C
 			return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 		}
 
-		comp, err := w.registry.GetComponent(ref.Component.Name)
+		action, err := w.registry.GetAction(ref.Component.Name)
 		if err != nil {
-			return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+			return nil, fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
 		}
 
-		return comp.Configuration(), nil
-	case models.NodeTypeBlueprint:
-		if ref.Blueprint == nil || ref.Blueprint.ID == "" {
-			return nil, fmt.Errorf("node %s has no blueprint reference", node.NodeID)
-		}
-
-		blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
-		if err != nil {
-			return nil, fmt.Errorf("blueprint %s not found: %w", ref.Blueprint.ID, err)
-		}
-
-		return blueprint.Configuration, nil
+		return action.Configuration(), nil
 	default:
 		return nil, nil
 	}
@@ -316,25 +402,16 @@ func (w *NodeQueueWorker) processComponentNode(ctx *core.ProcessQueueContext, no
 		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
 	}
 
-	comp, err := w.registry.GetComponent(ref.Component.Name)
+	action, err := w.registry.GetAction(ref.Component.Name)
 	if err != nil {
-		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+		return nil, fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
 	}
 
-	return comp.ProcessQueueItem(*ctx)
+	return action.ProcessQueueItem(*ctx)
 }
 
-func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) ([]*uuid.UUID, error) {
+func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, configErr *contexts.ConfigurationBuildError, onNewEvents func([]models.CanvasEvent)) ([]*uuid.UUID, error) {
 	err := configErr.QueueItem.Delete(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	//
-	// If we are creating a failed execution for a child node execution,
-	// we need to include the parent execution ID and fail the parent as well.
-	//
-	parentExecutionID, err := w.getParentExecutionID(tx, logger, configErr)
 	if err != nil {
 		return nil, err
 	}
@@ -344,9 +421,9 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 		WorkflowID:          configErr.QueueItem.WorkflowID,
 		NodeID:              configErr.Node.NodeID,
 		RootEventID:         configErr.RootEventID,
+		RunID:               configErr.QueueItem.RunID,
 		EventID:             configErr.Event.ID,
 		PreviousExecutionID: configErr.Event.ExecutionID,
-		ParentExecutionID:   parentExecutionID,
 		State:               models.CanvasNodeExecutionStateFinished,
 		Configuration:       configErr.Node.Configuration,
 		Result:              models.CanvasNodeExecutionResultFailed,
@@ -361,37 +438,10 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 		return nil, err
 	}
 
-	if parentExecutionID == nil {
-		return []*uuid.UUID{&execution.ID}, nil
-	}
-
 	//
-	// If this execution has a parent, we need to propagate
-	// the failure to the parent execution.
+	// The errored node could not execute, so notify the canvas' On Error nodes.
 	//
-	parent, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
-	if err != nil {
-		return nil, err
-	}
+	contexts.DispatchOnError(tx, &execution, onNewEvents)
 
-	err = parent.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonError, configErr.Err.Error())
-	if err != nil {
-		return nil, err
-	}
-
-	return []*uuid.UUID{&execution.ID, &parent.ID}, nil
-}
-
-func (w *NodeQueueWorker) getParentExecutionID(tx *gorm.DB, logger *log.Entry, configErr *contexts.ConfigurationBuildError) (*uuid.UUID, error) {
-	if configErr.Event.ExecutionID == nil {
-		return nil, nil
-	}
-
-	previous, err := models.FindNodeExecutionInTransaction(tx, configErr.Node.WorkflowID, *configErr.Event.ExecutionID)
-	if err != nil {
-		logger.Errorf("Error finding previous execution: %v", err)
-		return nil, err
-	}
-
-	return previous.ParentExecutionID, nil
+	return []*uuid.UUID{&execution.ID}, nil
 }

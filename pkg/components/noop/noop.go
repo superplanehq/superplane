@@ -1,7 +1,6 @@
 package noop
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -14,7 +13,7 @@ const ComponentName = "noop"
 const PayloadType = "noop.finished"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &NoOp{})
+	registry.RegisterAction(ComponentName, &NoOp{})
 }
 
 type NoOp struct{}
@@ -73,14 +72,6 @@ func (c *NoOp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error
 	return ctx.DefaultProcessing()
 }
 
-func (c *NoOp) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *NoOp) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("noop does not support actions")
-}
-
 func (c *NoOp) Setup(ctx core.SetupContext) error {
 	return nil
 }
@@ -94,5 +85,13 @@ func (c *NoOp) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webhook
 }
 
 func (c *NoOp) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *NoOp) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *NoOp) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

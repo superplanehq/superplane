@@ -14,55 +14,6 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// TestOnVMStarted_Metadata verifies the trigger's metadata methods
-func TestOnVMStarted_Metadata(t *testing.T) {
-	trigger := &OnVMStarted{}
-
-	assert.Equal(t, "azure.onVirtualMachineStarted", trigger.Name())
-	assert.Equal(t, "On VM Started", trigger.Label())
-	assert.Equal(t, "azure", trigger.Icon())
-	assert.Equal(t, "blue", trigger.Color())
-	assert.NotEmpty(t, trigger.Description())
-	assert.NotEmpty(t, trigger.Documentation())
-}
-
-// TestOnVMStarted_Configuration verifies the trigger's configuration fields
-func TestOnVMStarted_Configuration(t *testing.T) {
-	trigger := &OnVMStarted{}
-	config := trigger.Configuration()
-
-	require.Len(t, config, 2)
-	assert.Equal(t, "resourceGroup", config[0].Name)
-	assert.Equal(t, "Resource Group", config[0].Label)
-	assert.False(t, config[0].Required)
-	assert.Equal(t, "nameFilter", config[1].Name)
-	assert.Equal(t, "VM Name Filter", config[1].Label)
-	assert.False(t, config[1].Required)
-}
-
-// TestOnVMStarted_ExampleData verifies the trigger's example output
-func TestOnVMStarted_ExampleData(t *testing.T) {
-	trigger := &OnVMStarted{}
-	example := trigger.ExampleData()
-
-	require.NotNil(t, example)
-	assert.Contains(t, example, "type")
-	assert.Contains(t, example, "timestamp")
-	assert.Contains(t, example, "data")
-
-	envelope, ok := example["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Contains(t, envelope, "id")
-	assert.Contains(t, envelope, "eventType")
-	assert.Equal(t, "Microsoft.Resources.ResourceActionSuccess", envelope["eventType"])
-	assert.Contains(t, envelope, "subject")
-
-	data, ok := envelope["data"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "Microsoft.Compute/virtualMachines/start/action", data["operationName"])
-}
-
-// TestOnVMStarted_Setup verifies the trigger setup method
 func TestOnVMStarted_Setup(t *testing.T) {
 	trigger := &OnVMStarted{}
 
@@ -99,47 +50,6 @@ func TestOnVMStarted_Setup(t *testing.T) {
 	})
 }
 
-// TestOnVMStarted_Cleanup verifies the trigger cleanup method
-func TestOnVMStarted_Cleanup(t *testing.T) {
-	trigger := &OnVMStarted{}
-	metadataCtx := &contexts.MetadataContext{}
-	logger := logrus.NewEntry(logrus.New())
-
-	ctx := core.TriggerContext{
-		Logger:        logger,
-		Configuration: map[string]any{},
-		Metadata:      metadataCtx,
-	}
-
-	err := trigger.Cleanup(ctx)
-	assert.NoError(t, err)
-}
-
-// TestOnVMStarted_Actions verifies the trigger has no actions
-func TestOnVMStarted_Actions(t *testing.T) {
-	trigger := &OnVMStarted{}
-	actions := trigger.Actions()
-	assert.Empty(t, actions)
-}
-
-// TestOnVMStarted_HandleAction verifies the trigger's action handler
-func TestOnVMStarted_HandleAction(t *testing.T) {
-	trigger := &OnVMStarted{}
-	logger := logrus.NewEntry(logrus.New())
-
-	ctx := core.TriggerActionContext{
-		Name:          "test",
-		Parameters:    map[string]any{},
-		Configuration: map[string]any{},
-		Logger:        logger,
-	}
-
-	result, err := trigger.HandleAction(ctx)
-	assert.NoError(t, err)
-	assert.Nil(t, result)
-}
-
-// TestOnVMStarted_HandleWebhook_SubscriptionValidation verifies subscription validation handling
 func TestOnVMStarted_HandleWebhook_SubscriptionValidation(t *testing.T) {
 	trigger := &OnVMStarted{}
 

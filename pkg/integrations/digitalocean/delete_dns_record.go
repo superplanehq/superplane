@@ -179,18 +179,18 @@ func (d *DeleteDNSRecord) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteDNSRecord) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteDNSRecord) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (d *DeleteDNSRecord) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (d *DeleteDNSRecord) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (d *DeleteDNSRecord) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteDNSRecord) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

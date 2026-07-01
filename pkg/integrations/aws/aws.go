@@ -26,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/aws/eventbridge"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/iam"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/lambda"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/prometheus"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/route53"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sns"
 	"github.com/superplanehq/superplane/pkg/integrations/aws/sqs"
@@ -134,8 +135,8 @@ func (a *AWS) Configuration() []configuration.Field {
 	}
 }
 
-func (a *AWS) Components() []core.Component {
-	return []core.Component{
+func (a *AWS) Actions() []core.Action {
+	return []core.Action{
 		&codeartifact.CopyPackageVersions{},
 		&codeartifact.CreateRepository{},
 		&codeartifact.DeletePackageVersions{},
@@ -153,14 +154,27 @@ func (a *AWS) Components() []core.Component {
 		&ecs.RunTask{},
 		&ecs.StopTask{},
 		&ecs.UpdateService{},
+		&ec2.AllocateElasticIP{},
+		&ec2.ManageElasticIP{},
 		&ec2.CopyImage{},
+		&ec2.CreateAlarm{},
 		&ec2.CreateImage{},
+		&ec2.CreateInstance{},
+		&ec2.CreateLoadBalancer{},
 		&ec2.DeregisterImage{},
+		&ec2.DeleteInstance{},
+		&ec2.DeleteLoadBalancer{},
 		&ec2.DisableImage{},
 		&ec2.DisableImageDeprecation{},
 		&ec2.EnableImage{},
 		&ec2.EnableImageDeprecation{},
+		&ec2.GetAlarm{},
 		&ec2.GetImage{},
+		&ec2.GetInstance{},
+		&ec2.GetInstanceMetrics{},
+		&ec2.ManageInstancePower{},
+		&ec2.ReleaseElasticIP{},
+		&ec2.UpdateInstance{},
 		&sns.GetTopic{},
 		&sns.GetSubscription{},
 		&sns.CreateTopic{},
@@ -169,6 +183,12 @@ func (a *AWS) Components() []core.Component {
 		&ecr.GetImage{},
 		&ecr.GetImageScanFindings{},
 		&ecr.ScanImage{},
+		&prometheus.CreateWorkspace{},
+		&prometheus.GetWorkspace{},
+		&prometheus.UpdateWorkspace{},
+		&prometheus.DeleteWorkspace{},
+		&prometheus.Query{},
+		&prometheus.QueryRange{},
 		&lambda.RunFunction{},
 		&sqs.SendMessage{},
 		&sqs.GetQueue{},
@@ -186,6 +206,7 @@ func (a *AWS) Triggers() []core.Trigger {
 		&cloudwatch.OnAlarm{},
 		&codeartifact.OnPackageVersion{},
 		&codepipeline.OnPipeline{},
+		&ec2.OnAlarm{},
 		&ec2.OnImage{},
 		&ecr.OnImageScan{},
 		&ecr.OnImagePush{},
@@ -348,6 +369,7 @@ func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
 - Add permissions for the integration to manage EventBridge connections, API destinations, and rules. To get started, you can use the **AmazonEventBridgeFullAccess** managed policy
 - Add permissions for the integration manage IAM roles needed for itself. To get started, you can use the **IAMFullAccess** managed policy
 - Add permissions for the integration to manage SQS. To get started, you can use the **AmazonSQSFullAccess** managed policy
+- Add permissions for Amazon Managed Service for Prometheus workspaces if you use Prometheus components. At minimum, the workspace picker requires **aps:ListWorkspaces**; the workspace components also need **aps:CreateWorkspace**, **aps:DescribeWorkspace**, **aps:UpdateWorkspaceAlias**, **aps:DeleteWorkspace**, and **aps:QueryMetrics** for their respective operations.
 - Depending on the SuperPlane actions and triggers you will use, different permissions will be needed. Include the ones you need.
 - Give it a name and description, and create it
 
@@ -760,11 +782,11 @@ func (a *AWS) subscriptionApplies(subscription core.IntegrationSubscriptionConte
 	return true
 }
 
-func (a *AWS) Actions() []core.Action {
-	return []core.Action{
+func (a *AWS) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:        "provisionRule",
-			Description: "Provision an EventBridge rule",
+			Name: "provisionRule",
+			Type: core.HookTypeInternal,
 			Parameters: []configuration.Field{
 				{
 					Name:        "region",
@@ -792,17 +814,17 @@ func (a *AWS) Actions() []core.Action {
 	}
 }
 
-func (a *AWS) HandleAction(ctx core.IntegrationActionContext) error {
+func (a *AWS) HandleHook(ctx core.IntegrationHookContext) error {
 	switch ctx.Name {
 	case "provisionRule":
 		return a.handleProvisionRule(ctx)
 
 	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (a *AWS) handleProvisionRule(ctx core.IntegrationActionContext) error {
+func (a *AWS) handleProvisionRule(ctx core.IntegrationHookContext) error {
 	config := common.ProvisionRuleParameters{}
 	if err := mapstructure.Decode(ctx.Parameters, &config); err != nil {
 		return fmt.Errorf("failed to decode parameters: %v", err)

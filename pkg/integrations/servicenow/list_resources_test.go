@@ -21,7 +21,7 @@ func Test__ServiceNow__ListResources(t *testing.T) {
 			"clientId":     "client-123",
 			"clientSecret": "secret-123",
 		},
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			OAuthAccessToken: {Name: OAuthAccessToken, Value: []byte("access-token-123")},
 		},
 	}

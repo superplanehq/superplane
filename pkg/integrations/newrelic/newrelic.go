@@ -109,8 +109,8 @@ func (n *NewRelic) Configuration() []configuration.Field {
 	}
 }
 
-func (n *NewRelic) Components() []core.Component {
-	return []core.Component{
+func (n *NewRelic) Actions() []core.Action {
+	return []core.Action{
 		&ReportMetric{},
 		&RunNRQLQuery{},
 	}
@@ -178,10 +178,10 @@ func (n *NewRelic) ListResources(resourceType string, ctx core.ListResourcesCont
 	return []core.IntegrationResource{}, nil
 }
 
-func (n *NewRelic) Actions() []core.Action {
-	return []core.Action{}
+func (n *NewRelic) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (n *NewRelic) HandleAction(ctx core.IntegrationActionContext) error {
+func (n *NewRelic) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

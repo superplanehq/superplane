@@ -60,8 +60,8 @@ func (d *Daytona) Configuration() []configuration.Field {
 	}
 }
 
-func (d *Daytona) Components() []core.Component {
-	return []core.Component{
+func (d *Daytona) Actions() []core.Action {
+	return []core.Action{
 		&CreateSandbox{},
 		&CreateRepositorySandbox{},
 		&GetPreviewURLComponent{},
@@ -160,10 +160,10 @@ func (d *Daytona) ListResources(resourceType string, ctx core.ListResourcesConte
 	}
 }
 
-func (d *Daytona) Actions() []core.Action {
-	return []core.Action{}
+func (d *Daytona) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *Daytona) HandleAction(ctx core.IntegrationActionContext) error {
+func (d *Daytona) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

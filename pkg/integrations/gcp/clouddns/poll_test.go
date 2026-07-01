@@ -13,7 +13,7 @@ import (
 
 func TestPollChangeUntilDone(t *testing.T) {
 	t.Run("returns early when execution is already finished", func(t *testing.T) {
-		err := pollChangeUntilDone(core.ActionContext{
+		err := pollChangeUntilDone(core.ActionHookContext{
 			ExecutionState: &testcontexts.ExecutionStateContext{
 				Finished: true,
 				KVs:      map[string]string{},
@@ -39,7 +39,7 @@ func TestPollChangeUntilDone(t *testing.T) {
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &testcontexts.RequestContext{}
-		err := pollChangeUntilDone(core.ActionContext{
+		err := pollChangeUntilDone(core.ActionHookContext{
 			ExecutionState: state,
 			Requests:       requests,
 			Metadata: &testcontexts.MetadataContext{Metadata: RecordSetPollMetadata{
@@ -72,7 +72,7 @@ func TestPollChangeUntilDone(t *testing.T) {
 		})
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := pollChangeUntilDone(core.ActionContext{
+		err := pollChangeUntilDone(core.ActionHookContext{
 			ExecutionState: state,
 			Metadata: &testcontexts.MetadataContext{Metadata: RecordSetPollMetadata{
 				ChangeID:    "3",
@@ -112,7 +112,7 @@ func TestPollChangeUntilDone(t *testing.T) {
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &testcontexts.RequestContext{}
-		err := pollChangeUntilDone(core.ActionContext{
+		err := pollChangeUntilDone(core.ActionHookContext{
 			ExecutionState: state,
 			Requests:       requests,
 			Metadata: &testcontexts.MetadataContext{Metadata: RecordSetPollMetadata{

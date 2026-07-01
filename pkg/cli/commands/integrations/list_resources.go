@@ -56,7 +56,6 @@ func (c *listResourcesCommand) Execute(ctx core.CommandContext) error {
 
 	integration := integrationResponse.GetIntegration()
 	metadata := integration.GetMetadata()
-	spec := integration.GetSpec()
 
 	response, err := listIntegrationResourcesRequest(
 		ctx,
@@ -86,7 +85,7 @@ func (c *listResourcesCommand) Execute(ctx core.CommandContext) error {
 				"%s\t%s\t%s\t%s\t%s\t%s\n",
 				metadata.GetId(),
 				metadata.GetName(),
-				spec.GetIntegrationName(),
+				metadata.GetIntegrationName(),
 				resource.GetType(),
 				resource.GetName(),
 				resource.GetId(),

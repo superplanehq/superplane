@@ -75,7 +75,7 @@ func Test__GetImageTag__Execute(t *testing.T) {
 
 	err := component.Execute(core.ExecutionContext{
 		Integration: &contexts.IntegrationContext{
-			Secrets: map[string]core.IntegrationSecret{
+			CurrentSecrets: map[string]core.IntegrationSecret{
 				accessTokenSecretName: {Name: accessTokenSecretName, Value: []byte("token")},
 			},
 		},

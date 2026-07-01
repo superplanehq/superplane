@@ -9,6 +9,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -52,7 +53,7 @@ func sendBeacon() {
 		return
 	}
 
-	installationID, err := models.GetInstallationID()
+	installationID, err := models.GetInstallationID(database.Conn())
 	if err != nil {
 		log.WithError(err).Warn("Failed to load installation ID")
 		return

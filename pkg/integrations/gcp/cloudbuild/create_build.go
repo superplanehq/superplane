@@ -127,6 +127,11 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 			Required:    true,
 			Description: `JSON array of build steps. Each step needs a "name" (builder image) and optional "args".`,
 			Placeholder: `[{"name":"gcr.io/cloud-builders/docker","args":["build","."]}]`,
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "json",
+				},
+			},
 		},
 		{
 			Name:        "source",
@@ -137,6 +142,11 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 			Placeholder: `{"gitSource":{"url":"https://github.com/org/repo.git","revision":"main"}}`,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "useConnectedRepository", Values: []string{"", "false"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "json",
+				},
 			},
 		},
 		{
@@ -362,6 +372,11 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 			Required:    false,
 			Description: `JSON object of substitution key-value pairs.`,
 			Placeholder: `{"_ENV":"production","_VERSION":"1.0.0"}`,
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "json",
+				},
+			},
 		},
 		{
 			Name:        "timeout",
@@ -885,7 +900,7 @@ func completeCreateBuildExecution(executionState core.ExecutionStateContext, bui
 	return executionState.Emit(createBuildFailedOutputChannel, createBuildPayloadType, []any{build})
 }
 
-func (c *CreateBuild) poll(ctx core.ActionContext) error {
+func (c *CreateBuild) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -940,16 +955,16 @@ func (c *CreateBuild) poll(ctx core.ActionContext) error {
 	return completeCreateBuildExecution(ctx.ExecutionState, build)
 }
 
-func (c *CreateBuild) Actions() []core.Action {
-	return []core.Action{
+func (c *CreateBuild) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           createBuildPollAction,
-			UserAccessible: false,
+			Name: createBuildPollAction,
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CreateBuild) HandleAction(ctx core.ActionContext) error {
+func (c *CreateBuild) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case createBuildPollAction:
 		return c.poll(ctx)

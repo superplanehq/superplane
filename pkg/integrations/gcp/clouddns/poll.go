@@ -17,7 +17,7 @@ const (
 // pollChangeUntilDone polls for a Cloud DNS change status.
 // When "done" it emits the result and finishes, when "pending" it schedules
 // another poll, and any other status fails the execution.
-func pollChangeUntilDone(ctx core.ActionContext) error {
+func pollChangeUntilDone(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

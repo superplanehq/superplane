@@ -231,18 +231,18 @@ func (c *UpdateHTTPSyntheticCheck) ProcessQueueItem(ctx core.ProcessQueueContext
 	return ctx.DefaultProcessing()
 }
 
-func (c *UpdateHTTPSyntheticCheck) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *UpdateHTTPSyntheticCheck) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *UpdateHTTPSyntheticCheck) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *UpdateHTTPSyntheticCheck) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *UpdateHTTPSyntheticCheck) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateHTTPSyntheticCheck) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

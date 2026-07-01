@@ -14,9 +14,8 @@ import (
 )
 
 func TestWebhookResetSecret(t *testing.T) {
-	steps := &WebhookResetSteps{t: t}
-
 	t.Run("reset webhook secret shows new key", func(t *testing.T) {
+		steps := &WebhookResetSteps{t: t}
 		steps.start()
 		steps.givenACanvasWithWebhook("Webhook Reset Canvas", "Webhook")
 		steps.openWebhookConfiguration("Webhook")
@@ -44,17 +43,12 @@ func (s *WebhookResetSteps) givenACanvasWithWebhook(canvasName, nodeName string)
 	s.canvas.EnterEditMode()
 	s.addWebhookTrigger(nodeName, models.Position{X: 500, Y: 200})
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 	s.session.Sleep(1000)
 }
 
 func (s *WebhookResetSteps) addWebhookTrigger(name string, pos models.Position) {
-	s.canvas.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-webhook")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.canvas.AddBuildingBlockByTestID("building-block-webhook", pos)
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)

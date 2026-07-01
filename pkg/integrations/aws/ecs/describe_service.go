@@ -198,14 +198,6 @@ func (c *DescribeService) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *DescribeService) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *DescribeService) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *DescribeService) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -223,4 +215,12 @@ func (c *DescribeService) normalizeConfig(config DescribeServiceConfiguration) D
 	config.Cluster = strings.TrimSpace(config.Cluster)
 	config.Service = strings.TrimSpace(config.Service)
 	return config
+}
+
+func (c *DescribeService) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DescribeService) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

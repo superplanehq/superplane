@@ -271,11 +271,11 @@ func (t *OnEvent) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnEvent) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnEvent) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnEvent) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 
@@ -548,7 +548,7 @@ After implementing your integration:
 1. **Build and format**: Run `make format.go && make lint && make check.build.app`
 2. **Test the backend**: Run `make test`
 3. **Test the UI**: Run `make check.build.ui`
-4. **E2E tests**: Consider adding E2E tests (see [e2e_tests.md](e2e_tests.md))
+4. **E2E tests**: Consider adding E2E tests (see [e2e-tests.md](e2e-tests.md))
 
 ## Best Practices
 

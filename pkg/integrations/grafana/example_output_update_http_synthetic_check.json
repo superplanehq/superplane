@@ -1,0 +1,57 @@
+{
+  "type": "grafana.syntheticCheck.updated",
+  "timestamp": "2026-04-15T10:30:30Z",
+  "data": {
+    "check": {
+      "id": 101,
+      "job": "API health check",
+      "target": "https://api.example.com/health",
+      "frequency": 30000,
+      "timeout": 5000,
+      "enabled": true,
+      "alertSensitivity": "none",
+      "basicMetricsOnly": true,
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        },
+        {
+          "name": "environment",
+          "value": "prod"
+        }
+      ],
+      "probes": [1, 2, 3],
+      "created": 1776248430,
+      "modified": 1776249030,
+      "settings": {
+        "http": {
+          "method": "GET",
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "noFollowRedirects": false,
+          "failIfSSL": false,
+          "failIfNotSSL": true,
+          "validStatusCodes": [200]
+        }
+      },
+      "alerts": [
+        {
+          "name": "ProbeFailedExecutionsTooHigh",
+          "threshold": 2,
+          "period": "5m"
+        }
+      ]
+    },
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101",
+    "alerts": [
+      {
+        "name": "ProbeFailedExecutionsTooHigh",
+        "threshold": 2,
+        "period": "5m"
+      }
+    ]
+  }
+}

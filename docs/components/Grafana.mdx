@@ -15,14 +15,21 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Incident Activity" href="#add-incident-activity" description="Add a note to a Grafana IRM incident activity timeline" />
   <LinkCard title="Create Alert Rule" href="#create-alert-rule" description="Create a Grafana-managed alert rule from structured alert settings" />
   <LinkCard title="Create Annotation" href="#create-annotation" description="Create an annotation in Grafana to mark deploys, incidents, or other operational events on timelines" />
+  <LinkCard title="Create HTTP Synthetic Check" href="#create-http-synthetic-check" description="Create a Grafana Synthetic Monitoring HTTP check" />
   <LinkCard title="Create Silence" href="#create-silence" description="Create a new silence in the Grafana Alertmanager to suppress alert notifications" />
+  <LinkCard title="Declare Drill" href="#declare-drill" description="Declare a Grafana IRM drill incident" />
+  <LinkCard title="Declare Incident" href="#declare-incident" description="Declare a Grafana IRM incident" />
   <LinkCard title="Delete Alert Rule" href="#delete-alert-rule" description="Delete an existing Grafana-managed alert rule" />
   <LinkCard title="Delete Annotation" href="#delete-annotation" description="Delete an existing Grafana annotation by ID" />
+  <LinkCard title="Delete HTTP Synthetic Check" href="#delete-http-synthetic-check" description="Delete a Grafana HTTP synthetic check" />
   <LinkCard title="Delete Silence" href="#delete-silence" description="Expire (delete) an existing Grafana Alertmanager silence by ID" />
   <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule" />
   <LinkCard title="Get Dashboard" href="#get-dashboard" description="Retrieve a Grafana dashboard by UID" />
+  <LinkCard title="Get HTTP Synthetic Check" href="#get-http-synthetic-check" description="Retrieve a Grafana HTTP synthetic check configuration and best-effort operational metrics" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Retrieve a Grafana IRM incident" />
   <LinkCard title="Get Silence" href="#get-silence" description="Retrieve a single Grafana Alertmanager silence by ID" />
   <LinkCard title="List Alert Rules" href="#list-alert-rules" description="List Grafana-managed alert rules for the connected Grafana instance" />
   <LinkCard title="List Annotations" href="#list-annotations" description="List Grafana annotations filtered by tag, dashboard, or time range" />
@@ -31,7 +38,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Query Logs" href="#query-logs" description="Run a LogQL query against a Loki data source and return structured log results" />
   <LinkCard title="Query Traces" href="#query-traces" description="Run a TraceQL query against a Tempo data source and return matching traces" />
   <LinkCard title="Render Panel" href="#render-panel" description="Construct a Grafana image render URL for a dashboard panel" />
+  <LinkCard title="Resolve Incident" href="#resolve-incident" description="Resolve a Grafana IRM incident" />
   <LinkCard title="Update Alert Rule" href="#update-alert-rule" description="Update an existing Grafana-managed alert rule from structured alert settings" />
+  <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update a Grafana Synthetic Monitoring HTTP check" />
+  <LinkCard title="Update Incident" href="#update-incident" description="Update supported Grafana IRM incident fields" />
 </CardGrid>
 
 ## Instructions
@@ -50,6 +60,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <a id="on-alert-firing"></a>
 
 ## On Alert Firing
+
+**Trigger key:** `grafana.onAlertFiring`
 
 The On Alert Firing trigger starts a workflow when Grafana Unified Alerting sends a firing alert webhook.
 
@@ -101,9 +113,44 @@ The trigger emits the full Grafana webhook payload, including:
 }
 ```
 
+<a id="add-incident-activity"></a>
+
+## Add Incident Activity
+
+**Component key:** `grafana.addIncidentActivity`
+
+The Add Incident Activity component posts a user note to a Grafana IRM incident timeline.
+
+### Configuration
+
+- **Incident**: The incident to update (required)
+- **Body**: Note body (required)
+
+### Output
+
+Returns the created activity item.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "activityItemID": "activity-123",
+    "activityKind": "userNote",
+    "body": "Root cause identified and mitigation is in progress.",
+    "createdTime": "2026-04-20T10:05:00Z",
+    "incidentID": "incident-123"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.activityAdded"
+}
+```
+
 <a id="create-alert-rule"></a>
 
 ## Create Alert Rule
+
+**Component key:** `grafana.createAlertRule`
 
 The Create Alert Rule component creates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
 
@@ -241,6 +288,8 @@ Returns the created Grafana alert rule object, including identifiers and evaluat
 
 ## Create Annotation
 
+**Component key:** `grafana.createAnnotation`
+
 The Create Annotation component writes an annotation into Grafana, marking operational events on dashboard timelines.
 
 ### Use Cases
@@ -276,9 +325,109 @@ Returns the ID of the newly created annotation.
 }
 ```
 
+<a id="create-http-synthetic-check"></a>
+
+## Create HTTP Synthetic Check
+
+**Component key:** `grafana.createHttpSyntheticCheck`
+
+The Create HTTP Synthetic Check component creates an HTTP synthetic check in Grafana Synthetic Monitoring.
+
+### Use Cases
+
+- **Availability monitoring**: create checks for API and website uptime
+- **Deployment verification**: validate a service immediately after deployment
+- **Operational automation**: provision consistent HTTP checks from workflows
+
+### Configuration
+
+Fields are grouped like other synthetic check components:
+
+- **Job** and **Labels**: Check display name and optional key/value labels
+- **Request**: URL, HTTP method, headers, body, redirects, basic auth, and bearer token
+- **Schedule**: Whether the check is enabled, frequency (seconds), timeout (ms), and probe locations
+- **Response validation**: SSL expectations, accepted status codes, and body/header regex rules (optional)
+- **Per-Check Alerts**: Optional Grafana synthetic monitoring alerts configured after check creation
+
+### Output
+
+Returns the created Grafana synthetic check, including its ID and HTTP configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "name": "HTTPRequestDurationTooHighAvg",
+        "period": "5m",
+        "threshold": 500
+      }
+    ],
+    "check": {
+      "alertSensitivity": "none",
+      "alerts": [
+        {
+          "name": "HTTPRequestDurationTooHighAvg",
+          "period": "5m",
+          "threshold": 500
+        }
+      ],
+      "basicMetricsOnly": true,
+      "created": 1776248430,
+      "enabled": true,
+      "frequency": 60000,
+      "id": 101,
+      "job": "API health check",
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        }
+      ],
+      "modified": 1776248430,
+      "probes": [
+        1,
+        2
+      ],
+      "settings": {
+        "http": {
+          "failIfHeaderMatchesRegexp": [
+            {
+              "allowMissing": true,
+              "header": "X-Canary",
+              "regexp": "failed"
+            }
+          ],
+          "failIfNotSSL": true,
+          "failIfSSL": false,
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "method": "GET",
+          "noFollowRedirects": false,
+          "validStatusCodes": [
+            200
+          ]
+        }
+      },
+      "target": "https://api.example.com/health",
+      "timeout": 3000
+    },
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101"
+  },
+  "timestamp": "2026-04-15T10:20:30Z",
+  "type": "grafana.syntheticCheck.created"
+}
+```
+
 <a id="create-silence"></a>
 
 ## Create Silence
+
+**Component key:** `grafana.createSilence`
 
 The Create Silence component creates a new Alertmanager silence in Grafana, suppressing alert notifications that match the configured matchers during the specified time window.
 
@@ -314,9 +463,118 @@ Returns the ID of the newly created silence.
 }
 ```
 
+<a id="declare-drill"></a>
+
+## Declare Drill
+
+**Component key:** `grafana.declareDrill`
+
+The Declare Drill component creates a new drill incident in Grafana IRM.
+
+### Use Cases
+
+- **Operational exercises**: Run incident response drills without affecting production metrics
+- **Process validation**: Test runbooks, roles, and integrations in a safe environment
+
+### Configuration
+
+- **Title**: Drill title (required)
+- **Severity**: Pending, Critical, Major, or Minor (required)
+- **Description**: Optional initial status update added to the drill
+- **Labels**: Optional drill labels
+- **Status**: Start the drill as active or resolved
+- **Start Time**: Optional time when the drill began
+
+### Output
+
+Returns the created Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": true,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "drill"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Simulated database failover exercise for the API tier.",
+    "title": "Quarterly response drill"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.declared"
+}
+```
+
+<a id="declare-incident"></a>
+
+## Declare Incident
+
+**Component key:** `grafana.declareIncident`
+
+The Declare Incident component creates a new incident in Grafana IRM.
+
+### Use Cases
+
+- **Automated incident declaration**: Open an incident when a deployment, alert, or workflow detects a production issue
+
+### Configuration
+
+- **Title**: Incident title (required)
+- **Severity**: Pending, Critical, Major, or Minor (required)
+- **Description**: Optional initial status update added to the incident
+- **Labels**: Optional incident labels
+- **Status**: Start the incident as active or resolved
+- **Start Time**: Optional time when the incident began
+
+### Output
+
+Returns the created Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident.declared"
+}
+```
+
 <a id="delete-alert-rule"></a>
 
 ## Delete Alert Rule
+
+**Component key:** `grafana.deleteAlertRule`
 
 The Delete Alert Rule component deletes a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
 
@@ -352,6 +610,8 @@ Returns a confirmation object with the deleted alert rule UID, title, and deleti
 
 ## Delete Annotation
 
+**Component key:** `grafana.deleteAnnotation`
+
 The Delete Annotation component removes an annotation from Grafana by ID.
 
 ### Use Cases
@@ -381,9 +641,42 @@ Returns the annotation ID and a confirmation that the annotation was deleted.
 }
 ```
 
+<a id="delete-http-synthetic-check"></a>
+
+## Delete HTTP Synthetic Check
+
+**Component key:** `grafana.deleteHttpSyntheticCheck`
+
+The Delete HTTP Synthetic Check component deletes an existing Grafana synthetic check.
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to delete
+
+### Output
+
+Returns a compact confirmation payload for the deleted check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "job": "API health check",
+    "syntheticCheck": "101",
+    "target": "https://api.example.com/health"
+  },
+  "timestamp": "2026-04-15T10:35:30Z",
+  "type": "grafana.syntheticCheck.deleted"
+}
+```
+
 <a id="delete-silence"></a>
 
 ## Delete Silence
+
+**Component key:** `grafana.deleteSilence`
 
 The Delete Silence component expires an existing silence in Grafana Alertmanager.
 
@@ -416,6 +709,8 @@ Returns the silence ID and a confirmation that the silence was deleted.
 <a id="get-alert-rule"></a>
 
 ## Get Alert Rule
+
+**Component key:** `grafana.getAlertRule`
 
 The Get Alert Rule component fetches a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
 
@@ -542,6 +837,8 @@ Returns the full Grafana alert rule object, including title, folder, group, cond
 
 ## Get Dashboard
 
+**Component key:** `grafana.getDashboard`
+
 The Get Dashboard component fetches a Grafana dashboard using the Grafana Dashboards HTTP API.
 
 ### Use Cases
@@ -596,9 +893,163 @@ Returns the Grafana dashboard object, including title, slug, URL, folder, tags, 
 }
 ```
 
+<a id="get-http-synthetic-check"></a>
+
+## Get HTTP Synthetic Check
+
+**Component key:** `grafana.getHttpSyntheticCheck`
+
+The Get HTTP Synthetic Check component fetches a Grafana synthetic check and enriches it with best-effort operational metrics.
+
+### Use Cases
+
+- **Operational inspection**: fetch the current HTTP check configuration
+- **Workflow enrichment**: branch using recent synthetic check health data
+- **Troubleshooting**: pull current latency and run totals into incident workflows
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to retrieve
+
+### Output Channels
+
+- **Up**: All probe locations are passing
+- **Partial**: Some probe locations are passing and some are failing
+- **Down**: All probe locations are failing
+
+### Output
+
+Returns a combined payload containing:
+
+- **configuration**: the Grafana synthetic check definition
+- **alerts**: the configured per-check synthetic alerts when available
+- **metrics**: best-effort operational metrics derived from Grafana synthetic monitoring metrics; when present, **lastOutcome** is one of **Up**, **Partial**, or **Down**, matching the output channels
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "name": "ProbeFailedExecutionsTooHigh",
+        "period": "5m",
+        "threshold": 1
+      }
+    ],
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101",
+    "configuration": {
+      "alertSensitivity": "none",
+      "alerts": [
+        {
+          "name": "ProbeFailedExecutionsTooHigh",
+          "period": "5m",
+          "threshold": 1
+        }
+      ],
+      "basicMetricsOnly": true,
+      "created": 1776248430,
+      "enabled": true,
+      "frequency": 60000,
+      "id": 101,
+      "job": "API health check",
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        }
+      ],
+      "modified": 1776248730,
+      "probes": [
+        1,
+        2
+      ],
+      "settings": {
+        "http": {
+          "failIfNotSSL": true,
+          "failIfSSL": false,
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "method": "GET",
+          "noFollowRedirects": false,
+          "validStatusCodes": [
+            200
+          ]
+        }
+      },
+      "target": "https://api.example.com/health",
+      "timeout": 3000
+    },
+    "metrics": {
+      "averageLatencySeconds24h": 0.142,
+      "failureRuns24h": 2,
+      "frequencyMilliseconds": 60000,
+      "lastExecutionAt": "2026-04-15T10:25:00Z",
+      "lastOutcome": "Up",
+      "reachabilityPercent24h": 99.86,
+      "sslEarliestExpiryAt": "2026-05-15T10:25:00Z",
+      "sslEarliestExpiryDays": 30,
+      "successRuns24h": 1438,
+      "totalRuns24h": 1440,
+      "uptimePercent24h": 99.9
+    }
+  },
+  "timestamp": "2026-04-15T10:25:30Z",
+  "type": "grafana.syntheticCheck"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+**Component key:** `grafana.getIncident`
+
+The Get Incident component retrieves a single incident from Grafana IRM.
+
+### Configuration
+
+- **Incident**: The incident to retrieve (required)
+
+### Output
+
+Returns the full Grafana IRM incident object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:05:00Z",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:05:00Z",
+  "type": "grafana.incident"
+}
+```
+
 <a id="get-silence"></a>
 
 ## Get Silence
+
+**Component key:** `grafana.getSilence`
 
 The Get Silence component fetches the details of a single silence from Grafana Alertmanager using its ID.
 
@@ -646,6 +1097,8 @@ Returns the silence object including ID, state, comment, matchers, start/end tim
 <a id="list-alert-rules"></a>
 
 ## List Alert Rules
+
+**Component key:** `grafana.listAlertRules`
 
 The List Alert Rules component lists Grafana-managed alert rules using the Alerting Provisioning HTTP API.
 
@@ -696,6 +1149,8 @@ Returns an object containing the list of Grafana alert rule summaries, including
 <a id="list-annotations"></a>
 
 ## List Annotations
+
+**Component key:** `grafana.listAnnotations`
 
 The List Annotations component retrieves annotations from Grafana, optionally filtered by tag, dashboard, or time range.
 
@@ -763,6 +1218,8 @@ Returns a list of annotation objects including ID, text, tags, time, and dashboa
 
 ## List Silences
 
+**Component key:** `grafana.listSilences`
+
 The List Silences component retrieves silences from Grafana Alertmanager.
 
 ### Use Cases
@@ -814,6 +1271,8 @@ Returns a list of silence objects, each including ID, state, comment, matchers, 
 <a id="query-data-source"></a>
 
 ## Query Data Source
+
+**Component key:** `grafana.queryDataSource`
 
 The Query Data Source component executes a query against a Grafana data source using the Grafana Query API.
 
@@ -881,6 +1340,8 @@ Returns the Grafana query API response JSON.
 <a id="query-logs"></a>
 
 ## Query Logs
+
+**Component key:** `grafana.queryLogs`
 
 The Query Logs component executes a LogQL query against a Loki-backed Grafana data source.
 
@@ -961,6 +1422,8 @@ Returns the Grafana query API response containing matching log frames.
 <a id="query-traces"></a>
 
 ## Query Traces
+
+**Component key:** `grafana.queryTraces`
 
 The Query Traces component executes a TraceQL query against a Tempo-backed Grafana data source.
 
@@ -1046,6 +1509,8 @@ Returns the Grafana query API response containing matching trace frames.
 
 ## Render Panel
 
+**Component key:** `grafana.renderPanel`
+
 The Render Panel component constructs a Grafana image render URL for a dashboard panel using the Grafana Image Renderer.
 
 ### Use Cases
@@ -1081,9 +1546,57 @@ Returns the Grafana render URL along with the dashboard UID and panel.
 }
 ```
 
+<a id="resolve-incident"></a>
+
+## Resolve Incident
+
+**Component key:** `grafana.resolveIncident`
+
+The Resolve Incident component marks an existing Grafana IRM incident as resolved.
+
+### Configuration
+
+- **Incident**: The incident to resolve (required)
+- **Summary**: Optional resolution note added to the incident activity before resolving
+
+### Output
+
+Returns the resolved Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "closedTime": "2026-04-20T10:10:00Z",
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:10:00Z",
+    "severity": "minor",
+    "status": "resolved",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:10:00Z",
+  "type": "grafana.incident.resolved"
+}
+```
+
 <a id="update-alert-rule"></a>
 
 ## Update Alert Rule
+
+**Component key:** `grafana.updateAlertRule`
 
 The Update Alert Rule component updates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
 
@@ -1209,6 +1722,142 @@ Returns the updated Grafana alert rule object after the provisioning API applies
   },
   "timestamp": "2026-03-31T10:20:30Z",
   "type": "grafana.alertRule"
+}
+```
+
+<a id="update-http-synthetic-check"></a>
+
+## Update HTTP Synthetic Check
+
+**Component key:** `grafana.updateHttpSyntheticCheck`
+
+The Update HTTP Synthetic Check component updates an existing Grafana Synthetic Monitoring HTTP check.
+
+### Configuration
+
+- **Synthetic Check**: The synthetic check to update (required)
+- **Job**, **Labels**, **Request**, **Schedule**, **Response validation**, and **Per-Check Alerts** are **togglable**. Enable a section only when you want to change it; disabled sections keep the values currently stored in Grafana.
+
+### Output
+
+Returns the updated Grafana synthetic check.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "name": "ProbeFailedExecutionsTooHigh",
+        "period": "5m",
+        "threshold": 2
+      }
+    ],
+    "check": {
+      "alertSensitivity": "none",
+      "alerts": [
+        {
+          "name": "ProbeFailedExecutionsTooHigh",
+          "period": "5m",
+          "threshold": 2
+        }
+      ],
+      "basicMetricsOnly": true,
+      "created": 1776248430,
+      "enabled": true,
+      "frequency": 30000,
+      "id": 101,
+      "job": "API health check",
+      "labels": [
+        {
+          "name": "service",
+          "value": "api"
+        },
+        {
+          "name": "environment",
+          "value": "prod"
+        }
+      ],
+      "modified": 1776249030,
+      "probes": [
+        1,
+        2,
+        3
+      ],
+      "settings": {
+        "http": {
+          "failIfNotSSL": true,
+          "failIfSSL": false,
+          "headers": [
+            "Accept:application/json"
+          ],
+          "ipVersion": "V4",
+          "method": "GET",
+          "noFollowRedirects": false,
+          "validStatusCodes": [
+            200
+          ]
+        }
+      },
+      "target": "https://api.example.com/health",
+      "timeout": 5000
+    },
+    "checkUrl": "https://grafana.example.com/a/grafana-synthetic-monitoring-app/checks/101"
+  },
+  "timestamp": "2026-04-15T10:30:30Z",
+  "type": "grafana.syntheticCheck.updated"
+}
+```
+
+<a id="update-incident"></a>
+
+## Update Incident
+
+**Component key:** `grafana.updateIncident`
+
+The Update Incident component updates supported fields on an existing Grafana IRM incident.
+
+### Configuration
+
+- **Incident**: The incident to update (required)
+- **Title**: Optional new incident title
+- **Severity**: Optional new severity: Pending, Critical, Major, or Minor
+- **Labels**: Optional labels to add to the incident
+- **Is Drill**: Optional drill flag
+
+### Output
+
+Returns the updated Grafana IRM incident.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdTime": "2026-04-20T10:00:00Z",
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "isDrill": false,
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "production"
+      },
+      {
+        "label": "customer-impacting"
+      }
+    ],
+    "modifiedTime": "2026-04-20T10:07:00Z",
+    "severity": "major",
+    "status": "active",
+    "summary": "Database connection pool exhaustion identified as root cause.",
+    "title": "High latency in web requests"
+  },
+  "timestamp": "2026-04-20T10:07:00Z",
+  "type": "grafana.incident.updated"
 }
 ```
 

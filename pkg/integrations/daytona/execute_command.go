@@ -64,11 +64,27 @@ func (e *ExecuteCommand) Documentation() string {
 
 ## Configuration
 
-- **Sandbox**: The sandbox ID to run commands in (from createSandbox output). Supports expressions, e.g. ` + "`" + `{{ $["daytona.createSandbox"].data.id }}` + "`" + `
+- **Sandbox**: The sandbox ID to run commands in (from **Create Sandbox** or **Create Repository Sandbox** output). Supports expressions, e.g. ` + "`" + `{{ previous().data.id }}` + "`" + ` or ` + "`" + `{{ $["Create Repository Sandbox"].data.sandboxId }}` + "`" + `
 - **Command**: The shell command to execute
 - **Working Directory**: Optional working directory for the command
 - **Environment Variables**: Optional key-value pairs exported before command execution
 - **Timeout**: Optional execution timeout in seconds
+
+## Common Patterns
+
+When **Execute Command** runs immediately after **Create Sandbox**, set **Sandbox** to:
+
+` + "```text" + `
+{{ previous().data.id }}
+` + "```" + `
+
+If you want to run a second or third command in the same sandbox, keep referencing the original create node by name:
+
+` + "```text" + `
+{{ $["Create Sandbox"].data.id }}
+` + "```" + `
+
+This is more reliable than ` + "`" + `previous()` + "`" + ` once the previous node is another **Execute Command** node.
 
 ## Output
 
@@ -273,20 +289,20 @@ func (e *ExecuteCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (e *ExecuteCommand) Actions() []core.Action {
-	return []core.Action{
-		{Name: "poll", UserAccessible: false},
+func (e *ExecuteCommand) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "poll", Type: core.HookTypeInternal},
 	}
 }
 
-func (e *ExecuteCommand) HandleAction(ctx core.ActionContext) error {
+func (e *ExecuteCommand) HandleHook(ctx core.ActionHookContext) error {
 	if ctx.Name == "poll" {
 		return e.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (e *ExecuteCommand) poll(ctx core.ActionContext) error {
+func (e *ExecuteCommand) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +19,7 @@ type EventContext struct {
 }
 
 func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) *EventContext {
-	return &EventContext{tx: tx, node: node, maxPayloadSize: DefaultMaxPayloadSize, onNewEvents: onNewEvents}
+	return &EventContext{tx: tx, node: node, maxPayloadSize: config.MaxPayloadSize(), onNewEvents: onNewEvents}
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {
@@ -41,20 +41,23 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	now := time.Now()
 
 	//
-	// We use RawMessage here to avoid a second marshal when GORM persists the JSONType.
+	// We use RawMessage here to avoid a second marshal when GORM persists the JSON value.
 	//
 	event := models.CanvasEvent{
 		WorkflowID: s.node.WorkflowID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.NewJSONType[any](json.RawMessage(data)),
+		Data:       models.NewJSONValue(json.RawMessage(data)),
 		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
 	}
 
 	wrappedPayload := map[string]any{"data": payload}
-	customName, err := s.resolveCustomName(wrappedPayload)
-	if err == nil && customName != nil {
+	customName, err := s.resolveCustomName(wrappedPayload, structuredPayload)
+	if err != nil {
+		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
+		event.CustomName = &failed
+	} else if customName != nil {
 		event.CustomName = customName
 	}
 
@@ -70,7 +73,7 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
-func (s *EventContext) resolveCustomName(payload any) (*string, error) {
+func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string, error) {
 	config := s.node.Configuration.Data()
 	if config == nil {
 		return nil, nil
@@ -93,7 +96,8 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 
 	builder := NewNodeConfigurationBuilder(s.tx, s.node.WorkflowID).
 		WithNodeID(s.node.NodeID).
-		WithInput(map[string]any{s.node.NodeID: payload})
+		WithInput(map[string]any{s.node.NodeID: payload}).
+		WithRootPayload(rootPayload)
 	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err

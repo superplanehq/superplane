@@ -171,7 +171,7 @@ func Test__CreateSnapshot__Execute(t *testing.T) {
 	})
 }
 
-func Test__CreateSnapshot__HandleAction(t *testing.T) {
+func Test__CreateSnapshot__HandleHook(t *testing.T) {
 	component := &CreateSnapshot{}
 
 	t.Run("action completed -> fetches snapshot and emits", func(t *testing.T) {
@@ -231,7 +231,7 @@ func Test__CreateSnapshot__HandleAction(t *testing.T) {
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -285,7 +285,7 @@ func Test__CreateSnapshot__HandleAction(t *testing.T) {
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -338,7 +338,7 @@ func Test__CreateSnapshot__HandleAction(t *testing.T) {
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -352,17 +352,17 @@ func Test__CreateSnapshot__HandleAction(t *testing.T) {
 		assert.False(t, executionState.Passed)
 	})
 
-	t.Run("unknown action name -> returns error", func(t *testing.T) {
+	t.Run("unknown hook name -> returns error", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "unknown",
 			ExecutionState: executionState,
 		})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown action")
+		assert.Contains(t, err.Error(), "unknown hook")
 	})
 }

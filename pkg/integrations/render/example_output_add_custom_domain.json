@@ -1,0 +1,10 @@
+{
+  "data": {
+    "id": "cdm-abc123xyz456",
+    "name": "app.example.com",
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "verificationStatus": "verified"
+  },
+  "timestamp": "2026-02-05T16:25:00.000000Z",
+  "type": "render.customDomain.added"
+}

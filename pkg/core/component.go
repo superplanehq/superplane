@@ -2,132 +2,20 @@ package core
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/oidc"
 )
 
-var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
-
-var ErrSecretKeyNotFound = errors.New("secret or key not found")
-
-type Component interface {
-
-	/*
-	 * The unique identifier for the component.
-	 * This is how nodes reference it, and is used for registration.
-	 */
-	Name() string
-
-	/*
-	 * The label for the component.
-	 * This is how nodes are displayed in the UI.
-	 */
-	Label() string
-
-	/*
-	 * A good description of what the component does.
-	 * Helpful for documentation and user interfaces.
-	 */
-	Description() string
-
-	/*
-	 * Detailed markdown documentation explaining how to use the component.
-	 * This should provide in-depth information about the component's purpose,
-	 * configuration options, use cases, and examples.
-	 */
-	Documentation() string
-
-	/*
-	 * The icon for the component.
-	 * This is used in the UI to represent the component.
-	 */
-	Icon() string
-
-	/*
-	 * The color for the component.
-	 * This is used in the UI to represent the component.
-	 */
-	Color() string
-
-	/*
-	 * Example output data for the component.
-	 */
-	ExampleOutput() map[string]any
-
-	/*
-	 * The output channels used by the component.
-	 * If none is returned, the 'default' one is used.
-	 */
-	OutputChannels(configuration any) []OutputChannel
-
-	/*
-	 * The configuration fields exposed by the component.
-	 */
-	Configuration() []configuration.Field
-
-	/*
-	 * Setup the component.
-	 */
-	Setup(ctx SetupContext) error
-
-	/*
-	 * ProcessQueueItem is called when a queue item for this component's node
-	 * is ready to be processed. Implementations should create the appropriate
-	 * execution or handle the item synchronously using the provided context.
-	 */
-	ProcessQueueItem(ctx ProcessQueueContext) (*uuid.UUID, error)
-
-	/*
-	 * Passes full execution control to the component.
-	 *
-	 * Component execution has full control over the execution state,
-	 * so it is the responsibility of the component to control it.
-	 *
-	 * Components should finish the execution or move it to waiting state.
-	 * Components can also implement async components by combining Execute() and HandleAction().
-	 */
-	Execute(ctx ExecutionContext) error
-
-	/*
-	 * Allows components to define custom actions
-	 * that can be called on specific executions of the component.
-	 */
-	Actions() []Action
-
-	/*
-	 * Execution a custom action - defined in Actions() -
-	 * on a specific execution of the component.
-	 */
-	HandleAction(ctx ActionContext) error
-
-	/*
-	 * Handler for webhooks.
-	 */
-	HandleWebhook(ctx WebhookRequestContext) (int, *WebhookResponseBody, error)
-
-	/*
-	 * Cancel allows components to handle cancellation of executions.
-	 * Default behavior does nothing. Components can override to perform
-	 * cleanup or cancel external resources.
-	 */
-	Cancel(ctx ExecutionContext) error
-
-	/*
-	 * Cleanup allows components to clean up resources after being removed from a canvas.
-	 * Default behavior does nothing. Components can override to perform cleanup.
-	 */
-	Cleanup(ctx SetupContext) error
-}
-
-type OutputChannel struct {
-	Name        string
-	Label       string
-	Description string
-}
+var (
+	ErrSecretKeyNotFound   = errors.New("secret or key not found")
+	ErrExecutionKVNotFound = errors.New("execution kv not found")
+	ErrQueueItemDeferred   = errors.New("queue item deferred")
+)
 
 /*
  * ExecutionContext allows the component
@@ -152,15 +40,17 @@ type ExecutionContext struct {
 	Requests       RequestContext
 	Auth           AuthReader
 	Integration    IntegrationContext
-	Notifications  NotificationContext
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
+	Files          RepositoryFilesContext
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
+	OIDC           oidc.Provider
 }
 
 type ExpressionContext interface {
 	Run(expression string) (any, error)
+	RunWithExtraVariables(expression string, variables map[string]any) (any, error)
 }
 
 /*
@@ -187,6 +77,7 @@ type SetupContext struct {
 	Auth          AuthReader
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
+	Files         RepositoryFilesContext
 }
 
 type CanvasMemoryContext interface {
@@ -195,17 +86,33 @@ type CanvasMemoryContext interface {
 	FindFirst(namespace string, matches map[string]any) (any, error)
 }
 
+type RepositoryFilesContext interface {
+	List() ([]string, error)
+	Read(path string) (io.ReadCloser, error)
+}
+
+type CanvasMemoryRecord struct {
+	ID     uuid.UUID
+	Values any
+}
+
 /*
  * ExecutionStateContext allows components to control execution lifecycle.
  */
 type ExecutionStateContext interface {
 	IsFinished() bool
 	SetKV(key, value string) error
+	GetKV(key string) (string, error)
 
 	/*
 	 * Pass the execution, emitting a payload to the specified channel.
 	 */
 	Emit(channel, payloadType string, payloads []any) error
+
+	/*
+	 * Emit a payload but keep the execution active for further work.
+	 */
+	EmitAndContinue(channel, payloadType string, payloads []any) error
 
 	/*
 	 * Pass the execution, without emitting any payloads from it.
@@ -232,35 +139,6 @@ type RequestContext interface {
 }
 
 /*
- * Custom action definition for a component.
- */
-type Action struct {
-	Name           string
-	Description    string
-	UserAccessible bool
-	Parameters     []configuration.Field
-}
-
-/*
- * ActionContext allows the component to execute a custom action,
- * and control the state and metadata of each execution of it.
- */
-type ActionContext struct {
-	Name           string
-	Configuration  any
-	Parameters     map[string]any
-	Logger         *log.Entry
-	HTTP           HTTPContext
-	Metadata       MetadataWriter
-	ExecutionState ExecutionStateContext
-	Auth           AuthReader
-	Requests       RequestContext
-	Integration    IntegrationContext
-	Notifications  NotificationContext
-	Secrets        SecretsContext
-}
-
-/*
  * ProcessQueueContext is provided to components to process a node's queue item.
  * It mirrors the data the queue worker would otherwise use to create executions.
  */
@@ -280,6 +158,11 @@ type ProcessQueueContext struct {
 	DequeueItem func() error
 
 	//
+	// Defers the queue item by moving it to the back of the node queue.
+	//
+	DeferQueueItem func() error
+
+	//
 	// Updates the state of the node
 	//
 	UpdateNodeState func(state string) error
@@ -296,6 +179,12 @@ type ProcessQueueContext struct {
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 
 	//
+	// HasRunningExecutions reports whether this node currently has any
+	// unfinished (running) executions.
+	//
+	HasRunningExecutions func() (bool, error)
+
+	//
 	// DefaultProcessing performs the default processing for the queue item.
 	// Convenience method to avoid boilerplate in components that just want default behavior,
 	// where an execution is created and the item is dequeued.
@@ -308,17 +197,6 @@ type ProcessQueueContext struct {
 	// same source)
 	//
 	DistinctIncomingSources func() ([]Node, error)
-}
-
-type NotificationReceivers struct {
-	Emails []string
-	Groups []string
-	Roles  []string
-}
-
-type NotificationContext interface {
-	Send(title, body, url, urlLabel string, receivers NotificationReceivers) error
-	IsAvailable() bool
 }
 
 type SecretsContext interface {

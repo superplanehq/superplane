@@ -16,9 +16,8 @@ import (
 )
 
 func TestSecrets(t *testing.T) {
-	steps := &SecretsSteps{t: t}
-
 	t.Run("creating a new secret", func(t *testing.T) {
+		steps := &SecretsSteps{t: t}
 		steps.start()
 		steps.visitSecretsPage()
 		steps.clickCreateSecret()
@@ -30,6 +29,7 @@ func TestSecrets(t *testing.T) {
 	})
 
 	t.Run("adding a key/value pair to a secret", func(t *testing.T) {
+		steps := &SecretsSteps{t: t}
 		steps.start()
 		steps.visitSecretsPage()
 		steps.givenASecretExists("E2E Test Secret 2", map[string]string{"KEY1": "value1"})
@@ -40,6 +40,7 @@ func TestSecrets(t *testing.T) {
 	})
 
 	t.Run("removing a key/value pair from a secret", func(t *testing.T) {
+		steps := &SecretsSteps{t: t}
 		steps.start()
 		steps.visitSecretsPage()
 		steps.givenASecretExists("E2E Test Secret 3", map[string]string{"KEY1": "value1", "KEY2": "value2"})
@@ -48,6 +49,7 @@ func TestSecrets(t *testing.T) {
 	})
 
 	t.Run("edit a key/value pair from a secret", func(t *testing.T) {
+		steps := &SecretsSteps{t: t}
 		steps.start()
 		steps.visitSecretsPage()
 		steps.givenASecretExists("E2E Test Secret 4", map[string]string{"KEY1": "old-value"})
@@ -58,6 +60,7 @@ func TestSecrets(t *testing.T) {
 	})
 
 	t.Run("updating the secret name", func(t *testing.T) {
+		steps := &SecretsSteps{t: t}
 		steps.start()
 		steps.visitSecretsPage()
 		steps.givenASecretExists("E2E Test Secret 5", map[string]string{"KEY1": "value1"})
@@ -70,6 +73,7 @@ func TestSecrets(t *testing.T) {
 	})
 
 	t.Run("deleting a secret", func(t *testing.T) {
+		steps := &SecretsSteps{t: t}
 		steps.start()
 		steps.visitSecretsPage()
 		steps.givenASecretExists("E2E Test Secret 6", map[string]string{"KEY1": "value1"})

@@ -8,21 +8,24 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 var (
-	registeredComponents      = make(map[string]core.Component)
+	registeredActions         = make(map[string]core.Action)
 	registeredTriggers        = make(map[string]core.Trigger)
 	registeredIntegrations    = make(map[string]core.Integration)
 	registeredWebhookHandlers = make(map[string]core.WebhookHandler)
+	registeredSetupProviders  = make(map[string]core.IntegrationSetupProvider)
 	registeredWidgets         = make(map[string]core.Widget)
 	mu                        sync.RWMutex
 )
 
-func RegisterComponent(name string, c core.Component) {
+func RegisterAction(name string, a core.Action) {
 	mu.Lock()
 	defer mu.Unlock()
-	registeredComponents[name] = c
+	registeredActions[name] = a
 }
 
 func RegisterTrigger(name string, t core.Trigger) {
@@ -44,6 +47,25 @@ func RegisterIntegrationWithWebhookHandler(name string, i core.Integration, h co
 	registeredWebhookHandlers[name] = h
 }
 
+type IntegrationRegistrationOptions struct {
+	WebhookHandler core.WebhookHandler
+	SetupProvider  core.IntegrationSetupProvider
+}
+
+func RegisterIntegrationWithOptions(name string, i core.Integration, options IntegrationRegistrationOptions) {
+	mu.Lock()
+	defer mu.Unlock()
+	registeredIntegrations[name] = i
+
+	if options.WebhookHandler != nil {
+		registeredWebhookHandlers[name] = options.WebhookHandler
+	}
+
+	if options.SetupProvider != nil {
+		registeredSetupProviders[name] = options.SetupProvider
+	}
+}
+
 func RegisterWidget(name string, w core.Widget) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -57,13 +79,46 @@ type IntegrationRegistration struct {
 }
 
 type Registry struct {
-	httpCtx         *HTTPContext
-	Encryptor       crypto.Encryptor
+	httpCtx   *HTTPContext
+	Encryptor crypto.Encryptor
+	AppEnv    string
+
 	Integrations    map[string]core.Integration
 	WebhookHandlers map[string]core.WebhookHandler
-	Components      map[string]core.Component
-	Triggers        map[string]core.Trigger
-	Widgets         map[string]core.Widget
+	SetupProviders  map[string]core.IntegrationSetupProvider
+
+	Actions  map[string]core.Action
+	Triggers map[string]core.Trigger
+	Widgets  map[string]core.Widget
+}
+
+type RegistryOptions struct {
+	Encryptor crypto.Encryptor
+	HTTP      HTTPOptions
+	AppEnv    string
+}
+
+func NewRegistryWithOptions(options RegistryOptions) (*Registry, error) {
+	httpCtx, err := NewHTTPContext(options.HTTP)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &Registry{
+		Encryptor:       options.Encryptor,
+		AppEnv:          options.AppEnv,
+		httpCtx:         httpCtx,
+		Actions:         map[string]core.Action{},
+		Triggers:        map[string]core.Trigger{},
+		Integrations:    map[string]core.Integration{},
+		WebhookHandlers: map[string]core.WebhookHandler{},
+		SetupProviders:  map[string]core.IntegrationSetupProvider{},
+		Widgets:         map[string]core.Widget{},
+	}
+
+	r.Init()
+
+	return r, nil
 }
 
 func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry, error) {
@@ -75,10 +130,11 @@ func NewRegistry(encryptor crypto.Encryptor, httpOptions HTTPOptions) (*Registry
 	r := &Registry{
 		Encryptor:       encryptor,
 		httpCtx:         httpCtx,
-		Components:      map[string]core.Component{},
+		Actions:         map[string]core.Action{},
 		Triggers:        map[string]core.Trigger{},
 		Integrations:    map[string]core.Integration{},
 		WebhookHandlers: map[string]core.WebhookHandler{},
+		SetupProviders:  map[string]core.IntegrationSetupProvider{},
 		Widgets:         map[string]core.Widget{},
 	}
 
@@ -94,8 +150,8 @@ func (r *Registry) Init() {
 	mu.RLock()
 	defer mu.RUnlock()
 
-	for name, component := range registeredComponents {
-		r.Components[name] = NewPanicableComponent(component)
+	for name, action := range registeredActions {
+		r.Actions[name] = NewPanicableAction(action)
 	}
 
 	for name, trigger := range registeredTriggers {
@@ -110,6 +166,10 @@ func (r *Registry) Init() {
 		r.WebhookHandlers[name] = NewPanicableWebhookHandler(webhookHandler)
 	}
 
+	for name, setupProvider := range registeredSetupProviders {
+		r.SetupProviders[name] = setupProvider
+	}
+
 	//
 	// Widgets are not required to be panicable, since they just carry Configuration data
 	// and no logic is executed.
@@ -121,6 +181,51 @@ func (r *Registry) Init() {
 
 func (r *Registry) HTTPContext() *HTTPContext {
 	return r.httpCtx
+}
+
+func (r *Registry) HTTPContextInTransaction(tx *gorm.DB) *HTTPContextInTransaction {
+	return &HTTPContextInTransaction{
+		httpCtx: r.httpCtx,
+		tx:      tx,
+	}
+}
+
+func (r *Registry) FindConfigurableComponent(name string) (core.Configurable, error) {
+	action, err := r.GetAction(name)
+	if err == nil {
+		return action.(core.Configurable), nil
+	}
+
+	trigger, err := r.GetTrigger(name)
+	if err == nil {
+		return trigger.(core.Configurable), nil
+	}
+
+	widget, err := r.GetWidget(name)
+	if err == nil {
+		return widget.(core.Configurable), nil
+	}
+
+	return nil, fmt.Errorf("component %s not found", name)
+}
+
+func (r *Registry) ComponentType(name string) (string, error) {
+	_, err := r.GetAction(name)
+	if err == nil {
+		return models.NodeTypeComponent, nil
+	}
+
+	_, err = r.GetTrigger(name)
+	if err == nil {
+		return models.NodeTypeTrigger, nil
+	}
+
+	_, err = r.GetWidget(name)
+	if err == nil {
+		return models.NodeTypeWidget, nil
+	}
+
+	return "", fmt.Errorf("component %s not found", name)
 }
 
 func (r *Registry) ListTriggers() []core.Trigger {
@@ -151,32 +256,32 @@ func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 	return r.GetIntegrationTrigger(parts[0], name)
 }
 
-func (r *Registry) ListComponents() []core.Component {
-	components := make([]core.Component, 0, len(r.Components))
-	for _, component := range r.Components {
-		components = append(components, component)
+func (r *Registry) ListActions() []core.Action {
+	actions := make([]core.Action, 0, len(r.Actions))
+	for _, action := range r.Actions {
+		actions = append(actions, action)
 	}
 
-	sort.Slice(components, func(i, j int) bool {
-		return components[i].Name() < components[j].Name()
+	sort.Slice(actions, func(i, j int) bool {
+		return actions[i].Name() < actions[j].Name()
 	})
 
-	return components
+	return actions
 }
 
-func (r *Registry) GetComponent(name string) (core.Component, error) {
+func (r *Registry) GetAction(name string) (core.Action, error) {
 	parts := strings.SplitN(name, ".", 2)
 
 	if len(parts) == 1 {
-		component, ok := r.Components[name]
+		action, ok := r.Actions[name]
 		if !ok {
-			return nil, fmt.Errorf("component %s not registered", name)
+			return nil, fmt.Errorf("action %s not registered", name)
 		}
 
-		return component, nil
+		return action, nil
 	}
 
-	return r.GetIntegrationComponent(parts[0], name)
+	return r.GetIntegrationAction(parts[0], name)
 }
 
 func (r *Registry) GetWidget(name string) (core.Widget, error) {
@@ -209,6 +314,26 @@ func (r *Registry) GetIntegration(name string) (core.Integration, error) {
 	}
 
 	return integration, nil
+}
+
+func (r *Registry) SupportsNewSetupFlow(integrationName string) bool {
+	//
+	// For now, the new setup flow should only be available in development.
+	// We do not want to allow users to use it in production yet.
+	// We will remove this once we are more confident the new setup flow
+	// won't have any major changes.
+	//
+	setupProvider, _ := r.GetSetupProvider(integrationName)
+	return setupProvider != nil && r.AppEnv == "development"
+}
+
+func (r *Registry) GetSetupProvider(name string) (core.IntegrationSetupProvider, error) {
+	setupProvider, ok := r.SetupProviders[name]
+	if !ok {
+		return nil, fmt.Errorf("setup provider not registered for integration %s", name)
+	}
+
+	return setupProvider, nil
 }
 
 func (r *Registry) GetWebhookHandler(name string) (core.WebhookHandler, error) {
@@ -248,21 +373,80 @@ func (r *Registry) GetIntegrationTrigger(appName, triggerName string) (core.Trig
 	return nil, fmt.Errorf("trigger %s not found for integration %s", triggerName, appName)
 }
 
-func (r *Registry) GetIntegrationComponent(appName, componentName string) (core.Component, error) {
+func (r *Registry) GetIntegrationAction(appName, actionName string) (core.Action, error) {
 	integration, err := r.GetIntegration(appName)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, component := range integration.Components() {
-		if component.Name() == componentName {
-			return component, nil
+	for _, action := range integration.Actions() {
+		if action.Name() == actionName {
+			return action, nil
 		}
 	}
 
-	return nil, fmt.Errorf("component %s not found for integration %s", componentName, appName)
+	return nil, fmt.Errorf("action %s not found for integration %s", actionName, appName)
 }
 
 func (r *Registry) IsCoreBlock(name string) bool {
 	return !strings.Contains(name, ".")
+}
+
+func (r *Registry) FindActionHook(actionName, hookName string) (core.Action, *core.Hook, error) {
+	action, err := r.GetAction(actionName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, hook := range action.Hooks() {
+		if hook.Name == hookName {
+			return action, &hook, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("hook %s not found for action %s", hookName, actionName)
+}
+
+func (r *Registry) FindTriggerHook(triggerName, hookName string) (core.Trigger, *core.Hook, error) {
+	trigger, err := r.GetTrigger(triggerName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, hook := range trigger.Hooks() {
+		if hook.Name == hookName {
+			return trigger, &hook, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("hook %s not found for trigger %s", hookName, triggerName)
+}
+
+func (r *Registry) FindIntegrationHook(integrationName, hookName string) (core.Integration, *core.Hook, error) {
+	integration, err := r.GetIntegration(integrationName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, hook := range integration.Hooks() {
+		if hook.Name == hookName {
+			return integration, &hook, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("hook %s not found for integration %s", hookName, integrationName)
+}
+
+func (r *Registry) AllCapabilities(name string) []core.Capability {
+	setupProvider, err := r.GetSetupProvider(name)
+	if err != nil {
+		return []core.Capability{}
+	}
+
+	capabilities := []core.Capability{}
+	for _, group := range setupProvider.CapabilityGroups() {
+		capabilities = append(capabilities, group.Capabilities...)
+	}
+
+	return capabilities
 }

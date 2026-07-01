@@ -39,6 +39,7 @@ func (s *fakeLimitService) SetupAccount(_ context.Context, accountID string) (*u
 func (s *fakeLimitService) SetupOrganization(
 	_ context.Context,
 	organizationID, accountID string,
+	_ SetupOrganizationDetails,
 ) (*usagepb.SetupOrganizationResponse, error) {
 	s.setupOrganizationCalls = append(s.setupOrganizationCalls, [2]string{organizationID, accountID})
 	return &usagepb.SetupOrganizationResponse{}, nil

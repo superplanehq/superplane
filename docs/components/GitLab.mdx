@@ -42,6 +42,8 @@ When connecting using Personal Access Token:
 
 ## On Issue
 
+**Trigger key:** `gitlab.onIssue`
+
 The On Issue trigger starts a workflow execution when issue events occur in a GitLab project.
 
 ### Use Cases
@@ -140,6 +142,8 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
 
 ## On Merge Request
 
+**Trigger key:** `gitlab.onMergeRequest`
+
 The On Merge Request trigger starts a workflow execution when merge request events occur in a GitLab project.
 
 ### Configuration
@@ -237,6 +241,8 @@ The On Merge Request trigger starts a workflow execution when merge request even
 
 ## On Milestone
 
+**Trigger key:** `gitlab.onMilestone`
+
 The On Milestone trigger starts a workflow execution when milestone events occur in a GitLab project.
 
 ### Configuration
@@ -297,6 +303,8 @@ The On Milestone trigger starts a workflow execution when milestone events occur
 
 ## On Pipeline
 
+**Trigger key:** `gitlab.onPipeline`
+
 The On Pipeline trigger starts a workflow execution when pipeline events occur in a GitLab project.
 
 ### Configuration
@@ -355,6 +363,8 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
 <a id="on-release"></a>
 
 ## On Release
+
+**Trigger key:** `gitlab.onRelease`
 
 The On Release trigger starts a workflow execution when release events occur in a GitLab project.
 
@@ -437,6 +447,8 @@ The On Release trigger starts a workflow execution when release events occur in 
 
 ## On Tag
 
+**Trigger key:** `gitlab.onTag`
+
 The On Tag trigger starts a workflow execution when tag push events occur in a GitLab project.
 
 ### Configuration
@@ -500,6 +512,8 @@ The On Tag trigger starts a workflow execution when tag push events occur in a G
 <a id="on-vulnerability"></a>
 
 ## On Vulnerability
+
+**Trigger key:** `gitlab.onVulnerability`
 
 The On Vulnerability trigger starts a workflow execution when vulnerability events occur in a GitLab project.
 
@@ -584,6 +598,8 @@ The On Vulnerability trigger starts a workflow execution when vulnerability even
 <a id="create-issue"></a>
 
 ## Create Issue
+
+**Component key:** `gitlab.createIssue`
 
 The Create Issue component creates a new issue in a specified GitLab project.
 
@@ -701,6 +717,8 @@ The component outputs the created issue object, including:
 
 ## Get Latest Pipeline
 
+**Component key:** `gitlab.getLatestPipeline`
+
 The Get Latest Pipeline component retrieves the newest pipeline for a GitLab project.
 
 ### Configuration
@@ -755,6 +773,8 @@ The Get Latest Pipeline component retrieves the newest pipeline for a GitLab pro
 <a id="get-pipeline"></a>
 
 ## Get Pipeline
+
+**Component key:** `gitlab.getPipeline`
 
 The Get Pipeline component retrieves details for a specific GitLab pipeline.
 
@@ -815,6 +835,8 @@ Returns pipeline data including status, ref, SHA, and pipeline URL.
 
 ## Get Test Report Summary
 
+**Component key:** `gitlab.getTestReportSummary`
+
 The Get Test Report Summary component fetches the test report summary for a GitLab pipeline.
 
 ### Configuration
@@ -873,6 +895,8 @@ The Get Test Report Summary component fetches the test report summary for a GitL
 <a id="run-pipeline"></a>
 
 ## Run Pipeline
+
+**Component key:** `gitlab.runPipeline`
 
 The Run Pipeline component triggers a GitLab pipeline and waits for it to complete.
 

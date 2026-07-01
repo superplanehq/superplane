@@ -232,10 +232,8 @@ func (c *UpdateCase) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *UpdateCase) Actions() []core.Action                  { return nil }
-func (c *UpdateCase) HandleAction(_ core.ActionContext) error { return nil }
-func (c *UpdateCase) Cancel(_ core.ExecutionContext) error    { return nil }
-func (c *UpdateCase) Cleanup(_ core.SetupContext) error       { return nil }
+func (c *UpdateCase) Cancel(_ core.ExecutionContext) error { return nil }
+func (c *UpdateCase) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *UpdateCase) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -258,4 +256,12 @@ func hasCaseUpdates(config UpdateCaseConfiguration) bool {
 	}
 
 	return config.Tags != nil
+}
+
+func (c *UpdateCase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UpdateCase) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

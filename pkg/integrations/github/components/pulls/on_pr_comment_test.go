@@ -1,0 +1,233 @@
+package pulls
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"fmt"
+	"net/http"
+	"testing"
+
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	contexts "github.com/superplanehq/superplane/test/support/contexts"
+	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
+)
+
+func Test__OnPRComment__HandleWebhook(t *testing.T) {
+	trigger := &OnPRComment{}
+	eventType := "issue_comment"
+
+	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("X-GitHub-Event", eventType)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{Headers: headers, Logger: logrus.NewEntry(logrus.New())})
+
+		assert.Equal(t, http.StatusForbidden, code)
+		assert.ErrorContains(t, err, "invalid signature")
+	})
+
+	t.Run("no X-GitHub-Event -> 400", func(t *testing.T) {
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256=asdasd")
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Events:  &contexts.EventContext{},
+			Webhook: &contexts.NodeWebhookContext{},
+		})
+
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.ErrorContains(t, err, "missing X-GitHub-Event header")
+	})
+
+	t.Run("invalid signature -> 403", func(t *testing.T) {
+		headers := signedHeaders([]byte(`{"action":"created"}`), "wrong", eventType)
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    []byte(`{"action":"created"}`),
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  &contexts.EventContext{},
+		})
+
+		assert.Equal(t, http.StatusForbidden, code)
+		assert.ErrorContains(t, err, "invalid signature")
+	})
+
+	t.Run("issue_comment for PR with created action -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"},"number":1},"comment":{"body":"comment on PR conversation"}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("issue_comment without pull_request -> event is NOT emitted", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"id":123},"comment":{"body":"comment on issue"}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("non-created action -> event is not emitted", func(t *testing.T) {
+		body := []byte(`{"action":"edited","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"}},"comment":{"body":"edited"}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("content filter matches -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"}},"comment":{"body":"/solve this PR"}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "/solve",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("content filter does not match -> event is not emitted", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"}},"comment":{"body":"regular comment"}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "/solve",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("pull_request_review_comment event type -> ignored", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"some comment"}}`)
+		headers := signedHeaders(body, "test-secret", "pull_request_review_comment")
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+}
+
+func Test__OnPRComment__Setup(t *testing.T) {
+	trigger := OnPRComment{}
+
+	t.Run("webhook is requested for issue_comment", func(t *testing.T) {
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{
+					"id": 123456,
+					"name": "hello",
+					"html_url": "https://github.com/testhq/hello"
+				}`),
+			},
+		}
+
+		nodeMetadataCtx := contexts.MetadataContext{}
+		require.NoError(t, trigger.Setup(core.TriggerContext{
+			Integration:   integrationCtx,
+			Metadata:      &nodeMetadataCtx,
+			HTTP:          httpCtx,
+			Configuration: map[string]any{"repository": "hello"},
+		}))
+
+		require.Len(t, integrationCtx.WebhookRequests, 1)
+		webhookRequest := integrationCtx.WebhookRequests[0].(common.WebhookConfiguration)
+		assert.Equal(t, "hello", webhookRequest.Repository)
+		assert.Equal(t, "issue_comment", webhookRequest.EventType)
+		assert.Empty(t, webhookRequest.EventTypes)
+	})
+}
+
+func signedHeaders(body []byte, secret, eventType string) http.Header {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write(body)
+	signature := fmt.Sprintf("%x", h.Sum(nil))
+
+	headers := http.Header{}
+	headers.Set("X-Hub-Signature-256", "sha256="+signature)
+	headers.Set("X-GitHub-Event", eventType)
+	return headers
+}

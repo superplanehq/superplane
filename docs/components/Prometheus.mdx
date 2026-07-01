@@ -44,6 +44,8 @@ After editing config, reload Alertmanager (for example `POST /-/reload` when lif
 
 ## On Alert
 
+**Trigger key:** `prometheus.onAlert`
+
 The On Alert trigger starts a workflow execution when Alertmanager sends alerts to SuperPlane.
 
 ### What this trigger does
@@ -108,6 +110,8 @@ After updating Alertmanager config, reload it (for example `POST /-/reload` when
 
 ## Create Silence
 
+**Component key:** `prometheus.createSilence`
+
 The Create Silence component creates a silence in Alertmanager (`POST /api/v2/silences`) to suppress matching alerts.
 
 ### Configuration
@@ -160,6 +164,8 @@ Emits one `prometheus.silence` payload with silence ID, status, matchers, timing
 
 ## Expire Silence
 
+**Component key:** `prometheus.expireSilence`
+
 The Expire Silence component expires an active silence in Alertmanager (`DELETE /api/v2/silence/{silenceID}`).
 
 ### Configuration
@@ -186,6 +192,8 @@ Emits one `prometheus.silence.expired` payload with silence ID and status.
 <a id="get-alert"></a>
 
 ## Get Alert
+
+**Component key:** `prometheus.getAlert`
 
 The Get Alert component fetches active alerts from Prometheus (`/api/v1/alerts`) and returns the first alert that matches.
 
@@ -223,6 +231,8 @@ Emits one `prometheus.alert` payload with labels, annotations, state, and timing
 <a id="get-silence"></a>
 
 ## Get Silence
+
+**Component key:** `prometheus.getSilence`
 
 The Get Silence component retrieves a silence from Alertmanager (`GET /api/v2/silence/{silenceID}`) by its ID.
 
@@ -263,6 +273,8 @@ Emits one `prometheus.silence` payload with silence ID, status, matchers, timing
 
 ## Query
 
+**Component key:** `prometheus.query`
+
 The Query component executes an instant PromQL query against Prometheus (`GET /api/v1/query`).
 
 ### Configuration
@@ -301,6 +313,8 @@ Emits one `prometheus.query` payload with the result type and results.
 <a id="query-range"></a>
 
 ## Query Range
+
+**Component key:** `prometheus.queryRange`
 
 The Query Range component executes a range PromQL query against Prometheus (`GET /api/v1/query_range`).
 

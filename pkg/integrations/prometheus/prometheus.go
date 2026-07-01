@@ -148,8 +148,8 @@ func (p *Prometheus) Configuration() []configuration.Field {
 	}
 }
 
-func (p *Prometheus) Components() []core.Component {
-	return []core.Component{
+func (p *Prometheus) Actions() []core.Action {
+	return []core.Action{
 		&GetAlert{},
 		&CreateSilence{},
 		&ExpireSilence{},
@@ -225,10 +225,10 @@ func (p *Prometheus) HandleRequest(ctx core.HTTPRequestContext) {
 	// no-op
 }
 
-func (p *Prometheus) Actions() []core.Action {
-	return []core.Action{}
+func (p *Prometheus) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *Prometheus) HandleAction(ctx core.IntegrationActionContext) error {
+func (p *Prometheus) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

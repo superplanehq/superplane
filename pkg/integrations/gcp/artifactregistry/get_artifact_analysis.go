@@ -370,8 +370,6 @@ func (s *analysisSummary) accumulate(occ map[string]any) {
 	}
 }
 
-func (c *GetArtifactAnalysis) Actions() []core.Action                  { return nil }
-func (c *GetArtifactAnalysis) HandleAction(_ core.ActionContext) error { return nil }
 func (c *GetArtifactAnalysis) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -379,4 +377,12 @@ func (c *GetArtifactAnalysis) Cancel(_ core.ExecutionContext) error { return nil
 func (c *GetArtifactAnalysis) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *GetArtifactAnalysis) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (c *GetArtifactAnalysis) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetArtifactAnalysis) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

@@ -145,7 +145,7 @@ func Test__StopTask__Execute(t *testing.T) {
 				"cluster": "demo",
 				"task":    "arn:aws:ecs:us-east-1:123456789012:task/demo/abc",
 			},
-			Integration:    &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
+			Integration:    &contexts.IntegrationContext{},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		})
 
@@ -352,14 +352,14 @@ func Test__StopTask__OnIntegrationMessage(t *testing.T) {
 
 func setupStopTaskIntegrationContext(eventBridge *common.EventBridgeMetadata) *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
-		Metadata: common.IntegrationMetadata{EventBridge: eventBridge},
-		Secrets:  map[string]core.IntegrationSecret{},
+		Metadata:       common.IntegrationMetadata{EventBridge: eventBridge},
+		CurrentSecrets: map[string]core.IntegrationSecret{},
 	}
 }
 
 func validStopTaskIntegrationContext() *contexts.IntegrationContext {
 	return &contexts.IntegrationContext{
-		Secrets: map[string]core.IntegrationSecret{
+		CurrentSecrets: map[string]core.IntegrationSecret{
 			"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 			"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 			"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

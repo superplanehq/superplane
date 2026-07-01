@@ -13,7 +13,7 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-var expressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
+var ExpressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
 
 func ValidateConfiguration(fields []Field, config map[string]any) error {
 	for _, field := range fields {
@@ -84,6 +84,10 @@ func validateString(field Field, value any) error {
 	}
 
 	options := field.TypeOptions.String
+	if options.AllowExpressions != nil && !*options.AllowExpressions && ExpressionPlaceholderRegex.MatchString(text) {
+		return fmt.Errorf("expressions are not supported for this field")
+	}
+
 	textLength := len(text)
 
 	if options.MinLength != nil && textLength < *options.MinLength {
@@ -253,9 +257,9 @@ func validateDaysOfWeek(_ Field, value any) error {
 func validateObject(field Field, value any) error {
 	if text, ok := value.(string); ok {
 		normalized := text
-		hasExpressions := expressionPlaceholderRegex.MatchString(text)
+		hasExpressions := ExpressionPlaceholderRegex.MatchString(text)
 		if hasExpressions {
-			normalized = expressionPlaceholderRegex.ReplaceAllString(text, "{}")
+			normalized = ExpressionPlaceholderRegex.ReplaceAllString(text, "{}")
 		}
 
 		var parsed any

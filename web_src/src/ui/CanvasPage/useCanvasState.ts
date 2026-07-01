@@ -1,7 +1,34 @@
 import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CanvasPageProps } from ".";
+
+function areEdgeListsReferentiallyEqual(currentEdges: Edge[], nextEdges: Edge[]): boolean {
+  if (currentEdges.length !== nextEdges.length) {
+    return false;
+  }
+
+  return currentEdges.every((edge, index) => edge === nextEdges[index]);
+}
+
+function arePositionsEqual(
+  left: { x: number; y: number } | undefined,
+  right: { x: number; y: number } | undefined,
+): boolean {
+  return left?.x === right?.x && left?.y === right?.y;
+}
+
+function getRoundedPosition(position: { x: number; y: number }): { x: number; y: number } {
+  return {
+    x: Math.round(position.x),
+    y: Math.round(position.y),
+  };
+}
+
+type PendingNodePosition = {
+  localPosition: { x: number; y: number };
+  savedPosition: { x: number; y: number };
+};
 
 export interface CanvasPageState {
   nodes: Node[];
@@ -20,6 +47,7 @@ export interface CanvasPageState {
     selectedNodeId: string | null;
     close: () => void;
     open: (nodeId: string) => void;
+    clearSelection: () => void;
   };
 }
 
@@ -28,6 +56,16 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
   const [nodes, setNodes] = useState<Node[]>(() => initialNodes ?? []);
   const [edges, setEdges] = useState<Edge[]>(() => initialEdges ?? []);
+  const pendingNodePositionsRef = useRef<Map<string, PendingNodePosition>>(new Map());
+  const localOnlyNodeIdsKey = useMemo(
+    () =>
+      nodes
+        .filter((node) => node.data.isTemplate || node.data.isPendingConnection)
+        .map((node) => node.id)
+        .sort()
+        .join("\0"),
+    [nodes],
+  );
 
   // Sync node data changes from parent (but not collapsed state or selected state)
   useEffect(() => {
@@ -36,8 +74,10 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     setNodes((currentNodes) => {
       // Preserve locally-added template and pending connection nodes
       const localOnlyNodes = currentNodes.filter((node) => node.data.isTemplate || node.data.isPendingConnection);
+      const syncedNodeIds = new Set<string>();
 
       const syncedNodes = initialNodes.map((newNode) => {
+        syncedNodeIds.add(newNode.id);
         const existingNode = currentNodes.find((n) => n.id === newNode.id);
         const nodeData = { ...newNode.data };
         const nodeType = nodeData.type as string;
@@ -53,15 +93,31 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
           };
         }
 
+        const pendingPosition = pendingNodePositionsRef.current.get(newNode.id);
+        let position = (existingNode?.dragging && existingNode.position) || newNode.position;
+        if (pendingPosition) {
+          if (arePositionsEqual(newNode.position, pendingPosition.savedPosition)) {
+            pendingNodePositionsRef.current.delete(newNode.id);
+          } else {
+            position = pendingPosition.localPosition;
+          }
+        }
+
         // Preserve selected state and position of actively dragged nodes
         return {
           ...newNode,
           data: nodeData,
           selected: existingNode?.selected ?? newNode.selected,
-          position: (existingNode?.dragging && existingNode.position) || newNode.position,
+          position,
           dragging: existingNode?.dragging,
         };
       });
+
+      for (const nodeId of pendingNodePositionsRef.current.keys()) {
+        if (!syncedNodeIds.has(nodeId)) {
+          pendingNodePositionsRef.current.delete(nodeId);
+        }
+      }
 
       // Append local-only nodes at the end
       return [...syncedNodes, ...localOnlyNodes];
@@ -71,22 +127,23 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   useEffect(() => {
     if (!initialEdges) return;
 
+    const localOnlyNodeIds = new Set(localOnlyNodeIdsKey ? localOnlyNodeIdsKey.split("\0") : []);
+
     setEdges((currentEdges) => {
       // Preserve edges connected to template or pending connection nodes
       const localOnlyEdges = currentEdges.filter((edge) => {
-        const sourceIsLocal = nodes.some(
-          (n) => n.id === edge.source && (n.data.isTemplate || n.data.isPendingConnection),
-        );
-        const targetIsLocal = nodes.some(
-          (n) => n.id === edge.target && (n.data.isTemplate || n.data.isPendingConnection),
-        );
-        return sourceIsLocal || targetIsLocal;
+        return localOnlyNodeIds.has(edge.source) || localOnlyNodeIds.has(edge.target);
       });
 
       // Combine synced edges with local-only edges
-      return [...initialEdges, ...localOnlyEdges];
+      const nextEdges = [...initialEdges, ...localOnlyEdges];
+      if (areEdgeListsReferentiallyEqual(currentEdges, nextEdges)) {
+        return currentEdges;
+      }
+
+      return nextEdges;
     });
-  }, [initialEdges, nodes]);
+  }, [initialEdges, localOnlyNodeIdsKey]);
 
   // Apply initial collapsed state to nodes
   useEffect(() => {
@@ -130,6 +187,13 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       );
 
       if (positionChanges.length > 0) {
+        positionChanges.forEach((change) => {
+          pendingNodePositionsRef.current.set(change.id, {
+            localPosition: change.position,
+            savedPosition: getRoundedPosition(change.position),
+          });
+        });
+
         // If batch update is supported, use it for multiple nodes
         if (positionChanges.length > 1 && props.onNodesPositionChange) {
           const updates = positionChanges.map((change) => ({
@@ -147,7 +211,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
       setNodes((nds) => applyNodeChanges(changes, nds));
     },
-    [props.onNodeDelete, props.onNodePositionChange, props.onNodesPositionChange],
+    [props],
   );
 
   const onEdgesChange = useCallback(
@@ -161,7 +225,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
       setEdges((eds) => applyEdgeChanges(changes, eds));
     },
-    [props.onEdgeDelete],
+    [props],
   );
 
   const toggleNodeCollapse = useCallback(
@@ -211,27 +275,63 @@ function useComponentSidebarState(
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initial?.nodeId ?? null);
   const lastInitialRef = useRef<{ isOpen: boolean; nodeId: string | null } | null>(null);
 
+  // Keep the latest onChange in a ref so the callbacks and the sync effect below
+  // don't depend on its identity. `onChange` typically wraps react-router's
+  // `setSearchParams`, whose identity changes on every URL update — depending on
+  // it would otherwise re-run the sync effect on unrelated URL changes and
+  // re-push stale sidebar params back into the URL (e.g. after exiting edit
+  // mode, or clobbering the `branch` param when entering it).
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   const close = useCallback(() => {
     setIsOpen(false);
     setSelectedNodeId(null);
-    onChange?.(false, null);
-  }, [onChange]);
+    onChangeRef.current?.(false, null);
+  }, []);
 
-  const open = useCallback(
-    (nodeId: string) => {
-      setSelectedNodeId(nodeId);
-      setIsOpen(true);
-      onChange?.(true, nodeId);
-    },
-    [onChange],
-  );
+  const open = useCallback((nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setIsOpen(true);
+    onChangeRef.current?.(true, nodeId);
+  }, []);
 
-  // Keep external listener updated when selection changes while open
+  const clearSelection = useCallback(() => {
+    setSelectedNodeId(null);
+    onChangeRef.current?.(true, null);
+  }, []);
+
+  // Keep external listener updated when the selection genuinely changes while
+  // open. `open`/`close` already notify `onChange` for user-driven changes, so
+  // this effect only needs to cover internal selection changes that bypass them.
+  //
+  // It must NOT fire on mount or when echoing an externally-applied `initial`
+  // value. On mount the URL already reflects the sidebar state, and the
+  // component remounts whenever the selected version changes (its `key`
+  // includes the version id). Re-emitting here on remount would navigate from a
+  // stale location snapshot and clobber concurrent URL updates — e.g. switching
+  // drafts while a node is open would revert the freshly-set `branch` param.
+  const hasSyncedOnceRef = useRef(false);
   useEffect(() => {
-    if (isOpen) {
-      onChange?.(true, selectedNodeId);
+    if (!hasSyncedOnceRef.current) {
+      hasSyncedOnceRef.current = true;
+      return;
     }
-  }, [isOpen, selectedNodeId, onChange]);
+
+    if (!isOpen) {
+      return;
+    }
+
+    // Don't echo a selection that originated from an external (URL) sync.
+    const lastInitial = lastInitialRef.current;
+    if (lastInitial && lastInitial.isOpen === isOpen && lastInitial.nodeId === selectedNodeId) {
+      return;
+    }
+
+    onChangeRef.current?.(true, selectedNodeId);
+  }, [isOpen, selectedNodeId]);
 
   useEffect(() => {
     if (initial?.isOpen === undefined && initial?.nodeId === undefined) {
@@ -258,5 +358,6 @@ function useComponentSidebarState(
     selectedNodeId,
     close,
     open,
+    clearSelection,
   };
 }

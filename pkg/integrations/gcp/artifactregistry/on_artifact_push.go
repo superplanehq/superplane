@@ -130,12 +130,12 @@ func (t *OnArtifactPush) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnArtifactPush) Actions() []core.Action {
-	return nil
+func (t *OnArtifactPush) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnArtifactPush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+func (t *OnArtifactPush) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnArtifactPush) OnIntegrationMessage(ctx core.IntegrationMessageContext) error {

@@ -249,7 +249,7 @@ func isCommitSHA(ref string) bool {
 	return true
 }
 
-func (c *RunTrigger) poll(ctx core.ActionContext) error {
+func (c *RunTrigger) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -304,13 +304,13 @@ func (c *RunTrigger) poll(ctx core.ActionContext) error {
 	return completeCreateBuildExecution(ctx.ExecutionState, build)
 }
 
-func (c *RunTrigger) Actions() []core.Action {
-	return []core.Action{
-		{Name: createBuildPollAction, UserAccessible: false},
+func (c *RunTrigger) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: createBuildPollAction, Type: core.HookTypeInternal},
 	}
 }
 
-func (c *RunTrigger) HandleAction(ctx core.ActionContext) error {
+func (c *RunTrigger) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case createBuildPollAction:
 		return c.poll(ctx)

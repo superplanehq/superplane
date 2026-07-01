@@ -161,7 +161,7 @@ export const SecretKeyFieldRenderer = ({
 
   if (isLoading) {
     return (
-      <Select disabled>
+      <Select value="" disabled>
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Loading…" />
         </SelectTrigger>
@@ -172,7 +172,7 @@ export const SecretKeyFieldRenderer = ({
   if (!secrets.length || options.length === 0) {
     return (
       <div className="space-y-2">
-        <Select disabled>
+        <Select value="" disabled>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="No credentials available" />
           </SelectTrigger>
@@ -189,7 +189,7 @@ export const SecretKeyFieldRenderer = ({
         onChange(parseSecretKeySelection(val));
       }}
     >
-      <SelectTrigger className="w-full">
+      <SelectTrigger className="w-full ph-no-capture">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

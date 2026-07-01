@@ -83,7 +83,6 @@ func Test__RunFunction__Execute(t *testing.T) {
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"region": "us-east-1"},
-				Secrets:       map[string]core.IntegrationSecret{},
 			},
 		})
 
@@ -109,7 +108,7 @@ func Test__RunFunction__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"region": " "},
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -155,7 +154,7 @@ func Test__RunFunction__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"region": "us-east-1"},
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
@@ -196,7 +195,7 @@ func Test__RunFunction__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"region": "us-east-1"},
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

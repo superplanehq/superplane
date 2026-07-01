@@ -1,0 +1,9 @@
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "displayName": "my-functions-app",
+    "deleted": true
+  },
+  "timestamp": "2026-04-22T20:35:00.000000000Z",
+  "type": "oci.applicationDeleted"
+}

@@ -168,11 +168,11 @@ func (t *OnAlert) Setup(ctx core.TriggerContext) error {
 	return ctx.Metadata.Set(metadata)
 }
 
-func (t *OnAlert) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnAlert) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnAlert) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnAlert) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

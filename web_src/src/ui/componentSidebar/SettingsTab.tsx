@@ -21,7 +21,12 @@ import {
   validateFieldForSubmission,
 } from "@/lib/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
+import { buildConfigurationDisplayModel } from "./configurationView/buildConfigurationDisplayModel";
+import { ConfigurationView } from "./configurationView/ConfigurationView";
 import { SimpleTooltip } from "./SimpleTooltip";
+
+const REQUIRED_FIELD_BADGE_CLASS =
+  "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -131,7 +136,7 @@ export function SettingsTab({
   // All installations of this integration type (ready, error, pending)
   const integrationsOfType = useMemo(() => {
     if (!integrationName) return [];
-    return integrations.filter((i) => i.spec?.integrationName === integrationName);
+    return integrations.filter((i) => i.metadata?.integrationName === integrationName);
   }, [integrations, integrationName]);
   const selectedIntegrationFull = useMemo(() => {
     const id = selectedIntegration?.id ?? integrationRef?.id;
@@ -256,6 +261,10 @@ export function SettingsTab({
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
+    if (isReadOnly) {
+      return;
+    }
+
     if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
         autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, undefined);
@@ -282,7 +291,7 @@ export function SettingsTab({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
+  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName]);
 
   const shouldShowConfiguration = true;
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
@@ -448,12 +457,46 @@ export function SettingsTab({
     };
   }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
 
+  const configurationDisplayModel = useMemo(
+    () =>
+      buildConfigurationDisplayModel({
+        configuration: nodeConfiguration,
+        configurationFields,
+        integrationName,
+        integrationRef,
+        integrations,
+        allowIntegrations,
+      }),
+    [allowIntegrations, configurationFields, integrationName, integrationRef, integrations, nodeConfiguration],
+  );
+
+  if (isReadOnly) {
+    return (
+      <div className="overflow-y-auto p-4 pb-24" style={{ maxHeight: "80vh" }}>
+        <div className="space-y-6">
+          <ConfigurationView model={configurationDisplayModel} />
+          {customField && shouldShowConfiguration && (
+            <div
+              className={
+                configurationFields && configurationFields.length > 0
+                  ? ""
+                  : "border-t border-gray-200 dark:border-gray-700 pt-6"
+              }
+            >
+              {customField(nodeConfiguration)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`}
       style={{ maxHeight: "80vh" }}
       onBlurCapture={(event) => {
-        if (configurationSaveMode !== "auto" || isReadOnly) {
+        if (configurationSaveMode !== "auto") {
           return;
         }
         const target = event.target as HTMLElement | null;
@@ -468,29 +511,60 @@ export function SettingsTab({
     >
       <div className="space-y-6">
         {/* Node identification section — always visible */}
-        <div className={`flex flex-col gap-2 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}>
+        <div className="flex flex-col gap-2">
           <Label className="min-w-[100px] text-left">
             Name
             <span className="text-gray-800 ml-1">*</span>
-            {hasNodeNameError && <span className="text-red-500 text-xs ml-2">Required</span>}
+            {hasNodeNameError && <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>}
           </Label>
           <Input
             data-testid="node-name-input"
             type="text"
             value={currentNodeName}
-            onChange={(e) => setCurrentNodeName(e.target.value)}
+            onChange={(e) => {
+              setCurrentNodeName(e.target.value);
+              requestAutosave();
+            }}
             placeholder="Enter a name for this node"
             autoFocus
             className="shadow-none"
-            disabled={isReadOnly}
           />
         </div>
 
+        {/* Run title field — rendered right after name, before the separator */}
+        {(() => {
+          const runTitleField = configurationFields?.find((f) => f.name === "customName");
+          if (!runTitleField || !shouldShowConfiguration) return null;
+          return (
+            <div>
+              <ConfigurationFieldRenderer
+                allowExpressions={true}
+                field={runTitleField}
+                value={nodeConfiguration[runTitleField.name!]}
+                onChange={(value) => {
+                  setNodeConfiguration((prev) => ({
+                    ...prev,
+                    [runTitleField.name!]: value,
+                  }));
+                  if (value === undefined || value === null || value === "") {
+                    requestAutosave();
+                  }
+                }}
+                allValues={nodeConfiguration}
+                domainId={domainId}
+                domainType={domainType}
+                organizationId={domainId}
+                autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                realtimeValidationErrors={realtimeValidationErrors}
+                enableRealtimeValidation={true}
+              />
+            </div>
+          );
+        })()}
+
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
-          <div
-            className={`border-t border-gray-200 dark:border-gray-700 pt-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
-          >
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
             {!allowIntegrations ? (
               <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
                 You don't have permission to view integrations.
@@ -513,7 +587,7 @@ export function SettingsTab({
                   size="sm"
                   onClick={onOpenCreateIntegrationDialog}
                   className="flex-shrink-0"
-                  disabled={isReadOnly || !allowCreateIntegrations}
+                  disabled={!allowCreateIntegrations}
                 >
                   Connect
                 </Button>
@@ -525,7 +599,7 @@ export function SettingsTab({
                     Integration
                     <span className="text-gray-800 ml-1">*</span>
                     {showValidation && validationErrors.has("integration") && (
-                      <span className="text-red-500 text-xs ml-2">Required</span>
+                      <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
                     )}
                   </Label>
                   <p className="text-xs text-gray-500">Instance</p>
@@ -533,7 +607,7 @@ export function SettingsTab({
                     value={selectedIntegration?.id || ""}
                     onValueChange={(value) => {
                       if (value === CONNECT_ANOTHER_INSTANCE_VALUE) {
-                        if (!isReadOnly && allowCreateIntegrations && onOpenCreateIntegrationDialog) {
+                        if (allowCreateIntegrations && onOpenCreateIntegrationDialog) {
                           onOpenCreateIntegrationDialog();
                         }
                         return;
@@ -547,7 +621,6 @@ export function SettingsTab({
                         requestAutosave();
                       }
                     }}
-                    disabled={isReadOnly}
                   >
                     <SelectTrigger className="w-full shadow-none">
                       <SelectValue placeholder="Select an installation" />
@@ -555,7 +628,7 @@ export function SettingsTab({
                     <SelectContent>
                       {integrationsOfType.map((integration) => {
                         const instanceName = integration.metadata?.name;
-                        const typeName = integration.spec?.integrationName;
+                        const typeName = integration.metadata?.integrationName;
                         const displayName =
                           instanceName?.toLowerCase() === typeName?.toLowerCase()
                             ? getIntegrationTypeDisplayName(undefined, typeName) || instanceName
@@ -595,7 +668,7 @@ export function SettingsTab({
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <IntegrationIcon
-                              integrationName={selectedIntegrationFull.spec?.integrationName}
+                              integrationName={selectedIntegrationFull.metadata?.integrationName}
                               iconSlug={integrationDefinition?.icon}
                               className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
                             />
@@ -603,7 +676,7 @@ export function SettingsTab({
                               <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
                                 {getIntegrationTypeDisplayName(
                                   undefined,
-                                  selectedIntegrationFull.spec?.integrationName,
+                                  selectedIntegrationFull.metadata?.integrationName,
                                 ) || "Integration"}
                               </h3>
                             </div>
@@ -629,7 +702,7 @@ export function SettingsTab({
                                 size="sm"
                                 className="text-sm py-1.5"
                                 onClick={() => onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)}
-                                disabled={isReadOnly || !allowUpdateIntegrations}
+                                disabled={!allowUpdateIntegrations}
                               >
                                 Configure...
                               </Button>
@@ -660,11 +733,9 @@ export function SettingsTab({
 
         {/* Configuration section */}
         {configurationFields && configurationFields.length > 0 && shouldShowConfiguration && (
-          <div
-            className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
-          >
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
             {configurationFields.map((field) => {
-              if (!field.name) return null;
+              if (!field.name || field.name === "customName") return null;
               const fieldName = field.name;
               return (
                 <ConfigurationFieldRenderer
@@ -729,7 +800,6 @@ export function SettingsTab({
             data-testid="save-node-button"
             variant="default"
             onClick={handleSave}
-            disabled={isReadOnly}
             loading={isSaving}
             loadingText="Saving..."
           >

@@ -211,11 +211,11 @@ func (t *OnIncidentTimelineEvent) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnIncidentTimelineEvent) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnIncidentTimelineEvent) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnIncidentTimelineEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnIncidentTimelineEvent) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

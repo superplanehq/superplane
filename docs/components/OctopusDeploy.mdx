@@ -32,6 +32,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Deployment Event
 
+**Trigger key:** `octopus.onDeploymentEvent`
+
 The On Deployment Event trigger emits events when a deployment's status changes in Octopus Deploy.
 
 ### Use Cases
@@ -101,6 +103,8 @@ Each emitted event includes the following fields:
 <a id="deploy-release"></a>
 
 ## Deploy Release
+
+**Component key:** `octopus.deployRelease`
 
 The Deploy Release component deploys a chosen release to a chosen environment in Octopus Deploy and waits for completion.
 

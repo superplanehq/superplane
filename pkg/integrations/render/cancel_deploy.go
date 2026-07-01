@@ -105,7 +105,7 @@ func (c *CancelDeploy) Configuration() []configuration.Field {
 			Label:       "Deploy ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Placeholder: "e.g., dep-... or {{$.event.data.deployId}}",
+			Placeholder: "e.g., dep-... or {{$['Node Name'].data.deployId}}",
 			Description: "Render deploy ID to cancel",
 		},
 	}
@@ -195,24 +195,24 @@ func (c *CancelDeploy) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, CancelDeployPollInterval)
 }
 
-func (c *CancelDeploy) Actions() []core.Action {
-	return []core.Action{
+func (c *CancelDeploy) Hooks() []core.Hook {
+	return []core.Hook{
 		{
-			Name:           "poll",
-			UserAccessible: false,
+			Name: "poll",
+			Type: core.HookTypeInternal,
 		},
 	}
 }
 
-func (c *CancelDeploy) HandleAction(ctx core.ActionContext) error {
+func (c *CancelDeploy) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "poll":
 		return c.poll(ctx)
 	}
-	return fmt.Errorf("unknown action: %s", ctx.Name)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
-func (c *CancelDeploy) poll(ctx core.ActionContext) error {
+func (c *CancelDeploy) poll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

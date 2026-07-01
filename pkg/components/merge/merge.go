@@ -26,7 +26,7 @@ const (
 )
 
 func init() {
-	registry.RegisterComponent("merge", &Merge{})
+	registry.RegisterAction("merge", &Merge{})
 }
 
 /*
@@ -213,7 +213,7 @@ func (m *Merge) Configuration() []configuration.Field {
 			Label:       "Stop if",
 			Type:        configuration.FieldTypeExpression,
 			Description: "When true, stop waiting and finish immediately.",
-			Placeholder: "e.g. $.result == 'fail'",
+			Placeholder: "e.g. $['Node Name'].data.result == 'fail'",
 			Required:    false,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
@@ -225,9 +225,12 @@ func (m *Merge) Configuration() []configuration.Field {
 	}
 }
 
-func (m *Merge) Actions() []core.Action {
-	return []core.Action{
-		{Name: "timeoutReached"},
+func (m *Merge) Hooks() []core.Hook {
+	return []core.Hook{
+		{
+			Name: "timeoutReached",
+			Type: core.HookTypeInternal,
+		},
 	}
 }
 
@@ -291,7 +294,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	if spec.StopIfExpression != "" {
 		out, err := ctx.Expressions.Run(spec.StopIfExpression)
 		if err != nil {
-			return nil, err
+			return m.failStopExpression(executionCtx, md, err.Error())
 		}
 
 		//
@@ -300,18 +303,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		//
 		stopEarly, ok := out.(bool)
 		if !ok {
-			md.StopEarly = true
-			err := executionCtx.Metadata.Set(md)
-			if err != nil {
-				return nil, err
-			}
-
-			err = executionCtx.ExecutionState.Fail("error", fmt.Sprintf("stop expression must evaluate to boolean, got %T: %v", out, out))
-			if err != nil {
-				return nil, err
-			}
-
-			return &executionCtx.ID, nil
+			return m.failStopExpression(executionCtx, md, fmt.Sprintf("stop expression must evaluate to boolean, got %T: %v", out, out))
 		}
 
 		//
@@ -339,6 +331,21 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 			"merge.finished",
 			[]any{md},
 		)
+	}
+
+	return &executionCtx.ID, nil
+}
+
+func (m *Merge) failStopExpression(executionCtx *core.ExecutionContext, md *ExecutionMetadata, message string) (*uuid.UUID, error) {
+	md.StopEarly = true
+	err := executionCtx.Metadata.Set(md)
+	if err != nil {
+		return nil, err
+	}
+
+	err = executionCtx.ExecutionState.Fail("error", message)
+	if err != nil {
+		return nil, err
 	}
 
 	return &executionCtx.ID, nil
@@ -416,16 +423,16 @@ func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, executionCtx *c
 	return md, nil
 }
 
-func (m *Merge) HandleAction(ctx core.ActionContext) error {
+func (m *Merge) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case "timeoutReached":
 		return m.HandleTimeout(ctx)
 	default:
-		return fmt.Errorf("merge does not support action: %s", ctx.Name)
+		return fmt.Errorf("merge does not support hook: %s", ctx.Name)
 	}
 }
 
-func (m *Merge) HandleTimeout(ctx core.ActionContext) error {
+func (m *Merge) HandleTimeout(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}

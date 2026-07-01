@@ -47,7 +47,6 @@ func Test__Logfire__Sync__Success(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_key_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	err := integration.Sync(core.SyncContext{
@@ -63,9 +62,6 @@ func Test__Logfire__Sync__Success(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "acme-org", metadata.ExternalOrganizationID)
 	assert.True(t, metadata.SupportsQueryAPI)
-
-	assert.Empty(t, integrationCtx.Secrets)
-
 	require.Len(t, httpCtx.Requests, 1)
 }
 
@@ -84,7 +80,6 @@ func Test__Logfire__Sync__Fail_InvalidAPIKey(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_key_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	err := integration.Sync(core.SyncContext{
@@ -116,7 +111,6 @@ func Test__Logfire__Sync__PreservesWebhookSetupFromMetadata(t *testing.T) {
 		Metadata: map[string]any{
 			"supportsWebhookSetup": true,
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	err := integration.Sync(core.SyncContext{
@@ -155,7 +149,6 @@ func Test__Logfire__ListResources__Projects(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_key_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	resources, err := integration.ListResources("project", core.ListResourcesContext{
@@ -183,7 +176,6 @@ func Test__Logfire__ListResources__Alerts__MissingProjectId_ReturnsEmptyNoError(
 		Configuration: map[string]any{
 			"apiKey": "lf_api_key_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	resources, err := integration.ListResources("alert", core.ListResourcesContext{
@@ -205,7 +197,6 @@ func Test__Logfire__ListResources__Alerts__WithProjectId_Undefined_ReturnsEmptyN
 		Configuration: map[string]any{
 			"apiKey": "lf_api_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	resources, err := integration.ListResources("alert", core.ListResourcesContext{
@@ -230,7 +221,6 @@ func Test__Logfire__ListResources__Alerts__WithProjectId_Null_ReturnsEmptyNoErro
 		Configuration: map[string]any{
 			"apiKey": "lf_api_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	resources, err := integration.ListResources("alert", core.ListResourcesContext{
@@ -265,7 +255,6 @@ func Test__Logfire__ListResources__Alerts__WithProjectId(t *testing.T) {
 		Configuration: map[string]any{
 			"apiKey": "lf_api_key_123",
 		},
-		Secrets: map[string]core.IntegrationSecret{},
 	}
 
 	resources, err := integration.ListResources("alert", core.ListResourcesContext{

@@ -165,11 +165,11 @@ func (t *OnAlertFired) Setup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func (t *OnAlertFired) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnAlertFired) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnAlertFired) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnAlertFired) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

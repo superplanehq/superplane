@@ -123,21 +123,21 @@ func (t *OnVMInstance) Setup(ctx core.TriggerContext) error {
 	}, 2*time.Second)
 }
 
-func (t *OnVMInstance) Actions() []core.Action {
-	return []core.Action{
-		{Name: "provisionSink"},
+func (t *OnVMInstance) Hooks() []core.Hook {
+	return []core.Hook{
+		{Name: "provisionSink", Type: core.HookTypeInternal},
 	}
 }
 
-func (t *OnVMInstance) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnVMInstance) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	if ctx.Name != "provisionSink" {
-		return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+		return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 
 	return t.provisionSink(ctx)
 }
 
-func (t *OnVMInstance) provisionSink(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnVMInstance) provisionSink(ctx core.TriggerHookContext) (map[string]any, error) {
 	meta, err := integrationMetadata(ctx.Integration)
 	if err != nil {
 		return nil, err

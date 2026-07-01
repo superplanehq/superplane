@@ -163,14 +163,14 @@ func (g *GetArtifactInfo) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 	return 0, nil, nil
 }
 
-func (g *GetArtifactInfo) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *GetArtifactInfo) HandleAction(ctx core.ActionContext) error {
+func (g *GetArtifactInfo) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (g *GetArtifactInfo) Cleanup(ctx core.SetupContext) error {
+func (g *GetArtifactInfo) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetArtifactInfo) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

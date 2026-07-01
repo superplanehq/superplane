@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -18,7 +17,6 @@ import (
 
 type OrganizationService struct {
 	authorizationService authorization.Authorization
-	encryptor            crypto.Encryptor
 	registry             *registry.Registry
 	oidcProvider         oidc.Provider
 	baseURL              string
@@ -28,7 +26,6 @@ type OrganizationService struct {
 
 func NewOrganizationService(
 	authorizationService authorization.Authorization,
-	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
 	baseURL string,
@@ -41,7 +38,6 @@ func NewOrganizationService(
 		baseURL:              baseURL,
 		webhooksBaseURL:      webhooksBaseURL,
 		usageService:         usageService,
-		encryptor:            encryptor,
 		authorizationService: authorizationService,
 	}
 }
@@ -66,78 +62,19 @@ func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.De
 	return organizations.DeleteOrganization(ctx, s.authorizationService, orgID)
 }
 
-func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CreateInvitationWithUsage(ctx, s.authorizationService, s.usageService, orgID, req.Email)
-}
-
-func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListInvitationsRequest) (*pb.ListInvitationsResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListInvitations(ctx, orgID)
-}
-
-func (s *OrganizationService) RemoveInvitation(ctx context.Context, req *pb.RemoveInvitationRequest) (*pb.RemoveInvitationResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.RemoveInvitation(ctx, s.authorizationService, orgID, req.InvitationId)
-}
-
 func (s *OrganizationService) GetInviteLink(ctx context.Context, req *pb.GetInviteLinkRequest) (*pb.GetInviteLinkResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.GetInviteLink(orgID)
+	return organizations.GetInviteLink(ctx, orgID)
 }
 
 func (s *OrganizationService) UpdateInviteLink(ctx context.Context, req *pb.UpdateInviteLinkRequest) (*pb.UpdateInviteLinkResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UpdateInviteLink(orgID, req.Enabled)
+	return organizations.UpdateInviteLink(ctx, orgID, req.Enabled)
 }
 
 func (s *OrganizationService) ResetInviteLink(ctx context.Context, req *pb.ResetInviteLinkRequest) (*pb.ResetInviteLinkResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ResetInviteLink(orgID)
-}
-
-func (s *OrganizationService) GetAgentSettings(
-	ctx context.Context,
-	req *pb.GetAgentSettingsRequest,
-) (*pb.GetAgentSettingsResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.GetAgentSettings(orgID)
-}
-
-func (s *OrganizationService) UpdateAgentSettings(
-	ctx context.Context,
-	req *pb.UpdateAgentSettingsRequest,
-) (*pb.UpdateAgentSettingsResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return organizations.UpdateAgentSettings(orgID, req.AgentModeEnabled, userID)
-}
-
-func (s *OrganizationService) SetAgentOpenAIKey(
-	ctx context.Context,
-	req *pb.SetAgentOpenAIKeyRequest,
-) (*pb.SetAgentOpenAIKeyResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return organizations.SetAgentOpenAIKey(ctx, s.encryptor, orgID, userID, req.ApiKey, req.Validate)
-}
-
-func (s *OrganizationService) DeleteAgentOpenAIKey(
-	ctx context.Context,
-	req *pb.DeleteAgentOpenAIKeyRequest,
-) (*pb.DeleteAgentOpenAIKeyResponse, error) {
-	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return organizations.DeleteAgentOpenAIKey(orgID, userID)
+	return organizations.ResetInviteLink(ctx, orgID)
 }
 
 func (s *OrganizationService) DescribeUsage(
@@ -211,6 +148,31 @@ func (s *OrganizationService) UpdateIntegration(ctx context.Context, req *pb.Upd
 func (s *OrganizationService) DeleteIntegration(ctx context.Context, req *pb.DeleteIntegrationRequest) (*pb.DeleteIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.DeleteIntegration(ctx, orgID, req.IntegrationId)
+}
+
+func (s *OrganizationService) NextIntegrationSetupStep(ctx context.Context, req *pb.NextIntegrationSetupStepRequest) (*pb.NextIntegrationSetupStepResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.NextIntegrationSetupStep(ctx, s.registry, s.baseURL, s.webhooksBaseURL, orgID, req.IntegrationId, req.Inputs, req.Capabilities)
+}
+
+func (s *OrganizationService) PreviousIntegrationSetupStep(ctx context.Context, req *pb.PreviousIntegrationSetupStepRequest) (*pb.PreviousIntegrationSetupStepResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.PreviousIntegrationSetupStep(ctx, s.registry, orgID, req.IntegrationId)
+}
+
+func (s *OrganizationService) UpdateIntegrationCapabilities(ctx context.Context, req *pb.UpdateIntegrationCapabilitiesRequest) (*pb.UpdateIntegrationCapabilitiesResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateIntegrationCapabilities(ctx, s.registry, orgID, req.IntegrationId, req.Capabilities)
+}
+
+func (s *OrganizationService) UpdateIntegrationProperty(ctx context.Context, req *pb.UpdateIntegrationPropertyRequest) (*pb.UpdateIntegrationPropertyResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateIntegrationProperty(ctx, s.registry, orgID, req.IntegrationId, req.PropertyName, req.Value)
+}
+
+func (s *OrganizationService) UpdateIntegrationSecret(ctx context.Context, req *pb.UpdateIntegrationSecretRequest) (*pb.UpdateIntegrationSecretResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateIntegrationSecret(ctx, s.registry, orgID, req.IntegrationId, req.SecretName, req.Value)
 }
 
 func accountIDFromContext(ctx context.Context) (string, error) {

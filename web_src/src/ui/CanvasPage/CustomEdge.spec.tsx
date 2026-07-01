@@ -10,6 +10,13 @@ vi.mock("@xyflow/react", () => ({
   BaseEdge: ({ className }: { className?: string }) => <div data-testid="base-edge" data-class-name={className} />,
   EdgeLabelRenderer: ({ children }: { children?: ReactNode }) => <>{children}</>,
   getBezierPath: () => ["M0,0 C10,0 20,10 30,10", 15, 5],
+  getSmoothStepPath: () => ["M0,0 L10,0 L10,10 L30,10", 15, 5],
+  Position: {
+    Left: "left",
+    Right: "right",
+    Top: "top",
+    Bottom: "bottom",
+  },
   useReactFlow: () => ({
     setEdges,
   }),

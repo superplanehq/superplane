@@ -1,0 +1,21 @@
+{
+  "data": {
+    "zoneId": "zone123",
+    "rule": {
+      "id": "rule123",
+      "action": "route",
+      "expression": "starts_with(http.request.uri.path, \"/api/\")",
+      "description": "Route API requests",
+      "enabled": true,
+      "action_parameters": {
+        "host_header": "api.example.com",
+        "origin": {
+          "host": "api-origin.example.com",
+          "port": 8443
+        }
+      }
+    }
+  },
+  "type": "cloudflare.createOriginRule",
+  "timestamp": "2026-05-06T12:00:00Z"
+}

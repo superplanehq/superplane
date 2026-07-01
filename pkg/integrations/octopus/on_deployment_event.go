@@ -180,11 +180,11 @@ func (t *OnDeploymentEvent) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(webhookConfig)
 }
 
-func (t *OnDeploymentEvent) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnDeploymentEvent) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnDeploymentEvent) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnDeploymentEvent) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

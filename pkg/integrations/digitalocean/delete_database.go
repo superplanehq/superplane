@@ -178,18 +178,18 @@ func (d *DeleteDatabase) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 	return ctx.DefaultProcessing()
 }
 
-func (d *DeleteDatabase) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (d *DeleteDatabase) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (d *DeleteDatabase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (d *DeleteDatabase) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (d *DeleteDatabase) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (d *DeleteDatabase) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

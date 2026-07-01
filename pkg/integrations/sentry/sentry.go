@@ -198,8 +198,8 @@ func (s *Sentry) Configuration() []configuration.Field {
 	}
 }
 
-func (s *Sentry) Components() []core.Component {
-	return []core.Component{
+func (s *Sentry) Actions() []core.Action {
+	return []core.Action{
 		&CreateAlert{},
 		&UpdateAlert{},
 		&DeleteAlert{},
@@ -443,14 +443,6 @@ func sameStringSet(a, b []string) bool {
 }
 
 func (s *Sentry) Cleanup(ctx core.IntegrationCleanupContext) error {
-	return nil
-}
-
-func (s *Sentry) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (s *Sentry) HandleAction(ctx core.IntegrationActionContext) error {
 	return nil
 }
 
@@ -1114,4 +1106,12 @@ func missingCredentialsMessage(config Configuration) string {
 	}
 
 	return fmt.Sprintf("Sentry configuration is incomplete: missing %s", strings.Join(missing, " and "))
+}
+
+func (s *Sentry) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *Sentry) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

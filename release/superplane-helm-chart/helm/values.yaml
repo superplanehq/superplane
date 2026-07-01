@@ -74,6 +74,14 @@ sentry:
   dsn: ""
   environment: ""
 
+dash0Web:
+  secretName: ""
+  enabled: false
+  otlpEndpoint: ""
+  authToken: ""
+  serviceName: "superplane-web"
+  environment: ""
+
 #
 # Secret used to sign JWT session tokens
 #
@@ -172,6 +180,8 @@ database:
   username: postgres
   password: postgres
   ssl: false
+  statementTimeout: "60s"
+  idleInTransactionSessionTimeout: "30s"
   local:
     enabled: true
     version: 14.15-alpine3.21
@@ -194,6 +204,32 @@ rabbitmq:
     enabled: true
     version: 3.13.7-management-alpine
     size: 2Gi
+
+#
+# SuperGit configuration
+#
+supergit:
+  host: "supergit"
+  port: 8080
+  apiPath: "/api"
+  defaultBranch: main
+  maxFileBytes: 10485760
+  maxCommitBytes: 26214400
+  image:
+    registry: ghcr.io/superplanehq
+    name: supergit
+    pullPolicy: IfNotPresent
+  local:
+    enabled: true
+    version: 0.1.1
+    size: 2Gi
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
 
 #
 # Email configuration

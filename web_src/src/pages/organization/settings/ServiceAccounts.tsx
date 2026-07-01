@@ -1,5 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Link } from "@/components/Link/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/Table/table";
@@ -8,7 +9,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,6 +38,8 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
   const { data: serviceAccounts = [], isLoading } = useServiceAccounts(organizationId);
   const createMutation = useCreateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
+
+  useReportPageReady(!isLoading && !permissionsLoading);
 
   const handleCreateClick = () => {
     if (!canCreate) return;
@@ -165,6 +168,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 <TableRow>
                   <TableHeader>Name</TableHeader>
                   <TableHeader>Description</TableHeader>
+                  <TableHeader>Created by</TableHeader>
                   <TableHeader>Token</TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
@@ -186,6 +190,11 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">{sa.description || "—"}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {sa.createdByName ? sa.createdByName?.trim() : "—"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -336,7 +345,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ph-no-capture">
                 <Input
                   readOnly
                   value={newToken}

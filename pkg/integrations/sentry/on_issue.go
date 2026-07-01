@@ -155,11 +155,11 @@ func (t *OnIssue) subscribe(ctx core.TriggerContext, metadata OnIssueMetadata) (
 	return &value, nil
 }
 
-func (t *OnIssue) Actions() []core.Action {
-	return []core.Action{}
+func (t *OnIssue) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (t *OnIssue) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (t *OnIssue) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

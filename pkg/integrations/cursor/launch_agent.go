@@ -39,17 +39,7 @@ func (c *LaunchAgent) Icon() string { return "cpu" }
 func (c *LaunchAgent) Color() string { return "#8B5CF6" }
 
 func (c *LaunchAgent) ExampleOutput() map[string]any {
-	return map[string]any{
-		"data": map[string]any{
-			"status":     LaunchAgentStatusDone,
-			"agentId":    "agent_12345",
-			"summary":    "Refactored login logic.",
-			"prUrl":      "https://github.com/org/repo/pull/42",
-			"branchName": "cursor/agent-550e8400",
-		},
-		"timestamp": "2026-03-26T19:29:35.841265352Z",
-		"type":      LaunchAgentPayloadType,
-	}
+	return getLaunchAgentExampleOutput()
 }
 
 func (c *LaunchAgent) OutputChannels(config any) []core.OutputChannel {

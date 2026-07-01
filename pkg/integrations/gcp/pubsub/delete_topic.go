@@ -102,13 +102,19 @@ func (c *DeleteTopicComponent) Execute(ctx core.ExecutionContext) error {
 	})
 }
 
-func (c *DeleteTopicComponent) Actions() []core.Action                  { return nil }
-func (c *DeleteTopicComponent) HandleAction(_ core.ActionContext) error { return nil }
-func (c *DeleteTopicComponent) Cancel(_ core.ExecutionContext) error    { return nil }
-func (c *DeleteTopicComponent) Cleanup(_ core.SetupContext) error       { return nil }
+func (c *DeleteTopicComponent) Cancel(_ core.ExecutionContext) error { return nil }
+func (c *DeleteTopicComponent) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *DeleteTopicComponent) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 func (c *DeleteTopicComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
+}
+
+func (c *DeleteTopicComponent) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteTopicComponent) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

@@ -240,14 +240,6 @@ func (c *GetLastMention) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetLastMention) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetLastMention) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetLastMention) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
@@ -306,4 +298,12 @@ func parseDateTimeWithUTCDefault(value string) (time.Time, error) {
 		"expected datetime in ISO 8601 (e.g. 2026-03-10T16:00:00Z) or Go timestamp format (e.g. 2026-03-16 04:17:08.750328135 +0000 UTC), got %q",
 		value,
 	)
+}
+
+func (c *GetLastMention) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetLastMention) HandleHook(ctx core.ActionHookContext) error {
+	return nil
 }

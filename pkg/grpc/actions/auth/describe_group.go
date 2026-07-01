@@ -5,21 +5,20 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func DescribeGroup(ctx context.Context, domainType, domainID, groupName string, authService authorization.Authorization) (*pb.DescribeGroupResponse, error) {
 	if groupName == "" {
-		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
+		return nil, grpcerrors.InvalidArgument(nil, "group name must be specified")
 	}
 
-	role, err := authService.GetGroupRole(domainID, domainType, groupName)
+	role, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "group not found")
+		return nil, grpcerrors.NotFound(err, "group not found")
 	}
 
 	groupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
@@ -31,12 +30,12 @@ func DescribeGroup(ctx context.Context, domainType, domainID, groupName string, 
 		createdAt = timestamppb.New(groupMetadata.CreatedAt)
 		updatedAt = timestamppb.New(groupMetadata.UpdatedAt)
 	} else {
-		return nil, status.Error(codes.NotFound, "group not found")
+		return nil, grpcerrors.NotFound(err, "group not found")
 	}
 
-	groupUsers, err := authService.GetGroupUsers(domainID, domainType, groupName)
+	groupUsers, err := authService.GetGroupUsers(ctx, domainID, domainType, groupName)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get group members count")
+		return nil, grpcerrors.Internal(err, "failed to get group members count")
 	}
 
 	group := &pb.Group{

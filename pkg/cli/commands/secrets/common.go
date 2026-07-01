@@ -23,11 +23,20 @@ type secretResource struct {
 	Spec       *openapi_client.SecretsSecretSpec     `json:"spec,omitempty"`
 }
 
-func parseSecretFile(path string) (*secretResource, error) {
-	// #nosec
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read resource file: %w", err)
+func parseSecretInput(path string, stdin io.Reader) (*secretResource, error) {
+	var data []byte
+	var err error
+	if path == "-" {
+		data, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read from stdin: %w", err)
+		}
+	} else {
+		// #nosec
+		data, err = os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read resource file: %w", err)
+		}
 	}
 
 	apiVersion, kind, err := core.ParseYamlResourceHeaders(data)
@@ -51,8 +60,8 @@ func parseSecretFile(path string) (*secretResource, error) {
 	return &resource, nil
 }
 
-func resourceToSecret(resource secretResource) openapi_client.SecretsSecret {
-	secret := openapi_client.SecretsSecret{}
+func resourceToSecret(resource secretResource) openapi_client.SuperplaneSecretsSecret {
+	secret := openapi_client.SuperplaneSecretsSecret{}
 	if resource.Metadata != nil {
 		secret.SetMetadata(*resource.Metadata)
 	}
@@ -62,7 +71,7 @@ func resourceToSecret(resource secretResource) openapi_client.SecretsSecret {
 	return secret
 }
 
-func renderSecretListText(stdout io.Writer, items []openapi_client.SecretsSecret) error {
+func renderSecretListText(stdout io.Writer, items []openapi_client.SuperplaneSecretsSecret) error {
 	if len(items) == 0 {
 		_, err := fmt.Fprintln(stdout, "No secrets found.")
 		return err
@@ -99,7 +108,7 @@ func renderSecretListText(stdout io.Writer, items []openapi_client.SecretsSecret
 	return writer.Flush()
 }
 
-func renderSecretText(stdout io.Writer, item openapi_client.SecretsSecret) error {
+func renderSecretText(stdout io.Writer, item openapi_client.SuperplaneSecretsSecret) error {
 	metadata := item.GetMetadata()
 	spec := item.GetSpec()
 

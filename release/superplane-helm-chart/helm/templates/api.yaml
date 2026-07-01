@@ -67,12 +67,10 @@ spec:
                 name: {{ include "secrets.session.name" . }}
             - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
+            - secretRef:
+                name: {{ include "secrets.dash0Web.name" . }}
           env:
             - name: START_PUBLIC_API
-              value: "yes"
-            - name: START_INTERNAL_API
-              value: "yes"
-            - name: START_GRPC_GATEWAY
               value: "yes"
             - name: START_EVENT_DISTRIBUTER
               value: "yes"
@@ -96,6 +94,10 @@ spec:
               value: superplane
             - name: DB_POOL_SIZE
               value: "{{ .Values.api.dbPoolSize }}"
+            - name: DB_STATEMENT_TIMEOUT
+              value: "{{ .Values.database.statementTimeout }}"
+            - name: DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT
+              value: "{{ .Values.database.idleInTransactionSessionTimeout }}"
             - name: TEMPLATE_DIR
               value: /app/templates
             - name: OIDC_KEYS_PATH
@@ -120,6 +122,10 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+            - name: GIT_STORAGE_PROVIDER
+              value: supergit
+            - name: GIT_STORAGE_SUPERGIT_BASE_URL
+              value: {{ printf "http://%s:%v%s" .Values.supergit.host .Values.supergit.port .Values.supergit.apiPath | quote }}
 
           volumeMounts:
             - name: oidc-keys

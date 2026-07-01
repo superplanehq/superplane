@@ -43,6 +43,7 @@ message NumberTypeOptions {
 message StringTypeOptions {
   optional int32 min_length = 1;
   optional int32 max_length = 2;
+  optional bool allow_expressions = 3;
 }
 
 message ExpressionTypeOptions {
@@ -53,6 +54,7 @@ message ExpressionTypeOptions {
 message TextTypeOptions {
   optional int32 min_length = 1;
   optional int32 max_length = 2;
+  optional string language = 3;
 }
 
 message TimeTypeOptions {
@@ -73,6 +75,7 @@ message SelectTypeOptions {
 
 message MultiSelectTypeOptions {
   repeated SelectOption options = 1;
+  bool use_checkboxes = 2;
 }
 
 message ResourceTypeOptions {
@@ -96,6 +99,8 @@ message ListTypeOptions {
   ListItemDefinition item_definition = 1;
   string item_label = 2;
   optional int32 max_items = 3;
+  optional bool accordion = 4;
+  optional bool reorderable = 5;
 }
 
 message ObjectTypeOptions {
@@ -105,6 +110,7 @@ message ObjectTypeOptions {
 message SelectOption {
   string label = 1;
   string value = 2;
+  string description = 3;
 }
 
 message VisibilityCondition {

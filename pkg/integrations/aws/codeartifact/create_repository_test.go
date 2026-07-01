@@ -84,7 +84,7 @@ func TestCreateRepository_Execute(t *testing.T) {
 				"region": "us-east-1", "domain": "my-domain", "repository": "my-repo",
 			},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-			Integration:    &contexts.IntegrationContext{Secrets: map[string]core.IntegrationSecret{}},
+			Integration:    &contexts.IntegrationContext{},
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "credentials")
@@ -110,7 +110,7 @@ func TestCreateRepository_Execute(t *testing.T) {
 			ExecutionState: execState,
 			HTTP:           httpContext,
 			Integration: &contexts.IntegrationContext{
-				Secrets: map[string]core.IntegrationSecret{
+				CurrentSecrets: map[string]core.IntegrationSecret{
 					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
 					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
 					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},

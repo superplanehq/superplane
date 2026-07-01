@@ -1,0 +1,23 @@
+{
+  "type": "grafana.incident.declared",
+  "timestamp": "2026-04-20T10:05:00Z",
+  "data": {
+    "incidentID": "incident-123",
+    "incidentUrl": "https://grafana.example.com/a/grafana-irm-app/incidents/incident-123",
+    "title": "Quarterly response drill",
+    "severity": "minor",
+    "status": "active",
+    "summary": "Simulated database failover exercise for the API tier.",
+    "labels": [
+      {
+        "label": "api"
+      },
+      {
+        "label": "drill"
+      }
+    ],
+    "isDrill": true,
+    "createdTime": "2026-04-20T10:00:00Z",
+    "modifiedTime": "2026-04-20T10:05:00Z"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "data": {
+    "account_id": "90ddd046-218b-d375-f20e-9f9082cc0c6d",
+    "alert_name": "tunnel_health_event",
+    "alert_type": "tunnel_health_event",
+    "dashboard_link": "dash.cloudflare.com/aBcD1234efgh567i890j1kl234567m89",
+    "name": "SuperPlane Tunnel Health Alert",
+    "new_status": "TUNNEL_STATUS_TYPE_DEGRADED",
+    "policy_id": "fe9eda012119414084b1c9ffc9a1e2c9",
+    "policy_name": "SuperPlane Tunnel Health Alert",
+    "severity": "INFO",
+    "status_reason": "status change",
+    "text": "A Cloudflare Tunnel in your account has changed its connection status.\nTunnel: tunnel-name (aBcD1234efgh567i890j1kl234567m80) \nNew status: TUNNEL_STATUS_TYPE_DEGRADED (status change)",
+    "timestamp": "2022-10-27T06:00:22Z",
+    "ts": 1778597408,
+    "tunnel_id": "aBcD1234efgh567i890j1kl234567m80",
+    "tunnel_name": "tunnel-name"
+  },
+  "timestamp": "2026-05-12T14:50:14.036687251Z",
+  "type": "cloudflare.tunnel.healthEvent"
+}

@@ -16,7 +16,7 @@ const ChannelNameTrue = "true"
 const ChannelNameFalse = "false"
 
 func init() {
-	registry.RegisterComponent(ComponentName, &If{})
+	registry.RegisterAction(ComponentName, &If{})
 }
 
 type If struct{}
@@ -91,6 +91,7 @@ func (f *If) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "expression",
+			Label:       "Condition",
 			Type:        configuration.FieldTypeExpression,
 			Description: "Boolean expression to evaluate",
 			Required:    true,
@@ -130,14 +131,6 @@ func (f *If) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (f *If) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (f *If) HandleAction(ctx core.ActionContext) error {
-	return fmt.Errorf("if does not support actions")
-}
-
 func (f *If) Setup(ctx core.SetupContext) error {
 	return nil
 }
@@ -155,5 +148,13 @@ func (f *If) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookRe
 }
 
 func (f *If) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (f *If) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (f *If) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

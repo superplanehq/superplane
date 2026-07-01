@@ -113,7 +113,7 @@ func Test__CreateDatabaseCluster__Execute(t *testing.T) {
 	})
 }
 
-func Test__CreateDatabaseCluster__HandleAction(t *testing.T) {
+func Test__CreateDatabaseCluster__HandleHook(t *testing.T) {
 	component := &CreateDatabaseCluster{}
 
 	t.Run("online cluster emits result", func(t *testing.T) {
@@ -138,7 +138,7 @@ func Test__CreateDatabaseCluster__HandleAction(t *testing.T) {
 		}
 
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -171,7 +171,7 @@ func Test__CreateDatabaseCluster__HandleAction(t *testing.T) {
 
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		requestCtx := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
@@ -204,7 +204,7 @@ func Test__CreateDatabaseCluster__HandleAction(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{

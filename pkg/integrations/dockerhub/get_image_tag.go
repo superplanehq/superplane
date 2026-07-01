@@ -154,14 +154,6 @@ func (c *GetImageTag) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *GetImageTag) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetImageTag) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetImageTag) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -171,5 +163,13 @@ func (c *GetImageTag) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *GetImageTag) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetImageTag) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetImageTag) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

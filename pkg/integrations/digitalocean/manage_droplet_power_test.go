@@ -245,7 +245,7 @@ func Test__ManageDropletPower__Execute(t *testing.T) {
 	})
 }
 
-func Test__ManageDropletPower__HandleAction(t *testing.T) {
+func Test__ManageDropletPower__HandleHook(t *testing.T) {
 	component := &ManageDropletPower{}
 
 	t.Run("action completed -> emits with action data", func(t *testing.T) {
@@ -287,7 +287,7 @@ func Test__ManageDropletPower__HandleAction(t *testing.T) {
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -342,7 +342,7 @@ func Test__ManageDropletPower__HandleAction(t *testing.T) {
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,
@@ -395,7 +395,7 @@ func Test__ManageDropletPower__HandleAction(t *testing.T) {
 			KVs: map[string]string{},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			HTTP:           httpContext,
 			Integration:    integrationCtx,

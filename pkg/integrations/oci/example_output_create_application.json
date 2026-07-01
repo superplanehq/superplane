@@ -1,0 +1,11 @@
+{
+  "data": {
+    "applicationId": "ocid1.fnapp.oc1.eu-frankfurt-1.aaaaExample1234567890abcdefghijklmnopqrstuvwxyz",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
+    "displayName": "my-functions-app",
+    "lifecycleState": "ACTIVE",
+    "timeCreated": "2026-04-22T20:31:25.145Z"
+  },
+  "timestamp": "2026-04-22T20:31:58.249783188Z",
+  "type": "oci.applicationCreated"
+}

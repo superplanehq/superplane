@@ -69,6 +69,10 @@ func (m *mockOSClient) Post(ctx context.Context, path string, body any) ([]byte,
 	return nil, errors.New("not implemented")
 }
 
+func (m *mockOSClient) Delete(ctx context.Context, path string) ([]byte, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (m *mockOSClient) GetURL(ctx context.Context, fullURL string) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
@@ -76,6 +80,40 @@ func (m *mockOSClient) GetURL(ctx context.Context, fullURL string) ([]byte, erro
 func (m *mockOSClient) ProjectID() string {
 	return m.projectID
 }
+func Test_ListMachineTypeResourcesForInstance(t *testing.T) {
+	t.Run("empty instance returns empty without calling API", func(t *testing.T) {
+		mc := &mockOSClient{projectID: "p1", get: func(ctx context.Context, path string) ([]byte, error) {
+			return nil, errors.New("API should not be called")
+		}}
+		out, err := ListMachineTypeResourcesForInstance(context.Background(), mc, "")
+		assert.NoError(t, err)
+		assert.Empty(t, out)
+	})
+
+	t.Run("unparseable instance returns empty without calling API", func(t *testing.T) {
+		mc := &mockOSClient{projectID: "p1", get: func(ctx context.Context, path string) ([]byte, error) {
+			return nil, errors.New("API should not be called")
+		}}
+		out, err := ListMachineTypeResourcesForInstance(context.Background(), mc, "just-a-name")
+		assert.NoError(t, err)
+		assert.Empty(t, out)
+	})
+
+	t.Run("valid instance path lists machine types in the parsed zone", func(t *testing.T) {
+		var requestedPath string
+		mc := &mockOSClient{projectID: "lmtfi-proj", get: func(ctx context.Context, path string) ([]byte, error) {
+			requestedPath = path
+			return []byte(`{"items":[{"name":"n2-standard-4","guestCpus":4,"memoryMb":16384}]}`), nil
+		}}
+		out, err := ListMachineTypeResourcesForInstance(context.Background(), mc,
+			"zones/lmtfi-zone-a/instances/my-vm")
+		require.NoError(t, err)
+		assert.Contains(t, requestedPath, "projects/lmtfi-proj/zones/lmtfi-zone-a/machineTypes")
+		require.Len(t, out, 1)
+		assert.Equal(t, "n2-standard-4", out[0].ID)
+	})
+}
+
 func Test_isPublicImageProject(t *testing.T) {
 	assert.True(t, isPublicImageProject("debian-cloud"))
 	assert.True(t, isPublicImageProject("ubuntu-os-cloud"))

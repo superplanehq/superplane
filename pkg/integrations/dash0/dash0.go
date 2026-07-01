@@ -25,7 +25,7 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
+	NotificationChannelID string `json:"notificationChannelId" mapstructure:"notificationChannelId"`
 }
 
 func (d *Dash0) Name() string {
@@ -45,32 +45,38 @@ func (d *Dash0) Description() string {
 }
 
 func (d *Dash0) Instructions() string {
-	return ""
+	return `
+To connect Dash0 to Superplane:
+
+1. Go to **Settings → Auth Tokens → + Add** to create a new API token.
+2. Give the token a name, grant it access to the Default or all Datasets, all Signal types, and all Permissions.
+3. Click **Save** and copy the **Token** into the **API Token** field below.
+4. Go to **Settings → Endpoints → Prometheus API** and copy the **Endpoint** into the **Prometheus API Base URL** field below.
+5. Click **Connect** to finish setup.
+`
 }
 
 func (d *Dash0) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "apiToken",
-			Label:       "API Token",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Sensitive:   true,
-			Description: "Your Dash0 API token for authentication",
+			Name:      "apiToken",
+			Label:     "API Token",
+			Type:      configuration.FieldTypeString,
+			Required:  true,
+			Sensitive: true,
 		},
 		{
 			Name:        "baseURL",
 			Label:       "Prometheus API Base URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Your Dash0 Prometheus API base URL. Find this in Dash0 dashboard: Organization Settings > Endpoints > Prometheus API. You can use either the full endpoint URL (https://api.us-west-2.aws.dash0.com/api/prometheus) or just the base URL (https://api.us-west-2.aws.dash0.com)",
 			Placeholder: "https://api.us-west-2.aws.dash0.com",
 		},
 	}
 }
 
-func (d *Dash0) Components() []core.Component {
-	return []core.Component{
+func (d *Dash0) Actions() []core.Action {
+	return []core.Action{
 		&QueryPrometheus{},
 		&ListIssues{},
 		&CreateHTTPSyntheticCheck{},
@@ -120,12 +126,19 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error validating connection: %v", err)
 	}
 
+	webhookURL := fmt.Sprintf(
+		"%s/api/v1/integrations/%s/webhook",
+		strings.TrimRight(ctx.WebhooksBaseURL, "/"),
+		ctx.Integration.ID().String(),
+	)
+
+	channelID, err := provisionNotificationChannel(client, ctx.Integration, webhookURL)
+	if err != nil {
+		return err
+	}
+
 	ctx.Integration.SetMetadata(Metadata{
-		WebhookURL: fmt.Sprintf(
-			"%s/api/v1/integrations/%s/webhook",
-			strings.TrimRight(ctx.WebhooksBaseURL, "/"),
-			ctx.Integration.ID().String(),
-		),
+		NotificationChannelID: channelID,
 	})
 
 	ctx.Integration.Ready()
@@ -133,6 +146,18 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 }
 
 func (d *Dash0) Cleanup(ctx core.IntegrationCleanupContext) error {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("failed to create dash0 client during cleanup: %v", err)
+		}
+		return nil
+	}
+
+	if err := deleteProvisionedNotificationChannel(client, ctx.Integration, ctx.Logger); err != nil {
+		return nil
+	}
+
 	return nil
 }
 
@@ -274,10 +299,10 @@ func (d *Dash0) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(http.StatusOK)
 }
 
-func (d *Dash0) Actions() []core.Action {
-	return []core.Action{}
+func (d *Dash0) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (d *Dash0) HandleAction(ctx core.IntegrationActionContext) error {
+func (d *Dash0) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

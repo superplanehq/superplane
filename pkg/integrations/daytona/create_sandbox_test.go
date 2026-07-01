@@ -190,7 +190,7 @@ func Test__CreateSandbox__Execute(t *testing.T) {
 	})
 }
 
-func Test__CreateSandbox__HandleAction(t *testing.T) {
+func Test__CreateSandbox__HandleHook(t *testing.T) {
 	component := CreateSandbox{}
 
 	t.Run("poll reschedules when sandbox is still creating", func(t *testing.T) {
@@ -210,7 +210,7 @@ func Test__CreateSandbox__HandleAction(t *testing.T) {
 		}
 
 		requestCtx := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:        "poll",
 			HTTP:        httpContext,
 			Integration: appCtx,
@@ -246,7 +246,7 @@ func Test__CreateSandbox__HandleAction(t *testing.T) {
 		}
 
 		execCtx := &contexts.ExecutionStateContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:        "poll",
 			HTTP:        httpContext,
 			Integration: appCtx,
@@ -283,7 +283,7 @@ func Test__CreateSandbox__HandleAction(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:        "poll",
 			HTTP:        httpContext,
 			Integration: appCtx,
@@ -318,7 +318,7 @@ func Test__CreateSandbox__HandleAction(t *testing.T) {
 		}
 
 		requestCtx := &contexts.RequestContext{}
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:        "poll",
 			HTTP:        httpContext,
 			Integration: appCtx,
@@ -343,7 +343,7 @@ func Test__CreateSandbox__HandleAction(t *testing.T) {
 			},
 		}
 
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:        "poll",
 			HTTP:        &contexts.HTTPContext{},
 			Integration: appCtx,
@@ -362,7 +362,7 @@ func Test__CreateSandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("skips when execution already finished", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name:           "poll",
 			ExecutionState: &contexts.ExecutionStateContext{Finished: true},
 		})
@@ -371,7 +371,7 @@ func Test__CreateSandbox__HandleAction(t *testing.T) {
 	})
 
 	t.Run("unknown action -> error", func(t *testing.T) {
-		err := component.HandleAction(core.ActionContext{
+		err := component.HandleHook(core.ActionHookContext{
 			Name: "unknown",
 		})
 

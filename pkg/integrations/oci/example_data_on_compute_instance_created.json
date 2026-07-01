@@ -1,0 +1,30 @@
+{
+  "data": {
+    "cloudEventsVersion": "0.1",
+    "contentType": "application/json",
+    "data": {
+      "additionalDetails": {
+        "imageId": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890ab",
+        "shape": "VM.Standard.E2.1.Micro",
+        "type": "CustomerVmi"
+      },
+      "availabilityDomain": "EXAMPLE:EU-FRANKFURT-1-AD-1",
+      "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890",
+      "compartmentName": "root",
+      "definedTags": {},
+      "freeformTags": {},
+      "resourceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890cd",
+      "resourceName": "my-instance"
+    },
+    "eventID": "00000000-0000-0000-0000-000000000000",
+    "eventTime": "2026-01-01T00:00:00Z",
+    "eventType": "com.oraclecloud.computeapi.launchinstance.end",
+    "eventTypeVersion": "2.0",
+    "extensions": {
+      "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890abcdefghijklmnopqrstuvwxyz1234567890"
+    },
+    "source": "ComputeApi"
+  },
+  "timestamp": "2026-01-01T00:00:05Z",
+  "type": "oci.onComputeInstanceCreated"
+}

@@ -6,11 +6,16 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/common"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("semaphore", &Semaphore{}, &SemaphoreWebhookHandler{})
+	registry.RegisterIntegrationWithOptions("semaphore", &Semaphore{}, registry.IntegrationRegistrationOptions{
+		WebhookHandler: &SemaphoreWebhookHandler{},
+		SetupProvider:  &SetupProvider{},
+	})
 }
 
 type Semaphore struct{}
@@ -82,7 +87,7 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	client, err := common.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
@@ -91,7 +96,7 @@ func (s *Semaphore) Sync(ctx core.SyncContext) error {
 	// Semaphore doesn't have a whoami endpoint, so
 	// we list projects just to verify that the connection is working.
 	//
-	_, err = client.listProjects()
+	_, err = client.ListProjects()
 	if err != nil {
 		return fmt.Errorf("error listing projects: %v", err)
 	}
@@ -105,22 +110,22 @@ func (s *Semaphore) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (s *Semaphore) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (s *Semaphore) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
-
-func (s *Semaphore) Components() []core.Component {
-	return []core.Component{
-		&RunWorkflow{},
-		&GetPipeline{},
+	return []core.Action{
+		&components.RunWorkflow{},
+		&components.GetPipeline{},
 	}
 }
 
 func (s *Semaphore) Triggers() []core.Trigger {
 	return []core.Trigger{
-		&OnPipelineDone{},
+		&components.OnPipelineDone{},
 	}
+}
+
+func (s *Semaphore) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (s *Semaphore) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

@@ -3,6 +3,7 @@ package jira
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -15,10 +16,12 @@ const CreateIssuePayloadType = "jira.issue"
 type CreateIssue struct{}
 
 type CreateIssueSpec struct {
-	Project     string `json:"project"`
-	IssueType   string `json:"issueType"`
-	Summary     string `json:"summary"`
-	Description string `json:"description"`
+	Project     string `json:"project" mapstructure:"project"`
+	IssueType   string `json:"issueType" mapstructure:"issueType"`
+	Summary     string `json:"summary" mapstructure:"summary"`
+	Description string `json:"description" mapstructure:"description"`
+	Assignee    string `json:"assignee" mapstructure:"assignee"`
+	Status      string `json:"status" mapstructure:"status"`
 }
 
 func (c *CreateIssue) Name() string {
@@ -45,16 +48,19 @@ func (c *CreateIssue) Documentation() string {
 ## Configuration
 
 - **Project**: The Jira project to create the issue in
-- **Issue Type**: The type of issue (e.g. Task, Bug, Story)
+- **Issue Type**: The type of issue (scoped to the chosen project)
 - **Summary**: The issue summary/title
 - **Description**: Optional description text
+- **Assignee**: Optional Jira user to assign the issue to
+- **Status**: Optional initial status. Jira always creates issues in the workflow's initial state, so when this is set the component executes a transition immediately after create. The status must be reachable via a transition from the initial state.
 
 ## Output
 
 Returns the created issue including:
 - **id**: The issue ID
 - **key**: The issue key (e.g. PROJ-123)
-- **self**: API URL for the issue`
+- **self**: API URL for the issue
+- **fields**: Full issue fields after any status transition`
 }
 
 func (c *CreateIssue) Icon() string {
@@ -87,15 +93,27 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 		{
 			Name:        "issueType",
 			Label:       "Issue Type",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The type of issue (e.g. Task, Bug, Story)",
-			Placeholder: "Task",
+			Placeholder: "Select an issue type",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "issueType",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "summary",
 			Label:       "Summary",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "The issue summary/title",
 			Placeholder: "Issue summary",
@@ -103,9 +121,48 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 		{
 			Name:        "description",
 			Label:       "Description",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional description text",
+		},
+		{
+			Name:        "assignee",
+			Label:       "Assignee",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "User to assign the new issue to",
+			Placeholder: "Leave empty to keep the project default",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "assignee",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "status",
+			Label:       "Initial Status",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Move the new issue to this status via a transition (must be reachable from the workflow's initial state)",
+			Placeholder: "Leave empty to keep the workflow default",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "issueStatus",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -128,29 +185,16 @@ func (c *CreateIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("summary is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	project, err := requireProject(ctx.HTTP, ctx.Integration, spec.Project)
 	if err != nil {
-		return fmt.Errorf("failed to create client: %v", err)
+		return err
 	}
 
-	projects, err := client.ListProjects()
-	if err != nil {
-		return fmt.Errorf("failed to list projects: %v", err)
-	}
-
-	var project *Project
-	for _, p := range projects {
-		if p.Key == spec.Project {
-			project = &p
-			break
-		}
-	}
-
-	if project == nil {
-		return fmt.Errorf("project %s not found", spec.Project)
-	}
-
-	return ctx.Metadata.Set(NodeMetadata{Project: project})
+	return ctx.Metadata.Set(NodeMetadata{
+		Project:   project,
+		IssueType: spec.IssueType,
+		Status:    spec.Status,
+	})
 }
 
 func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
@@ -172,16 +216,30 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 			Description: WrapInADF(spec.Description),
 		},
 	}
+	if strings.TrimSpace(spec.Assignee) != "" {
+		req.Fields.Assignee = &UserRef{AccountID: strings.TrimSpace(spec.Assignee)}
+	}
 
-	response, err := client.CreateIssue(req)
+	created, err := client.CreateIssue(req)
 	if err != nil {
 		return fmt.Errorf("failed to create issue: %v", err)
+	}
+
+	if status := strings.TrimSpace(spec.Status); status != "" {
+		if err := applyStatus(client, created.Key, status); err != nil {
+			return fmt.Errorf("issue %s created, but failed to apply status %q: %v", created.Key, status, err)
+		}
+	}
+
+	issue, err := client.GetIssue(created.Key)
+	if err != nil {
+		return fmt.Errorf("failed to fetch created issue: %v", err)
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		CreateIssuePayloadType,
-		[]any{response},
+		[]any{issue},
 	)
 }
 
@@ -193,18 +251,18 @@ func (c *CreateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 	return ctx.DefaultProcessing()
 }
 
-func (c *CreateIssue) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *CreateIssue) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *CreateIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (c *CreateIssue) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *CreateIssue) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateIssue) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

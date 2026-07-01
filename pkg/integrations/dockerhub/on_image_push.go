@@ -190,11 +190,11 @@ func (p *OnImagePush) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (p *OnImagePush) Actions() []core.Action {
-	return []core.Action{}
+func (p *OnImagePush) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (p *OnImagePush) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+func (p *OnImagePush) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 

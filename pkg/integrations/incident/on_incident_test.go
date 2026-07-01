@@ -201,7 +201,7 @@ func Test__OnIncident__HandleWebhook(t *testing.T) {
 	})
 }
 
-func Test__OnIncident__HandleAction__SetSecret(t *testing.T) {
+func Test__OnIncident__HandleHook__SetSecret(t *testing.T) {
 	trigger := &OnIncident{}
 
 	t.Run("setSecret stores secret and updates metadata", func(t *testing.T) {
@@ -210,7 +210,7 @@ func Test__OnIncident__HandleAction__SetSecret(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 		metadataCtx.Metadata = OnIncidentMetadata{WebhookURL: "https://example.com/webhook"}
 
-		result, err := trigger.HandleAction(core.TriggerActionContext{
+		result, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:       "setSecret",
 			Parameters: map[string]any{"webhookSigningSecret": "whsec_abc123"},
 			Webhook:    webhookCtx,
@@ -236,7 +236,7 @@ func Test__OnIncident__HandleAction__SetSecret(t *testing.T) {
 		metadataCtx := &contexts.MetadataContext{}
 		metadataCtx.Metadata = OnIncidentMetadata{WebhookURL: "https://example.com/webhook", SigningSecretConfigured: true}
 
-		result, err := trigger.HandleAction(core.TriggerActionContext{
+		result, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:       "setSecret",
 			Parameters: map[string]any{"webhookSigningSecret": ""},
 			Webhook:    webhookCtx,
@@ -254,7 +254,7 @@ func Test__OnIncident__HandleAction__SetSecret(t *testing.T) {
 	})
 
 	t.Run("setSecret without webhook returns error", func(t *testing.T) {
-		result, err := trigger.HandleAction(core.TriggerActionContext{
+		result, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:       "setSecret",
 			Parameters: map[string]any{"webhookSigningSecret": "whsec_xyz"},
 			Webhook:    nil,
@@ -266,7 +266,7 @@ func Test__OnIncident__HandleAction__SetSecret(t *testing.T) {
 	})
 
 	t.Run("unsupported action returns error", func(t *testing.T) {
-		result, err := trigger.HandleAction(core.TriggerActionContext{
+		result, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:    "unknownAction",
 			Webhook: &setupFirstWebhookContext{setupCalled: true},
 		})

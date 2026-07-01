@@ -28,7 +28,7 @@ func (c *GetService) Label() string {
 }
 
 func (c *GetService) Description() string {
-	return "Retrieve a Render service by ID"
+	return "Retrieve a Render service and its custom domains"
 }
 
 func (c *GetService) Documentation() string {
@@ -36,7 +36,7 @@ func (c *GetService) Documentation() string {
 
 ## Use Cases
 
-- **Service inspection**: Fetch current service configuration and metadata
+- **Service inspection**: Fetch current service configuration, metadata, and custom domains
 - **Workflow context**: Use service fields to drive branching decisions in later steps
 
 ## Configuration
@@ -45,7 +45,7 @@ func (c *GetService) Documentation() string {
 
 ## Output
 
-Emits a ` + "`render.service`" + ` payload containing service fields like ` + "`serviceId`" + `, ` + "`serviceName`" + `, ` + "`type`" + `, ` + "`dashboardUrl`" + `, and ` + "`suspended`" + `.`
+Emits a ` + "`render.service`" + ` payload containing service fields like ` + "`serviceId`" + `, ` + "`serviceName`" + `, ` + "`type`" + `, ` + "`dashboardUrl`" + `, ` + "`suspended`" + `, and ` + "`customDomains`" + `.`
 }
 
 func (c *GetService) Icon() string {
@@ -116,10 +116,15 @@ func (c *GetService) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	domains, err := client.ListCustomDomains(spec.Service)
+	if err != nil {
+		return err
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		GetServicePayloadType,
-		[]any{serviceDataFromService(service)},
+		[]any{serviceDataFromServiceAndCustomDomains(service, domains)},
 	)
 }
 
@@ -127,18 +132,18 @@ func (c *GetService) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 	return http.StatusOK, nil, nil
 }
 
-func (c *GetService) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *GetService) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *GetService) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
 func (c *GetService) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *GetService) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetService) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

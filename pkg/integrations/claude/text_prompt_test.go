@@ -25,6 +25,7 @@ func TestTextPrompt_Configuration(t *testing.T) {
 		"systemMessage": {false, string(configuration.FieldTypeText)},
 		"maxTokens":     {false, string(configuration.FieldTypeNumber)},
 		"temperature":   {false, string(configuration.FieldTypeNumber)},
+		"files":         {false, string(configuration.FieldTypeList)},
 	}
 
 	for _, field := range config {

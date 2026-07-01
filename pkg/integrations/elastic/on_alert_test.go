@@ -211,7 +211,7 @@ func Test__OnAlertFires__CheckConnectorAndAttachRule(t *testing.T) {
 		}}
 		meta := &contexts.MetadataContext{Metadata: OnAlertFiresMetadata{RuleID: "rule-123"}}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:        checkAlertConnectorAction,
 			HTTP:        httpCtx,
 			Integration: integrationCtx,
@@ -246,7 +246,7 @@ func Test__OnAlertFires__CheckConnectorAndAttachRule(t *testing.T) {
 			PreviousRuleID: "rule-old",
 		}}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:        checkAlertConnectorAction,
 			HTTP:        httpCtx,
 			Integration: integrationCtx,
@@ -280,7 +280,7 @@ func Test__OnAlertFires__CheckConnectorAndAttachRule(t *testing.T) {
 		}}
 		requestCtx := &contexts.RequestContext{}
 
-		_, err := trigger.HandleAction(core.TriggerActionContext{
+		_, err := trigger.HandleHook(core.TriggerHookContext{
 			Name:        checkAlertConnectorAction,
 			HTTP:        httpCtx,
 			Integration: integrationCtx,

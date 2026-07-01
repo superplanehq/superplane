@@ -99,8 +99,8 @@ func (s *SMTP) Configuration() []configuration.Field {
 	}
 }
 
-func (s *SMTP) Components() []core.Component {
-	return []core.Component{
+func (s *SMTP) Actions() []core.Action {
+	return []core.Action{
 		&SendEmail{},
 	}
 }
@@ -158,10 +158,10 @@ func (s *SMTP) ListResources(resourceType string, ctx core.ListResourcesContext)
 	return []core.IntegrationResource{}, nil
 }
 
-func (s *SMTP) Actions() []core.Action {
-	return []core.Action{}
+func (s *SMTP) Hooks() []core.Hook {
+	return []core.Hook{}
 }
 
-func (s *SMTP) HandleAction(ctx core.IntegrationActionContext) error {
+func (s *SMTP) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

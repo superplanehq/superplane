@@ -58,8 +58,8 @@ func (l *LaunchDarkly) Configuration() []configuration.Field {
 	}
 }
 
-func (l *LaunchDarkly) Components() []core.Component {
-	return []core.Component{
+func (l *LaunchDarkly) Actions() []core.Action {
+	return []core.Action{
 		&GetFeatureFlag{},
 		&DeleteFeatureFlag{},
 	}
@@ -102,14 +102,6 @@ func (l *LaunchDarkly) Sync(ctx core.SyncContext) error {
 }
 
 func (l *LaunchDarkly) HandleRequest(ctx core.HTTPRequestContext) {}
-
-func (l *LaunchDarkly) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (l *LaunchDarkly) HandleAction(ctx core.IntegrationActionContext) error {
-	return nil
-}
 
 func (l *LaunchDarkly) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
@@ -189,4 +181,12 @@ func (l *LaunchDarkly) ListResources(resourceType string, ctx core.ListResources
 	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
+
+func (l *LaunchDarkly) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (l *LaunchDarkly) HandleHook(ctx core.IntegrationHookContext) error {
+	return nil
 }

@@ -5,7 +5,7 @@ import AuthGuard from "@/components/AuthGuard";
 
 const useAccountMock = vi.fn();
 
-vi.mock("@/contexts/AccountContext", () => ({
+vi.mock("@/contexts/useAccount", () => ({
   useAccount: () => useAccountMock(),
 }));
 

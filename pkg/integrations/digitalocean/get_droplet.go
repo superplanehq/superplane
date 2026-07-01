@@ -146,18 +146,18 @@ func (g *GetDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID,
 	return ctx.DefaultProcessing()
 }
 
-func (g *GetDroplet) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (g *GetDroplet) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (g *GetDroplet) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
 func (g *GetDroplet) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (g *GetDroplet) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (g *GetDroplet) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }

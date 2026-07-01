@@ -290,14 +290,6 @@ func (c *SendMessage) buildMessageBody(config SendMessageConfiguration) (string,
 	return string(message), nil
 }
 
-func (c *SendMessage) Actions() []core.Action {
-	return []core.Action{}
-}
-
-func (c *SendMessage) HandleAction(ctx core.ActionContext) error {
-	return nil
-}
-
 func (c *SendMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
@@ -307,5 +299,13 @@ func (c *SendMessage) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *SendMessage) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *SendMessage) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *SendMessage) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
