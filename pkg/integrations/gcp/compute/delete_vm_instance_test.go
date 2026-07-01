@@ -33,6 +33,10 @@ func (m *mockDeleteClient) Post(ctx context.Context, path string, body any) ([]b
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (m *mockDeleteClient) Patch(ctx context.Context, path string, body any) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (m *mockDeleteClient) Delete(ctx context.Context, path string) ([]byte, error) {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(ctx, path)
