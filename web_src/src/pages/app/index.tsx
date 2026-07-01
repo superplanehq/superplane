@@ -3770,13 +3770,15 @@ export function AppPage() {
   });
 
   const handleSelectRunFromSidebarEvent = useCallback(
-    (runId: string) => {
+    (runId: string, options?: { nodeId?: string }) => {
       exitEditableVersionForRunInspection();
       clearDismissedRunDetail();
-      const inspectorNodeId = searchParams.get("sidebar") === "1" ? searchParams.get("node") : null;
+      const inspectorNodeId =
+        options?.nodeId ?? (searchParams.get("sidebar") === "1" ? searchParams.get("node") : null);
       if (inspectorNodeId) {
         preserveRunDetailNodeOnNextRunChangeRef.current = true;
         setRunDetailNodeId(inspectorNodeId);
+        setFocusRequest({ nodeId: inspectorNodeId, requestId: Date.now(), tab: "latest" });
       } else {
         setRunDetailNodeId(null);
       }
