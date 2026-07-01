@@ -517,7 +517,6 @@ export function AppPage() {
     activateBranch,
   });
 
-  const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [canvasFitAllNonce, setCanvasFitAllNonce] = useState(0);
   const wasRunInspectionModeRef = useRef(false);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
@@ -1671,21 +1670,15 @@ export function AppPage() {
   });
   const runsViewportKey = isRunInspectionMode ? "runs" : null;
   if (lastRunsViewportKeyRef.current !== runsViewportKey) {
-    runsHasFitToViewRef.current = false;
-    runsViewportRef.current = undefined;
+    if (runsViewportKey) {
+      runsHasFitToViewRef.current = Boolean(viewportRef.current);
+      runsViewportRef.current = viewportRef.current ? { ...viewportRef.current } : undefined;
+    } else {
+      runsHasFitToViewRef.current = false;
+      runsViewportRef.current = undefined;
+    }
     lastRunsViewportKeyRef.current = runsViewportKey;
   }
-
-  const runCanvasFitKey = useMemo(() => {
-    if (!isRunInspectionMode || !selectedRunId || !runCanvasData) return null;
-    return `${selectedRunId}|${runCanvasData.participantNodeIds.slice().sort().join("|")}`;
-  }, [isRunInspectionMode, selectedRunId, runCanvasData]);
-
-  useEffect(() => {
-    if (!isRunInspectionMode) return;
-    if (!runCanvasFitKey) return;
-    setRunsFitAllNonce((n) => n + 1);
-  }, [isRunInspectionMode, runCanvasFitKey]);
 
   useEffect(() => {
     if (wasRunInspectionModeRef.current && !isRunInspectionMode) {
@@ -4488,7 +4481,7 @@ export function AppPage() {
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunInspectionMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          fitAllRequest={isRunInspectionMode ? runsFitAllNonce : canvasFitAllNonce > 0 ? canvasFitAllNonce : null}
+          fitAllRequest={!isRunInspectionMode && canvasFitAllNonce > 0 ? canvasFitAllNonce : null}
           fitAllFocusNodeIds={
             isRunInspectionMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
               ? runCanvasData.participantNodeIds
