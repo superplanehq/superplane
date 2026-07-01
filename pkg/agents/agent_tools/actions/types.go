@@ -10,6 +10,7 @@ type Input struct {
 	UseDraft            *bool             `json:"use_draft,omitempty"`
 	IncludeConsole      bool              `json:"include_console,omitempty"`
 	IncludeIntegrations bool              `json:"include_integrations,omitempty"`
+	IncludeCanvasYAML   bool              `json:"include_canvas_yaml,omitempty"`
 	ConsoleYAML         string            `json:"console_yaml,omitempty"`
 	PatchOperations     []PatchOperation  `json:"patch_operations,omitempty"`
 	AutoLayout          *AutoLayoutInput  `json:"auto_layout,omitempty"`
@@ -69,15 +70,17 @@ type AutoLayoutInput struct {
 }
 
 type readResult struct {
-	Action       string              `json:"action"`
-	CanvasID     string              `json:"canvas_id"`
-	Source       string              `json:"source"`
-	VersionID    string              `json:"version_id,omitempty"`
-	Draft        *draftResult        `json:"draft,omitempty"`
-	Summary      summary             `json:"summary"`
-	CanvasYAML   string              `json:"canvas_yaml"`
-	ConsoleYAML  string              `json:"console_yaml,omitempty"`
-	Integrations []integrationResult `json:"integrations,omitempty"`
+	Action            string              `json:"action"`
+	CanvasID          string              `json:"canvas_id"`
+	Source            string              `json:"source"`
+	VersionID         string              `json:"version_id,omitempty"`
+	Draft             *draftResult        `json:"draft,omitempty"`
+	Summary           summary             `json:"summary"`
+	CanvasYAML        string              `json:"canvas_yaml,omitempty"`
+	CanvasYAMLBytes   int                 `json:"canvas_yaml_bytes,omitempty"`
+	CanvasYAMLOmitted bool                `json:"canvas_yaml_omitted,omitempty"`
+	ConsoleYAML       string              `json:"console_yaml,omitempty"`
+	Integrations      []integrationResult `json:"integrations,omitempty"`
 }
 
 type updateResult struct {

@@ -99,6 +99,10 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 				Type:        "boolean",
 				Description: "For read. Include console.yaml in the response.",
 			},
+			"include_canvas_yaml": {
+				Type:        "boolean",
+				Description: "For read. Defaults to false so read stays compact; set true only when you need the complete canvas.yaml text. Compact reads still return summary, version_id, canvas_yaml_bytes, and canvas_yaml_omitted.",
+			},
 			"include_integrations": {
 				Type:        "boolean",
 				Description: "For read. Include connected integration IDs, names, vendors, and state.",
