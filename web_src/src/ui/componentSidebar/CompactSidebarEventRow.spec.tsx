@@ -57,6 +57,17 @@ describe("CompactSidebarEventRow", () => {
     expect(onSelectRun).toHaveBeenCalledWith("run-1");
   });
 
+  it("selects the run with node context when the row belongs to a selected node", async () => {
+    const user = userEvent.setup();
+    const onSelectRun = vi.fn();
+
+    renderRow({ runId: "run-1", selectionNodeId: "node-1", onSelectRun });
+
+    await user.click(screen.getByTestId("compact-sidebar-event-row-select"));
+
+    expect(onSelectRun).toHaveBeenCalledWith("run-1", { nodeId: "node-1" });
+  });
+
   it("fetches the run id on click when the row is not pre-resolved", async () => {
     const user = userEvent.setup();
     const onSelectRun = vi.fn();

@@ -28,9 +28,10 @@ interface LatestTabProps {
     execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
   compact?: boolean;
+  selectionNodeId?: string;
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRun?: (runId: string) => void;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
 }
 
 function SectionHeader({ label }: { label: string }) {
@@ -57,6 +58,7 @@ export const LatestTab = ({
   onReEmit,
   getExecutionState,
   compact = false,
+  selectionNodeId,
   resolveRunId,
   fetchRunId,
   onSelectRun,
@@ -96,6 +98,7 @@ export const LatestTab = ({
               <CompactSidebarEventRow
                 key={event.id}
                 event={event}
+                selectionNodeId={selectionNodeId}
                 runId={runIdByEventId.get(event.id) ?? null}
                 fetchRunId={fetchRunId}
                 onSelectRun={onSelectRun}
@@ -130,6 +133,7 @@ export const LatestTab = ({
                   <CompactSidebarEventRow
                     key={event.id}
                     event={event}
+                    selectionNodeId={selectionNodeId}
                     runId={runIdByEventId.get(event.id) ?? null}
                     fetchRunId={fetchRunId}
                     onSelectRun={onSelectRun}

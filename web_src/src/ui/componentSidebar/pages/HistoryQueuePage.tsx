@@ -24,9 +24,10 @@ interface HistoryQueuePageProps {
     execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
   compact?: boolean;
+  selectionNodeId?: string;
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRun?: (runId: string) => void;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
 
   // Pagination props
   hasMoreItems: boolean;
@@ -46,6 +47,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   onReEmit,
   getExecutionState,
   compact = false,
+  selectionNodeId,
   resolveRunId,
   fetchRunId,
   onSelectRun,
@@ -79,6 +81,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
               <CompactSidebarEventRow
                 key={event.id}
                 event={event}
+                selectionNodeId={selectionNodeId}
                 runId={runIdByEventId.get(event.id) ?? null}
                 fetchRunId={fetchRunId}
                 onSelectRun={onSelectRun}

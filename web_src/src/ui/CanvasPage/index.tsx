@@ -294,7 +294,7 @@ export interface CanvasPageProps {
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
   resolveRunIdForSidebarEvent?: (event: SidebarEvent) => string | null;
   fetchRunIdForSidebarEvent?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRunFromSidebarEvent?: (runId: string) => void;
+  onSelectRunFromSidebarEvent?: (runId: string, options?: { nodeId?: string }) => void;
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
@@ -1596,7 +1596,7 @@ function Sidebar({
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRun?: (runId: string) => void;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
@@ -2408,13 +2408,16 @@ function CanvasContent({
       : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
   const suppressNextPaneClickRef = useRef(false);
   const suppressNextPaneClickTimeoutRef = useRef<number | null>(null);
+  const runCanvasNodeIdsKey = useMemo(() => state.nodes.map((node) => node.id).join("|"), [state.nodes]);
 
   useEffect(() => {
     if (!focusRequest) {
       return;
     }
 
-    const targetNode = stateRef.current.nodes?.find((node) => node.id === focusRequest.nodeId);
+    const targetNode =
+      getNodes().find((node) => node.id === focusRequest.nodeId) ??
+      stateRef.current.nodes?.find((node) => node.id === focusRequest.nodeId);
     if (!targetNode) {
       return;
     }
@@ -2426,9 +2429,7 @@ function CanvasContent({
       })),
     );
     fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
-  }, [focusRequest, fitView]);
-
-  const runCanvasNodeIdsKey = useMemo(() => state.nodes.map((node) => node.id).join("|"), [state.nodes]);
+  }, [focusRequest, fitView, getNodes, runCanvasNodeIdsKey]);
 
   useEffect(() => {
     if (!isRunInspectionMode) {
