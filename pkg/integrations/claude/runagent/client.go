@@ -70,15 +70,13 @@ type Environment struct {
 }
 
 type listAgentsResponse struct {
-	Data    []Agent `json:"data"`
-	HasMore bool    `json:"has_more"`
-	LastID  string  `json:"last_id"`
+	Data     []Agent `json:"data"`
+	NextPage string  `json:"next_page"`
 }
 
 type listEnvironmentsResponse struct {
-	Data    []Environment `json:"data"`
-	HasMore bool          `json:"has_more"`
-	LastID  string        `json:"last_id"`
+	Data     []Environment `json:"data"`
+	NextPage string        `json:"next_page"`
 }
 
 type ManagedSessionEvent struct {
@@ -199,17 +197,23 @@ func nonEmptyStrings(in []string) []string {
 	return out
 }
 
-const listPageLimit = "100"
+const (
+	listPageLimit = "100"
+	// maxListPages caps pagination to guard against a server that keeps
+	// returning a non-empty next_page cursor indefinitely.
+	maxListPages = 1000
+)
 
-// ListAgents returns all (non-archived) Managed Agents, following pagination.
+// ListAgents returns all (non-archived) Managed Agents, following the
+// page/next_page cursor pagination used by the Managed Agents API.
 func (c *Client) ListAgents() ([]Agent, error) {
 	var all []Agent
-	afterID := ""
-	for {
+	page := ""
+	for i := 0; i < maxListPages; i++ {
 		params := url.Values{}
 		params.Set("limit", listPageLimit)
-		if afterID != "" {
-			params.Set("after_id", afterID)
+		if page != "" {
+			params.Set("page", page)
 		}
 		URL := c.BaseURL + "/agents?" + params.Encode()
 		responseBody, err := c.execRequestWithBeta(http.MethodGet, URL, nil, anthropicBetaManagedAgents)
@@ -221,23 +225,24 @@ func (c *Client) ListAgents() ([]Agent, error) {
 			return nil, fmt.Errorf("failed to unmarshal agents response: %w", err)
 		}
 		all = append(all, resp.Data...)
-		if !resp.HasMore || resp.LastID == "" {
+		if resp.NextPage == "" || resp.NextPage == page {
 			break
 		}
-		afterID = resp.LastID
+		page = resp.NextPage
 	}
 	return all, nil
 }
 
-// ListEnvironments returns all Managed Agent environments, following pagination.
+// ListEnvironments returns all Managed Agent environments, following the
+// page/next_page cursor pagination used by the Managed Agents API.
 func (c *Client) ListEnvironments() ([]Environment, error) {
 	var all []Environment
-	afterID := ""
-	for {
+	page := ""
+	for i := 0; i < maxListPages; i++ {
 		params := url.Values{}
 		params.Set("limit", listPageLimit)
-		if afterID != "" {
-			params.Set("after_id", afterID)
+		if page != "" {
+			params.Set("page", page)
 		}
 		URL := c.BaseURL + "/environments?" + params.Encode()
 		responseBody, err := c.execRequestWithBeta(http.MethodGet, URL, nil, anthropicBetaManagedAgents)
@@ -249,10 +254,10 @@ func (c *Client) ListEnvironments() ([]Environment, error) {
 			return nil, fmt.Errorf("failed to unmarshal environments response: %w", err)
 		}
 		all = append(all, resp.Data...)
-		if !resp.HasMore || resp.LastID == "" {
+		if resp.NextPage == "" || resp.NextPage == page {
 			break
 		}
-		afterID = resp.LastID
+		page = resp.NextPage
 	}
 	return all, nil
 }

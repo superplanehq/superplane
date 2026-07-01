@@ -176,8 +176,7 @@ func TestClaude_ListResources(t *testing.T) {
 						"data": [
 							{"id": "agent_01", "name": "Coding Assistant"},
 							{"id": "agent_02", "name": ""}
-						],
-						"has_more": false
+						]
 					}`)),
 				}
 			},
@@ -195,8 +194,7 @@ func TestClaude_ListResources(t *testing.T) {
 					Body: io.NopCloser(bytes.NewBufferString(`{
 						"data": [
 							{"id": "env_01", "name": "python-dev"}
-						],
-						"has_more": false
+						]
 					}`)),
 				}
 			},

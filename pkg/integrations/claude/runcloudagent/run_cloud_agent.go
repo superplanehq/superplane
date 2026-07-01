@@ -3,6 +3,7 @@ package runcloudagent
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -654,5 +655,57 @@ func validateSpec(spec Spec) error {
 	if strings.TrimSpace(spec.Prompt) == "" {
 		return fmt.Errorf("prompt is required")
 	}
+	return validateRepository(spec.Repository, spec.Branch)
+}
+
+// gitBranchPattern matches safe git ref characters (no whitespace or shell/prompt
+// metacharacters), so the branch can be embedded in the clone instruction safely.
+var gitBranchPattern = regexp.MustCompile(`^[A-Za-z0-9._][A-Za-z0-9._/-]*$`)
+
+// validateRepository ensures a configured repository/branch are well-formed
+// before they are embedded into the agent prompt. This rejects a branch set
+// without a repository (which would be silently ignored) and constrains the
+// values to safe characters so they cannot be used to inject prompt content.
+// Expression placeholders ({{ ... }}) are resolved at runtime and skipped here.
+func validateRepository(repository, branch string) error {
+	repository = strings.TrimSpace(repository)
+	branch = strings.TrimSpace(branch)
+
+	if branch != "" && repository == "" {
+		return fmt.Errorf("branch is set but repository is required")
+	}
+
+	if repository != "" && !containsExpression(repository) {
+		if strings.ContainsAny(repository, " \t\r\n") {
+			return fmt.Errorf("repository must not contain whitespace")
+		}
+		if !isGitRepositoryURL(repository) {
+			return fmt.Errorf("repository must be a valid git URL (https://, http://, ssh://, git://, or user@host:path)")
+		}
+	}
+
+	if branch != "" && !containsExpression(branch) && !gitBranchPattern.MatchString(branch) {
+		return fmt.Errorf("branch %q contains invalid characters", branch)
+	}
+
 	return nil
+}
+
+func containsExpression(value string) bool {
+	return strings.Contains(value, "{{")
+}
+
+// scpLikeGitURL matches the scp-style git remote form, e.g. git@github.com:owner/repo.git.
+var scpLikeGitURL = regexp.MustCompile(`^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:.+$`)
+
+func isGitRepositoryURL(repository string) bool {
+	switch {
+	case strings.HasPrefix(repository, "https://"),
+		strings.HasPrefix(repository, "http://"),
+		strings.HasPrefix(repository, "ssh://"),
+		strings.HasPrefix(repository, "git://"):
+		return true
+	default:
+		return scpLikeGitURL.MatchString(repository)
+	}
 }

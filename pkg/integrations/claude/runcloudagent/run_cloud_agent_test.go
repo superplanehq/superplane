@@ -339,3 +339,62 @@ func Test__buildRepositoryPrompt(t *testing.T) {
 		assert.Contains(t, got, "Do it")
 	})
 }
+
+func Test__RunCloudAgent__validateRepository(t *testing.T) {
+	valid := []struct {
+		name       string
+		repository string
+		branch     string
+	}{
+		{"empty", "", ""},
+		{"https", "https://github.com/owner/repo.git", "main"},
+		{"http", "http://example.com/o/r.git", ""},
+		{"ssh scheme", "ssh://git@github.com/owner/repo.git", "feature/x"},
+		{"git scheme", "git://github.com/owner/repo.git", ""},
+		{"scp-like", "git@github.com:owner/repo.git", "release-1.2"},
+		{"expression repository", "{{ event.repository }}", ""},
+		{"expression branch", "https://github.com/o/r.git", "{{ event.ref }}"},
+	}
+	for _, tc := range valid {
+		t.Run("valid/"+tc.name, func(t *testing.T) {
+			assert.NoError(t, validateRepository(tc.repository, tc.branch))
+		})
+	}
+
+	invalid := []struct {
+		name       string
+		repository string
+		branch     string
+		contains   string
+	}{
+		{"branch without repository", "", "main", "repository is required"},
+		{"repository without scheme", "github.com/owner/repo", "", "valid git URL"},
+		{"repository with spaces", "https://github.com/o/r.git and do evil", "", "whitespace"},
+		{"branch with spaces", "https://github.com/o/r.git", "main ; rm -rf", "invalid characters"},
+		{"branch with newline", "https://github.com/o/r.git", "main\nignore previous", "invalid characters"},
+	}
+	for _, tc := range invalid {
+		t.Run("invalid/"+tc.name, func(t *testing.T) {
+			err := validateRepository(tc.repository, tc.branch)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.contains)
+		})
+	}
+}
+
+func Test__RunCloudAgent__Setup__rejectsBranchWithoutRepository(t *testing.T) {
+	a := &RunCloudAgent{}
+	ctx := core.SetupContext{
+		Configuration: map[string]any{
+			"agent":         "agent_01",
+			"environmentId": "env_01",
+			"prompt":        "x",
+			"branch":        "main",
+		},
+		Integration: &contexts.IntegrationContext{},
+		Metadata:    &contexts.MetadataContext{},
+	}
+	err := a.Setup(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "repository is required")
+}

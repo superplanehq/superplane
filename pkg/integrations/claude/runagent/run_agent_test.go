@@ -269,7 +269,7 @@ func TestClient_ListAgents(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{{
 				StatusCode: 200,
-				Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_1","name":"A"},{"id":"agent_2","name":"B"}],"has_more":false}`)),
+				Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_1","name":"A"},{"id":"agent_2","name":"B"}]}`)),
 			}},
 		}
 		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
@@ -287,8 +287,8 @@ func TestClient_ListAgents(t *testing.T) {
 	t.Run("follows pagination", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_1","name":"A"}],"has_more":true,"last_id":"agent_1"}`))},
-				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_2","name":"B"}],"has_more":false}`))},
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_1","name":"A"}],"next_page":"page_2"}`))},
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_2","name":"B"}]}`))},
 			},
 		}
 		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
@@ -296,7 +296,23 @@ func TestClient_ListAgents(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, agents, 2)
 		require.Len(t, httpCtx.Requests, 2)
-		assert.Equal(t, "agent_1", httpCtx.Requests[1].URL.Query().Get("after_id"))
+		assert.Equal(t, "page_2", httpCtx.Requests[1].URL.Query().Get("page"))
+	})
+
+	t.Run("stops when next_page repeats", func(t *testing.T) {
+		// A misbehaving server that always returns the same next_page cursor
+		// must not cause an infinite loop.
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_1","name":"A"}],"next_page":"page_2"}`))},
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_2","name":"B"}],"next_page":"page_2"}`))},
+			},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+		agents, err := client.ListAgents()
+		require.NoError(t, err)
+		require.Len(t, agents, 2)
+		require.Len(t, httpCtx.Requests, 2)
 	})
 }
 
@@ -343,7 +359,7 @@ func TestClient_ListEnvironments(t *testing.T) {
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{{
 			StatusCode: 200,
-			Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"env_1","name":"dev"}],"has_more":false}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"env_1","name":"dev"}]}`)),
 		}},
 	}
 	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
