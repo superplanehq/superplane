@@ -13,10 +13,9 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
-import { showErrorToast } from "@/lib/toast.ts";
 import { CopyButton } from "@/ui/CopyButton";
 import { useAccount } from "@/contexts/useAccount";
-import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
+import { showErrorToast } from "@/lib/toast.ts";
 import { ChangePasswordDialog } from "./components/ChangePasswordDialog";
 
 export function Profile() {
