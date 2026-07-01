@@ -171,7 +171,7 @@ func startWorkers(
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewNodeQueueWorker(registry, gitProvider, rabbitMQURL)
+		w := workers.NewNodeQueueWorker(encryptor, registry, gitProvider, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
