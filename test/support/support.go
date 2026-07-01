@@ -345,7 +345,6 @@ func CreateNextNodeExecution(
 
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
-	liveVersionID := uuid.New()
 
 	inputNodes := make([]models.Node, len(nodes))
 	for i, node := range nodes {
@@ -367,7 +366,6 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 	workflow := &models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
-		LiveVersionID:  &liveVersionID,
 		Name:           RandomName("canvas"),
 		Description:    "Test canvas",
 		CreatedBy:      &userID,
@@ -403,21 +401,21 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			createdNodes = append(createdNodes, canvasNode)
 		}
 
-		version := models.CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  workflow.ID,
-			OwnerID:     &userID,
-			State:       models.CanvasVersionStatePublished,
-			Name:        workflow.Name,
-			Description: workflow.Description,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice(inputNodes),
-			Edges:       datatypes.NewJSONSlice(edges),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+		version, _, err := models.CreateInitialCommitInTransaction(
+			tx,
+			workflow.ID,
+			userID,
+			models.CanvasGitBranchMain,
+			"Initial commit",
+			inputNodes,
+			edges,
+		)
+		if err != nil {
+			return err
 		}
 
-		return tx.Create(&version).Error
+		workflow.LiveVersionID = &version.ID
+		return tx.Model(workflow).Update("live_version_id", version.ID).Error
 	}))
 
 	return workflow, createdNodes

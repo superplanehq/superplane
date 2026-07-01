@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -34,10 +35,6 @@ func CommitCanvasStaging(
 	webhookBaseURL string,
 	authService authorization.Authorization,
 ) (*pb.CommitCanvasStagingResponse, error) {
-	_ = encryptor
-	_ = webhookBaseURL
-	_ = authService
-
 	canvas, branch, headVersion, userUUID, err := loadBranchForStaging(ctx, organizationID, canvasID, branchName, versionID)
 	if err != nil {
 		return nil, err
@@ -70,6 +67,18 @@ func CommitCanvasStaging(
 				return createErr
 			}
 			sourceBranch = createdBranch
+		}
+
+		var previousLive *models.CanvasVersion
+		if targetBranchName == models.CanvasGitBranchMain {
+			var liveErr error
+			previousLive, liveErr = models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+			if liveErr != nil && !errors.Is(liveErr, gorm.ErrRecordNotFound) {
+				return liveErr
+			}
+			if errors.Is(liveErr, gorm.ErrRecordNotFound) {
+				previousLive = nil
+			}
 		}
 
 		var createErr error
@@ -124,6 +133,19 @@ func CommitCanvasStaging(
 				return err
 			}
 			committed.CommitSHA = commitSHA
+		}
+
+		if targetBranchName == models.CanvasGitBranchMain {
+			if err := promoteMainCanvasVersionInTransaction(
+				ctx,
+				tx,
+				canvas,
+				previousLive,
+				committed,
+				canvasPublisherOptions(registry, encryptor, gitProvider, organizationUUID, authService, webhookBaseURL),
+			); err != nil {
+				return err
+			}
 		}
 
 		return models.DiscardWorkflowStagingInTransaction(tx, stagingBranchID, userUUID, nil)

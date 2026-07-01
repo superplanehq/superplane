@@ -112,7 +112,10 @@ import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandle
 import { useDraftStagingActions } from "./useDraftStagingActions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
-import { getVersionActionAvailability } from "./lib/version-action-state";
+import {
+  getVersionActionAvailability,
+  hasMergeableBranchChanges as branchHasMergeableChanges,
+} from "./lib/version-action-state";
 import { buildCanvasYamlExportPayload, materializeCanvasSpec } from "./lib/workflow-spec-files";
 import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
@@ -4556,12 +4559,21 @@ export function AppPage() {
         : !hasEditableVersion
           ? "Enable edit mode before discarding draft."
           : undefined;
+  const activeBranchNameForEdit = resolvedActiveBranch || activeBranch || CANVAS_MAIN_BRANCH;
+  const isMainEditBranch = activeBranchNameForEdit === CANVAS_MAIN_BRANCH;
+  const mergeableBranchChanges = branchHasMergeableChanges({
+    isMainBranch: isMainEditBranch,
+    branchHeadVersionId: activeBranchHeadVersionId,
+    liveVersionId: liveCanvasVersionId,
+  });
+  const hasVersionActionChanges = (!!latestDraftVersion && hasDraftDiffVersusLive) || mergeableBranchChanges;
   const { publishVersionDisabled, publishVersionDisabledTooltip } = getVersionActionAvailability({
     hasEditableVersion,
     publishPending: publishCanvasVersionMutation.isPending,
     canvasDeletedRemotely,
     isPreparingVersionAction,
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftDiffVersusLive,
+    hasMergeableBranchChanges: mergeableBranchChanges,
   });
   // Exit leaves the edit session entirely (including while previewing the current
   // or an older version), so it must not require an editable draft to be active.
@@ -4578,8 +4590,6 @@ export function AppPage() {
   });
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
-  const activeBranchNameForEdit = resolvedActiveBranch || activeBranch || CANVAS_MAIN_BRANCH;
-  const isMainEditBranch = activeBranchNameForEdit === CANVAS_MAIN_BRANCH;
   const filesHeaderVersionActions = resolveFilesHeaderVersionActions({
     handlePublishVersion: handleMergeOrPublishVersion,
     handleResetDraftChanges,
@@ -4590,7 +4600,7 @@ export function AppPage() {
     hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
     publishVersionLabel: isMainEditBranch ? "Publish" : "Merge",
     allowDiscard: editSessionActive && !isMainEditBranch && isEditing && !hasStagingChanges,
-    allowPublish: editSessionActive && isEditing && !hasStagingChanges && hasDraftDiffVersusLive,
+    allowPublish: editSessionActive && isEditing && !hasStagingChanges && hasVersionActionChanges,
   });
 
   const showRunsSidebar =

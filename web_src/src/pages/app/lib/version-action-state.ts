@@ -5,6 +5,8 @@ type VersionActionAvailabilityInput = {
   isPreparingVersionAction: boolean;
   /** Live vs latest draft has node-level differences (same basis as draft discard UI). */
   hasDraftDiffVersusLive: boolean;
+  /** Feature branch head differs from live main (e.g. README-only commits). */
+  hasMergeableBranchChanges?: boolean;
 };
 
 type VersionActionAvailability = {
@@ -80,12 +82,41 @@ function getPublishVersionDisabledTooltip({
   return undefined;
 }
 
+export function hasMergeableBranchChanges({
+  isMainBranch,
+  branchHeadVersionId,
+  liveVersionId,
+}: {
+  isMainBranch: boolean;
+  branchHeadVersionId?: string;
+  liveVersionId?: string;
+}): boolean {
+  if (isMainBranch) {
+    return false;
+  }
+  if (!branchHeadVersionId || !liveVersionId) {
+    return false;
+  }
+  return branchHeadVersionId !== liveVersionId;
+}
+
+export function hasVersionActionChanges({
+  hasDraftDiffVersusLive,
+  hasMergeableBranchChanges = false,
+}: {
+  hasDraftDiffVersusLive: boolean;
+  hasMergeableBranchChanges?: boolean;
+}): boolean {
+  return hasDraftDiffVersusLive || hasMergeableBranchChanges;
+}
+
 export function getVersionActionAvailability({
   hasEditableVersion,
   publishPending,
   canvasDeletedRemotely,
   isPreparingVersionAction,
   hasDraftDiffVersusLive,
+  hasMergeableBranchChanges = false,
 }: VersionActionAvailabilityInput): VersionActionAvailability {
   const publishVersionDisabledBase = getPublishVersionDisabled({
     hasEditableVersion,
@@ -99,7 +130,11 @@ export function getVersionActionAvailability({
     hasEditableVersion,
   });
 
-  const publishVersionDisabled = publishVersionDisabledBase || !hasDraftDiffVersusLive;
+  const hasActionableChanges = hasVersionActionChanges({
+    hasDraftDiffVersusLive,
+    hasMergeableBranchChanges,
+  });
+  const publishVersionDisabled = publishVersionDisabledBase || !hasActionableChanges;
   const publishVersionDisabledTooltip = publishVersionDisabledBase ? publishVersionDisabledTooltipBase : undefined;
 
   return {

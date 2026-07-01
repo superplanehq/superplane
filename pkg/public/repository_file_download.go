@@ -15,17 +15,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc/codes"
 )
 
 var (
-	errRepositoryFileNotFound   = errors.New("repository file not found")
-	errRepositoryNotFound       = errors.New("repository not found")
-	errRepositoryFileReadFailed = errors.New("repository file read failed")
+	errRepositoryFileNotFound    = errors.New("repository file not found")
+	errRepositoryNotFound        = errors.New("repository not found")
+	errRepositoryFileReadFailed  = errors.New("repository file read failed")
+	errRepositoryVersionNotFound = errors.New("repository version not found")
 )
 
 func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +82,10 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 	err = s.readRepositoryFile(ctx, w, user, canvas, canvasID, path, versionID, stage)
 	if errors.Is(err, errRepositoryFileNotFound) {
 		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	if errors.Is(err, errRepositoryVersionNotFound) {
+		http.Error(w, "Version not found", http.StatusNotFound)
 		return
 	}
 	if errors.Is(err, errRepositoryNotFound) {
@@ -183,7 +190,7 @@ func (s *Server) readRepositoryFile(
 		}
 	}
 
-	return s.writeRepositoryGitFile(ctx, w, user.OrganizationID, canvas, canvasID, path)
+	return s.writeRepositoryGitFile(ctx, w, user, canvas, canvasID, path, versionID)
 }
 
 func (s *Server) tryWriteStagedRepositoryFile(
@@ -227,17 +234,33 @@ func (s *Server) tryWriteStagedRepositoryFile(
 func (s *Server) writeRepositoryGitFile(
 	ctx context.Context,
 	w http.ResponseWriter,
-	organizationID uuid.UUID,
+	user *models.User,
 	canvas *models.Canvas,
 	canvasID uuid.UUID,
 	path string,
+	versionID string,
 ) error {
-	repository, repoErr := models.FindRepository(organizationID, canvas.ID)
+	authCtx := authentication.SetUserIdInMetadata(ctx, user.ID.String())
+	gitRef, refErr := canvases.ResolveRepositoryGitRef(
+		authCtx,
+		user.OrganizationID.String(),
+		canvas.ID.String(),
+		versionID,
+	)
+	if refErr != nil {
+		if grpcerrors.Code(refErr) == codes.NotFound {
+			return errRepositoryVersionNotFound
+		}
+		log.Errorf("Failed to resolve git ref for version %s in canvas %s: %v", versionID, canvasID.String(), refErr)
+		return errRepositoryFileReadFailed
+	}
+
+	repository, repoErr := models.FindRepository(user.OrganizationID, canvas.ID)
 	if repoErr != nil {
 		return errRepositoryNotFound
 	}
 
-	reader, fileErr := s.gitProvider.GetFile(ctx, repository.RepoID, path, "")
+	reader, fileErr := s.gitProvider.GetFile(ctx, repository.RepoID, path, gitRef)
 	if fileErr != nil {
 		log.Errorf("Failed to get file %s in canvas %s: %v", path, canvasID.String(), fileErr)
 		return errRepositoryFileReadFailed

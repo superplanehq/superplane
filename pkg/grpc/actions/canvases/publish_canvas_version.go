@@ -32,11 +32,6 @@ func PublishCanvasVersion(
 	webhookBaseURL string,
 	authService authorization.Authorization,
 ) (*pb.PublishCanvasVersionResponse, error) {
-	_ = encryptor
-	_ = reg
-	_ = webhookBaseURL
-	_ = authService
-
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -63,6 +58,10 @@ func PublishCanvasVersion(
 	publishedVersion, err := mergeBranchToMain(
 		ctx,
 		gitProv,
+		reg,
+		encryptor,
+		authService,
+		webhookBaseURL,
 		canvas,
 		organizationID,
 		organizationUUID,
@@ -96,6 +95,10 @@ func PublishCanvasVersion(
 func mergeBranchToMain(
 	ctx context.Context,
 	gitProvider gitprovider.Provider,
+	reg *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	webhookBaseURL string,
 	canvas *models.Canvas,
 	organizationID string,
 	organizationUUID uuid.UUID,
@@ -148,6 +151,14 @@ func mergeBranchToMain(
 			return grpcerrors.FailedPrecondition(nil, "branch has uncommitted staged changes")
 		}
 
+		previousLive, liveErr := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+		if liveErr != nil && !errors.Is(liveErr, gorm.ErrRecordNotFound) {
+			return liveErr
+		}
+		if errors.Is(liveErr, gorm.ErrRecordNotFound) {
+			previousLive = nil
+		}
+
 		created, createErr := models.CreateCommitOnBranch(tx, models.CreateCommitInput{
 			WorkflowID:    canvasUUID,
 			BranchName:    models.CanvasGitBranchMain,
@@ -187,6 +198,17 @@ func mergeBranchToMain(
 			return err
 		}
 
+		if err := promoteMainCanvasVersionInTransaction(
+			ctx,
+			tx,
+			canvas,
+			previousLive,
+			created,
+			canvasPublisherOptions(reg, encryptor, gitProvider, organizationUUID, authService, webhookBaseURL),
+		); err != nil {
+			return err
+		}
+
 		publishedVersion = created
 		return nil
 	})
@@ -207,6 +229,10 @@ func mergeBranchToMain(
 
 func mergeBranchToMainInTransaction(
 	ctx context.Context,
+	encryptor crypto.Encryptor,
+	reg *registry.Registry,
+	authService authorization.Authorization,
+	webhookBaseURL string,
 	organizationUUID uuid.UUID,
 	canvasUUID uuid.UUID,
 	sourceVersionUUID uuid.UUID,
@@ -221,6 +247,10 @@ func mergeBranchToMainInTransaction(
 	return mergeBranchToMain(
 		ctx,
 		nil,
+		reg,
+		encryptor,
+		authService,
+		webhookBaseURL,
 		canvas,
 		organizationUUID.String(),
 		organizationUUID,
@@ -259,6 +289,10 @@ func publishDraftVersionInTransaction(
 	return mergeBranchToMain(
 		ctx,
 		gitProv,
+		reg,
+		encryptor,
+		authService,
+		webhookBaseURL,
 		canvas,
 		organizationID,
 		organizationUUID,

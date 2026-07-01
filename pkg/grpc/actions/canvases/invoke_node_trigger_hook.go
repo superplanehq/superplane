@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -17,6 +18,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"gorm.io/gorm"
 )
 
 func InvokeNodeTriggerHook(
@@ -43,7 +45,19 @@ func InvokeNodeTriggerHook(
 
 	node, err := canvas.FindNode(nodeID)
 	if err != nil {
-		return nil, grpcerrors.NotFound(err, "node not found")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			repairErr := repairCanvasRuntimeNodesIfOutOfSync(
+				ctx,
+				canvas,
+				canvasPublisherOptions(registry, encryptor, nil, orgID, authService, webhookBaseURL),
+			)
+			if repairErr == nil {
+				node, err = canvas.FindNode(nodeID)
+			}
+		}
+		if err != nil {
+			return nil, grpcerrors.NotFound(err, "node not found")
+		}
 	}
 
 	// Only trigger nodes have trigger actions
