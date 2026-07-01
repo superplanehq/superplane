@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
+	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
@@ -23,6 +27,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestResolveToolAutoLayoutInput_DefaultsNodeIDsToConnectedComponent(t *testing.T) {
@@ -1081,6 +1087,93 @@ func TestReadRuntimeAction_RejectsUnknownResource(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported runtime resource")
+}
+
+func TestReadRuntimeAction_ReadsRunnerLogsByExecutionID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	broker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		assert.Equal(t, "/v1/tasks/task-agent-logs/live-logs", req.URL.Path)
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		_, _ = w.Write([]byte(`{"type":"line","text":"agent log line"}` + "\n"))
+	}))
+	defer broker.Close()
+	t.Setenv("TASK_BROKER_BASE_URL", broker.URL)
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID: "trigger-1",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "start"},
+			}),
+		},
+		{
+			NodeID: "runner-1",
+			Type:   models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Component: &models.ComponentRef{Name: "runnerBash"},
+			}),
+		},
+	}, nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
+
+	var run *models.CanvasRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		run, err = models.FindOrCreateCanvasRunForRootEventInTransaction(tx, event)
+		if err != nil {
+			return err
+		}
+		return event.RoutedInTransaction(tx)
+	}))
+
+	now := time.Now()
+	execution := models.CanvasNodeExecution{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      "runner-1",
+		RootEventID: event.ID,
+		RunID:       run.ID,
+		EventID:     event.ID,
+		State:       models.CanvasNodeExecutionStateStarted,
+		Metadata: datatypes.NewJSONType(map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: "task-agent-logs",
+		}),
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+	require.NoError(t, database.Conn().Create(&execution).Error)
+
+	action := readRuntimeAction{
+		registry: r.Registry,
+		auth:     allowingPermissionChecker{},
+	}
+
+	result, err := action.Execute(context.Background(), agents.AgentSessionContext{
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Resource:    "runner_logs",
+		ExecutionID: execution.ID.String(),
+		Limit:       10,
+	})
+
+	require.NoError(t, err)
+	read, ok := result.(runtimeReadResult)
+	require.True(t, ok)
+	payload, ok := read.Payload.(runnerLogsPayload)
+	require.True(t, ok)
+	require.Len(t, payload.Logs, 1)
+	assert.Equal(t, execution.ID.String(), payload.Logs[0].ExecutionID)
+	assert.Equal(t, "runner-1", payload.Logs[0].NodeID)
+	assert.Equal(t, "task-agent-logs", payload.Logs[0].BrokerTaskID)
+	require.Len(t, payload.Logs[0].Records, 1)
+	assert.Equal(t, "agent log line", payload.Logs[0].Records[0].Text)
 }
 
 type allowingPermissionChecker struct{}
