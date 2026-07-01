@@ -234,16 +234,9 @@ func serializeCanvas(
 	liveVersion *models.CanvasVersion,
 	user *models.User,
 	status *pb.Canvas_Status,
-) (*pb.Canvas, error) {
-	var proto *pb.Canvas
-	err := telemetry.RunSpan(ctx, "canvases.serialize", func(ctx context.Context) error {
-		var serErr error
-		proto, serErr = SerializeCanvas(canvas, liveVersion, user, status)
-		return serErr
-	})
-	if err != nil {
-		return nil, err
-	}
+) (proto *pb.Canvas, err error) {
+	ctx, done := telemetry.Span(ctx, "canvases.serialize")
+	defer done(&err)
 
-	return proto, nil
+	return SerializeCanvas(canvas, liveVersion, user, status)
 }

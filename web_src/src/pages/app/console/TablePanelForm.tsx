@@ -60,6 +60,13 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
           ))}
         </datalist>
       ) : null}
+      {fieldOptions.length > 0 ? (
+        <datalist id="table-href-field-options">
+          {fieldOptions.map((f) => (
+            <option key={f} value={`{{ ${f} }}`} />
+          ))}
+        </datalist>
+      ) : null}
     </div>
   );
 }

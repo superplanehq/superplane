@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
@@ -33,7 +34,8 @@ func DescribeServiceAccount(ctx context.Context, req *pb.DescribeServiceAccountR
 		return nil, grpcerrors.NotFound(err, "service account not found")
 	}
 
-	creator, err := creatorUserForServiceAccount(orgID, user)
+	db := database.DB(ctx)
+	creator, err := creatorUserForServiceAccount(db, orgID, user)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to describe service account")
 	}

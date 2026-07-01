@@ -1,5 +1,8 @@
 import type { StorybookConfig } from "@storybook/react-vite";
-import * as path from "path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const config: StorybookConfig = {
   stories: ["../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
@@ -26,8 +29,8 @@ const config: StorybookConfig = {
       ...config.resolve,
       alias: {
         ...config.resolve?.alias,
-        "@/canvas": path.resolve(__dirname, "../src/pages/canvas"),
-        "@": path.resolve(__dirname, "../src"),
+        "@/canvas": resolve(__dirname, "../src/pages/canvas"),
+        "@": resolve(__dirname, "../src"),
       },
     };
 

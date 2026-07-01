@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
@@ -446,6 +447,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
 	assert.Equal(t, []string{"echo hello"}, req.Commands)
+	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 }
 
 func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {

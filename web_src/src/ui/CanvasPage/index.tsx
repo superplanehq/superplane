@@ -124,6 +124,7 @@ export interface CanvasEdge extends ReactFlowEdge {
 interface FocusRequest {
   nodeId: string;
   requestId: number;
+  targetMode: "live" | "runs";
   tab?: "latest" | "settings";
 }
 
@@ -217,8 +218,6 @@ export interface CanvasPageProps {
   onConsoleOpenYaml?: () => void;
   /** DOM slot for Files mode actions owned by the files editor overlay. */
   filesHeaderActionsSlotId?: string;
-  /** Opens the canvas YAML modal. */
-  onYamlOpen?: () => void;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
@@ -296,7 +295,7 @@ export interface CanvasPageProps {
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
   resolveRunIdForSidebarEvent?: (event: SidebarEvent) => string | null;
   fetchRunIdForSidebarEvent?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRunFromSidebarEvent?: (runId: string) => void;
+  onSelectRunFromSidebarEvent?: (runId: string, options?: { nodeId?: string }) => void;
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
@@ -829,8 +828,18 @@ function CanvasPage(props: CanvasPageProps) {
       return;
     }
 
+    const expectedTargetMode = props.isRunInspectionMode ? "runs" : "live";
+    if (props.focusRequest.targetMode !== expectedTargetMode) {
+      return;
+    }
+
     setCurrentTab(props.focusRequest.tab);
-  }, [props.focusRequest?.requestId, props.focusRequest?.tab]);
+  }, [
+    props.focusRequest?.requestId,
+    props.focusRequest?.tab,
+    props.focusRequest?.targetMode,
+    props.isRunInspectionMode,
+  ]);
 
   // Get editing data for the currently selected node
   const { getNodeEditData } = props;
@@ -1390,7 +1399,6 @@ function CanvasPage(props: CanvasPageProps) {
               canvasEditControls
               onSidebarOpen={handleBuildingBlocksShortcutOpen}
               onAddNote={handleAddNote}
-              onYamlOpen={props.onYamlOpen}
             />
           )
         ) : (
@@ -1398,7 +1406,6 @@ function CanvasPage(props: CanvasPageProps) {
             mode={readOnly ? "live" : "edit"}
             onSidebarOpen={handleBuildingBlocksShortcutOpen}
             onAddNote={handleAddNote}
-            onYamlOpen={props.onYamlOpen}
           />
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
@@ -1600,7 +1607,7 @@ function Sidebar({
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRun?: (runId: string) => void;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
@@ -2177,6 +2184,7 @@ function CanvasContent({
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
+  const [hasReactFlowInitialized, setHasReactFlowInitialized] = useState(false);
   const lastFitAllRequestRef = useRef<{ nonce: number; runMode: boolean } | null>(null);
   const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(() => {
     const saved = localStorage.getItem(CONSOLE_OPEN_STORAGE_KEY);
@@ -2412,27 +2420,57 @@ function CanvasContent({
       : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
   const suppressNextPaneClickRef = useRef(false);
   const suppressNextPaneClickTimeoutRef = useRef<number | null>(null);
+  const handledFocusRequestKeyRef = useRef<string | null>(null);
+  const runCanvasNodeIdsKey = useMemo(() => state.nodes.map((node) => node.id).join("|"), [state.nodes]);
 
   useEffect(() => {
-    if (!focusRequest) {
+    if (!focusRequest || !hasReactFlowInitialized) {
       return;
     }
 
-    const targetNode = stateRef.current.nodes?.find((node) => node.id === focusRequest.nodeId);
+    const expectedTargetMode = isRunInspectionMode ? "runs" : "live";
+    if (focusRequest.targetMode !== expectedTargetMode) {
+      return;
+    }
+
+    const focusRequestKey = `${focusRequest.targetMode}:${focusRequest.requestId}:${focusRequest.nodeId}`;
+    if (handledFocusRequestKeyRef.current === focusRequestKey) {
+      return;
+    }
+
+    const targetNode =
+      getNodes().find((node) => node.id === focusRequest.nodeId) ??
+      stateRef.current.nodes?.find((node) => node.id === focusRequest.nodeId);
     if (!targetNode) {
       return;
     }
 
+    handledFocusRequestKeyRef.current = focusRequestKey;
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
         ...node,
         selected: node.id === focusRequest.nodeId,
       })),
     );
-    fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
-  }, [focusRequest, fitView]);
-
-  const runCanvasNodeIdsKey = useMemo(() => state.nodes.map((node) => node.id).join("|"), [state.nodes]);
+    void fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 }).then(
+      () => {
+        const nextViewport = getViewport();
+        viewportRef.current = nextViewport;
+        reportZoom(nextViewport.zoom);
+      },
+      () => undefined,
+    );
+  }, [
+    focusRequest,
+    fitView,
+    getNodes,
+    getViewport,
+    hasReactFlowInitialized,
+    isRunInspectionMode,
+    reportZoom,
+    runCanvasNodeIdsKey,
+    viewportRef,
+  ]);
 
   useEffect(() => {
     if (!isRunInspectionMode) {
@@ -2577,12 +2615,14 @@ function CanvasContent({
 
         hasFitToViewRef.current = true;
         setIsInitialized(true);
+        setHasReactFlowInitialized(true);
       } else {
         // If we've already fit to view once and have a stored viewport, restore it
         if (viewportRef.current) {
           reactFlowInstance.setViewport(viewportRef.current);
         }
         setIsInitialized(true);
+        setHasReactFlowInitialized(true);
       }
     },
     [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],

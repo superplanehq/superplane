@@ -31,8 +31,8 @@ export const ROW_STYLE_CLASS: Record<WidgetRowStyleTone, string> = {
   "red-soft": "bg-red-50",
   blue: "bg-sky-100",
   "blue-soft": "bg-sky-50",
-  green: "bg-emerald-100",
-  "green-soft": "bg-emerald-50",
+  green: "bg-green-100",
+  "green-soft": "bg-green-50",
 };
 
 export const ROW_STYLE_LABEL: Record<WidgetRowStyleTone, string> = {

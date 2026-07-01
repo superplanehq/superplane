@@ -154,7 +154,7 @@ interface ComponentSidebarProps {
   layout?: "sidebar" | "bottom";
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRun?: (runId: string) => void;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
 }
 
 export const ComponentSidebar = ({
@@ -686,6 +686,7 @@ export const ComponentSidebar = ({
                     onReEmit={onReEmit}
                     getExecutionState={getExecutionState}
                     compact={isBottomLayout}
+                    selectionNodeId={nodeId}
                     resolveRunId={resolveRunId}
                     fetchRunId={fetchRunId}
                     onSelectRun={onSelectRun}
@@ -759,6 +760,7 @@ export const ComponentSidebar = ({
                   onToggleOpen={handleToggleOpen}
                   onEventClick={onEventClick}
                   compact={isBottomLayout}
+                  selectionNodeId={nodeId}
                   resolveRunId={resolveRunId}
                   fetchRunId={fetchRunId}
                   onSelectRun={onSelectRun}

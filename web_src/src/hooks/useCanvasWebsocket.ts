@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import useWebSocket from "react-use-websocket";
+import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
@@ -195,14 +195,34 @@ export function useCanvasWebsocket(
   );
 
   const patchExecutionInCache = useCallback(
-    (execution: CanvasesCanvasNodeExecution) => {
-      queryClient.setQueriesData<InfiniteData<InfiniteRunsPage>>(
-        { queryKey: canvasKeys.infiniteRuns(canvasId) },
-        (old) => upsertExecutionIntoInfiniteRunsData(old, execution),
-      );
+    (execution: CanvasesCanvasNodeExecution): boolean => {
+      let patched = false;
+      const queries = queryClient.getQueriesData<InfiniteData<InfiniteRunsPage>>({
+        queryKey: canvasKeys.infiniteRuns(canvasId),
+      });
+
+      for (const [queryKey, data] of queries) {
+        if (!data) {
+          continue;
+        }
+
+        const next = upsertExecutionIntoInfiniteRunsData(data, execution);
+        if (next !== data) {
+          patched = true;
+          queryClient.setQueryData(queryKey, next);
+        }
+      }
+
+      return patched;
     },
     [queryClient, canvasId],
   );
+
+  const invalidateRuns = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: canvasKeys.infiniteRuns(canvasId),
+    });
+  }, [queryClient, canvasId]);
 
   const invalidateMemoryEntries = useCallback(() => {
     queryClient.invalidateQueries({
@@ -235,6 +255,9 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const workflowEvent = payload as CanvasesCanvasEvent;
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
+            if (workflowEvent.root) {
+              invalidateRuns();
+            }
 
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
             onWorkflowEvent?.(workflowEvent, data.event);
@@ -248,7 +271,9 @@ export function useCanvasWebsocket(
             if (execution.nodeId) {
               nodeExecutionStore.updateNodeExecution(execution.nodeId, execution);
 
-              patchExecutionInCache(execution);
+              if (!patchExecutionInCache(execution)) {
+                invalidateRuns();
+              }
 
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
@@ -264,6 +289,7 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.addNodeQueueItem(queueItem.nodeId!, queueItem);
+            invalidateRuns();
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
@@ -336,6 +362,7 @@ export function useCanvasWebsocket(
       patchRunInCache,
       patchExecutionInCache,
       invalidateMemoryEntries,
+      invalidateRuns,
     ],
   );
 
@@ -421,13 +448,11 @@ export function useCanvasWebsocket(
       return;
     }
 
-    queryClient.invalidateQueries({
-      queryKey: canvasKeys.infiniteRuns(canvasId),
-    });
+    invalidateRuns();
     // Refresh memory in case mutations happened while we were disconnected; we
     // no longer poll, so the websocket is the only push channel.
     invalidateMemoryEntries();
-  }, [queryClient, canvasId, invalidateMemoryEntries]);
+  }, [invalidateRuns, invalidateMemoryEntries]);
 
   // Cleanup on unmount
   useEffect(() => {

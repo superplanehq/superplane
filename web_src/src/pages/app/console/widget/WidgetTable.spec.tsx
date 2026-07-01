@@ -121,12 +121,71 @@ describe("WidgetTable row styles — background tone", () => {
     const firstRow = view.container.querySelector("table tbody tr");
     expect(firstRow).not.toBeNull();
     expect(firstRow!.className).toContain("bg-red-100");
-    expect(firstRow!.className).not.toContain("bg-emerald-");
+    expect(firstRow!.className).not.toContain("bg-green-");
+  });
+});
+
+describe("WidgetTable link column href", () => {
+  function renderLink(tableRender: WidgetTableRender, rows: unknown[]) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
+            <WidgetTable render={tableRender} rows={rows} isLoading={false} />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("resolves {{ field }} expressions in href, rendering the cell value as the link text", () => {
+    const view = renderLink(
+      {
+        kind: "table",
+        columns: [{ field: "prNumber", format: "link", href: "{{ prUrl }}" }],
+      },
+      [{ id: "row-1", prNumber: 42, prUrl: "https://github.com/acme/core/pull/42" }],
+    );
+    const anchor = view.container.querySelector("table tbody tr a");
+    expect(anchor).not.toBeNull();
+    expect(anchor!.getAttribute("href")).toBe("https://github.com/acme/core/pull/42");
+    expect(anchor!.textContent).toBe("42");
+    view.unmount();
+  });
+
+  it("resolves mixed {{ }} templates with literal text in href", () => {
+    const view = renderLink(
+      {
+        kind: "table",
+        columns: [
+          { field: "prNumber", format: "link", href: "https://github.com/{{ org }}/{{ repo }}/pull/{{ prNumber }}" },
+        ],
+      },
+      [{ id: "row-1", prNumber: 7, org: "acme", repo: "core" }],
+    );
+    const anchor = view.container.querySelector("table tbody tr a");
+    expect(anchor!.getAttribute("href")).toBe("https://github.com/acme/core/pull/7");
+    expect(anchor!.textContent).toBe("7");
+    view.unmount();
+  });
+
+  it("keeps legacy single-brace {field} placeholders working", () => {
+    const view = renderLink(
+      {
+        kind: "table",
+        columns: [{ field: "service", format: "link", href: "/services/{service}" }],
+      },
+      [{ id: "row-1", service: "api" }],
+    );
+    const anchor = view.container.querySelector("table tbody tr a");
+    expect(anchor!.getAttribute("href")).toBe("/services/api");
+    view.unmount();
   });
 });
 
 describe("WidgetTable column formatting", () => {
-  it("renders status and badge columns as pills with the same classes", () => {
+  it("renders status columns as colored pills and badge columns as neutral tags", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const renderWithFormat = (format: "status" | "badge") =>
       render(
@@ -153,14 +212,17 @@ describe("WidgetTable column formatting", () => {
     const statusPill = statusView.container.querySelector("table tbody tr td:nth-child(2) span");
     expect(statusPill).not.toBeNull();
     expect(statusPill!.textContent).toBe("failed");
-    const statusClass = statusPill!.getAttribute("class") ?? "";
+    expect(statusPill!.className).toContain("bg-red-500");
+    expect(statusPill!.className).toContain("text-white");
     statusView.unmount();
 
     const badgeView = renderWithFormat("badge");
     const badgePill = badgeView.container.querySelector("table tbody tr td:nth-child(2) span");
     expect(badgePill).not.toBeNull();
     expect(badgePill!.textContent).toBe("failed");
-    expect(badgePill!.getAttribute("class")).toBe(statusClass);
+    expect(badgePill!.className).toContain("bg-transparent");
+    expect(badgePill!.className).toContain("outline-slate-950/15");
+    expect(badgePill!.className).toContain("text-slate-700");
   });
 });
 
