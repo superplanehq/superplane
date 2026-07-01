@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/claude/runagent"
+	"github.com/superplanehq/superplane/pkg/integrations/claude/runcloudagent"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -53,6 +54,7 @@ func (i *Claude) Actions() []core.Action {
 	return []core.Action{
 		&TextPrompt{},
 		&runagent.RunAgent{},
+		&runcloudagent.RunCloudAgent{},
 	}
 }
 
@@ -95,10 +97,19 @@ func (i *Claude) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "model" {
+	switch resourceType {
+	case "model":
+		return i.listModels(resourceType, ctx)
+	case "agent":
+		return i.listAgents(resourceType, ctx)
+	case "environment":
+		return i.listEnvironments(resourceType, ctx)
+	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
 
+func (i *Claude) listModels(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -119,6 +130,70 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 			Type: resourceType,
 			Name: model.ID,
 			ID:   model.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func (i *Claude) listAgents(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := runagent.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	agents, err := client.ListAgents()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(agents))
+	for _, agent := range agents {
+		if agent.ID == "" {
+			continue
+		}
+
+		name := agent.Name
+		if name == "" {
+			name = agent.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: name,
+			ID:   agent.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func (i *Claude) listEnvironments(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := runagent.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	environments, err := client.ListEnvironments()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(environments))
+	for _, environment := range environments {
+		if environment.ID == "" {
+			continue
+		}
+
+		name := environment.Name
+		if name == "" {
+			name = environment.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: name,
+			ID:   environment.ID,
 		})
 	}
 
