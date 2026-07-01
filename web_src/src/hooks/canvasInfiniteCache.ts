@@ -86,8 +86,8 @@ function parseTimestamp(value: string | undefined): number {
 }
 
 function shouldAcceptRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): boolean {
-  const existingUpdatedAt = parseTimestamp(existing.updatedAt);
-  const incomingUpdatedAt = parseTimestamp(incoming.updatedAt);
+  const existingUpdatedAt = getRunUpdateTimestamp(existing);
+  const incomingUpdatedAt = getRunUpdateTimestamp(incoming);
 
   if (incomingUpdatedAt < existingUpdatedAt) {
     return false;
@@ -100,6 +100,26 @@ function shouldAcceptRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCa
   const existingState = RUN_STATE_ORDER[existing.state ?? "STATE_UNKNOWN"] ?? 0;
   const incomingState = RUN_STATE_ORDER[incoming.state ?? "STATE_UNKNOWN"] ?? 0;
   return incomingState >= existingState;
+}
+
+function getRunUpdateTimestamp(run: CanvasesCanvasRun): number {
+  return parseTimestamp(run.updatedAt) || parseTimestamp(run.finishedAt) || parseTimestamp(run.createdAt);
+}
+
+function getRunSortTimestamp(run: CanvasesCanvasRun): number {
+  return parseTimestamp(run.createdAt) || parseTimestamp(run.updatedAt);
+}
+
+function mergeRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): CanvasesCanvasRun {
+  return {
+    ...existing,
+    ...incoming,
+    createdAt: incoming.createdAt ?? existing.createdAt,
+    updatedAt: incoming.updatedAt ?? existing.updatedAt,
+    finishedAt: incoming.finishedAt ?? existing.finishedAt,
+    rootEvent: incoming.rootEvent ?? existing.rootEvent,
+    executions: incoming.executions?.length ? incoming.executions : (existing.executions ?? incoming.executions),
+  };
 }
 
 function bumpTotalCountOnAllPages<T extends { totalCount?: number }>(pages: T[], delta: number): void {
@@ -120,8 +140,8 @@ function findRunLocation(pages: InfiniteRunsPage[], runId: string): { pageIndex:
 }
 
 function insertRunSorted(runs: CanvasesCanvasRun[], run: CanvasesCanvasRun): CanvasesCanvasRun[] {
-  const runCreatedAt = parseTimestamp(run.createdAt);
-  const insertIndex = runs.findIndex((existingRun) => parseTimestamp(existingRun.createdAt) < runCreatedAt);
+  const runTimestamp = getRunSortTimestamp(run);
+  const insertIndex = runs.findIndex((existingRun) => getRunSortTimestamp(existingRun) < runTimestamp);
   if (insertIndex === -1) {
     return [...runs, run];
   }
@@ -143,19 +163,25 @@ export function upsertRunIntoInfiniteData(
     runs: page.runs ? [...page.runs] : [],
   }));
   const location = findRunLocation(pages, run.id ?? "");
-  const matches = runMatchesFilters(run, filters);
 
-  if (matches) {
-    if (location) {
-      const existing = pages[location.pageIndex].runs![location.runIndex];
-      if (!shouldAcceptRunUpdate(existing, run)) {
-        return old;
-      }
+  if (location) {
+    const existing = pages[location.pageIndex].runs![location.runIndex];
+    if (!shouldAcceptRunUpdate(existing, run)) {
+      return old;
+    }
 
-      pages[location.pageIndex].runs![location.runIndex] = run;
+    const nextRun = mergeRunUpdate(existing, run);
+    if (runMatchesFilters(nextRun, filters)) {
+      pages[location.pageIndex].runs![location.runIndex] = nextRun;
       return { ...old, pages };
     }
 
+    pages[location.pageIndex].runs!.splice(location.runIndex, 1);
+    bumpTotalCountOnAllPages(pages, -1);
+    return { ...old, pages };
+  }
+
+  if (runMatchesFilters(run, filters)) {
     if (pages.length === 0) {
       return {
         ...old,
@@ -168,13 +194,7 @@ export function upsertRunIntoInfiniteData(
     return { ...old, pages };
   }
 
-  if (!location) {
-    return old;
-  }
-
-  pages[location.pageIndex].runs!.splice(location.runIndex, 1);
-  bumpTotalCountOnAllPages(pages, -1);
-  return { ...old, pages };
+  return old;
 }
 
 export function executionToRef(execution: CanvasesCanvasNodeExecution): CanvasesCanvasNodeExecutionRef {
@@ -295,5 +315,5 @@ export function upsertRunIntoDescribeRunData(
     return current;
   }
 
-  return { ...current, run: incoming };
+  return { ...current, run: mergeRunUpdate(current.run, incoming) };
 }
