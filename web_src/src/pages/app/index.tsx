@@ -143,6 +143,7 @@ import {
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import { runPositionAutoSave } from "./runPositionAutoSave";
+import { syncRunInspectionViewportTransition } from "./lib/run-inspection-viewport";
 import {
   clearRunDetailNodeSearchParams,
   getCanvasLogNodesSignature,
@@ -517,8 +518,6 @@ export function AppPage() {
     activateBranch,
   });
 
-  const [canvasFitAllNonce, setCanvasFitAllNonce] = useState(0);
-  const wasRunInspectionModeRef = useRef(false);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(
     () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
@@ -662,7 +661,7 @@ export function AppPage() {
    */
   const viewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
   const runsViewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
-  const lastRunsViewportKeyRef = useRef<string | null>(null);
+  const lastRunsViewportKeyRef = useRef<"runs" | null>(null);
 
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
@@ -1668,24 +1667,14 @@ export function AppPage() {
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
-  const runsViewportKey = isRunInspectionMode ? "runs" : null;
-  if (lastRunsViewportKeyRef.current !== runsViewportKey) {
-    if (runsViewportKey) {
-      runsHasFitToViewRef.current = Boolean(viewportRef.current);
-      runsViewportRef.current = viewportRef.current ? { ...viewportRef.current } : undefined;
-    } else {
-      runsHasFitToViewRef.current = false;
-      runsViewportRef.current = undefined;
-    }
-    lastRunsViewportKeyRef.current = runsViewportKey;
-  }
-
-  useEffect(() => {
-    if (wasRunInspectionModeRef.current && !isRunInspectionMode) {
-      setCanvasFitAllNonce((n) => n + 1);
-    }
-    wasRunInspectionModeRef.current = isRunInspectionMode;
-  }, [isRunInspectionMode]);
+  syncRunInspectionViewportTransition({
+    isRunInspectionMode,
+    liveViewportRef: viewportRef,
+    runsViewportRef,
+    liveHasFitToViewRef: hasFitToViewRef,
+    runsHasFitToViewRef,
+    lastRunsViewportKeyRef,
+  });
 
   useEffect(() => {
     if (
@@ -3810,6 +3799,7 @@ export function AppPage() {
       clearDismissedRunDetail();
       preserveRunDetailNodeOnNextRunChangeRef.current = true;
       setRunDetailNodeId(options.nodeId);
+      setFocusRequest({ nodeId: options.nodeId, requestId: Date.now(), tab: "latest" });
       setSearchParams(
         (current) =>
           applyRunInspectionNavigationSearchParams(current, {
@@ -3875,6 +3865,14 @@ export function AppPage() {
       );
     },
     [setRunDetailNodeId, setSearchParams],
+  );
+
+  const handleRunNodeDetailNavigate = useCallback(
+    (nodeId: string) => {
+      handleRunNodeDetailSelection(nodeId);
+      setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
+    },
+    [handleRunNodeDetailSelection],
   );
 
   useStaleRunInspectionUrlCleanup({
@@ -4481,7 +4479,6 @@ export function AppPage() {
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunInspectionMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          fitAllRequest={!isRunInspectionMode && canvasFitAllNonce > 0 ? canvasFitAllNonce : null}
           fitAllFocusNodeIds={
             isRunInspectionMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
               ? runCanvasData.participantNodeIds
@@ -4497,7 +4494,7 @@ export function AppPage() {
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
           onRunNodeDetailClose={() => handleRunNodeDetailSelection(null)}
-          onRunNodeDetailNavigate={handleRunNodeDetailSelection}
+          onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           runNodeDetailPaneHeight={runNodeDetailPaneHeight}
           onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
           onShowDiff={onShowDiff}
