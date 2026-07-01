@@ -17,7 +17,7 @@ import (
 const defaultAPIURL = "https://app.superplane.com"
 
 var (
-	errTokenNotFound    = errors.New("token is required (use --token or SUPERPLANE_OIDC_TOKEN)")
+	errTokenNotFound    = errors.New("token is required (use --token or SUPERPLANE_OIDC_ASSERTION)")
 	errAudienceRequired = errors.New("audience is required (use --audience)")
 )
 
@@ -185,7 +185,7 @@ func claimString(claims map[string]any, key string) string {
 func (c *verifyCommand) lookupToken() error {
 	token := strings.TrimSpace(*c.token)
 	if token == "" {
-		token = strings.TrimSpace(os.Getenv("SUPERPLANE_OIDC_TOKEN"))
+		token = strings.TrimSpace(os.Getenv("SUPERPLANE_OIDC_ASSERTION"))
 	}
 	if token == "" {
 		return errTokenNotFound

@@ -22,7 +22,7 @@ const PipelineStateDone = "done"
 const PipelineResultPassed = "passed"
 const PollInterval = 5 * time.Minute
 
-const oidcTokenParameterName = "SUPERPLANE_OIDC_TOKEN"
+const oidcAssertionParameterName = "SUPERPLANE_OIDC_ASSERTION"
 
 const (
 	semaphoreOIDCTokenAudience = "semaphore"
@@ -73,7 +73,7 @@ type RunWorkflowSpec struct {
 	Ref          string      `json:"ref"`
 	PipelineFile string      `json:"pipelineFile"`
 	CommitSha    string      `json:"commitSha"`
-	AddOidcToken bool        `json:"addOidcToken"`
+	AddOidcAssertion bool        `json:"addOidcAssertion"`
 	Parameters   []Parameter `json:"parameters"`
 }
 
@@ -119,7 +119,7 @@ func (r *RunWorkflow) Documentation() string {
 - **Ref**: Git reference to run the workflow on (branch, tag, or commit SHA)
 - **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
 - **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
-- **Add OIDC token**: Send a signed token so CI can confirm this run was triggered by SuperPlane
+- **Add OIDC assertion**: Send ` + "`SUPERPLANE_OIDC_ASSERTION`" + ` so CI can confirm this run was triggered by SuperPlane
 
 ## Injected Parameters
 
@@ -127,11 +127,11 @@ SuperPlane automatically adds these workflow parameters when triggering Semaphor
 
 - ` + "`SUPERPLANE_EXECUTION_ID`" + `: The SuperPlane node execution ID
 - ` + "`SUPERPLANE_CANVAS_ID`" + `: The SuperPlane canvas ID
-- ` + "`SUPERPLANE_OIDC_TOKEN`" + `: When **Add OIDC token** is enabled, a signed token attesting this workflow was triggered by a specific canvas node
+- ` + "`SUPERPLANE_OIDC_ASSERTION`" + `: When **Add OIDC assertion** is enabled, a signed OIDC assertion attesting this workflow was triggered by SuperPlane
 
 ## Verifying Triggers in CI
 
-To verify that a Semaphore job was triggered by SuperPlane, verify ` + "`SUPERPLANE_OIDC_TOKEN`" + ` before running any steps. 
+To verify that a Semaphore job was triggered by SuperPlane, verify ` + "`SUPERPLANE_OIDC_ASSERTION`" + ` before running any steps. 
 Check every claim your policy depends on. For example:
 
 ` + "```bash" + `
@@ -238,10 +238,10 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "addOidcToken",
-			Label:       "Add OIDC token",
+			Name:        "addOidcAssertion",
+			Label:       "Add OIDC assertion",
 			Type:        configuration.FieldTypeBool,
-			Description: "Send a signed token so CI can confirm this run was triggered by SuperPlane",
+			Description: "Send a signed JWT assertion so Semaphore can confirm this run was triggered by SuperPlane",
 		},
 	}
 }
@@ -639,7 +639,7 @@ func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflo
 	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID
 	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
 
-	if !spec.AddOidcToken {
+	if !spec.AddOidcAssertion {
 		return parameters, nil
 	}
 
@@ -649,7 +649,7 @@ func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflo
 		return nil, fmt.Errorf("failed to sign OIDC execution token")
 	}
 
-	parameters[oidcTokenParameterName] = token
+	parameters[oidcAssertionParameterName] = token
 
 	return parameters, nil
 }
