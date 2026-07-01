@@ -99,6 +99,48 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	return responseBody, nil
 }
 
+// paginatedResponse wraps a paginated API response.
+type paginatedResponse[T any] struct {
+	Items []T
+	More  bool
+}
+
+// paginatedList fetches all items from a paginated PagerDuty API endpoint.
+// urlBuilder receives limit and offset and returns the full URL for that page.
+// parseResponse parses the response body and returns the items and whether there are more pages.
+func paginatedList[T any](
+	c *Client,
+	urlBuilder func(limit, offset int) string,
+	parseResponse func([]byte) (paginatedResponse[T], error),
+) ([]T, error) {
+	var allItems []T
+	offset := 0
+	limit := 100
+
+	for {
+		apiURL := urlBuilder(limit, offset)
+		responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		parsed, err := parseResponse(responseBody)
+		if err != nil {
+			return nil, err
+		}
+
+		allItems = append(allItems, parsed.Items...)
+
+		if !parsed.More {
+			break
+		}
+
+		offset += limit
+	}
+
+	return allItems, nil
+}
+
 type CreateIncidentRequest struct {
 	Incident IncidentPayload `json:"incident"`
 }
@@ -472,22 +514,21 @@ type Service struct {
 }
 
 func (c *Client) ListServices() ([]Service, error) {
-	apiURL := fmt.Sprintf("%s/services", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Services []Service `json:"services"`
-	}
-
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.Services, nil
+	return paginatedList(c,
+		func(limit, offset int) string {
+			return fmt.Sprintf("%s/services?limit=%d&offset=%d", c.BaseURL, limit, offset)
+		},
+		func(body []byte) (paginatedResponse[Service], error) {
+			var response struct {
+				Services []Service `json:"services"`
+				More     bool      `json:"more"`
+			}
+			if err := json.Unmarshal(body, &response); err != nil {
+				return paginatedResponse[Service]{}, fmt.Errorf("error parsing response: %v", err)
+			}
+			return paginatedResponse[Service]{Items: response.Services, More: response.More}, nil
+		},
+	)
 }
 
 func (c *Client) GetService(id string) (*Service, error) {
@@ -542,22 +583,21 @@ type User struct {
 }
 
 func (c *Client) ListUsers() ([]User, error) {
-	apiURL := fmt.Sprintf("%s/users", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Users []User `json:"users"`
-	}
-
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.Users, nil
+	return paginatedList(c,
+		func(limit, offset int) string {
+			return fmt.Sprintf("%s/users?limit=%d&offset=%d", c.BaseURL, limit, offset)
+		},
+		func(body []byte) (paginatedResponse[User], error) {
+			var response struct {
+				Users []User `json:"users"`
+				More  bool   `json:"more"`
+			}
+			if err := json.Unmarshal(body, &response); err != nil {
+				return paginatedResponse[User]{}, fmt.Errorf("error parsing response: %v", err)
+			}
+			return paginatedResponse[User]{Items: response.Users, More: response.More}, nil
+		},
+	)
 }
 
 type EscalationPolicy struct {
@@ -567,22 +607,21 @@ type EscalationPolicy struct {
 }
 
 func (c *Client) ListEscalationPolicies() ([]EscalationPolicy, error) {
-	apiURL := fmt.Sprintf("%s/escalation_policies", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		EscalationPolicies []EscalationPolicy `json:"escalation_policies"`
-	}
-
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.EscalationPolicies, nil
+	return paginatedList(c,
+		func(limit, offset int) string {
+			return fmt.Sprintf("%s/escalation_policies?limit=%d&offset=%d", c.BaseURL, limit, offset)
+		},
+		func(body []byte) (paginatedResponse[EscalationPolicy], error) {
+			var response struct {
+				EscalationPolicies []EscalationPolicy `json:"escalation_policies"`
+				More               bool               `json:"more"`
+			}
+			if err := json.Unmarshal(body, &response); err != nil {
+				return paginatedResponse[EscalationPolicy]{}, fmt.Errorf("error parsing response: %v", err)
+			}
+			return paginatedResponse[EscalationPolicy]{Items: response.EscalationPolicies, More: response.More}, nil
+		},
+	)
 }
 
 // Incident represents a PagerDuty incident returned from the API
@@ -633,28 +672,25 @@ type PriorityRef struct {
 // ListIncidents retrieves incidents from PagerDuty filtered by status and optionally by service IDs.
 // By default, it returns open incidents (triggered and acknowledged).
 func (c *Client) ListIncidents(serviceIDs []string) ([]Incident, error) {
-	apiURL := fmt.Sprintf("%s/incidents?statuses[]=triggered&statuses[]=acknowledged", c.BaseURL)
-
-	// Add service ID filters if provided
-	for _, serviceID := range serviceIDs {
-		apiURL += fmt.Sprintf("&service_ids[]=%s", serviceID)
-	}
-
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Incidents []Incident `json:"incidents"`
-	}
-
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.Incidents, nil
+	return paginatedList(c,
+		func(limit, offset int) string {
+			apiURL := fmt.Sprintf("%s/incidents?statuses[]=triggered&statuses[]=acknowledged&limit=%d&offset=%d", c.BaseURL, limit, offset)
+			for _, serviceID := range serviceIDs {
+				apiURL += fmt.Sprintf("&service_ids[]=%s", serviceID)
+			}
+			return apiURL
+		},
+		func(body []byte) (paginatedResponse[Incident], error) {
+			var response struct {
+				Incidents []Incident `json:"incidents"`
+				More      bool       `json:"more"`
+			}
+			if err := json.Unmarshal(body, &response); err != nil {
+				return paginatedResponse[Incident]{}, fmt.Errorf("error parsing response: %v", err)
+			}
+			return paginatedResponse[Incident]{Items: response.Incidents, More: response.More}, nil
+		},
+	)
 }
 
 type SnoozeIncidentRequest struct {
