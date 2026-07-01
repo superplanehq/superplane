@@ -57,6 +57,28 @@ type ManagedSession struct {
 	Status string `json:"status"`
 }
 
+// Agent is a subset of the agent resource returned by GET /v1/agents.
+type Agent struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Environment is a subset of the environment resource returned by GET /v1/environments.
+type Environment struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type listAgentsResponse struct {
+	Data     []Agent `json:"data"`
+	NextPage string  `json:"next_page"`
+}
+
+type listEnvironmentsResponse struct {
+	Data     []Environment `json:"data"`
+	NextPage string        `json:"next_page"`
+}
+
 type ManagedSessionEvent struct {
 	Type    string                       `json:"type"`
 	Content []ManagedSessionContentBlock `json:"content"`
@@ -173,6 +195,105 @@ func nonEmptyStrings(in []string) []string {
 		return nil
 	}
 	return out
+}
+
+const (
+	listPageLimit = "100"
+	// maxListPages caps pagination to guard against a server that keeps
+	// returning a non-empty next_page cursor indefinitely.
+	maxListPages = 1000
+)
+
+// ListAgents returns all (non-archived) Managed Agents, following the
+// page/next_page cursor pagination used by the Managed Agents API.
+func (c *Client) ListAgents() ([]Agent, error) {
+	var all []Agent
+	page := ""
+	for i := 0; i < maxListPages; i++ {
+		params := url.Values{}
+		params.Set("limit", listPageLimit)
+		if page != "" {
+			params.Set("page", page)
+		}
+		URL := c.BaseURL + "/agents?" + params.Encode()
+		responseBody, err := c.execRequestWithBeta(http.MethodGet, URL, nil, anthropicBetaManagedAgents)
+		if err != nil {
+			return nil, err
+		}
+		var resp listAgentsResponse
+		if err := json.Unmarshal(responseBody, &resp); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal agents response: %w", err)
+		}
+		all = append(all, resp.Data...)
+		if resp.NextPage == "" || resp.NextPage == page {
+			break
+		}
+		page = resp.NextPage
+	}
+	return all, nil
+}
+
+// ListEnvironments returns all Managed Agent environments, following the
+// page/next_page cursor pagination used by the Managed Agents API.
+func (c *Client) ListEnvironments() ([]Environment, error) {
+	var all []Environment
+	page := ""
+	for i := 0; i < maxListPages; i++ {
+		params := url.Values{}
+		params.Set("limit", listPageLimit)
+		if page != "" {
+			params.Set("page", page)
+		}
+		URL := c.BaseURL + "/environments?" + params.Encode()
+		responseBody, err := c.execRequestWithBeta(http.MethodGet, URL, nil, anthropicBetaManagedAgents)
+		if err != nil {
+			return nil, err
+		}
+		var resp listEnvironmentsResponse
+		if err := json.Unmarshal(responseBody, &resp); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal environments response: %w", err)
+		}
+		all = append(all, resp.Data...)
+		if resp.NextPage == "" || resp.NextPage == page {
+			break
+		}
+		page = resp.NextPage
+	}
+	return all, nil
+}
+
+// GetAgent retrieves a single agent by ID (GET /v1/agents/{id}).
+func (c *Client) GetAgent(agentID string) (*Agent, error) {
+	if agentID == "" {
+		return nil, fmt.Errorf("agent id is required")
+	}
+	URL := c.BaseURL + "/agents/" + url.PathEscape(agentID)
+	responseBody, err := c.execRequestWithBeta(http.MethodGet, URL, nil, anthropicBetaManagedAgents)
+	if err != nil {
+		return nil, err
+	}
+	var out Agent
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal agent: %w", err)
+	}
+	return &out, nil
+}
+
+// GetEnvironment retrieves a single environment by ID (GET /v1/environments/{id}).
+func (c *Client) GetEnvironment(environmentID string) (*Environment, error) {
+	if environmentID == "" {
+		return nil, fmt.Errorf("environment id is required")
+	}
+	URL := c.BaseURL + "/environments/" + url.PathEscape(environmentID)
+	responseBody, err := c.execRequestWithBeta(http.MethodGet, URL, nil, anthropicBetaManagedAgents)
+	if err != nil {
+		return nil, err
+	}
+	var out Environment
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal environment: %w", err)
+	}
+	return &out, nil
 }
 
 // CreateManagedSession creates a Managed Agents session.
