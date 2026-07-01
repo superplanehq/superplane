@@ -15,8 +15,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-const runnerLiveLogSessionEndpoint = "RunnerLiveLogSession"
-
 type LogsCommand struct {
 	CanvasID    *string
 	ExecutionID *string
@@ -208,7 +206,7 @@ func (c *LogsCommand) fetchLiveLogSession(ctx core.CommandContext, canvasID, exe
 		return nil, fmt.Errorf("api client config is required")
 	}
 
-	baseURL, err := config.ServerURLWithContext(ctx.Context, runnerLiveLogSessionEndpoint)
+	baseURL, err := config.ServerURLWithContext(ctx.Context, "")
 	if err != nil {
 		return nil, err
 	}
