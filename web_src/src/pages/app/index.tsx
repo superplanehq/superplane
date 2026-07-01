@@ -4421,11 +4421,16 @@ export function AppPage() {
         />
         <CanvasPage
           key={canvasRenderKey}
-          // Persist right sidebar in query params
-          initialSidebar={{
-            isOpen: searchParams.get("sidebar") === "1",
-            nodeId: searchParams.get("node") || null,
-          }}
+          // In run inspection, sidebar/node params restore the run detail pane,
+          // not the live node inspector.
+          initialSidebar={
+            isRunInspectionMode
+              ? { isOpen: false, nodeId: null }
+              : {
+                  isOpen: searchParams.get("sidebar") === "1",
+                  nodeId: searchParams.get("node") || null,
+                }
+          }
           onSidebarChange={handleSidebarChange}
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}

@@ -235,6 +235,7 @@ describe("CanvasPage run inspection", () => {
 
   it("focuses a run node when the node appears after the focus request", async () => {
     const hasFitToViewRef = { current: true };
+    const viewportRef = { current: { x: 10, y: 20, zoom: 0.8 } };
     const focusRequest = { nodeId: "run-node-1", requestId: 1, tab: "latest" as const };
     getNodesMock.mockReturnValue([]);
 
@@ -250,6 +251,7 @@ describe("CanvasPage run inspection", () => {
           isEditing={false}
           activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
+          viewportRef={viewportRef}
           focusRequest={focusRequest}
         />
       </MemoryRouter>,
@@ -280,14 +282,22 @@ describe("CanvasPage run inspection", () => {
           isEditing={false}
           activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
+          viewportRef={viewportRef}
           focusRequest={focusRequest}
         />
       </MemoryRouter>,
     );
 
+    expect(fitViewMock).not.toHaveBeenCalled();
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: setViewportMock });
+    });
+
     await waitFor(() => {
       expect(fitViewMock).toHaveBeenCalledWith({ nodes: [runNode], duration: 500, maxZoom: 1.2 });
     });
+    expect(setViewportMock).toHaveBeenCalledWith(viewportRef.current);
   });
 
   it("refits when leaving run inspection with the same fit request nonce", () => {
