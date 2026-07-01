@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -314,6 +315,9 @@ func findRunnerLogExecutionTarget(tx *gorm.DB, canvasID, executionID uuid.UUID) 
 func isRunnerLogExecutionTarget(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (bool, error) {
 	node, err := models.FindCanvasNode(tx, canvasID, nodeID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
 		return false, fmt.Errorf("load node %q: %w", nodeID, err)
 	}
 	ref := node.Ref.Data()

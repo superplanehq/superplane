@@ -1176,6 +1176,118 @@ func TestReadRuntimeAction_ReadsRunnerLogsByExecutionID(t *testing.T) {
 	assert.Equal(t, "agent log line", payload.Logs[0].Records[0].Text)
 }
 
+func TestReadRuntimeAction_ReadsRunnerLogsByRunIDWithMissingNodeExecution(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	broker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		assert.Equal(t, "/v1/tasks/task-agent-logs/live-logs", req.URL.Path)
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		_, _ = w.Write([]byte(`{"type":"line","text":"agent log line"}` + "\n"))
+	}))
+	defer broker.Close()
+	t.Setenv("TASK_BROKER_BASE_URL", broker.URL)
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID: "trigger-1",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "start"},
+			}),
+		},
+		{
+			NodeID: "runner-1",
+			Type:   models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Component: &models.ComponentRef{Name: "runnerBash"},
+			}),
+		},
+		{
+			NodeID: "missing-node",
+			Type:   models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Component: &models.ComponentRef{Name: "runnerBash"},
+			}),
+		},
+	}, nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-1", "default", nil)
+
+	var run *models.CanvasRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		run, err = models.FindOrCreateCanvasRunForRootEventInTransaction(tx, event)
+		if err != nil {
+			return err
+		}
+		return event.RoutedInTransaction(tx)
+	}))
+
+	now := time.Now()
+	executions := []models.CanvasNodeExecution{
+		{
+			ID:            uuid.New(),
+			WorkflowID:    canvas.ID,
+			NodeID:        "missing-node",
+			RootEventID:   event.ID,
+			RunID:         run.ID,
+			EventID:       event.ID,
+			State:         models.CanvasNodeExecutionStateStarted,
+			Metadata:      datatypes.NewJSONType(map[string]any{}),
+			Configuration: datatypes.NewJSONType(map[string]any{}),
+			CreatedAt:     &now,
+			UpdatedAt:     &now,
+		},
+		{
+			ID:          uuid.New(),
+			WorkflowID:  canvas.ID,
+			NodeID:      "runner-1",
+			RootEventID: event.ID,
+			RunID:       run.ID,
+			EventID:     event.ID,
+			State:       models.CanvasNodeExecutionStateStarted,
+			Metadata: datatypes.NewJSONType(map[string]any{
+				runneraction.ExecutionMetadataBrokerTaskID: "task-agent-logs",
+			}),
+			Configuration: datatypes.NewJSONType(map[string]any{}),
+			CreatedAt:     &now,
+			UpdatedAt:     &now,
+		},
+	}
+	require.NoError(t, database.Conn().Create(&executions).Error)
+	require.NoError(t, database.Conn().
+		Where("workflow_id = ?", canvas.ID).
+		Where("node_id = ?", "missing-node").
+		Delete(&models.CanvasNode{}).
+		Error)
+
+	action := readRuntimeAction{
+		registry: r.Registry,
+		auth:     allowingPermissionChecker{},
+	}
+
+	result, err := action.Execute(context.Background(), agents.AgentSessionContext{
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Resource: "runner_logs",
+		RunID:    run.ID.String(),
+		Limit:    10,
+	})
+
+	require.NoError(t, err)
+	read, ok := result.(runtimeReadResult)
+	require.True(t, ok)
+	payload, ok := read.Payload.(runnerLogsPayload)
+	require.True(t, ok)
+	require.Len(t, payload.Logs, 1)
+	assert.Equal(t, executions[1].ID.String(), payload.Logs[0].ExecutionID)
+	assert.Equal(t, "runner-1", payload.Logs[0].NodeID)
+	assert.Equal(t, "agent log line", payload.Logs[0].Records[0].Text)
+}
+
 type allowingPermissionChecker struct{}
 
 func (allowingPermissionChecker) CheckOrganizationPermission(_ context.Context, _, _, _, _ string) (bool, error) {
