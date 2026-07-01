@@ -4326,7 +4326,7 @@ export function AppPage() {
     initialOpenDetail: openRunDetailOnMount,
     detailDismissedForRunId,
     selectedNodeId: runDetailNodeId,
-    onSelectNode: handleRunNodeDetailSelection,
+    onSelectNode: handleRunNodeDetailNavigate,
     hasNextPage: !!infiniteRunsQuery.hasNextPage,
     isFetchingNextPage: infiniteRunsQuery.isFetchingNextPage,
     onLoadMore: () => infiniteRunsQuery.fetchNextPage(),
