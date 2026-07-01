@@ -23,7 +23,13 @@ import (
 	"gorm.io/gorm"
 )
 
-const readRuntimeActionName = "read_runtime"
+const (
+	readRuntimeActionName = "read_runtime"
+	// The task-broker polls CloudWatch every 300-750ms, so 1500ms gives it at
+	// least two quiet polling intervals before an agent tool call returns a
+	// bounded snapshot instead of waiting for an open live stream to close.
+	runnerLogSnapshotIdleTimeout = 1500 * time.Millisecond
+)
 
 var runtimeResources = []string{
 	"memory",
@@ -356,7 +362,10 @@ func fetchRunnerLogsForTarget(ctx context.Context, organizationID, canvasID uuid
 		return result, err
 	}
 
-	fetch, err := runneraction.FetchLiveLogRecords(ctx, access.BrokerTaskID, runneraction.LiveLogFetchOptions{Limit: limit})
+	fetch, err := runneraction.FetchLiveLogRecords(ctx, access.BrokerTaskID, runneraction.LiveLogFetchOptions{
+		Limit:       limit,
+		IdleTimeout: runnerLogSnapshotIdleTimeout,
+	})
 	if err != nil {
 		return result, err
 	}
