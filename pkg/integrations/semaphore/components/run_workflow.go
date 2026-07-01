@@ -118,7 +118,7 @@ func (r *RunWorkflow) Documentation() string {
 - **Ref**: Git reference to run the workflow on (branch, tag, or commit SHA)
 - **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
 - **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
-- **Inject OIDC token**: When enabled, adds a signed ` + "`SUPERPLANE_OIDC_TOKEN`" + ` workflow parameter for CI verification
+- **Add OIDC token**: Send a signed token so CI can confirm this run was triggered by SuperPlane
 
 ## Injected Parameters
 
@@ -126,7 +126,7 @@ SuperPlane automatically adds these workflow parameters when triggering Semaphor
 
 - ` + "`SUPERPLANE_EXECUTION_ID`" + `: The SuperPlane node execution ID
 - ` + "`SUPERPLANE_CANVAS_ID`" + `: The SuperPlane canvas ID
-- ` + "`SUPERPLANE_OIDC_TOKEN`" + `: When **Inject OIDC token** is enabled, a signed token attesting this workflow was triggered by a specific canvas node
+- ` + "`SUPERPLANE_OIDC_TOKEN`" + `: When **Add OIDC token** is enabled, a signed token attesting this workflow was triggered by a specific canvas node
 
 ## Verifying Triggers in CI
 
@@ -211,12 +211,6 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 			Type:  configuration.FieldTypeString,
 		},
 		{
-			Name:        "injectOidcToken",
-			Label:       "Inject OIDC token",
-			Type:        configuration.FieldTypeBool,
-			Description: "Add a signed SUPERPLANE_OIDC_TOKEN workflow parameter for CI verification",
-		},
-		{
 			Name:  "parameters",
 			Label: "Parameters",
 			Type:  configuration.FieldTypeList,
@@ -242,6 +236,12 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 					},
 				},
 			},
+		},
+		{
+			Name:        "injectOidcToken",
+			Label:       "Add OIDC token",
+			Type:        configuration.FieldTypeBool,
+			Description: "Send a signed token so CI can confirm this run was triggered by SuperPlane",
 		},
 	}
 }

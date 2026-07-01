@@ -3,6 +3,7 @@ package oidc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 const (
 	defaultAPIURL          = "https://app.superplane.com"
 	executionTokenAudience = "semaphore"
+	errTokenNotFound       = errors.New("token is required (use --token or SUPERPLANE_OIDC_TOKEN)")
 )
 
 type verifyCommand struct {
@@ -25,22 +27,11 @@ type verifyCommand struct {
 }
 
 func (c *verifyCommand) Execute(ctx core.CommandContext) error {
-	token := strings.TrimSpace(*c.token)
-	if token == "" {
-		token = strings.TrimSpace(os.Getenv("SUPERPLANE_OIDC_TOKEN"))
-	}
-	if token == "" {
-		return fmt.Errorf("token is required (use --token or SUPERPLANE_OIDC_TOKEN)")
-	}
+	apiURL := c.lookupAPIURL(ctx)
 
-	apiURL := strings.TrimRight(strings.TrimSpace(*c.apiURL), "/")
-	if apiURL == "" {
-		if ctx.Config != nil {
-			apiURL = strings.TrimRight(ctx.Config.GetURL(), "/")
-		}
-	}
-	if apiURL == "" {
-		apiURL = defaultAPIURL
+	token, err := c.lookupToken(ctx)
+	if err != nil {
+		return err
 	}
 
 	claims, err := validateRemote(ctx.Context, http.DefaultClient, token, apiURL)
@@ -210,4 +201,34 @@ func claimString(claims map[string]any, key string) string {
 	default:
 		return fmt.Sprint(typed)
 	}
+}
+
+func (c *verifyCommand) lookupToken(ctx core.CommandContext) (string, error) {
+	token := strings.TrimSpace(*c.token)
+
+	if token == "" {
+		token = strings.TrimSpace(os.Getenv("SUPERPLANE_OIDC_TOKEN"))
+	}
+
+	if token == "" {
+		return "", errTokenNotFound
+	}
+
+	return token, nil
+}
+
+func (c *verifyCommand) lookupAPIURL(ctx core.CommandContext) string {
+	apiURL := strings.TrimRight(strings.TrimSpace(*c.apiURL), "/")
+
+	if apiURL == "" {
+		if ctx.Config != nil {
+			apiURL = strings.TrimRight(ctx.Config.GetURL(), "/")
+		}
+	}
+
+	if apiURL == "" {
+		apiURL = defaultAPIURL
+	}
+
+	return apiURL
 }
