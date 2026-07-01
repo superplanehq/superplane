@@ -204,6 +204,47 @@ func Test__RunCloudAgent__Execute__syncIdle(t *testing.T) {
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/events")
 }
 
+func Test__RunCloudAgent__Execute__cleansUpSessionOnFailure(t *testing.T) {
+	a := &RunCloudAgent{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))},            // create
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                            // send user message
+			{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"boom"}}`))}, // get session -> fails
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                            // delete session (cleanup)
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
+	metadataCtx := &contexts.MetadataContext{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	requestsCtx := &contexts.RequestContext{}
+
+	execCtx := core.ExecutionContext{
+		ID:             uuid.New(),
+		Configuration:  map[string]any{"agent": "a", "environmentId": "e", "prompt": "p"},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Requests:       requestsCtx,
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := a.Execute(execCtx)
+	require.Error(t, err)
+	assert.False(t, executionState.Finished)
+	assert.Equal(t, "", requestsCtx.Action) // no poll scheduled
+
+	// The created session must be deleted so it is not left running.
+	var deleted bool
+	for _, r := range httpContext.Requests {
+		if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/sessions/sess_1") {
+			deleted = true
+		}
+	}
+	assert.True(t, deleted, "expected a DELETE to reclaim the created session")
+}
+
 func Test__RunCloudAgent__Execute__repositoryPrompt(t *testing.T) {
 	a := &RunCloudAgent{}
 	httpContext := &contexts.HTTPContext{

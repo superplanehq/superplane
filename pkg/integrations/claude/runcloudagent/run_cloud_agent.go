@@ -387,12 +387,12 @@ func (a *RunCloudAgent) Execute(ctx core.ExecutionContext) error {
 	}
 	mergeSessionIntoMetadata(&metadata, session)
 	if err := ctx.Metadata.Set(metadata); err != nil {
-		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
+		cleanupManagedSession(client, ctx, session.ID)
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
 	if err := ctx.ExecutionState.SetKV("managed_session_id", session.ID); err != nil {
-		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
+		cleanupManagedSession(client, ctx, session.ID)
 		return fmt.Errorf("failed to set managed_session_id: %w", err)
 	}
 
@@ -400,14 +400,14 @@ func (a *RunCloudAgent) Execute(ctx core.ExecutionContext) error {
 	// field — instead, prepend a clone instruction so the agent checks it out.
 	message := buildRepositoryPrompt(spec.Repository, spec.Branch, spec.Prompt)
 	if err := client.SendManagedSessionUserMessage(session.ID, message); err != nil {
-		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
+		cleanupManagedSession(client, ctx, session.ID)
 		return fmt.Errorf("failed to send user message: %w", err)
 	}
 
 	// Check if session already finished (fast tasks).
 	refreshed, err := client.GetManagedSession(session.ID)
 	if err != nil {
-		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
+		cleanupManagedSession(client, ctx, session.ID)
 		return fmt.Errorf("failed to get session: %w", err)
 	}
 
@@ -487,7 +487,7 @@ func (a *RunCloudAgent) emitIfAlreadyTerminal(client *runagent.Client, ctx core.
 
 	out := buildOutputFromSessionMessages(session.Status, sessionID, sm)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
-		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
+		cleanupManagedSession(client, ctx, sessionID)
 		return false, err
 	}
 
@@ -519,6 +519,20 @@ func getUploadedFileIDs(state core.ExecutionStateContext) []string {
 
 func cleanupUploadedFiles(client *runagent.Client, ctx core.ExecutionContext, logWarn func(string, ...any)) {
 	client.CleanupFiles(getUploadedFileIDs(ctx.ExecutionState), logWarn)
+}
+
+// cleanupManagedSession best-effort reclaims everything provisioned for an
+// execution after the session was created: the session itself, uploaded files,
+// and the temporary vault. Used on failure paths before polling takes over, so
+// an errored step does not leave an active session or orphaned files behind.
+func cleanupManagedSession(client *runagent.Client, ctx core.ExecutionContext, sessionID string) {
+	if sessionID != "" {
+		if err := client.DeleteManagedSession(sessionID); err != nil {
+			ctx.Logger.Warnf("Failed to delete managed session %s: %v", sessionID, err)
+		}
+	}
+	cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
+	cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 }
 
 func cleanupUploadedFilesFromHook(client *runagent.Client, ctx core.ActionHookContext, logWarn func(string, ...any)) {
