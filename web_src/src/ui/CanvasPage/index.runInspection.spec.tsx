@@ -3,15 +3,17 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fitViewMock, getNodesMock, reactFlowPropsRef } = vi.hoisted(() => ({
+const { fitViewMock, getNodesMock, reactFlowPropsRef, setViewportMock } = vi.hoisted(() => ({
   fitViewMock: vi.fn().mockResolvedValue(true),
   getNodesMock: vi.fn<() => Array<{ id: string; position: { x: number; y: number } }>>(() => []),
   reactFlowPropsRef: {
     current: null as null | {
       nodes?: unknown;
       onPaneClick?: (...args: unknown[]) => unknown;
+      onInit?: (instance: { setViewport: (viewport: { x: number; y: number; zoom: number }) => void }) => unknown;
     },
   },
+  setViewportMock: vi.fn(),
 }));
 
 vi.mock("@/sentry", () => ({
@@ -39,7 +41,7 @@ vi.mock("@xyflow/react", () => ({
     fitView: fitViewMock,
     screenToFlowPosition: vi.fn((position) => position),
     getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
-    setViewport: vi.fn(),
+    setViewport: setViewportMock,
     getInternalNode: vi.fn(),
     zoomTo: vi.fn(),
     zoomIn: vi.fn(),
@@ -99,6 +101,7 @@ describe("CanvasPage run inspection", () => {
     fitViewMock.mockResolvedValue(true);
     getNodesMock.mockReset();
     getNodesMock.mockReturnValue([]);
+    setViewportMock.mockClear();
     globalThis.ResizeObserver = class {
       observe() {}
       unobserve() {}
@@ -189,6 +192,45 @@ describe("CanvasPage run inspection", () => {
 
     expect(fitViewMock).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
+  });
+
+  it("restores an existing run viewport on init without fitting all nodes", () => {
+    const hasFitToViewRef = { current: true };
+    const viewportRef = { current: { x: -240, y: -120, zoom: 0.75 } };
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          nodes={[
+            {
+              id: "run-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Run 1",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          viewportRef={viewportRef}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: setViewportMock });
+    });
+
+    expect(setViewportMock).toHaveBeenCalledWith({ x: -240, y: -120, zoom: 0.75 });
+    expect(fitViewMock).not.toHaveBeenCalled();
   });
 
   it("refits when leaving run inspection with the same fit request nonce", () => {

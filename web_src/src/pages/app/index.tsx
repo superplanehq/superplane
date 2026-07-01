@@ -119,7 +119,7 @@ import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { getRunCanvasFitKey, useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
+import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useRunsDetailState } from "./useRunsDetailState";
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
@@ -517,7 +517,6 @@ export function AppPage() {
     activateBranch,
   });
 
-  const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [canvasFitAllNonce, setCanvasFitAllNonce] = useState(0);
   const wasRunInspectionModeRef = useRef(false);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
@@ -1671,21 +1670,15 @@ export function AppPage() {
   });
   const runsViewportKey = isRunInspectionMode ? "runs" : null;
   if (lastRunsViewportKeyRef.current !== runsViewportKey) {
-    runsHasFitToViewRef.current = false;
-    runsViewportRef.current = undefined;
+    if (runsViewportKey) {
+      runsHasFitToViewRef.current = Boolean(viewportRef.current);
+      runsViewportRef.current = viewportRef.current ? { ...viewportRef.current } : undefined;
+    } else {
+      runsHasFitToViewRef.current = false;
+      runsViewportRef.current = undefined;
+    }
     lastRunsViewportKeyRef.current = runsViewportKey;
   }
-
-  const runCanvasFitKey = useMemo(
-    () => getRunCanvasFitKey({ isRunInspectionMode, selectedRunId, runCanvasData, runCanvasLoading }),
-    [isRunInspectionMode, runCanvasData, runCanvasLoading, selectedRunId],
-  );
-
-  useEffect(() => {
-    if (!isRunInspectionMode) return;
-    if (!runCanvasFitKey) return;
-    setRunsFitAllNonce((n) => n + 1);
-  }, [isRunInspectionMode, runCanvasFitKey]);
 
   useEffect(() => {
     if (wasRunInspectionModeRef.current && !isRunInspectionMode) {
@@ -4488,7 +4481,7 @@ export function AppPage() {
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunInspectionMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          fitAllRequest={isRunInspectionMode ? runsFitAllNonce : canvasFitAllNonce > 0 ? canvasFitAllNonce : null}
+          fitAllRequest={!isRunInspectionMode && canvasFitAllNonce > 0 ? canvasFitAllNonce : null}
           fitAllFocusNodeIds={
             isRunInspectionMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
               ? runCanvasData.participantNodeIds

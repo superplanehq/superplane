@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun } from "@/api-client";
-import { getRunCanvasFitKey, mergeRunExecutionsForCanvas, type RunCanvasData } from "./useRunCanvasData";
+import { mergeRunExecutionsForCanvas } from "./useRunCanvasData";
 
 function makeRunExecutionRef(id: string, nodeId: string): NonNullable<CanvasesCanvasRun["executions"]>[number] {
   return {
@@ -80,68 +80,5 @@ describe("mergeRunExecutionsForCanvas", () => {
       "identified-node",
       "anonymous-after",
     ]);
-  });
-});
-
-describe("getRunCanvasFitKey", () => {
-  const runCanvasData: RunCanvasData = {
-    nodes: [],
-    edges: [],
-    participantNodeIds: ["selected-node", "trigger-node"],
-  };
-
-  it("does not request a fit outside run inspection", () => {
-    expect(
-      getRunCanvasFitKey({
-        isRunInspectionMode: false,
-        selectedRunId: "run-1",
-        runCanvasData,
-        runCanvasLoading: false,
-      }),
-    ).toBeNull();
-  });
-
-  it("does not request a fit without a selected run", () => {
-    expect(
-      getRunCanvasFitKey({
-        isRunInspectionMode: true,
-        selectedRunId: null,
-        runCanvasData,
-        runCanvasLoading: false,
-      }),
-    ).toBeNull();
-  });
-
-  it("does not request a fit without run canvas data", () => {
-    expect(
-      getRunCanvasFitKey({
-        isRunInspectionMode: true,
-        selectedRunId: "run-1",
-        runCanvasData: null,
-        runCanvasLoading: false,
-      }),
-    ).toBeNull();
-  });
-
-  it("does not request a run canvas fit while execution data is loading", () => {
-    expect(
-      getRunCanvasFitKey({
-        isRunInspectionMode: true,
-        selectedRunId: "run-1",
-        runCanvasData,
-        runCanvasLoading: true,
-      }),
-    ).toBeNull();
-  });
-
-  it("builds a stable fit key after the run canvas finishes loading", () => {
-    expect(
-      getRunCanvasFitKey({
-        isRunInspectionMode: true,
-        selectedRunId: "run-1",
-        runCanvasData,
-        runCanvasLoading: false,
-      }),
-    ).toBe("run-1|selected-node|trigger-node");
   });
 });

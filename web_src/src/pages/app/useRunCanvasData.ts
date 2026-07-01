@@ -95,21 +95,6 @@ export function mergeRunExecutionsForCanvas(
   });
 }
 
-export function getRunCanvasFitKey({
-  isRunInspectionMode,
-  selectedRunId,
-  runCanvasData,
-  runCanvasLoading,
-}: {
-  isRunInspectionMode: boolean;
-  selectedRunId: string | null;
-  runCanvasData: RunCanvasData | null;
-  runCanvasLoading: boolean;
-}): string | null {
-  if (!isRunInspectionMode || !selectedRunId || !runCanvasData || runCanvasLoading) return null;
-  return `${selectedRunId}|${runCanvasData.participantNodeIds.slice().sort().join("|")}`;
-}
-
 export function useRunCanvasData({
   isRunInspectionMode,
   selectedRun,
