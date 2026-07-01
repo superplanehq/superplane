@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -98,6 +99,36 @@ func TestLogsCommandResolvesRunExecutions(t *testing.T) {
 	require.Empty(t, output[0].Error)
 }
 
+func TestRenderRunnerLogsTextPrintsAllOutputsAfterTruncatedOutput(t *testing.T) {
+	stdout := bytes.NewBuffer(nil)
+	outputs := []runnerLogOutput{
+		{
+			ExecutionID: "exec-001",
+			NodeID:      "node-001",
+			Truncated:   true,
+			Records: []runneraction.LiveLogRecord{
+				{Type: "line", Text: "first execution"},
+			},
+		},
+		{
+			ExecutionID: "exec-002",
+			NodeID:      "node-002",
+			Records: []runneraction.LiveLogRecord{
+				{Type: "line", Text: "second execution"},
+			},
+		},
+	}
+
+	require.NoError(t, renderRunnerLogsText(stdout, outputs))
+
+	raw := stdout.String()
+	require.Contains(t, raw, "exec-001")
+	require.Contains(t, raw, "first execution")
+	require.Contains(t, raw, "... truncated")
+	require.Contains(t, raw, "exec-002")
+	require.Contains(t, raw, "second execution")
+}
+
 func newExecutionLogBroker(t *testing.T) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +154,18 @@ func newExecutionLogsServer(t *testing.T, brokerURL string) *httptest.Server {
 				"token":"token-001",
 				"expires_at":"2026-07-01T10:00:00Z"
 			}`, brokerURL+"/v1/tasks/task-001/live-logs")
+		case r.URL.Path == "/api/v1/canvases/canvas-001":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"canvas":{
+					"spec":{
+						"nodes":[
+							{"id":"node-ignored","component":"noop"},
+							{"id":"node-001","component":"runner"}
+						]
+					}
+				}
+			}`))
 		case r.URL.Path == "/api/v1/canvases/canvas-001/nodes/node-001/executions":
 			require.Equal(t, "1", r.URL.Query().Get("limit"))
 			w.Header().Set("Content-Type", "application/json")
@@ -138,6 +181,7 @@ func newExecutionLogsServer(t *testing.T, brokerURL string) *httptest.Server {
 					"id":"run-001",
 					"canvasId":"canvas-001",
 					"executions":[
+						{"id":"exec-ignored","nodeId":"node-ignored","state":"STATE_FINISHED"},
 						{"id":"exec-001","nodeId":"node-001","state":"STATE_FINISHED"}
 					]
 				}

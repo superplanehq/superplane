@@ -95,20 +95,55 @@ func (c *LogsCommand) resolveRunTargets(ctx core.CommandContext, canvasID string
 	}
 
 	executions := run.GetExecutions()
+	runnerNodes, err := c.runnerNodeIDs(ctx, canvasID)
+	if err != nil {
+		return nil, err
+	}
+
 	targets := make([]runnerLogTarget, 0, len(executions))
 	for _, execution := range executions {
-		if strings.TrimSpace(*c.NodeID) != "" && execution.GetNodeId() != strings.TrimSpace(*c.NodeID) {
+		nodeID := execution.GetNodeId()
+		if strings.TrimSpace(*c.NodeID) != "" && nodeID != strings.TrimSpace(*c.NodeID) {
+			continue
+		}
+		if !runnerNodes[nodeID] {
 			continue
 		}
 		targets = append(targets, runnerLogTarget{
 			ExecutionID: execution.GetId(),
-			NodeID:      execution.GetNodeId(),
+			NodeID:      nodeID,
 		})
 	}
 	if len(targets) == 0 {
-		return nil, fmt.Errorf("no executions found for log target")
+		return nil, fmt.Errorf("no runner executions found for log target")
 	}
 	return targets, nil
+}
+
+func (c *LogsCommand) runnerNodeIDs(ctx core.CommandContext, canvasID string) (map[string]bool, error) {
+	response, _, err := ctx.API.CanvasAPI.
+		CanvasesDescribeCanvas(ctx.Context, canvasID).
+		Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	canvas, ok := response.GetCanvasOk()
+	if !ok || canvas == nil {
+		return nil, fmt.Errorf("canvas %q not found", canvasID)
+	}
+
+	spec := canvas.GetSpec()
+	nodes := spec.GetNodes()
+	ids := make(map[string]bool, len(nodes))
+	for _, node := range nodes {
+		id := strings.TrimSpace(node.GetId())
+		if id == "" || !runneraction.IsRunnerComponent(node.GetComponent()) {
+			continue
+		}
+		ids[id] = true
+	}
+	return ids, nil
 }
 
 func (c *LogsCommand) resolveLatestNodeTarget(ctx core.CommandContext, canvasID string) ([]runnerLogTarget, error) {
@@ -252,8 +287,10 @@ func renderRunnerLogsText(stdout io.Writer, outputs []runnerLogOutput) error {
 			return err
 		}
 		if output.Error != "" {
-			_, err := fmt.Fprintf(stdout, "Error: %s\n", output.Error)
-			return err
+			if _, err := fmt.Fprintf(stdout, "Error: %s\n", output.Error); err != nil {
+				return err
+			}
+			continue
 		}
 		for _, record := range output.Records {
 			if err := renderRunnerLogRecord(stdout, record); err != nil {
@@ -261,8 +298,9 @@ func renderRunnerLogsText(stdout io.Writer, outputs []runnerLogOutput) error {
 			}
 		}
 		if output.Truncated {
-			_, err := fmt.Fprintln(stdout, "... truncated")
-			return err
+			if _, err := fmt.Fprintln(stdout, "... truncated"); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
