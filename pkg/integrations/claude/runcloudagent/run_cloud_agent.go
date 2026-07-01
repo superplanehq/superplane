@@ -223,11 +223,15 @@ func resolveNodeMetadata(ctx core.SetupContext, spec Spec) error {
 	agentID := strings.TrimSpace(spec.Agent)
 	environmentID := strings.TrimSpace(spec.EnvironmentID)
 
-	// Reuse already-resolved names when the IDs are unchanged.
+	// Reuse already-resolved names when the IDs are unchanged. Only skip the
+	// lookup when the stored names were genuinely resolved — a best-effort
+	// fallback stores the raw ID as the name, and that must be retried on the
+	// next Setup once the integration becomes usable.
 	var existing NodeMetadata
 	if mapstructure.Decode(ctx.Metadata.Get(), &existing) == nil &&
 		existing.AgentID == agentID && existing.EnvironmentID == environmentID &&
-		existing.AgentName != "" && existing.EnvironmentName != "" {
+		isResolvedName(existing.AgentName, agentID) &&
+		isResolvedName(existing.EnvironmentName, environmentID) {
 		return nil
 	}
 
@@ -249,6 +253,20 @@ func resolveNodeMetadata(ctx core.SetupContext, spec Spec) error {
 		meta.EnvironmentName = name
 	}
 	return ctx.Metadata.Set(meta)
+}
+
+// isResolvedName reports whether a stored name represents a genuine resolution
+// rather than the best-effort ID fallback. A name that equals the ID only counts
+// as resolved when the ID is an expression placeholder (which always resolves to
+// itself); otherwise it is the fallback and should be retried.
+func isResolvedName(name, id string) bool {
+	if name == "" {
+		return false
+	}
+	if name == id {
+		return containsExpression(id)
+	}
+	return true
 }
 
 // resolveAgentName returns the agent's display name, or "" when it can't be resolved.

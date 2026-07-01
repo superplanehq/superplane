@@ -82,6 +82,54 @@ func Test__RunCloudAgent__Setup__nodeMetadataFallsBackToIDs(t *testing.T) {
 	assert.Equal(t, "env_01", md.EnvironmentName)
 }
 
+func Test__RunCloudAgent__Setup__retriesResolutionAfterFallback(t *testing.T) {
+	a := &RunCloudAgent{}
+	config := map[string]any{
+		"agent":         "agent_01",
+		"environmentId": "env_01",
+		"prompt":        "Do the thing",
+	}
+
+	// First Setup: no client available, so the IDs are stored as the fallback names.
+	metadataCtx := &contexts.MetadataContext{}
+	require.NoError(t, a.Setup(core.SetupContext{
+		Configuration: config,
+		Integration:   &contexts.IntegrationContext{},
+		Metadata:      metadataCtx,
+	}))
+
+	// Second Setup: the integration is now usable — resolution must be retried
+	// (not short-circuited by the ID-as-name cache) and produce the real names.
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"agent_01","name":"My Agent"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"env_01","name":"My Env"}`))},
+		},
+	}
+	require.NoError(t, a.Setup(core.SetupContext{
+		Configuration: config,
+		Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		HTTP:          httpContext,
+		Metadata:      metadataCtx,
+	}))
+	require.Len(t, httpContext.Requests, 2)
+
+	md := NodeMetadata{}
+	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &md))
+	assert.Equal(t, "My Agent", md.AgentName)
+	assert.Equal(t, "My Env", md.EnvironmentName)
+
+	// Third Setup with the same resolved names must short-circuit (no API calls).
+	httpContext2 := &contexts.HTTPContext{}
+	require.NoError(t, a.Setup(core.SetupContext{
+		Configuration: config,
+		Integration:   &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		HTTP:          httpContext2,
+		Metadata:      metadataCtx,
+	}))
+	assert.Empty(t, httpContext2.Requests)
+}
+
 func Test__RunCloudAgent__Setup__missingAgent(t *testing.T) {
 	a := &RunCloudAgent{}
 	ctx := core.SetupContext{
