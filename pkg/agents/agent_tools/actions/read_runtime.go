@@ -25,6 +25,8 @@ import (
 
 const readRuntimeActionName = "read_runtime"
 
+var runnerLogSnapshotIdleTimeout = 1500 * time.Millisecond
+
 var runtimeResources = []string{
 	"memory",
 	"runs",
@@ -356,7 +358,10 @@ func fetchRunnerLogsForTarget(ctx context.Context, organizationID, canvasID uuid
 		return result, err
 	}
 
-	fetch, err := runneraction.FetchLiveLogRecords(ctx, access.BrokerTaskID, runneraction.LiveLogFetchOptions{Limit: limit})
+	fetch, err := runneraction.FetchLiveLogRecords(ctx, access.BrokerTaskID, runneraction.LiveLogFetchOptions{
+		Limit:       limit,
+		IdleTimeout: runnerLogSnapshotIdleTimeout,
+	})
 	if err != nil {
 		return result, err
 	}
