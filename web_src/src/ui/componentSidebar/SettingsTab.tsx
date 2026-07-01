@@ -526,7 +526,6 @@ export function SettingsTab({
               requestAutosave();
             }}
             placeholder="Enter a name for this node"
-            autoFocus
             className="shadow-none"
           />
         </div>
