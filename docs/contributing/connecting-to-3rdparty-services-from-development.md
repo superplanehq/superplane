@@ -8,13 +8,23 @@ expose it via a tunnel so external services can deliver webhooks.
 
 Install [ngrok](https://ngrok.com/):
 
-```bash
-# Install (macOS)
+# Install ngrok (choose your OS)
+
+# macOS
 brew install ngrok
 
-# Authenticate
+# Linux (Debian/Ubuntu)
+curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
+  && echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+  | sudo tee /etc/apt/sources.list.d/ngrok.list \
+  && sudo apt update && sudo apt install ngrok
+
+# Windows (via Chocolatey)
+choco install ngrok
+
+# Authenticate (all platforms)
 ngrok config add-authtoken YOUR_AUTH_TOKEN
-```
 
 ### 2. Start ngrok Tunnel
 
@@ -83,3 +93,4 @@ The AWS integration uses OpenID Connect. When running locally, AWS IAM needs an 
 
 - **Webhooks not received:** Check `WEBHOOKS_BASE_URL`, ensure the tunnel is running, and that the third-party service uses the correct webhook URL.
 - **AWS "Could not connect":** Restart SuperPlane with the tunnel URL as base; confirm `/.well-known/openid-configuration` returns the right issuer; try the Provider URL with a trailing slash; keep the tunnel running. If trycloudflare.com is blocked, use ngrok (paid avoids interstitial) or another tunnel.
+
