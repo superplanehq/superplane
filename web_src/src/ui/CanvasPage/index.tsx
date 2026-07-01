@@ -124,6 +124,7 @@ export interface CanvasEdge extends ReactFlowEdge {
 interface FocusRequest {
   nodeId: string;
   requestId: number;
+  targetMode: "live" | "runs";
   tab?: "latest" | "settings";
 }
 
@@ -827,8 +828,18 @@ function CanvasPage(props: CanvasPageProps) {
       return;
     }
 
+    const expectedTargetMode = props.isRunInspectionMode ? "runs" : "live";
+    if (props.focusRequest.targetMode !== expectedTargetMode) {
+      return;
+    }
+
     setCurrentTab(props.focusRequest.tab);
-  }, [props.focusRequest?.requestId, props.focusRequest?.tab]);
+  }, [
+    props.focusRequest?.requestId,
+    props.focusRequest?.tab,
+    props.focusRequest?.targetMode,
+    props.isRunInspectionMode,
+  ]);
 
   // Get editing data for the currently selected node
   const { getNodeEditData } = props;
@@ -2417,7 +2428,12 @@ function CanvasContent({
       return;
     }
 
-    const focusRequestKey = `${focusRequest.requestId}:${focusRequest.nodeId}`;
+    const expectedTargetMode = isRunInspectionMode ? "runs" : "live";
+    if (focusRequest.targetMode !== expectedTargetMode) {
+      return;
+    }
+
+    const focusRequestKey = `${focusRequest.targetMode}:${focusRequest.requestId}:${focusRequest.nodeId}`;
     if (handledFocusRequestKeyRef.current === focusRequestKey) {
       return;
     }
@@ -2437,7 +2453,7 @@ function CanvasContent({
       })),
     );
     fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
-  }, [focusRequest, fitView, getNodes, hasReactFlowInitialized, runCanvasNodeIdsKey]);
+  }, [focusRequest, fitView, getNodes, hasReactFlowInitialized, isRunInspectionMode, runCanvasNodeIdsKey]);
 
   useEffect(() => {
     if (!isRunInspectionMode) {

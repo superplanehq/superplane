@@ -1782,6 +1782,7 @@ export function AppPage() {
   const [focusRequest, setFocusRequest] = useState<{
     nodeId: string;
     requestId: number;
+    targetMode: "live" | "runs";
     tab?: "latest" | "settings";
   } | null>(null);
   const handleSidebarChange = useCallback(
@@ -1827,7 +1828,7 @@ export function AppPage() {
   const handleLogNodeSelect = useCallback(
     (nodeId: string) => {
       handleSidebarChange(true, nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), tab: "settings" });
+      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "live", tab: "settings" });
     },
     [handleSidebarChange],
   );
@@ -1835,7 +1836,7 @@ export function AppPage() {
   const handleLogRunNodeSelect = useCallback(
     (nodeId: string) => {
       handleSidebarChange(true, nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
+      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "live", tab: "latest" });
     },
     [handleSidebarChange],
   );
@@ -3778,7 +3779,7 @@ export function AppPage() {
       if (inspectorNodeId) {
         preserveRunDetailNodeOnNextRunChangeRef.current = true;
         setRunDetailNodeId(inspectorNodeId);
-        setFocusRequest({ nodeId: inspectorNodeId, requestId: Date.now(), tab: "latest" });
+        setFocusRequest({ nodeId: inspectorNodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
       } else {
         setRunDetailNodeId(null);
       }
@@ -3801,7 +3802,7 @@ export function AppPage() {
       clearDismissedRunDetail();
       preserveRunDetailNodeOnNextRunChangeRef.current = true;
       setRunDetailNodeId(options.nodeId);
-      setFocusRequest({ nodeId: options.nodeId, requestId: Date.now(), tab: "latest" });
+      setFocusRequest({ nodeId: options.nodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
       setSearchParams(
         (current) =>
           applyRunInspectionNavigationSearchParams(current, {
@@ -3872,7 +3873,7 @@ export function AppPage() {
   const handleRunNodeDetailNavigate = useCallback(
     (nodeId: string) => {
       handleRunNodeDetailSelection(nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
+      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
     },
     [handleRunNodeDetailSelection],
   );
