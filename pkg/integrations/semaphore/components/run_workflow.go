@@ -69,12 +69,12 @@ type Project struct {
 }
 
 type RunWorkflowSpec struct {
-	Project      string      `json:"project"`
-	Ref          string      `json:"ref"`
-	PipelineFile string      `json:"pipelineFile"`
-	CommitSha    string      `json:"commitSha"`
+	Project          string      `json:"project"`
+	Ref              string      `json:"ref"`
+	PipelineFile     string      `json:"pipelineFile"`
+	CommitSha        string      `json:"commitSha"`
 	AddOidcAssertion bool        `json:"addOidcAssertion"`
-	Parameters   []Parameter `json:"parameters"`
+	Parameters       []Parameter `json:"parameters"`
 }
 
 type Parameter struct {
