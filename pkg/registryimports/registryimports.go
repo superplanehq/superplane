@@ -5,6 +5,7 @@ package registryimports
 import (
 	// These blank imports intentionally trigger init-time registration.
 	_ "github.com/superplanehq/superplane/pkg/components/addmemory"
+	_ "github.com/superplanehq/superplane/pkg/components/ansible"
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
 	_ "github.com/superplanehq/superplane/pkg/components/display"
