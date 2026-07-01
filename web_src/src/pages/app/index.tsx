@@ -119,7 +119,7 @@ import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
+import { getRunCanvasFitKey, useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useRunsDetailState } from "./useRunsDetailState";
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
@@ -1676,10 +1676,10 @@ export function AppPage() {
     lastRunsViewportKeyRef.current = runsViewportKey;
   }
 
-  const runCanvasFitKey = useMemo(() => {
-    if (!isRunInspectionMode || !selectedRunId || !runCanvasData) return null;
-    return `${selectedRunId}|${runCanvasData.participantNodeIds.slice().sort().join("|")}`;
-  }, [isRunInspectionMode, selectedRunId, runCanvasData]);
+  const runCanvasFitKey = useMemo(
+    () => getRunCanvasFitKey({ isRunInspectionMode, selectedRunId, runCanvasData, runCanvasLoading }),
+    [isRunInspectionMode, runCanvasData, runCanvasLoading, selectedRunId],
+  );
 
   useEffect(() => {
     if (!isRunInspectionMode) return;

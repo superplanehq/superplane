@@ -41,11 +41,53 @@ type UseRunCanvasPresentationParams = {
   isSelectedRunExecutionsLoading: boolean;
 };
 
-type RunCanvasData = {
+export type RunCanvasData = {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   participantNodeIds: string[];
 };
+
+type RunExecutionRef = NonNullable<CanvasesCanvasRun["executions"]>[number];
+
+export function mergeRunExecutionsForCanvas(
+  runExecutions: RunExecutionRef[] = [],
+  fullExecutions: CanvasesCanvasNodeExecution[] = [],
+): CanvasesCanvasNodeExecution[] {
+  const merged = new Map<string, CanvasesCanvasNodeExecution>();
+  const executionsWithoutId: CanvasesCanvasNodeExecution[] = [];
+
+  const addExecution = (execution: RunExecutionRef | CanvasesCanvasNodeExecution) => {
+    const canvasExecution = execution as CanvasesCanvasNodeExecution;
+    if (!canvasExecution.id) {
+      executionsWithoutId.push(canvasExecution);
+      return;
+    }
+
+    if (!merged.has(canvasExecution.id)) {
+      merged.set(canvasExecution.id, canvasExecution);
+    }
+  };
+
+  runExecutions.forEach(addExecution);
+  fullExecutions.forEach(addExecution);
+
+  return [...merged.values(), ...executionsWithoutId];
+}
+
+export function getRunCanvasFitKey({
+  isRunInspectionMode,
+  selectedRunId,
+  runCanvasData,
+  runCanvasLoading,
+}: {
+  isRunInspectionMode: boolean;
+  selectedRunId: string | null;
+  runCanvasData: RunCanvasData | null;
+  runCanvasLoading: boolean;
+}): string | null {
+  if (!isRunInspectionMode || !selectedRunId || !runCanvasData || runCanvasLoading) return null;
+  return `${selectedRunId}|${runCanvasData.participantNodeIds.slice().sort().join("|")}`;
+}
 
 export function useRunCanvasData({
   isRunInspectionMode,
@@ -80,11 +122,12 @@ export function useRunCanvasData({
     const runNodeIds = new Set<string>();
     const nodeEventsMap: Record<string, CanvasesCanvasEvent[]> = {};
     const nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]> = {};
+    const runExecutions = mergeRunExecutionsForCanvas(selectedRun.executions, selectedRunFullExecutions);
     if (selectedRun.rootEvent?.nodeId) {
       runNodeIds.add(selectedRun.rootEvent.nodeId);
       nodeEventsMap[selectedRun.rootEvent.nodeId] = [selectedRun.rootEvent as CanvasesCanvasEvent];
     }
-    for (const execution of selectedRun.executions || []) {
+    for (const execution of runExecutions) {
       if (!execution.nodeId) continue;
       runNodeIds.add(execution.nodeId);
       if (!nodeExecutionsMap[execution.nodeId]) {
