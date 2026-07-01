@@ -89,8 +89,7 @@ func (a *RunCloudAgent) finishTimeout(ctx core.ActionHookContext, sessionID stri
 		return err
 	}
 	if c, cErr := runagent.NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
-		cleanupUploadedFilesFromHook(c, ctx, ctx.Logger.Warnf)
-		cleanupManagedVaultFromHook(c, ctx, ctx.Logger.Warnf)
+		cleanupManagedSessionFromHook(c, ctx, sessionID, true)
 	}
 	return nil
 }
@@ -108,8 +107,7 @@ func (a *RunCloudAgent) handlePollError(ctx core.ActionHookContext, client *runa
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
 		return err
 	}
-	cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
-	cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
+	cleanupManagedSessionFromHook(client, ctx, sessionID, true)
 	return nil
 }
 
@@ -130,6 +128,9 @@ func (a *RunCloudAgent) handleTerminalSession(ctx core.ActionHookContext, client
 
 	out := buildOutputFromSessionMessages(sess.Status, sessionID, sm)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
+		// The session is terminal; reclaim it so it is not left orphaned while
+		// the hook errors out (matches the Execute fast-path behaviour).
+		cleanupManagedSessionFromHook(client, ctx, sessionID, false)
 		return err
 	}
 
@@ -137,11 +138,7 @@ func (a *RunCloudAgent) handleTerminalSession(ctx core.ActionHookContext, client
 	mergeSessionIntoMetadata(metadata, sess)
 	_ = ctx.Metadata.Set(*metadata)
 
-	if err := client.DeleteManagedSession(sessionID); err != nil {
-		ctx.Logger.Warnf("Failed to delete managed session %s: %v", sessionID, err)
-	}
-	cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
-	cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
+	cleanupManagedSessionFromHook(client, ctx, sessionID, false)
 	return nil
 }
 

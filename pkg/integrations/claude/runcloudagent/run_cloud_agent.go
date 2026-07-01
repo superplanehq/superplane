@@ -223,15 +223,12 @@ func resolveNodeMetadata(ctx core.SetupContext, spec Spec) error {
 	agentID := strings.TrimSpace(spec.Agent)
 	environmentID := strings.TrimSpace(spec.EnvironmentID)
 
-	// Reuse already-resolved names when the IDs are unchanged. Only skip the
-	// lookup when the stored names were genuinely resolved — a best-effort
-	// fallback stores the raw ID as the name, and that must be retried on the
-	// next Setup once the integration becomes usable.
+	// Reuse metadata only when a previous attempt actually reached the API for
+	// the same IDs. A best-effort fallback (client unavailable) leaves Resolved
+	// false, so it is retried once the integration becomes usable.
 	var existing NodeMetadata
 	if mapstructure.Decode(ctx.Metadata.Get(), &existing) == nil &&
-		existing.AgentID == agentID && existing.EnvironmentID == environmentID &&
-		isResolvedName(existing.AgentName, agentID) &&
-		isResolvedName(existing.EnvironmentName, environmentID) {
+		existing.Resolved && existing.AgentID == agentID && existing.EnvironmentID == environmentID {
 		return nil
 	}
 
@@ -244,51 +241,52 @@ func resolveNodeMetadata(ctx core.SetupContext, spec Spec) error {
 
 	client, err := runagent.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return ctx.Metadata.Set(meta)
+		return ctx.Metadata.Set(meta) // Resolved stays false -> retried next Setup
 	}
-	if name := resolveAgentName(client, agentID); name != "" {
-		meta.AgentName = name
+
+	agentName, agentOK := resolveAgentName(client, agentID)
+	if agentName != "" {
+		meta.AgentName = agentName
 	}
-	if name := resolveEnvironmentName(client, environmentID); name != "" {
-		meta.EnvironmentName = name
+	environmentName, environmentOK := resolveEnvironmentName(client, environmentID)
+	if environmentName != "" {
+		meta.EnvironmentName = environmentName
 	}
+	meta.Resolved = agentOK && environmentOK
 	return ctx.Metadata.Set(meta)
 }
 
-// isResolvedName reports whether a stored name represents a genuine resolution
-// rather than the best-effort ID fallback. A name that equals the ID only counts
-// as resolved when the ID is an expression placeholder (which always resolves to
-// itself); otherwise it is the fallback and should be retried.
-func isResolvedName(name, id string) bool {
-	if name == "" {
-		return false
+// resolveAgentName returns the agent's display name and whether resolution
+// reached a definitive answer. ok is true for an expression placeholder or a
+// successful API lookup (even when the API returns an empty name); it is false
+// only when the lookup itself fails, so the caller can retry later.
+func resolveAgentName(client *runagent.Client, agentID string) (name string, ok bool) {
+	if agentID == "" || containsExpression(agentID) {
+		return agentID, true
 	}
-	if name == id {
-		return containsExpression(id)
+	a, err := client.GetAgent(agentID)
+	if err != nil {
+		return "", false
 	}
-	return true
+	if a == nil {
+		return "", true
+	}
+	return strings.TrimSpace(a.Name), true
 }
 
-// resolveAgentName returns the agent's display name, or "" when it can't be resolved.
-func resolveAgentName(client *runagent.Client, agentID string) string {
-	if agentID == "" || strings.Contains(agentID, "{{") {
-		return agentID
+// resolveEnvironmentName mirrors resolveAgentName for environments.
+func resolveEnvironmentName(client *runagent.Client, environmentID string) (name string, ok bool) {
+	if environmentID == "" || containsExpression(environmentID) {
+		return environmentID, true
 	}
-	if a, err := client.GetAgent(agentID); err == nil && a != nil && strings.TrimSpace(a.Name) != "" {
-		return a.Name
+	e, err := client.GetEnvironment(environmentID)
+	if err != nil {
+		return "", false
 	}
-	return ""
-}
-
-// resolveEnvironmentName returns the environment's display name, or "" when it can't be resolved.
-func resolveEnvironmentName(client *runagent.Client, environmentID string) string {
-	if environmentID == "" || strings.Contains(environmentID, "{{") {
-		return environmentID
+	if e == nil {
+		return "", true
 	}
-	if e, err := client.GetEnvironment(environmentID); err == nil && e != nil && strings.TrimSpace(e.Name) != "" {
-		return e.Name
-	}
-	return ""
+	return strings.TrimSpace(e.Name), true
 }
 
 // validateConfiguredFiles ensures every configured file path exists in the app repository.
@@ -537,6 +535,25 @@ func cleanupManagedSession(client *runagent.Client, ctx core.ExecutionContext, s
 
 func cleanupUploadedFilesFromHook(client *runagent.Client, ctx core.ActionHookContext, logWarn func(string, ...any)) {
 	client.CleanupFiles(getUploadedFileIDs(ctx.ExecutionState), logWarn)
+}
+
+// cleanupManagedSessionFromHook deletes the session and releases its files and
+// vault so nothing is left orphaned when a hook terminates the run. When the
+// session may still be running (timeout / repeated errors), pass interrupt=true
+// to stop it first, since the API rejects deleting a running session.
+func cleanupManagedSessionFromHook(client *runagent.Client, ctx core.ActionHookContext, sessionID string, interrupt bool) {
+	if sessionID != "" {
+		if interrupt {
+			if err := client.SendManagedSessionInterrupt(sessionID); err != nil {
+				ctx.Logger.Warnf("Failed to interrupt managed session %s: %v", sessionID, err)
+			}
+		}
+		if err := client.DeleteManagedSession(sessionID); err != nil {
+			ctx.Logger.Warnf("Failed to delete managed session %s: %v", sessionID, err)
+		}
+	}
+	cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
+	cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 }
 
 func uploadRepositoryFiles(client *runagent.Client, ctx core.ExecutionContext, files []string) ([]runagent.FileResource, error) {

@@ -56,6 +56,10 @@ type NodeMetadata struct {
 	AgentName       string `json:"agentName" mapstructure:"agentName"`
 	EnvironmentID   string `json:"environmentId" mapstructure:"environmentId"`
 	EnvironmentName string `json:"environmentName" mapstructure:"environmentName"`
+	// Resolved is true once name resolution reached the API (even if the API
+	// returned an empty name), so the lookup is not repeated on every Setup. A
+	// best-effort fallback that stored the raw IDs leaves it false to be retried.
+	Resolved bool `json:"resolved" mapstructure:"resolved"`
 }
 
 // ExecutionMetadata is persisted for the run.

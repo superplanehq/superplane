@@ -61,6 +61,41 @@ func Test__RunCloudAgent__Setup__resolvesNodeMetadata(t *testing.T) {
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/environments/env_01")
 }
 
+func Test__RunCloudAgent__Setup__cachesEmptyApiName(t *testing.T) {
+	a := &RunCloudAgent{}
+	config := map[string]any{
+		"agent":         "agent_01",
+		"environmentId": "env_01",
+		"prompt":        "Do the thing",
+	}
+	integration := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}}
+	metadataCtx := &contexts.MetadataContext{}
+
+	// The API resolves successfully but returns empty names.
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"agent_01","name":""}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"env_01","name":""}`))},
+		},
+	}
+	require.NoError(t, a.Setup(core.SetupContext{
+		Configuration: config, Integration: integration, HTTP: httpContext, Metadata: metadataCtx,
+	}))
+
+	md := NodeMetadata{}
+	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &md))
+	assert.Equal(t, "agent_01", md.AgentName) // falls back to ID for display
+	assert.Equal(t, "env_01", md.EnvironmentName)
+	assert.True(t, md.Resolved)
+
+	// A successful (if empty) resolution must be cached: the second Setup makes no calls.
+	httpContext2 := &contexts.HTTPContext{}
+	require.NoError(t, a.Setup(core.SetupContext{
+		Configuration: config, Integration: integration, HTTP: httpContext2, Metadata: metadataCtx,
+	}))
+	assert.Empty(t, httpContext2.Requests)
+}
+
 func Test__RunCloudAgent__Setup__nodeMetadataFallsBackToIDs(t *testing.T) {
 	a := &RunCloudAgent{}
 	metadataCtx := &contexts.MetadataContext{}
@@ -391,6 +426,47 @@ func Test__RunCloudAgent__poll__timeout(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, executionState.Finished)
 	assert.Equal(t, "timeout", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+}
+
+func Test__RunCloudAgent__poll__timeoutReclaimsSession(t *testing.T) {
+	a := &RunCloudAgent{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // interrupt
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // delete
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{Session: &SessionMetadata{ID: "sess_1", Status: "running"}},
+	}
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(maxPollAttempts + 1), "errors": float64(0)},
+		HTTP:           httpContext,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, executionState.Finished)
+	assert.Equal(t, "timeout", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+
+	// A still-running session must be interrupted and deleted so it does not
+	// keep running after the step times out.
+	var interrupted, deleted bool
+	for _, r := range httpContext.Requests {
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/sessions/sess_1/events") {
+			interrupted = true
+		}
+		if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/sessions/sess_1") {
+			deleted = true
+		}
+	}
+	assert.True(t, interrupted, "expected the session to be interrupted")
+	assert.True(t, deleted, "expected the session to be deleted")
 }
 
 func Test__RunCloudAgent__scheduleNextPoll(t *testing.T) {
