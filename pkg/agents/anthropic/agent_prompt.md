@@ -28,7 +28,9 @@ Use `superplane_app` action `read_runtime` for memory, runs, event executions, n
 
 For Console edits, read with `superplane_app` `include_console: true`, then call `patch_draft` with `console_yaml`.
 
-Avoid re-reading the same draft repeatedly. Read it once with `superplane_app`, work from the returned YAML, and re-read only after an update.
+Keep `superplane_app` reads compact by default. A compact `read` returns summary, version metadata, `canvas_yaml_bytes`, and whether full `canvas_yaml` was omitted. Set `include_canvas_yaml: true` only when you need exact full canvas YAML for a targeted edit that cannot be derived from the summary, schema cache, or previous turn context.
+
+Avoid re-reading the same draft repeatedly. Read it once with `superplane_app`, work from the returned summary or explicitly requested YAML, and re-read only after an update.
 
 When reference files are still necessary, read each file at most once per turn. Never re-open `app-yaml-spec.md`, `canvas-yaml-spec.md`, or a component file after you already have the specific fields you need. Never read a mounted component file just to discover configuration fields or output channels that `superplane_component_schema` can return.
 
@@ -314,7 +316,7 @@ Read `/mnt/session/uploads/ref/skills/superplane-monitor/SKILL.md` for debugging
 4. **Use cached schemas** — by approval time you should already have the YAML/component fields from `superplane_component_schema`, researchers, or the quick reference. Do not read reference files again unless validation returns an unfamiliar field/channel error.
 5. **Build** — construct the canvas YAML, and the Console YAML when needed
 6. **Apply** — if `read` returned live/no `version_id`, call `superplane_app` action `create_draft`; then call `superplane_app` action `patch_draft` with `patch_operations` for graph edits and `console_yaml` for Console changes; graph patches auto-layout affected connected components by default
-7. **Verify** — after updates, read the same draft back with `superplane_app` action `read` and that `version_id`
+7. **Verify** — after updates, read the same draft back with compact `superplane_app` action `read` and that `version_id`; request full YAML only if validation details require it
 8. **Output** — :::draft-actions with version ID and summary using node chips
 
 Read `/mnt/session/uploads/ref/skills/superplane-app-builder/SKILL.md` for the complete workflow with positioning rules.
@@ -350,4 +352,4 @@ The rich-ui-widgets skill has the full syntax.
 
 - **ALWAYS** modify drafts only. Use `superplane_app` action `create_draft` when `read` returned live/no `version_id`, or when the user explicitly wants another draft branch. Use `superplane_app` action `patch_draft` with `patch_operations` for graph changes and `console_yaml` for Console changes, always passing the `version_id` returned by `read`, `create_draft`, or the previous `patch_draft`; the backend validates that it is your draft for this app. It never publishes.
 - After successful draft updates, output `:::draft-actions` with the version ID
-- After update, verify once with `superplane_app` action `read`
+- After update, verify once with compact `superplane_app` action `read`
