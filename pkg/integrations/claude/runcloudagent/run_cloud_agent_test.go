@@ -439,34 +439,54 @@ func Test__RunCloudAgent__poll__emitFailureRetriesWithoutDeleting(t *testing.T) 
 
 func Test__RunCloudAgent__poll__timeout(t *testing.T) {
 	a := &RunCloudAgent{}
-	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-	metadataCtx := &contexts.MetadataContext{
-		Metadata: ExecutionMetadata{
-			Session: &SessionMetadata{ID: "sess_1", Status: "running"},
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))}, // get session (still running)
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // interrupt
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // delete
 		},
 	}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{Session: &SessionMetadata{ID: "sess_1", Status: "running"}},
+	}
 	hookCtx := core.ActionHookContext{
-		Name: "poll",
-		Parameters: map[string]any{
-			"attempt": float64(maxPollAttempts + 1),
-			"errors":  float64(0),
-		},
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(maxPollAttempts + 1), "errors": float64(0)},
+		HTTP:           httpContext,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
 		Metadata:       metadataCtx,
 		ExecutionState: executionState,
 		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
 	}
 
-	err := a.HandleHook(hookCtx)
-	require.NoError(t, err)
+	require.NoError(t, a.HandleHook(hookCtx))
 	require.True(t, executionState.Finished)
 	assert.Equal(t, "timeout", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+
+	// A still-running session must be interrupted and deleted on timeout.
+	var interrupted, deleted bool
+	for _, r := range httpContext.Requests {
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/sessions/sess_1/events") {
+			interrupted = true
+		}
+		if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/sessions/sess_1") {
+			deleted = true
+		}
+	}
+	assert.True(t, interrupted, "expected the session to be interrupted")
+	assert.True(t, deleted, "expected the session to be deleted")
 }
 
-func Test__RunCloudAgent__poll__timeoutReclaimsSession(t *testing.T) {
+func Test__RunCloudAgent__poll__timeoutFinalCheckFindsTerminal(t *testing.T) {
+	// On the final attempt the session has become idle: it must be reported as
+	// a completed result, not a timeout.
 	a := &RunCloudAgent{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // interrupt
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Final"}]}]}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // delete
 		},
 	}
@@ -482,25 +502,72 @@ func Test__RunCloudAgent__poll__timeoutReclaimsSession(t *testing.T) {
 		Metadata:       metadataCtx,
 		ExecutionState: executionState,
 		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
 	}
 
 	require.NoError(t, a.HandleHook(hookCtx))
 	require.True(t, executionState.Finished)
-	assert.Equal(t, "timeout", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+	assert.Equal(t, "Final", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).LastMessage)
+}
 
-	// A still-running session must be interrupted and deleted so it does not
-	// keep running after the step times out.
-	var interrupted, deleted bool
+func Test__RunCloudAgent__poll__clientErrorReportsError(t *testing.T) {
+	// A client/config failure while polling must surface as "error", not "timeout".
+	a := &RunCloudAgent{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{Session: &SessionMetadata{ID: "sess_1", Status: "running"}},
+	}
+	hookCtx := core.ActionHookContext{
+		Name: "poll",
+		// errors already at the budget edge so this failing attempt emits.
+		Parameters:     map[string]any{"attempt": float64(2), "errors": float64(maxPollErrors - 1)},
+		Integration:    &contexts.IntegrationContext{}, // no apiKey -> NewClient fails
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, executionState.Finished)
+	assert.Equal(t, "error", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+}
+
+func Test__RunCloudAgent__poll__timeoutCleansUpOnEmitFailure(t *testing.T) {
+	// Even if emitting the timeout payload fails, the session must be reclaimed.
+	a := &RunCloudAgent{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))}, // get session
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // interrupt
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // delete
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}, EmitErr: fmt.Errorf("boom")}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{Session: &SessionMetadata{ID: "sess_1", Status: "running"}},
+	}
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(maxPollAttempts + 1), "errors": float64(0)},
+		HTTP:           httpContext,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
+	}
+
+	err := a.HandleHook(hookCtx)
+	require.Error(t, err) // emit failed
+	var deleted bool
 	for _, r := range httpContext.Requests {
-		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/sessions/sess_1/events") {
-			interrupted = true
-		}
 		if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/sessions/sess_1") {
 			deleted = true
 		}
 	}
-	assert.True(t, interrupted, "expected the session to be interrupted")
-	assert.True(t, deleted, "expected the session to be deleted")
+	assert.True(t, deleted, "session must be reclaimed even when the timeout emit fails")
 }
 
 func Test__RunCloudAgent__scheduleNextPoll(t *testing.T) {

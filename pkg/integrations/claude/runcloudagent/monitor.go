@@ -44,13 +44,10 @@ func (a *RunCloudAgent) poll(ctx core.ActionHookContext) error {
 	sessionID := metadata.Session.ID
 	attempt, errs := parsePollParams(ctx)
 
-	if attempt > maxPollAttempts {
-		return a.finishTimeout(ctx, sessionID)
-	}
-
 	client, err := runagent.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return a.scheduleNextPoll(ctx, attempt+1, errs)
+		// A client/config failure is an error, not a timeout.
+		return a.handleClientError(ctx, sessionID, attempt, errs, err)
 	}
 
 	sess, err := client.GetManagedSession(sessionID)
@@ -58,15 +55,17 @@ func (a *RunCloudAgent) poll(ctx core.ActionHookContext) error {
 		return a.handlePollError(ctx, client, sessionID, attempt, errs)
 	}
 
-	// Don't write terminal status to metadata yet — we only persist it
-	// after a successful emit to avoid blocking future poll retries.
-	if sess == nil {
-		return a.scheduleNextPoll(ctx, attempt+1, errs)
+	// Always check for a terminal session before declaring a timeout: the
+	// session may have finished after the previous poll saw it running.
+	if sess != nil && isSessionTerminal(sess.Status) {
+		return a.handleTerminalSession(ctx, client, &metadata, sess, attempt, errs)
 	}
-	if !isSessionTerminal(sess.Status) {
-		return a.scheduleNextPoll(ctx, attempt+1, 0)
+
+	// Still running (or status unknown).
+	if attempt > maxPollAttempts {
+		return a.finishTimeout(ctx, client, sessionID)
 	}
-	return a.handleTerminalSession(ctx, client, &metadata, sess, attempt, errs)
+	return a.scheduleNextPoll(ctx, attempt+1, 0)
 }
 
 // parsePollParams reads the attempt and error counters from the hook parameters.
@@ -81,21 +80,18 @@ func parsePollParams(ctx core.ActionHookContext) (int, int) {
 	return attempt, errs
 }
 
-// finishTimeout emits a timeout payload and cleans up best-effort.
-func (a *RunCloudAgent) finishTimeout(ctx core.ActionHookContext, sessionID string) error {
+// finishTimeout reclaims the still-running session and emits a timeout payload.
+// Cleanup runs before the emit so the session is reclaimed even if the emit fails.
+func (a *RunCloudAgent) finishTimeout(ctx core.ActionHookContext, client *runagent.Client, sessionID string) error {
 	ctx.Logger.Errorf("Managed session %s exceeded max poll attempts", sessionID)
+	cleanupManagedSessionFromHook(client, ctx, sessionID, true)
 	out := buildOutput("timeout", sessionID)
-	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
-		return err
-	}
-	if c, cErr := runagent.NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
-		cleanupManagedSessionFromHook(c, ctx, sessionID, true)
-	}
-	return nil
+	return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 }
 
-// handlePollError records a failed status read and emits an error payload once
-// the retry budget is exhausted, otherwise schedules another poll.
+// handlePollError records a failed status read and, once the retry budget is
+// exhausted, reclaims the session and emits an error payload. Cleanup runs
+// before the emit so the session is reclaimed even if the emit fails.
 func (a *RunCloudAgent) handlePollError(ctx core.ActionHookContext, client *runagent.Client, sessionID string, attempt, errs int) error {
 	errs++
 	if errs < maxPollErrors {
@@ -103,37 +99,51 @@ func (a *RunCloudAgent) handlePollError(ctx core.ActionHookContext, client *runa
 	}
 
 	ctx.Logger.Errorf("Managed session %s: polling failed repeatedly", sessionID)
-	out := buildOutput("error", sessionID)
-	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
-		return err
-	}
 	cleanupManagedSessionFromHook(client, ctx, sessionID, true)
-	return nil
+	out := buildOutput("error", sessionID)
+	return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+}
+
+// handleClientError handles a failure to build the API client during polling.
+// It retries a few times, then emits an error (not a timeout) so integration or
+// configuration problems are surfaced accurately. Without a client the session
+// cannot be reclaimed here; a persisted session id is cleaned up on Cancel.
+func (a *RunCloudAgent) handleClientError(ctx core.ActionHookContext, sessionID string, attempt, errs int, cause error) error {
+	errs++
+	if errs < maxPollErrors {
+		return a.scheduleNextPoll(ctx, attempt+1, errs)
+	}
+	ctx.Logger.Errorf("Managed session %s: cannot create client to poll: %v", sessionID, cause)
+	out := buildOutput("error", sessionID)
+	return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 }
 
 // handleTerminalSession emits the final messages for a terminal session and
-// cleans up, or reschedules a poll if the events are not yet fully written.
+// cleans up. While events are still being written it reschedules a poll, and
+// while the result cannot be emitted it retries via polling — both bounded by
+// maxPollAttempts so a stuck session cannot poll forever.
 func (a *RunCloudAgent) handleTerminalSession(ctx core.ActionHookContext, client *runagent.Client, metadata *ExecutionMetadata, sess *runagent.ManagedSession, attempt, errs int) error {
 	sessionID := metadata.Session.ID
 
-	sm, err := client.GetSessionMessagesWithRetry(sessionID, finalMessageReads, finalMessageDelay)
-	if err != nil {
-		ctx.Logger.Warnf("Failed to fetch messages for session %s: %v. Retrying poll.", sessionID, err)
-		return a.scheduleNextPoll(ctx, attempt+1, errs+1)
-	}
-	if sm == nil || !sm.Complete {
-		ctx.Logger.Warnf("Events not complete for session %s after retries. Retrying poll.", sessionID)
+	sm := a.fetchFinalMessages(ctx, client, sessionID)
+	if (sm == nil || !sm.Complete) && attempt <= maxPollAttempts {
+		// Events are not fully written yet (eventual consistency); retry.
+		ctx.Logger.Warnf("Events not complete for session %s. Retrying poll.", sessionID)
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
+	// Emit the result (possibly partial if we ran past the retry budget).
 	out := buildOutputFromSessionMessages(sess.Status, sessionID, sm)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
-		// Do NOT delete the session here: it holds the assembled result. A
-		// transient emit failure must be recoverable, so retry via polling.
-		// A persistent failure is bounded by the max-attempts timeout, which
-		// interrupts and deletes the session.
-		ctx.Logger.Warnf("Failed to emit result for session %s: %v. Retrying poll.", sessionID, err)
-		return a.scheduleNextPoll(ctx, attempt+1, errs)
+		if attempt <= maxPollAttempts {
+			// Do NOT delete the session: it holds the assembled result, so a
+			// transient emit failure must be recoverable. Retry via polling.
+			ctx.Logger.Warnf("Failed to emit result for session %s: %v. Retrying poll.", sessionID, err)
+			return a.scheduleNextPoll(ctx, attempt+1, errs)
+		}
+		// Retry budget exhausted: reclaim the session and give up.
+		cleanupManagedSessionFromHook(client, ctx, sessionID, false)
+		return err
 	}
 
 	// Only persist terminal status after successful emit
@@ -142,6 +152,16 @@ func (a *RunCloudAgent) handleTerminalSession(ctx core.ActionHookContext, client
 
 	cleanupManagedSessionFromHook(client, ctx, sessionID, false)
 	return nil
+}
+
+// fetchFinalMessages returns the session's messages, or nil if they cannot be fetched.
+func (a *RunCloudAgent) fetchFinalMessages(ctx core.ActionHookContext, client *runagent.Client, sessionID string) *runagent.SessionMessages {
+	sm, err := client.GetSessionMessagesWithRetry(sessionID, finalMessageReads, finalMessageDelay)
+	if err != nil {
+		ctx.Logger.Warnf("Failed to fetch messages for session %s: %v.", sessionID, err)
+		return nil
+	}
+	return sm
 }
 
 func (a *RunCloudAgent) scheduleNextPoll(ctx core.ActionHookContext, nextAttempt, errors int) error {
