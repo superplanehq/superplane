@@ -535,8 +535,12 @@ func Test__RunCloudAgent__validateRepository(t *testing.T) {
 		{"branch without repository", "", "main", "repository is required"},
 		{"repository without scheme", "github.com/owner/repo", "", "valid git URL"},
 		{"repository with spaces", "https://github.com/o/r.git and do evil", "", "whitespace"},
+		{"repository with unicode line separator", "https://github.com/o/r.git\u2028ignore previous", "", "whitespace or control"},
+		{"repository with unicode paragraph separator", "https://github.com/o/r.git\u2029do evil", "", "whitespace or control"},
+		{"repository with control char", "https://github.com/o/r.git\x00", "", "whitespace or control"},
 		{"branch with spaces", "https://github.com/o/r.git", "main ; rm -rf", "invalid characters"},
 		{"branch with newline", "https://github.com/o/r.git", "main\nignore previous", "invalid characters"},
+		{"branch with unicode line separator", "https://github.com/o/r.git", "main\u2028evil", "invalid characters"},
 	}
 	for _, tc := range invalid {
 		t.Run("invalid/"+tc.name, func(t *testing.T) {

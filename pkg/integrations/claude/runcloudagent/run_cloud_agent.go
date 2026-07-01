@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -725,8 +726,12 @@ func validateRepository(repository, branch string) error {
 	}
 
 	if repository != "" && !containsExpression(repository) {
-		if strings.ContainsAny(repository, " \t\r\n") {
-			return fmt.Errorf("repository must not contain whitespace")
+		// Reject any Unicode whitespace (incl. U+2028/U+2029 line separators) or
+		// control character so the value cannot inject extra lines into the prompt.
+		if i := strings.IndexFunc(repository, func(r rune) bool {
+			return unicode.IsSpace(r) || unicode.IsControl(r)
+		}); i >= 0 {
+			return fmt.Errorf("repository must not contain whitespace or control characters")
 		}
 		if !isGitRepositoryURL(repository) {
 			return fmt.Errorf("repository must be a valid git URL (https://, http://, ssh://, git://, or user@host:path)")
