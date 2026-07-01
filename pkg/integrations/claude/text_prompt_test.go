@@ -26,7 +26,7 @@ func TestTextPrompt_Configuration(t *testing.T) {
 		"maxTokens":     {false, string(configuration.FieldTypeNumber)},
 		"temperature":   {false, string(configuration.FieldTypeNumber)},
 		"files":         {false, string(configuration.FieldTypeList)},
-		"outputFields":  {false, string(configuration.FieldTypeList)},
+		"outputSchema":  {false, string(configuration.FieldTypeText)},
 	}
 
 	for _, field := range config {
@@ -75,56 +75,38 @@ func TestTextPrompt_Setup(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "Valid output fields",
+			name: "Valid output schema",
 			config: map[string]interface{}{
-				"model":  "claude-3-opus",
-				"prompt": "Hello",
-				"outputFields": []any{
-					map[string]any{"name": "sentiment", "type": "string", "required": true},
-				},
+				"model":        "claude-3-opus",
+				"prompt":       "Hello",
+				"outputSchema": `{"type":"object","properties":{"sentiment":{"type":"string"}},"required":["sentiment"]}`,
 			},
 			expectError: false,
 		},
 		{
-			name: "Field missing name",
+			name: "Invalid JSON schema",
 			config: map[string]interface{}{
 				"model":        "claude-3-opus",
 				"prompt":       "Hello",
-				"outputFields": []any{map[string]any{"type": "string"}},
+				"outputSchema": `{"type":"object",}`,
 			},
 			expectError: true,
 		},
 		{
-			name: "Object field without sub-fields",
+			name: "Schema root not an object",
 			config: map[string]interface{}{
 				"model":        "claude-3-opus",
 				"prompt":       "Hello",
-				"outputFields": []any{map[string]any{"name": "addr", "type": "object"}},
+				"outputSchema": `["a","b"]`,
 			},
 			expectError: true,
 		},
 		{
-			name: "Nested object field valid",
+			name: "Schema missing properties",
 			config: map[string]interface{}{
-				"model":  "claude-3-opus",
-				"prompt": "Hello",
-				"outputFields": []any{
-					map[string]any{"name": "addr", "type": "object", "fields": []any{
-						map[string]any{"name": "city", "type": "string"},
-					}},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name: "Duplicate field name",
-			config: map[string]interface{}{
-				"model":  "claude-3-opus",
-				"prompt": "Hello",
-				"outputFields": []any{
-					map[string]any{"name": "a", "type": "string"},
-					map[string]any{"name": "a", "type": "number"},
-				},
+				"model":        "claude-3-opus",
+				"prompt":       "Hello",
+				"outputSchema": `{"type":"object"}`,
 			},
 			expectError: true,
 		},
@@ -291,9 +273,7 @@ func TestTextPrompt_Execute(t *testing.T) {
 func TestTextPrompt_StructuredOutput(t *testing.T) {
 	c := &TextPrompt{}
 
-	outputFields := []any{
-		map[string]any{"name": "sentiment", "type": "string", "required": true},
-	}
+	outputSchema := `{"type":"object","properties":{"sentiment":{"type":"string"}},"required":["sentiment"]}`
 
 	run := func(t *testing.T, responseBody string) (MessagePayload, []byte) {
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -309,7 +289,7 @@ func TestTextPrompt_StructuredOutput(t *testing.T) {
 			Configuration: map[string]any{
 				"model":        "claude-3-test",
 				"prompt":       "classify",
-				"outputFields": outputFields,
+				"outputSchema": outputSchema,
 			},
 			ExecutionState: execState,
 			HTTP:           httpCtx,
@@ -432,12 +412,10 @@ func TestTextPrompt_NodeMetadata(t *testing.T) {
 	md := &contexts.MetadataContext{}
 	ctx := core.SetupContext{
 		Configuration: map[string]any{
-			"model":     "claude-3-test",
-			"prompt":    "hi",
-			"maxTokens": 500,
-			"outputFields": []any{
-				map[string]any{"name": "x", "type": "string", "required": true},
-			},
+			"model":        "claude-3-test",
+			"prompt":       "hi",
+			"maxTokens":    500,
+			"outputSchema": `{"type":"object","properties":{"x":{"type":"string"}},"required":["x"]}`,
 		},
 		Metadata: md,
 	}

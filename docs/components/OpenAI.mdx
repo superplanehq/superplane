@@ -31,7 +31,7 @@ The Text Prompt component generates text responses using OpenAI's language model
 
 - **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
 - **Prompt**: The text prompt to send to the model (supports expressions)
-- **Structured Output**: (Optional) Define the output fields (name, type, description, required) and the model returns JSON matching them, available on the parsed output. Supports nested objects and lists; the JSON Schema (OpenAI strict mode, including nullable handling for optional fields) is built for you.
+- **Structured Output**: (Optional) Provide a JSON Schema for the response and the model returns JSON matching it, available on the parsed output. The schema is validated before the request and sent in OpenAI strict mode; strict mode marks every property required, so express optional fields by making their type nullable.
 
 ### Output
 

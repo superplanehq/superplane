@@ -18,8 +18,8 @@ func Test__CreateResponse__Configuration(t *testing.T) {
 	for _, f := range fields {
 		found[f.Name] = f.Type
 	}
-	if found["outputFields"] != "list" {
-		t.Errorf("expected outputFields field of type list, got %q", found["outputFields"])
+	if found["outputSchema"] != "text" {
+		t.Errorf("expected outputSchema field of type text, got %q", found["outputSchema"])
 	}
 }
 
@@ -28,29 +28,27 @@ func Test__CreateResponse__Setup__fieldValidation(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		fields      any
+		schema      string
 		expectError bool
 	}{
 		{
-			name: "valid fields",
-			fields: []any{
-				map[string]any{"name": "name", "type": "string", "required": true},
-			},
+			name:        "valid schema",
+			schema:      `{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}`,
 			expectError: false,
 		},
 		{
-			name:        "missing name",
-			fields:      []any{map[string]any{"type": "string"}},
+			name:        "invalid JSON",
+			schema:      `{"type":"object",}`,
 			expectError: true,
 		},
 		{
-			name:        "object without sub-fields",
-			fields:      []any{map[string]any{"name": "addr", "type": "object"}},
+			name:        "root not an object",
+			schema:      `["a"]`,
 			expectError: true,
 		},
 		{
-			name:        "unknown type",
-			fields:      []any{map[string]any{"name": "x", "type": "weird"}},
+			name:        "missing properties",
+			schema:      `{"type":"object"}`,
 			expectError: true,
 		},
 	}
@@ -61,7 +59,7 @@ func Test__CreateResponse__Setup__fieldValidation(t *testing.T) {
 				Configuration: map[string]any{
 					"model":        "gpt-5.2",
 					"input":        "hi",
-					"outputFields": tt.fields,
+					"outputSchema": tt.schema,
 				},
 			}
 			err := c.Setup(ctx)
@@ -77,9 +75,7 @@ func Test__CreateResponse__Setup__fieldValidation(t *testing.T) {
 
 func Test__CreateResponse__Execute__structuredOutput(t *testing.T) {
 	c := &CreateResponse{}
-	outputFields := []any{
-		map[string]any{"name": "city", "type": "string", "required": true},
-	}
+	outputSchema := `{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}`
 
 	run := func(t *testing.T, responseBody string) (ResponsePayload, []byte) {
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -95,7 +91,7 @@ func Test__CreateResponse__Execute__structuredOutput(t *testing.T) {
 			Configuration: map[string]any{
 				"model":        "gpt-5.2",
 				"input":        "where?",
-				"outputFields": outputFields,
+				"outputSchema": outputSchema,
 			},
 			ExecutionState: execState,
 			HTTP:           httpCtx,

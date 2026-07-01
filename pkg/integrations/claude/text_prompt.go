@@ -26,7 +26,7 @@ type TextPromptSpec struct {
 	MaxTokens     int      `json:"maxTokens"`
 	Temperature   *float64 `json:"temperature"`
 	Files         []string `json:"files"`
-	OutputFields  any      `json:"outputFields"`
+	OutputSchema  string   `json:"outputSchema"`
 }
 
 type MessagePayload struct {
@@ -75,7 +75,7 @@ func (c *TextPrompt) Documentation() string {
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
 - **Max Tokens**: (Optional) Limit the length of the generated response.
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0).
-- **Structured Output**: (Optional) Define the output fields (name, type, description, required) and Claude returns JSON matching them, available on the parsed output. Supports nested objects and lists; the JSON Schema is built for you.
+- **Structured Output**: (Optional) Provide a JSON Schema for the response. Claude is constrained to return JSON matching it, available on the parsed output. The schema is validated before the request; every object is sent with additionalProperties:false.
 
 ## Output
 
@@ -169,9 +169,9 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 			},
 		},
 		structuredoutput.ConfigField(
-			"outputFields",
+			"outputSchema",
 			"Structured Output",
-			"Define the fields Claude should return. The response is constrained to a JSON object with these fields (available on the `parsed` output). Supports nested objects and lists.",
+			"A JSON Schema describing the response. Claude is constrained to return JSON matching it (available on the `parsed` output). Edit the default schema; it is validated before the request. Every object gets `additionalProperties: false`.",
 		),
 	}
 }
@@ -215,11 +215,8 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	fields, err := structuredoutput.Decode(spec.OutputFields)
+	schema, err := structuredoutput.Parse(spec.OutputSchema)
 	if err != nil {
-		return err
-	}
-	if err := structuredoutput.Validate(fields); err != nil {
 		return err
 	}
 
@@ -231,7 +228,7 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		_ = ctx.Metadata.Set(TextPromptNodeMetadata{
 			Model:            spec.Model,
 			MaxTokens:        maxTokens,
-			StructuredOutput: len(fields) > 0,
+			StructuredOutput: schema != nil,
 		})
 	}
 
@@ -258,7 +255,7 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("maxTokens must be at least 1")
 	}
 
-	fields, err := structuredoutput.Decode(spec.OutputFields)
+	schema, err := structuredoutput.Parse(spec.OutputSchema)
 	if err != nil {
 		return err
 	}
@@ -290,9 +287,9 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		req.System = spec.SystemMessage
 	}
 
-	if len(fields) > 0 {
+	if schema != nil {
 		req.OutputConfig = &OutputConfig{
-			Format: &OutputFormat{Type: "json_schema", Schema: structuredoutput.BuildSchema(fields, false)},
+			Format: &OutputFormat{Type: "json_schema", Schema: structuredoutput.Prepare(schema, false)},
 		}
 	}
 
@@ -315,7 +312,7 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 	// When a schema is configured, parse the model's JSON text into a structured
 	// object. Only trust the output on a normal completion (end_turn); a refusal
 	// or truncation (max_tokens) may not conform to the schema.
-	if len(fields) > 0 && response.StopReason == "end_turn" && text != "" {
+	if schema != nil && response.StopReason == "end_turn" && text != "" {
 		var parsed any
 		if err := json.Unmarshal([]byte(text), &parsed); err == nil {
 			payload.Parsed = parsed

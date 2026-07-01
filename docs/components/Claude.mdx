@@ -80,7 +80,7 @@ The Text Prompt component uses Anthropic's Claude models to generate text respon
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
 - **Max Tokens**: (Optional) Limit the length of the generated response.
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0).
-- **Structured Output**: (Optional) Define the output fields (name, type, description, required) and Claude returns JSON matching them, available on the parsed output. Supports nested objects and lists; the JSON Schema is built for you.
+- **Structured Output**: (Optional) Provide a JSON Schema for the response. Claude is constrained to return JSON matching it, available on the parsed output. The schema is validated before the request; every object is sent with additionalProperties:false.
 
 ### Output
 

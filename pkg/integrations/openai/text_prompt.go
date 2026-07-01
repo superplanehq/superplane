@@ -20,7 +20,7 @@ type CreateResponse struct{}
 type CreateResponseSpec struct {
 	Model        string `json:"model"`
 	Input        string `json:"input"`
-	OutputFields any    `json:"outputFields"`
+	OutputSchema string `json:"outputSchema"`
 }
 
 type ResponsePayload struct {
@@ -65,7 +65,7 @@ func (c *CreateResponse) Documentation() string {
 
 - **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
 - **Prompt**: The text prompt to send to the model (supports expressions)
-- **Structured Output**: (Optional) Define the output fields (name, type, description, required) and the model returns JSON matching them, available on the parsed output. Supports nested objects and lists; the JSON Schema (OpenAI strict mode, including nullable handling for optional fields) is built for you.
+- **Structured Output**: (Optional) Provide a JSON Schema for the response and the model returns JSON matching it, available on the parsed output. The schema is validated before the request and sent in OpenAI strict mode; strict mode marks every property required, so express optional fields by making their type nullable.
 
 ## Output
 
@@ -119,9 +119,9 @@ func (c *CreateResponse) Configuration() []configuration.Field {
 			Placeholder: "Enter the prompt text",
 		},
 		structuredoutput.ConfigField(
-			"outputFields",
+			"outputSchema",
 			"Structured Output",
-			"Define the fields the model should return. The response is constrained to a JSON object with these fields (available on the `parsed` output). Supports nested objects and lists.",
+			"A JSON Schema describing the response. The model is constrained to return JSON matching it (available on the `parsed` output). Edit the default schema; it is validated before the request. Strict mode requires every property to be listed in `required`, so all top-level and nested properties are marked required automatically.",
 		),
 	}
 }
@@ -140,18 +140,15 @@ func (c *CreateResponse) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("input is required")
 	}
 
-	fields, err := structuredoutput.Decode(spec.OutputFields)
+	schema, err := structuredoutput.Parse(spec.OutputSchema)
 	if err != nil {
-		return err
-	}
-	if err := structuredoutput.Validate(fields); err != nil {
 		return err
 	}
 
 	if ctx.Metadata != nil {
 		_ = ctx.Metadata.Set(ResponseNodeMetadata{
 			Model:            spec.Model,
-			StructuredOutput: len(fields) > 0,
+			StructuredOutput: schema != nil,
 		})
 	}
 
@@ -172,7 +169,7 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("input is required")
 	}
 
-	fields, err := structuredoutput.Decode(spec.OutputFields)
+	schema, err := structuredoutput.Parse(spec.OutputSchema)
 	if err != nil {
 		return err
 	}
@@ -183,12 +180,12 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := CreateResponseRequest{Model: spec.Model, Input: spec.Input}
-	if len(fields) > 0 {
+	if schema != nil {
 		req.Text = &ResponseTextConfig{
 			Format: &ResponseFormat{
 				Type:   "json_schema",
 				Name:   "structured_output",
-				Schema: structuredoutput.BuildSchema(fields, true),
+				Schema: structuredoutput.Prepare(schema, true),
 				Strict: true,
 			},
 		}
@@ -211,7 +208,7 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 	// When a schema is configured, surface a refusal as text (it arrives on a
 	// dedicated content item that extractResponseText skips) and otherwise parse
 	// the JSON response into a structured object.
-	if len(fields) > 0 {
+	if schema != nil {
 		if refusal := extractRefusal(response); refusal != "" {
 			if payload.Text == "" {
 				payload.Text = refusal

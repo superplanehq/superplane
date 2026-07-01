@@ -1,201 +1,105 @@
 package structuredoutput
 
 import (
+	"reflect"
 	"testing"
-
-	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
-func boolPtr(b bool) *bool { return &b }
-
-func TestBuildSchema_Scalars_NonStrict(t *testing.T) {
-	fields := []OutputField{
-		{Name: "title", Type: TypeString, Required: boolPtr(true)},
-		{Name: "count", Type: TypeInteger},                         // required nil -> default true
-		{Name: "note", Type: TypeString, Required: boolPtr(false)}, // optional
-	}
-	schema := BuildSchema(fields, false) // Anthropic rules
-
-	if schema["type"] != "object" || schema["additionalProperties"] != false {
-		t.Fatalf("unexpected root: %v", schema)
-	}
-	props := schema["properties"].(map[string]any)
-	if props["title"].(map[string]any)["type"] != "string" {
-		t.Errorf("title type wrong: %v", props["title"])
-	}
-	req := toStringSlice(schema["required"])
-	if !contains(req, "title") || !contains(req, "count") {
-		t.Errorf("expected title and count required, got %v", req)
-	}
-	if contains(req, "note") {
-		t.Errorf("non-strict: optional note should be omitted from required, got %v", req)
+func TestParse_Unset(t *testing.T) {
+	for _, raw := range []any{nil, "", "   ", "\n\t "} {
+		schema, err := Parse(raw)
+		if err != nil {
+			t.Errorf("Parse(%q) unexpected error: %v", raw, err)
+		}
+		if schema != nil {
+			t.Errorf("Parse(%q) = %v, want nil (treated as unset)", raw, schema)
+		}
 	}
 }
 
-func TestBuildSchema_StrictNullable(t *testing.T) {
-	fields := []OutputField{
-		{Name: "title", Type: TypeString, Required: boolPtr(true)},
-		{Name: "note", Type: TypeString, Required: boolPtr(false)},
-	}
-	schema := BuildSchema(fields, true) // OpenAI strict
-
-	req := toStringSlice(schema["required"])
-	if !contains(req, "title") || !contains(req, "note") {
-		t.Fatalf("strict mode must list every field in required, got %v", req)
-	}
-	props := schema["properties"].(map[string]any)
-	noteType := props["note"].(map[string]any)["type"]
-	ts, ok := noteType.([]any)
-	if !ok || len(ts) != 2 || ts[0] != "string" || ts[1] != "null" {
-		t.Errorf("optional field should be nullable [string,null], got %v", noteType)
-	}
-	if props["title"].(map[string]any)["type"] != "string" {
-		t.Errorf("required field should stay a plain string, got %v", props["title"])
-	}
-}
-
-func TestBuildSchema_Nested(t *testing.T) {
-	fields := []OutputField{
-		{Name: "topic", Type: TypeString, Required: boolPtr(true)},
-		{Name: "tags", Type: TypeStringArray, Required: boolPtr(true)},
-		{Name: "contacts", Type: TypeObjectArray, Required: boolPtr(true), Fields: []OutputField{
-			{Name: "name", Type: TypeString, Required: boolPtr(true)},
-			{Name: "email", Type: TypeString, Required: boolPtr(true)},
-		}},
-		{Name: "address", Type: TypeObject, Required: boolPtr(true), Fields: []OutputField{
-			{Name: "city", Type: TypeString, Required: boolPtr(true)},
-		}},
-	}
-	props := BuildSchema(fields, false)["properties"].(map[string]any)
-
-	tags := props["tags"].(map[string]any)
-	if tags["type"] != "array" || tags["items"].(map[string]any)["type"] != "string" {
-		t.Errorf("tags should be array of strings, got %v", tags)
-	}
-
-	contacts := props["contacts"].(map[string]any)
-	if contacts["type"] != "array" {
-		t.Fatalf("contacts should be array, got %v", contacts["type"])
-	}
-	items := contacts["items"].(map[string]any)
-	if items["type"] != "object" || items["additionalProperties"] != false {
-		t.Errorf("array items should be object with additionalProperties:false, got %v", items)
-	}
-	if _, ok := items["properties"].(map[string]any)["email"]; !ok {
-		t.Errorf("nested item missing email property")
-	}
-
-	address := props["address"].(map[string]any)
-	if address["type"] != "object" || address["additionalProperties"] != false {
-		t.Errorf("address should be a nested object, got %v", address)
-	}
-}
-
-func TestValidate(t *testing.T) {
-	cases := []struct {
-		name    string
-		fields  []OutputField
-		wantErr bool
-	}{
-		{"valid", []OutputField{{Name: "a", Type: TypeString}}, false},
-		{"missing name", []OutputField{{Type: TypeString}}, true},
-		{"missing type", []OutputField{{Name: "a"}}, true},
-		{"unknown type", []OutputField{{Name: "a", Type: "weird"}}, true},
-		{"object without sub-fields", []OutputField{{Name: "a", Type: TypeObject}}, true},
-		{"duplicate name", []OutputField{{Name: "a", Type: TypeString}, {Name: "a", Type: TypeNumber}}, true},
-		{"nested object valid", []OutputField{{Name: "a", Type: TypeObject, Fields: []OutputField{{Name: "b", Type: TypeString}}}}, false},
-		{"nested duplicate", []OutputField{{Name: "a", Type: TypeObject, Fields: []OutputField{{Name: "b", Type: TypeString}, {Name: "b", Type: TypeNumber}}}}, true},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			err := Validate(c.fields)
-			if c.wantErr && err == nil {
-				t.Error("expected error, got nil")
-			}
-			if !c.wantErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
-func TestDecode_RequiredDefault(t *testing.T) {
-	raw := []any{
-		map[string]any{"name": "a", "type": "string"},                    // required absent -> default true
-		map[string]any{"name": "b", "type": "string", "required": false}, // explicit optional
-		map[string]any{"name": "c", "type": "object", "fields": []any{
-			map[string]any{"name": "d", "type": "string"},
-		}},
-	}
-	fields, err := Decode(raw)
+func TestParse_Valid(t *testing.T) {
+	schema, err := Parse(`{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}`)
 	if err != nil {
-		t.Fatalf("decode error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(fields) != 3 {
-		t.Fatalf("expected 3 fields, got %d", len(fields))
-	}
-	if !isRequired(fields[0]) {
-		t.Error("absent required toggle should default to true")
-	}
-	if isRequired(fields[1]) {
-		t.Error("explicit required:false should be optional")
-	}
-	if len(fields[2].Fields) != 1 || fields[2].Fields[0].Name != "d" {
-		t.Errorf("nested fields not decoded: %+v", fields[2].Fields)
+	if schema["type"] != "object" {
+		t.Errorf("expected type object, got %v", schema["type"])
 	}
 }
 
-func TestConfigField(t *testing.T) {
-	f := ConfigField("outputFields", "Structured Output", "desc")
-	if f.Type != configuration.FieldTypeList || !f.Togglable {
-		t.Fatalf("expected togglable list field, got type=%s togglable=%v", f.Type, f.Togglable)
-	}
-	item := f.TypeOptions.List.ItemDefinition
-	if item.Type != configuration.FieldTypeObject {
-		t.Fatalf("item should be object, got %s", item.Type)
-	}
-
-	names := map[string]bool{}
-	var sub *configuration.Field
-	for i := range item.Schema {
-		names[item.Schema[i].Name] = true
-		if item.Schema[i].Name == "fields" {
-			sub = &item.Schema[i]
-		}
-	}
-	for _, n := range []string{"name", "type", "description", "required", "fields"} {
-		if !names[n] {
-			t.Errorf("missing item field %q", n)
-		}
-	}
-	if sub == nil || sub.Type != configuration.FieldTypeList {
-		t.Fatal("expected nested 'fields' list for recursion")
-	}
-	if len(sub.VisibilityConditions) == 0 {
-		t.Error("nested 'fields' should be gated by VisibilityConditions on type")
+func TestParse_DefaultSchemaIsValid(t *testing.T) {
+	if _, err := Parse(DefaultSchema); err != nil {
+		t.Errorf("DefaultSchema should parse cleanly: %v", err)
 	}
 }
 
-func toStringSlice(v any) []string {
-	if s, ok := v.([]string); ok {
-		return s
+func TestParse_Errors(t *testing.T) {
+	cases := map[string]string{
+		"invalid JSON":          `{"type":"object",}`,
+		"not an object":         `["a","b"]`,
+		"scalar":                `"hello"`,
+		"non-object root type":  `{"type":"array","properties":{"a":{"type":"string"}}}`,
+		"missing properties":    `{"type":"object"}`,
+		"empty properties":      `{"type":"object","properties":{}}`,
+		"properties not object": `{"type":"object","properties":[]}`,
 	}
-	out := []string{}
-	if arr, ok := v.([]any); ok {
-		for _, e := range arr {
-			if s, ok := e.(string); ok {
-				out = append(out, s)
-			}
+	for name, raw := range cases {
+		if _, err := Parse(raw); err == nil {
+			t.Errorf("%s: expected error, got nil", name)
 		}
 	}
-	return out
 }
 
-func contains(s []string, v string) bool {
-	for _, x := range s {
-		if x == v {
-			return true
-		}
+func TestPrepare_AddsAdditionalProperties(t *testing.T) {
+	schema, _ := Parse(`{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}`)
+	out := Prepare(schema, false)
+	if out["additionalProperties"] != false {
+		t.Errorf("expected additionalProperties false, got %v", out["additionalProperties"])
 	}
-	return false
+	// non-strict keeps required as-is
+	if req, _ := out["required"].([]any); len(req) != 1 || req[0] != "a" {
+		t.Errorf("non-strict should keep required as written, got %v", out["required"])
+	}
+}
+
+func TestPrepare_NestedObjectsAndArrays(t *testing.T) {
+	schema, _ := Parse(`{
+		"type":"object",
+		"properties":{
+			"item":{"type":"object","properties":{"x":{"type":"number"}},"required":["x"]},
+			"list":{"type":"array","items":{"type":"object","properties":{"y":{"type":"string"}}}}
+		},
+		"required":["item","list"]
+	}`)
+	out := Prepare(schema, false)
+
+	props := out["properties"].(map[string]any)
+	item := props["item"].(map[string]any)
+	if item["additionalProperties"] != false {
+		t.Errorf("nested object should get additionalProperties false")
+	}
+	items := props["list"].(map[string]any)["items"].(map[string]any)
+	if items["additionalProperties"] != false {
+		t.Errorf("array item object should get additionalProperties false")
+	}
+}
+
+func TestPrepare_StrictForcesRequired(t *testing.T) {
+	schema, _ := Parse(`{"type":"object","properties":{"a":{"type":"string"},"b":{"type":"number"}},"required":["a"]}`)
+	out := Prepare(schema, true)
+	req, ok := out["required"].([]string)
+	if !ok {
+		t.Fatalf("required should be []string in strict mode, got %T", out["required"])
+	}
+	if !reflect.DeepEqual(req, []string{"a", "b"}) {
+		t.Errorf("strict mode should require all properties (sorted), got %v", req)
+	}
+}
+
+func TestPrepare_DoesNotMutateInput(t *testing.T) {
+	schema, _ := Parse(`{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]}`)
+	_ = Prepare(schema, true)
+	if _, exists := schema["additionalProperties"]; exists {
+		t.Errorf("Prepare must not mutate the input schema")
+	}
 }
