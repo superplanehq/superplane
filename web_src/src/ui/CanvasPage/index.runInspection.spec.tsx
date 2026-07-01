@@ -298,6 +298,27 @@ describe("CanvasPage run inspection", () => {
       expect(fitViewMock).toHaveBeenCalledWith({ nodes: [runNode], duration: 500, maxZoom: 1.2 });
     });
     expect(setViewportMock).toHaveBeenCalledWith(viewportRef.current);
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          nodes={[runNode]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          viewportRef={viewportRef}
+          focusRequest={{ ...focusRequest }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
   });
 
   it("refits when leaving run inspection with the same fit request nonce", () => {

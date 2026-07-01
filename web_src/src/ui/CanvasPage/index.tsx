@@ -2409,10 +2409,16 @@ function CanvasContent({
       : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
   const suppressNextPaneClickRef = useRef(false);
   const suppressNextPaneClickTimeoutRef = useRef<number | null>(null);
+  const handledFocusRequestKeyRef = useRef<string | null>(null);
   const runCanvasNodeIdsKey = useMemo(() => state.nodes.map((node) => node.id).join("|"), [state.nodes]);
 
   useEffect(() => {
     if (!focusRequest || !hasReactFlowInitialized) {
+      return;
+    }
+
+    const focusRequestKey = `${focusRequest.requestId}:${focusRequest.nodeId}`;
+    if (handledFocusRequestKeyRef.current === focusRequestKey) {
       return;
     }
 
@@ -2423,6 +2429,7 @@ function CanvasContent({
       return;
     }
 
+    handledFocusRequestKeyRef.current = focusRequestKey;
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
         ...node,
