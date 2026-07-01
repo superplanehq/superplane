@@ -372,10 +372,6 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
 		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
 	).Methods("GET")
-	s.Router.Handle(
-		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs",
-		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogs)),
-	).Methods("GET")
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)

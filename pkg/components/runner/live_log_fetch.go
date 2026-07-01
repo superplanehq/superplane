@@ -38,7 +38,6 @@ type LiveLogFetchResult struct {
 }
 
 func FetchLiveLogRecords(ctx context.Context, brokerTaskID string, opts LiveLogFetchOptions) (*LiveLogFetchResult, error) {
-	limit := normalizeLiveLogRecordLimit(opts.Limit)
 	now := opts.Now
 	if now.IsZero() {
 		now = time.Now()
@@ -49,6 +48,11 @@ func FetchLiveLogRecords(ctx context.Context, brokerTaskID string, opts LiveLogF
 		return nil, err
 	}
 
+	return FetchLiveLogSessionRecords(ctx, *session, opts)
+}
+
+func FetchLiveLogSessionRecords(ctx context.Context, session LiveLogSession, opts LiveLogFetchOptions) (*LiveLogFetchResult, error) {
+	limit := normalizeLiveLogRecordLimit(opts.Limit)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, session.StreamURL, nil)
 	if err != nil {
 		return nil, err

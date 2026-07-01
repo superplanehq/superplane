@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -67,29 +66,6 @@ func runnerLiveLogSessionGET(
 	return rec
 }
 
-func runnerLiveLogsGET(
-	t *testing.T,
-	server *Server,
-	signer *jwt.Signer,
-	r *support.ResourceRegistry,
-	canvasID, executionID string,
-	limit int,
-) *httptest.ResponseRecorder {
-	t.Helper()
-	path := fmt.Sprintf("/api/v1/canvases/%s/node-executions/%s/runner-live-logs", canvasID, executionID)
-	if limit > 0 {
-		path += fmt.Sprintf("?limit=%d", limit)
-	}
-	req := httptest.NewRequest(http.MethodGet, path, nil)
-	req.Header.Set("x-organization-id", r.Organization.ID.String())
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
-	require.NoError(t, err)
-	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
-	rec := httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
-	return rec
-}
-
 func createExecutionForCanvasRun(
 	t *testing.T,
 	run *models.CanvasRun,
@@ -112,44 +88,6 @@ func createExecutionForCanvasRun(
 	}
 	require.NoError(t, database.Conn().Create(&execution).Error)
 	return &execution
-}
-
-func TestHandleRunnerLiveLogs(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	server, signer := mustRunnerLiveLogServer(t, r)
-	broker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, "/v1/tasks/task-logs/live-logs", req.URL.Path)
-		assert.True(t, strings.HasPrefix(req.Header.Get("Authorization"), "Bearer "))
-		w.Header().Set("Content-Type", "application/x-ndjson")
-		_, _ = fmt.Fprintln(w, `{"type":"cmd_start","index":1,"text":"echo hello","started_at":1761850000000}`)
-		_, _ = fmt.Fprintln(w, `{"type":"line","text":"hello"}`)
-		_, _ = fmt.Fprintln(w, `{"type":"cmd_end","index":1,"status":"passed","duration_ms":12}`)
-	}))
-	defer broker.Close()
-
-	t.Setenv("TASK_BROKER_BASE_URL", broker.URL)
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-	canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerBash", "runner-logs-1", map[string]any{
-		runneraction.ExecutionMetadataBrokerTaskID: "task-logs",
-	})
-
-	rec := runnerLiveLogsGET(t, server, signer, r, canvasID.String(), execID.String(), 2)
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
-
-	var response runnerLiveLogsResponse
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	assert.Equal(t, canvasID.String(), response.CanvasID)
-	assert.Equal(t, execID.String(), response.ExecutionID)
-	assert.Equal(t, "task-logs", response.BrokerTaskID)
-	assert.Equal(t, 2, response.Count)
-	assert.True(t, response.Truncated)
-	require.Len(t, response.Records, 2)
-	assert.Equal(t, "cmd_start", response.Records[0].Type)
-	assert.Equal(t, "hello", response.Records[1].Text)
 }
 
 func createCanvasWithComponentExecution(

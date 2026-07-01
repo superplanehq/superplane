@@ -262,6 +262,13 @@ func resolveRunnerLogRunTargets(tx *gorm.DB, canvasID uuid.UUID, rawRunID, nodeI
 		if strings.TrimSpace(nodeID) != "" && execution.NodeID != nodeID {
 			continue
 		}
+		isRunner, err := isRunnerLogExecutionTarget(tx, canvasID, execution.NodeID)
+		if err != nil {
+			return nil, err
+		}
+		if !isRunner {
+			continue
+		}
 		targets = append(targets, runnerLogTarget{
 			ExecutionID: execution.ID,
 			NodeID:      execution.NodeID,
@@ -269,7 +276,7 @@ func resolveRunnerLogRunTargets(tx *gorm.DB, canvasID uuid.UUID, rawRunID, nodeI
 		})
 	}
 	if len(targets) == 0 {
-		return nil, fmt.Errorf("no executions found for runner_logs target")
+		return nil, fmt.Errorf("no runner executions found for runner_logs target")
 	}
 	return targets, nil
 }
@@ -302,6 +309,18 @@ func findRunnerLogExecutionTarget(tx *gorm.DB, canvasID, executionID uuid.UUID) 
 		return nil, err
 	}
 	return &execution, nil
+}
+
+func isRunnerLogExecutionTarget(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (bool, error) {
+	node, err := models.FindCanvasNode(tx, canvasID, nodeID)
+	if err != nil {
+		return false, fmt.Errorf("load node %q: %w", nodeID, err)
+	}
+	ref := node.Ref.Data()
+	if ref.Component == nil {
+		return false, nil
+	}
+	return runneraction.IsRunnerComponent(ref.Component.Name), nil
 }
 
 func listLatestRunnerLogNodeExecutions(tx *gorm.DB, canvasID uuid.UUID, nodeID string) ([]models.CanvasNodeExecution, error) {

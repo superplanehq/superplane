@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
+
+const runnerLiveLogSessionEndpoint = "RunnerLiveLogSession"
 
 type LogsCommand struct {
 	CanvasID    *string
@@ -22,39 +25,19 @@ type LogsCommand struct {
 	Limit       *int64
 }
 
-type runnerLogRecord struct {
-	Type       string `json:"type,omitempty"`
-	Text       string `json:"text,omitempty"`
-	Message    string `json:"message,omitempty"`
-	Index      *int   `json:"index,omitempty"`
-	Status     string `json:"status,omitempty"`
-	DurationMS *int64 `json:"duration_ms,omitempty"`
-	StartedAt  *int64 `json:"started_at,omitempty"`
-}
-
-type runnerLogsResponse struct {
-	CanvasID     string            `json:"canvas_id"`
-	ExecutionID  string            `json:"execution_id"`
-	BrokerTaskID string            `json:"broker_task_id"`
-	Count        int               `json:"count"`
-	Truncated    bool              `json:"truncated,omitempty"`
-	Records      []runnerLogRecord `json:"records"`
-}
-
 type runnerLogTarget struct {
 	ExecutionID string
 	NodeID      string
 }
 
 type runnerLogOutput struct {
-	CanvasID     string            `json:"canvas_id"`
-	ExecutionID  string            `json:"execution_id"`
-	NodeID       string            `json:"node_id,omitempty"`
-	BrokerTaskID string            `json:"broker_task_id,omitempty"`
-	Count        int               `json:"count"`
-	Truncated    bool              `json:"truncated,omitempty"`
-	Records      []runnerLogRecord `json:"records,omitempty"`
-	Error        string            `json:"error,omitempty"`
+	CanvasID    string                       `json:"canvas_id"`
+	ExecutionID string                       `json:"execution_id"`
+	NodeID      string                       `json:"node_id,omitempty"`
+	Count       int                          `json:"count"`
+	Truncated   bool                         `json:"truncated,omitempty"`
+	Records     []runneraction.LiveLogRecord `json:"records,omitempty"`
+	Error       string                       `json:"error,omitempty"`
 }
 
 func (c *LogsCommand) Execute(ctx core.CommandContext) error {
@@ -106,7 +89,11 @@ func (c *LogsCommand) resolveRunTargets(ctx core.CommandContext, canvasID string
 		return nil, err
 	}
 
-	run := response.GetRun()
+	run, ok := response.GetRunOk()
+	if !ok || run == nil {
+		return nil, fmt.Errorf("run %q not found", strings.TrimSpace(*c.RunID))
+	}
+
 	executions := run.GetExecutions()
 	targets := make([]runnerLogTarget, 0, len(executions))
 	for _, execution := range executions {
@@ -152,26 +139,41 @@ func (c *LogsCommand) fetchTargetLogs(ctx core.CommandContext, canvasID string, 
 		NodeID:      target.NodeID,
 	}
 
-	response, err := c.fetchExecutionLogs(ctx, canvasID, target.ExecutionID)
+	records, err := c.fetchExecutionLogs(ctx, canvasID, target.ExecutionID)
 	if err != nil {
 		output.Error = err.Error()
 		return output
 	}
 
-	output.BrokerTaskID = response.BrokerTaskID
-	output.Count = response.Count
-	output.Truncated = response.Truncated
-	output.Records = response.Records
+	output.Count = len(records.Records)
+	output.Truncated = records.Truncated
+	output.Records = records.Records
 	return output
 }
 
-func (c *LogsCommand) fetchExecutionLogs(ctx core.CommandContext, canvasID, executionID string) (*runnerLogsResponse, error) {
+func (c *LogsCommand) fetchExecutionLogs(ctx core.CommandContext, canvasID, executionID string) (*runneraction.LiveLogFetchResult, error) {
+	session, err := c.fetchLiveLogSession(ctx, canvasID, executionID)
+	if err != nil {
+		return nil, err
+	}
+
+	records, err := runneraction.FetchLiveLogSessionRecords(ctx.Context, *session, runneraction.LiveLogFetchOptions{
+		Limit:      normalizedLogLimit(c.Limit),
+		HTTPClient: logHTTPClient(ctx.API.GetConfig()),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fetch runner logs for execution %s: %w", executionID, err)
+	}
+	return records, nil
+}
+
+func (c *LogsCommand) fetchLiveLogSession(ctx core.CommandContext, canvasID, executionID string) (*runneraction.LiveLogSession, error) {
 	config := ctx.API.GetConfig()
 	if config == nil {
 		return nil, fmt.Errorf("api client config is required")
 	}
 
-	baseURL, err := config.ServerURLWithContext(ctx.Context, "CanvasNodeExecutionAPIService.CanvasesCancelExecution")
+	baseURL, err := config.ServerURLWithContext(ctx.Context, runnerLiveLogSessionEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -180,11 +182,10 @@ func (c *LogsCommand) fetchExecutionLogs(ctx core.CommandContext, canvasID, exec
 	}
 
 	endpoint := fmt.Sprintf(
-		"%s/api/v1/canvases/%s/node-executions/%s/runner-live-logs?limit=%d",
+		"%s/api/v1/canvases/%s/node-executions/%s/runner-live-logs/session",
 		strings.TrimRight(baseURL, "/"),
 		url.PathEscape(canvasID),
 		url.PathEscape(executionID),
-		normalizedLogLimit(c.Limit),
 	)
 
 	request, err := http.NewRequestWithContext(ctx.Context, http.MethodGet, endpoint, nil)
@@ -207,29 +208,36 @@ func (c *LogsCommand) fetchExecutionLogs(ctx core.CommandContext, canvasID, exec
 		return nil, err
 	}
 	if response.StatusCode >= http.StatusMultipleChoices {
-		message := strings.TrimSpace(string(body))
-		if message == "" {
-			message = response.Status
-		}
-		return nil, fmt.Errorf("%s", message)
+		return nil, fmt.Errorf("create runner log session for execution %s: %s", executionID, responseErrorMessage(response.Status, body))
 	}
 
-	var payload runnerLogsResponse
-	if err := json.Unmarshal(body, &payload); err != nil {
+	var session runneraction.LiveLogSession
+	if err := json.Unmarshal(body, &session); err != nil {
 		return nil, err
 	}
-	return &payload, nil
+	return &session, nil
 }
 
-func normalizedLogLimit(limit *int64) int64 {
-	if limit == nil || *limit <= 0 {
-		return 200
+func responseErrorMessage(status string, body []byte) string {
+	message := strings.TrimSpace(string(body))
+	if message != "" {
+		return message
 	}
-	return *limit
+	return status
+}
+
+func normalizedLogLimit(limit *int64) int {
+	if limit == nil || *limit <= 0 {
+		return runneraction.DefaultLiveLogRecordLimit
+	}
+	if *limit > int64(runneraction.MaxLiveLogRecordLimit) {
+		return runneraction.MaxLiveLogRecordLimit
+	}
+	return int(*limit)
 }
 
 func logHTTPClient(config *openapi_client.Configuration) *http.Client {
-	if config.HTTPClient != nil {
+	if config != nil && config.HTTPClient != nil {
 		return config.HTTPClient
 	}
 	return &http.Client{Timeout: 30 * time.Second}
@@ -266,14 +274,11 @@ func renderRunnerLogHeader(stdout io.Writer, output runnerLogOutput) error {
 	if output.NodeID != "" {
 		_, _ = fmt.Fprintf(writer, "Node\t%s\n", output.NodeID)
 	}
-	if output.BrokerTaskID != "" {
-		_, _ = fmt.Fprintf(writer, "Broker task\t%s\n", output.BrokerTaskID)
-	}
 	_, _ = fmt.Fprintln(writer, "Logs")
 	return writer.Flush()
 }
 
-func renderRunnerLogRecord(stdout io.Writer, record runnerLogRecord) error {
+func renderRunnerLogRecord(stdout io.Writer, record runneraction.LiveLogRecord) error {
 	switch record.Type {
 	case "line":
 		_, err := fmt.Fprintln(stdout, record.Text)
