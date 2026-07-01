@@ -21,7 +21,7 @@ IMAGE_REPO="${DEMO_IMAGE_REPO:-ghcr.io/superplanehq/superplane-demo}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-SUPERGIT_VERSION="${SUPERGIT_VERSION:-v0.1.1}"
+SUPERGIT_VERSION="${SUPERGIT_VERSION:-v0.1.2}"
 
 # shellcheck source=../lib/image-build-prerequisites.sh
 source "${REPO_ROOT}/release/lib/image-build-prerequisites.sh"

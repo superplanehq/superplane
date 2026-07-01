@@ -149,7 +149,7 @@ services:
       - /tmp:/tmp
 
   supergit:
-    image: ghcr.io/superplanehq/supergit:0.1.1
+    image: ghcr.io/superplanehq/supergit:0.1.2
     environment:
       SUPERGIT_ROOT: /var/lib/supergit/repos
       SUPERGIT_PORT: "8080"

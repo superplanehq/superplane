@@ -122,7 +122,7 @@ func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", "", "", testWebhookBaseURL, r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
 	assert.Equal(t, original.Name+"-staged", resp.GetVersion().GetMetadata().GetName())
@@ -171,9 +171,10 @@ func TestStageArbitraryRepositoryFile(t *testing.T) {
 	require.Error(t, err)
 
 	// Commit durably writes the arbitrary file to git and clears staging.
-	resp, err := CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	resp, err := CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", "", "", testWebhookBaseURL, r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
+	assert.NotEmpty(t, resp.GetVersion().GetMetadata().GetCommitSha())
 
 	reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", "")
 	require.NoError(t, err)

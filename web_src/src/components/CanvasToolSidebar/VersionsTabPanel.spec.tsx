@@ -3,6 +3,10 @@ import type { CanvasesCanvasBranch, CanvasesCanvasVersion } from "@/api-client";
 import { describe, expect, it, vi } from "vitest";
 import { VersionsTabPanel } from "./VersionsTabPanel";
 
+vi.mock("@/hooks/useOrganizationUserAvatars", () => ({
+  useOrganizationUserAvatars: () => new Map(),
+}));
+
 function makeCommit(id: string, message: string, sha?: string): CanvasesCanvasVersion {
   return {
     metadata: {
@@ -58,7 +62,7 @@ describe("VersionsTabPanel", () => {
     expect(screen.getByText("Commits")).toBeInTheDocument();
     expect(screen.getByText("Latest change")).toBeInTheDocument();
     expect(screen.getByText("abc1234")).toBeInTheDocument();
-    expect(screen.getByText("HEAD")).toBeInTheDocument();
+    expect(screen.getAllByTestId("committer-avatar")).toHaveLength(2);
   });
 
   it("selects a commit when a row is clicked", () => {

@@ -1,5 +1,7 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
+import { Avatar } from "@/components/Avatar/avatar";
 import { TimeAgo } from "@/components/TimeAgo";
+import type { UserDisplayProfile } from "@/lib/userRefDisplay";
 import { cn } from "@/lib/utils";
 import { formatCommitMessage, formatCommitSha } from "@/pages/app/lib/canvas-versions";
 import { useCallback } from "react";
@@ -9,14 +11,14 @@ import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 export function VersionRow({
   version,
   isActive = false,
-  isBranchHead = false,
   rowTestId,
+  committer,
   onUseVersion,
 }: {
   version: CanvasesCanvasVersion;
   isActive?: boolean;
-  isBranchHead?: boolean;
   rowTestId?: string;
+  committer?: UserDisplayProfile;
   onUseVersion: (versionID: string) => void;
 }) {
   const { versionID, commitMessage, commitSha, timestamp } = deriveCommitRowFields(version);
@@ -51,24 +53,33 @@ export function VersionRow({
       aria-label={ariaLabel}
       title={ariaLabel}
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        {commitSha ? <span className="font-mono text-[11px] font-medium text-slate-600">{commitSha}</span> : null}
+      {committer ? (
+        <Avatar
+          src={committer.avatarUrl}
+          initials={committer.initials}
+          alt={committer.name}
+          className="size-6 shrink-0 bg-slate-700 text-slate-100"
+          data-testid="committer-avatar"
+        />
+      ) : null}
+      <div className="min-w-0 flex-1 truncate">
         <span
           className={cn(
-            "min-w-0 truncate text-xs",
+            "block truncate text-xs",
             isActive ? "font-semibold text-sky-900" : "font-medium text-slate-900",
           )}
         >
           {commitMessage}
         </span>
       </div>
-      {isBranchHead ? (
-        <span className="shrink-0 rounded bg-sky-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-800">
-          HEAD
-        </span>
-      ) : null}
-      {timestamp ? (
-        <TimeAgo date={timestamp} includeAgo={false} className="shrink-0 text-xs tabular-nums text-slate-500" />
+      {timestamp || commitSha ? (
+        <div className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-slate-500">
+          {commitSha ? (
+            <span className="shrink-0 font-mono text-[11px] font-medium text-slate-600">{commitSha}</span>
+          ) : null}
+          {commitSha && timestamp ? <span className="text-slate-300">·</span> : null}
+          {timestamp ? <TimeAgo date={timestamp} includeAgo={false} className="shrink-0" /> : null}
+        </div>
       ) : null}
     </div>
   );

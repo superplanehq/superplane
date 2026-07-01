@@ -64,7 +64,7 @@ services:
       retries: 10
 
   supergit:
-    image: ghcr.io/superplanehq/supergit:0.1.1
+    image: ghcr.io/superplanehq/supergit:0.1.2
     restart: always
     environment:
       SUPERGIT_ROOT: /var/lib/supergit/repos

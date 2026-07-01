@@ -12,6 +12,7 @@ import (
 	logrus "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -193,6 +194,16 @@ func (w *RepositoryProvisionerWorker) provisionRepository(ctx context.Context, r
 
 		if err := w.commitSeedFiles(ctx, tx, repository); err != nil {
 			w.log("Error committing seed files for canvas %s: %v", repository.CanvasID, err)
+			return repository.MarkError(tx)
+		}
+
+		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, repository.CanvasID)
+		if err != nil {
+			return err
+		}
+
+		if err := canvases.SyncCanvasVersionsMissingCommitSHA(ctx, w.Storage, tx, canvas.OrganizationID.String(), canvas); err != nil {
+			w.log("Error syncing workflow versions to git for canvas %s: %v", repository.CanvasID, err)
 			return repository.MarkError(tx)
 		}
 

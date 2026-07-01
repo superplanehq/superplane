@@ -110,10 +110,17 @@ func DeleteWorkflowBranch(tx *gorm.DB, workflowID uuid.UUID, name string) error 
 	if name == CanvasGitBranchMain {
 		return errors.New("cannot delete main branch")
 	}
-	return tx.
+
+	result := tx.
 		Where("workflow_id = ? AND name = ?", workflowID, name).
-		Delete(&WorkflowBranch{}).
-		Error
+		Delete(&WorkflowBranch{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func lockWorkflowBranchForUpdate(tx *gorm.DB, branchID uuid.UUID) (*WorkflowBranch, error) {

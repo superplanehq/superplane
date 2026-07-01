@@ -36,6 +36,7 @@ export interface CanvasRunsSidebarPanelConfig {
 }
 
 export interface CanvasVersionsSidebarPanelConfig {
+  organizationId?: string;
   isOpen: boolean;
   scrollPersistenceKey?: string;
   branchHeadVersionId?: string;

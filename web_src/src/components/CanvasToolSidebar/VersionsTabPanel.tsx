@@ -1,11 +1,14 @@
 import type { CanvasesCanvasBranch, CanvasesCanvasVersion } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { CanvasBranchSelector } from "@/ui/CanvasPage/components/CanvasBranchSelector";
+import { useOrganizationUserAvatars } from "@/hooks/useOrganizationUserAvatars";
+import { userRefDisplayProfile, type UserDisplayProfile } from "@/lib/userRefDisplay";
 import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 import { useVersionsTabScroll } from "./useVersionsTabScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
 
 export interface VersionsTabPanelProps {
+  organizationId?: string;
   scrollPersistenceKey?: string;
   branchHeadVersionId?: string;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
@@ -26,12 +29,11 @@ type CommitRowItem = {
   key: string;
   version: CanvasesCanvasVersion;
   isActive: boolean;
-  isBranchHead: boolean;
-  isFirstCommit?: boolean;
   rowTestId?: string;
 };
 
 export function VersionsTabPanel({
+  organizationId,
   scrollPersistenceKey,
   branchHeadVersionId,
   selectedCanvasVersion,
@@ -47,12 +49,10 @@ export function VersionsTabPanel({
   onSelectBranch,
   branchSelectorDisabled,
 }: VersionsTabPanelProps) {
+  const userAvatars = useOrganizationUserAvatars(organizationId);
   const selectedVersionId = selectedCanvasVersion?.metadata?.id || branchHeadVersionId || "";
   const commitItems = buildCommitItems({
-    branchHeadVersionId,
     branchCommits,
-    loadMoreBranchCommitsDisabled,
-    onLoadMoreBranchCommits,
     selectedVersionId,
   });
   const { scrollRef, handleScroll } = useVersionsTabScroll({
@@ -89,7 +89,7 @@ export function VersionsTabPanel({
           {commitItems.length === 0 ? (
             <p className="px-3 py-2 text-xs text-slate-600">No commits on this branch yet.</p>
           ) : (
-            <VersionRowList items={commitItems} onUseVersion={onUseVersion} />
+            <VersionRowList items={commitItems} onUseVersion={onUseVersion} userAvatars={userAvatars} />
           )}
         </section>
       </div>
@@ -127,9 +127,11 @@ function VersionsNotices({
 function VersionRowList({
   items,
   onUseVersion,
+  userAvatars,
 }: {
   items: CommitRowItem[];
   onUseVersion: (versionID: string) => void;
+  userAvatars: Map<string, UserDisplayProfile>;
 }) {
   return items.map((item) => (
     <VersionRow
@@ -137,36 +139,26 @@ function VersionRowList({
       rowTestId={item.rowTestId}
       version={item.version}
       isActive={item.isActive}
-      isBranchHead={item.isBranchHead}
+      committer={userRefDisplayProfile(item.version.metadata?.owner, userAvatars)}
       onUseVersion={onUseVersion}
     />
   ));
 }
 
 function buildCommitItems({
-  branchHeadVersionId,
   branchCommits,
-  loadMoreBranchCommitsDisabled,
-  onLoadMoreBranchCommits,
   selectedVersionId,
 }: {
-  branchHeadVersionId?: string;
   branchCommits: CanvasesCanvasVersion[];
-  loadMoreBranchCommitsDisabled?: boolean;
-  onLoadMoreBranchCommits?: () => void;
   selectedVersionId: string;
 }): CommitRowItem[] {
-  return branchCommits.map((version, index) => {
+  return branchCommits.map((version) => {
     const versionID = version.metadata?.id || "";
-    const isFirstCommit =
-      index === branchCommits.length - 1 && (onLoadMoreBranchCommits ? !!loadMoreBranchCommitsDisabled : true);
     return {
       key: versionID,
       rowTestId: "canvas-commit-row",
       version,
       isActive: versionID === selectedVersionId,
-      isBranchHead: !!branchHeadVersionId && branchHeadVersionId === versionID,
-      isFirstCommit,
     };
   });
 }

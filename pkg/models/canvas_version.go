@@ -18,6 +18,7 @@ var ErrCanvasDraftNotFound = errors.New("canvas draft not found")
 type CanvasVersion struct {
 	ID            uuid.UUID
 	WorkflowID    uuid.UUID
+	BranchID      uuid.UUID `gorm:"type:uuid;not null"`
 	OwnerID       *uuid.UUID
 	Nodes         datatypes.JSONSlice[Node]
 	Edges         datatypes.JSONSlice[Edge]
@@ -110,10 +111,14 @@ func FindVersionByCommitSHAInTransaction(tx *gorm.DB, workflowID uuid.UUID, comm
 }
 
 func ListVersionsForBranchInTransaction(tx *gorm.DB, workflowID uuid.UUID, gitBranch string) ([]CanvasVersion, error) {
+	branch, err := FindWorkflowBranch(tx, workflowID, gitBranch)
+	if err != nil {
+		return nil, err
+	}
+
 	var versions []CanvasVersion
-	err := tx.
-		Where("workflow_id = ?", workflowID).
-		Where("git_branch = ?", gitBranch).
+	err = tx.
+		Where("branch_id = ?", branch.ID).
 		Order("created_at DESC, id DESC").
 		Find(&versions).
 		Error
@@ -187,9 +192,13 @@ func ListBranchCommitsInTransaction(
 	limit int,
 	before *time.Time,
 ) ([]CanvasVersion, error) {
+	branch, err := FindWorkflowBranch(tx, workflowID, branchName)
+	if err != nil {
+		return nil, err
+	}
+
 	query := tx.
-		Where("workflow_id = ?", workflowID).
-		Where("git_branch = ?", branchName).
+		Where("branch_id = ?", branch.ID).
 		Order("created_at DESC, id DESC")
 
 	if before != nil {
@@ -207,11 +216,15 @@ func ListBranchCommitsInTransaction(
 }
 
 func CountBranchCommitsInTransaction(tx *gorm.DB, workflowID uuid.UUID, branchName string) (int64, error) {
+	branch, err := FindWorkflowBranch(tx, workflowID, branchName)
+	if err != nil {
+		return 0, err
+	}
+
 	var count int64
-	err := tx.
+	err = tx.
 		Model(&CanvasVersion{}).
-		Where("workflow_id = ?", workflowID).
-		Where("git_branch = ?", branchName).
+		Where("branch_id = ?", branch.ID).
 		Count(&count).
 		Error
 	if err != nil {
@@ -268,10 +281,16 @@ func CreateInitialCommitInTransaction(
 	nodes []Node,
 	edges []Edge,
 ) (*CanvasVersion, *WorkflowBranch, error) {
+	branch, err := CreateWorkflowBranch(tx, canvasID, branchName, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	now := time.Now()
 	version := CanvasVersion{
 		ID:            uuid.New(),
 		WorkflowID:    canvasID,
+		BranchID:      branch.ID,
 		OwnerID:       &ownerID,
 		Nodes:         datatypes.NewJSONSlice(nodes),
 		Edges:         datatypes.NewJSONSlice(edges),
@@ -284,10 +303,10 @@ func CreateInitialCommitInTransaction(
 		return nil, nil, err
 	}
 
-	branch, err := CreateWorkflowBranch(tx, canvasID, branchName, &version.ID)
-	if err != nil {
+	if err := UpdateWorkflowBranchHead(tx, branch.ID, version.ID); err != nil {
 		return nil, nil, err
 	}
+
 	return &version, branch, nil
 }
 
@@ -322,6 +341,7 @@ func CreateCommitOnBranch(tx *gorm.DB, input CreateCommitInput) (*CanvasVersion,
 	version := CanvasVersion{
 		ID:            uuid.New(),
 		WorkflowID:    input.WorkflowID,
+		BranchID:      lockedBranch.ID,
 		OwnerID:       &input.OwnerID,
 		Nodes:         datatypes.NewJSONSlice(input.Nodes),
 		Edges:         datatypes.NewJSONSlice(input.Edges),
@@ -368,6 +388,21 @@ func CreateCommitOnBranch(tx *gorm.DB, input CreateCommitInput) (*CanvasVersion,
 	}
 
 	return &version, nil
+}
+
+func UpdateCanvasVersionCommitSHA(workflowID, versionID uuid.UUID, commitSHA string) error {
+	return UpdateCanvasVersionCommitSHAInTransaction(database.Conn(), workflowID, versionID, commitSHA)
+}
+
+func UpdateCanvasVersionCommitSHAInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID, commitSHA string) error {
+	commitSHA = strings.TrimSpace(commitSHA)
+	if commitSHA == "" {
+		return nil
+	}
+
+	return tx.Model(&CanvasVersion{}).
+		Where("workflow_id = ? AND id = ?", workflowID, versionID).
+		Update("commit_sha", commitSHA).Error
 }
 
 func CreateBranchFromHeadInTransaction(
@@ -433,6 +468,7 @@ func CreateCanvasSnapshotVersionInTransaction(
 	version := CanvasVersion{
 		ID:            uuid.New(),
 		WorkflowID:    workflowID,
+		BranchID:      sourceVersion.BranchID,
 		OwnerID:       &ownerID,
 		Nodes:         datatypes.NewJSONSlice(nodes),
 		Edges:         datatypes.NewJSONSlice(edges),

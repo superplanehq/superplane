@@ -4631,6 +4631,7 @@ export function AppPage() {
     onStatusFiltersChange: setRunStatusFilters,
   });
   const toolSidebarVersionsContent = renderCanvasVersionsSidebarPanel({
+    organizationId,
     isOpen: showVersionsSidebar,
     scrollPersistenceKey: canvasId,
     branchHeadVersionId: activeBranchHeadVersionId,

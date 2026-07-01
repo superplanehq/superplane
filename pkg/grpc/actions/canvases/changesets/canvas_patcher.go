@@ -60,6 +60,7 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 	v := &models.CanvasVersion{
 		ID:            p.originalVersion.ID,
 		WorkflowID:    p.originalVersion.WorkflowID,
+		BranchID:      p.originalVersion.BranchID,
 		OwnerID:       p.originalVersion.OwnerID,
 		ConsolePanels: p.originalVersion.ConsolePanels,
 		ConsoleLayout: p.originalVersion.ConsoleLayout,

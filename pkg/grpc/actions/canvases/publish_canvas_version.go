@@ -17,7 +17,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 )
 
@@ -35,7 +34,6 @@ func PublishCanvasVersion(
 ) (*pb.PublishCanvasVersionResponse, error) {
 	_ = encryptor
 	_ = reg
-	_ = gitProv
 	_ = webhookBaseURL
 	_ = authService
 
@@ -62,8 +60,11 @@ func PublishCanvasVersion(
 		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
-	publishedVersion, err := mergeBranchToMainInTransaction(
+	publishedVersion, err := mergeBranchToMain(
 		ctx,
+		gitProv,
+		canvas,
+		organizationID,
 		organizationUUID,
 		canvasUUID,
 		versionUUID,
@@ -71,9 +72,12 @@ func PublishCanvasVersion(
 		commitMessage,
 	)
 	if err != nil {
-		if grpcerrors.Code(err) != codes.Unknown {
-			return nil, err
-		}
+		log.WithError(err).WithFields(log.Fields{
+			"organization_id": organizationID,
+			"canvas_id":       canvasID,
+			"version_id":      versionID,
+			"commit_message":  commitMessage,
+		}).Error("PublishCanvasVersion: failed to merge branch to main")
 		return nil, err
 	}
 
@@ -89,18 +93,35 @@ func PublishCanvasVersion(
 	}, nil
 }
 
-func mergeBranchToMainInTransaction(
+func mergeBranchToMain(
 	ctx context.Context,
+	gitProvider gitprovider.Provider,
+	canvas *models.Canvas,
+	organizationID string,
 	organizationUUID uuid.UUID,
 	canvasUUID uuid.UUID,
 	sourceVersionUUID uuid.UUID,
 	userUUID uuid.UUID,
 	commitMessage string,
 ) (*models.CanvasVersion, error) {
-	_ = ctx
+	sourceVersion, err := models.FindCanvasVersion(canvasUUID, sourceVersionUUID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, grpcerrors.NotFound(err, "version not found")
+		}
+		return nil, err
+	}
+
+	if sourceVersion.GitBranch == models.CanvasGitBranchMain {
+		return sourceVersion, nil
+	}
+
+	message := resolvedMergeCommitMessage(commitMessage, sourceVersion.GitBranch)
+
+	sourceBranchName := sourceVersion.GitBranch
 	var publishedVersion *models.CanvasVersion
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		sourceVersion, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, sourceVersionUUID)
 		if findErr != nil {
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {
@@ -119,9 +140,9 @@ func mergeBranchToMainInTransaction(
 			return branchErr
 		}
 
-		hasStaging, err := models.HasWorkflowStagingInTransaction(tx, branch.ID, userUUID)
-		if err != nil {
-			return err
+		hasStaging, stagingErr := models.HasWorkflowStagingInTransaction(tx, branch.ID, userUUID)
+		if stagingErr != nil {
+			return stagingErr
 		}
 		if hasStaging {
 			return grpcerrors.FailedPrecondition(nil, "branch has uncommitted staged changes")
@@ -131,7 +152,7 @@ func mergeBranchToMainInTransaction(
 			WorkflowID:    canvasUUID,
 			BranchName:    models.CanvasGitBranchMain,
 			OwnerID:       userUUID,
-			CommitMessage: resolvedMergeCommitMessage(commitMessage, sourceVersion.GitBranch),
+			CommitMessage: message,
 			Nodes:         append([]models.Node(nil), sourceVersion.Nodes...),
 			Edges:         append([]models.Edge(nil), sourceVersion.Edges...),
 			ConsolePanels: sourceVersion.ConsolePanels.Data(),
@@ -141,6 +162,27 @@ func mergeBranchToMainInTransaction(
 			return createErr
 		}
 
+		if gitProvider != nil {
+			mergeSHA, gitErr := mergeWorkflowBranchInGit(
+				ctx,
+				gitProvider,
+				canvas,
+				organizationID,
+				userUUID,
+				sourceVersion.GitBranch,
+				models.CanvasGitBranchMain,
+				message,
+			)
+			if gitErr != nil {
+				return gitErr
+			}
+
+			if err := models.UpdateCanvasVersionCommitSHAInTransaction(tx, canvasUUID, created.ID, mergeSHA); err != nil {
+				return err
+			}
+			created.CommitSHA = mergeSHA
+		}
+
 		if err := models.DeleteWorkflowBranch(tx, canvasUUID, sourceVersion.GitBranch); err != nil {
 			return err
 		}
@@ -148,12 +190,45 @@ func mergeBranchToMainInTransaction(
 		publishedVersion = created
 		return nil
 	})
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"organization_id": organizationID,
+			"canvas_id":       canvasUUID.String(),
+			"version_id":      sourceVersionUUID.String(),
+			"source_branch":   sourceBranchName,
+		}).Error("PublishCanvasVersion: failed to merge branch to main")
+		return nil, err
+	}
 
+	deleteGitBranchBestEffort(ctx, gitProvider, canvas, sourceBranchName)
+
+	return publishedVersion, nil
+}
+
+func mergeBranchToMainInTransaction(
+	ctx context.Context,
+	organizationUUID uuid.UUID,
+	canvasUUID uuid.UUID,
+	sourceVersionUUID uuid.UUID,
+	userUUID uuid.UUID,
+	commitMessage string,
+) (*models.CanvasVersion, error) {
+	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
 	if err != nil {
 		return nil, err
 	}
 
-	return publishedVersion, nil
+	return mergeBranchToMain(
+		ctx,
+		nil,
+		canvas,
+		organizationUUID.String(),
+		organizationUUID,
+		canvasUUID,
+		sourceVersionUUID,
+		userUUID,
+		commitMessage,
+	)
 }
 
 func resolvedMergeCommitMessage(requestedMessage, branchName string) string {
@@ -176,5 +251,20 @@ func publishDraftVersionInTransaction(
 	authService authorization.Authorization,
 	webhookBaseURL string,
 ) (*models.CanvasVersion, error) {
-	return mergeBranchToMainInTransaction(ctx, organizationUUID, canvasUUID, versionUUID, userUUID, "")
+	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mergeBranchToMain(
+		ctx,
+		gitProv,
+		canvas,
+		organizationID,
+		organizationUUID,
+		canvasUUID,
+		versionUUID,
+		userUUID,
+		"",
+	)
 }

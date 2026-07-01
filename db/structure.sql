@@ -681,7 +681,8 @@ CREATE TABLE public.workflow_versions (
     console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
     commit_sha character varying(40) DEFAULT ''::character varying NOT NULL,
     git_branch text NOT NULL,
-    commit_message text DEFAULT ''::text NOT NULL
+    commit_message text DEFAULT ''::text NOT NULL,
+    branch_id uuid NOT NULL
 );
 
 
@@ -1558,6 +1559,13 @@ CREATE INDEX idx_workflow_staged_files_branch_user ON public.workflow_staged_fil
 
 
 --
+-- Name: idx_workflow_versions_branch_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_branch_id ON public.workflow_versions USING btree (branch_id);
+
+
+--
 -- Name: idx_workflow_versions_commit_sha; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2041,6 +2049,14 @@ ALTER TABLE ONLY public.workflow_staged_files
 
 ALTER TABLE ONLY public.workflow_staged_files
     ADD CONSTRAINT workflow_staged_files_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_versions workflow_versions_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_versions
+    ADD CONSTRAINT workflow_versions_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.workflow_branches(id) ON DELETE CASCADE;
 
 
 --

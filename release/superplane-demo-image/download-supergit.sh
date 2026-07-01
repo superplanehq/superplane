@@ -7,7 +7,7 @@ if [ "${1-}" = "" ] || [ "${2-}" = "" ]; then
   echo "Usage: release/superplane-demo-image/download-supergit.sh <version> <arch>"
   echo ""
   echo "Example:"
-  echo "  release/superplane-demo-image/download-supergit.sh v0.1.1 amd64"
+  echo "  release/superplane-demo-image/download-supergit.sh v0.1.2 amd64"
   exit 1
 fi
 

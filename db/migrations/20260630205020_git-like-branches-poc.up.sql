@@ -73,6 +73,29 @@ SET commit_message = COALESCE(
 )
 WHERE v.state = 'draft';
 
+-- Commits belong to a branch row; deleting the branch cascades to its commits.
+ALTER TABLE workflow_versions
+  ADD COLUMN IF NOT EXISTS branch_id uuid;
+
+UPDATE workflow_versions v
+SET branch_id = b.id
+FROM workflow_branches b
+WHERE b.workflow_id = v.workflow_id
+  AND b.name = v.git_branch;
+
+ALTER TABLE workflow_versions
+  ALTER COLUMN branch_id SET NOT NULL;
+
+ALTER TABLE workflow_versions
+  DROP CONSTRAINT IF EXISTS workflow_versions_branch_id_fkey;
+
+ALTER TABLE workflow_versions
+  ADD CONSTRAINT workflow_versions_branch_id_fkey
+    FOREIGN KEY (branch_id) REFERENCES workflow_branches(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_workflow_versions_branch_id
+  ON workflow_versions USING btree (branch_id);
+
 -- Staging is per branch + user (POC: drop existing staged rows).
 DELETE FROM workflow_staged_files;
 

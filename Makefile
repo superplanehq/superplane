@@ -161,6 +161,9 @@ dev.db:
 dev.db.console:
 	$(MAKE) db.console DB_NAME=superplane_dev
 
+dev.supergit:
+	$(COMPOSE) exec -it supergit /bin/sh
+
 dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
 

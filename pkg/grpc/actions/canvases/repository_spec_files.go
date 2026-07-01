@@ -12,12 +12,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"sort"
 	"strings"
+	"time"
 )
 
 const (
@@ -256,6 +259,111 @@ func ApplyRepositorySpecFileOperations(
 	}
 
 	return nil
+}
+
+func applyRepositorySpecFileOperationsInTransaction(
+	ctx context.Context,
+	tx *gorm.DB,
+	usageService usage.Service,
+	registry *registry.Registry,
+	organizationID string,
+	organizationUUID uuid.UUID,
+	canvas *models.Canvas,
+	versionID uuid.UUID,
+	operations []*pb.CanvasRepositoryFileOperation,
+) (*models.CanvasVersion, error) {
+	version, err := models.FindCanvasVersionInTransaction(tx, canvas.ID, versionID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, grpcerrors.NotFound(err, "version not found")
+		}
+		return nil, err
+	}
+
+	for _, operation := range operations {
+		if operation == nil {
+			continue
+		}
+		if operation.GetDelete() {
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
+		}
+
+		normalized := normalizeRepositoryFilePath(operation.GetPath())
+		content := string(operation.GetContent())
+
+		switch normalized {
+		case CanvasYAMLRepositoryPath:
+			pbCanvas, err := canvasFromYAMLText(content)
+			if err != nil {
+				return nil, err
+			}
+
+			nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+			if err != nil {
+				return nil, err
+			}
+
+			if usageService != nil {
+				if err := usage.EnsureOrganizationWithinLimits(
+					ctx,
+					usageService,
+					organizationID,
+					&usagepb.OrganizationState{},
+					&usagepb.CanvasState{Nodes: int32(len(nodes))},
+				); err != nil {
+					return nil, err
+				}
+			}
+
+			nextName := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
+			if nextName == "" {
+				return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
+			}
+
+			if canvas.Name != nextName {
+				findErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvas.ID, nextName)
+				if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
+					return nil, grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
+				}
+				if findErr != nil {
+					return nil, findErr
+				}
+				if err := tx.Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("name", nextName).Error; err != nil {
+					return nil, err
+				}
+				canvas.Name = nextName
+			}
+
+			if nextDescription := pbCanvas.GetMetadata().GetDescription(); canvas.Description != nextDescription {
+				if err := tx.Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("description", nextDescription).Error; err != nil {
+					return nil, err
+				}
+				canvas.Description = nextDescription
+			}
+
+			now := time.Now()
+			version.Nodes = datatypes.NewJSONSlice(nodes)
+			version.Edges = datatypes.NewJSONSlice(edges)
+			version.UpdatedAt = &now
+			if err := tx.Save(version).Error; err != nil {
+				return nil, err
+			}
+		case ConsoleYAMLRepositoryPath:
+			panels, layout, err := consolePanelsLayoutFromYAMLText(content)
+			if err != nil {
+				return nil, err
+			}
+
+			version, err = models.UpdateCanvasVersionConsoleInTransaction(tx, version, panels, layout)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", operation.GetPath()))
+		}
+	}
+
+	return version, nil
 }
 
 // ParseAndValidateCanvasYAML parses canvas.yaml text and runs the same registry

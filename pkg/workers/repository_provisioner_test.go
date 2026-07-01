@@ -4,20 +4,76 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
+
+func setupCanvasWithInitialCommit(t *testing.T, r *support.ResourceRegistry) *models.Canvas {
+	t.Helper()
+
+	canvasID := uuid.New()
+	ownerID := r.User
+	liveVersionID := uuid.New()
+	now := time.Now()
+
+	canvas := &models.Canvas{
+		ID:             canvasID,
+		OrganizationID: r.Organization.ID,
+		Name:           support.RandomName("canvas"),
+		Description:    "Test canvas",
+		LiveVersionID:  &liveVersionID,
+		CreatedBy:      &ownerID,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+
+		mainBranch, err := models.CreateWorkflowBranch(tx, canvasID, models.CanvasGitBranchMain, nil)
+		if err != nil {
+			return err
+		}
+
+		version := models.CanvasVersion{
+			ID:            liveVersionID,
+			WorkflowID:    canvasID,
+			BranchID:      mainBranch.ID,
+			OwnerID:       &ownerID,
+			Nodes:         datatypes.NewJSONSlice([]models.Node{}),
+			Edges:         datatypes.NewJSONSlice([]models.Edge{}),
+			GitBranch:     models.CanvasGitBranchMain,
+			CommitMessage: "Initial commit",
+			CreatedAt:     &now,
+			UpdatedAt:     &now,
+		}
+		if err := tx.Create(&version).Error; err != nil {
+			return err
+		}
+
+		return models.UpdateWorkflowBranchHead(tx, mainBranch.ID, liveVersionID)
+	})
+	require.NoError(t, err)
+
+	return canvas
+}
 
 func Test__RepositoryProvisionerWorker_CommitsSeedFiles(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	canvas := setupCanvasWithInitialCommit(t, r)
 	repoID := r.GitProvider.GetRepositoryID(git.RepositoryOptions{
 		OrganizationID: canvas.OrganizationID,
 		CanvasID:       canvas.ID,
@@ -65,7 +121,7 @@ func Test__RepositoryProvisionerWorker_NoSeedFiles(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	canvas := setupCanvasWithInitialCommit(t, r)
 	repoID := r.GitProvider.GetRepositoryID(git.RepositoryOptions{
 		OrganizationID: canvas.OrganizationID,
 		CanvasID:       canvas.ID,
@@ -79,13 +135,18 @@ func Test__RepositoryProvisionerWorker_NoSeedFiles(t *testing.T) {
 	updated, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.RepositoryStatusReady, updated.Status)
+
+	liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, liveVersion.CommitSHA)
+	assert.Equal(t, "Initial commit", liveVersion.CommitMessage)
 }
 
 func Test__RepositoryProvisionerWorker_SeedFilesPersistedDuringInstallSurvive(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	canvas := setupCanvasWithInitialCommit(t, r)
 	repoID := r.GitProvider.GetRepositoryID(git.RepositoryOptions{
 		OrganizationID: canvas.OrganizationID,
 		CanvasID:       canvas.ID,

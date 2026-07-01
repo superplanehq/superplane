@@ -1,12 +1,10 @@
 package canvases
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"io"
 	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -17,6 +15,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
+	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 )
 
@@ -35,6 +34,10 @@ func CommitCanvasStaging(
 	webhookBaseURL string,
 	authService authorization.Authorization,
 ) (*pb.CommitCanvasStagingResponse, error) {
+	_ = encryptor
+	_ = webhookBaseURL
+	_ = authService
+
 	canvas, branch, headVersion, userUUID, err := loadBranchForStaging(ctx, organizationID, canvasID, branchName, versionID)
 	if err != nil {
 		return nil, err
@@ -42,24 +45,11 @@ func CommitCanvasStaging(
 
 	rows, err := models.ListWorkflowStaging(branch.ID, userUUID)
 	if err != nil {
+		log.WithError(err).WithFields(commitCanvasStagingLogFields(organizationID, canvasID, versionID, branchName, newBranchName, branch.Name, "")).Error("CommitCanvasStaging: failed to load staging")
 		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}
 
 	specOps, gitOps := stagedCommitOperations(rows)
-
-	var gitRevertOps []gitprovider.FileOperation
-	if len(gitOps) > 0 {
-		var snapshotErr error
-		gitRevertOps, snapshotErr = snapshotGitFilesBeforeCommit(ctx, gitProvider, canvas, gitOps)
-		if snapshotErr != nil {
-			return nil, snapshotErr
-		}
-
-		message := resolvedStagingCommitMessage(commitMessage)
-		if err := commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userUUID.String(), message, gitOps); err != nil {
-			return nil, err
-		}
-	}
 
 	targetBranchName := branch.Name
 	if strings.TrimSpace(newBranchName) != "" {
@@ -67,16 +57,19 @@ func CommitCanvasStaging(
 	}
 
 	stagingBranchID := branch.ID
+	parentBranchName := branch.Name
+	sourceBranch := branch
+	organizationUUID := uuid.MustParse(organizationID)
+	message := resolvedStagingCommitMessage(commitMessage)
 
 	var committed *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		message := resolvedStagingCommitMessage(commitMessage)
-		if targetBranchName != branch.Name {
+		if targetBranchName != sourceBranch.Name {
 			createdBranch, createErr := models.CreateWorkflowBranch(tx, canvas.ID, targetBranchName, nil)
 			if createErr != nil {
 				return createErr
 			}
-			branch = createdBranch
+			sourceBranch = createdBranch
 		}
 
 		var createErr error
@@ -94,44 +87,54 @@ func CommitCanvasStaging(
 			return createErr
 		}
 
-		return nil
+		if len(specOps) > 0 {
+			updated, applyErr := applyRepositorySpecFileOperationsInTransaction(
+				ctx,
+				tx,
+				usageService,
+				registry,
+				organizationID,
+				organizationUUID,
+				canvas,
+				committed.ID,
+				specOps,
+			)
+			if applyErr != nil {
+				return applyErr
+			}
+			committed = updated
+		}
+
+		if gitProvider != nil {
+			commitSHA, gitErr := commitWorkflowVersionToGit(ctx, gitProvider, commitWorkflowVersionInput{
+				Canvas:           canvas,
+				Version:          committed,
+				OrganizationID:   organizationID,
+				UserID:           userUUID,
+				Message:          message,
+				BranchName:       targetBranchName,
+				ParentBranchName: parentBranchName,
+				ExtraGitOps:      gitOps,
+			})
+			if gitErr != nil {
+				return gitErr
+			}
+
+			if err := models.UpdateCanvasVersionCommitSHAInTransaction(tx, canvas.ID, committed.ID, commitSHA); err != nil {
+				return err
+			}
+			committed.CommitSHA = commitSHA
+		}
+
+		return models.DiscardWorkflowStagingInTransaction(tx, stagingBranchID, userUUID, nil)
 	})
 	if err != nil {
-		if len(gitRevertOps) > 0 {
-			if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userUUID.String(), gitRevertOps); revertErr != nil {
-				log.Errorf("failed to revert git commit after commit failure for canvas %s: %v", canvasID, revertErr)
-			}
-		}
-		return nil, grpcerrors.Internal(err, "failed to create commit")
-	}
-
-	if len(specOps) > 0 {
-		if err := ApplyRepositorySpecFileOperations(
-			ctx,
-			usageService,
-			encryptor,
-			registry,
-			organizationID,
-			canvasID,
-			committed.ID.String(),
-			webhookBaseURL,
-			authService,
-			nil,
-			false,
-			specOps,
-		); err != nil {
+		if grpcerrors.Code(err) != codes.Unknown {
+			log.WithError(err).WithFields(commitCanvasStagingLogFields(organizationID, canvasID, versionID, branchName, newBranchName, targetBranchName, parentBranchName)).Error("CommitCanvasStaging: failed to commit staging")
 			return nil, err
 		}
-
-		updated, reloadErr := models.FindCanvasVersion(canvas.ID, committed.ID)
-		if reloadErr != nil {
-			return nil, grpcerrors.Internal(reloadErr, "failed to load committed version")
-		}
-		committed = updated
-	}
-
-	if err := models.DiscardWorkflowStaging(stagingBranchID, userUUID, nil); err != nil {
-		return nil, grpcerrors.Internal(err, "failed to clear staging")
+		log.WithError(err).WithFields(commitCanvasStagingLogFields(organizationID, canvasID, versionID, branchName, newBranchName, targetBranchName, parentBranchName)).Error("CommitCanvasStaging: failed to create commit")
+		return nil, grpcerrors.Internal(err, "failed to create commit")
 	}
 
 	state, _, err := stagingSummaryForBranch(stagingBranchID, userUUID)
@@ -177,160 +180,31 @@ func stagedCommitOperations(rows []models.WorkflowStaging) (specOps, gitOps []*p
 	return specOps, gitOps
 }
 
-func commitStagedGitFiles(
-	ctx context.Context,
-	gitProvider gitprovider.Provider,
-	canvas *models.Canvas,
-	organizationID string,
-	userID string,
-	message string,
-	gitOps []*pb.CanvasRepositoryFileOperation,
-) error {
-	if gitProvider == nil {
-		return grpcerrors.FailedPrecondition(nil, "git provider is not configured")
+func commitCanvasStagingLogFields(
+	organizationID,
+	canvasID,
+	versionID,
+	branchName,
+	newBranchName,
+	targetBranchName,
+	parentBranchName string,
+) log.Fields {
+	fields := log.Fields{
+		"organization_id": organizationID,
+		"canvas_id":       canvasID,
+		"version_id":      versionID,
+		"branch_name":     branchName,
 	}
-
-	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
-	if err != nil {
-		return grpcerrors.NotFound(err, "repository not found")
+	if newBranchName != "" {
+		fields["new_branch_name"] = newBranchName
 	}
-
-	user, err := models.FindActiveUserByID(organizationID, userID)
-	if err != nil {
-		return grpcerrors.Internal(err, "failed to find user")
+	if targetBranchName != "" {
+		fields["target_branch_name"] = targetBranchName
 	}
-
-	headSHA, err := gitProvider.Head(ctx, repository.RepoID, "")
-	if err != nil {
-		return grpcerrors.Internal(err, "failed to resolve repository head")
+	if parentBranchName != "" {
+		fields["parent_branch_name"] = parentBranchName
 	}
-
-	operations := make([]gitprovider.FileOperation, 0, len(gitOps))
-	for _, operation := range gitOps {
-		content := operation.GetContent()
-		var reader io.Reader
-		if !operation.GetDelete() {
-			reader = bytes.NewReader(content)
-		}
-
-		operations = append(operations, gitprovider.FileOperation{
-			Path:      operation.GetPath(),
-			Content:   reader,
-			SizeBytes: int64(len(content)),
-			Delete:    operation.GetDelete(),
-		})
-	}
-
-	_, err = gitProvider.Commit(ctx, repository.RepoID, gitprovider.CommitOptions{
-		Branch:          "main",
-		BaseBranch:      "main",
-		ExpectedHeadSHA: headSHA,
-		Message:         message,
-		Operations:      operations,
-		Author: gitprovider.CommitAuthor{
-			Name:  user.Name,
-			Email: user.GetEmail(),
-		},
-	})
-	if err != nil {
-		return grpcerrors.Internal(err, "failed to commit repository files")
-	}
-
-	return nil
-}
-
-func snapshotGitFilesBeforeCommit(
-	ctx context.Context,
-	gitProvider gitprovider.Provider,
-	canvas *models.Canvas,
-	gitOps []*pb.CanvasRepositoryFileOperation,
-) ([]gitprovider.FileOperation, error) {
-	if gitProvider == nil {
-		return nil, grpcerrors.FailedPrecondition(nil, "git provider is not configured")
-	}
-
-	repository, err := models.FindRepository(canvas.OrganizationID, canvas.ID)
-	if err != nil {
-		return nil, grpcerrors.NotFound(err, "repository not found")
-	}
-
-	revertOps := make([]gitprovider.FileOperation, 0, len(gitOps))
-	for _, operation := range gitOps {
-		path := operation.GetPath()
-		if operation.GetDelete() {
-			reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path, "")
-			if readErr != nil {
-				return nil, grpcerrors.FailedPrecondition(nil, fmt.Sprintf("cannot snapshot %q before staged delete: %v", path, readErr))
-			}
-
-			content, readErr := io.ReadAll(reader)
-			_ = reader.Close()
-			if readErr != nil {
-				return nil, grpcerrors.Internal(readErr, "failed to read before commit")
-			}
-
-			revertOps = append(revertOps, gitprovider.FileOperation{
-				Path:      path,
-				Content:   bytes.NewReader(content),
-				SizeBytes: int64(len(content)),
-			})
-			continue
-		}
-
-		reader, readErr := gitProvider.GetFile(ctx, repository.RepoID, path, "")
-		if readErr != nil {
-			revertOps = append(revertOps, gitprovider.FileOperation{
-				Path:   path,
-				Delete: true,
-			})
-			continue
-		}
-
-		content, readErr := io.ReadAll(reader)
-		_ = reader.Close()
-		if readErr != nil {
-			return nil, grpcerrors.Internal(readErr, "failed to read before commit")
-		}
-
-		revertOps = append(revertOps, gitprovider.FileOperation{
-			Path:      path,
-			Content:   bytes.NewReader(content),
-			SizeBytes: int64(len(content)),
-		})
-	}
-
-	return revertOps, nil
-}
-
-func revertGitFileCommit(
-	ctx context.Context,
-	gitProvider gitprovider.Provider,
-	canvas *models.Canvas,
-	organizationID string,
-	userID string,
-	revertOps []gitprovider.FileOperation,
-) error {
-	if len(revertOps) == 0 {
-		return nil
-	}
-
-	pbOps := make([]*pb.CanvasRepositoryFileOperation, 0, len(revertOps))
-	for _, operation := range revertOps {
-		pbOp := &pb.CanvasRepositoryFileOperation{
-			Path:   operation.Path,
-			Delete: operation.Delete,
-		}
-		if operation.Content != nil && !operation.Delete {
-			content, err := io.ReadAll(operation.Content)
-			if err != nil {
-				return grpcerrors.Internal(err, "failed to read revert content")
-			}
-			pbOp.Content = content
-		}
-		pbOps = append(pbOps, pbOp)
-	}
-
-	return commitStagedGitFiles(ctx, gitProvider, canvas, organizationID, userID, "Revert staged file commit", pbOps)
+	return fields
 }
 
 func resolvedStagingCommitMessage(messages ...string) string {

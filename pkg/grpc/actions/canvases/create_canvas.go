@@ -153,9 +153,15 @@ func CreateCanvasWithSeedFiles(
 		//
 		// Create initial commit on main branch
 		//
+		mainBranch, err := models.CreateWorkflowBranch(tx, canvasID, models.CanvasGitBranchMain, nil)
+		if err != nil {
+			return err
+		}
+
 		emptyVersion := models.CanvasVersion{
 			ID:            versionID,
 			WorkflowID:    canvasID,
+			BranchID:      mainBranch.ID,
 			OwnerID:       &createdBy,
 			Nodes:         datatypes.NewJSONSlice([]models.Node{}),
 			Edges:         datatypes.NewJSONSlice([]models.Edge{}),
@@ -169,7 +175,7 @@ func CreateCanvasWithSeedFiles(
 			return err
 		}
 
-		if _, err := models.CreateWorkflowBranch(tx, canvasID, models.CanvasGitBranchMain, &versionID); err != nil {
+		if err := models.UpdateWorkflowBranchHead(tx, mainBranch.ID, versionID); err != nil {
 			return err
 		}
 
