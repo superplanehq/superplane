@@ -1,5 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Link } from "@/components/Link/link";
 import { Textarea } from "@/components/Textarea/textarea";
@@ -37,6 +38,8 @@ export function Secrets({ organizationId }: SecretsProps) {
 
   const { data: secrets = [], isLoading } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const createSecretMutation = useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+
+  useReportPageReady(!isLoading && !permissionsLoading);
 
   const handleCreateClick = () => {
     if (!canCreateSecrets) return;

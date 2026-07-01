@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -90,7 +91,8 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			"http://localhost",
 		)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "template")
+		require.NotNil(t, errors.Unwrap(err))
+		assert.Contains(t, errors.Unwrap(err).Error(), "template")
 	})
 
 	t.Run("successful run persists event on default channel", func(t *testing.T) {

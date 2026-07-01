@@ -159,8 +159,9 @@ function OpenBuildingBlocksSidebar({
   const sortedCategories = useMemo(() => {
     const categoryOrder: Record<string, number> = {
       Core: 0,
-      Debugging: 1,
-      Memory: 2,
+      Runners: 1,
+      Debugging: 2,
+      Memory: 3,
     };
 
     return [...blocks].sort((a, b) => {

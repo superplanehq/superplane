@@ -7,8 +7,12 @@ import { cn } from "@/lib/utils";
 import type { AgentMessage } from "./types";
 import type { MessageGroup } from "./agentMessageGroups";
 
+const STICKY_USER_MESSAGE_MAX_CHARS = 240;
+const STICKY_USER_MESSAGE_MAX_LINES = 4;
+
 export const ConversationTranscript = memo(function ConversationTranscript({
   error,
+  notice,
   canvasId,
   organizationId,
   messageGroups,
@@ -20,6 +24,7 @@ export const ConversationTranscript = memo(function ConversationTranscript({
   showThinking,
 }: {
   error: string | null;
+  notice?: string | null;
   canvasId: string;
   organizationId: string;
   messageGroups: MessageGroup[];
@@ -34,7 +39,7 @@ export const ConversationTranscript = memo(function ConversationTranscript({
   // next user message). Each turn is its own block so the sticky user bubble inside is bounded by
   // its turn — when the turn scrolls past, the bubble scrolls with it and the next turn's bubble
   // pushes up to take its place. No two stickies ever overlap.
-  const turns = useMemo(() => chunkIntoTurns(messageGroups), [messageGroups]);
+  const turns = useMemo(() => chunkIntoTurns(messageGroups.filter(isRenderableGroup)), [messageGroups]);
 
   return (
     <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3" data-testid="agent-chat-messages">
@@ -61,6 +66,7 @@ export const ConversationTranscript = memo(function ConversationTranscript({
           </>
         )}
         {showThinking ? <ThinkingRow /> : null}
+        {notice ? <p className="px-3 py-2 text-sm text-amber-600">{notice}</p> : null}
         {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
       </div>
     </div>
@@ -85,6 +91,14 @@ function chunkIntoTurns(groups: MessageGroup[]): MessageGroup[][] {
 
   if (current.length > 0) turns.push(current);
   return turns;
+}
+
+function isRenderableGroup(group: MessageGroup): boolean {
+  if (group.type !== "message") {
+    return true;
+  }
+
+  return shouldRenderMessage(group.message);
 }
 
 function turnKey(turn: MessageGroup[]): string {
@@ -157,21 +171,23 @@ const MessageRow = memo(function MessageRow({
     return <ToolMessageRow message={message} />;
   }
 
-  if (message.role === "system" || (message.role === "user" && isSystemNotification(message.content))) {
+  if (!shouldRenderMessage(message)) {
     return null;
   }
 
   const isUser = message.role === "user";
+  const shouldStickUserMessage = isUser && isCompactUserMessage(message);
 
   return (
     <div
       className={cn(
         "flex w-full min-w-0 flex-col",
-        // User bubbles stick to the top of the scrollable transcript so the most-recent question
-        // remains visible while a long agent reply scrolls past underneath it. Older user messages
-        // also stick, but the most recent one paints on top via DOM order, so visually it's always
-        // the latest. Background is opaque to mask scrolling content behind.
-        isUser ? "sticky top-0 z-10 items-end bg-white py-1.5" : "items-start",
+        isUser && "items-end py-1.5",
+        !isUser && "items-start",
+        // Compact user bubbles stick to the top of the scrollable transcript so the current prompt
+        // remains visible while a long agent reply scrolls past. Long prompts must scroll normally;
+        // otherwise the sticky bubble can cover the active Thinking or command rows.
+        shouldStickUserMessage && "sticky top-0 z-10 bg-white",
       )}
     >
       <div
@@ -183,17 +199,14 @@ const MessageRow = memo(function MessageRow({
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
-        {isUser ? (
-          message.content
-        ) : (
-          <RichMessage
-            content={message.content}
-            onAction={onAction}
-            onStartBuilding={onStartBuilding}
-            canvasId={canvasId}
-            organizationId={organizationId}
-          />
-        )}
+        <MessageImages images={message.images} />
+        <RichMessage
+          content={message.content}
+          onAction={isUser ? undefined : onAction}
+          onStartBuilding={isUser ? undefined : onStartBuilding}
+          canvasId={canvasId}
+          organizationId={organizationId}
+        />
       </div>
       {message.createdAt ? (
         <span className="mt-0.5 text-[10px] text-slate-500">{formatTime(message.createdAt)}</span>
@@ -201,6 +214,40 @@ const MessageRow = memo(function MessageRow({
     </div>
   );
 });
+
+function MessageImages({ images }: { images: AgentMessage["images"] }) {
+  if (!images || images.length === 0) return null;
+
+  return (
+    <div className="mb-1.5 flex flex-wrap gap-1.5" data-testid="agent-message-images">
+      {images.map((image, index) => (
+        <a
+          key={index}
+          href={image.url}
+          target="_blank"
+          rel="noreferrer"
+          className="block overflow-hidden rounded-md border border-slate-200"
+        >
+          <img src={image.url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function shouldRenderMessage(message: AgentMessage): boolean {
+  return message.role !== "system" && !(message.role === "user" && isSystemNotification(message.content));
+}
+
+function isCompactUserMessage(message: AgentMessage): boolean {
+  // Messages with image attachments render tall thumbnails; pinning them would
+  // cover in-progress agent output, so they never stick regardless of text length.
+  if (message.images && message.images.length > 0) {
+    return false;
+  }
+  const content = message.content;
+  return content.length <= STICKY_USER_MESSAGE_MAX_CHARS && content.split("\n").length <= STICKY_USER_MESSAGE_MAX_LINES;
+}
 
 function SubagentCard({ messages }: { messages: AgentMessage[] }) {
   const [expanded, setExpanded] = useState(false);
@@ -262,13 +309,31 @@ function truncateQuestion(question: string): string {
   return question.length > 200 ? `${question.slice(0, 200)}…` : question;
 }
 
+// The `superplane_app` tool's `patch_draft` action edits the canvas — label it
+// "Editing canvas" rather than a generic "Running command".
+function isCanvasEditMessage(message: AgentMessage): boolean {
+  if (message.toolName !== "superplane_app") return false;
+  try {
+    return (JSON.parse(message.content) as { action?: string })?.action === "patch_draft";
+  } catch {
+    return message.content.includes("patch_draft");
+  }
+}
+
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
   const hasRunning = messages.some((message) => message.toolStatus === "started");
+  const editRunning = messages.some((message) => message.toolStatus === "started" && isCanvasEditMessage(message));
+  const editedAny = messages.some(isCanvasEditMessage);
   const [expanded, setExpanded] = useState(hasRunning);
   const count = messages.length;
-  const label = hasRunning
-    ? `Running command${count > 1 ? ` (${count})` : ""}...`
-    : `Ran ${count} command${count !== 1 ? "s" : ""}`;
+  let label: string;
+  if (hasRunning) {
+    // Only call it "Editing canvas" when an edit is the tool actually running,
+    // so a finished edit next to another running tool isn't mislabeled.
+    label = editRunning ? "Editing canvas…" : `Running command${count > 1 ? ` (${count})` : ""}...`;
+  } else {
+    label = editedAny ? "Edited canvas" : `Ran ${count} command${count !== 1 ? "s" : ""}`;
+  }
 
   useEffect(() => {
     setExpanded(hasRunning);

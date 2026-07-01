@@ -23,8 +23,7 @@ const setHmrPortFromPortPlugin = {
 };
 
 // https://vite.dev/config/
-export default defineConfig(({ command }: { command: string }) => {
-  const isDev = command !== "build";
+export default defineConfig(() => {
   const isProduction = process.env.APP_ENV === "production";
   const apiPort = process.env.API_PORT || process.env.PUBLIC_API_PORT || "8000";
   const devPort = Number.parseInt(process.env.VITE_DEV_PORT || "5173", 10);
@@ -74,11 +73,10 @@ export default defineConfig(({ command }: { command: string }) => {
       },
     },
     build: {
-      commonjsOptions: { transformMixedEsModules: true },
       target: "es2020",
       outDir: "../pkg/web/assets/dist", // emit assets to pkg/web/assets/dist
       emptyOutDir: true,
-      sourcemap: isDev, // enable source map in dev build
+      sourcemap: true,
       manifest: false, // do not generate manifest.json
       // rollupOptions: {
       //   input: {

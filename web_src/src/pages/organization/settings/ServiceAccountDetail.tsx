@@ -1,5 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -36,6 +37,8 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
   const updateMutation = useUpdateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
   const regenerateTokenMutation = useRegenerateServiceAccountToken(organizationId);
+
+  useReportPageReady(!isLoading && !permissionsLoading && !!id);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");

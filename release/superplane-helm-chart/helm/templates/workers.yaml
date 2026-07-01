@@ -51,6 +51,8 @@ spec:
               value: "yes"
             - name: START_EVENT_ROUTER
               value: "yes"
+            - name: START_RUN_FINALIZER
+              value: "yes"
             - name: START_NODE_EXECUTOR
               value: "yes"
             - name: START_NODE_QUEUE_WORKER

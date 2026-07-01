@@ -504,31 +504,6 @@ func TestApproval_Execute(t *testing.T) {
 		assert.NotNil(t, metadataCtx.Metadata)
 	})
 
-	t.Run("with pending items publishes approval notification", func(t *testing.T) {
-		stateCtx := &contexts.ExecutionStateContext{}
-		metadataCtx := &contexts.MetadataContext{}
-		notificationCtx := &contexts.NotificationContext{Messages: []contexts.Notification{}}
-
-		ctx := core.ExecutionContext{
-			WorkflowID:   "workflow-1",
-			NodeMetadata: &contexts.MetadataContext{},
-			Configuration: map[string]any{
-				"items": []any{
-					map[string]any{
-						"type": "anyone",
-					},
-				},
-			},
-			Metadata:       metadataCtx,
-			ExecutionState: stateCtx,
-			Notifications:  notificationCtx,
-		}
-
-		err := approval.Execute(ctx)
-		require.NoError(t, err)
-		assert.Len(t, notificationCtx.Messages, 1)
-	})
-
 	t.Run("with role and group items creates records", func(t *testing.T) {
 		stateCtx := &contexts.ExecutionStateContext{}
 		metadataCtx := &contexts.MetadataContext{}

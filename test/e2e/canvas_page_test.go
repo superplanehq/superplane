@@ -126,6 +126,7 @@ func TestCanvasPage(t *testing.T) {
 		steps.publishCanvas()
 		steps.enterEditMode()
 		steps.deleteConnectionBetweenNodes("First", "Second")
+		steps.saveCanvas()
 		steps.publishCanvas()
 		steps.assertNodesAreNotConnectedInDB("First", "Second")
 	})
@@ -138,6 +139,7 @@ func TestCanvasPage(t *testing.T) {
 		steps.addFilter("Filter")
 		steps.connectNodes("Start", "Filter")
 		steps.saveCanvas()
+		steps.waitForDraftConnection("Start", "Filter")
 		steps.openNodeSettings("Filter")
 		steps.typeExpression("$")
 		steps.assertAutocompleteNodeSuggestionVisible()
@@ -217,7 +219,7 @@ func (s *CanvasPageSteps) saveCanvas() {
 }
 
 func (s *CanvasPageSteps) publishCanvas() {
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *CanvasPageSteps) enterEditMode() {
@@ -226,6 +228,36 @@ func (s *CanvasPageSteps) enterEditMode() {
 
 func (s *CanvasPageSteps) deleteConnectionBetweenNodes(sourceName, targetName string) {
 	s.canvas.DeleteConnection(sourceName, targetName)
+}
+
+func (s *CanvasPageSteps) waitForDraftConnection(sourceName, targetName string) {
+	require.Eventually(s.t, func() bool {
+		nodes, edges := s.canvas.DraftEffectiveSpec()
+		if len(nodes) == 0 {
+			return false
+		}
+
+		sourceID := ""
+		targetID := ""
+		for _, node := range nodes {
+			if node.Name == sourceName {
+				sourceID = node.ID
+			}
+			if node.Name == targetName {
+				targetID = node.ID
+			}
+		}
+		if sourceID == "" || targetID == "" {
+			return false
+		}
+
+		for _, edge := range edges {
+			if edge.SourceID == sourceID && edge.TargetID == targetID {
+				return true
+			}
+		}
+		return false
+	}, 10*time.Second, 200*time.Millisecond)
 }
 
 func (s *CanvasPageSteps) assertIsNodeCollapsed(nodeName string) {
@@ -326,7 +358,7 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	s.session.TakeScreenshot()
 	s.canvas.Connect("Start", "Wait")
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 	s.t.Cleanup(func() {
 		s.cleanupQueuedWaitWork("Wait")
 	})
@@ -583,8 +615,8 @@ func (s *CanvasPageSteps) openFilesTab() {
 	filesTab := q.TestID("canvas-view-mode-files")
 	s.session.AssertVisible(filesTab)
 	s.session.Click(filesTab)
-	s.session.AssertVisible(q.TestID("workflow-files-overlay"))
-	s.session.AssertVisible(q.TestID("workflow-file-editor"))
+	s.session.AssertVisible(q.TestID("files-overlay"))
+	s.session.AssertVisible(q.TestID("file-editor"))
 	s.waitForMonacoEditor()
 }
 
@@ -595,16 +627,16 @@ func (s *CanvasPageSteps) returnToCanvasTab() {
 
 func (s *CanvasPageSteps) assertFileIsOpen(name string) {
 	s.session.AssertText(name)
-	s.session.AssertVisible(q.TestID("workflow-file-editor"))
+	s.session.AssertVisible(q.TestID("file-editor"))
 }
 
 func (s *CanvasPageSteps) assertYamlContentVisible(text string) {
 	s.waitForMonacoEditor()
-	s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="workflow-file-editor"] >> text=%s`, text)))
+	s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="file-editor"] >> text=%s`, text)))
 }
 
 func (s *CanvasPageSteps) waitForMonacoEditor() {
-	monacoLines := q.Locator(`[data-testid="workflow-file-editor"] .view-lines`)
+	monacoLines := q.Locator(`[data-testid="file-editor"] .view-lines`)
 	if err := monacoLines.Run(s.session).WaitFor(pw.LocatorWaitForOptions{
 		State:   pw.WaitForSelectorStateVisible,
 		Timeout: pw.Float(15000),

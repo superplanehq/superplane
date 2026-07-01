@@ -1,5 +1,5 @@
 import { Rabbit } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { appPath } from "@/lib/appPaths";
 import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
@@ -46,13 +46,11 @@ export function RunChipFromLink({
 }
 
 export function RunChip({ runId, label, status, canvasId, organizationId }: RunChipProps) {
-  const navigate = useNavigate();
   const meta = RUN_STATUS_META[status];
 
   return (
-    <button
-      type="button"
-      onClick={() => navigate(appPath(organizationId, canvasId, `?view=runs&run=${runId}`))}
+    <Link
+      to={appPath(organizationId, canvasId, `?run=${runId}`)}
       className={cn(
         "inline-flex items-center gap-1 px-2 py-0.5 rounded-full ring-0 text-xs font-medium transition-colors cursor-pointer align-middle",
         meta.badgeClassName,
@@ -62,6 +60,6 @@ export function RunChip({ runId, label, status, canvasId, organizationId }: RunC
     >
       <Rabbit className="size-3" />
       {label}
-    </button>
+    </Link>
   );
 }

@@ -20,7 +20,7 @@ func TestApprovals(t *testing.T) {
 		steps.givenACanvasExists()
 		steps.addApprovalToCanvas("TestApproval")
 		steps.saveCanvas()
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.verifyApprovalSavedToDB("TestApproval")
 	})
 
@@ -31,7 +31,7 @@ func TestApprovals(t *testing.T) {
 		groupName := steps.createApprovalGroup()
 		steps.addApprovalWithUserRoleGroup("ReleaseApproval", models.Position{X: 600, Y: 200}, models.DisplayNameOwner, groupName)
 		steps.saveCanvas()
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.verifyApprovalConfigurationPersisted(models.RoleOrgOwner, groupName)
 	})
 
@@ -156,7 +156,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
 	s.canvas.Connect("Approval", "Output")
 
 	s.saveCanvas()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *ApprovalSteps) givenCanvasWithManualTriggerRoleApprovalAndNoop(roleLabel string) {
@@ -173,7 +173,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerRoleApprovalAndNoop(roleLabe
 	s.canvas.Connect("Approval", "Output")
 
 	s.saveCanvas()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *ApprovalSteps) givenCanvasWithManualTriggerGroupApprovalAndNoop(groupLabel string) {
@@ -190,7 +190,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerGroupApprovalAndNoop(groupLa
 	s.canvas.Connect("Approval", "Output")
 
 	s.saveCanvas()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *ApprovalSteps) givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop() {
@@ -207,7 +207,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop
 	s.canvas.Connect("Approval", "Output")
 
 	s.saveCanvas()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos models.Position) {

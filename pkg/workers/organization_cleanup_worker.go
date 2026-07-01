@@ -195,10 +195,6 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organizatio
 		return nil, nil, fmt.Errorf("delete organization role metadata: %w", err)
 	}
 
-	if err := tx.Where("organization_id = ?", organization.ID).Delete(&models.Blueprint{}).Error; err != nil {
-		return nil, nil, fmt.Errorf("delete organization blueprints: %w", err)
-	}
-
 	if err := tx.Where("domain_type = ?", models.DomainTypeOrganization).Where("domain_id = ?", organization.ID).Delete(&models.Secret{}).Error; err != nil {
 		return nil, nil, fmt.Errorf("delete organization secrets: %w", err)
 	}

@@ -9,15 +9,15 @@ import (
 	"github.com/superplanehq/superplane/test/support/cli"
 )
 
-func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
+func TestFindCurrentUserDraftVersionIDReturnsFirstDraft(t *testing.T) {
 	server := newAPITestServer(
 		t,
 		requestExpectation{
 			method: http.MethodGet,
-			path:   "/api/v1/canvases/canvas-123/versions",
+			path:   draftVersionsPath("canvas-123"),
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"pub-1","state":"STATE_PUBLISHED"}},{"metadata":{"id":"draft-1","state":"STATE_DRAFT"}}]}`))
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","owner":{"id":"user-1"}}},{"metadata":{"id":"draft-2","owner":{"id":"user-1"}}}]}`))
 			},
 		},
 	)
@@ -27,6 +27,10 @@ func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
 	versionID, err := common.FindCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
 	require.Equal(t, "draft-1", versionID)
+
+	server.AssertCalls(t, []string{
+		http.MethodGet + " " + draftVersionsPath("canvas-123"),
+	})
 }
 
 func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
@@ -34,7 +38,7 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 		t,
 		requestExpectation{
 			method: http.MethodGet,
-			path:   "/api/v1/canvases/canvas-123/versions",
+			path:   draftVersionsPath("canvas-123"),
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"versions":[]}`))
@@ -42,7 +46,7 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 		},
 		requestExpectation{
 			method: http.MethodPost,
-			path:   "/api/v1/canvases/canvas-123/versions",
+			path:   draftVersionsPath("canvas-123"),
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-1"}}}`))
@@ -57,8 +61,8 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 	require.Equal(t, "draft-1", versionID)
 
 	server.AssertCalls(t, []string{
-		http.MethodGet + " /api/v1/canvases/canvas-123/versions",
-		http.MethodPost + " /api/v1/canvases/canvas-123/versions",
+		http.MethodGet + " " + draftVersionsPath("canvas-123"),
+		http.MethodPost + " " + draftVersionsPath("canvas-123"),
 	})
 }
 

@@ -1,5 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Link } from "@/components/Link/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/Table/table";
@@ -36,6 +37,8 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
   const { data: serviceAccounts = [], isLoading } = useServiceAccounts(organizationId);
   const createMutation = useCreateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
+
+  useReportPageReady(!isLoading && !permissionsLoading);
 
   const handleCreateClick = () => {
     if (!canCreate) return;

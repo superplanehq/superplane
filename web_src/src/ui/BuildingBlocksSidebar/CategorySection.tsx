@@ -32,6 +32,9 @@ function resolveCategoryIcon(categoryName: string, integrationName: string) {
   if (categoryName === "Core") {
     return resolveIcon("zap");
   }
+  if (categoryName === "Runners") {
+    return resolveIcon("terminal");
+  }
   if (categoryName === "Debugging") {
     return resolveIcon("bug");
   }

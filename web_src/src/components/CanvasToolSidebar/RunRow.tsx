@@ -1,11 +1,15 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
+import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import { RunNodeIcon } from "@/ui/Runs/RunNodeIcon";
+import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { Link as LinkIcon } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { isNormalClick } from "@/lib/linkHelpers";
+import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 interface RunRowProps {
   run: CanvasesCanvasRun;
@@ -28,73 +32,82 @@ export function RunRow({
   componentIconMap,
   onSelectRun,
 }: RunRowProps) {
+  const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
+  const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?run=${run.id}`) : "#";
 
   return (
     <div
       data-testid="runs-sidebar-row"
-      role="button"
-      tabIndex={0}
-      onClick={() => run.id && onSelectRun(run.id)}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        if (run.id) {
-          onSelectRun(run.id);
-        }
-      }}
       className={cn(
-        "group flex w-full cursor-pointer items-center gap-1.5 border-b border-l-2 border-slate-100 px-3 py-2 text-left transition-colors",
-        status === "failed" ? "border-l-red-400" : "border-l-transparent",
-        isSelected ? "border-l-sky-500 bg-sky-100" : "hover:bg-gray-50",
+        RUNS_SIDEBAR_ROW_CLASS,
+        "group relative w-full transition-colors",
+        isSelected ? "bg-sky-100" : "hover:bg-gray-50",
       )}
     >
-      <RunNodeIcon
-        iconSrc={iconSrc}
-        iconSlug={iconSlug}
-        alt={triggerName}
-        size={14}
-        className="shrink-0 text-gray-400"
+      <Link
+        to={runHref}
+        onClick={(e) => {
+          if (isNormalClick(e)) {
+            e.preventDefault();
+            if (run.id) onSelectRun(run.id);
+          }
+        }}
+        className="absolute inset-0 z-0"
+        aria-label={title}
       />
-      <span
-        className={cn(
-          "max-w-[35%] shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
-          isSelected ? "bg-sky-200 text-sky-800" : "bg-slate-100 text-slate-600",
-        )}
-      >
-        {triggerName}
-      </span>
-      <span
-        aria-label={RUN_STATUS_META[status].label}
-        title={RUN_STATUS_META[status].label}
-        className={cn("inline-block h-2 w-2 shrink-0 rounded-full", RUN_STATUS_META[status].dotClassName)}
-      />
-      <span
-        className={cn(
-          "min-w-0 flex-1 truncate text-xs",
-          isSelected ? "font-semibold text-sky-900" : "font-medium text-gray-800",
-        )}
-      >
-        {title}
+      <span className="pointer-events-none relative z-0 flex min-w-0 flex-1 items-center gap-1.5">
+        <RunNodeIcon
+          iconSrc={iconSrc}
+          iconSlug={iconSlug}
+          alt={triggerName}
+          size={RUN_NODE_ICON_SIZE}
+          className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-gray-800" : "text-gray-500")}
+        />
+        <span
+          aria-label={RUN_STATUS_META[status].label}
+          title={RUN_STATUS_META[status].label}
+          className={cn("inline-block h-2 w-2 shrink-0 rounded-full", RUN_STATUS_META[status].dotClassName)}
+        />
+        <span
+          className={cn(
+            "max-w-[35%] shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
+            isSelected ? "bg-sky-200 text-sky-800" : "bg-slate-100 text-slate-600",
+          )}
+        >
+          {triggerName}
+        </span>
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-xs",
+            isSelected ? "font-semibold text-sky-900" : "font-medium text-gray-800",
+          )}
+        >
+          {title}
+        </span>
       </span>
       <button
         type="button"
         title="Copy link to run"
-        className="hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
+        className="relative z-10 hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
         onClick={(event) => {
           event.stopPropagation();
-          const url = new URL(window.location.href);
-          url.searchParams.set("view", "runs");
-          url.searchParams.set("run", run.id || "");
-          navigator.clipboard.writeText(url.toString());
-          toast.success("Run link copied");
+          void (async () => {
+            const copyUrl = new URL(runHref, window.location.origin);
+            try {
+              await navigator.clipboard.writeText(copyUrl.toString());
+              toast.success("Run link copied");
+            } catch {
+              toast.error("Failed to copy run link");
+            }
+          })();
         }}
       >
         <LinkIcon className="h-3 w-3" />
       </button>
       {run.createdAt ? (
-        <span className="shrink-0 text-xs tabular-nums text-gray-500">
+        <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-500">
           <TimeAgo date={run.createdAt} includeAgo={false} />
         </span>
       ) : null}

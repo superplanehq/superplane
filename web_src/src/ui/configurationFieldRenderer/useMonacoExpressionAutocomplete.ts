@@ -34,6 +34,7 @@ const suggestionSortPriority = {
   $: 1,
   root: 2,
   previous: 3,
+  memory: 4,
 } as const;
 
 const modelContextMap = new WeakMap<MonacoEditor.ITextModel, ModelContext>();

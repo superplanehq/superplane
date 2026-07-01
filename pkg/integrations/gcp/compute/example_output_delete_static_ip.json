@@ -1,0 +1,8 @@
+{
+  "type": "gcp.compute.staticIP.deleted",
+  "data": {
+    "name": "web-prod-ip",
+    "region": "us-central1"
+  },
+  "timestamp": "2025-02-14T12:00:00Z"
+}

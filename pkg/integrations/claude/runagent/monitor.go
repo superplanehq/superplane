@@ -41,9 +41,6 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 	if metadata.Session == nil || metadata.Session.ID == "" {
 		return nil
 	}
-	if isSessionTerminal(metadata.Session.Status) {
-		return nil
-	}
 
 	attempt := 1
 	errs := 0
@@ -57,7 +54,14 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 	if attempt > maxPollAttempts {
 		ctx.Logger.Errorf("Managed session %s exceeded max poll attempts", metadata.Session.ID)
 		out := buildOutput("timeout", metadata.Session.ID)
-		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+		if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+			return emitErr
+		}
+		if c, cErr := NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
+			cleanupUploadedFilesFromHook(c, ctx, ctx.Logger.Warnf)
+			cleanupManagedVaultFromHook(c, ctx, ctx.Logger.Warnf)
+		}
+		return nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -71,27 +75,47 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		if errs >= maxPollErrors {
 			ctx.Logger.Errorf("Managed session %s: polling failed repeatedly: %v", metadata.Session.ID, err)
 			out := buildOutput("error", metadata.Session.ID)
-			return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+				return emitErr
+			}
+			cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
+			cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
+			return nil
 		}
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
-	mergeSessionIntoMetadata(&metadata, sess)
-	_ = ctx.Metadata.Set(metadata)
-
+	// Don't write terminal status to metadata yet — we only persist it
+	// after a successful emit to avoid blocking future poll retries.
 	if sess == nil {
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 	if isSessionTerminal(sess.Status) {
-		lastMessage, events, err := client.GetLastManagedSessionAgentMessageWithRetry(metadata.Session.ID, finalMessageReads, finalMessageDelay)
+		sm, err := client.GetSessionMessagesWithRetry(metadata.Session.ID, finalMessageReads, finalMessageDelay)
 		if err != nil {
-			ctx.Logger.Warnf("Failed to fetch final message for managed session %s: %v", metadata.Session.ID, err)
+			ctx.Logger.Warnf("Failed to fetch messages for session %s: %v. Retrying poll.", metadata.Session.ID, err)
+			return a.scheduleNextPoll(ctx, attempt+1, errs+1)
 		}
-		if err == nil && lastMessage == "" {
-			ctx.Logger.Warnf("No final agent message found for managed session %s. Event types: %s", metadata.Session.ID, managedSessionEventTypes(events))
+		if sm == nil || !sm.Complete {
+			ctx.Logger.Warnf("Events not complete for session %s after retries. Retrying poll.", metadata.Session.ID)
+			return a.scheduleNextPoll(ctx, attempt+1, errs)
 		}
-		out := buildOutput(sess.Status, metadata.Session.ID, lastMessage)
-		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
+
+		out := buildOutputFromSessionMessages(sess.Status, metadata.Session.ID, sm)
+		if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
+			return emitErr
+		}
+
+		// Only persist terminal status after successful emit
+		mergeSessionIntoMetadata(&metadata, sess)
+		_ = ctx.Metadata.Set(metadata)
+
+		if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
+			ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
+		}
+		cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
+		cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
+		return nil
 	}
 
 	return a.scheduleNextPoll(ctx, attempt+1, 0)
@@ -127,5 +151,7 @@ func (a *RunAgent) Cancel(ctx core.ExecutionContext) error {
 	}
 	// Best effort cleanup; may fail if session is still running.
 	_ = client.DeleteManagedSession(metadata.Session.ID)
+	cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
+	cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 	return nil
 }

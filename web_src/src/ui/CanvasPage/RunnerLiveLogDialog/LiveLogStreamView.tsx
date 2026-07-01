@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../../../lib/utils";
-import type { ExecutionInfo } from "../../../pages/workflowv2/mappers/types";
+import type { ExecutionInfo } from "../../../pages/app/mappers/types";
 import { isExecutionInFlight, type CommandSection } from "./types";
 import { useLiveLogStream } from "./useLiveLogStream";
 

@@ -1,0 +1,16 @@
+{
+  "type": "gcp.monitoring.alertingPolicy.updated",
+  "data": {
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "id": "1234567890123456789",
+    "displayName": "High CPU on production instances",
+    "combiner": "OR",
+    "enabled": false,
+    "conditionsCount": 1,
+    "comparison": "COMPARISON_GT",
+    "thresholdValue": 0.9,
+    "duration": "300s",
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\""
+  },
+  "timestamp": "2025-02-14T12:00:00Z"
+}

@@ -8,8 +8,6 @@ const createTriggerProps = (
 ): TriggerProps => ({
   ...baseProps,
   onDuplicate: () => console.log("Duplicate clicked!"),
-  onEdit: () => console.log("Edit clicked!"),
-  onDeactivate: () => console.log("Deactivate clicked!"),
   onToggleView: () => console.log("Toggle view clicked!"),
   onDelete: () => console.log("Delete clicked!"),
 });

@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
+import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
 import type { ReactNode } from "react";
 import { showErrorToast } from "@/lib/toast";
 
@@ -112,17 +112,16 @@ vi.mock("@/hooks/useCanvasData", () => ({
 import { HomePage } from "./index";
 import { NewAppPage } from "./NewAppPage";
 
-function makeCanvas(id: string, name: string, canvasFolderId?: string): CanvasesCanvas {
+function makeCanvas(id: string, name: string, canvasFolderId?: string): CanvasesCanvasSummary {
   return {
-    metadata: {
-      id,
-      name,
-      folderId: canvasFolderId,
-      createdAt: "2026-05-05T00:00:00Z",
-      createdBy: { name: "Ada Lovelace" },
-    },
-    spec: { nodes: [], edges: [] },
-  } as CanvasesCanvas;
+    id,
+    name,
+    folderId: canvasFolderId,
+    createdAt: "2026-05-05T00:00:00Z",
+    createdBy: { name: "Ada Lovelace" },
+    nodes: [],
+    edges: [],
+  } as CanvasesCanvasSummary;
 }
 
 function makeFolder(

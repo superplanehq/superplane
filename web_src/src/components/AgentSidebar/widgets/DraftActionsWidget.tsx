@@ -25,17 +25,21 @@ export function DraftActionsWidget({
     window.dispatchEvent(new CustomEvent("agent:view-version", { detail: { versionId } }));
   };
 
-  const callApi = async (method: string, url: string, action: "publish" | "discard") => {
+  const sendRequest = (method: string, url: string, body?: string) =>
+    fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "x-organization-id": organizationId,
+      },
+      credentials: "include",
+      ...(body !== undefined ? { body } : {}),
+    });
+
+  const runAction = async (action: "publish" | "discard", run: () => Promise<Response>) => {
     setBusy(action);
     try {
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": organizationId,
-        },
-        credentials: "include",
-      });
+      const response = await run();
       if (response.ok) {
         onDismiss?.();
       } else {
@@ -49,9 +53,26 @@ export function DraftActionsWidget({
     }
   };
 
-  const handlePublish = () => callApi("PATCH", `/api/v1/canvases/${canvasId}/versions/${versionId}/publish`, "publish");
+  // The agent writes draft edits into workflow_staged_files (the same layer the UI
+  // editor stages into), and publish materializes the draft version row only.
+  // Commit any pending staging before publishing so the agent's staged edits
+  // are included; otherwise publish would ship the last committed version and
+  // silently drop them. Commit is a no-op when there is nothing staged.
+  const handlePublish = () =>
+    runAction("publish", async () => {
+      const commitResponse = await sendRequest(
+        "POST",
+        `/api/v1/canvases/${canvasId}/versions/${versionId}/staging/commit`,
+        "{}",
+      );
+      if (!commitResponse.ok) {
+        return commitResponse;
+      }
+      return sendRequest("PATCH", `/api/v1/canvases/${canvasId}/versions/${versionId}/publish`, "{}");
+    });
 
-  const handleDiscard = () => callApi("DELETE", `/api/v1/canvases/${canvasId}/versions/${versionId}`, "discard");
+  const handleDiscard = () =>
+    runAction("discard", () => sendRequest("DELETE", `/api/v1/canvases/${canvasId}/versions/${versionId}`));
 
   return (
     <div className="flex items-center gap-2">
@@ -66,7 +87,7 @@ export function DraftActionsWidget({
           disabled={busy !== null}
         >
           <Eye size={12} />
-          See in Editor
+          See changes
         </Button>
       )}
       <Button

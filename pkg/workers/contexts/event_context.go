@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -18,7 +19,7 @@ type EventContext struct {
 }
 
 func NewEventContext(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) *EventContext {
-	return &EventContext{tx: tx, node: node, maxPayloadSize: DefaultMaxPayloadSize, onNewEvents: onNewEvents}
+	return &EventContext{tx: tx, node: node, maxPayloadSize: config.MaxPayloadSize(), onNewEvents: onNewEvents}
 }
 
 func (s *EventContext) Emit(payloadType string, payload any) error {

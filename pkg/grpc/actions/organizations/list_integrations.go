@@ -5,15 +5,19 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID string) (*pb.ListIntegrationsResponse, error) {
-	integrations, err := models.ListIntegrations(uuid.MustParse(orgID))
+	db := database.DB(ctx)
+	integrations, err := models.ListIntegrations(db, uuid.MustParse(orgID))
 	if err != nil {
-		return nil, err
+		log.Errorf("failed to list integrations for organization %s: %v", orgID, err)
+		return nil, grpcerrors.Internal(err, "failed to list integrations")
 	}
 
 	protos := []*pb.Integration{}

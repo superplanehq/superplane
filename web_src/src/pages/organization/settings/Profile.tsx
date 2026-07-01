@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { meRegenerateToken } from "@/api-client/sdk.gen";
 import { Avatar } from "@/components/Avatar/avatar";
 import { Heading } from "@/components/Heading/heading";
@@ -30,6 +31,10 @@ export function Profile() {
 
   const errorMessage =
     actionError || (meError instanceof Error ? meError.message : meError ? "Failed to load profile" : null);
+
+  useReportPageReady(!loading, {
+    failed: !!errorMessage,
+  });
 
   const handleRegenerateToken = async () => {
     try {

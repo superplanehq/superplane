@@ -1,5 +1,6 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Palette } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
@@ -40,7 +41,14 @@ export function HomePage() {
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
-  if (isLoading || (isFetching && canvases.length === 0 && canvasFolders.length === 0)) {
+  const isHomePageLoading = isLoading || (isFetching && canvases.length === 0 && canvasFolders.length === 0);
+  useReportPageReady(!isHomePageLoading && !!account && !!organizationId, {
+    canvas_count: canvases.length,
+    folder_count: canvasFolders.length,
+    failed: !!canvasError,
+  });
+
+  if (isHomePageLoading) {
     return <LoadingView />;
   }
 

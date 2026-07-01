@@ -138,7 +138,9 @@ Use the `test/e2e/helpers/query.go` for lookup:
 
 Common test IDs:
 
-- Canvas: `canvas-drop-area`, `save-canvas-button`, `canvas-group-node` (group container), `multi-select-group` (multi-select toolbar)
+- Canvas: `canvas-drop-area`, `canvas-commit-staging-button`, `canvas-publish-version-button`, `canvas-group-node` (group container), `multi-select-group` (multi-select toolbar)
+
+When a test edits a draft and promotes it to live, call `canvas.CommitAndPublish()` from `test/e2e/shared/canvas_steps.go`. Edits autosave to staging; publish only works on committed draft content, so commit and publish stay separate steps.
 - Modals/Forms: `canvas-name-input`, `component-name-input`, `save-node-button`
 - Building blocks: `building-block-<name>` (e.g., `building-block-noop`, `building-block-approval`)
 

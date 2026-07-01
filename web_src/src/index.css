@@ -31,16 +31,17 @@ button {
 
 div.monaco-editor {
   --vscode-focusBorder: transparent;
+  --vscode-editorLineHighlightBackground: rgb(248 250 252);
+  --vscode-editorLineHighlightBorder: transparent;
 }
 
-/* Canvas YAML + workflow file editor: slate-100 current line; strip line-highlight border (Monaco applies these via DOM) */
-.canvas-yaml-monaco .monaco-editor .margin-view-overlays .current-line,
-.canvas-yaml-monaco .monaco-editor .view-overlays .current-line,
-.workflow-file-editor-monaco .monaco-editor .margin-view-overlays .current-line,
-.workflow-file-editor-monaco .monaco-editor .view-overlays .current-line {
-  background-color: rgb(241 245 249) !important;
+/* Current line: slate-50 background only, no top/bottom border */
+div.monaco-editor .margin-view-overlays .current-line,
+div.monaco-editor .view-overlays .current-line {
+  background-color: rgb(248 250 252) !important;
   border: none !important;
   box-shadow: none !important;
+  outline: none !important;
 }
 
 .workflow-file-editor-monaco .monaco-editor {

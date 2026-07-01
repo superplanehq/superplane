@@ -11,7 +11,7 @@ import (
 )
 
 type getCommand struct {
-	draft *bool
+	draftID *string
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
@@ -33,51 +33,82 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	if err != nil {
 		return err
 	}
-	if response.Canvas == nil {
+	if response.Canvas == nil || response.Canvas.Metadata == nil {
 		return fmt.Errorf("canvas %q not found", canvasID)
 	}
 
-	canvas := *response.Canvas
-	if c.draft != nil && *c.draft {
-		me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-		if err != nil {
-			return err
-		}
-		currentUserID := strings.TrimSpace(me.User.GetId())
-		if currentUserID == "" {
-			return fmt.Errorf("current user id not found")
-		}
+	described := response.Canvas
+	canvasName := strings.TrimSpace(described.Metadata.GetName())
+	organizationID := strings.TrimSpace(described.Metadata.GetOrganizationId())
 
-		versionID, err := common.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
-		if err != nil {
-			return err
-		}
-		if versionID == "" {
-			return fmt.Errorf("draft version not found for current user")
-		}
+	draftID := ""
+	if c.draftID != nil {
+		draftID = strings.TrimSpace(*c.draftID)
+	}
 
-		version, err := common.DescribeAppVersionByID(ctx, canvasID, versionID)
+	useDraft := draftID != ""
+	versionID := ""
+	if useDraft {
+		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
 		if err != nil {
 			return err
-		}
-		if version.Spec != nil {
-			canvas.SetSpec(*version.Spec)
 		}
 	}
 
-	resource := models.CanvasResourceFromCanvas(canvas)
+	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, versionID)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(string(yamlBytes)) == "" {
+		return fmt.Errorf("app %q has no canvas", canvasID)
+	}
+
+	resource, err := models.ParseCanvas(yamlBytes)
+	if err != nil {
+		return fmt.Errorf("invalid canvas yaml from server: %w", err)
+	}
+	if resource.Metadata == nil {
+		return fmt.Errorf("canvas metadata is required")
+	}
+	if resource.Metadata.Id == nil || strings.TrimSpace(resource.Metadata.GetId()) == "" {
+		resource.Metadata.SetId(canvasID)
+	}
+	if resource.Metadata.Name == nil || strings.TrimSpace(resource.Metadata.GetName()) == "" {
+		if canvasName == "" {
+			return fmt.Errorf("canvas metadata.name is required")
+		}
+		resource.Metadata.SetName(canvasName)
+	}
+	if organizationID != "" && (resource.Metadata.OrganizationId == nil || strings.TrimSpace(resource.Metadata.GetOrganizationId()) == "") {
+		resource.Metadata.SetOrganizationId(organizationID)
+	}
+
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(resource)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		source := "live"
+		if useDraft {
+			source = "draft"
+		}
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())
-		if url := common.BuildAppURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
+		if url := common.BuildAppURL(ctx, organizationID, canvasID); url != "" {
 			_, _ = fmt.Fprintf(stdout, "App URL: %s\n", url)
 		}
-		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(resource.Spec.GetNodes()))
-		_, err := fmt.Fprintf(stdout, "Edges: %d\n", len(resource.Spec.GetEdges()))
+		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
+		if versionID != "" {
+			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
+		}
+		nodeCount := 0
+		edgeCount := 0
+		if resource.Spec != nil {
+			nodeCount = len(resource.Spec.GetNodes())
+			edgeCount = len(resource.Spec.GetEdges())
+		}
+		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", nodeCount)
+		_, err := fmt.Fprintf(stdout, "Edges: %d\n", edgeCount)
 		return err
 	})
 }

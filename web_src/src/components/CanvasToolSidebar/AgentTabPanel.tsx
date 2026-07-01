@@ -17,6 +17,7 @@ import {
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import { useCanvas, useCanvasVersion, useCanvasVersions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
@@ -26,8 +27,6 @@ import {
 } from "@/lib/agentBootContext";
 import { ConversationTranscript } from "./AgentConversationTranscript";
 import {
-  buildRubricText,
-  createInitialOutcomeState,
   createWebsocketCallbacks,
   isOutcomeActive,
   statusLabel,
@@ -35,7 +34,7 @@ import {
   useStoredOutcomeState,
   useThinkingIndicator,
 } from "./agentConversationState";
-import type { AgentMessage } from "./types";
+import type { AgentMessage, AgentOutgoingImage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
 
@@ -43,6 +42,7 @@ type ChatConversationProps = {
   chatId: string;
   canvasId: string;
   organizationId: string;
+  initialStatus: string;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
@@ -52,16 +52,13 @@ type DraftActionsBarProps = {
   messages: AgentMessage[];
   canvasId: string;
   organizationId: string;
-  chatId: string;
-  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
-  agentMode: AgentMode;
   isEditing: boolean;
   outcomePassed?: boolean;
   onVersionPublished?: () => void;
 };
 
 type ConversationHandlers = {
-  handleSend: (content: string) => Promise<void>;
+  handleSend: (content: string, images?: AgentOutgoingImage[]) => Promise<void>;
   handleStop: () => void;
   handleQuickAction: (action: string) => Promise<void>;
   handleStartBuilding: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => Promise<void>;
@@ -97,6 +94,7 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
       chatId={chatId}
       canvasId={canvasId}
       organizationId={organizationId}
+      initialStatus={chatQuery.data?.status ?? "idle"}
       agentMode={toolSidebarState.agentMode}
       onModeSwitch={toolSidebarState.switchAgentMode}
       isEditing={toolSidebarState.isEditing}
@@ -108,6 +106,7 @@ function ChatConversation({
   chatId,
   canvasId,
   organizationId,
+  initialStatus,
   agentMode,
   onModeSwitch,
   isEditing,
@@ -116,13 +115,18 @@ function ChatConversation({
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
   const interruptMutation = useInterruptAgentChat(organizationId);
   const outcomeMutation = useDefineAgentOutcome(organizationId);
-  const [status, setStatus] = useState<string>("idle");
+  const [status, setStatus] = useState<string>(initialStatus || "idle");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [outcomeState, setOutcomeState] = useStoredOutcomeState(chatId);
   const rawMessages = useConversationMessages(messagesQuery.data);
   const { account } = useContext(AccountContext);
   const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
   const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
+
+  useEffect(() => {
+    setStatus(initialStatus || "idle");
+  }, [initialStatus]);
 
   // Prepend a synthetic greeting as the first message so it never disappears
   const messages = useMemo(() => {
@@ -162,10 +166,14 @@ function ChatConversation({
     interruptMutation,
     sendMutation,
     setError,
+    setNotice,
     setOutcomeState,
   });
 
-  const wsCallbacks = useMemo(() => createWebsocketCallbacks(setStatus, setError, setOutcomeState), [setOutcomeState]);
+  const wsCallbacks = useMemo(
+    () => createWebsocketCallbacks(setStatus, setError, setOutcomeState, setNotice),
+    [setOutcomeState],
+  );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
@@ -178,6 +186,7 @@ function ChatConversation({
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTranscript
         error={error}
+        notice={notice}
         canvasId={canvasId}
         organizationId={organizationId}
         messageGroups={messageGroups}
@@ -201,21 +210,20 @@ function ChatConversation({
         messages={messages}
         canvasId={canvasId}
         organizationId={organizationId}
-        chatId={chatId}
-        sendMutation={sendMutation}
-        agentMode={agentMode}
         isEditing={isEditing}
         outcomePassed={outcomeState?.phase === "passed"}
         onVersionPublished={() => setOutcomeState(null)}
       />
 
-      <ChatComposer
+      <ComposerWithCanvasData
+        canvasId={canvasId}
+        organizationId={organizationId}
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
         sending={agentBusy}
         sendPending={sendMutation.isPending}
         stopping={interruptMutation.isPending}
-        statusLabel={statusLabel(status)}
+        statusLabel={sendMutation.isPending ? "Starting agent..." : statusLabel(status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
         modeDisabled={modeDisabled}
@@ -260,11 +268,20 @@ function useAgentBootKickoff({
     const allMessages = messagesQuery.data.pages?.flatMap((p) => p.messages) ?? [];
     if (allMessages.length > 0) return;
 
+    const bootMessage = getAgentBootMessage(canvasId);
+
+    // If no boot message (e.g. blank canvas), skip sending — static greeting only.
+    // Don't clear the boot context so refreshes still see the blank marker and skip again.
+    if (!bootMessage) {
+      bootState.current = "sent";
+      return;
+    }
+
     bootState.current = "sending";
     void sendMutation
       .mutateAsync({
         chatId,
-        content: createSystemMessage(getAgentBootMessage(canvasId)),
+        content: createSystemMessage(bootMessage),
         mode: agentMode,
       })
       .then(() => {
@@ -284,7 +301,8 @@ function useConversationHandlers({
   interruptMutation,
   sendMutation,
   setError,
-  setOutcomeState,
+  setNotice,
+  setOutcomeState: _setOutcomeState,
 }: {
   agentMode: AgentMode;
   chatId: string;
@@ -292,6 +310,7 @@ function useConversationHandlers({
   interruptMutation: ReturnType<typeof useInterruptAgentChat>;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   setError: (value: string | null) => void;
+  setNotice: (value: string | null) => void;
   setOutcomeState: (update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => void;
 }): ConversationHandlers {
   // React Query mutation objects are new on every render; keep latest refs in
@@ -301,16 +320,17 @@ function useConversationHandlers({
   mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation };
 
   const handleSend = useCallback(
-    async (content: string) => {
+    async (content: string, images?: AgentOutgoingImage[]) => {
       const { sendMutation: send } = mutationsRef.current;
-      if (!content.trim() || send.isPending) return;
+      if ((!content.trim() && (images?.length ?? 0) === 0) || send.isPending) return;
       setError(null);
-      await send.mutateAsync({ chatId, content, mode: agentMode }).catch((error) => {
+      setNotice(null);
+      await send.mutateAsync({ chatId, content, mode: agentMode, images }).catch((error) => {
         setError(error instanceof Error ? error.message : "failed to send message");
         throw error;
       });
     },
-    [agentMode, chatId, setError],
+    [agentMode, chatId, setError, setNotice],
   );
 
   const handleStop = useCallback(() => {
@@ -331,41 +351,22 @@ function useConversationHandlers({
   );
 
   const handleStartBuilding = useCallback(
-    async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
-      const rubricText = buildRubricText(rubric);
-      const { sendMutation: send, outcomeMutation: outcome } = mutationsRef.current;
+    async (_rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
+      const { sendMutation: send } = mutationsRef.current;
 
-      // In Build mode: rubric is a spec confirmation, not an outcome.
-      // Agent already has full context — just confirm.
-      if (agentMode === "builder") {
+      // Rubric is a spec confirmation — tell the agent to start building.
+      // Always use builder mode regardless of current agentMode.
+      try {
         await send.mutateAsync({
           chatId,
           content: "Specs approved. Start building.",
           mode: "builder",
         });
-        return;
-      }
-
-      // In Plan mode: kick off outcome with grading loop
-      setOutcomeState(createInitialOutcomeState(rubric));
-
-      try {
-        await outcome.mutateAsync({
-          chatId,
-          description: `Build a canvas based on this plan: ${rubric.title}`,
-          rubric: rubricText,
-          maxIterations: 3,
-        });
       } catch {
-        setOutcomeState(null);
-        await send.mutateAsync({
-          chatId,
-          content: `Start building based on this plan:\n\n${rubricText}`,
-          mode: "builder",
-        });
+        setError("Failed to start building. Please try again.");
       }
     },
-    [chatId, agentMode, setOutcomeState],
+    [chatId, setError],
   );
 
   return useMemo(
@@ -378,9 +379,6 @@ function DraftActionsBar({
   messages,
   canvasId,
   organizationId,
-  chatId,
-  sendMutation,
-  agentMode,
   isEditing,
   outcomePassed,
   onVersionPublished,
@@ -389,12 +387,17 @@ function DraftActionsBar({
     messages,
     canvasId,
     organizationId,
-    chatId,
-    sendMutation,
-    agentMode,
     outcomePassed,
     onVersionPublished,
   });
+
+  useEffect(() => {
+    if (!latestDraft) {
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("agent:draft-ready", { detail: { versionId: latestDraft.versionId } }));
+  }, [canvasId, latestDraft]);
 
   if (!latestDraft) return null;
 
@@ -412,4 +415,43 @@ function DraftActionsBar({
       </div>
     </div>
   );
+}
+
+function ComposerWithCanvasData({
+  canvasId,
+  organizationId,
+  ...composerProps
+}: {
+  canvasId: string;
+  organizationId: string;
+  onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
+  onStop: () => void;
+  sending: boolean;
+  sendPending: boolean;
+  stopping?: boolean;
+  statusLabel: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  modeDisabled?: boolean;
+}) {
+  const { data: canvas } = useCanvas(organizationId, canvasId, {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+  const { data: versions } = useCanvasVersions(organizationId, canvasId);
+  const latestVersion = versions?.[0];
+  const isDraft = latestVersion?.metadata?.state === "STATE_DRAFT";
+  const { data: draftVersion } = useCanvasVersion(organizationId, canvasId, latestVersion?.metadata?.id ?? "", isDraft);
+
+  // Use draft nodes if a draft exists, otherwise fall back to published
+  const nodes = useMemo(
+    () => (isDraft && draftVersion?.spec?.nodes ? draftVersion.spec.nodes : canvas?.spec?.nodes) ?? [],
+    [isDraft, draftVersion, canvas],
+  );
+
+  const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);
+  const runs = useMemo(() => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [], [runsQuery.data]);
+
+  return <ChatComposer {...composerProps} nodes={nodes} runs={runs} />;
 }

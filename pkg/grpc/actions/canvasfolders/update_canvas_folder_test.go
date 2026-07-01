@@ -6,11 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__UpdateCanvasFolder__UpdatesFolder(t *testing.T) {
@@ -71,5 +71,5 @@ func Test__UpdateCanvasFolder__RejectsDuplicateTitle(t *testing.T) {
 		false,
 	)
 	require.Error(t, err)
-	assert.Equal(t, codes.AlreadyExists, status.Code(err))
+	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 }

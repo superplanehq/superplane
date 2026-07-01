@@ -11,8 +11,11 @@ import awsRoute53Icon from "@/assets/icons/integrations/aws.route53.svg";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
+import awsPrometheusIcon from "@/assets/icons/integrations/aws.prometheus.svg";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
+import cloudsmithIcon from "@/assets/icons/integrations/cloudsmith.svg";
+import coolifyIcon from "@/assets/icons/integrations/coolify.svg";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
@@ -35,6 +38,10 @@ import gcpCloudRunIcon from "@/assets/icons/integrations/gcp.cloudrun.svg";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
 import gcpCloudDNSIcon from "@/assets/icons/integrations/gcp.clouddns.svg";
+import gcpComputeIcon from "@/assets/icons/integrations/gcp.compute.svg";
+import gcpCloudSqlIcon from "@/assets/icons/integrations/gcp.cloudsql.svg";
+import gcpStorageIcon from "@/assets/icons/integrations/gcp.storage.svg";
+import gcpMonitoringIcon from "@/assets/icons/integrations/gcp.monitoring.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -67,6 +74,8 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   circleci: circleciIcon,
   azure: azureIcon,
   cloudflare: cloudflareIcon,
+  cloudsmith: cloudsmithIcon,
+  coolify: coolifyIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,
   daytona: daytonaIcon,
@@ -116,6 +125,8 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   bitbucket: bitbucketIcon,
   circleci: circleciIcon,
   cloudflare: cloudflareIcon,
+  cloudsmith: cloudsmithIcon,
+  coolify: coolifyIcon,
   dash0: dash0Icon,
   datadog: datadogIcon,
   daytona: daytonaIcon,
@@ -166,6 +177,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     route53: awsRoute53Icon,
     ecs: awsEcsIcon,
     sns: awsSnsIcon,
+    prometheus: awsPrometheusIcon,
   },
   honeycomb: honeycombIcon,
   gcp: {
@@ -174,6 +186,20 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
     artifactregistry: gcpArtifactRegistryIcon,
     pubsub: gcpPubSubIcon,
     clouddns: gcpCloudDNSIcon,
+    cloudsql: gcpCloudSqlIcon,
+    storage: gcpStorageIcon,
+    compute: gcpComputeIcon,
+    createVM: gcpComputeIcon,
+    deleteVMInstance: gcpComputeIcon,
+    manageVMInstancePower: gcpComputeIcon,
+    updateVMInstanceType: gcpComputeIcon,
+    getVMInstanceMetrics: gcpComputeIcon,
+    getVMInstance: gcpComputeIcon,
+    createImage: gcpComputeIcon,
+    updateImage: gcpComputeIcon,
+    deleteImage: gcpComputeIcon,
+    monitoring: gcpMonitoringIcon,
+    prometheus: gcpMonitoringIcon,
   },
   elastic: elasticIcon,
   oci: ociIcon,

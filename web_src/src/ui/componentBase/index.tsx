@@ -206,7 +206,6 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   iconColor?: string;
   title: string;
   showHeader?: boolean;
-  paused?: boolean;
   specs?: ComponentBaseSpec[];
   hideCount?: boolean;
   hideMetadataList?: boolean;
@@ -252,12 +251,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   collapsedBackground: _collapsedBackground,
   eventSections,
   selected = false,
-  runDisabled: _runDisabled,
-  runDisabledTooltip: _runDisabledTooltip,
-  onTogglePause,
-  onEdit: _onEdit,
   onDuplicate,
-  onDeactivate: _onDeactivate,
   onToggleView,
   onDelete,
   isCompactView,
@@ -272,7 +266,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   emptyStateProps,
   error,
   warning,
-  paused,
   canvasMode = "live",
   dimBodyBelowHeader = false,
   draftDiffStatus,
@@ -317,8 +310,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
       tone: "neutral" as const,
     };
   }, [canvasMode, emptyStateProps, emptyStatePurpose]);
-  const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
-  const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
   const DuplicateIcon = React.useMemo(() => resolveIcon("copy"), []);
   const DeleteIcon = React.useMemo(() => resolveIcon("trash-2"), []);
   const ToggleViewIcon = React.useMemo(
@@ -352,21 +343,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
         {showHeader ? (
           <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-            {onTogglePause && !hasError && (
-              <button
-                type="button"
-                data-testid="node-action-pause"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onTogglePause();
-                }}
-                className="flex items-center gap-1 px-1 py-0.5 text-[13px] font-medium text-gray-500 transition hover:text-gray-800"
-              >
-                {paused ? <ResumeIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
-                <span>{paused ? "Resume" : "Pause"}</span>
-              </button>
-            )}
             {onDuplicate && (
               <button
                 type="button"
@@ -440,24 +416,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p className="max-w-xs text-sm">{hasError ? safeError : safeWarning}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-
-            {paused && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div
-                      data-testid="node-paused-badge"
-                      className={`absolute -top-8 ${hasBadge ? "left-7" : "left-0"} bg-blue-500 rounded-md h-6 p-1 cursor-pointer`}
-                    >
-                      <PauseIcon className="h-4 w-4 text-white" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-sm">Queued items will not be consumed.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

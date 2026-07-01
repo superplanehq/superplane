@@ -100,18 +100,28 @@ func RefOrDefault(ref, branch string) string {
 const (
 	initialRepositoryFilePath      = "README.md"
 	initialRepositoryCommitMessage = "Initialize repository"
-	initialRepositoryAuthorName    = "SuperPlane"
-	initialRepositoryAuthorEmail   = "bot@superplane.local"
+
+	// SuperPlaneBotAuthorName and SuperPlaneBotAuthorEmail identify the
+	// SuperPlane service in commits it authors on behalf of the platform
+	// (initial repository, app install seeding, etc.).
+	SuperPlaneBotAuthorName  = "SuperPlane"
+	SuperPlaneBotAuthorEmail = "bot@superplane.local"
 )
+
+// SuperPlaneBotAuthor returns the canonical author used for commits made by
+// SuperPlane itself rather than by an end user.
+func SuperPlaneBotAuthor() CommitAuthor {
+	return CommitAuthor{
+		Name:  SuperPlaneBotAuthorName,
+		Email: SuperPlaneBotAuthorEmail,
+	}
+}
 
 func InitialRepositoryCommitOptions(branch string) CommitOptions {
 	return CommitOptions{
 		Branch:  DefaultBranch(branch),
 		Message: initialRepositoryCommitMessage,
-		Author: CommitAuthor{
-			Name:  initialRepositoryAuthorName,
-			Email: initialRepositoryAuthorEmail,
-		},
+		Author:  SuperPlaneBotAuthor(),
 		Operations: []FileOperation{
 			{
 				Path:      initialRepositoryFilePath,

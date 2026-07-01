@@ -2,7 +2,7 @@ package canvases
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -11,13 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func InvokeNodeTriggerHook(
@@ -34,41 +33,41 @@ func InvokeNodeTriggerHook(
 ) (*pb.InvokeNodeTriggerHookResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	canvas, err := models.FindCanvas(orgID, canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	node, err := canvas.FindNode(nodeID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "node not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "node not found")
 	}
 
 	// Only trigger nodes have trigger actions
 	if node.Ref.Data().Trigger == nil {
-		return nil, status.Error(codes.InvalidArgument, "node is not a trigger node")
+		return nil, grpcerrors.InvalidArgument(nil, "node is not a trigger node")
 	}
 
 	hookProvider, hookDef, err := registry.FindTriggerHook(node.Ref.Data().Trigger.Name, hookName)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "hook not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "hook not found")
 	}
 
 	// Check if hook is user accessible
 	if hookDef.Type != core.HookTypeUser {
-		return nil, status.Errorf(codes.PermissionDenied, "hook '%s' cannot be invoked by user", hookName)
+		return nil, grpcerrors.PermissionDenied(nil, fmt.Sprintf("hook '%s' cannot be invoked by user", hookName))
 	}
 
 	if err := configuration.ValidateConfiguration(hookDef.Parameters, parameters); err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "hook parameter validation failed: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "hook parameter validation failed")
 	}
 
 	_, err = models.FindActiveUserByID(orgID.String(), userID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "user not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "user not found")
 	}
 
 	tx := database.Conn()
@@ -87,9 +86,9 @@ func InvokeNodeTriggerHook(
 			"parameters": expressionParameters,
 		}).
 		WithConfigurationFields(hookProvider.Configuration()).
-		Build(node.Configuration.Data())
+		Build(contexts.WithoutRunTitleConfiguration(node.Configuration.Data()))
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to resolve trigger configuration: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "failed to resolve trigger configuration")
 	}
 
 	hookCtx := core.TriggerHookContext{
@@ -107,7 +106,7 @@ func InvokeNodeTriggerHook(
 		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			logger.Errorf("error finding app installation: %v", err)
-			return nil, status.Error(codes.Internal, "error building context")
+			return nil, grpcerrors.Internal(err, "error building context")
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
@@ -117,7 +116,7 @@ func InvokeNodeTriggerHook(
 	hookCtx.Logger = logger
 	result, err := hookProvider.HandleHook(hookCtx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "hook execution failed: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "hook execution failed")
 	}
 
 	if len(newEvents) > 0 {
@@ -137,7 +136,7 @@ func InvokeNodeTriggerHook(
 	// Convert result to protobuf struct
 	resultStruct, err := newStructpbStruct(result)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create result struct: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to create result struct")
 	}
 
 	return &pb.InvokeNodeTriggerHookResponse{

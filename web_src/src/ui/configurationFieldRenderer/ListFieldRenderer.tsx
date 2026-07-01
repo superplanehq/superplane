@@ -1,10 +1,11 @@
 import React from "react";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronDown, GripVertical, Plus, Trash2 } from "lucide-react";
-import { Button } from "../button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem } from "@/ui/accordion";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
+import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { listFieldItemTitle } from "./listFieldItemTitle";
@@ -205,6 +206,16 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
       );
     }
 
+    if (itemDefinition?.type === "repository-file") {
+      return (
+        <RepositoryFileFieldRenderer
+          field={{ name: `${field.name || "item"}-${index}`, label: itemLabel, type: "repository-file" }}
+          value={item}
+          onChange={(val) => updateItem(index, val)}
+        />
+      );
+    }
+
     return (
       <Input
         type={itemDefinition?.type === "number" ? "number" : "text"}
@@ -250,15 +261,15 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   const renderRemoveButton = (index: number, className?: string) => (
     <Button
       variant="ghost"
-      size="icon"
+      size="icon-sm"
       onClick={(event) => {
         event.stopPropagation();
         removeItem(index);
       }}
-      className={className}
+      className={cn("group mt-1 text-gray-500 hover:bg-red-50 hover:text-red-500", className)}
       aria-label={`Remove ${listFieldItemTitle(renderedItems[index], index, itemLabel)}`}
     >
-      <Trash2 className="h-4 w-4 text-red-500" />
+      <Trash2 className="size-4" />
     </Button>
   );
 
@@ -314,8 +325,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
             );
           })}
         </Accordion>
-        <Button variant="outline" onClick={addItem} className="w-full mt-3" disabled={!canAddMore}>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
+          <Plus />
           Add {itemLabel}
         </Button>
       </div>
@@ -337,9 +348,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
             {renderDragHandle(index)}
             <div className="flex-1">
               {itemDefinition?.type === "object" && itemDefinition.schema ? (
-                <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
-                  {renderObjectItemFields(item, index)}
-                </div>
+                <div className="rounded-md bg-slate-100 p-4 space-y-4">{renderObjectItemFields(item, index)}</div>
               ) : (
                 renderListItemBody(item, index)
               )}
@@ -348,8 +357,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           </div>
         );
       })}
-      <Button variant="outline" onClick={addItem} className="w-full mt-3" disabled={!canAddMore}>
-        <Plus className="h-4 w-4 mr-2" />
+      <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
+        <Plus />
         Add {itemLabel}
       </Button>
     </div>

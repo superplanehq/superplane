@@ -1,5 +1,5 @@
 import { Heading } from "@/components/Heading/heading";
-import type { SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
+import type { ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 import { Link } from "react-router-dom";
 import { appPath } from "@/lib/appPaths";
 import { CanvasActionsMenu } from "./CanvasActionsMenu";
@@ -85,7 +85,7 @@ function CanvasCard({
             <div className="flex flex-col flex-1 min-w-0">
               <Heading
                 level={3}
-                className="mb-0 line-clamp-2 !text-lg font-medium text-gray-800 transition-colors !leading-6"
+                className="mb-0 line-clamp-2 !text-base font-medium text-gray-800 transition-colors !leading-6"
               >
                 <span className="truncate">{canvas.name}</span>
               </Heading>
@@ -122,7 +122,7 @@ function CanvasCard({
 
 interface CanvasMiniMapProps {
   nodes?: SuperplaneComponentsNode[];
-  edges?: SuperplaneComponentsEdge[];
+  edges?: ComponentsEdge[];
 }
 
 function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {

@@ -209,6 +209,201 @@ func ListSecurityGroups(ctx core.ListResourcesContext, resourceType string) ([]c
 	return resources, nil
 }
 
+func ListPublicIPv4Pools(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	pools, err := client.ListPublicIPv4Pools()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list public IPv4 pools: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(pools))
+	for _, pool := range pools {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: publicIPv4PoolResourceName(pool),
+			ID:   pool.PoolID,
+		})
+	}
+
+	return resources, nil
+}
+
+func ListCustomerOwnedIPv4Pools(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	pools, err := client.ListCustomerOwnedIPv4Pools()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list customer-owned IPv4 pools: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(pools))
+	for _, pool := range pools {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: customerOwnedIPv4PoolResourceName(pool),
+			ID:   pool.PoolID,
+		})
+	}
+
+	return resources, nil
+}
+
+func ListIpamPools(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	pools, err := client.ListIpamPoolsForElasticIP()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list IPAM pools: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(pools))
+	for _, pool := range pools {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: ipamPoolResourceName(pool),
+			ID:   pool.PoolID,
+		})
+	}
+
+	return resources, nil
+}
+
+func ListElasticIPs(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	addresses, err := client.ListAddresses()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Elastic IPs: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(addresses))
+	for _, address := range addresses {
+		if address.Domain != "vpc" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: elasticIPResourceName(address),
+			ID:   address.AllocationID,
+		})
+	}
+
+	return resources, nil
+}
+
+func ListUnassociatedElasticIPs(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	addresses, err := client.ListAddresses()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Elastic IPs: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(addresses))
+	for _, address := range addresses {
+		if address.Domain != "vpc" {
+			continue
+		}
+
+		if strings.TrimSpace(address.AssociationID) != "" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: elasticIPResourceName(address),
+			ID:   address.AllocationID,
+		})
+	}
+
+	return resources, nil
+}
+
+func ListElasticIPAssociations(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	addresses, err := client.ListAddresses()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Elastic IP associations: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(addresses))
+	for _, address := range addresses {
+		if address.Domain != "vpc" {
+			continue
+		}
+
+		associationID := strings.TrimSpace(address.AssociationID)
+		if associationID == "" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: elasticIPAssociationResourceName(address),
+			ID:   associationID,
+		})
+	}
+
+	return resources, nil
+}
+
 func ListKeyPairs(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
@@ -236,6 +431,153 @@ func ListKeyPairs(ctx core.ListResourcesContext, resourceType string) ([]core.In
 	}
 
 	return resources, nil
+}
+
+func ListInstanceProfiles(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		region = "us-east-1"
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	profiles, err := client.ListInstanceProfiles()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list IAM instance profiles: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(profiles))
+	for _, profile := range profiles {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: profile.Name,
+			ID:   profile.Name,
+		})
+	}
+
+	return resources, nil
+}
+
+func ListAlarms(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	alarms, err := client.ListAlarms()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list CloudWatch alarms: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(alarms))
+	for _, alarm := range alarms {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: alarm.AlarmName,
+			ID:   alarm.AlarmName,
+		})
+	}
+
+	return resources, nil
+}
+
+func ListInstanceAlarms(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	instanceID := strings.TrimSpace(ctx.Parameters["instanceId"])
+	if instanceID == "" {
+		return nil, fmt.Errorf("instanceId is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	alarms, err := client.ListAlarmsForInstance(instanceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list CloudWatch alarms for instance %s: %w", instanceID, err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(alarms))
+	for _, alarm := range alarms {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: alarm.AlarmName,
+			ID:   alarm.AlarmName,
+		})
+	}
+
+	return resources, nil
+}
+
+func publicIPv4PoolResourceName(pool PublicIPv4Pool) string {
+	description := strings.TrimSpace(pool.Description)
+	if description == "" {
+		return pool.PoolID
+	}
+
+	return fmt.Sprintf("%s (%s)", description, pool.PoolID)
+}
+
+func customerOwnedIPv4PoolResourceName(pool CustomerOwnedIPv4Pool) string {
+	if routeTable := strings.TrimSpace(pool.LocalGatewayRouteTableID); routeTable != "" {
+		return fmt.Sprintf("%s (%s)", pool.PoolID, routeTable)
+	}
+
+	return pool.PoolID
+}
+
+func ipamPoolResourceName(pool IpamPool) string {
+	description := strings.TrimSpace(pool.Description)
+	if description == "" {
+		if locale := strings.TrimSpace(pool.Locale); locale != "" {
+			return fmt.Sprintf("%s (%s)", pool.PoolID, locale)
+		}
+
+		return pool.PoolID
+	}
+
+	return fmt.Sprintf("%s (%s)", description, pool.PoolID)
+}
+
+func elasticIPResourceName(address ElasticIP) string {
+	publicIP := strings.TrimSpace(address.PublicIP)
+	if publicIP == "" {
+		return address.AllocationID
+	}
+
+	return fmt.Sprintf("%s (%s)", publicIP, address.AllocationID)
+}
+
+func elasticIPAssociationResourceName(address ElasticIP) string {
+	publicIP := strings.TrimSpace(address.PublicIP)
+	instanceID := strings.TrimSpace(address.InstanceID)
+
+	switch {
+	case publicIP != "" && instanceID != "":
+		return fmt.Sprintf("%s → %s (%s)", publicIP, instanceID, address.AssociationID)
+	case publicIP != "":
+		return fmt.Sprintf("%s (%s)", publicIP, address.AssociationID)
+	case instanceID != "":
+		return fmt.Sprintf("%s (%s)", instanceID, address.AssociationID)
+	default:
+		return address.AssociationID
+	}
 }
 
 func instanceResourceName(instance Instance) string {
@@ -281,4 +623,82 @@ func instanceTypeResourceName(instanceType InstanceTypeInfo) string {
 	}
 
 	return fmt.Sprintf("%s (%d vCPU, %.1f GiB Memory)", instanceType.InstanceType, instanceType.VCPUs, memoryGiB)
+}
+
+func ListLoadBalancers(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	loadBalancers, err := client.ListLoadBalancers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list load balancers: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(loadBalancers))
+	for _, lb := range loadBalancers {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: loadBalancerResourceName(lb),
+			ID:   lb.LoadBalancerARN,
+		})
+	}
+
+	return resources, nil
+}
+
+func loadBalancerResourceName(lb LoadBalancer) string {
+	name := strings.TrimSpace(lb.Name)
+	if name == "" {
+		return lb.LoadBalancerARN
+	}
+
+	return fmt.Sprintf("%s (%s)", name, lb.Type)
+}
+
+func ListTargetGroups(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	region := strings.TrimSpace(ctx.Parameters["region"])
+	if region == "" {
+		return nil, fmt.Errorf("region is required")
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	targetGroups, err := client.ListTargetGroups()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list target groups: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(targetGroups))
+	for _, tg := range targetGroups {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: targetGroupResourceName(tg),
+			ID:   tg.TargetGroupARN,
+		})
+	}
+
+	return resources, nil
+}
+
+func targetGroupResourceName(tg TargetGroup) string {
+	name := strings.TrimSpace(tg.Name)
+	if name == "" {
+		return tg.TargetGroupARN
+	}
+	if tg.Protocol != "" && tg.Port > 0 {
+		return fmt.Sprintf("%s (%s:%d)", name, tg.Protocol, tg.Port)
+	}
+	return name
 }

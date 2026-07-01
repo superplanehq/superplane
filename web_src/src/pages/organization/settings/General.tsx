@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { OrganizationsOrganization } from "../../../api-client/types.gen";
 import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
 import { Heading } from "../../../components/Heading/heading";
@@ -9,9 +10,7 @@ import { Input } from "../../../components/Input/input";
 import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/useOrganizationData";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { Switch } from "@/ui/switch";
 import { usePermissions } from "@/contexts/usePermissions";
-import { isChangeManagementSettingsEnabled } from "@/lib/env";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -21,25 +20,17 @@ export function General({ organization }: GeneralProps) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   usePageTitle(["Settings"]);
+  useReportPageReady(!permissionsLoading);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [changeManagementMessage, setChangeManagementMessage] = useState<string | null>(null);
   const [name, setName] = useState(organization.metadata?.name || "");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showDeleteForm, setShowDeleteForm] = useState(false);
-  const [changeManagementEnabled, setChangeManagementEnabled] = useState(
-    organization.spec?.changeManagementEnabled ?? false,
-  );
 
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
-  const updateChangeManagementMutation = useUpdateOrganization(organizationId || "");
   const deleteOrganizationMutation = useDeleteOrganization(organizationId || "");
   const canUpdateOrg = canAct("org", "update");
   const canDeleteOrg = canAct("org", "delete");
-
-  useEffect(() => {
-    setChangeManagementEnabled(organization.spec?.changeManagementEnabled ?? false);
-  }, [organization.spec?.changeManagementEnabled]);
 
   const handleSave = async () => {
     if (!canUpdateOrg) return;
@@ -80,30 +71,6 @@ export function General({ organization }: GeneralProps) {
       window.location.href = "/";
     } catch {
       setDeleteError("Failed to delete organization. Please try again.");
-    }
-  };
-
-  const handleChangeManagementToggle = async (enabled: boolean) => {
-    if (!canUpdateOrg || !organizationId) {
-      return;
-    }
-
-    const previous = changeManagementEnabled;
-    setChangeManagementEnabled(enabled);
-    setChangeManagementMessage(null);
-
-    try {
-      await updateChangeManagementMutation.mutateAsync({
-        changeManagementEnabled: enabled,
-      });
-      if (enabled) {
-        setChangeManagementMessage("Change management enabled");
-        setTimeout(() => setChangeManagementMessage(null), 3000);
-      }
-    } catch {
-      setChangeManagementEnabled(previous);
-      setChangeManagementMessage("Failed to update change management");
-      setTimeout(() => setChangeManagementMessage(null), 3000);
     }
   };
 
@@ -149,55 +116,6 @@ export function General({ organization }: GeneralProps) {
           </div>
         </Field>
       </Fieldset>
-
-      {isChangeManagementSettingsEnabled() ? (
-        <PermissionTooltip
-          allowed={canUpdateOrg || permissionsLoading}
-          message="You don't have permission to update this organization."
-          className="w-full"
-        >
-          <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
-            <div className="flex items-start justify-between gap-6">
-              <div>
-                <Label
-                  htmlFor="organization-change-management-switch"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Change Management
-                </Label>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Require change requests with approvals before publishing canvas changes. When enabled at the
-                  organization level, change management is enforced for every canvas and cannot be turned off per
-                  canvas.
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  When disabled here, each canvas can choose its own change management setting. New canvases inherit
-                  this organization setting by default.
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {changeManagementEnabled ? "Enabled" : "Disabled"}
-                </span>
-                <Switch
-                  id="organization-change-management-switch"
-                  checked={changeManagementEnabled}
-                  onCheckedChange={handleChangeManagementToggle}
-                  disabled={updateChangeManagementMutation.isPending || !canUpdateOrg}
-                  aria-label="Toggle change management"
-                />
-              </div>
-            </div>
-            {changeManagementMessage ? (
-              <p
-                className={`mt-3 text-sm ${changeManagementMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}
-              >
-                {changeManagementMessage}
-              </p>
-            ) : null}
-          </Fieldset>
-        </PermissionTooltip>
-      ) : null}
 
       <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
         {!showDeleteForm ? (

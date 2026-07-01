@@ -131,6 +131,102 @@
 
 @import "tw-animate-css";
 
+/*
+ * Console HTML widget Tailwind safelist.
+ *
+ * The console "html" panel renders user-authored HTML at runtime, but
+ * Tailwind v4 only compiles classes it discovers while scanning source
+ *
+ * Variant policy:
+ *  - Color (`text-*`, `bg-*`, `border-*`), text decoration, shadow, opacity,
+ *    and display utilities are safelisted with `{hover:,focus:,}` so authors
+ *    can write interactive styles like `hover:bg-blue-100`, `focus:shadow-lg`,
+ *    or `hover:underline` without the compiler dropping them. Adding a new
+ *    interactive utility family requires extending the safelist below.
+ *  - Sizing / spacing / typography size families intentionally do not get
+ *    `hover:` / `focus:` variants — animating those on hover is rare and
+ *    multiplies the bundle without payoff. Author can still use them as
+ *    static utilities.
+ *  - `dark:` is not safelisted. Dark mode in this app is opt-out (via
+ *    ancestors with `.dark-mode-disabled`), so widget authors should pick
+ *    colors that work in both themes rather than relying on the variant.
+ * files. To make a stable, predictable set of utilities available to html
+ * panel authors (and to anyone else writing untracked class strings such
+ * as those interpolated from canvas memory), we explicitly inline-source
+ * the curated set below.
+ *
+ * Edits here are user-visible: removing a utility breaks any console panel
+ * that was relying on it. Add utilities conservatively.
+ */
+@source inline("{hover:,focus:,}{block,inline,inline-block,flex,inline-flex,grid,inline-grid,hidden,table,table-row,table-cell}");
+@source inline("flex-{row,row-reverse,col,col-reverse,wrap,nowrap,1,auto,initial,none}");
+@source inline("items-{start,center,end,baseline,stretch}");
+@source inline("justify-{start,center,end,between,around,evenly}");
+@source inline("self-{auto,start,center,end,stretch}");
+@source inline("place-{items,content}-{start,center,end,stretch}");
+@source inline("grid-cols-{1,2,3,4,5,6,7,8,9,10,11,12}");
+@source inline("grid-rows-{1,2,3,4,5,6}");
+@source inline("col-span-{1,2,3,4,5,6,7,8,9,10,11,12,full}");
+@source inline("row-span-{1,2,3,4,5,6,full}");
+@source inline("gap-{0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12}");
+@source inline("gap-{x,y}-{0,1,2,3,4,5,6,8}");
+@source inline("p-{0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12,16}");
+@source inline("p{x,y,t,r,b,l}-{0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12,16}");
+@source inline("m-{0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12,16,auto}");
+@source inline("m{x,y,t,r,b,l}-{0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12,16,auto}");
+@source inline("space-{x,y}-{0,0.5,1,1.5,2,2.5,3,4,5,6,8}");
+@source inline("w-{auto,full,screen,min,max,fit,0,1,2,3,4,5,6,8,10,12,16,20,24,32,40,48,56,64,80,96,1/2,1/3,2/3,1/4,3/4,1/5,2/5,3/5,4/5}");
+@source inline("h-{auto,full,screen,min,max,fit,0,1,2,3,4,5,6,8,10,12,16,20,24,32,40,48,56,64,80,96}");
+@source inline("min-{w,h}-0");
+@source inline("max-{w,h}-{none,full,screen,fit,xs,sm,md,lg,xl,2xl,3xl,4xl,5xl,6xl,7xl}");
+@source inline("text-{xs,sm,base,lg,xl,2xl,3xl,4xl}");
+@source inline("text-{left,center,right,justify}");
+@source inline("font-{thin,extralight,light,normal,medium,semibold,bold,extrabold,black}");
+@source inline("font-{sans,serif,mono}");
+@source inline("italic");
+@source inline("not-italic");
+@source inline("{hover:,focus:,}underline");
+@source inline("{hover:,focus:,}line-through");
+@source inline("{hover:,focus:,}no-underline");
+@source inline("uppercase");
+@source inline("lowercase");
+@source inline("capitalize");
+@source inline("normal-case");
+@source inline("tracking-{tighter,tight,normal,wide,wider,widest}");
+@source inline("leading-{none,tight,snug,normal,relaxed,loose}");
+@source inline("truncate");
+@source inline("whitespace-{normal,nowrap,pre,pre-line,pre-wrap,break-spaces}");
+@source inline("break-{normal,words,all,keep}");
+@source inline("{hover:,focus:,}text-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("{hover:,focus:,}text-{white,black,inherit,current,transparent}");
+@source inline("{hover:,focus:,}bg-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("{hover:,focus:,}bg-{white,black,inherit,current,transparent}");
+@source inline("border-{0,1,2,4,8}");
+@source inline("border-{t,r,b,l}-{0,1,2,4,8}");
+@source inline("border-{solid,dashed,dotted,double,none}");
+@source inline("{hover:,focus:,}border-{slate,gray,zinc,neutral,stone,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("{hover:,focus:,}border-{white,black,transparent,current}");
+@source inline("rounded{,-sm,-md,-lg,-xl,-2xl,-3xl,-full,-none}");
+@source inline("rounded-{t,r,b,l,tl,tr,bl,br}-{sm,md,lg,xl,2xl,3xl,full,none}");
+@source inline("{hover:,focus:,}shadow{,-sm,-md,-lg,-xl,-2xl,-inner,-none}");
+@source inline("{hover:,focus:,}opacity-{0,5,10,20,25,30,40,50,60,70,75,80,90,95,100}");
+@source inline("overflow-{auto,hidden,clip,visible,scroll,x-auto,y-auto,x-hidden,y-hidden,x-scroll,y-scroll}");
+@source inline("relative");
+@source inline("absolute");
+@source inline("fixed");
+@source inline("sticky");
+@source inline("static");
+@source inline("z-{0,10,20,30,40,50,auto}");
+@source inline("top-0");
+@source inline("right-0");
+@source inline("bottom-0");
+@source inline("left-0");
+@source inline("inset-0");
+@source inline("cursor-{auto,default,pointer,wait,text,move,help,not-allowed}");
+@source inline("transition{,-all,-colors,-opacity,-transform,-shadow}");
+@source inline("duration-{75,100,150,200,300,500,700,1000}");
+@source inline("ease-{linear,in,out,in-out}");
+
 @custom-variant dark (&:is(.dark-mode-disabled *));
 
 

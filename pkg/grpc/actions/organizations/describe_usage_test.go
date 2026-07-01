@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/usage"
@@ -18,17 +19,19 @@ import (
 type fakeUsageService struct {
 	enabled bool
 
-	describeLimitsResponse *pb.DescribeOrganizationLimitsResponse
-	describeLimitsError    error
-	describeUsageResponse  *pb.DescribeOrganizationUsageResponse
-	describeUsageError     error
-	setupAccountError      error
-	setupOrganizationError error
-	setupOrganizationResp  *pb.SetupOrganizationResponse
-	checkAccountResponse   *pb.CheckAccountLimitsResponse
-	checkAccountError      error
-	checkOrganizationResp  *pb.CheckOrganizationLimitsResponse
-	checkOrganizationError error
+	describeLimitsResponse        *pb.DescribeOrganizationLimitsResponse
+	describeLimitsError           error
+	describeLimitsAfterSetupError error
+	describeUsageResponse         *pb.DescribeOrganizationUsageResponse
+	describeUsageError            error
+	describeUsageAfterSetupError  error
+	setupAccountError             error
+	setupOrganizationError        error
+	setupOrganizationResp         *pb.SetupOrganizationResponse
+	checkAccountResponse          *pb.CheckAccountLimitsResponse
+	checkAccountError             error
+	checkOrganizationResp         *pb.CheckOrganizationLimitsResponse
+	checkOrganizationError        error
 
 	setupAccountCalls      []string
 	setupOrganizationCalls [][2]string
@@ -81,6 +84,10 @@ func (s *fakeUsageService) DescribeOrganizationLimits(
 		return nil, s.describeLimitsError
 	}
 
+	if s.describeLimitsAfterSetupError != nil && len(s.setupOrganizationCalls) > 0 {
+		return nil, s.describeLimitsAfterSetupError
+	}
+
 	return s.describeLimitsResponse, nil
 }
 
@@ -97,6 +104,10 @@ func (s *fakeUsageService) DescribeOrganizationUsage(
 ) (*pb.DescribeOrganizationUsageResponse, error) {
 	if s.describeUsageError != nil && len(s.setupOrganizationCalls) == 0 {
 		return nil, s.describeUsageError
+	}
+
+	if s.describeUsageAfterSetupError != nil && len(s.setupOrganizationCalls) > 0 {
+		return nil, s.describeUsageAfterSetupError
 	}
 
 	return s.describeUsageResponse, nil
@@ -255,5 +266,46 @@ func Test__DescribeUsage(t *testing.T) {
 		assert.Equal(t, int32(1), response.Usage.Canvases)
 		require.NotNil(t, response.Usage.NextEventBucketDecreaseAt)
 		assert.WithinDuration(t, now.Add(24*time.Hour), response.Usage.NextEventBucketDecreaseAt.AsTime(), time.Second)
+	})
+
+	t.Run("returns failed precondition when usage setup is rejected", func(t *testing.T) {
+		service := &fakeUsageService{
+			enabled:                       true,
+			describeLimitsError:           status.Error(codes.NotFound, "organization not configured"),
+			describeLimitsAfterSetupError: status.Error(codes.NotFound, "organization not configured"),
+			setupOrganizationError:        status.Error(codes.FailedPrecondition, "organization already belongs to another account"),
+		}
+
+		response, err := DescribeUsage(context.Background(), service, r.Organization.ID.String())
+		require.Error(t, err)
+		assert.Nil(t, response)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "organization usage setup failed precondition", msg)
+		assert.Len(t, service.setupAccountCalls, 1)
+		require.Len(t, service.setupOrganizationCalls, 1)
+		assert.Equal(t, r.Organization.ID.String(), service.setupOrganizationCalls[0][0])
+		assert.Equal(t, r.Account.ID.String(), service.setupOrganizationCalls[0][1])
+	})
+
+	t.Run("returns failed precondition when usage remains unconfigured after setup", func(t *testing.T) {
+		service := &fakeUsageService{
+			enabled:                       true,
+			describeLimitsError:           status.Error(codes.NotFound, "organization not configured"),
+			describeLimitsAfterSetupError: status.Error(codes.NotFound, "organization not configured"),
+		}
+
+		response, err := DescribeUsage(context.Background(), service, r.Organization.ID.String())
+		require.Error(t, err)
+		assert.Nil(t, response)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Equal(t, "organization usage is not configured", msg)
+		assert.Len(t, service.setupAccountCalls, 1)
+		require.Len(t, service.setupOrganizationCalls, 1)
+		assert.Equal(t, r.Organization.ID.String(), service.setupOrganizationCalls[0][0])
+		assert.Equal(t, r.Account.ID.String(), service.setupOrganizationCalls[0][1])
 	})
 }

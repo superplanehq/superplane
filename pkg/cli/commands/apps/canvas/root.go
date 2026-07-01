@@ -22,18 +22,18 @@ rules, install skills:
 		Short: "Get a canvas",
 		Long: `Print a canvas for an app. With -o yaml, prints the canonical
 Canvas YAML (apiVersion: v1, kind: Canvas). Defaults to the live canvas;
-use --draft to read your in-progress draft.
+pass --draft-id to read a specific draft.
 
 The app argument is optional. When omitted, the active app
 configured with "superplane apps active" is used.`,
 		Args: cobra.MaximumNArgs(1),
 	}
-	var getDraft bool
-	getCmd.Flags().BoolVar(&getDraft, "draft", false, "get your draft version instead of the live version")
-	core.Bind(getCmd, &getCommand{draft: &getDraft}, options)
+	var getDraftID string
+	getCmd.Flags().StringVar(&getDraftID, "draft-id", "", "target a specific draft by id (see `superplane apps drafts list`)")
+	core.Bind(getCmd, &getCommand{draftID: &getDraftID}, options)
 
 	var updateFile string
-	var updateDraft bool
+	var updateDraftID string
 	var updateAutoLayout string
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
@@ -45,13 +45,13 @@ configured with "superplane apps active" is used.`,
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	_ = updateCmd.MarkFlagRequired("file")
-	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "keep the update as a draft instead of auto-publishing (required when change management is enabled)")
+	updateCmd.Flags().StringVar(&updateDraftID, "draft-id", "", "update a specific draft by id instead of auto-publishing")
 	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(updateCmd, &updateCommand{
 		file:            &updateFile,
-		draft:           &updateDraft,
+		draftID:         &updateDraftID,
 		autoLayout:      &updateAutoLayout,
 		autoLayoutScope: &updateAutoLayoutScope,
 		autoLayoutNodes: &updateAutoLayoutNodes,
@@ -63,11 +63,14 @@ configured with "superplane apps active" is used.`,
 	initCmd := &cobra.Command{
 		Use:   "init",
 		Short: "Generate a starter canvas YAML definition",
-		Long:  "Print a starter canvas YAML definition to stdout. Use --template to start from an existing template, or --list-templates to see available options.",
-		Args:  cobra.NoArgs,
+		Long: `Print a starter canvas YAML definition to stdout.
+
+By default, prints a blank canvas. Use --template to start from a built-in
+example (currently: health-check-monitor), or --list-templates to see options.`,
+		Args: cobra.NoArgs,
 	}
-	initCmd.Flags().StringVar(&initTemplate, "template", "", "start from a named template (e.g. health-check-monitor)")
-	initCmd.Flags().BoolVar(&initListTemplates, "list-templates", false, "list available template names")
+	initCmd.Flags().StringVar(&initTemplate, "template", "", "start from a built-in template (e.g. health-check-monitor)")
+	initCmd.Flags().BoolVar(&initListTemplates, "list-templates", false, "list available built-in templates")
 	initCmd.Flags().StringVar(&initOutputFile, "output-file", "", "write to a file instead of stdout")
 	core.Bind(initCmd, &initCommand{
 		template:      &initTemplate,

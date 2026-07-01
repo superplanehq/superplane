@@ -1,5 +1,6 @@
 import { Heading } from "@/components/Heading/heading";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../../../components/Icon";
@@ -21,6 +22,8 @@ export function CreateGroupPage() {
 
   const { data: roles = [], isLoading: loadingRoles } = useOrganizationRoles(orgId || "");
   const createGroupMutation = useCreateGroup(orgId || "");
+
+  useReportPageReady(!loadingRoles);
 
   const sortedRoles = useMemo(() => {
     const defaultRoles = new Set(["org_admin", "org_owner", "org_viewer"]);

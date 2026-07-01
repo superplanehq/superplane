@@ -9,75 +9,113 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
+
+// commitCanvasRepositoryFilesForTest wraps CommitCanvasRepositoryFiles with the
+// shared services from the test ResourceRegistry so each case only has to supply
+// the request-specific arguments.
+func commitCanvasRepositoryFilesForTest(
+	ctx context.Context,
+	r *support.ResourceRegistry,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	expectedHeadSha string,
+	message string,
+	operations []*pb.CanvasRepositoryFileOperation,
+) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+	return CommitCanvasRepositoryFiles(
+		ctx,
+		r.GitProvider,
+		nil,
+		r.Encryptor,
+		r.Registry,
+		organizationID,
+		canvasID,
+		versionID,
+		expectedHeadSha,
+		message,
+		operations,
+		nil,
+		"",
+		r.AuthService,
+	)
+}
 
 func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			context.Background(),
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			uuid.New().String(),
+			"",
 			"abc123",
 			"commit message",
 			nil,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Unauthenticated, s.Code())
+		assert.Equal(t, codes.Unauthenticated, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			"invalid-id",
+			"",
 			"abc123",
 			"commit message",
 			nil,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("repository missing -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
+			"",
 			"abc123",
 			"commit message",
-			nil,
+			[]*pb.CanvasRepositoryFileOperation{
+				{Path: "README.md", Content: []byte("hello")},
+			},
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("commit fails -> propagates error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
+			"",
 			"stale-head",
 			"commit message",
 			[]*pb.CanvasRepositoryFileOperation{
@@ -85,10 +123,10 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			},
 		)
 
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Internal, s.Code())
-		assert.Contains(t, s.Message(), "failed to commit repository files")
+		assert.Equal(t, codes.Internal, code)
+		assert.Contains(t, msg, "failed to commit repository files")
 	})
 
 	t.Run("canvas from different organization -> not found", func(t *testing.T) {
@@ -96,31 +134,33 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 		otherOrg := support.CreateOrganization(t, r, r.User)
 
-		_, err := CommitCanvasRepositoryFiles(
+		_, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			otherOrg.ID.String(),
 			canvas.ID.String(),
+			"",
 			"abc123",
 			"commit message",
 			nil,
 		)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("commits files with authenticated user as author", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID)
+		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID, "")
 		require.NoError(t, err)
 
-		response, err := CommitCanvasRepositoryFiles(
+		response, err := commitCanvasRepositoryFilesForTest(
 			ctx,
-			r.GitProvider,
+			r,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
+			"",
 			headSHA,
 			"add readme",
 			[]*pb.CanvasRepositoryFileOperation{
@@ -131,15 +171,70 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, response.CommitSha)
 
-		reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md")
+		reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", "")
 		require.NoError(t, err)
 		content, err := io.ReadAll(reader)
 		require.NoError(t, err)
 		require.NoError(t, reader.Close())
 		assert.Equal(t, "hello world", string(content))
 
-		files, err := r.GitProvider.ListFiles(ctx, repository.RepoID)
+		files, err := r.GitProvider.ListFiles(ctx, repository.RepoID, "")
 		require.NoError(t, err)
 		assert.Equal(t, []string{"README.md"}, files)
 	})
+}
+
+func Test__CommitCanvasRepositoryFiles_DiscardsStaging(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+	draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
+	require.NoError(t, err)
+
+	_, err = models.UpsertWorkflowStagingPath(
+		draftVersion.ID,
+		r.Organization.ID,
+		ConsoleYAMLRepositoryPath,
+		"stale staged content",
+		"",
+		&r.User,
+	)
+	require.NoError(t, err)
+
+	hasStaging, err := models.HasWorkflowStaging(draftVersion.ID)
+	require.NoError(t, err)
+	require.True(t, hasStaging)
+
+	yamlText := `apiVersion: v1
+kind: Canvas
+metadata:
+  name: ` + canvas.Name + `
+spec:
+  nodes:
+    - id: s
+      name: Start
+      type: TYPE_TRIGGER
+      component: start
+  edges: []
+`
+
+	_, err = commitCanvasRepositoryFilesForTest(
+		ctx,
+		r,
+		r.Organization.ID.String(),
+		canvas.ID.String(),
+		draftVersion.ID.String(),
+		"",
+		"Update canvas.yaml",
+		[]*pb.CanvasRepositoryFileOperation{
+			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
+		},
+	)
+	require.NoError(t, err)
+
+	hasStaging, err = models.HasWorkflowStaging(draftVersion.ID)
+	require.NoError(t, err)
+	assert.False(t, hasStaging, "direct commit should discard existing staged changes")
 }

@@ -11,7 +11,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -36,7 +38,7 @@ func TestAdminListOrganizations(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := signer.Generate(account.ID.String(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		response := execRequest(server, requestParams{
@@ -144,6 +146,7 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		err := json.Unmarshal(response.Body.Bytes(), &result)
 		require.NoError(t, err)
 		assert.False(t, result.AllowPrivateNetworkAccess)
+		assert.True(t, result.SignupsEnabled)
 		assert.NotEmpty(t, result.EffectiveBlockedHTTPHosts)
 		assert.NotEmpty(t, result.EffectivePrivateIPRanges)
 		assert.False(t, result.SMTPEnabled)
@@ -165,7 +168,7 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		metadata, err := models.GetInstallationMetadata()
+		metadata, err := models.GetInstallationMetadata(database.Conn())
 		require.NoError(t, err)
 		assert.True(t, metadata.AllowPrivateNetworkAccess)
 
@@ -175,6 +178,32 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		assert.True(t, result.AllowPrivateNetworkAccess)
 		assert.Empty(t, result.EffectiveBlockedHTTPHosts)
 		assert.Empty(t, result.EffectivePrivateIPRanges)
+	})
+
+	t.Run("admin can disable signups through installation settings", func(t *testing.T) {
+		body, err := json.Marshal(map[string]bool{
+			"signups_enabled": false,
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/network-settings",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		metadata, err := models.GetInstallationMetadata(database.Conn())
+		require.NoError(t, err)
+		assert.False(t, metadata.SignupsEnabled)
+
+		var result installationSettingsResponse
+		err = json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.False(t, result.SignupsEnabled)
 	})
 
 	t.Run("admin can read existing smtp settings", func(t *testing.T) {
@@ -276,14 +305,16 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 	t.Run("admin installation settings updates are atomic", func(t *testing.T) {
 		require.NoError(t, models.DeleteEmailSettings(models.EmailProviderSMTP))
 
-		metadata, err := models.GetInstallationMetadata()
+		metadata, err := models.GetInstallationMetadata(database.Conn())
 		require.NoError(t, err)
 		metadata.AllowPrivateNetworkAccess = false
+		metadata.SignupsEnabled = true
 		metadata.UpdatedAt = time.Now()
-		require.NoError(t, models.UpdateInstallationMetadata(metadata))
+		require.NoError(t, models.UpdateInstallationMetadata(database.Conn(), metadata))
 
 		body, err := json.Marshal(map[string]any{
 			"allow_private_network_access": true,
+			"signups_enabled":              false,
 			"smtp_enabled":                 true,
 			"smtp_host":                    "smtp.internal",
 			"smtp_port":                    2525,
@@ -304,9 +335,10 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 
-		metadata, err = models.GetInstallationMetadata()
+		metadata, err = models.GetInstallationMetadata(database.Conn())
 		require.NoError(t, err)
 		assert.False(t, metadata.AllowPrivateNetworkAccess)
+		assert.True(t, metadata.SignupsEnabled)
 
 		_, err = models.FindEmailSettings(models.EmailProviderSMTP)
 		require.Error(t, err)
@@ -684,7 +716,7 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 	signer := jwt.NewSigner("test-client-secret")
 
 	t.Run("non-admin with impersonation cookie is ignored", func(t *testing.T) {
-		regularToken, err := signer.Generate(otherAccount.ID.String(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, otherAccount.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
@@ -796,20 +828,20 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Cleanup(func() {
-		_ = models.DisableExperimentalFeature(r.Organization.ID, "runner")
+		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgents)
 	})
 
 	t.Run("enables a known feature", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "POST",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runner",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureClaudeManagedAgents,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), "runner")
+		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureClaudeManagedAgents)
 	})
 
 	t.Run("rejects unknown feature ids", func(t *testing.T) {
@@ -824,7 +856,7 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "POST",
-			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runner",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/" + features.FeatureClaudeManagedAgents,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
@@ -835,18 +867,18 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Run("disables a previously enabled feature", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, "runner"))
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgents))
 
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runner",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureClaudeManagedAgents,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), "runner")
+		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureClaudeManagedAgents)
 	})
 
 	t.Run("is idempotent for ids not currently enabled", func(t *testing.T) {
@@ -861,7 +893,7 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runner",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/" + features.FeatureClaudeManagedAgents,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)

@@ -3,6 +3,7 @@ import Editor from "@monaco-editor/react";
 import type { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
 import { coerceMonacoValue } from "@/lib/monaco";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
@@ -121,16 +122,19 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
               Expanded XML editor for {field.label || field.name}.
             </DialogDescription>
             <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
-              <button
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1"
                 onClick={(e) => {
                   e.stopPropagation();
                   copyToClipboard();
                 }}
-                className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
               >
                 {React.createElement(resolveIcon("copy"), { size: 14 })}
                 Copy
-              </button>
+              </Button>
             </SimpleTooltip>
           </div>
           <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-md">

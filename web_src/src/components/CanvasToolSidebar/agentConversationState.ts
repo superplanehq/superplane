@@ -88,6 +88,7 @@ export function createWebsocketCallbacks(
   setStatus: (value: string) => void,
   setError: (value: string | null) => void,
   setOutcomeState: (update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => void,
+  setNotice?: (value: string | null) => void,
 ) {
   return {
     onPersistedMessage: (message: AgentMessage) => {
@@ -98,6 +99,10 @@ export function createWebsocketCallbacks(
     onStatusChange: (next: string, error?: string) => {
       setStatus(next || "idle");
       setError(error ?? null);
+      setNotice?.(null); // turn boundary clears any stale notice
+    },
+    onNotice: (message: string) => {
+      setNotice?.(message || "The agent hit a recoverable error and is retrying.");
     },
     onOutcomeEvent: (phase: "start" | "end", evaluation: OutcomeEvaluationPayload) => {
       setOutcomeState((prev) => {
@@ -151,7 +156,7 @@ export function statusLabel(status: string): string {
     case "streaming":
       return "Agent is running...";
     case "failed":
-      return "Last turn failed";
+      return "Message failed. Try again.";
     case "terminated":
       return "Session ended";
     default:

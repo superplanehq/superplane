@@ -4,6 +4,8 @@ import type { TooltipPayloadEntry, TooltipValueType } from "recharts";
 
 import { cn } from "@/lib/utils";
 
+import { toChartColorVarName } from "./chartColorVarName";
+
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
 
@@ -92,7 +94,7 @@ ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ?? itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
+    return color ? `  --color-${toChartColorVarName(key)}: ${color};` : null;
   })
   .join("\n")}
 }
@@ -356,7 +358,7 @@ function ChartLegendContent({
                 <div
                   className="h-2 w-2 shrink-0 rounded-[2px]"
                   style={{
-                    backgroundColor: item.color,
+                    backgroundColor: itemConfig?.color ?? item.color,
                   }}
                 />
               )}

@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 import React, { useCallback } from "react";
 import type { EdgeProps } from "@xyflow/react";
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, useReactFlow } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, useReactFlow } from "@xyflow/react";
+import { getCanvasEdgePath } from "./edgePath";
 import { CircleX } from "lucide-react";
 
 interface CustomEdgeData {
@@ -93,7 +94,7 @@ export const CustomEdge = React.memo(function CustomEdge({
   const canDelete = edgeData?.canDelete === true;
   const onDeleteEdge = edgeData?.onDelete;
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [edgePath, labelX, labelY] = getCanvasEdgePath({
     sourceX,
     sourceY,
     sourcePosition,

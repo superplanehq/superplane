@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE agent_sessions ADD COLUMN heartbeat_at TIMESTAMPTZ NULL;
+
+COMMIT;

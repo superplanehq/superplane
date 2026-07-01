@@ -1,7 +1,6 @@
 package installation
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,10 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
+	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
@@ -34,6 +32,31 @@ var defaultRefs = []string{"main", "master"}
 var httpGet = func(rawURL string) (*http.Response, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
 	return client.Get(rawURL)
+}
+
+// fetchRawCanvasFile resolves the ref and downloads the raw canvas.yaml bytes.
+// It tries defaultRefs (main, master) when repo.Ref is empty. On success it
+// sets repo.Ref to the resolved ref and returns the raw YAML content.
+func fetchRawCanvasFile(repo *Repository) ([]byte, string, error) {
+	if repo.Ref == "" {
+		for _, ref := range defaultRefs {
+			body, fetchErr := fetchURL(rawFileURL(repo, ref, canvasFileName))
+			if fetchErr == nil {
+				repo.Ref = ref
+				return body, ref, nil
+			}
+			if !errors.Is(fetchErr, errFileNotFound) {
+				return nil, "", fetchErr
+			}
+		}
+		return nil, "", fmt.Errorf("canvas.yaml not found on main or master branch")
+	}
+
+	body, err := fetchURL(rawFileURL(repo, repo.Ref, canvasFileName))
+	if err != nil {
+		return nil, "", err
+	}
+	return body, repo.Ref, nil
 }
 
 // FetchCanvas loads and parses canvas.yaml from a public GitHub repository.
@@ -77,11 +100,11 @@ func fetchCanvasAtRef(repo *Repository, ref string) (*pb.Canvas, error) {
 // FetchConsole loads and parses an optional console.yaml from a public GitHub
 // repository at the given ref. The console is opt-in: a missing file returns
 // (nil, nil) so callers can install the app without one. Parse and validation
-// errors from models.DashboardFromYML are wrapped and surfaced to the caller.
+// errors from models.ConsoleFromYML are wrapped and surfaced to the caller.
 //
 // Callers must pass a non-empty ref. Resolve it via FetchCanvas first so the
 // canvas and console are read from the same commit.
-func FetchConsole(repo *Repository, ref string) (*models.DashboardYAML, error) {
+func FetchConsole(repo *Repository, ref string) (*models.ConsoleYAML, error) {
 	if ref == "" {
 		return nil, fmt.Errorf("console fetch requires a resolved ref")
 	}
@@ -94,7 +117,7 @@ func FetchConsole(repo *Repository, ref string) (*models.DashboardYAML, error) {
 		return nil, err
 	}
 
-	console, err := models.DashboardFromYML(body)
+	console, err := models.ConsoleFromYML(body)
 	if err != nil {
 		return nil, fmt.Errorf("parse console yaml: %w", err)
 	}
@@ -145,67 +168,12 @@ func fetchURL(rawURL string) ([]byte, error) {
 }
 
 func parseCanvasYAML(data []byte) (*pb.Canvas, error) {
-	jsonData, err := yaml.YAMLToJSON(data)
-	if err != nil {
-		return nil, fmt.Errorf("parse canvas yaml: %w", err)
-	}
-
-	canvasJSON, err := canvasJSONFromResource(jsonData)
+	canvas, err := canvasyaml.ParseCanvasResource(data)
 	if err != nil {
 		return nil, err
 	}
 
-	var canvas pb.Canvas
-	if err := protojson.Unmarshal(canvasJSON, &canvas); err != nil {
-		return nil, fmt.Errorf("parse canvas definition: %w", err)
-	}
-
-	if canvas.Metadata == nil {
-		return nil, fmt.Errorf("canvas metadata is required")
-	}
-
-	if canvas.Metadata.GetIsTemplate() {
-		return nil, fmt.Errorf("canvas templates cannot be installed")
-	}
-
 	canvas.Metadata.Id = ""
 
-	return &canvas, nil
-}
-
-func canvasJSONFromResource(jsonData []byte) ([]byte, error) {
-	var resource map[string]json.RawMessage
-	if err := json.Unmarshal(jsonData, &resource); err != nil {
-		return nil, fmt.Errorf("parse canvas yaml: %w", err)
-	}
-
-	if kindRaw, ok := resource["kind"]; ok {
-		var kind string
-		if err := json.Unmarshal(kindRaw, &kind); err != nil {
-			return nil, fmt.Errorf("parse canvas definition: %w", err)
-		}
-
-		if kind != "" && kind != "Canvas" {
-			return nil, fmt.Errorf("unsupported resource kind %q", kind)
-		}
-	}
-
-	canvasPayload := make(map[string]json.RawMessage)
-	if metadata, ok := resource["metadata"]; ok {
-		canvasPayload["metadata"] = metadata
-	}
-	if spec, ok := resource["spec"]; ok {
-		canvasPayload["spec"] = spec
-	}
-
-	if len(canvasPayload) == 0 {
-		return jsonData, nil
-	}
-
-	canvasJSON, err := json.Marshal(canvasPayload)
-	if err != nil {
-		return nil, fmt.Errorf("parse canvas definition: %w", err)
-	}
-
-	return canvasJSON, nil
+	return canvas, nil
 }

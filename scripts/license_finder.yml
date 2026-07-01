@@ -120,6 +120,18 @@
     :versions: []
     :when: 2026-05-13 00:00:00.000000000 Z
 - - :approve
+  - csv
+  - :who: SuperPlane maintainers
+    :why: Dual-licensed Ruby/BSD-2-Clause; Ruby gem used by license_finder tooling only.
+    :versions: []
+    :when: 2026-06-10 00:00:00.000000000 Z
+- - :approve
+  - khroma
+  - :who: SuperPlane maintainers
+    :why: MIT license per upstream repository; npm metadata omits the license field.
+    :versions: []
+    :when: 2026-06-10 00:00:00.000000000 Z
+- - :approve
   - chownr
   - :who: SuperPlane maintainers
     :why: BlueOak-1.0.0; permissive license compatible with Apache-2.0.

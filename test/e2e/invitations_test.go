@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
@@ -83,7 +85,7 @@ func (s *invitationSteps) startLoggedOut() {
 }
 
 func (s *invitationSteps) createInviteLink() string {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(s.session.OrgID.String())
+	inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(s.t.Context()), s.session.OrgID.String())
 	if err == nil {
 		return inviteLink.Token.String()
 	}
@@ -190,7 +192,7 @@ func (s *invitationSteps) assertInviteeViewerRole(email string) {
 	authService, err := authorization.NewAuthService()
 	require.NoError(s.t, err)
 
-	roles, err := authService.GetUserRolesForOrg(user.ID.String(), s.session.OrgID.String())
+	roles, err := authService.GetUserRolesForOrg(context.Background(), user.ID.String(), s.session.OrgID.String())
 	require.NoError(s.t, err)
 	require.NotEmpty(s.t, roles)
 

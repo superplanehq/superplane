@@ -80,21 +80,3 @@ func (steps *TestHomePageSteps) ClickNewApp() {
 	steps.session.Click(q.Text("Start from scratch"))
 	steps.session.Sleep(3000)
 }
-
-func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {
-	component, err := models.FindBlueprintByName(s, steps.session.OrgID)
-
-	assert.NoError(steps.t, err)
-	assert.Equal(steps.t, s, component.Name)
-}
-
-func (steps *TestHomePageSteps) FillInNewComponentForm(name string) {
-	newComponentButton := q.Text("New Bundle")
-	saveComponentButton := q.Text("Create Bundle")
-	componentNameInput := q.TestID("component-name-input")
-
-	steps.session.Click(newComponentButton)
-	steps.session.FillIn(componentNameInput, name)
-	steps.session.Click(saveComponentButton)
-	steps.session.Sleep(500)
-}

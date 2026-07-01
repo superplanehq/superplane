@@ -18,7 +18,6 @@ type Organization struct {
 	Name                        string    `gorm:"uniqueIndex"`
 	Description                 string
 	AllowedProviders            datatypes.JSONSlice[string]
-	ChangeManagementEnabled     bool
 	EnabledExperimentalFeatures datatypes.JSONSlice[string]
 	UsageSyncedAt               *time.Time
 	UsageRetentionWindowDays    *int32
@@ -181,7 +180,6 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		Name:                        name,
 		Description:                 description,
 		AllowedProviders:            datatypes.JSONSlice[string]{ProviderGitHub},
-		ChangeManagementEnabled:     false,
 		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{},
 		CreatedAt:                   &now,
 		UpdatedAt:                   &now,
@@ -571,22 +569,4 @@ func HasExperimentalFeature(orgID uuid.UUID, featureID string) (bool, error) {
 		return false, err
 	}
 	return organization.HasExperimentalFeature(featureID), nil
-}
-
-func IsChangeManagementEnabled(organizationID uuid.UUID) (bool, error) {
-	return IsChangeManagementEnabledInTransaction(database.Conn(), organizationID)
-}
-
-func IsChangeManagementEnabledInTransaction(tx *gorm.DB, organizationID uuid.UUID) (bool, error) {
-	var organization Organization
-	err := tx.
-		Select("change_management_enabled").
-		Where("id = ?", organizationID).
-		First(&organization).
-		Error
-	if err != nil {
-		return false, err
-	}
-
-	return organization.ChangeManagementEnabled, nil
 }

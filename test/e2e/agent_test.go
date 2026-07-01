@@ -102,8 +102,16 @@ func TestAgentE2E(t *testing.T) {
 		steps.assertVisible(q.TestID("agent-stop-button"))
 		steps.stopAgent()
 		steps.assertInterruptSent()
-		steps.finishRunningTurnAsFailed("stopped by e2e")
-		steps.assertText("Last turn failed")
+		// InterruptSession resets the row to idle and broadcasts
+		// turn_completed/idle, so the composer flips back to "Ready" on
+		// the WS event — regardless of any late provider stream error.
+		// The "late session_failed must not overwrite idle" race is
+		// covered as a unit test in
+		// TestAgentStreamWorker_DoesNotOverwriteIdleWithFailedAfterInterrupt;
+		// reproducing it here would race InterruptSession's DB commit
+		// (assertInterruptSent fires as soon as the provider call is
+		// recorded, mid-flight) and flake.
+		steps.assertText("Ready")
 		steps.assertHidden(q.TestID("agent-stop-button"))
 	})
 
@@ -129,11 +137,17 @@ func TestAgentE2E(t *testing.T) {
 		})
 	})
 
-	t.Run("starts outcome-based building from a rubric response", func(t *testing.T) {
+	t.Run("starts building from a rubric response", func(t *testing.T) {
+		var approvalReceived bool
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
 			if isAgentSystemMessage(call.Message) {
 				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
+			}
+
+			if call.Message == "Specs approved. Start building." {
+				approvalReceived = true
+				return agentAssistantTurn("Building now."), nil
 			}
 
 			return agentAssistantTurn(strings.Join([]string{
@@ -145,33 +159,14 @@ func TestAgentE2E(t *testing.T) {
 				":::",
 			}, "\n")), nil
 		})
-		ctx.AgentProvider.SetDefineOutcomeEvents(
-			agents.ProviderEvent{
-				ProviderEventID: "outcome-start-" + uuid.NewString(),
-				Type:            agents.ProviderEventOutcomeEvaluationStart,
-				OutcomeResult:   &agents.OutcomeEvaluation{Iteration: 1},
-			},
-			agents.ProviderEvent{
-				ProviderEventID: "outcome-end-" + uuid.NewString(),
-				Type:            agents.ProviderEventOutcomeEvaluation,
-				OutcomeResult: &agents.OutcomeEvaluation{
-					Iteration:   1,
-					Result:      "satisfied",
-					Explanation: "all criteria satisfied",
-				},
-			},
-			agentTurnCompletedEvent(),
-		)
 
 		steps.start()
 		steps.openAgent()
-		steps.switchToAskMode()
 		steps.sendMessage("Create a build plan")
 		steps.assertText("E2E Build Plan")
 		steps.startBuildingFromRubric()
-		steps.assertDefineOutcomeSent()
-		steps.assertVisible(q.TestID("outcome-progress"))
-		steps.assertText("Complete")
+		steps.assertText("Building now.")
+		require.True(t, approvalReceived, "expected 'Specs approved. Start building.' message")
 	})
 }
 
@@ -213,22 +208,10 @@ func (s *agentSteps) openAgent() {
 	s.waitForToolSidebarOpen()
 
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.clickAgentTab()
 	s.waitForAgentInput()
 	s.waitForSendCall(func(call support.AgentProviderSendMessageCall) bool {
 		return isAgentSystemMessage(call.Message)
 	})
-}
-
-func (s *agentSteps) clickAgentTab() {
-	tab := q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Agent")`).Run(s.session)
-	require.Eventually(s.t, func() bool {
-		visible, err := tab.IsVisible()
-		if err != nil || !visible {
-			return false
-		}
-		return tab.Click(pw.LocatorClickOptions{Timeout: pw.Float(1000)}) == nil
-	}, agentWaitTimeout, agentPollInterval)
 }
 
 func (s *agentSteps) waitForAgentInput() {
@@ -303,15 +286,6 @@ func (s *agentSteps) stopAgent() {
 
 func (s *agentSteps) startBuildingFromRubric() {
 	s.session.Click(q.Locator(`button:has-text("Start Building")`))
-}
-
-func (s *agentSteps) finishRunningTurnAsFailed(message string) {
-	agentSession := s.currentAgentSession()
-	require.NoError(s.t, ctx.AgentProvider.QueueEvents(agentSession.ProviderSessionID, agents.ProviderEvent{
-		ProviderEventID: "session-failed-" + uuid.NewString(),
-		Type:            agents.ProviderEventSessionFailed,
-		ErrorMessage:    message,
-	}))
 }
 
 func (s *agentSteps) currentAgentSession() *models.AgentSession {

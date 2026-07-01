@@ -9,11 +9,14 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { getResponseErrorMessage } from "@/lib/errors";
 import { analytics } from "@/lib/analytics";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useReportPageReady(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

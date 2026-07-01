@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -19,6 +20,12 @@ const (
 	AgentToolStatusFailed   = "failed"
 )
 
+// AgentSessionImage is a base64-encoded image attached to a user message.
+type AgentSessionImage struct {
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
+}
+
 type AgentSessionMessage struct {
 	ID              uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	SessionID       uuid.UUID
@@ -28,6 +35,7 @@ type AgentSessionMessage struct {
 	ToolCallID      string
 	ToolName        string
 	ToolStatus      string
+	Images          datatypes.JSONSlice[AgentSessionImage]
 	CreatedAt       *time.Time
 }
 
@@ -44,14 +52,18 @@ func AppendAgentSessionMessageInTransaction(tx *gorm.DB, msg *AgentSessionMessag
 		now := time.Now()
 		msg.CreatedAt = &now
 	}
+	if msg.Images == nil {
+		msg.Images = datatypes.JSONSlice[AgentSessionImage]{}
+	}
 
 	if msg.ProviderEventID == "" {
 		return tx.Create(msg).Error
 	}
 
-	// Preserve the existing content when the incoming event has none — the
-	// tool_finished payload doesn't carry the input the user already saw on
-	// tool_started, and overwriting with '' wipes the expandable command.
+	// Preserve the existing content and tool name when the incoming event has
+	// none. Anthropic tool_result events commonly omit both, and overwriting
+	// with empty values hides the command/file that the user already saw on
+	// tool_started.
 	return tx.Exec(`
 		INSERT INTO agent_session_messages
 			(id, session_id, provider_event_id, role, content, tool_call_id, tool_name, tool_status, created_at)
@@ -59,9 +71,17 @@ func AppendAgentSessionMessageInTransaction(tx *gorm.DB, msg *AgentSessionMessag
 		ON CONFLICT (session_id, provider_event_id)
 		WHERE provider_event_id <> ''
 		DO UPDATE SET
-			content = COALESCE(NULLIF(EXCLUDED.content, ''), agent_session_messages.content),
-			tool_status = EXCLUDED.tool_status,
-			tool_name = EXCLUDED.tool_name
+			content = CASE
+				WHEN agent_session_messages.tool_status IN ('finished', 'failed') AND EXCLUDED.tool_status = 'started'
+				THEN agent_session_messages.content
+				ELSE COALESCE(NULLIF(EXCLUDED.content, ''), agent_session_messages.content)
+			END,
+			tool_status = CASE
+				WHEN agent_session_messages.tool_status IN ('finished', 'failed') AND EXCLUDED.tool_status = 'started'
+				THEN agent_session_messages.tool_status
+				ELSE EXCLUDED.tool_status
+			END,
+			tool_name = COALESCE(NULLIF(EXCLUDED.tool_name, ''), agent_session_messages.tool_name)
 	`,
 		msg.ID,
 		msg.SessionID,
@@ -77,6 +97,14 @@ func AppendAgentSessionMessageInTransaction(tx *gorm.DB, msg *AgentSessionMessag
 
 func AppendAgentSessionMessage(msg *AgentSessionMessage) error {
 	return AppendAgentSessionMessageInTransaction(database.Conn(), msg)
+}
+
+func FindAgentSessionMessage(tx *gorm.DB, id uuid.UUID) (*AgentSessionMessage, error) {
+	var message AgentSessionMessage
+	if err := tx.Where("id = ?", id).First(&message).Error; err != nil {
+		return nil, err
+	}
+	return &message, nil
 }
 
 // ListAgentSessionMessagesPage returns up to `limit` messages strictly older

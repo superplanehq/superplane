@@ -96,16 +96,6 @@ func defaultResourceSourcesForSkillsBaseURL(skillsBaseURL string) ([]resourceSou
 			),
 		},
 		{
-			MountPath: "ref/skills/superplane-cli/SKILL.md",
-			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-cli", "SKILL.md")),
-			SourceURL: skillsRawURL(
-				skillsBaseURL,
-				"skills",
-				"superplane-cli",
-				"SKILL.md",
-			),
-		},
-		{
 			MountPath: "ref/skills/superplane-cli/references/canvas-yaml-spec.md",
 			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-cli", "references", "canvas-yaml-spec.md")),
 			SourceURL: skillsRawURL(

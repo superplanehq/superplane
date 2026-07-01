@@ -1,4 +1,4 @@
-export type AgentMode = "builder" | "operator" | "architect";
+export type AgentMode = "builder" | "operator";
 
 const CANVAS_AGENT_MODE_STORAGE_KEY = "canvasAgentMode";
 

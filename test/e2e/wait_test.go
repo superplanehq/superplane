@@ -21,7 +21,7 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Wait Seconds")
 		steps.addWaitWithDuration(10, "Seconds")
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.assertWaitSavedToDB(10, "seconds")
 	})
 
@@ -30,7 +30,7 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Wait Minutes")
 		steps.addWaitWithDuration(5, "Minutes")
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.assertWaitSavedToDB(5, "minutes")
 	})
 
@@ -39,7 +39,7 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Wait Hours")
 		steps.addWaitWithDuration(2, "Hours")
-		steps.canvas.Publish()
+		steps.canvas.CommitAndPublish()
 		steps.assertWaitSavedToDB(2, "hours")
 	})
 
@@ -147,7 +147,7 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 	s.canvas.Connect("Wait", "Output")
 
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *WaitSteps) runManualTrigger() {
