@@ -3754,6 +3754,7 @@ export function AppPage() {
       exitEditableVersionForRunInspection();
       clearDismissedRunDetail();
       setRunDetailNodeId(null);
+      setFocusRequest(null);
       startTransition(() => {
         setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
       });
@@ -3782,6 +3783,7 @@ export function AppPage() {
         setFocusRequest({ nodeId: inspectorNodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
       } else {
         setRunDetailNodeId(null);
+        setFocusRequest(null);
       }
 
       setSearchParams(
@@ -3835,6 +3837,7 @@ export function AppPage() {
 
   const handleClearRunInspection = useCallback(() => {
     setRunDetailNodeId(null);
+    setFocusRequest(null);
     startTransition(() => {
       setSearchParams(
         (current) => {
@@ -3852,6 +3855,10 @@ export function AppPage() {
   const handleRunNodeDetailSelection = useCallback(
     (nodeId: string | null) => {
       setRunDetailNodeId(nodeId);
+      if (!nodeId) {
+        setFocusRequest(null);
+      }
+
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);
