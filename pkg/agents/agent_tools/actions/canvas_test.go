@@ -1149,6 +1149,10 @@ func TestReadRuntimeAction_ReadsRunnerLogsByExecutionID(t *testing.T) {
 		assert.Equal(t, "/v1/tasks/task-agent-logs/live-logs", req.URL.Path)
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		_, _ = w.Write([]byte(`{"type":"line","text":"agent log line"}` + "\n"))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		<-req.Context().Done()
 	}))
 	defer broker.Close()
 	t.Setenv("TASK_BROKER_BASE_URL", broker.URL)
