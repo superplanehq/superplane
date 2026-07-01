@@ -486,8 +486,11 @@ func (a *RunCloudAgent) emitIfAlreadyTerminal(client *runagent.Client, ctx core.
 
 	out := buildOutputFromSessionMessages(session.Status, sessionID, sm)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
-		cleanupManagedSession(client, ctx, sessionID)
-		return false, err
+		// Do NOT delete the session: it holds the assembled result. Fall through
+		// to polling so a transient emit failure can be retried without losing
+		// the completed run.
+		ctx.Logger.Warnf("Failed to emit result for managed session %s: %v. Scheduling poll.", sessionID, err)
+		return false, nil
 	}
 
 	// Persist terminal status only after successful emit

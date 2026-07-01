@@ -253,6 +253,9 @@ type ExecutionStateContext struct {
 	Type           string
 	Payloads       []any
 	KVs            map[string]string
+	// EmitErr, when set, is returned by Emit/EmitAndContinue to simulate a
+	// failed emit without marking the execution finished.
+	EmitErr error
 }
 
 func (c *ExecutionStateContext) IsFinished() bool {
@@ -266,6 +269,9 @@ func (c *ExecutionStateContext) Pass() error {
 }
 
 func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any) error {
+	if c.EmitErr != nil {
+		return c.EmitErr
+	}
 	c.Finished = true
 	c.Passed = true
 	c.Channel = channel
@@ -285,6 +291,9 @@ func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 }
 
 func (c *ExecutionStateContext) EmitAndContinue(channel, payloadType string, payloads []any) error {
+	if c.EmitErr != nil {
+		return c.EmitErr
+	}
 	c.Finished = false
 	c.Passed = true
 	c.Channel = channel

@@ -1,6 +1,7 @@
 package runcloudagent
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -401,6 +402,39 @@ func Test__RunCloudAgent__poll__terminal(t *testing.T) {
 	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
 	assert.Equal(t, "Final", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).LastMessage)
 	assert.Equal(t, []string{"Earlier", "Final"}, executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Messages)
+}
+
+func Test__RunCloudAgent__poll__emitFailureRetriesWithoutDeleting(t *testing.T) {
+	a := &RunCloudAgent{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Final"}]}]}`))},
+		},
+	}
+	requestsCtx := &contexts.RequestContext{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}, EmitErr: fmt.Errorf("boom")}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{Session: &SessionMetadata{ID: "sess_1", Status: "running"}},
+	}
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(0)},
+		HTTP:           httpContext,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       requestsCtx,
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	assert.False(t, executionState.Finished)
+	// A transient emit failure must retry via polling and keep the session.
+	assert.Equal(t, "poll", requestsCtx.Action)
+	for _, r := range httpContext.Requests {
+		assert.NotEqual(t, http.MethodDelete, r.Method, "session must not be deleted on emit failure")
+	}
 }
 
 func Test__RunCloudAgent__poll__timeout(t *testing.T) {

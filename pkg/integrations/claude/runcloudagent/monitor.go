@@ -128,10 +128,12 @@ func (a *RunCloudAgent) handleTerminalSession(ctx core.ActionHookContext, client
 
 	out := buildOutputFromSessionMessages(sess.Status, sessionID, sm)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
-		// The session is terminal; reclaim it so it is not left orphaned while
-		// the hook errors out (matches the Execute fast-path behaviour).
-		cleanupManagedSessionFromHook(client, ctx, sessionID, false)
-		return err
+		// Do NOT delete the session here: it holds the assembled result. A
+		// transient emit failure must be recoverable, so retry via polling.
+		// A persistent failure is bounded by the max-attempts timeout, which
+		// interrupts and deletes the session.
+		ctx.Logger.Warnf("Failed to emit result for session %s: %v. Retrying poll.", sessionID, err)
+		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
 	// Only persist terminal status after successful emit
