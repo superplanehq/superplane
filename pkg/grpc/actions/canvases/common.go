@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -168,27 +167,6 @@ func publishCanvasVersionInTransaction(
 	}
 
 	if len(changeset.Changes) == 0 {
-		outOfSync, syncErr := canvasRuntimeNodesOutOfSync(tx, nextVersion)
-		if syncErr != nil {
-			return syncErr
-		}
-		if outOfSync {
-			syntheticLive := &models.CanvasVersion{
-				WorkflowID: nextVersion.WorkflowID,
-				Nodes:      append([]models.Node(nil), liveVersion.Nodes...),
-				Edges:      append([]models.Edge(nil), liveVersion.Edges...),
-			}
-			if len(syntheticLive.Nodes) == len(nextVersion.Nodes) {
-				syntheticLive.Nodes = nil
-				syntheticLive.Edges = nil
-			}
-			publisher, publisherErr := changesets.NewCanvasPublisher(tx, nextVersion, syntheticLive, options)
-			if publisherErr != nil {
-				return publisherErr
-			}
-			return mapCanvasNameUniqueConstraintError(publisher.Publish(ctx))
-		}
-
 		return mapCanvasNameUniqueConstraintError(
 			models.PromoteToLiveInTransaction(tx, nextVersion, nextVersion.Nodes, nextVersion.Edges),
 		)
@@ -200,51 +178,4 @@ func publishCanvasVersionInTransaction(
 	}
 
 	return mapCanvasNameUniqueConstraintError(publisher.Publish(ctx))
-}
-
-func canvasRuntimeNodesOutOfSync(tx *gorm.DB, version *models.CanvasVersion) (bool, error) {
-	runtimeNodes, err := models.FindCanvasNodesInTransaction(tx, version.WorkflowID)
-	if err != nil {
-		return false, err
-	}
-
-	runtimeIDs := make(map[string]struct{}, len(runtimeNodes))
-	for _, node := range runtimeNodes {
-		runtimeIDs[node.NodeID] = struct{}{}
-	}
-
-	for _, node := range version.Nodes {
-		if _, ok := runtimeIDs[node.ID]; !ok {
-			return true, nil
-		}
-	}
-
-	return len(runtimeIDs) != len(version.Nodes), nil
-}
-
-func repairCanvasRuntimeNodesIfOutOfSync(
-	ctx context.Context,
-	canvas *models.Canvas,
-	options changesets.CanvasPublisherOptions,
-) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-		if err != nil {
-			return err
-		}
-
-		outOfSync, err := canvasRuntimeNodesOutOfSync(tx, liveVersion)
-		if err != nil || !outOfSync {
-			return err
-		}
-
-		return promoteMainCanvasVersionInTransaction(
-			ctx,
-			tx,
-			canvas,
-			&models.CanvasVersion{WorkflowID: canvas.ID},
-			liveVersion,
-			options,
-		)
-	})
 }
