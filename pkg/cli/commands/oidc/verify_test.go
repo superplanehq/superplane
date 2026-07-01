@@ -16,46 +16,98 @@ import (
 
 const testExecutionTokenAudience = "semaphore"
 
-func TestVerifyAndParseClaims(t *testing.T) {
+func TestVerifyToken(t *testing.T) {
 	t.Parallel()
 
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/.well-known/openid-configuration":
-			respondJSON(w, map[string]any{
-				"issuer":   server.URL,
-				"jwks_uri": server.URL + "/.well-known/jwks.json",
-			})
-		case "/.well-known/jwks.json":
-			respondJSON(w, map[string]any{"keys": providerPublicJWKs(t, server.URL)})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-
 	nodeID := uuid.NewString()
-	token := signTestExecutionToken(t, server.URL, map[string]any{
+	server, token := newOIDCTestServer(t, map[string]any{
 		"node_id":       nodeID,
 		"pipeline_file": ".semaphore/deploy.yml",
 	})
 
 	cmd := &verifyCommand{
-		client:      server.Client(),
-		runToken:    token,
-		runAPIURL:   server.URL,
-		runAudience: testExecutionTokenAudience,
+		client:         server.Client(),
+		parsedToken:    token,
+		parsedAPIURL:   server.URL,
+		parsedAudience: testExecutionTokenAudience,
+		parsedExpectedClaims: map[string]string{
+			"node_id":       nodeID,
+			"pipeline_file": ".semaphore/deploy.yml",
+		},
 	}
 
-	claims, err := cmd.verifyAndParseClaims(t.Context())
-	require.NoError(t, err)
-	require.Equal(t, nodeID, claims["node_id"])
-	require.Equal(t, ".semaphore/deploy.yml", claims["pipeline_file"])
+	require.NoError(t, cmd.verifyToken(t.Context()))
 }
 
-func TestVerifyAndParseClaimsRejectsInvalidToken(t *testing.T) {
+func TestVerifyTokenRejectsInvalidToken(t *testing.T) {
 	t.Parallel()
+
+	server, _ := newOIDCTestServer(t, nil)
+
+	cmd := &verifyCommand{
+		client:               server.Client(),
+		parsedToken:          "not-a-token",
+		parsedAPIURL:         server.URL,
+		parsedAudience:       testExecutionTokenAudience,
+		parsedExpectedClaims: map[string]string{},
+	}
+
+	require.Error(t, cmd.verifyToken(t.Context()))
+}
+
+func TestVerifyTokenRejectsMismatchedClaim(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.NewString()
+	server, token := newOIDCTestServer(t, map[string]any{
+		"node_id": nodeID,
+	})
+
+	cmd := &verifyCommand{
+		client:         server.Client(),
+		parsedToken:    token,
+		parsedAPIURL:   server.URL,
+		parsedAudience: testExecutionTokenAudience,
+		parsedExpectedClaims: map[string]string{
+			"node_id": "other-node",
+		},
+	}
+
+	err := cmd.verifyToken(t.Context())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "expected claim node_id")
+}
+
+func TestParseExpectedClaims(t *testing.T) {
+	t.Parallel()
+
+	raw := []string{
+		"pipeline_file=.semaphore/deploy.yml",
+		"node_id=deploy",
+	}
+	cmd := &verifyCommand{expectedClaims: &raw}
+
+	require.NoError(t, cmd.parseExpectedClaims())
+	require.Equal(t, map[string]string{
+		"pipeline_file": ".semaphore/deploy.yml",
+		"node_id":       "deploy",
+	}, cmd.parsedExpectedClaims)
+
+	invalid := []string{"invalid"}
+	cmd = &verifyCommand{expectedClaims: &invalid}
+	require.Error(t, cmd.parseExpectedClaims())
+}
+
+func TestClaimString(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, "deploy", claimString(map[string]any{"node_id": "deploy"}, "node_id"))
+	require.Equal(t, "", claimString(map[string]any{}, "node_id"))
+	require.Equal(t, "123", claimString(map[string]any{"count": 123}, "count"))
+}
+
+func newOIDCTestServer(t *testing.T, claims map[string]any) (*httptest.Server, string) {
+	t.Helper()
 
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,54 +123,10 @@ func TestVerifyAndParseClaimsRejectsInvalidToken(t *testing.T) {
 			http.NotFound(w, r)
 		}
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
-	cmd := &verifyCommand{
-		client:      server.Client(),
-		runToken:    "not-a-token",
-		runAPIURL:   server.URL,
-		runAudience: testExecutionTokenAudience,
-	}
-
-	_, err := cmd.verifyAndParseClaims(t.Context())
-	require.Error(t, err)
-}
-
-func TestParseExpectedClaims(t *testing.T) {
-	t.Parallel()
-
-	expected, err := parseExpectedClaims([]string{
-		"pipeline_file=.semaphore/deploy.yml",
-		"node_id=deploy",
-	})
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{
-		"pipeline_file": ".semaphore/deploy.yml",
-		"node_id":       "deploy",
-	}, expected)
-
-	_, err = parseExpectedClaims([]string{"invalid"})
-	require.Error(t, err)
-}
-
-func TestMatchExpectedClaims(t *testing.T) {
-	t.Parallel()
-
-	err := matchExpectedClaims(map[string]any{
-		"pipeline_file": ".semaphore/deploy.yml",
-		"node_id":       "deploy",
-	}, map[string]string{
-		"pipeline_file": ".semaphore/deploy.yml",
-		"node_id":       "deploy",
-	})
-	require.NoError(t, err)
-
-	err = matchExpectedClaims(map[string]any{
-		"node_id": "other-node",
-	}, map[string]string{
-		"node_id": "expected-node",
-	})
-	require.Error(t, err)
+	token := signTestExecutionToken(t, server.URL, claims)
+	return server, token
 }
 
 func providerPublicJWKs(t *testing.T, issuer string) []spoidc.PublicJWK {

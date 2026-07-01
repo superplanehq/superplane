@@ -25,20 +25,20 @@ type verifyCommand struct {
 	token          *string
 	apiURL         *string
 	audience       *string
-	expectedClaims *map[string]string
+	expectedClaims *[]string
 
-	client      *http.Client
-	runToken    string
-	runAPIURL   string
-	runAudience string
-	issuer      string
+	client               *http.Client
+	parsedToken          string
+	parsedAPIURL         string
+	parsedAudience       string
+	parsedExpectedClaims map[string]string
 }
 
 func (c *verifyCommand) Execute(ctx core.CommandContext) error {
 	var err error
 
 	c.client = http.DefaultClient
-	c.runAPIURL = c.lookupAPIURL(ctx)
+	c.parsedAPIURL = c.lookupAPIURL(ctx)
 
 	err = c.lookupToken()
 	if err != nil {
@@ -67,7 +67,7 @@ func (c *verifyCommand) Execute(ctx core.CommandContext) error {
 func (c *verifyCommand) verifyToken(ctx context.Context) error {
 	ctx = gooidc.ClientContext(ctx, c.client)
 
-	issuer, err := c.fetchIssuer(ctx, c.runAPIURL)
+	issuer, err := c.fetchIssuer(ctx, c.parsedAPIURL)
 	if err != nil {
 		return err
 	}
@@ -78,10 +78,10 @@ func (c *verifyCommand) verifyToken(ctx context.Context) error {
 	}
 
 	verifier := provider.Verifier(&gooidc.Config{
-		ClientID: c.runAudience,
+		ClientID: c.parsedAudience,
 	})
 
-	idToken, err := verifier.Verify(ctx, c.runToken)
+	idToken, err := verifier.Verify(ctx, c.parsedToken)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (c *verifyCommand) verifyToken(ctx context.Context) error {
 		return err
 	}
 
-	for key, want := range *c.expectedClaims {
+	for key, want := range c.parsedExpectedClaims {
 		if claimString(claims, key) != want {
 			return fmt.Errorf("token verification failed: expected claim %s to be %s, got %s", key, want, claimString(claims, key))
 		}
@@ -142,7 +142,11 @@ func (c *verifyCommand) fetchIssuer(ctx context.Context, baseURL string) (string
 }
 
 func (c *verifyCommand) parseExpectedClaims() error {
-	expected := make(map[string]string, len(*c.expectedClaims))
+	expected := make(map[string]string)
+	if c.expectedClaims == nil {
+		c.parsedExpectedClaims = expected
+		return nil
+	}
 
 	for _, claim := range *c.expectedClaims {
 		claim = strings.TrimSpace(claim)
@@ -159,7 +163,7 @@ func (c *verifyCommand) parseExpectedClaims() error {
 		expected[key] = value
 	}
 
-	c.expectedClaims = &expected
+	c.parsedExpectedClaims = expected
 
 	return nil
 }
@@ -187,7 +191,7 @@ func (c *verifyCommand) lookupToken() error {
 		return errTokenNotFound
 	}
 
-	c.runToken = token
+	c.parsedToken = token
 
 	return nil
 }
@@ -198,7 +202,7 @@ func (c *verifyCommand) lookupAudience() error {
 		return errAudienceRequired
 	}
 
-	c.runAudience = audience
+	c.parsedAudience = audience
 
 	return nil
 }

@@ -29,6 +29,7 @@ const (
 	semaphoreOIDCTokenDuration = time.Hour
 
 	semaphoreClaimAppID        = "app_id"
+	semaphoreClaimOrgID        = "org_id"
 	semaphoreClaimNodeID       = "node_id"
 	semaphoreClaimExecutionID  = "execution_id"
 	semaphoreClaimComponent    = "component"
@@ -68,12 +69,12 @@ type Project struct {
 }
 
 type RunWorkflowSpec struct {
-	Project         string      `json:"project"`
-	Ref             string      `json:"ref"`
-	PipelineFile    string      `json:"pipelineFile"`
-	CommitSha       string      `json:"commitSha"`
-	InjectOidcToken bool        `json:"injectOidcToken"`
-	Parameters      []Parameter `json:"parameters"`
+	Project      string      `json:"project"`
+	Ref          string      `json:"ref"`
+	PipelineFile string      `json:"pipelineFile"`
+	CommitSha    string      `json:"commitSha"`
+	AddOidcToken bool        `json:"addOidcToken"`
+	Parameters   []Parameter `json:"parameters"`
 }
 
 type Parameter struct {
@@ -130,21 +131,19 @@ SuperPlane automatically adds these workflow parameters when triggering Semaphor
 
 ## Verifying Triggers in CI
 
-In protected Semaphore jobs (production deploys, artifact uploads), verify ` + "`SUPERPLANE_OIDC_TOKEN`" + ` before running any steps. Check every claim your policy depends on — ` + "`pipeline_file`" + ` alone only proves which pipeline SuperPlane intended to run, not which organization, commit, or canvas node triggered it:
+To verify that a Semaphore job was triggered by SuperPlane, verify ` + "`SUPERPLANE_OIDC_TOKEN`" + ` before running any steps. 
+Check every claim your policy depends on. For example:
 
 ` + "```bash" + `
 superplane oidc verify \
   --audience semaphore \
-  --claim app_id=eb3aca82-3864-4f76-b1d6-f670c297f136 \
+  --claim org_id=eb3aca82-3864-4f76-b1d6-f670c297f136 \
+  --claim app_id=c4d5e6f7-8901-4234-a567-890123456789 \
   --claim pipeline_file=.semaphore/production/deploy.yml \
   --claim node_id=deploy-production
 ` + "```" + `
 
-Expected claim values must be pinned in your pipeline — hardcoded literals or Semaphore project env vars — not taken from parameters SuperPlane injects at trigger time.
-
-Set **Commit SHA** on the component when you need the token to bind to a specific revision; otherwise pin ` + "`ref`" + ` and still compare ` + "`commit_sha`" + ` against ` + "`$SEMAPHORE_GIT_SHA`" + ` in CI so the job runs the code SuperPlane attested.
-
-The command reads the token from the environment, fetches JWKS from your SuperPlane instance, and verifies the signature locally. Pass expected claims with ` + "`--claim key=value`" + ` (repeatable) to enforce your policy — SuperPlane attests what was triggered; your pipeline decides what it accepts. Exit code 0 means the token is valid and matches your expectations; any other exit code aborts the job.
+The command reads the token from the environment, fetches JWKS from your SuperPlane instance, and verifies the signature. 
 
 ## Output Channels
 
@@ -239,7 +238,7 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "injectOidcToken",
+			Name:        "addOidcToken",
 			Label:       "Add OIDC token",
 			Type:        configuration.FieldTypeBool,
 			Description: "Send a signed token so CI can confirm this run was triggered by SuperPlane",
@@ -603,7 +602,8 @@ func (r *RunWorkflow) signOIDCToken(ctx core.ExecutionContext, spec RunWorkflowS
 	}
 
 	claims := map[string]any{
-		semaphoreClaimAppID:       ctx.OrganizationID,
+		semaphoreClaimAppID:       ctx.WorkflowID,
+		semaphoreClaimOrgID:       ctx.OrganizationID,
 		semaphoreClaimNodeID:      ctx.NodeID,
 		semaphoreClaimExecutionID: ctx.ID.String(),
 		semaphoreClaimComponent:   r.Name(),
@@ -639,15 +639,13 @@ func (r *RunWorkflow) buildParameters(ctx core.ExecutionContext, spec RunWorkflo
 	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID
 	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
 
-	if !spec.InjectOidcToken {
+	if !spec.AddOidcToken {
 		return parameters, nil
 	}
 
 	token, err := r.signOIDCToken(ctx, spec, metadata)
 	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.Errorf("failed to sign OIDC execution token: %v", err)
-		}
+		ctx.Logger.Errorf("failed to sign OIDC execution token: %v", err)
 		return nil, fmt.Errorf("failed to sign OIDC execution token")
 	}
 

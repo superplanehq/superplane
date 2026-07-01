@@ -809,7 +809,7 @@ func Test_NodeConfigurationBuilder_NodeIDNotAllowed(t *testing.T) {
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "expression evaluation failed")
+	assert.Contains(t, err.Error(), "node name node-1 not found in execution chain")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing.T) {
@@ -835,7 +835,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "expression evaluation failed")
+	assert.Contains(t, err.Error(), "not found in execution chain")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
@@ -1166,7 +1166,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NoPreviousExecution(t
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "expression evaluation failed")
+	assert.Contains(t, err.Error(), "not found in execution chain")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *testing.T) {
@@ -1199,41 +1199,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *tes
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "expression evaluation failed")
-}
-
-func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_MissingReferenceResolvesNil(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	node1 := "node-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{NodeID: node1, Name: node1, Type: models.NodeTypeComponent},
-		},
-		[]models.Edge{},
-	)
-
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID)
-
-	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
-		WithPreviousExecution(&execution1.ID).
-		WithInput(map[string]any{})
-
-	result, err := builder.Build(map[string]any{
-		"field": "{{ $[\"token that does not exist\"] }}",
-	})
-
-	require.NoError(t, err)
-	assert.Equal(t, "null", result["field"])
-
-	value, err := builder.ResolveExpression(`$["token that does not exist"]`)
-	require.NoError(t, err)
-	assert.Nil(t, value)
+	assert.Contains(t, err.Error(), "not found in execution chain")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_KnownNodeWithoutExecutionResolvesNil(t *testing.T) {
