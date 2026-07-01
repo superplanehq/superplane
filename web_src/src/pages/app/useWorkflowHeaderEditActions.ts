@@ -81,49 +81,72 @@ function useAutoEditMode(
   setSearchParams: SetURLSearchParams,
 ) {
   const triggeredRef = useRef(false);
+  const inFlightRef = useRef(false);
   const canvasId = startup?.canvas?.metadata?.id;
   const hasEditableVersion = startup?.hasEditableVersion ?? false;
   const canUpdateCanvas = startup?.canUpdateCanvas ?? false;
   const canvasLoaded = Boolean(startup?.canvas);
   const editEntryReady = startup?.editEntryReady ?? true;
   const searchParams = startup?.searchParams;
+  const editRequested = searchParams?.get("edit") === "1";
+  const runInUrl = searchParams?.get("run") ?? "";
 
   useEffect(() => {
     triggeredRef.current = false;
+    inFlightRef.current = false;
   }, [canvasId]);
 
   useEffect(() => {
-    if (triggeredRef.current) return;
-    if (!searchParams || searchParams.get("edit") !== "1") return;
-    if (!canvasLoaded) return;
-    if (!editEntryReady) return;
-    if (hasEditableVersion) return;
-    if (!canUpdateCanvas) return;
+    if (triggeredRef.current || inFlightRef.current) {
+      return;
+    }
+    if (!editRequested) {
+      return;
+    }
+    if (!canvasLoaded) {
+      return;
+    }
+    if (!editEntryReady) {
+      return;
+    }
+    if (hasEditableVersion) {
+      return;
+    }
+    if (!canUpdateCanvas) {
+      return;
+    }
+
+    inFlightRef.current = true;
 
     void (async () => {
-      if (searchParams.get("run")) {
-        setRunDetailNodeId(null);
-        setSearchParams(clearRunInspectionSearchParams, { replace: true });
-        await Promise.resolve();
-      }
+      try {
+        if (runInUrl) {
+          setRunDetailNodeId(null);
+          setSearchParams(clearRunInspectionSearchParams, { replace: true });
+          await Promise.resolve();
+        }
 
-      const enteredEditMode = await handleToggleEditMode();
-      if (!enteredEditMode) {
-        return;
-      }
+        const enteredEditMode = await handleToggleEditMode();
+        if (!enteredEditMode) {
+          return;
+        }
 
-      triggeredRef.current = true;
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.delete("edit");
-          return next;
-        },
-        { replace: true },
-      );
+        triggeredRef.current = true;
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            next.delete("edit");
+            return next;
+          },
+          { replace: true },
+        );
+      } finally {
+        inFlightRef.current = false;
+      }
     })();
   }, [
-    searchParams,
+    editRequested,
+    runInUrl,
     setSearchParams,
     setRunDetailNodeId,
     hasEditableVersion,

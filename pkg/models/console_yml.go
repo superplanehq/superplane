@@ -108,18 +108,24 @@ func ConsoleFromYML(raw []byte) (*ConsoleYAML, error) {
 // CanvasVersionToConsoleYML serializes a stored dashboard into the canonical YAML
 // representation with stable field ordering. Empty dashboards produce a
 // valid empty spec.
-func CanvasVersionToConsoleYML(canvasVersion *CanvasVersion) ([]byte, error) {
+func CanvasVersionToConsoleYML(canvas *Canvas, canvasVersion *CanvasVersion) ([]byte, error) {
 	if canvasVersion == nil {
 		return nil, errors.New("canvas version is required")
+	}
+
+	metadata := ConsoleYAMLMetadata{
+		CanvasID: canvasVersion.WorkflowID.String(),
+	}
+	if canvas != nil {
+		if name := strings.TrimSpace(canvas.Name); name != "" {
+			metadata.Name = name
+		}
 	}
 
 	resource := ConsoleYAML{
 		APIVersion: DashboardAPIVersion,
 		Kind:       ConsoleKind,
-		Metadata: ConsoleYAMLMetadata{
-			CanvasID: canvasVersion.WorkflowID.String(),
-			Name:     canvasVersion.GitBranch,
-		},
+		Metadata:   metadata,
 		Spec: ConsoleYAMLSpec{
 			Panels: normalizeConsolePanelsForExport(canvasVersion.ConsolePanels.Data()),
 			Layout: normalizeConsoleLayoutForExport(canvasVersion.ConsoleLayout.Data()),

@@ -44,6 +44,9 @@ export function useCanvasAgentChat(
   return useQuery({
     queryKey: agentChatKeys.forCanvas(canvasId ?? ""),
     enabled: enabled && Boolean(canvasId),
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     queryFn: async () => {
       const response = await agentsGetCanvasAgentChat(
         withOrganizationHeader({ organizationId, path: { canvasId: canvasId ?? "" } }),

@@ -185,6 +185,51 @@ describe("useWorkflowHeaderEditActions", () => {
     });
   });
 
+  it("does not re-trigger auto edit when search params change during toggle", async () => {
+    let resolveToggle!: (value: boolean) => void;
+    const togglePromise = new Promise<boolean>((resolve) => {
+      resolveToggle = resolve;
+    });
+    const handleToggleEditMode = vi.fn().mockReturnValue(togglePromise);
+    const setSearchParams = vi.fn();
+
+    const { rerender } = renderHook(
+      ({ searchParams }) =>
+        useWorkflowHeaderEditActions({
+          isRunInspectionMode: false,
+          handleClearRunInspection: vi.fn(),
+          handleToggleEditMode,
+          setRunDetailNodeId: vi.fn(),
+          setSearchParams: setSearchParams as unknown as SetURLSearchParams,
+          startup: {
+            hasEditableVersion: false,
+            canUpdateCanvas: true,
+            canvas: { metadata: { id: "canvas-1" }, spec: {} },
+            searchParams,
+            editEntryReady: true,
+          },
+        }),
+      { initialProps: { searchParams: new URLSearchParams("edit=1") } },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
+
+    rerender({ searchParams: new URLSearchParams("edit=1&branch=main") });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveToggle(true);
+      await togglePromise;
+    });
+  });
+
   it("does not consume edit=1 when entering edit fails", async () => {
     const handleToggleEditMode = vi.fn().mockResolvedValue(false);
     const setSearchParams = vi.fn();

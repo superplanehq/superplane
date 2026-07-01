@@ -1,5 +1,5 @@
 import { Button as UIButton } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";

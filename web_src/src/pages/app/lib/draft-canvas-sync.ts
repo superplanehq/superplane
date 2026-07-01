@@ -1,6 +1,6 @@
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 
-function getWorkflowSpecSignature(
+export function canvasSpecSignature(
   spec: CanvasesCanvas["spec"] | CanvasesCanvasVersion["spec"] | null | undefined,
 ): string | null {
   if (spec == null) {
@@ -8,6 +8,13 @@ function getWorkflowSpecSignature(
   }
 
   return JSON.stringify(spec);
+}
+
+export function canvasSpecsEqual(
+  left: CanvasesCanvas["spec"] | CanvasesCanvasVersion["spec"] | null | undefined,
+  right: CanvasesCanvas["spec"] | CanvasesCanvasVersion["spec"] | null | undefined,
+): boolean {
+  return canvasSpecSignature(left) === canvasSpecSignature(right);
 }
 
 export function shouldPreserveDraftSpec({
@@ -25,18 +32,18 @@ export function shouldPreserveDraftSpec({
     return false;
   }
 
-  const incomingSignature = getWorkflowSpecSignature(incomingSpec);
-  const liveVersionSignature = getWorkflowSpecSignature(liveVersionSpec);
+  const incomingSignature = canvasSpecSignature(incomingSpec);
+  const liveVersionSignature = canvasSpecSignature(liveVersionSpec);
 
   if (incomingSignature !== liveVersionSignature) {
     return false;
   }
 
-  const currentDraftSignature = getWorkflowSpecSignature(draftSpec);
+  const currentDraftSignature = canvasSpecSignature(draftSpec);
   if (currentDraftSignature && currentDraftSignature !== incomingSignature) {
     return true;
   }
 
-  const selectedDraftVersionSignature = getWorkflowSpecSignature(selectedDraftVersionSpec);
+  const selectedDraftVersionSignature = canvasSpecSignature(selectedDraftVersionSpec);
   return selectedDraftVersionSignature != null && selectedDraftVersionSignature !== incomingSignature;
 }

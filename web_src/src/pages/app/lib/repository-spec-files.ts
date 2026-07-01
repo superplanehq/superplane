@@ -111,6 +111,15 @@ export async function fetchCanvasVersionWithSpec(
   return canvasVersionWithSpecFromYaml(describeResponse.data?.version, canvasYaml);
 }
 
+// Effective branch-head spec for the editor: overlays workflow_staged_files on the
+// committed version row (same as repository/file?stage=true).
+export async function fetchCanvasVersionForEditing(
+  canvasId: string,
+  versionId: string,
+): Promise<CanvasesCanvasVersion | undefined> {
+  return fetchCanvasVersionWithSpec(canvasId, versionId, true);
+}
+
 export type ConsoleSpecData = {
   panels: NonNullable<ReturnType<typeof dematerializeConsoleSpec>>["panels"];
   layout: NonNullable<ReturnType<typeof dematerializeConsoleSpec>>["layout"];

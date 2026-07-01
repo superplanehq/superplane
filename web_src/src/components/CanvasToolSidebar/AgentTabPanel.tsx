@@ -72,6 +72,21 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
   const { account } = useContext(AccountContext);
   const firstName = account?.name?.split(" ")[0] ?? "there";
 
+  if (chatQuery.isError) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex flex-col items-start">
+            <div className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900">
+              Hi {firstName}! I'm your SuperPlane agent. The agent service is unavailable right now, so chat is
+              temporarily disabled. You can still edit the canvas manually.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (chatQuery.isLoading || !chatId) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">

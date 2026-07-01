@@ -1,5 +1,5 @@
 import React from "react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 import { usePermissions } from "@/contexts/usePermissions";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { cn } from "@/lib/utils";

@@ -124,7 +124,7 @@ func readRepositorySpecFile(
 	case CanvasYAMLRepositoryPath:
 		return canvasYAMLFromVersion(canvas, version, organizationID)
 	default:
-		return consoleYAMLFromVersion(version)
+		return consoleYAMLFromVersion(canvas, version)
 	}
 }
 

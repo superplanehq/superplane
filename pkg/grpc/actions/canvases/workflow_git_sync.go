@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"gorm.io/gorm"
@@ -194,7 +194,7 @@ func buildWorkflowVersionGitOperations(
 		return nil, grpcerrors.Internal(err, "failed to serialize canvas.yaml")
 	}
 
-	consoleYAML, err := consoleYAMLFromVersion(version)
+	consoleYAML, err := consoleYAMLFromVersion(canvas, version)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to serialize console.yaml")
 	}

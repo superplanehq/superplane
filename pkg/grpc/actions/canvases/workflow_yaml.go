@@ -12,8 +12,8 @@ func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion,
 	return canvasyaml.CanvasResourceYAML(SerializeCanvasVersion(version, organizationID, nil, canvas), canvas.ID.String())
 }
 
-func consoleYAMLFromVersion(version *models.CanvasVersion) (string, error) {
-	raw, err := models.CanvasVersionToConsoleYML(version)
+func consoleYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion) (string, error) {
+	raw, err := models.CanvasVersionToConsoleYML(canvas, version)
 	if err != nil {
 		return "", err
 	}
