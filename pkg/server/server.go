@@ -213,6 +213,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_REPOSITORY_MATERIALIZER") == "yes" {
+		log.Println("Starting Repository Materializer")
+		webhookBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewRepositoryMaterializerWorker(rabbitMQURL, gitProvider, registry, encryptor, authService, webhookBaseURL)
+		go w.Start(context.Background())
+	}
+
 	var workerUsageService usage.Service
 	initWorkerUsageService := func() (usage.Service, error) {
 		if workerUsageService != nil {
