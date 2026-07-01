@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fitViewMock, getNodesMock, reactFlowPropsRef, setViewportMock } = vi.hoisted(() => ({
+const { fitViewMock, getNodesMock, getViewportMock, reactFlowPropsRef, setViewportMock } = vi.hoisted(() => ({
   fitViewMock: vi.fn().mockResolvedValue(true),
   getNodesMock: vi.fn<() => Array<{ id: string; position: { x: number; y: number } }>>(() => []),
+  getViewportMock: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
   reactFlowPropsRef: {
     current: null as null | {
       nodes?: unknown;
@@ -40,7 +41,7 @@ vi.mock("@xyflow/react", () => ({
   useReactFlow: vi.fn(() => ({
     fitView: fitViewMock,
     screenToFlowPosition: vi.fn((position) => position),
-    getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
+    getViewport: getViewportMock,
     setViewport: setViewportMock,
     getInternalNode: vi.fn(),
     zoomTo: vi.fn(),
@@ -101,6 +102,8 @@ describe("CanvasPage run inspection", () => {
     fitViewMock.mockResolvedValue(true);
     getNodesMock.mockReset();
     getNodesMock.mockReturnValue([]);
+    getViewportMock.mockReset();
+    getViewportMock.mockReturnValue({ x: 0, y: 0, zoom: 1 });
     setViewportMock.mockClear();
     globalThis.ResizeObserver = class {
       observe() {}
@@ -235,9 +238,12 @@ describe("CanvasPage run inspection", () => {
 
   it("focuses a run node when the node appears after the focus request", async () => {
     const hasFitToViewRef = { current: true };
-    const viewportRef = { current: { x: 10, y: 20, zoom: 0.8 } };
+    const initialViewport = { x: 10, y: 20, zoom: 0.8 };
+    const viewportRef = { current: initialViewport };
+    const focusedViewport = { x: -120, y: -80, zoom: 1.2 };
     const focusRequest = { nodeId: "run-node-1", requestId: 1, targetMode: "runs" as const, tab: "latest" as const };
     getNodesMock.mockReturnValue([]);
+    getViewportMock.mockReturnValue(focusedViewport);
 
     const { rerender } = render(
       <MemoryRouter>
@@ -297,7 +303,10 @@ describe("CanvasPage run inspection", () => {
     await waitFor(() => {
       expect(fitViewMock).toHaveBeenCalledWith({ nodes: [runNode], duration: 500, maxZoom: 1.2 });
     });
-    expect(setViewportMock).toHaveBeenCalledWith(viewportRef.current);
+    await waitFor(() => {
+      expect(viewportRef.current).toEqual(focusedViewport);
+    });
+    expect(setViewportMock).toHaveBeenCalledWith(initialViewport);
     expect(fitViewMock).toHaveBeenCalledTimes(1);
 
     rerender(

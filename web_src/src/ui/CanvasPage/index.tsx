@@ -2452,8 +2452,25 @@ function CanvasContent({
         selected: node.id === focusRequest.nodeId,
       })),
     );
-    fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
-  }, [focusRequest, fitView, getNodes, hasReactFlowInitialized, isRunInspectionMode, runCanvasNodeIdsKey]);
+    void fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 }).then(
+      () => {
+        const nextViewport = getViewport();
+        viewportRef.current = nextViewport;
+        reportZoom(nextViewport.zoom);
+      },
+      () => undefined,
+    );
+  }, [
+    focusRequest,
+    fitView,
+    getNodes,
+    getViewport,
+    hasReactFlowInitialized,
+    isRunInspectionMode,
+    reportZoom,
+    runCanvasNodeIdsKey,
+    viewportRef,
+  ]);
 
   useEffect(() => {
     if (!isRunInspectionMode) {
