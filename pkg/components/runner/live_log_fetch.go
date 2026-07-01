@@ -102,6 +102,10 @@ func readLiveLogRecords(reader io.Reader, limit int) (*LiveLogFetchResult, error
 
 	records := make([]LiveLogRecord, 0, min(limit, 32))
 	for scanner.Scan() {
+		if len(records) >= limit {
+			return &LiveLogFetchResult{Records: records, Truncated: true}, nil
+		}
+
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
@@ -110,9 +114,6 @@ func readLiveLogRecords(reader io.Reader, limit int) (*LiveLogFetchResult, error
 		record, ok := parseLiveLogRecord(line)
 		if !ok {
 			continue
-		}
-		if len(records) >= limit {
-			return &LiveLogFetchResult{Records: records, Truncated: true}, nil
 		}
 		records = append(records, record)
 	}
