@@ -115,7 +115,11 @@ func readLiveLogRecords(reader io.Reader, limit int) (*LiveLogFetchResult, error
 		if !ok {
 			continue
 		}
+
 		records = append(records, record)
+		if len(records) >= limit {
+			return &LiveLogFetchResult{Records: records, Truncated: true}, nil
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("read live logs: %w", err)
