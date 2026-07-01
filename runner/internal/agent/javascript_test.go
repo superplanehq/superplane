@@ -30,6 +30,28 @@ function main() {
 	}
 }
 
+func TestBuildJavaScriptProgramDoesNotRedeclareFs(t *testing.T) {
+	t.Parallel()
+	prog, err := buildJavaScriptProgram(`
+const fs = require("fs");
+
+function main() {
+  return { exists: fs.existsSync(".") };
+}
+`, json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(prog)
+	if strings.Count(s, "const fs") != 1 {
+		t.Fatalf("expected exactly one top-level `const fs` declaration (the user's), got %d:\n%s",
+			strings.Count(s, "const fs"), s)
+	}
+	if strings.Contains(s, "const fs = require('fs')") {
+		t.Fatalf("wrapper must not declare its own top-level `const fs`, it collides with user scripts:\n%s", s)
+	}
+}
+
 func TestBuildJavaScriptProgramRejectsInvalidChain(t *testing.T) {
 	t.Parallel()
 	_, err := buildJavaScriptProgram(`function main() { return 1; }`, json.RawMessage(`{not json`))
