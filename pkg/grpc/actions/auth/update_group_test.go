@@ -95,6 +95,18 @@ func TestUpdateGroup(t *testing.T) {
 		assert.Len(t, users, 2)
 	})
 
+	t.Run("nil spec returns current state without panic", func(t *testing.T) {
+		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "nil-spec-group", models.RoleOrgViewer, "Nil Spec Group", "Nil Spec Description")
+		require.NoError(t, err)
+
+		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "nil-spec-group", nil, r.AuthService)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, models.RoleOrgViewer, resp.Group.Spec.Role)
+		assert.Equal(t, "Nil Spec Group", resp.Group.Spec.DisplayName)
+		assert.Equal(t, "Nil Spec Description", resp.Group.Spec.Description)
+	})
+
 	t.Run("group not found", func(t *testing.T) {
 		groupSpec := &pb.Group_Spec{
 			Role: models.RoleOrgAdmin,
