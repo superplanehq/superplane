@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
-	"github.com/superplanehq/superplane/pkg/integrations/llmattach"
 )
 
 const MessagePayloadType = "claude.message"
@@ -196,6 +195,12 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 				return fmt.Errorf("file %q not found in app repository", f)
 			}
 		}
+
+		// Read the files now so unsupported types, empty files, and size limits
+		// are caught at config time rather than on every execution.
+		if _, err := readAttachments(ctx.Files, spec.Files); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -228,7 +233,7 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 
 	// Read attached repository files and build the message content. Files are
 	// uploaded to the Files API and referenced by file_id; the prompt goes last.
-	attachments, err := llmattach.Read(ctx.Files, spec.Files)
+	attachments, err := readAttachments(ctx.Files, spec.Files)
 	if err != nil {
 		return fmt.Errorf("failed to read attachments: %v", err)
 	}
@@ -314,7 +319,7 @@ func extractMessageText(response *CreateMessageResponse) string {
 // message content: an image/document block (referenced by file_id) per file,
 // followed by the prompt text. With no attachments it returns the prompt string.
 // The returned file IDs should be cleaned up after the request.
-func buildUserContent(client *Client, attachments []llmattach.Attachment, prompt string) (any, []string, error) {
+func buildUserContent(client *Client, attachments []attachment, prompt string) (any, []string, error) {
 	if len(attachments) == 0 {
 		return prompt, nil, nil
 	}

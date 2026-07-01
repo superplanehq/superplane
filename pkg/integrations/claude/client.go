@@ -176,7 +176,6 @@ func requestReferencesFiles(req CreateMessageRequest) bool {
 	return false
 }
 
-// UploadFile uploads a file to the Anthropic Files API and returns its file_id.
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
 // createFormFile is like multipart.Writer.CreateFormFile but lets the caller set
@@ -194,6 +193,7 @@ func createFormFile(w *multipart.Writer, fieldname, filename, contentType string
 	return w.CreatePart(h)
 }
 
+// UploadFile uploads a file to the Anthropic Files API and returns its file_id.
 func (c *Client) UploadFile(content io.Reader, filename, contentType string) (string, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
