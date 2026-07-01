@@ -7,13 +7,6 @@ import { useParams } from "react-router-dom";
 import { toTestId } from "@/lib/testID";
 import type { FieldRendererProps } from "./types";
 
-// canvas.yaml and console.yaml are virtual canvas spec files: the repository
-// listing always injects them, but they are materialized from the canvas
-// version in the database and never committed to git. Components read attached
-// files through the git-backed repository file context, so these spec files are
-// not actually attachable and must be hidden from the picker.
-const CANVAS_SPEC_FILES = new Set(["canvas.yaml", "console.yaml"]);
-
 export const RepositoryFileFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const { appId } = useParams<{ appId: string }>();
 
@@ -30,9 +23,7 @@ export const RepositoryFileFieldRenderer: React.FC<FieldRendererProps> = ({ fiel
           path: { canvasId: appId },
         }),
       );
-      return (
-        response.data?.files?.map((f) => f.path ?? "").filter((path) => path && !CANVAS_SPEC_FILES.has(path)) ?? []
-      );
+      return response.data?.files?.map((f) => f.path ?? "").filter(Boolean) ?? [];
     },
     enabled: !!appId,
     staleTime: 30 * 1000,
