@@ -134,6 +134,7 @@ In protected Semaphore jobs (production deploys, artifact uploads), verify ` + "
 
 ` + "```bash" + `
 superplane oidc verify \
+  --audience semaphore \
   --claim app_id=eb3aca82-3864-4f76-b1d6-f670c297f136 \
   --claim pipeline_file=.semaphore/production/deploy.yml \
   --claim node_id=deploy-production

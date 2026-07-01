@@ -19,15 +19,18 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	var token string
 	var apiURL string
+	var audience string
 	var expectedClaims []string
 
 	verifyCmd.Flags().StringVar(&token, "token", "", "OIDC token to verify (default: SUPERPLANE_OIDC_TOKEN env var)")
 	verifyCmd.Flags().StringVar(&apiURL, "url", "", "SuperPlane API URL (default: configured context URL, or https://app.superplane.com)")
+	verifyCmd.Flags().StringVar(&audience, "audience", "", "expected token audience")
 	verifyCmd.Flags().StringArrayVar(&expectedClaims, "claim", nil, "expected claim key=value (repeatable)")
 
 	core.Bind(verifyCmd, &verifyCommand{
 		token:          &token,
 		apiURL:         &apiURL,
+		audience:       &audience,
 		expectedClaims: &expectedClaims,
 	}, options)
 

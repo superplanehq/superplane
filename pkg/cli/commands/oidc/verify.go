@@ -14,110 +14,93 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-const (
-	defaultAPIURL          = "https://app.superplane.com"
-	executionTokenAudience = "semaphore"
-	errTokenNotFound       = errors.New("token is required (use --token or SUPERPLANE_OIDC_TOKEN)")
+const defaultAPIURL = "https://app.superplane.com"
+
+var (
+	errTokenNotFound    = errors.New("token is required (use --token or SUPERPLANE_OIDC_TOKEN)")
+	errAudienceRequired = errors.New("audience is required (use --audience)")
 )
 
 type verifyCommand struct {
 	token          *string
 	apiURL         *string
-	expectedClaims *[]string
+	audience       *string
+	expectedClaims *map[string]string
+
+	client      *http.Client
+	runToken    string
+	runAPIURL   string
+	runAudience string
+	issuer      string
 }
 
 func (c *verifyCommand) Execute(ctx core.CommandContext) error {
-	apiURL := c.lookupAPIURL(ctx)
+	var err error
 
-	token, err := c.lookupToken(ctx)
+	c.client = http.DefaultClient
+	c.runAPIURL = c.lookupAPIURL(ctx)
+
+	err = c.lookupToken()
 	if err != nil {
 		return err
 	}
 
-	claims, err := validateRemote(ctx.Context, http.DefaultClient, token, apiURL)
-	if err != nil {
-		return fmt.Errorf("token verification failed")
-	}
-
-	expected, err := parseExpectedClaims(*c.expectedClaims)
+	err = c.lookupAudience()
 	if err != nil {
 		return err
 	}
 
-	if err := matchExpectedClaims(claims, expected); err != nil {
+	err = c.parseExpectedClaims()
+	if err != nil {
 		return err
 	}
 
-	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(claims)
+	err = c.verifyToken(ctx.Context)
+	if err != nil {
+		return err
 	}
 
-	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, err := fmt.Fprintf(stdout, "Token verified\n")
-		if err != nil {
-			return err
-		}
-
-		for key := range claims {
-			value := claimString(claims, key)
-			if value == "" {
-				continue
-			}
-			_, err = fmt.Fprintf(stdout, "%s: %s\n", key, value)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	fmt.Println("Token verified")
+	return nil
 }
 
-func validateRemote(ctx context.Context, client *http.Client, token, baseURL string) (map[string]any, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if client != nil {
-		ctx = gooidc.ClientContext(ctx, client)
-	}
+func (c *verifyCommand) verifyToken(ctx context.Context) error {
+	ctx = gooidc.ClientContext(ctx, c.client)
 
-	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	if baseURL == "" {
-		return nil, fmt.Errorf("base URL is required")
-	}
-
-	issuer, err := fetchIssuer(ctx, client, baseURL)
+	issuer, err := c.fetchIssuer(ctx, c.runAPIURL)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	provider, err := gooidc.NewProvider(ctx, issuer)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	verifier := provider.Verifier(&gooidc.Config{
-		ClientID: executionTokenAudience,
+		ClientID: c.runAudience,
 	})
 
-	idToken, err := verifier.Verify(ctx, token)
+	idToken, err := verifier.Verify(ctx, c.runToken)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	claims := map[string]any{}
 	if err := idToken.Claims(&claims); err != nil {
-		return nil, err
+		return err
 	}
 
-	return claims, nil
+	for key, want := range *c.expectedClaims {
+		if claimString(claims, key) != want {
+			return fmt.Errorf("token verification failed: expected claim %s to be %s, got %s", key, want, claimString(claims, key))
+		}
+	}
+
+	return nil
 }
 
-func fetchIssuer(ctx context.Context, client *http.Client, baseURL string) (string, error) {
-	if client == nil {
-		client = http.DefaultClient
-	}
-
+func (c *verifyCommand) fetchIssuer(ctx context.Context, baseURL string) (string, error) {
 	request, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
@@ -128,7 +111,7 @@ func fetchIssuer(ctx context.Context, client *http.Client, baseURL string) (stri
 		return "", err
 	}
 
-	response, err := client.Do(request)
+	response, err := c.client.Do(request)
 	if err != nil {
 		return "", fmt.Errorf("fetch OIDC discovery document: %w", err)
 	}
@@ -158,33 +141,25 @@ func fetchIssuer(ctx context.Context, client *http.Client, baseURL string) (stri
 	return issuer, nil
 }
 
-func parseExpectedClaims(flags []string) (map[string]string, error) {
-	expected := make(map[string]string, len(flags))
+func (c *verifyCommand) parseExpectedClaims() error {
+	expected := make(map[string]string, len(*c.expectedClaims))
 
-	for _, flag := range flags {
-		flag = strings.TrimSpace(flag)
-		if flag == "" {
+	for _, claim := range *c.expectedClaims {
+		claim = strings.TrimSpace(claim)
+		if claim == "" {
 			continue
 		}
 
-		key, value, ok := strings.Cut(flag, "=")
+		key, value, ok := strings.Cut(claim, "=")
 		key = strings.TrimSpace(key)
 		if !ok || key == "" {
-			return nil, fmt.Errorf("invalid claim %q (expected key=value)", flag)
+			return fmt.Errorf("invalid claim %q (expected key=value)", claim)
 		}
 
 		expected[key] = value
 	}
 
-	return expected, nil
-}
-
-func matchExpectedClaims(claims map[string]any, expected map[string]string) error {
-	for key, want := range expected {
-		if claimString(claims, key) != want {
-			return fmt.Errorf("token verification failed")
-		}
-	}
+	c.expectedClaims = &expected
 
 	return nil
 }
@@ -203,29 +178,36 @@ func claimString(claims map[string]any, key string) string {
 	}
 }
 
-func (c *verifyCommand) lookupToken(ctx core.CommandContext) (string, error) {
+func (c *verifyCommand) lookupToken() error {
 	token := strings.TrimSpace(*c.token)
-
 	if token == "" {
 		token = strings.TrimSpace(os.Getenv("SUPERPLANE_OIDC_TOKEN"))
 	}
-
 	if token == "" {
-		return "", errTokenNotFound
+		return errTokenNotFound
 	}
 
-	return token, nil
+	c.runToken = token
+
+	return nil
+}
+
+func (c *verifyCommand) lookupAudience() error {
+	audience := strings.TrimSpace(*c.audience)
+	if audience == "" {
+		return errAudienceRequired
+	}
+
+	c.runAudience = audience
+
+	return nil
 }
 
 func (c *verifyCommand) lookupAPIURL(ctx core.CommandContext) string {
 	apiURL := strings.TrimRight(strings.TrimSpace(*c.apiURL), "/")
-
-	if apiURL == "" {
-		if ctx.Config != nil {
-			apiURL = strings.TrimRight(ctx.Config.GetURL(), "/")
-		}
+	if apiURL == "" && ctx.Config != nil {
+		apiURL = strings.TrimRight(ctx.Config.GetURL(), "/")
 	}
-
 	if apiURL == "" {
 		apiURL = defaultAPIURL
 	}

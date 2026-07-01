@@ -14,7 +14,9 @@ import (
 	spoidc "github.com/superplanehq/superplane/pkg/oidc"
 )
 
-func TestValidateRemote(t *testing.T) {
+const testExecutionTokenAudience = "semaphore"
+
+func TestVerifyAndParseClaims(t *testing.T) {
 	t.Parallel()
 
 	var server *httptest.Server
@@ -39,13 +41,20 @@ func TestValidateRemote(t *testing.T) {
 		"pipeline_file": ".semaphore/deploy.yml",
 	})
 
-	claims, err := validateRemote(t.Context(), server.Client(), token, server.URL)
+	cmd := &verifyCommand{
+		client:      server.Client(),
+		runToken:    token,
+		runAPIURL:   server.URL,
+		runAudience: testExecutionTokenAudience,
+	}
+
+	claims, err := cmd.verifyAndParseClaims(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, nodeID, claims["node_id"])
 	require.Equal(t, ".semaphore/deploy.yml", claims["pipeline_file"])
 }
 
-func TestValidateRemoteRejectsInvalidToken(t *testing.T) {
+func TestVerifyAndParseClaimsRejectsInvalidToken(t *testing.T) {
 	t.Parallel()
 
 	var server *httptest.Server
@@ -64,7 +73,14 @@ func TestValidateRemoteRejectsInvalidToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := validateRemote(t.Context(), server.Client(), "not-a-token", server.URL)
+	cmd := &verifyCommand{
+		client:      server.Client(),
+		runToken:    "not-a-token",
+		runAPIURL:   server.URL,
+		runAudience: testExecutionTokenAudience,
+	}
+
+	_, err := cmd.verifyAndParseClaims(t.Context())
 	require.Error(t, err)
 }
 
@@ -122,7 +138,7 @@ func signTestExecutionToken(t *testing.T, issuer string, claims map[string]any) 
 	token, err := provider.Sign(
 		fmt.Sprintf("execution:%s", uuid.NewString()),
 		time.Hour,
-		executionTokenAudience,
+		testExecutionTokenAudience,
 		claims,
 	)
 	require.NoError(t, err)
