@@ -45,6 +45,7 @@ func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
 		LeaseUntil:              t.LeaseUntil,
 		ExecutionTimeoutSeconds: t.ExecutionTimeoutSeconds,
 		ExitCode:                t.ExitCode,
+		WebhookPayloadSizeLimit: t.WebhookPayloadSizeLimit,
 	}
 	if strings.TrimSpace(t.Script) != "" {
 		row.ScriptJSON = t.Script
@@ -127,6 +128,7 @@ func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
 		LeaseUntil:              row.LeaseUntil,
 		ExecutionTimeoutSeconds: row.ExecutionTimeoutSeconds,
 		ExitCode:                row.ExitCode,
+		WebhookPayloadSizeLimit: row.WebhookPayloadSizeLimit,
 	}
 	if t.RunMode == "" {
 		t.RunMode = models.InferRunMode(t.Commands, t.Command, t.Script)

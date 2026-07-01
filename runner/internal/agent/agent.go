@@ -363,7 +363,19 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload,
 	}
 
 	exit, _, runErr := ex.Execute(execCtx, task, live, resultPath)
-	result := readTaskResultFile(resultPath, a.Config.MaxOutputBytes, a.Config.Log)
+
+	resultLimit := a.Config.MaxOutputBytes
+	if task.WebhookPayloadSizeLimit > 0 {
+		// Reserve 1 KB for the JSON wrapper fields added by the broker webhook payload.
+		webhookResultLimit := task.WebhookPayloadSizeLimit - 1024
+		if resultLimit <= 0 || webhookResultLimit < resultLimit {
+			resultLimit = webhookResultLimit
+		}
+	}
+	result, resultTooLarge := readTaskResultFile(resultPath, resultLimit, a.Config.Log)
+	if resultTooLarge {
+		return taskExecutionResult{ExitCode: 1, RunErr: fmt.Errorf("result payload too large: exceeds %d byte limit", resultLimit)}
+	}
 
 	if stoppedByCancel.Load() {
 		return taskExecutionResult{ExitCode: exit, RunErr: runErr, UserCanceled: true, Result: result}

@@ -45,10 +45,12 @@ func setProcessEnv(cmd *exec.Cmd, name, hostPath string) {
 	cmd.Env = append(os.Environ(), pair)
 }
 
-func readTaskResultFile(path string, maxBytes int, log *slog.Logger) json.RawMessage {
+// readTaskResultFile reads and validates the result JSON file written by the task.
+// Returns (result, tooLarge): tooLarge is true when the file exists but exceeds maxBytes.
+func readTaskResultFile(path string, maxBytes int, log *slog.Logger) (json.RawMessage, bool) {
 	b, err := os.ReadFile(path)
 	if err != nil || len(bytes.TrimSpace(b)) == 0 {
-		return nil
+		return nil, false
 	}
 	b = bytes.TrimSpace(b)
 	if maxBytes > 0 && len(b) > maxBytes {
@@ -56,15 +58,15 @@ func readTaskResultFile(path string, maxBytes int, log *slog.Logger) json.RawMes
 			log.Warn("task_result_file_too_large",
 				slog.String("path", path), slog.Int("bytes", len(b)), slog.Int("max", maxBytes))
 		}
-		return nil
+		return nil, true
 	}
 	if !json.Valid(b) {
 		if log != nil {
 			log.Warn("task_result_file_invalid_json", slog.String("path", path))
 		}
-		return nil
+		return nil, false
 	}
 	out := make(json.RawMessage, len(b))
 	copy(out, b)
-	return out
+	return out, false
 }

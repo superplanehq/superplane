@@ -58,6 +58,8 @@ type Task struct {
 	InfraRetryCount int
 	// CancelRequested is true while the task is claimed and a caller asked to stop it (persisted).
 	CancelRequested bool
+	// WebhookPayloadSizeLimit is the maximum accepted webhook POST body in bytes (0 = unlimited).
+	WebhookPayloadSizeLimit int
 }
 
 // EnvironmentVariable is one task-scoped environment variable.
