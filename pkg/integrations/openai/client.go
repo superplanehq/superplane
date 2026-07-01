@@ -137,8 +137,6 @@ func (c *Client) CreateResponse(req CreateResponseRequest) (*OpenAIResponse, err
 	return &response, nil
 }
 
-// UploadFile uploads a file to the OpenAI Files API with the given purpose
-// ("vision" for images, "user_data" for documents) and returns its file id.
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
 // createFormFile is like multipart.Writer.CreateFormFile but lets the caller set
@@ -156,6 +154,8 @@ func createFormFile(w *multipart.Writer, fieldname, filename, contentType string
 	return w.CreatePart(h)
 }
 
+// UploadFile uploads a file to the OpenAI Files API with the given purpose
+// ("vision" for images, "user_data" for documents) and returns its file id.
 func (c *Client) UploadFile(content io.Reader, filename, purpose, contentType string) (string, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
