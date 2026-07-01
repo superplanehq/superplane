@@ -84,8 +84,10 @@ type TextPromptConfiguration = {
 };
 
 // metadataList surfaces the configured model and structured-output state on the
-// canvas node tile. It prefers backend node metadata (set in Setup) and falls
-// back to the node configuration so the model shows before the first execution.
+// canvas node tile. The model prefers backend node metadata (set in Setup) and
+// falls back to the configuration so it shows before the first execution. The
+// structured-output badge is derived from the live configuration, since metadata
+// can go stale (autosave updates configuration only, not metadata).
 function metadataList(node: NodeInfo): MetadataItem[] {
   const items: MetadataItem[] = [];
   const meta = node.metadata as TextPromptNodeMetadata | undefined;
@@ -96,7 +98,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     items.push({ icon: "sparkles", label: model });
   }
 
-  const structured = meta?.structuredOutput ?? hasSchema(config?.outputSchema);
+  const structured = config ? hasSchema(config.outputSchema) : Boolean(meta?.structuredOutput);
   if (structured) {
     items.push({ icon: "braces", label: "Structured output" });
   }

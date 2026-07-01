@@ -757,8 +757,7 @@ export function SettingsTab({
                     // and must persist immediately. Otherwise a save-on-blur field type (e.g. text
                     // pre-filled with a default) would keep its value only in local state, so a run
                     // or reload before the editor blurs would drop the enabled value.
-                    const togglableEnabled =
-                      field.togglable === true && previousValue == null && !fieldWasCleared;
+                    const togglableEnabled = field.togglable === true && previousValue == null && !fieldWasCleared;
                     if (fieldWasCleared || togglableEnabled || shouldAutosaveOnChangeByFieldType(field.type)) {
                       requestAutosave();
                     }
