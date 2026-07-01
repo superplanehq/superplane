@@ -84,6 +84,44 @@ func TestHostExecutorJavaScriptSetupFailureSkipsScript(t *testing.T) {
 	_ = err
 }
 
+func TestHostExecutorJavaScriptScriptRedeclaringFs(t *testing.T) {
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skipf("node not on PATH: %v", err)
+	}
+
+	resultPath := filepath.Join(t.TempDir(), "result.json")
+	task := &api.TaskPayload{
+		ID:      "task-js-fs-redeclare",
+		RunMode: string(models.RunModeJavaScript),
+		Script: `const fs = require("fs");
+
+function main() {
+  return { cwdExists: fs.existsSync(".") };
+}`,
+	}
+	workDir := t.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	exit, out, err := (&HostExecutor{TaskWorkDir: workDir}).Execute(ctx, task, nil, resultPath)
+	if err != nil || exit != 0 {
+		t.Fatalf("javascript host with user-declared fs: exit=%d err=%v out=%q", exit, err, out)
+	}
+	b, err := os.ReadFile(resultPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		CwdExists bool `json:"cwdExists"`
+	}
+	if err := json.Unmarshal(b, &result); err != nil {
+		t.Fatalf("result json: %v body=%s", err, b)
+	}
+	if !result.CwdExists {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
 func TestHostExecutorJavaScriptScript(t *testing.T) {
 	if _, err := exec.LookPath("node"); err != nil {
 		t.Skipf("node not on PATH: %v", err)
