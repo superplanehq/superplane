@@ -41,11 +41,74 @@ type UseRunCanvasPresentationParams = {
   isSelectedRunExecutionsLoading: boolean;
 };
 
-type RunCanvasData = {
+export type RunCanvasData = {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   participantNodeIds: string[];
 };
+
+type RunExecutionRef = NonNullable<CanvasesCanvasRun["executions"]>[number];
+type OrderedRunExecution =
+  | { kind: "identified"; id: string }
+  | { kind: "anonymous"; execution: CanvasesCanvasNodeExecution };
+
+export function mergeRunExecutionsForCanvas(
+  runExecutions: RunExecutionRef[] = [],
+  fullExecutions: CanvasesCanvasNodeExecution[] = [],
+): CanvasesCanvasNodeExecution[] {
+  const identifiedExecutions = new Map<string, CanvasesCanvasNodeExecution>();
+  const orderedExecutions: OrderedRunExecution[] = [];
+
+  const appendExecution = (execution: RunExecutionRef | CanvasesCanvasNodeExecution): void => {
+    if (!execution.id) {
+      orderedExecutions.push({ kind: "anonymous", execution });
+      return;
+    }
+
+    if (!identifiedExecutions.has(execution.id)) {
+      identifiedExecutions.set(execution.id, execution);
+      orderedExecutions.push({ kind: "identified", id: execution.id });
+    }
+  };
+
+  runExecutions.forEach(appendExecution);
+
+  for (const execution of fullExecutions) {
+    if (!execution.id) {
+      orderedExecutions.push({ kind: "anonymous", execution });
+      continue;
+    }
+
+    const existing = identifiedExecutions.get(execution.id);
+    if (existing) {
+      identifiedExecutions.set(execution.id, { ...existing, ...execution });
+      continue;
+    }
+
+    identifiedExecutions.set(execution.id, execution);
+    orderedExecutions.push({ kind: "identified", id: execution.id });
+  }
+
+  return orderedExecutions.map((execution) => {
+    if (execution.kind === "anonymous") return execution.execution;
+    return identifiedExecutions.get(execution.id)!;
+  });
+}
+
+export function getRunCanvasFitKey({
+  isRunInspectionMode,
+  selectedRunId,
+  runCanvasData,
+  runCanvasLoading,
+}: {
+  isRunInspectionMode: boolean;
+  selectedRunId: string | null;
+  runCanvasData: RunCanvasData | null;
+  runCanvasLoading: boolean;
+}): string | null {
+  if (!isRunInspectionMode || !selectedRunId || !runCanvasData || runCanvasLoading) return null;
+  return `${selectedRunId}|${runCanvasData.participantNodeIds.slice().sort().join("|")}`;
+}
 
 export function useRunCanvasData({
   isRunInspectionMode,
@@ -80,11 +143,12 @@ export function useRunCanvasData({
     const runNodeIds = new Set<string>();
     const nodeEventsMap: Record<string, CanvasesCanvasEvent[]> = {};
     const nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]> = {};
+    const runExecutions = mergeRunExecutionsForCanvas(selectedRun.executions, selectedRunFullExecutions);
     if (selectedRun.rootEvent?.nodeId) {
       runNodeIds.add(selectedRun.rootEvent.nodeId);
       nodeEventsMap[selectedRun.rootEvent.nodeId] = [selectedRun.rootEvent as CanvasesCanvasEvent];
     }
-    for (const execution of selectedRun.executions || []) {
+    for (const execution of runExecutions) {
       if (!execution.nodeId) continue;
       runNodeIds.add(execution.nodeId);
       if (!nodeExecutionsMap[execution.nodeId]) {
