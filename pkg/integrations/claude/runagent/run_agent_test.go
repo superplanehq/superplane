@@ -264,6 +264,98 @@ func TestClient_GetLastManagedSessionAgentMessage(t *testing.T) {
 	assert.Equal(t, "page_2", httpCtx.Requests[1].URL.Query().Get("page"))
 }
 
+func TestClient_ListAgents(t *testing.T) {
+	t.Run("single page", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_1","name":"A"},{"id":"agent_2","name":"B"}],"has_more":false}`)),
+			}},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+		agents, err := client.ListAgents()
+		require.NoError(t, err)
+		require.Len(t, agents, 2)
+		assert.Equal(t, "agent_1", agents[0].ID)
+		assert.Equal(t, "A", agents[0].Name)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.True(t, strings.HasSuffix(httpCtx.Requests[0].URL.Path, "/agents"))
+		assert.Equal(t, anthropicBetaManagedAgents, httpCtx.Requests[0].Header.Get("anthropic-beta"))
+	})
+
+	t.Run("follows pagination", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_1","name":"A"}],"has_more":true,"last_id":"agent_1"}`))},
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"agent_2","name":"B"}],"has_more":false}`))},
+			},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+		agents, err := client.ListAgents()
+		require.NoError(t, err)
+		require.Len(t, agents, 2)
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, "agent_1", httpCtx.Requests[1].URL.Query().Get("after_id"))
+	})
+}
+
+func TestClient_GetAgent(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{{
+			StatusCode: 200,
+			Body:       io.NopCloser(strings.NewReader(`{"id":"agent_1","name":"Coding Assistant"}`)),
+		}},
+	}
+	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+	agent, err := client.GetAgent("agent_1")
+	require.NoError(t, err)
+	assert.Equal(t, "agent_1", agent.ID)
+	assert.Equal(t, "Coding Assistant", agent.Name)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+	assert.True(t, strings.HasSuffix(httpCtx.Requests[0].URL.Path, "/agents/agent_1"))
+
+	_, err = client.GetAgent("")
+	require.Error(t, err)
+}
+
+func TestClient_GetEnvironment(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{{
+			StatusCode: 200,
+			Body:       io.NopCloser(strings.NewReader(`{"id":"env_1","name":"python-dev"}`)),
+		}},
+	}
+	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+	env, err := client.GetEnvironment("env_1")
+	require.NoError(t, err)
+	assert.Equal(t, "env_1", env.ID)
+	assert.Equal(t, "python-dev", env.Name)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.True(t, strings.HasSuffix(httpCtx.Requests[0].URL.Path, "/environments/env_1"))
+
+	_, err = client.GetEnvironment("")
+	require.Error(t, err)
+}
+
+func TestClient_ListEnvironments(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{{
+			StatusCode: 200,
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"env_1","name":"dev"}],"has_more":false}`)),
+		}},
+	}
+	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+	envs, err := client.ListEnvironments()
+	require.NoError(t, err)
+	require.Len(t, envs, 1)
+	assert.Equal(t, "env_1", envs[0].ID)
+	assert.Equal(t, "dev", envs[0].Name)
+	require.Len(t, httpCtx.Requests, 1)
+	assert.True(t, strings.HasSuffix(httpCtx.Requests[0].URL.Path, "/environments"))
+}
+
 func Test__buildCreateSessionBody__latest(t *testing.T) {
 	b, err := buildCreateSessionBody(CreateManagedSessionRequest{
 		Agent:         "  ag  ",

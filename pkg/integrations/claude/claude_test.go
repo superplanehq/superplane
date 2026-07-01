@@ -164,6 +164,45 @@ func TestClaude_ListResources(t *testing.T) {
 			expectedIDs: []string{"claude-2.1", "claude-instant-1.2"},
 		},
 		{
+			name:         "List Agents Success",
+			resourceType: "agent",
+			config: map[string][]byte{
+				"apiKey": []byte("test"),
+			},
+			mockResponses: func(req *http.Request) *http.Response {
+				return &http.Response{
+					StatusCode: 200,
+					Body: io.NopCloser(bytes.NewBufferString(`{
+						"data": [
+							{"id": "agent_01", "name": "Coding Assistant"},
+							{"id": "agent_02", "name": ""}
+						],
+						"has_more": false
+					}`)),
+				}
+			},
+			expectedIDs: []string{"agent_01", "agent_02"},
+		},
+		{
+			name:         "List Environments Success",
+			resourceType: "environment",
+			config: map[string][]byte{
+				"apiKey": []byte("test"),
+			},
+			mockResponses: func(req *http.Request) *http.Response {
+				return &http.Response{
+					StatusCode: 200,
+					Body: io.NopCloser(bytes.NewBufferString(`{
+						"data": [
+							{"id": "env_01", "name": "python-dev"}
+						],
+						"has_more": false
+					}`)),
+				}
+			},
+			expectedIDs: []string{"env_01"},
+		},
+		{
 			name:         "Invalid Resource Type",
 			resourceType: "deployment",
 			expectedIDs:  []string{}, // Returns empty list, no error
