@@ -22,6 +22,7 @@ type Input struct {
 	NodeID              string            `json:"node_id,omitempty"`
 	EventID             string            `json:"event_id,omitempty"`
 	ExecutionID         string            `json:"execution_id,omitempty"`
+	RunID               string            `json:"run_id,omitempty"`
 	Limit               uint32            `json:"limit,omitempty"`
 	Before              string            `json:"before,omitempty"`
 	States              []string          `json:"states,omitempty"`
