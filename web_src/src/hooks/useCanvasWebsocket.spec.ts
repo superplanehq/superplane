@@ -104,8 +104,9 @@ afterEach(() => {
 });
 
 describe("useCanvasWebsocket", () => {
-  it("does not patch root workflow events into the infinite runs cache", async () => {
+  it("refreshes runs for root workflow events without patching them into the cache", async () => {
     const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
     seedInfiniteRuns(queryClient, [
       {
         id: "run-old",
@@ -129,9 +130,10 @@ describe("useCanvasWebsocket", () => {
       const data = queryClient.getQueryData<InfiniteData<InfiniteRunsPage>>(canvasKeys.infiniteRuns(testCanvasId));
       expect(data?.pages[0]?.runs?.map((run) => run.rootEvent?.id)).toEqual(["event-old"]);
     });
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
   });
 
-  it("does not invalidate infinite runs query for queue_item_created", async () => {
+  it("invalidates infinite runs query for queue_item_created", async () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
 
@@ -143,7 +145,7 @@ describe("useCanvasWebsocket", () => {
 
     await flushMessageQueue();
 
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
   });
 
   it("does not invalidate infinite runs query for queue_item_consumed", async () => {
@@ -190,6 +192,25 @@ describe("useCanvasWebsocket", () => {
       expect(runsData?.pages[0]?.runs?.[0]?.executions?.[0]?.id).toBe("execution-1");
     });
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(0);
+  });
+
+  it("invalidates infinite runs when execution events cannot be patched into cached runs", async () => {
+    const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+    seedInfiniteRuns(queryClient, []);
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("execution_created", {
+      id: "execution-1",
+      nodeId: testNodeId,
+      state: "STATE_PENDING",
+      updatedAt: "2026-06-01T12:00:00.000Z",
+      rootEvent: { id: "event-1", nodeId: testNodeId },
+    });
+
+    await flushMessageQueue();
+
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
   });
 
   it("patches run events into all infinite runs cache variants", async () => {

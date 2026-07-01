@@ -12,9 +12,10 @@ import { SidebarEventActionsMenu } from "./SidebarEventItem/SidebarEventActionsM
 
 interface CompactSidebarEventRowProps {
   event: SidebarEvent;
+  selectionNodeId?: string;
   runId?: string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
-  onSelectRun?: (runId: string) => void;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
@@ -30,6 +31,7 @@ function isRunNavigableEvent(event: SidebarEvent): boolean {
 
 export function CompactSidebarEventRow({
   event,
+  selectionNodeId,
   runId,
   fetchRunId,
   onSelectRun,
@@ -71,6 +73,16 @@ export function CompactSidebarEventRow({
   const showActionsMenu = showCancel || showReEmit;
   const isSelectable = Boolean(onSelectRun && isRunNavigableEvent(event) && (runId || fetchRunId));
   const runHref = organizationId && appId && runId ? appPath(organizationId, appId, `?run=${runId}`) : null;
+  const runSelectionNodeId = event.nodeId || selectionNodeId;
+
+  const selectResolvedRun = (selectedRunId: string) => {
+    if (runSelectionNodeId) {
+      onSelectRun?.(selectedRunId, { nodeId: runSelectionNodeId });
+      return;
+    }
+
+    onSelectRun?.(selectedRunId);
+  };
 
   const selectRun = async () => {
     if (!onSelectRun || isResolvingRef.current) {
@@ -80,7 +92,7 @@ export function CompactSidebarEventRow({
     isResolvingRef.current = true;
     try {
       if (runId) {
-        onSelectRun(runId);
+        selectResolvedRun(runId);
         return;
       }
 
@@ -90,7 +102,7 @@ export function CompactSidebarEventRow({
 
       const resolvedRunId = await fetchRunId(event);
       if (resolvedRunId) {
-        onSelectRun(resolvedRunId);
+        selectResolvedRun(resolvedRunId);
       }
     } finally {
       isResolvingRef.current = false;
