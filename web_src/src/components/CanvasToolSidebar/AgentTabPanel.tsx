@@ -191,7 +191,6 @@ function ChatConversation({
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
   const outcomeActive = isOutcomeActive(outcomeState);
   const agentBusy = status === "streaming" || outcomeMutation.isPending || outcomeActive;
-  const modeDisabled = agentBusy;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -237,7 +236,7 @@ function ChatConversation({
         statusLabel={sendMutation.isPending ? "Starting agent..." : statusLabel(status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
-        modeDisabled={modeDisabled}
+        modeDisabled={agentBusy}
       />
     </div>
   );
