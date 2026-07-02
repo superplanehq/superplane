@@ -244,8 +244,6 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Version)
 		assert.Equal(t, pb.CanvasVersion_STATE_PUBLISHED, resp.Version.Metadata.State)
-		assert.Equal(t, "publish-metadata-only-renamed", resp.Version.Metadata.Name)
-		assert.Equal(t, "updated through metadata-only publish", resp.Version.Metadata.Description)
 
 		canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
 		require.NoError(t, err)

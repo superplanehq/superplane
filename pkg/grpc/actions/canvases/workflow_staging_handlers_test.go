@@ -103,7 +103,6 @@ func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
 	require.NoError(t, err)
 	assert.False(t, resp.GetStagingSummary().GetHasStaging())
-	assert.Equal(t, canvas.Name, resp.GetVersion().GetMetadata().GetName())
 
 	updatedCanvas, err := models.FindCanvas(r.Organization.ID, canvasUUID)
 	require.NoError(t, err)
@@ -140,9 +139,8 @@ func TestCommitCanvasStagingIgnoresRenamedCanvasInYAML(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	_, err = CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
 	require.NoError(t, err)
-	assert.Equal(t, canvas.Name, resp.GetVersion().GetMetadata().GetName())
 
 	updatedCanvas, err := models.FindCanvas(r.Organization.ID, canvasUUID)
 	require.NoError(t, err)

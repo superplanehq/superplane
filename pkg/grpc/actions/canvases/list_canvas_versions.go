@@ -61,7 +61,7 @@ func ListCanvasVersionsPaginated(
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
 
-	protoVersions := serializeCanvasVersions(ctx, canvas, publishedVersions, organizationID)
+	protoVersions := serializeCanvasVersions(ctx, publishedVersions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
@@ -88,7 +88,7 @@ func listDraftCanvasVersions(
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
 
-	protoVersions := serializeCanvasVersions(ctx, canvas, draftVersions, organizationID)
+	protoVersions := serializeCanvasVersions(ctx, draftVersions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,

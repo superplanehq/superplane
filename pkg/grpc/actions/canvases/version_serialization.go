@@ -21,7 +21,7 @@ func canvasMetadataFromCanvas(canvas *models.Canvas) (name, description string) 
 	return canvas.Name, canvas.Description
 }
 
-func SerializeCanvasVersion(canvas *models.Canvas, version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
+func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
 	var owner *pb.UserRef
 	if version.OwnerID != nil {
 		owner = canvasVersionOwnerRef(organizationID, version.OwnerID.String(), ownersByID)
@@ -37,15 +37,11 @@ func SerializeCanvasVersion(canvas *models.Canvas, version *models.CanvasVersion
 		state = pb.CanvasVersion_STATE_SNAPSHOT
 	}
 
-	name, description := canvasMetadataFromCanvas(canvas)
-
 	metadata := &pb.CanvasVersion_Metadata{
-		Id:          version.ID.String(),
-		CanvasId:    version.WorkflowID.String(),
-		Owner:       owner,
-		State:       state,
-		Name:        name,
-		Description: description,
+		Id:       version.ID.String(),
+		CanvasId: version.WorkflowID.String(),
+		Owner:    owner,
+		State:    state,
 	}
 
 	if version.PublishedAt != nil {
@@ -71,8 +67,8 @@ func SerializeCanvasVersion(canvas *models.Canvas, version *models.CanvasVersion
 	}
 }
 
-func SerializeCanvasVersionMetadata(canvas *models.Canvas, version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
-	full := SerializeCanvasVersion(canvas, version, organizationID, ownersByID)
+func SerializeCanvasVersionMetadata(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
+	full := SerializeCanvasVersion(version, organizationID, ownersByID)
 	return &pb.CanvasVersion{
 		Metadata: full.GetMetadata(),
 	}
@@ -121,7 +117,7 @@ func ownersByIDForCanvasVersions(ctx context.Context, orgID string, versions []m
 	return ownersByID, nil
 }
 
-func serializeCanvasVersions(ctx context.Context, canvas *models.Canvas, versions []models.CanvasVersion, organizationID string) []*pb.CanvasVersion {
+func serializeCanvasVersions(ctx context.Context, versions []models.CanvasVersion, organizationID string) []*pb.CanvasVersion {
 	var err error
 	ctx, done := telemetry.Span(ctx, "canvases.serialize_versions")
 	defer done(&err)
@@ -133,7 +129,7 @@ func serializeCanvasVersions(ctx context.Context, canvas *models.Canvas, version
 
 	protoVersions := make([]*pb.CanvasVersion, 0, len(versions))
 	for i := range versions {
-		protoVersions = append(protoVersions, SerializeCanvasVersion(canvas, &versions[i], organizationID, ownersByID))
+		protoVersions = append(protoVersions, SerializeCanvasVersion(&versions[i], organizationID, ownersByID))
 	}
 
 	if span := trace.SpanFromContext(ctx); span.IsRecording() {

@@ -98,18 +98,13 @@ func CommitCanvasStaging(
 		return nil, grpcerrors.Internal(err, "failed to reload version")
 	}
 
-	refreshedCanvas, err := models.FindCanvas(canvas.OrganizationID, canvas.ID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to reload canvas")
-	}
-
 	state, _, err := stagingSummaryForVersion(version.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.CommitCanvasStagingResponse{
-		Version:        SerializeCanvasVersionMetadata(refreshedCanvas, committed, organizationID, nil),
+		Version:        SerializeCanvasVersionMetadata(committed, organizationID, nil),
 		StagingSummary: state,
 	}, nil
 }

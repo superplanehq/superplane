@@ -72,13 +72,8 @@ func PublishCanvasVersion(
 		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
 	}
 
-	refreshedCanvas, err := models.FindCanvas(organizationUUID, canvasUUID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to reload canvas")
-	}
-
 	return &pb.PublishCanvasVersionResponse{
-		Version: SerializeCanvasVersion(refreshedCanvas, publishedVersion, organizationID, nil),
+		Version: SerializeCanvasVersion(publishedVersion, organizationID, nil),
 	}, nil
 }
 

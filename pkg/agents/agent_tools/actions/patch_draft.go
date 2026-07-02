@@ -53,7 +53,12 @@ func (a patchDraftAction) Execute(ctx context.Context, session agents.AgentSessi
 		return updateResult{}, err
 	}
 
-	canvas, err := models.FindCanvas(target.organizationID, uuid.MustParse(session.CanvasID))
+	canvasID, err := uuid.Parse(session.CanvasID)
+	if err != nil {
+		return updateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
+	}
+
+	canvas, err := models.FindCanvas(target.organizationID, canvasID)
 	if err != nil {
 		return updateResult{}, fmt.Errorf("load canvas: %w", err)
 	}
@@ -471,14 +476,10 @@ func defaultPatchDraftAutoLayoutNodeIDs(
 
 func serializePatchedDraftYAML(canvas *models.Canvas, version *models.CanvasVersion, canvasID string) (string, error) {
 	positioned := &pb.CanvasVersion{
-		Metadata: &pb.CanvasVersion_Metadata{
-			Name:        canvas.Name,
-			Description: canvas.Description,
-		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: grpcactions.NodesToProto(version.Nodes),
 			Edges: grpcactions.EdgesToProto(version.Edges),
 		},
 	}
-	return canvasyaml.CanvasResourceYAML(positioned, canvasID)
+	return canvasyaml.CanvasResourceYAML(positioned, canvasID, canvas.Name, canvas.Description)
 }

@@ -9,7 +9,13 @@ import (
 )
 
 func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion, organizationID string) (string, error) {
-	return canvasyaml.CanvasResourceYAML(SerializeCanvasVersion(canvas, version, organizationID, nil), canvas.ID.String())
+	name, description := canvasMetadataFromCanvas(canvas)
+	return canvasyaml.CanvasResourceYAML(
+		SerializeCanvasVersion(version, organizationID, nil),
+		canvas.ID.String(),
+		name,
+		description,
+	)
 }
 
 func consoleYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion) (string, error) {
