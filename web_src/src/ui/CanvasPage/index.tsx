@@ -95,6 +95,7 @@ import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
+import { applyCanvasViewportCulling, useCanvasViewportCulling } from "./useCanvasViewportCulling";
 import type { TriggerActionModal } from "@/pages/app/mappers/types";
 
 export interface SidebarData {
@@ -2937,6 +2938,12 @@ function CanvasContent({
     });
   }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
 
+  const { visibleNodeIds, visibleEdgeIds } = useCanvasViewportCulling(nodesWithCallbacks, styledEdges ?? [], true);
+  const { nodes: culledNodes, edges: culledEdges } = useMemo(
+    () => applyCanvasViewportCulling(nodesWithCallbacks, styledEdges ?? [], visibleNodeIds, visibleEdgeIds),
+    [nodesWithCallbacks, styledEdges, visibleNodeIds, visibleEdgeIds],
+  );
+
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
   const { onNodesChange, onEdgesChange } = state;
 
@@ -3114,8 +3121,8 @@ function CanvasContent({
       <div className="h-full">
         <div className="h-full w-full">
           <ReactFlow
-            nodes={nodesWithCallbacks}
-            edges={styledEdges}
+            nodes={culledNodes}
+            edges={culledEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             minZoom={MIN_CANVAS_ZOOM}
@@ -3134,7 +3141,6 @@ function CanvasContent({
             nodesDraggable={!isReadOnly}
             nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
-            onlyRenderVisibleElements={true}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
