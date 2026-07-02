@@ -188,6 +188,9 @@ func (q *QuarantinePackage) Execute(ctx core.ExecutionContext) error {
 	release := spec.Action == QuarantineActionRelease
 	pkg, err := client.QuarantinePackage(owner, repo, spec.Package, release)
 	if err != nil {
+		if release {
+			return fmt.Errorf("failed to release package: %v", err)
+		}
 		return fmt.Errorf("failed to quarantine package: %v", err)
 	}
 

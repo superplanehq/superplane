@@ -286,7 +286,7 @@ func Test__QuarantinePackage__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid repository")
 	})
 
-	t.Run("API error returns error", func(t *testing.T) {
+	t.Run("quarantine API error returns quarantine error", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
 		err := component.Execute(core.ExecutionContext{
@@ -309,5 +309,31 @@ func Test__QuarantinePackage__Execute(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to quarantine package")
+	})
+
+	t.Run("release API error returns release error", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"repository": "acme/production",
+				"package":    "perm123",
+				"action":     QuarantineActionRelease,
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusForbidden,
+						Body:       io.NopCloser(strings.NewReader(`{"detail":"Permission denied."}`)),
+					},
+				},
+			},
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+			ExecutionState: executionState,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to release package")
+		assert.NotContains(t, err.Error(), "failed to quarantine package")
 	})
 }
