@@ -200,18 +200,6 @@ service Canvases {
     };
   }
 
-  rpc ApplyCanvasAutoLayout(ApplyCanvasAutoLayoutRequest) returns (ApplyCanvasAutoLayoutResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/auto-layout"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Apply canvas auto-layout";
-      description: "Lays out the staged canvas.yaml for a draft version and re-stages the positioned result";
-      tags: "CanvasVersion";
-    };
-  }
-
   rpc DeleteCanvas(DeleteCanvasRequest) returns (DeleteCanvasResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvases/{id}"
@@ -611,16 +599,6 @@ message CommitCanvasStagingRequest {
 message CommitCanvasStagingResponse {
   CanvasVersion version = 1;
   StagingSummary staging_summary = 2;
-}
-
-message ApplyCanvasAutoLayoutRequest {
-  string canvas_id = 1;
-  string version_id = 2;
-  CanvasAutoLayout auto_layout = 3;
-}
-
-message ApplyCanvasAutoLayoutResponse {
-  StagingSummary staging_summary = 1;
 }
 
 message DeleteCanvasRequest {
