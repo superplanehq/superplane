@@ -96,7 +96,6 @@ func (i *Cursor) Actions() []core.Action {
 	return []core.Action{
 		&LaunchAgent{},
 		&GetDailyUsageData{},
-		&GetLastMessage{},
 	}
 }
 

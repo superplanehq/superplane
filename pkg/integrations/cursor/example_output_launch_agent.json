@@ -4,7 +4,24 @@
     "branchName": "cursor/agent-550e8400",
     "prUrl": "https://github.com/org/repo/pull/42",
     "status": "FINISHED",
-    "summary": "Refactored login logic."
+    "summary": "Refactored login logic.",
+    "messages": [
+      {
+        "id": "msg_001",
+        "type": "user_message",
+        "text": "Refactor the login logic and add tests."
+      },
+      {
+        "id": "msg_002",
+        "type": "assistant_message",
+        "text": "Refactored login logic and added unit tests."
+      }
+    ],
+    "lastMessage": {
+      "id": "msg_002",
+      "type": "assistant_message",
+      "text": "Refactored login logic and added unit tests."
+    }
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cursor.launchAgent.finished"
