@@ -223,7 +223,13 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	ctx.Logger.Infof("Started code agent session %s. Waiting for completion...", meta.Session.ID)
-	return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll)
+	if err := ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll); err != nil {
+		// Without a scheduled poll nothing will finish or reclaim the run, so
+		// tear everything down rather than leaking the running session.
+		a.teardown(client, meta, true, ctx.Logger.Warnf)
+		return fmt.Errorf("failed to schedule poll: %w", err)
+	}
+	return nil
 }
 
 // startSession creates the session, persists metadata, and sends the task prompt.
@@ -409,6 +415,9 @@ func resolvePullRequestForRun(ctx core.ExecutionContext, spec Spec, token string
 	}
 	if pr.isFork() {
 		return nil, fmt.Errorf("pull request %s was opened from a fork (%s); updating fork PRs is not yet supported", spec.PrURL, pr.HeadRepo)
+	}
+	if strings.TrimSpace(pr.BaseRepo) == "" || strings.TrimSpace(pr.HeadRef) == "" {
+		return nil, fmt.Errorf("pull request %s is missing its base repository or head branch", spec.PrURL)
 	}
 	return pr, nil
 }

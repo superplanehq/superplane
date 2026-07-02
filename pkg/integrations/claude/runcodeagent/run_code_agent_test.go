@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -491,4 +492,55 @@ func Test__RunCodeAgent__poll__missingSessionFinishesError(t *testing.T) {
 	require.NoError(t, a.HandleHook(hookCtx))
 	require.True(t, execState.Finished)
 	assert.Equal(t, "error", execState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+}
+
+// failingSchedule implements core.RequestContext with a ScheduleActionCall that
+// always fails, without touching the shared test-support package.
+type failingSchedule struct{ err error }
+
+func (f *failingSchedule) ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error {
+	return f.err
+}
+
+func Test__RunCodeAgent__Execute__reclaimsOnScheduleFailure(t *testing.T) {
+	a := &RunCodeAgent{}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"agent_1"}`),                                   // create agent
+		resp(`{"id":"env_1"}`),                                     // create environment
+		resp(`{"id":"vault_1"}`),                                   // create vault
+		resp(`{}`),                                                 // credential
+		resp(`{"id":"sess_1","status":"running"}`),                 // create session
+		resp(`{}`),                                                 // send message
+		resp(`{"id":"sess_1","status":"running"}`),                 // get session (fast-path, not terminal)
+		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), // teardown
+	}}
+	execCtx := core.ExecutionContext{
+		ID:             uuid.New(),
+		Configuration:  repoConfig(),
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{"gh/token": []byte("ghp_123")}},
+		Metadata:       &contexts.MetadataContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &failingSchedule{err: fmt.Errorf("schedule boom")},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.Error(t, a.Execute(execCtx))
+	var deleted bool
+	for _, r := range httpCtx.Requests {
+		if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/sessions/sess_1") {
+			deleted = true
+		}
+	}
+	assert.True(t, deleted, "resources must be reclaimed when the poll cannot be scheduled")
+}
+
+func Test__RunCodeAgent__resolvePullRequestForRun__missingRef(t *testing.T) {
+	ctx := core.ExecutionContext{HTTP: &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"state":"open","head":{"ref":"","repo":{"full_name":"o/r"}},"base":{"ref":"main","repo":{"full_name":"o/r"}}}`),
+	}}}
+	_, err := resolvePullRequestForRun(ctx, Spec{PrURL: "https://github.com/o/r/pull/1"}, "tok")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing its base repository or head branch")
 }
