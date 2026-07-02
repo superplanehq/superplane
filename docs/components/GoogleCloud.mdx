@@ -35,11 +35,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud SQL • Delete Instance" href="#cloud-sql-•-delete-instance" description="Delete a Cloud SQL instance" />
   <LinkCard title="Cloud SQL • Get Database" href="#cloud-sql-•-get-database" description="Fetch a logical database from a Cloud SQL instance" />
   <LinkCard title="Cloud SQL • Get Instance" href="#cloud-sql-•-get-instance" description="Fetch a Cloud SQL instance's configuration and status" />
+  <LinkCard title="Compute • Create Firewall Rule" href="#compute-•-create-firewall-rule" description="Create a VPC firewall rule that allows or denies traffic to or from your VM instances" />
   <LinkCard title="Compute • Create Load Balancer" href="#compute-•-create-load-balancer" description="Create a regional external passthrough Network Load Balancer that forwards TCP/UDP traffic to a group of VM instances" />
   <LinkCard title="Compute • Create Static IP" href="#compute-•-create-static-ip" description="Reserve a regional external static IP address in a Google Cloud project" />
+  <LinkCard title="Compute • Delete Firewall Rule" href="#compute-•-delete-firewall-rule" description="Permanently delete a VPC firewall rule" />
   <LinkCard title="Compute • Delete Load Balancer" href="#compute-•-delete-load-balancer" description="Delete a regional external passthrough Network Load Balancer and its backend service and health check" />
   <LinkCard title="Compute • Delete Static IP" href="#compute-•-delete-static-ip" description="Release a regional external static IP address from a Google Cloud project" />
   <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
+  <LinkCard title="Compute • Update Firewall Rule" href="#compute-•-update-firewall-rule" description="Update a VPC firewall rule: its protocols and ports, ranges, priority, targets and source filters, description, or enabled state" />
   <LinkCard title="Compute • Create Image" href="#compute-•-create-image" description="Create a Google Compute Engine custom image from a disk, snapshot, or another image" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
   <LinkCard title="Compute • Delete Image" href="#compute-•-delete-image" description="Permanently delete a Google Compute Engine custom image" />
@@ -90,7 +93,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 - `roles/logging.configWriter` — create logging sinks for event triggers
 - `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/monitoring.viewer` to read VM metrics, `roles/cloudsql.admin` to manage Cloud SQL databases and instances, `roles/storage.admin` to manage Cloud Storage buckets)
+- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/compute.securityAdmin` to create, update, and delete firewall rules, `roles/iam.serviceAccountViewer` to populate the firewall service-account picker, `roles/monitoring.viewer` to read VM metrics, `roles/cloudsql.admin` to manage Cloud SQL databases and instances, `roles/storage.admin` to manage Cloud Storage buckets)
 
 <a id="artifact-registry-•-on-artifact-analysis"></a>
 
@@ -1110,6 +1113,85 @@ Emits a `gcp.cloudsql.instance` payload with the instance `name`, `state`, `data
 }
 ```
 
+<a id="compute-•-create-firewall-rule"></a>
+
+## Compute • Create Firewall Rule
+
+**Component key:** `gcp.compute.createFirewallRule`
+
+The Create Firewall Rule component creates a VPC firewall rule that controls traffic to and from the VM instances in a network.
+
+### Use Cases
+
+- **Open a port**: Allow inbound traffic on specific ports (e.g. 80, 443) to your VMs
+- **Lock down access**: Deny traffic from specific source ranges
+- **Targeted rules**: Apply a rule only to VMs carrying specific network tags
+
+### Configuration
+
+- **Name**: Name for the new firewall rule (lowercase letters, numbers and hyphens; 1–63 chars) (required)
+- **Network**: The VPC network the rule applies to (required)
+- **Direction**: `INGRESS` (incoming, default) or `EGRESS` (outgoing)
+- **Action**: `allow` (default) or `deny` the matched traffic
+- **Priority**: 0–65535; lower numbers win (default 1000)
+- **Protocols and ports**: *Specified protocols and ports* (default) lists protocol/ports entries (e.g. `tcp` with ports `80, 443`; leave ports empty to match all ports of that protocol). *All protocols and ports* matches every protocol/port and hides the list
+- **Targets**: Which instances the rule applies to — *All instances in the network* (default), *Specified target tags*, or *Specified service accounts*. Choosing tags or service accounts reveals the matching input (the service-account picker has a custom field for cross-project emails)
+- **Source filter** (INGRESS): How incoming traffic is matched — *IP ranges* (default, `0.0.0.0/0`), *Source tags*, or *Service accounts*. Choosing one reveals its input. With *IP ranges*, at least one CIDR is required (use `0.0.0.0/0` to match all) — an empty list is rejected because GCP would otherwise silently widen the rule to `0.0.0.0/0`.
+- **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default `0.0.0.0/0`); at least one is required for the same reason.
+- **Description**: Optional human-readable description
+- **Disabled**: Create the rule in a disabled state
+- **Logs**: Turn on Firewall Rules Logging (optionally choosing whether to include metadata)
+
+> The Targets and Source filter dropdowns make tags and service accounts mutually exclusive within each, mirroring the GCP Console. A rule still can't mix tags on one side with service accounts on the other (e.g. target tags + source service accounts) — the component rejects that.
+
+### Output
+
+Emits the created firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target/source tags, target/source service accounts, disabled, logging state, creationTimestamp, and a console link.
+
+### Important Notes
+
+- Firewall rules are **global** resources; the network and rule live at the project level.
+- Requires the `roles/compute.securityAdmin` IAM role (or `roles/compute.admin`).
+- The **service-account dropdowns** additionally require `iam.serviceAccounts.list` (e.g. `roles/iam.serviceAccountViewer`) on the project; without it the dropdown can't list accounts — use the custom field to enter emails directly.
+- GCP does **not** verify that a service account exists when creating the rule, so a wrong or non-existent email produces a rule that silently matches nothing. The dropdown avoids this; the custom field is format-checked.
+- The component waits for the underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "action": "ALLOW",
+    "allowed": [
+      {
+        "IPProtocol": "tcp",
+        "ports": [
+          "80",
+          "443"
+        ]
+      }
+    ],
+    "creationTimestamp": "2026-06-23T12:00:00.000-07:00",
+    "direction": "INGRESS",
+    "disabled": false,
+    "link": "https://console.cloud.google.com/networking/firewalls/details/allow-http?project=my-project",
+    "loggingEnabled": false,
+    "name": "allow-http",
+    "network": "default",
+    "priority": 1000,
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/firewalls/allow-http",
+    "sourceRanges": [
+      "0.0.0.0/0"
+    ],
+    "targetTags": [
+      "web"
+    ]
+  },
+  "timestamp": "2026-06-23T12:00:00Z",
+  "type": "gcp.compute.firewallRule.created"
+}
+```
+
 <a id="compute-•-create-load-balancer"></a>
 
 ## Compute • Create Load Balancer
@@ -1228,6 +1310,46 @@ Returns the reserved address:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.staticIP.created"
+}
+```
+
+<a id="compute-•-delete-firewall-rule"></a>
+
+## Compute • Delete Firewall Rule
+
+**Component key:** `gcp.compute.deleteFirewallRule`
+
+The Delete Firewall Rule component permanently deletes a VPC firewall rule.
+
+### Use Cases
+
+- **Cleanup**: Remove a firewall rule created by **Create Firewall Rule**
+- **Tighten security**: Remove an overly permissive rule as part of a workflow
+- **Lifecycle automation**: Remove temporary access rules once they are no longer needed
+
+### Configuration
+
+- **Firewall rule**: The firewall rule to delete. Pick from the list of rules in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.compute.createFirewallRule`) (required)
+
+### Output
+
+Returns the name of the deleted firewall rule.
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone.
+- If the firewall rule is not found, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup.
+- Requires the `roles/compute.securityAdmin` IAM role (or `roles/compute.admin`).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "allow-http"
+  },
+  "timestamp": "2026-06-23T12:00:00Z",
+  "type": "gcp.compute.firewallRule.deleted"
 }
 ```
 
@@ -1371,6 +1493,85 @@ Returns the instance state after the operation:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.staticIP.attached"
+}
+```
+
+<a id="compute-•-update-firewall-rule"></a>
+
+## Compute • Update Firewall Rule
+
+**Component key:** `gcp.compute.updateFirewallRule`
+
+The Update Firewall Rule component changes an existing VPC firewall rule. **Toggle on only the fields you want to change; everything left off is untouched.** Enabled state, protocols and ports, targets, source filter, and logs are dropdowns you toggle on and then pick a value.
+
+### Use Cases
+
+- **Adjust access**: Change the allowed/denied protocols and ports
+- **Widen or narrow scope**: Update the source/destination CIDR ranges or the targets
+- **Re-prioritize**: Change the rule's priority
+- **Pause a rule**: Disable a rule without deleting it, then re-enable it later
+
+### Configuration
+
+- **Firewall rule**: The firewall rule to update (required)
+- **Enabled state** (toggle): enable or disable the rule
+- **Priority** (toggle): new priority (0-65535); lower numbers take precedence
+- **Protocols and ports** (toggle): "Specified protocols and ports" (replace with a list) or "All protocols and ports" (match everything). The rule keeps its existing action (allow or deny)
+- **Ranges** (toggle): Replace the rule's CIDR ranges. Independent of the **Source filter**; applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed). `sourceRanges` may legitimately coexist with source tags **or** source service accounts, and editing the source filter does **not** touch ranges.
+- **Targets** (toggle): "All instances in the network", "Specified target tags", or "Specified service accounts". Choosing tags or service accounts **clears the other automatically** — a rule cannot use both. A specified tags/service-accounts selection with an empty list is rejected (it would silently broaden the rule to all instances).
+- **Source filter (INGRESS only, toggle)**: "IP ranges only" (clears source tags/service accounts), "Source tags", or "Source service accounts". Toggling this on for an EGRESS rule is rejected.
+- **Logs** (toggle): turn Firewall Rules Logging on or off (with optional metadata)
+- **Description** (toggle): Replace the rule's description
+
+> A firewall rule filters by **network tags** or by **service accounts**, never both. Switching a rule from one to the other is a single dropdown choice — the component auto-clears the opposite side. The component still rejects an update whose **result** would mix tags and service accounts across the Targets and Source filter sides.
+
+### Output
+
+Emits the updated firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target/source tags, target/source service accounts, disabled, logging state, creationTimestamp, and a console link.
+
+### Important Notes
+
+- A rule's **network** and **direction** are fixed at creation and cannot be changed; this component cannot switch an allow rule to a deny rule.
+- You must change at least one field.
+- Requires the `roles/compute.securityAdmin` IAM role (or `roles/compute.admin`).
+- The **service-account dropdowns** additionally require `iam.serviceAccounts.list` (e.g. `roles/iam.serviceAccountViewer`); without it, use the custom field to enter emails directly. Cross-project and non-existent service accounts aren't validated by GCP, so prefer the dropdown.
+- The component waits for the underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "action": "ALLOW",
+    "allowed": [
+      {
+        "IPProtocol": "tcp",
+        "ports": [
+          "80",
+          "443",
+          "8080"
+        ]
+      }
+    ],
+    "creationTimestamp": "2026-06-23T12:00:00.000-07:00",
+    "direction": "INGRESS",
+    "disabled": true,
+    "link": "https://console.cloud.google.com/networking/firewalls/details/allow-http?project=my-project",
+    "logMetadata": "INCLUDE_ALL_METADATA",
+    "loggingEnabled": true,
+    "name": "allow-http",
+    "network": "default",
+    "priority": 900,
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/firewalls/allow-http",
+    "sourceRanges": [
+      "10.0.0.0/8"
+    ],
+    "targetTags": [
+      "web"
+    ]
+  },
+  "timestamp": "2026-06-23T12:00:00Z",
+  "type": "gcp.compute.firewallRule.updated"
 }
 ```
 
