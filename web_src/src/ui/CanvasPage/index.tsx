@@ -82,7 +82,7 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
-import { RunNodeDetailPane } from "../Runs/RunNodeDetailPane";
+import { RunInspectionSidePanel } from "../Runs/RunInspectionSidePanel";
 import { ResizableBottomPane } from "./ResizableBottomPane";
 import { LiveBottomInspectorEmptyState } from "./LiveBottomInspectorEmptyState";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
@@ -1217,13 +1217,12 @@ function CanvasPage(props: CanvasPageProps) {
 
   const liveBottomInspectorOpen = !props.isRunInspectionMode && !props.isEditing && state.componentSidebar.isOpen;
 
-  const runNodeDetailPaneOpen =
-    props.isRunInspectionMode &&
-    !!props.runNodeDetailRun &&
-    !!props.runNodeDetailNodeId &&
-    !!props.runNodeDetailCanvasId;
+  // The run's step accordion now lives in a right-side panel that opens as soon
+  // as a run is selected (a node does not need to be picked yet). The expanded
+  // step, if any, is driven by runNodeDetailNodeId.
+  const runInspectionPanelOpen = props.isRunInspectionMode && !!props.runNodeDetailRun && !!props.runNodeDetailCanvasId;
 
-  const bottomDetailPaneOpen = runNodeDetailPaneOpen || liveBottomInspectorOpen;
+  const bottomDetailPaneOpen = liveBottomInspectorOpen;
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1509,19 +1508,6 @@ function CanvasPage(props: CanvasPageProps) {
               ? renderInspectorSidebar("sidebar")
               : null}
           </div>
-          {runNodeDetailPaneOpen ? (
-            <RunNodeDetailPane
-              canvasId={props.runNodeDetailCanvasId!}
-              run={props.runNodeDetailRun!}
-              nodeId={props.runNodeDetailNodeId!}
-              workflowNodes={props.workflowNodes}
-              componentIconMap={props.runsComponentIconMap}
-              onClose={() => props.onRunNodeDetailClose?.()}
-              onNavigateNode={props.onRunNodeDetailNavigate}
-              height={props.runNodeDetailPaneHeight}
-              onHeightChange={props.onRunNodeDetailPaneHeightChange}
-            />
-          ) : null}
           {liveBottomInspectorOpen ? (
             <ResizableBottomPane
               height={liveNodeDetailPaneHeight}
@@ -1537,6 +1523,24 @@ function CanvasPage(props: CanvasPageProps) {
             </ResizableBottomPane>
           ) : null}
         </div>
+
+        {runInspectionPanelOpen ? (
+          <RunInspectionSidePanel
+            canvasId={props.runNodeDetailCanvasId!}
+            run={props.runNodeDetailRun!}
+            workflowNodes={props.workflowNodes ?? []}
+            componentIconMap={props.runsComponentIconMap}
+            expandedNodeId={props.runNodeDetailNodeId ?? null}
+            onToggleNode={(nodeId) => {
+              if (nodeId === props.runNodeDetailNodeId) {
+                props.onRunNodeDetailClose?.();
+                return;
+              }
+              props.onRunNodeDetailNavigate?.(nodeId);
+            }}
+            onClose={() => props.onRunNodeDetailClose?.()}
+          />
+        ) : null}
       </div>
 
       {/* Edit existing node modal - now handled by settings sidebar */}

@@ -34,6 +34,12 @@ export interface RunsTabPanelProps {
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
+  /**
+   * When true the sidebar always shows the runs list and never slides to the
+   * single-run detail view. Used when run steps are inspected in a separate
+   * side panel instead of inside the sidebar.
+   */
+  keepListView?: boolean;
 }
 
 export function RunsTabPanel({
@@ -59,6 +65,7 @@ export function RunsTabPanel({
   workflowNodes = [],
   componentIconMap = {},
   onStatusFiltersChange,
+  keepListView = false,
 }: RunsTabPanelProps) {
   const [sidebarView, setSidebarView] = useState<RunsSidebarView>(() =>
     initialOpenDetail && selectedRunId ? "detail" : "list",
@@ -164,7 +171,8 @@ export function RunsTabPanel({
     onNavigateRun: handleNavigateRun,
   });
 
-  const isDetailView = sidebarView === "detail" && (!!selectedRun || (!!selectedRunId && isSelectedRunLoading));
+  const isDetailView =
+    !keepListView && sidebarView === "detail" && (!!selectedRun || (!!selectedRunId && isSelectedRunLoading));
   const isLiveCanvasSelected = !selectedRunId;
 
   return (
@@ -196,34 +204,38 @@ export function RunsTabPanel({
           onClearTriggers={filterState.clearTriggers}
         />
 
-        <div
-          className={`absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-white transition-transform duration-300 ease-in-out ${
-            isDetailView ? "translate-x-0" : "translate-x-full"
-          } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
-        >
-          {selectedRun ? (
-            <RunDetailPanel
-              canvasId={canvasId}
-              run={selectedRun}
-              workflowNodes={workflowNodes}
-              componentIconMap={componentIconMap}
-              selectedNodeId={selectedNodeId}
-              onSelectNode={onSelectNode ?? (() => {})}
-              onBack={handleBack}
-              newerRunId={newerRunId}
-              olderRunId={olderRunId}
-              canNavigateOlder={canNavigateOlder}
-              onNavigateRun={handleNavigateRun}
-              onNavigateOlder={
-                atOlderPaginationBoundary && hasNextPage && !filterState.hasAnyFilter ? handleNavigateOlder : undefined
-              }
-            />
-          ) : isSelectedRunLoading ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-sm text-gray-500">
-              Loading run…
-            </div>
-          ) : null}
-        </div>
+        {keepListView ? null : (
+          <div
+            className={`absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-white transition-transform duration-300 ease-in-out ${
+              isDetailView ? "translate-x-0" : "translate-x-full"
+            } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
+          >
+            {selectedRun ? (
+              <RunDetailPanel
+                canvasId={canvasId}
+                run={selectedRun}
+                workflowNodes={workflowNodes}
+                componentIconMap={componentIconMap}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={onSelectNode ?? (() => {})}
+                onBack={handleBack}
+                newerRunId={newerRunId}
+                olderRunId={olderRunId}
+                canNavigateOlder={canNavigateOlder}
+                onNavigateRun={handleNavigateRun}
+                onNavigateOlder={
+                  atOlderPaginationBoundary && hasNextPage && !filterState.hasAnyFilter
+                    ? handleNavigateOlder
+                    : undefined
+                }
+              />
+            ) : isSelectedRunLoading ? (
+              <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-sm text-gray-500">
+                Loading run…
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );

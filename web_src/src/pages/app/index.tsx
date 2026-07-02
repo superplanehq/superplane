@@ -4346,6 +4346,7 @@ export function AppPage() {
     workflowNodes: canvasNodes,
     componentIconMap,
     onStatusFiltersChange: setRunStatusFilters,
+    keepListView: true,
   });
   const toolSidebarVersionsContent = renderCanvasVersionsSidebarPanel({
     isOpen: showVersionsSidebar,

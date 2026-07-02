@@ -33,6 +33,7 @@ export interface CanvasRunsSidebarPanelConfig {
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
+  keepListView?: boolean;
 }
 
 export interface CanvasVersionsSidebarPanelConfig {
