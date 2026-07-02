@@ -56,8 +56,8 @@ func ApplyCanvasAutoLayout(
 
 	positioned := &pb.CanvasVersion{
 		Metadata: &pb.CanvasVersion_Metadata{
-			Name:        pbCanvas.GetMetadata().GetName(),
-			Description: pbCanvas.GetMetadata().GetDescription(),
+			Name:        canvas.Name,
+			Description: canvas.Description,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: actions.NodesToProto(laidOutNodes),

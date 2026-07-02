@@ -14,9 +14,6 @@ func summarizeCanvasVersion(canvas *models.Canvas, version *models.CanvasVersion
 	if version == nil {
 		return summary
 	}
-	if summary.CanvasName == "" {
-		summary.CanvasName = version.Name
-	}
 	summary.NodeCount = len(version.Nodes)
 	summary.EdgeCount = len(version.Edges)
 	summary.Nodes = summarizeNodes(version.Nodes, 20)

@@ -3,18 +3,15 @@ package canvases
 import (
 	"context"
 	"errors"
-	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 func UpdateCanvas(
@@ -39,6 +36,7 @@ func UpdateCanvas(
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		return updateCanvasInTransaction(tx, organizationUUID, canvasID, name, description)
 	})
+
 	if err != nil {
 		if _, _, ok := grpcerrors.HandlerStatus(err); ok {
 			return nil, err
@@ -83,24 +81,15 @@ func updateCanvasInTransaction(
 	name *string,
 	description *string,
 ) error {
-	lockedCanvas, err := lockCanvasForUpdate(tx, organizationUUID, canvasID)
+	canvas, err := models.FindCanvasInTransaction(tx, organizationUUID, canvasID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return grpcerrors.NotFound(err, "canvas not found")
+		}
 		return err
 	}
 
-	liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasID)
-	if err != nil {
-		return err
-	}
-
-	changed, err := applyCanvasLiveVersionUpdates(
-		tx,
-		organizationUUID,
-		canvasID,
-		liveVersion,
-		name,
-		description,
-	)
+	changed, err := applyCanvasMetadataUpdates(canvas, name, description)
 	if err != nil {
 		return err
 	}
@@ -109,109 +98,5 @@ func updateCanvasInTransaction(
 		return nil
 	}
 
-	return saveCanvasMetadataUpdate(tx, lockedCanvas, liveVersion)
-}
-
-func lockCanvasForUpdate(tx *gorm.DB, organizationUUID, canvasID uuid.UUID) (*models.Canvas, error) {
-	lockedCanvas := &models.Canvas{}
-	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE"}).
-		// This locks workflows directly, so select only columns that physically
-		// exist on workflows; metadata fields are projected from live versions.
-		Select(
-			"id",
-			"organization_id",
-			"live_version_id",
-			"folder_id",
-			"name",
-			"created_by",
-			"created_at",
-			"updated_at",
-			"deleted_at",
-		).
-		Where("organization_id = ?", organizationUUID).
-		Where("id = ?", canvasID).
-		First(lockedCanvas).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return lockedCanvas, nil
-}
-
-func applyCanvasLiveVersionUpdates(
-	tx *gorm.DB,
-	organizationUUID uuid.UUID,
-	canvasID uuid.UUID,
-	liveVersion *models.CanvasVersion,
-	name *string,
-	description *string,
-) (bool, error) {
-	nameChanged, err := applyCanvasNameUpdate(tx, organizationUUID, canvasID, liveVersion, name)
-	if err != nil {
-		return false, err
-	}
-
-	descriptionChanged := applyCanvasDescriptionUpdate(liveVersion, description)
-
-	return nameChanged || descriptionChanged, nil
-}
-
-func applyCanvasNameUpdate(
-	tx *gorm.DB,
-	organizationUUID uuid.UUID,
-	canvasID uuid.UUID,
-	liveVersion *models.CanvasVersion,
-	name *string,
-) (bool, error) {
-	if name == nil {
-		return false, nil
-	}
-
-	nextName := strings.TrimSpace(*name)
-	if nextName == "" {
-		return false, grpcerrors.InvalidArgument(nil, "canvas name is required")
-	}
-
-	nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasID, nextName)
-	if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
-		return false, grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
-	}
-	if nameErr != nil {
-		return false, nameErr
-	}
-
-	if liveVersion.Name == nextName {
-		return false, nil
-	}
-
-	liveVersion.Name = nextName
-	return true, nil
-}
-
-func applyCanvasDescriptionUpdate(liveVersion *models.CanvasVersion, description *string) bool {
-	if description == nil || liveVersion.Description == *description {
-		return false
-	}
-
-	liveVersion.Description = *description
-	return true
-}
-
-func saveCanvasMetadataUpdate(tx *gorm.DB, lockedCanvas *models.Canvas, liveVersion *models.CanvasVersion) error {
-	now := time.Now()
-	liveVersion.UpdatedAt = &now
-	lockedCanvas.Name = liveVersion.Name
-	lockedCanvas.UpdatedAt = &now
-
-	if err := tx.Save(liveVersion).Error; err != nil {
-		return err
-	}
-
-	if err := tx.Save(lockedCanvas).Error; err != nil {
-		return mapCanvasNameUniqueConstraintError(err)
-	}
-
-	return nil
+	return saveCanvasMetadataUpdate(tx, canvas)
 }
