@@ -37,7 +37,7 @@ func (c *LaunchAgent) Documentation() string {
 On completion the component emits:
 - **status**, **agentId**, **prUrl**, **summary**, **branchName**
 - **messages**: the agent's full conversation history (chronological); each message has an ` + "`id`, `type`" + ` (` + "`user_message`" + ` or ` + "`assistant_message`" + `) and ` + "`text`" + `
-- **lastMessage**: convenience pointer to the final assistant reply (use this, or select from ` + "`messages`" + ` via an expression)`
+- **lastMessage**: convenience pointer to the final assistant reply — or, if the agent produced no assistant reply, the last message overall (use this, or select from ` + "`messages`" + ` via an expression)`
 }
 
 func (c *LaunchAgent) Icon() string { return "cpu" }
