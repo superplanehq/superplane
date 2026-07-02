@@ -31,9 +31,9 @@ type Canvas struct {
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
 
 	//
-	// The `->` tag marks fields as read-only in GORM. These values are projected
-	// from the live version via SELECT aliases; they are not stored on workflows.
-	// They are stored in workflow_versions table.
+	// The `->` tag marks fields as read-only in GORM. Nodes and edges are projected
+	// from the live version via SELECT aliases when using queryCanvasWithLiveVersion.
+	// They are stored in workflow_versions, not on workflows.
 	//
 	Nodes datatypes.JSONSlice[Node] `gorm:"column:nodes;->"`
 	Edges datatypes.JSONSlice[Edge] `gorm:"column:edges;->"`
@@ -168,8 +168,8 @@ func FindCanvasByName(name string, organizationID uuid.UUID) (*Canvas, error) {
 
 func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.name = ? AND workflows.organization_id = ?", name, organizationID).
+	err := tx.
+		Where("name = ? AND organization_id = ?", name, organizationID).
 		First(&canvas).
 		Error
 
@@ -182,9 +182,9 @@ func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid
 
 func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.organization_id = ?", orgID).
-		Where("workflows.id = ?", id).
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("id = ?", id).
 		First(&canvas).
 		Error
 
@@ -216,8 +216,8 @@ func FindCanvasWithoutOrgScope(id uuid.UUID) (*Canvas, error) {
 
 func FindCanvasWithoutOrgScopeInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.id = ?", id).
+	err := tx.
+		Where("id = ?", id).
 		First(&canvas).
 		Error
 
@@ -234,9 +234,9 @@ func FindUnscopedCanvas(id uuid.UUID) (*Canvas, error) {
 
 func FindUnscopedCanvasInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
+	err := tx.
 		Unscoped().
-		Where("workflows.id = ?", id).
+		Where("id = ?", id).
 		First(&canvas).
 		Error
 
@@ -248,11 +248,10 @@ func FindUnscopedCanvasInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error)
 }
 
 func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, int64, error) {
-	query := queryCanvasWithLiveVersion(database.Conn()).
-		Where("workflows.organization_id = ?", orgID)
+	query := database.Conn().Model(&Canvas{}).Where("organization_id = ?", orgID)
 
 	if search != "" {
-		query = query.Where("workflows.name ILIKE ?", "%"+search+"%")
+		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
 
 	var total int64
@@ -269,7 +268,7 @@ func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, i
 	}
 
 	var canvases []Canvas
-	if err := query.Order("workflows.name ASC").Find(&canvases).Error; err != nil {
+	if err := query.Order("name ASC").Find(&canvases).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -277,6 +276,21 @@ func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, i
 }
 
 func ListCanvases(orgID string) ([]Canvas, error) {
+	var canvases []Canvas
+	err := database.Conn().
+		Where("organization_id = ?", orgID).
+		Order("name ASC").
+		Find(&canvases).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return canvases, nil
+}
+
+func ListCanvasesWithLiveVersion(orgID string) ([]Canvas, error) {
 	var canvases []Canvas
 	err := queryCanvasWithLiveVersion(database.Conn()).
 		Where("workflows.organization_id = ?", orgID).
@@ -326,9 +340,9 @@ func ListMaybeDeletedCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID uuid
 
 	// Organization teardown must include every workflow for the org when deciding
 	// whether cleanup can continue.
-	err := queryCanvasWithLiveVersion(tx).
+	err := tx.
 		Unscoped().
-		Where("workflows.organization_id = ?", orgID).
+		Where("organization_id = ?", orgID).
 		Find(&canvases).
 		Error
 	if err != nil {
