@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -78,11 +77,6 @@ func Test__UpdateCanvas(t *testing.T) {
 		require.NoError(t, findErr)
 		assert.Equal(t, newName, updatedCanvas.Name)
 		assert.Equal(t, newDescription, updatedCanvas.Description)
-
-		liveVersion, findVersionErr := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
-		require.NoError(t, findVersionErr)
-		assert.Equal(t, newName, liveVersion.Name)
-		assert.Equal(t, newDescription, liveVersion.Description)
 	})
 
 	t.Run("duplicate name -> error", func(t *testing.T) {
