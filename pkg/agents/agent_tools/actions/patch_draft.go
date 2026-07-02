@@ -58,7 +58,7 @@ func (a patchDraftAction) Execute(ctx context.Context, session agents.AgentSessi
 		return updateResult{}, fmt.Errorf("load canvas: %w", err)
 	}
 
-	stagedCanvas, err := a.readStagedDraftCanvas(ctx, session, target.draft, canvas)
+	stagedCanvas, err := a.readStagedDraftCanvas(ctx, session, target.draft)
 	if err != nil {
 		return updateResult{}, err
 	}
@@ -120,7 +120,7 @@ func resolvePatchDraftTarget(session agents.AgentSessionContext, input Input) (p
 	}, nil
 }
 
-func (a patchDraftAction) readStagedDraftCanvas(ctx context.Context, session agents.AgentSessionContext, draft *models.CanvasVersion, canvas *models.Canvas) (stagedDraftCanvas, error) {
+func (a patchDraftAction) readStagedDraftCanvas(ctx context.Context, session agents.AgentSessionContext, draft *models.CanvasVersion) (stagedDraftCanvas, error) {
 	canvasYAML, err := canvasRepository.ReadRepositorySpecFileStaged(
 		ctx,
 		session.OrganizationID,
@@ -135,10 +135,6 @@ func (a patchDraftAction) readStagedDraftCanvas(ctx context.Context, session age
 	pbCanvas, err := canvasyaml.ParseCanvasResource([]byte(strings.TrimSpace(canvasYAML)))
 	if err != nil {
 		return stagedDraftCanvas{}, fmt.Errorf("parse staged canvas yaml: %w", err)
-	}
-
-	if err := canvasRepository.EnsureCanvasMetadataUnchanged(canvas, pbCanvas); err != nil {
-		return stagedDraftCanvas{}, err
 	}
 
 	nodes, edges, err := canvasRepository.ParseCanvas(a.deps.Registry, session.OrganizationID, pbCanvas)

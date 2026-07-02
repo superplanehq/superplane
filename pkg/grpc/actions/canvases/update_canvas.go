@@ -3,6 +3,8 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -99,4 +101,57 @@ func updateCanvasInTransaction(
 	}
 
 	return saveCanvasMetadataUpdate(tx, canvas)
+}
+
+func applyCanvasMetadataUpdates(
+	canvas *models.Canvas,
+	name *string,
+	description *string,
+) (bool, error) {
+	nameChanged, err := applyCanvasNameUpdate(canvas, name)
+	if err != nil {
+		return false, err
+	}
+
+	descriptionChanged := applyCanvasDescriptionUpdate(canvas, description)
+
+	return nameChanged || descriptionChanged, nil
+}
+
+func applyCanvasNameUpdate(canvas *models.Canvas, name *string) (bool, error) {
+	if name == nil {
+		return false, nil
+	}
+
+	nextName := strings.TrimSpace(*name)
+	if nextName == "" {
+		return false, grpcerrors.InvalidArgument(nil, "canvas name is required")
+	}
+
+	if canvas.Name == nextName {
+		return false, nil
+	}
+
+	canvas.Name = nextName
+	return true, nil
+}
+
+func applyCanvasDescriptionUpdate(canvas *models.Canvas, description *string) bool {
+	if description == nil || canvas.Description == *description {
+		return false
+	}
+
+	canvas.Description = *description
+	return true
+}
+
+func saveCanvasMetadataUpdate(tx *gorm.DB, canvas *models.Canvas) error {
+	now := time.Now()
+	canvas.UpdatedAt = &now
+
+	if err := tx.Save(canvas).Error; err != nil {
+		return mapCanvasNameUniqueConstraintError(err)
+	}
+
+	return nil
 }

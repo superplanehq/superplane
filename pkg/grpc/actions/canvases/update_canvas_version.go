@@ -135,15 +135,6 @@ func UpdateCanvasVersionWithUsage(
 			return err
 		}
 
-		lockedCanvas, err := models.LockCanvasForUpdate(tx, organizationUUID, canvasUUID)
-		if err != nil {
-			return err
-		}
-
-		if err := EnsureCanvasMetadataUnchanged(lockedCanvas, pbCanvas); err != nil {
-			return err
-		}
-
 		now := time.Now()
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)

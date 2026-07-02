@@ -141,7 +141,7 @@ func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 	assert.False(t, hasStaging)
 }
 
-func TestCommitCanvasStagingRejectsRenamedCanvas(t *testing.T) {
+func TestCommitCanvasStagingIgnoresRenamedCanvasInYAML(t *testing.T) {
 	r, ctx, canvasID, versionID := setupStagingDraft(t)
 	orgID := r.Organization.ID.String()
 
@@ -164,8 +164,9 @@ func TestCommitCanvasStagingRejectsRenamedCanvas(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
-	require.Error(t, err)
+	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	require.NoError(t, err)
+	assert.Equal(t, canvas.Name, resp.GetVersion().GetMetadata().GetName())
 
 	updatedCanvas, err := models.FindCanvas(r.Organization.ID, canvasUUID)
 	require.NoError(t, err)
@@ -173,7 +174,7 @@ func TestCommitCanvasStagingRejectsRenamedCanvas(t *testing.T) {
 
 	hasStaging, err := models.HasWorkflowStaging(original.ID)
 	require.NoError(t, err)
-	assert.True(t, hasStaging)
+	assert.False(t, hasStaging)
 }
 
 func TestStageArbitraryRepositoryFile(t *testing.T) {

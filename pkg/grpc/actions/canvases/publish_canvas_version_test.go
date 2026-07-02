@@ -290,7 +290,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Equal(t, "published console", panels[0].Content["body"])
 	})
 
-	t.Run("canvas.yaml cannot rename app", func(t *testing.T) {
+	t.Run("canvas.yaml name is ignored", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvas.ID.String(), "")
@@ -307,9 +307,11 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			testWebhookBaseURL,
 			r.AuthService,
 		)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
+		require.NoError(t, err)
+
+		refreshedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
+		require.NoError(t, findErr)
+		assert.Equal(t, canvas.Name, refreshedCanvas.Name)
 	})
 
 }
