@@ -65,7 +65,7 @@ import (
 )
 
 const (
-	// Event payload can be up to 64k in size
+	// Event payload can be up to 512k in size
 	MaxEventSize = config.MaxWebhookPayloadSize
 
 	// The size of the stage execution outputs can be up to 4k
