@@ -38,11 +38,14 @@ import type { AgentMessage, AgentOutgoingImage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
 
+const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 3000;
+
 type ChatConversationProps = {
   chatId: string;
   canvasId: string;
   organizationId: string;
   initialStatus: string;
+  refreshChatStatus: () => Promise<string | undefined>;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
@@ -71,6 +74,11 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
   const chatId = chatQuery.data?.id ?? null;
   const { account } = useContext(AccountContext);
   const firstName = account?.name?.split(" ")[0] ?? "there";
+  const { refetch: refetchChat } = chatQuery;
+  const refreshChatStatus = useCallback(async () => {
+    const result = await refetchChat();
+    return result.data?.status;
+  }, [refetchChat]);
 
   if (chatQuery.isLoading || !chatId) {
     return (
@@ -95,6 +103,7 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
       canvasId={canvasId}
       organizationId={organizationId}
       initialStatus={chatQuery.data?.status ?? "idle"}
+      refreshChatStatus={refreshChatStatus}
       agentMode={toolSidebarState.agentMode}
       onModeSwitch={toolSidebarState.switchAgentMode}
       isEditing={toolSidebarState.isEditing}
@@ -107,6 +116,7 @@ function ChatConversation({
   canvasId,
   organizationId,
   initialStatus,
+  refreshChatStatus,
   agentMode,
   onModeSwitch,
   isEditing,
@@ -127,6 +137,7 @@ function ChatConversation({
   useEffect(() => {
     setStatus(initialStatus || "idle");
   }, [initialStatus]);
+  useStreamingStatusReconciler(status, setStatus, refreshChatStatus);
 
   // Prepend a synthetic greeting as the first message so it never disappears
   const messages = useMemo(() => {
@@ -230,6 +241,48 @@ function ChatConversation({
       />
     </div>
   );
+}
+
+function useStreamingStatusReconciler(
+  status: string,
+  setStatus: (value: string) => void,
+  refreshChatStatus: () => Promise<string | undefined>,
+) {
+  useEffect(() => {
+    if (status !== "streaming") {
+      return;
+    }
+
+    let active = true;
+    let inFlight = false;
+    const reconcile = async () => {
+      if (inFlight) {
+        return;
+      }
+
+      inFlight = true;
+      try {
+        const nextStatus = await refreshChatStatus();
+        if (active && nextStatus && nextStatus !== "streaming") {
+          setStatus(nextStatus);
+        }
+      } catch {
+        // Websocket events remain the primary status path; refetch only repairs missed terminal events.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void reconcile();
+    const intervalId = window.setInterval(() => {
+      void reconcile();
+    }, STREAMING_STATUS_RECONCILE_INTERVAL_MS);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [refreshChatStatus, setStatus, status]);
 }
 
 function useAgentBootKickoff({
