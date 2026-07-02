@@ -2,6 +2,10 @@
   "data": {
     "id": "msg_01X9JGt5...123456",
     "model": "claude-3-5-sonnet-latest",
+    "parsed": {
+      "summary": "Deployment completed successfully",
+      "severity": "low"
+    },
     "response": {
       "content": [
         {

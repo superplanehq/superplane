@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -16,16 +18,25 @@ const ResponsePayloadType = "openai.response"
 type CreateResponse struct{}
 
 type CreateResponseSpec struct {
-	Model string `json:"model"`
-	Input string `json:"input"`
+	Model        string `json:"model"`
+	Input        string `json:"input"`
+	OutputSchema string `json:"outputSchema"`
 }
 
 type ResponsePayload struct {
 	ID       string          `json:"id"`
 	Model    string          `json:"model"`
 	Text     string          `json:"text"`
+	Parsed   any             `json:"parsed,omitempty"`
 	Usage    *ResponseUsage  `json:"usage,omitempty"`
 	Response *OpenAIResponse `json:"response"`
+}
+
+// ResponseNodeMetadata is node-level metadata surfaced in the UI so the
+// configured model and options are visible on the node without opening it.
+type ResponseNodeMetadata struct {
+	Model            string `json:"model" mapstructure:"model"`
+	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
 }
 
 func (c *CreateResponse) Name() string {
@@ -54,6 +65,7 @@ func (c *CreateResponse) Documentation() string {
 
 - **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
 - **Prompt**: The text prompt to send to the model (supports expressions)
+- **Structured Output**: (Optional) Provide a JSON Schema for the response and the model returns JSON matching it, available on the parsed output. The schema is validated before the request and sent in OpenAI strict mode; strict mode marks every property required, so express optional fields by making their type nullable.
 
 ## Output
 
@@ -62,13 +74,14 @@ Returns the generated response including:
 - **model**: The model used for generation
 - **usage**: Token usage information (prompt tokens, completion tokens, total tokens)
 - **id**: Response ID for tracking
+- **parsed**: When Structured Output is configured, the response parsed into an object.
 
 ## Notes
 
 - Requires a valid OpenAI API key configured in the application settings
 - Response quality and speed depend on the selected model
 - Token usage is tracked and may incur costs based on your OpenAI plan
-- Supports OpenAI-compatible providers by setting a custom Base URL in the integration settings (e.g., Azure OpenAI, Ollama, vLLM)`
+- Supports OpenAI-compatible providers by setting a custom Base URL in the integration settings (e.g., Azure OpenAI, Ollama, vLLM). Note: structured output uses the OpenAI Responses API text.format parameter and may not be supported by all compatible providers.`
 }
 
 func (c *CreateResponse) Icon() string {
@@ -105,6 +118,11 @@ func (c *CreateResponse) Configuration() []configuration.Field {
 			Required:    true,
 			Placeholder: "Enter the prompt text",
 		},
+		structuredoutput.ConfigField(
+			"outputSchema",
+			"Structured Output",
+			"A JSON Schema describing the response. The model is constrained to return JSON matching it (available on the `parsed` output). Edit the default schema; it is validated before the request. Strict mode requires every property to be listed in `required`, so all top-level and nested properties are marked required automatically.",
+		),
 	}
 }
 
@@ -120,6 +138,23 @@ func (c *CreateResponse) Setup(ctx core.SetupContext) error {
 
 	if spec.Input == "" {
 		return fmt.Errorf("input is required")
+	}
+
+	// The schema field supports expressions (like the prompt), which are only
+	// resolved at execution. Validate it as JSON only when it has no unresolved
+	// expression; Execute re-parses the resolved value.
+	hasSchema := strings.TrimSpace(spec.OutputSchema) != ""
+	if hasSchema && !strings.Contains(spec.OutputSchema, "{{") {
+		if _, err := structuredoutput.Parse(spec.OutputSchema); err != nil {
+			return err
+		}
+	}
+
+	if ctx.Metadata != nil {
+		_ = ctx.Metadata.Set(ResponseNodeMetadata{
+			Model:            spec.Model,
+			StructuredOutput: hasSchema,
+		})
 	}
 
 	return nil
@@ -139,12 +174,29 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("input is required")
 	}
 
+	schema, err := structuredoutput.Parse(spec.OutputSchema)
+	if err != nil {
+		return err
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	response, err := client.CreateResponse(spec.Model, spec.Input)
+	req := CreateResponseRequest{Model: spec.Model, Input: spec.Input}
+	if schema != nil {
+		req.Text = &ResponseTextConfig{
+			Format: &ResponseFormat{
+				Type:   "json_schema",
+				Name:   "structured_output",
+				Schema: structuredoutput.Prepare(schema, true),
+				Strict: true,
+			},
+		}
+	}
+
+	response, err := client.CreateResponse(req)
 	if err != nil {
 		return err
 	}
@@ -156,6 +208,22 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		Text:     text,
 		Usage:    response.Usage,
 		Response: response,
+	}
+
+	// When a schema is configured, surface a refusal as text (it arrives on a
+	// dedicated content item that extractResponseText skips) and otherwise parse
+	// the JSON response into a structured object.
+	if schema != nil {
+		if refusal := extractRefusal(response); refusal != "" {
+			if payload.Text == "" {
+				payload.Text = refusal
+			}
+		} else if text != "" {
+			var parsed any
+			if err := json.Unmarshal([]byte(text), &parsed); err == nil {
+				payload.Parsed = parsed
+			}
+		}
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -205,6 +273,22 @@ func extractResponseText(response *OpenAIResponse) string {
 	}
 
 	return builder.String()
+}
+
+// extractRefusal returns the refusal message from a Responses API output, if any.
+// Refusals arrive as a dedicated content item (type "refusal") rather than JSON.
+func extractRefusal(response *OpenAIResponse) string {
+	if response == nil {
+		return ""
+	}
+	for _, output := range response.Output {
+		for _, content := range output.Content {
+			if content.Type == "refusal" && content.Refusal != "" {
+				return content.Refusal
+			}
+		}
+	}
+	return ""
 }
 
 func (c *CreateResponse) Cleanup(ctx core.SetupContext) error {

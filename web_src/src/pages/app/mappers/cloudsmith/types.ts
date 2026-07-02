@@ -187,3 +187,36 @@ export interface PromotePackageResult {
   self_webapp_url?: string;
   slug_perm?: string;
 }
+
+export interface ScanPackageConfiguration {
+  repository?: string;
+  package?: string;
+}
+
+export interface QuarantinePackageConfiguration {
+  repository?: string;
+  package?: string;
+  action?: string;
+}
+
+export interface GetPackageVulnerabilitiesConfiguration {
+  repository?: string;
+  package?: string;
+}
+
+export interface VulnerabilityPackageRef {
+  identifier?: string;
+  name?: string;
+  version?: string;
+  url?: string;
+}
+
+export interface VulnerabilityScanResult {
+  identifier?: string;
+  created_at?: string;
+  package?: VulnerabilityPackageRef;
+  scan_id?: string | null;
+  has_vulnerabilities?: boolean;
+  num_vulnerabilities?: number;
+  max_severity?: string;
+}

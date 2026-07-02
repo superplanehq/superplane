@@ -41,13 +41,28 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 }
 
 type CreateResponseRequest struct {
-	Model string `json:"model"`
-	Input string `json:"input"`
+	Model string              `json:"model"`
+	Input string              `json:"input"`
+	Text  *ResponseTextConfig `json:"text,omitempty"`
+}
+
+// ResponseTextConfig carries the structured-output format for the Responses API.
+type ResponseTextConfig struct {
+	Format *ResponseFormat `json:"format,omitempty"`
+}
+
+// ResponseFormat constrains the response to a JSON schema (Responses API: text.format).
+type ResponseFormat struct {
+	Type   string `json:"type"`             // "json_schema"
+	Name   string `json:"name"`             // required by the Responses API
+	Schema any    `json:"schema"`           // the JSON Schema object
+	Strict bool   `json:"strict,omitempty"` // enforce exact schema conformance
 }
 
 type ResponseContent struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type    string `json:"type"`
+	Text    string `json:"text"`
+	Refusal string `json:"refusal,omitempty"`
 }
 
 type ResponseOutput struct {
@@ -97,11 +112,8 @@ func (c *Client) ListModels() ([]Model, error) {
 	return response.Data, nil
 }
 
-func (c *Client) CreateResponse(model, input string) (*OpenAIResponse, error) {
-	body, err := json.Marshal(CreateResponseRequest{
-		Model: model,
-		Input: input,
-	})
+func (c *Client) CreateResponse(req CreateResponseRequest) (*OpenAIResponse, error) {
+	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
