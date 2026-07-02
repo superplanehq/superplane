@@ -44,12 +44,13 @@ func ListCanvasVersionsPaginated(
 		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
 
-	if err := checkCanvasExistence(ctx, database.DB(ctx), orgUUID, canvasUUID); err != nil {
+	canvas, err := loadCanvas(ctx, database.DB(ctx), orgUUID, canvasUUID)
+	if err != nil {
 		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	if state == pb.CanvasVersion_STATE_DRAFT {
-		return listDraftCanvasVersions(ctx, organizationID, canvasUUID, uuid.MustParse(userID), limit, before)
+		return listDraftCanvasVersions(ctx, canvas, organizationID, canvasUUID, uuid.MustParse(userID), limit, before)
 	}
 
 	limit = getCanvasVersionLimit(limit)
@@ -60,7 +61,7 @@ func ListCanvasVersionsPaginated(
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
 
-	protoVersions := serializeCanvasVersions(ctx, publishedVersions, organizationID)
+	protoVersions := serializeCanvasVersions(ctx, canvas, publishedVersions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
@@ -72,6 +73,7 @@ func ListCanvasVersionsPaginated(
 
 func listDraftCanvasVersions(
 	ctx context.Context,
+	canvas *models.Canvas,
 	organizationID string,
 	canvasID uuid.UUID,
 	ownerID uuid.UUID,
@@ -86,7 +88,7 @@ func listDraftCanvasVersions(
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
 
-	protoVersions := serializeCanvasVersions(ctx, draftVersions, organizationID)
+	protoVersions := serializeCanvasVersions(ctx, canvas, draftVersions, organizationID)
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
