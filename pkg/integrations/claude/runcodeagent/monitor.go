@@ -130,15 +130,13 @@ func (a *RunCodeAgent) handleClientError(ctx core.ActionHookContext, meta *Execu
 
 func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client *runagent.Client, meta *ExecutionMetadata, sess *runagent.ManagedSession, attempt, errs int) error {
 	sm, err := client.GetSessionMessagesWithRetry(meta.Session.ID, finalMessageReads, finalMessageDelay)
-	if err != nil || sm == nil || !sm.Complete {
-		// Keep polling until the event stream confirms completion; if the budget
-		// runs out first, report a timeout rather than emitting a result we could
-		// not fully assemble.
-		if attempt <= maxPollAttempts {
-			ctx.Logger.Warnf("Events not complete for session %s. Retrying poll.", meta.Session.ID)
-			return a.scheduleNextPoll(ctx, attempt+1, errs)
-		}
-		return a.finishTimeout(ctx, client, meta)
+	if (err != nil || sm == nil || !sm.Complete) && attempt <= maxPollAttempts {
+		// Give the event stream a chance to finish writing so we can assemble the
+		// full result. Once the budget is spent, emit the session's real terminal
+		// status (idle/terminated) with whatever we have — the API already
+		// confirmed the session finished, so this is not a timeout.
+		ctx.Logger.Warnf("Events not complete for session %s. Retrying poll.", meta.Session.ID)
+		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
 	out := buildOutput(sess.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)

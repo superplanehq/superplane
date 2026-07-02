@@ -131,13 +131,19 @@ describe("runCodeAgentMapper.props", () => {
     expect(props.metadata).toEqual([{ icon: "git-pull-request", label: "https://github.com/o/r/pull/9" }]);
   });
 
-  it("falls back to configuration when metadata is absent", () => {
+  it("falls back to configuration (repository and base branch) when metadata is absent", () => {
     const props = runCodeAgentMapper.props(
       buildPropsContext({
-        node: buildNode({ metadata: {}, configuration: { sourceMode: "repository", repository: "acme/widgets" } }),
+        node: buildNode({
+          metadata: {},
+          configuration: { sourceMode: "repository", repository: "acme/widgets", baseBranch: "develop" },
+        }),
       }),
     );
-    expect(props.metadata).toEqual([{ icon: "git-branch", label: "acme/widgets" }]);
+    expect(props.metadata).toEqual([
+      { icon: "git-branch", label: "acme/widgets" },
+      { icon: "git-branch", label: "develop" },
+    ]);
   });
 });
 

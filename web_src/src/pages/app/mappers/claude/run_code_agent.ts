@@ -25,6 +25,7 @@ type RunCodeAgentNodeMetadata = {
 type RunCodeAgentConfiguration = {
   sourceMode?: string;
   repository?: string;
+  baseBranch?: string;
   prUrl?: string;
   model?: string;
 };
@@ -111,8 +112,9 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     if (repo) {
       items.push({ icon: "git-branch", label: repo });
     }
-    if (meta.baseBranch) {
-      items.push({ icon: "git-branch", label: meta.baseBranch });
+    const baseBranch = meta.baseBranch || config.baseBranch;
+    if (baseBranch) {
+      items.push({ icon: "git-branch", label: baseBranch });
     }
   }
 
