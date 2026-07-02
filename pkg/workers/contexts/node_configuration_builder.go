@@ -325,7 +325,7 @@ func (b *NodeConfigurationBuilder) ResolveCodeTemplateExpressions(expression str
 			return nil, err
 		}
 
-		if isInsideQuotedLiteral(expression, matchStart) {
+		if isInsideQuotedLiteral(expression, matchStart, language) {
 			buf.WriteString(formatTemplateValue(value))
 		} else {
 			literal, err := formatCodeLiteral(value, language)
@@ -345,32 +345,55 @@ func (b *NodeConfigurationBuilder) ResolveCodeTemplateExpressions(expression str
 
 // isInsideQuotedLiteral reports whether byte offset pos in source falls inside
 // an open single/double/backtick-quoted literal, by scanning from the start
-// of source and tracking quote/escape state.
-func isInsideQuotedLiteral(source string, pos int) bool {
+// of source and tracking quote/escape state. For Python, a triple-quote
+// delimiter (three repeated quote characters) is treated as one token rather
+// than as independent open/close events.
+func isInsideQuotedLiteral(source string, pos int, language string) bool {
+	tripleQuotesAllowed := strings.EqualFold(language, "python")
+
 	var openQuote byte
+	tripleQuoted := false
 	escaped := false
 
-	for i := 0; i < pos && i < len(source); i++ {
+	i := 0
+	for i < pos && i < len(source) {
 		c := source[i]
 
-		if openQuote != 0 {
-			switch {
-			case escaped:
-				escaped = false
-			case c == '\\':
-				escaped = true
-			case c == openQuote:
-				openQuote = 0
+		if openQuote == 0 {
+			if tripleQuotesAllowed && (c == '\'' || c == '"') && isTripleQuoteAt(source, i, c) {
+				openQuote, tripleQuoted = c, true
+				i += 3
+				continue
 			}
+			if c == '\'' || c == '"' || c == '`' {
+				openQuote = c
+			}
+			i++
 			continue
 		}
 
-		if c == '\'' || c == '"' || c == '`' {
-			openQuote = c
+		switch {
+		case escaped:
+			escaped = false
+		case c == '\\':
+			escaped = true
+		case tripleQuoted && c == openQuote:
+			if !isTripleQuoteAt(source, i, openQuote) {
+				break // a lone quote char inside a triple-quoted string doesn't close it
+			}
+			openQuote, tripleQuoted = 0, false
+			i += 2 // consume the other two quote chars; the trailing i++ below covers the third
+		case c == openQuote:
+			openQuote = 0
 		}
+		i++
 	}
 
 	return openQuote != 0
+}
+
+func isTripleQuoteAt(source string, i int, quote byte) bool {
+	return i+2 < len(source) && source[i+1] == quote && source[i+2] == quote
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
@@ -861,9 +884,14 @@ func formatPythonList(value []any) (string, error) {
 	return buf.String(), nil
 }
 
-// formatShellLiteral renders value as a single, single-quoted POSIX shell
-// word, so it survives as one token regardless of embedded whitespace or
-// shell-special characters.
+// shellSafeWordPattern matches characters that never need quoting in a POSIX
+// shell word (mirrors Python's shlex.quote _find_unsafe allow-list).
+var shellSafeWordPattern = regexp.MustCompile(`^[\w@%+=:,./-]+$`)
+
+// formatShellLiteral renders value as a shell word, quoting it only when
+// necessary (empty, or containing whitespace/shell-special characters).
+// Plain numeric/word tokens are left bare so they still work in contexts like
+// $(( {{ x }} + 1 )) arithmetic expansion.
 func formatShellLiteral(value any) (string, error) {
 	var text string
 
@@ -880,6 +908,10 @@ func formatShellLiteral(value any) (string, error) {
 		text = string(encoded)
 	default:
 		text = formatTemplateValue(v)
+	}
+
+	if text != "" && shellSafeWordPattern.MatchString(text) {
+		return text, nil
 	}
 
 	return shellQuote(text), nil

@@ -94,6 +94,32 @@ func Test_NodeConfigurationBuilder_CodeField_ShellQuoting(t *testing.T) {
 	assert.Equal(t, `echo 'hello world'`, result["commands"])
 }
 
+func Test_NodeConfigurationBuilder_CodeField_ShellArithmeticExpansionStaysUnquoted(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{"count": 5}).
+		WithConfigurationFields([]configuration.Field{codeTextField("commands", "shell")})
+
+	result, err := builder.Build(map[string]any{
+		"commands": "echo $(( {{ root().count }} + 1 ))",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "echo $(( 5 + 1 ))", result["commands"])
+}
+
+func Test_NodeConfigurationBuilder_CodeField_PythonTripleQuotedPlaceholderIsNotReQuoted(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{"name": "john", "n": 5}).
+		WithConfigurationFields([]configuration.Field{codeTextField("script", "python")})
+
+	result, err := builder.Build(map[string]any{
+		"script": "msg = \"\"\"He said \"hi\" to {{ root().name }}\"\"\"\nn = {{ root().n }}",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "msg = \"\"\"He said \"hi\" to john\"\"\"\nn = 5", result["script"])
+}
+
 func Test_NodeConfigurationBuilder_CodeField_AlreadyQuotedPlaceholderIsNotDoubleQuoted(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithRootPayload(map[string]any{
