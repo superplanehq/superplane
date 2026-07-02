@@ -21,27 +21,18 @@ type Canvas struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 	LiveVersionID  *uuid.UUID
-	IsTemplate     bool
+	CanvasFolderID *uuid.UUID `gorm:"column:folder_id"`
 	Name           string
 	// The `->` tag marks fields as read-only in GORM. These values are projected
 	// from the live version via SELECT aliases; they are not stored on workflows.
-	Description             string                                           `gorm:"column:description;->"`
-	ChangeManagementEnabled bool                                             `gorm:"column:change_management_enabled;->"`
-	ChangeRequestApprovers  datatypes.JSONSlice[CanvasChangeRequestApprover] `gorm:"column:change_request_approvers;->"`
-	CreatedBy               *uuid.UUID
-	CreatedAt               *time.Time
-	UpdatedAt               *time.Time
-	DeletedAt               gorm.DeletedAt `gorm:"index"`
-}
-
-func (c *Canvas) EffectiveChangeRequestApprovers() []CanvasChangeRequestApprover {
-	if c == nil || len(c.ChangeRequestApprovers) == 0 {
-		return DefaultCanvasChangeRequestApprovers()
-	}
-
-	approvers := make([]CanvasChangeRequestApprover, len(c.ChangeRequestApprovers))
-	copy(approvers, c.ChangeRequestApprovers)
-	return approvers
+	Description            string                    `gorm:"column:description;->"`
+	Nodes                  datatypes.JSONSlice[Node] `gorm:"column:nodes;->"`
+	Edges                  datatypes.JSONSlice[Edge] `gorm:"column:edges;->"`
+	CreatedBy              *uuid.UUID
+	NextDraftDisplayNumber int `gorm:"column:next_draft_display_number;not null;default:1"`
+	CreatedAt              *time.Time
+	UpdatedAt              *time.Time
+	DeletedAt              gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) TableName() string {
@@ -68,9 +59,17 @@ func queryCanvasWithLiveVersion(tx *gorm.DB) *gorm.DB {
 		Select(
 			"workflows.*",
 			"live_version.description AS description",
-			"live_version.change_management_enabled AS change_management_enabled",
-			"live_version.change_request_approvers AS change_request_approvers",
+			"live_version.nodes AS nodes",
+			"live_version.edges AS edges",
 		)
+}
+
+func withActiveCanvas(tx *gorm.DB, workflowIDColumn string) *gorm.DB {
+	return tx.
+		Joins(fmt.Sprintf("JOIN workflows ON %s = workflows.id", workflowIDColumn)).
+		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
+		Where("workflows.deleted_at IS NULL").
+		Where("organizations.deleted_at IS NULL")
 }
 
 func (c *Canvas) FindNode(id string) (*CanvasNode, error) {
@@ -179,26 +178,6 @@ func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid
 	return &canvas, nil
 }
 
-func FindCanvasTemplateByName(name string) (*Canvas, error) {
-	return FindCanvasTemplateByNameInTransaction(database.Conn(), name)
-}
-
-func FindCanvasTemplateByNameInTransaction(tx *gorm.DB, name string) (*Canvas, error) {
-	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.organization_id = ?", TemplateOrganizationID).
-		Where("workflows.is_template = ?", true).
-		Where("workflows.name = ?", name).
-		First(&canvas).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &canvas, nil
-}
-
 func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
 	err := queryCanvasWithLiveVersion(tx).
@@ -212,6 +191,21 @@ func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) 
 	}
 
 	return &canvas, nil
+}
+
+func CheckCanvasExistence(tx *gorm.DB, orgID, id uuid.UUID) (bool, error) {
+	var count int64
+
+	err := tx.Model(&Canvas{}).
+		Where("organization_id = ?", orgID).
+		Where("id = ?", id).
+		Count(&count).Error
+
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
 
 func FindCanvasWithoutOrgScope(id uuid.UUID) (*Canvas, error) {
@@ -280,21 +274,10 @@ func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, i
 	return canvases, total, nil
 }
 
-func ListCanvases(orgID string, includeTemplates bool) ([]Canvas, error) {
+func ListCanvases(orgID string) ([]Canvas, error) {
 	var canvases []Canvas
-	var query *gorm.DB
-	if includeTemplates {
-		query = queryCanvasWithLiveVersion(database.Conn()).Where(
-			"(workflows.organization_id = ?) OR (workflows.organization_id = ? AND workflows.is_template = ?)",
-			orgID,
-			TemplateOrganizationID,
-			true,
-		)
-	} else {
-		query = queryCanvasWithLiveVersion(database.Conn()).Where("workflows.organization_id = ?", orgID)
-	}
-
-	err := query.
+	err := queryCanvasWithLiveVersion(database.Conn()).
+		Where("workflows.organization_id = ?", orgID).
 		Order("live_version.name ASC").
 		Find(&canvases).
 		Error
@@ -306,30 +289,26 @@ func ListCanvases(orgID string, includeTemplates bool) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func FindCanvasTemplate(id uuid.UUID) (*Canvas, error) {
-	return FindCanvasTemplateInTransaction(database.Conn(), id)
-}
-
-func FindCanvasTemplateInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
-	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.id = ?", id).
-		Where("workflows.is_template = ?", true).
-		First(&canvas).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &canvas, nil
-}
-
 func ListDeletedCanvases() ([]Canvas, error) {
 	var canvases []Canvas
-	err := queryCanvasWithLiveVersion(database.Conn()).
+	err := database.Conn().
+		Model(&Canvas{}).
 		Unscoped().
-		Where("workflows.deleted_at IS NOT NULL").
+		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
+		Joins("JOIN organizations ON organizations.id = workflows.organization_id").
+		Select(
+			"workflows.id",
+			"workflows.organization_id",
+			"workflows.live_version_id",
+			"workflows.folder_id",
+			"workflows.name",
+			"workflows.created_by",
+			"workflows.created_at",
+			"workflows.updated_at",
+			"COALESCE(workflows.deleted_at, organizations.deleted_at) AS deleted_at",
+			"live_version.description AS description",
+		).
+		Where("workflows.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
 		Find(&canvases).
 		Error
 
@@ -343,6 +322,8 @@ func ListDeletedCanvases() ([]Canvas, error) {
 func ListMaybeDeletedCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID uuid.UUID) ([]Canvas, error) {
 	var canvases []Canvas
 
+	// Organization teardown must include every workflow for the org when deciding
+	// whether cleanup can continue.
 	err := queryCanvasWithLiveVersion(tx).
 		Unscoped().
 		Where("workflows.organization_id = ?", orgID).
@@ -361,20 +342,25 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 	err := tx.
 		Unscoped().
 		Model(&Canvas{}).
+		Joins("JOIN organizations ON organizations.id = workflows.organization_id").
 		Select(
 			"workflows.id",
 			"workflows.organization_id",
 			"workflows.live_version_id",
-			"workflows.is_template",
+			"workflows.folder_id",
 			"workflows.name",
 			"workflows.created_by",
 			"workflows.created_at",
 			"workflows.updated_at",
-			"workflows.deleted_at",
+			"COALESCE(workflows.deleted_at, organizations.deleted_at) AS deleted_at",
 		).
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflows"},
+			Options:  "SKIP LOCKED",
+		}).
 		Where("workflows.id = ?", id).
-		Where("workflows.deleted_at IS NOT NULL").
+		Where("workflows.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
 		First(&canvas).
 		Error
 
@@ -390,8 +376,6 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 
 		canvas.Name = liveVersion.Name
 		canvas.Description = liveVersion.Description
-		canvas.ChangeManagementEnabled = liveVersion.ChangeManagementEnabled
-		canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(liveVersion.EffectiveChangeRequestApprovers())
 	}
 
 	return &canvas, nil
@@ -434,8 +418,7 @@ func CountCanvasesByOrganization(orgID string) (int64, error) {
 
 func CountCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64, error) {
 	var count int64
-	err := tx.
-		Model(&Canvas{}).
+	err := tx.Model(&Canvas{}).
 		Where("organization_id = ?", orgID).
 		Count(&count).
 		Error

@@ -14,7 +14,7 @@ type DeleteQueueItemCommand struct {
 }
 
 func (c *DeleteQueueItemCommand) Execute(ctx core.CommandContext) error {
-	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	canvasID, err := core.ResolveAppID(ctx, *c.CanvasID)
 	if err != nil {
 		return err
 	}

@@ -222,6 +222,7 @@ type CapabilityContext interface {
 	Clear()
 	IsRequested(capabilities ...string) bool
 	Requested() []string
+	Enabled() []string
 }
 
 type CapabilityGroup struct {
@@ -236,4 +237,14 @@ type Capability struct {
 	Description    string                    `json:"description"`
 	Configuration  []configuration.Field     `json:"configuration"`
 	OutputChannels []OutputChannel           `json:"outputChannels"`
+	ExampleOutput  map[string]any            `json:"exampleOutput,omitempty"`
+	ExampleData    map[string]any            `json:"exampleData,omitempty"`
+}
+
+/*
+ * IntegrationSetupContext allows integrations to manage setup state
+ * from outside the setup flow (e.g. from an HTTP request handler).
+ */
+type IntegrationSetupContext interface {
+	SetStep(step SetupStep) error
 }

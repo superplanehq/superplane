@@ -1,0 +1,9 @@
+{
+    "type": "jira.incident.created",
+    "data": {
+        "id": "10050",
+        "key": "ITSM-30",
+        "self": "https://your-domain.atlassian.net/rest/api/3/issue/10050"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

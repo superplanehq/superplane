@@ -155,6 +155,7 @@ func (c *PublishCommitStatus) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -170,12 +171,7 @@ func (c *PublishCommitStatus) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid commit SHA format: expected 40-character hexadecimal string, got %q", config.SHA)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -197,14 +193,7 @@ func (c *PublishCommitStatus) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Create the commit status
-	status, _, err := client.Repositories.CreateStatus(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		config.SHA,
-		repoStatus,
-	)
-
+	status, _, err := client.CreateStatus(context.Background(), config.Repository, config.SHA, repoStatus)
 	if err != nil {
 		return fmt.Errorf("failed to create commit status: %w", err)
 	}

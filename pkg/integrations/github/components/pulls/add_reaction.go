@@ -164,6 +164,7 @@ func (c *AddReaction) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -183,37 +184,23 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("comment ID is not a number: %v", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
-	reactionRequest := map[string]string{
-		"content": config.Content,
-	}
-
-	var requestPath string
+	reaction := &github.Reaction{}
 	switch config.Target {
 	case ReactionTargetIssueComment:
-		requestPath = fmt.Sprintf("repos/%s/%s/issues/comments/%d/reactions", appMetadata.Owner, config.Repository, commentID)
+		reaction, _, err = client.CreateIssueReaction(context.Background(), config.Repository, commentID, config.Content)
+		if err != nil {
+			return fmt.Errorf("failed to create issue reaction: %w", err)
+		}
 	case ReactionTargetReviewComment:
-		requestPath = fmt.Sprintf("repos/%s/%s/pulls/comments/%d/reactions", appMetadata.Owner, config.Repository, commentID)
-	}
-
-	request, err := client.NewRequest("POST", requestPath, reactionRequest)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	reaction := &github.Reaction{}
-	_, err = client.Do(context.Background(), request, reaction)
-	if err != nil {
-		return fmt.Errorf("failed to add reaction: %w", err)
+		reaction, _, err = client.CreateReviewCommentReaction(context.Background(), config.Repository, commentID, config.Content)
+		if err != nil {
+			return fmt.Errorf("failed to create review comment reaction: %w", err)
+		}
 	}
 
 	return ctx.ExecutionState.Emit(

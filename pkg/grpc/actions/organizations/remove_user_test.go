@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -26,10 +26,10 @@ func Test_RemoveUser(t *testing.T) {
 	t.Run("user not found -> error", func(t *testing.T) {
 		_, err := RemoveUser(ctx, r.AuthService, orgID, uuid.NewString())
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Equal(t, "user not found", s.Message())
+		assert.Equal(t, codes.NotFound, code)
+		assert.Equal(t, "user not found", msg)
 	})
 
 	t.Run("user found -> removes user from organization", func(t *testing.T) {
@@ -64,7 +64,7 @@ func Test_RemoveUser(t *testing.T) {
 		//
 		// Verify no organization roles exist anymore for that user anymore
 		//
-		roles, err := r.AuthService.GetUserRolesForOrg(newUser.ID.String(), orgID)
+		roles, err := r.AuthService.GetUserRolesForOrg(context.Background(), newUser.ID.String(), orgID)
 		require.NoError(t, err)
 		require.Len(t, roles, 0)
 	})

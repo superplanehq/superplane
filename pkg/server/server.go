@@ -3,95 +3,122 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
+	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
+	_ "net/http/pprof"
 	"os"
+	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/agents"
+	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
+	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/git"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
+	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
-	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
-
-	// Import integrations, components and triggers to register them via init()
-	_ "github.com/superplanehq/superplane/pkg/components/addmemory"
-	_ "github.com/superplanehq/superplane/pkg/components/approval"
-	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
-	_ "github.com/superplanehq/superplane/pkg/components/filter"
-	_ "github.com/superplanehq/superplane/pkg/components/graphql"
-	_ "github.com/superplanehq/superplane/pkg/components/http"
-	_ "github.com/superplanehq/superplane/pkg/components/if"
-	_ "github.com/superplanehq/superplane/pkg/components/merge"
-	_ "github.com/superplanehq/superplane/pkg/components/noop"
-	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
-	_ "github.com/superplanehq/superplane/pkg/components/send_email"
-	_ "github.com/superplanehq/superplane/pkg/components/ssh"
-	_ "github.com/superplanehq/superplane/pkg/components/timegate"
-	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
-	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
-	_ "github.com/superplanehq/superplane/pkg/components/wait"
-	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
-	_ "github.com/superplanehq/superplane/pkg/integrations/azure"
-	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
-	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
-	_ "github.com/superplanehq/superplane/pkg/integrations/claude"
-	_ "github.com/superplanehq/superplane/pkg/integrations/cloudflare"
-	_ "github.com/superplanehq/superplane/pkg/integrations/cursor"
-	_ "github.com/superplanehq/superplane/pkg/integrations/dash0"
-	_ "github.com/superplanehq/superplane/pkg/integrations/datadog"
-	_ "github.com/superplanehq/superplane/pkg/integrations/daytona"
-	_ "github.com/superplanehq/superplane/pkg/integrations/digitalocean"
-	_ "github.com/superplanehq/superplane/pkg/integrations/discord"
-	_ "github.com/superplanehq/superplane/pkg/integrations/dockerhub"
-	_ "github.com/superplanehq/superplane/pkg/integrations/elastic"
-	_ "github.com/superplanehq/superplane/pkg/integrations/firehydrant"
-	_ "github.com/superplanehq/superplane/pkg/integrations/gcp"
-	_ "github.com/superplanehq/superplane/pkg/integrations/github"
-	_ "github.com/superplanehq/superplane/pkg/integrations/gitlab"
-	_ "github.com/superplanehq/superplane/pkg/integrations/grafana"
-	_ "github.com/superplanehq/superplane/pkg/integrations/harness"
-	_ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
-	_ "github.com/superplanehq/superplane/pkg/integrations/honeycomb"
-	_ "github.com/superplanehq/superplane/pkg/integrations/incident"
-	_ "github.com/superplanehq/superplane/pkg/integrations/jfrog_artifactory"
-	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
-	_ "github.com/superplanehq/superplane/pkg/integrations/launchdarkly"
-	_ "github.com/superplanehq/superplane/pkg/integrations/logfire"
-	_ "github.com/superplanehq/superplane/pkg/integrations/newrelic"
-	_ "github.com/superplanehq/superplane/pkg/integrations/oci"
-	_ "github.com/superplanehq/superplane/pkg/integrations/octopus"
-	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
-	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
-	_ "github.com/superplanehq/superplane/pkg/integrations/perplexity"
-	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
-	_ "github.com/superplanehq/superplane/pkg/integrations/render"
-	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"
-	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
-	_ "github.com/superplanehq/superplane/pkg/integrations/sendgrid"
-	_ "github.com/superplanehq/superplane/pkg/integrations/sentry"
-	_ "github.com/superplanehq/superplane/pkg/integrations/servicenow"
-	_ "github.com/superplanehq/superplane/pkg/integrations/slack"
-	_ "github.com/superplanehq/superplane/pkg/integrations/smtp"
-	_ "github.com/superplanehq/superplane/pkg/integrations/statuspage"
-	_ "github.com/superplanehq/superplane/pkg/integrations/teams"
-	_ "github.com/superplanehq/superplane/pkg/integrations/telegram"
-	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
-	_ "github.com/superplanehq/superplane/pkg/triggers/start"
-	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
-	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
+	"gorm.io/gorm"
 )
 
-func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {
+var _ = registryimports.Loaded
+
+var agentProviderOverride = struct {
+	sync.Mutex
+	provider agents.Provider
+}{}
+
+func SetAgentProviderForTests(provider agents.Provider) func() {
+	agentProviderOverride.Lock()
+	previous := agentProviderOverride.provider
+	agentProviderOverride.provider = provider
+	agentProviderOverride.Unlock()
+
+	return func() {
+		agentProviderOverride.Lock()
+		agentProviderOverride.provider = previous
+		agentProviderOverride.Unlock()
+	}
+}
+
+func getAgentProviderOverride() agents.Provider {
+	agentProviderOverride.Lock()
+	defer agentProviderOverride.Unlock()
+	return agentProviderOverride.provider
+}
+
+func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
+	if provider := getAgentProviderOverride(); provider != nil {
+		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
+		return provider, agents.NewService(provider, authService)
+	}
+
+	cfg := config.LoadAnthropicAgentConfig()
+	if !cfg.Enabled() {
+		log.Info("Anthropic managed agents disabled: missing ANTHROPIC_* env vars")
+		return nil, nil
+	}
+
+	if err := anthropic.SyncDefaultAgentPrompt(context.Background(), anthropic.Config{
+		APIKey:        cfg.APIKey,
+		AgentID:       cfg.AgentID,
+		EnvironmentID: cfg.EnvironmentID,
+	}); err != nil {
+		log.WithError(err).Warn("failed to sync Anthropic managed agent prompt; continuing with provider prompt")
+	} else {
+		log.Info("Anthropic managed agent prompt synced")
+	}
+
+	fileResources, err := anthropic.LoadDefaultSessionResources(context.Background(), anthropic.Config{
+		APIKey:        cfg.APIKey,
+		AgentID:       cfg.AgentID,
+		EnvironmentID: cfg.EnvironmentID,
+	})
+	if err != nil {
+		log.WithError(err).Warn("failed to load Anthropic session resources; continuing without mounted references")
+		fileResources = nil
+	}
+
+	provider, err := anthropic.New(anthropic.Config{
+		APIKey:        cfg.APIKey,
+		AgentID:       cfg.AgentID,
+		EnvironmentID: cfg.EnvironmentID,
+		Resources:     fileResources,
+	})
+	if err != nil {
+		log.WithError(err).Warn("failed to initialise Anthropic managed agents provider")
+		return nil, nil
+	}
+
+	service := agents.NewService(provider, authService)
+	log.Info("Anthropic managed agents enabled")
+	return provider, service
+}
+
+func startWorkers(
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+	gitProvider gitprovider.Provider,
+	baseURL string,
+	authService authorization.Authorization,
+	agentProvider agents.Provider,
+) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -100,7 +127,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	}
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
-		startEmailConsumers(rabbitMQURL, encryptor, baseURL, authService)
+		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
@@ -110,11 +137,18 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_RUN_FINALIZER") == "yes" {
+		log.Println("Starting Run Finalizer")
+
+		w := workers.NewRunFinalizer(rabbitMQURL)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL, authService)
+		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, oidcProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -122,7 +156,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		log.Println("Starting Node Request Worker")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
+		w := workers.NewNodeRequestWorker(encryptor, registry, gitProvider, webhookBaseURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -137,7 +171,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
-		w := workers.NewNodeQueueWorker(registry, rabbitMQURL)
+		w := workers.NewNodeQueueWorker(registry, gitProvider, rabbitMQURL)
 		go w.Start(context.Background())
 	}
 
@@ -169,22 +203,73 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
-		w := workers.NewCanvasCleanupWorker()
+		w := workers.NewCanvasCleanupWorker(gitProvider, agentProvider)
 		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_REPOSITORY_PROVISIONER") == "yes" {
+		log.Println("Starting Repository Provisioner")
+		w := workers.NewRepositoryProvisionerWorker(rabbitMQURL, gitProvider)
+		go w.Start(context.Background())
+	}
+
+	var workerUsageService usage.Service
+	initWorkerUsageService := func() (usage.Service, error) {
+		if workerUsageService != nil {
+			return workerUsageService, nil
+		}
+
+		service, err := usage.NewServiceFromEnv()
+		if err != nil {
+			return nil, err
+		}
+		workerUsageService = service
+		return workerUsageService, nil
+	}
+	getRequiredWorkerUsageService := func() usage.Service {
+		service, err := initWorkerUsageService()
+		if err != nil {
+			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
+		}
+		return service
+	}
+	getOptionalWorkerUsageService := func() usage.Service {
+		service, err := initWorkerUsageService()
+		if err != nil {
+			log.Printf("usage service unavailable for agent canvas tool: %v", err)
+			return nil
+		}
+		return service
 	}
 
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
-		w := workers.NewOrganizationCleanupWorker()
+		w := workers.NewOrganizationCleanupWorker(gitProvider, agentProvider)
+		go w.Start(context.Background())
+	}
+
+	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
+		log.Println("Starting Agent Stream Worker")
+		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
+			Encryptor:         encryptor,
+			ComponentRegistry: registry,
+			GitProvider:       gitProvider,
+			WebhookBaseURL:    getWebhookBaseURL(baseURL),
+			AuthService:       authService,
+			UsageService:      getOptionalWorkerUsageService(),
+		})
+		w := workers.NewAgentStreamWorkerWithUsageService(
+			agentProvider,
+			rabbitMQURL,
+			getOptionalWorkerUsageService(),
+			agentToolRegistry,
+		)
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
-		usageService, err := usage.NewServiceFromEnv()
-		if err != nil {
-			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
-		}
+		usageService := getRequiredWorkerUsageService()
 
 		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
 			log.Println("Starting Event Retention Worker")
@@ -201,7 +286,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 
 }
 
-func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {
+func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
 	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
 		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
 		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
@@ -214,47 +299,52 @@ func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL
 		return
 	}
 
-	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
+	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL)
 }
 
-func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string, authService authorization.Authorization) {
-	log.Println("Starting Invitation Email Consumer")
-	invitationEmailConsumer := workers.NewInvitationEmailConsumer(rabbitMQURL, emailService, baseURL)
-	go invitationEmailConsumer.Start()
-
-	log.Println("Starting Notification Email Consumer")
-	notificationEmailConsumer := workers.NewNotificationEmailConsumer(rabbitMQURL, emailService, authService)
-	go notificationEmailConsumer.Start()
-
+func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string) {
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()
 }
 
-func startInternalAPI(
-	baseURL, webhooksBaseURL, basePath string,
+func buildGRPCServices(
+	baseURL, webhooksBaseURL string,
 	encryptor crypto.Encryptor,
-	jwtSigner *jwt.Signer,
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
-) {
-	log.Println("Starting Internal API")
+	gitProvider gitprovider.Provider,
+	agentService agentsActions.AgentsService,
+) (*grpc.Services, error) {
+	usageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("initialize usage service: %w", err)
+	}
 
-	grpc.RunServer(
-		baseURL,
-		webhooksBaseURL,
-		basePath,
-		encryptor,
-		jwtSigner,
-		authService,
-		registry,
-		oidcProvider,
-		lookupInternalAPIPort(),
-	)
+	return grpc.NewServices(grpc.ServicesConfig{
+		BaseURL:         baseURL,
+		WebhooksBaseURL: webhooksBaseURL,
+		Encryptor:       encryptor,
+		AuthService:     authService,
+		Registry:        registry,
+		OIDCProvider:    oidcProvider,
+		GitProvider:     gitProvider,
+		AgentService:    agentService,
+		UsageService:    usageService,
+	})
 }
 
-func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
+func startPublicAPI(
+	baseURL, basePath string,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	jwtSigner *jwt.Signer,
+	oidcProvider oidc.Provider,
+	authService authorization.Authorization,
+	gitProvider gitprovider.Provider,
+	grpcServices *grpc.Services,
+) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	appEnv := os.Getenv("APP_ENV")
@@ -271,6 +361,7 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 		registry,
 		jwtSigner,
 		oidcProvider,
+		gitProvider,
 		basePath,
 		baseURL,
 		webhooksBaseURL,
@@ -293,21 +384,14 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
 	}
 
-	if os.Getenv("START_GRPC_GATEWAY") == "yes" {
-		log.Println("Adding gRPC Gateway to Public API")
+	log.Println("Registering gRPC gateway handlers on Public API")
 
-		grpcServerAddr := os.Getenv("GRPC_SERVER_ADDR")
-		if grpcServerAddr == "" {
-			grpcServerAddr = "localhost:50051"
-		}
-
-		err := server.RegisterGRPCGateway(grpcServerAddr)
-		if err != nil {
-			log.Fatalf("Failed to register gRPC gateway: %v", err)
-		}
-
-		server.RegisterOpenAPIHandler()
+	err = server.RegisterGRPCGateway(grpcServices)
+	if err != nil {
+		log.Fatalf("Failed to register gRPC gateway: %v", err)
 	}
+
+	server.RegisterOpenAPIHandler()
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
 	if os.Getenv("START_WEB_SERVER") == "yes" {
@@ -338,20 +422,6 @@ func lookupPublicAPIPort() int {
 	return port
 }
 
-func lookupInternalAPIPort() int {
-	port := 50051
-
-	if p := os.Getenv("INTERNAL_API_PORT"); p != "" {
-		if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
-			port = v
-		} else {
-			log.Warnf("Invalid INTERNAL_API_PORT %q, falling back to 50051", p)
-		}
-	}
-
-	return port
-}
-
 func configureLogging() {
 	appEnv := os.Getenv("APP_ENV")
 
@@ -368,7 +438,7 @@ func configureLogging() {
 	}
 }
 
-func setupOtelMetrics() {
+func setupOtel() {
 	if os.Getenv("OTEL_ENABLED") != "yes" {
 		return
 	}
@@ -381,11 +451,40 @@ func setupOtelMetrics() {
 	} else {
 		log.Info("OpenTelemetry metrics initialized")
 	}
+
+	if err := telemetry.InitTracing(ctx); err != nil {
+		log.Warnf("Failed to initialize OpenTelemetry tracing: %v", err)
+	} else {
+		log.Info("OpenTelemetry tracing initialized for critical API endpoints")
+	}
+}
+
+func startPprofServer() {
+	if os.Getenv("PPROF_ENABLED") != "yes" {
+		return
+	}
+
+	port := os.Getenv("PPROF_PORT")
+	if port == "" {
+		port = "6060"
+	}
+
+	// Sample contention so /debug/pprof/block and /debug/pprof/mutex are useful.
+	runtime.SetBlockProfileRate(1)
+	runtime.SetMutexProfileFraction(5)
+
+	go func() {
+		log.Infof("pprof server listening on :%s", port)
+		if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil {
+			log.Warnf("pprof server stopped: %v", err)
+		}
+	}()
 }
 
 func Start() {
 	configureLogging()
-	setupOtelMetrics()
+	setupOtel()
+	startPprofServer()
 
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
@@ -438,6 +537,12 @@ func Start() {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
+	log.Println("Creating Git Provider")
+	gitProvider, err := git.NewProvider()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create git provider: %v", err))
+	}
+
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
 		AppEnv:    appEnv,
@@ -445,6 +550,17 @@ func Start() {
 			MaxResponseBytes: DefaultMaxHTTPResponseBytes,
 			PolicyResolver: func() (registry.HTTPPolicy, error) {
 				policy, err := networkpolicy.ResolveHTTPPolicy()
+				if err != nil {
+					return registry.HTTPPolicy{}, err
+				}
+
+				return registry.HTTPPolicy{
+					BlockedHosts:    policy.BlockedHosts,
+					PrivateIPRanges: policy.PrivateIPRanges,
+				}, nil
+			},
+			PolicyResolverInTransaction: func(tx *gorm.DB) (registry.HTTPPolicy, error) {
+				policy, err := networkpolicy.ResolveHTTPPolicyInTransaction(tx)
 				if err != nil {
 					return registry.HTTPPolicy{}, err
 				}
@@ -462,17 +578,47 @@ func Start() {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
 
-	templates.Setup(registry)
+	agentProvider, agentService := buildAgentService(authService)
 
+	var grpcServices *grpc.Services
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
+		services, err := buildGRPCServices(
+			baseURL,
+			webhooksBaseURL,
+			encryptorInstance,
+			authService,
+			registry,
+			oidcProvider,
+			gitProvider,
+			agentService,
+		)
+		if err != nil {
+			log.Fatalf("failed to build gRPC services: %v", err)
+		}
+		grpcServices = services
+
+		go startPublicAPI(
+			baseURL,
+			basePath,
+			encryptorInstance,
+			registry,
+			jwtSigner,
+			oidcProvider,
+			authService,
+			gitProvider,
+			grpcServices,
+		)
 	}
 
-	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider)
-	}
-
-	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)
+	startWorkers(
+		encryptorInstance,
+		registry,
+		oidcProvider,
+		gitProvider,
+		baseURL,
+		authService,
+		agentProvider,
+	)
 
 	log.Println("SuperPlane is UP.")
 

@@ -18,89 +18,48 @@ function createCategory(name: string): BuildingBlockCategory {
 }
 
 describe("CategorySection", () => {
-  it("does not render the ItemGroup for a non-Core category that is collapsed by default", () => {
+  it("keeps a non-Core category collapsed by default", () => {
     const category = createCategory("Email");
 
-    const { container } = render(
-      <CategorySection
-        category={category}
-        integrations={[]}
-        showIntegrationSetupStatus={false}
-        canvasZoom={1}
-        isDraggingRef={{ current: false }}
-        setHoveredBlock={() => {}}
-        dragPreviewRef={{ current: null }}
-      />,
-    );
+    const { container } = render(<CategorySection category={category} />);
 
     expect(screen.getByText("Email")).toBeInTheDocument();
-    expect(container.querySelector('[data-slot="item-group"]')).not.toBeInTheDocument();
+    expect(container.querySelector("details")?.open).toBe(false);
   });
 
-  it("renders the ItemGroup for the Core category, which is expanded by default", () => {
+  it("expands the Core category by default", () => {
     const category = createCategory("Core");
 
-    const { container } = render(
-      <CategorySection
-        category={category}
-        integrations={[]}
-        showIntegrationSetupStatus={false}
-        canvasZoom={1}
-        isDraggingRef={{ current: false }}
-        setHoveredBlock={() => {}}
-        dragPreviewRef={{ current: null }}
-      />,
-    );
+    const { container } = render(<CategorySection category={category} />);
 
     expect(screen.getByText("Core")).toBeInTheDocument();
     expect(screen.getByText("Send Email")).toBeInTheDocument();
-    expect(container.querySelector('[data-slot="item-group"]')).toBeInTheDocument();
+    expect(container.querySelector("details")?.open).toBe(true);
   });
 
-  it("renders the ItemGroup for a non-Core category when a search term is present", () => {
+  it("expands a non-Core category when a search term is present", () => {
     const category = createCategory("Email");
 
-    const { container } = render(
-      <CategorySection
-        category={category}
-        integrations={[]}
-        showIntegrationSetupStatus={false}
-        canvasZoom={1}
-        searchTerm="send"
-        isDraggingRef={{ current: false }}
-        setHoveredBlock={() => {}}
-        dragPreviewRef={{ current: null }}
-      />,
-    );
+    const { container } = render(<CategorySection category={category} searchTerm="send" />);
 
     expect(screen.getByText("Email")).toBeInTheDocument();
     expect(screen.getByText("Send Email")).toBeInTheDocument();
-    expect(container.querySelector('[data-slot="item-group"]')).toBeInTheDocument();
+    expect(container.querySelector("details")?.open).toBe(true);
   });
 
-  it("renders the ItemGroup for a non-Core category after it is manually opened", () => {
+  it("expands a non-Core category after it is manually opened", () => {
     const category = createCategory("Email");
 
-    const { container } = render(
-      <CategorySection
-        category={category}
-        integrations={[]}
-        showIntegrationSetupStatus={false}
-        canvasZoom={1}
-        isDraggingRef={{ current: false }}
-        setHoveredBlock={() => {}}
-        dragPreviewRef={{ current: null }}
-      />,
-    );
+    const { container } = render(<CategorySection category={category} />);
 
     const details = container.querySelector("details");
     expect(details).toBeInTheDocument();
-    expect(container.querySelector('[data-slot="item-group"]')).not.toBeInTheDocument();
+    expect(details?.open).toBe(false);
 
     details!.open = true;
     fireEvent(details!, new Event("toggle"));
 
+    expect(details?.open).toBe(true);
     expect(screen.getByText("Send Email")).toBeInTheDocument();
-    expect(container.querySelector('[data-slot="item-group"]')).toBeInTheDocument();
   });
 });

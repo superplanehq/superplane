@@ -1,0 +1,23 @@
+{
+  "type": "coolify.services.listed",
+  "data": {
+    "count": 2,
+    "services": [
+      {
+        "uuid": "svc111aaa222",
+        "name": "postgres",
+        "status": "running",
+        "description": "Primary database",
+        "serverUuid": "srv999zzz000"
+      },
+      {
+        "uuid": "svc333bbb444",
+        "name": "plausible",
+        "status": "running",
+        "fqdn": "https://analytics.example.com",
+        "serverUuid": "srv999zzz000"
+      }
+    ]
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

@@ -1,0 +1,15 @@
+{
+  "type": "gcp.compute.vmInstance.metrics",
+  "data": {
+    "instanceId": "1234567890123456789",
+    "name": "my-vm",
+    "zone": "us-central1-a",
+    "start": "2025-02-14T11:00:00Z",
+    "end": "2025-02-14T12:00:00Z",
+    "lookbackPeriod": "1h",
+    "avgCpuUsagePercent": 23.47,
+    "avgNetworkInboundBytesPerSec": 10485.76,
+    "avgNetworkOutboundBytesPerSec": 8192.33
+  },
+  "timestamp": "2025-02-14T12:00:00Z"
+}

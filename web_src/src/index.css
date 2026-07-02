@@ -20,11 +20,6 @@ body {
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
 button {
   cursor: pointer;
 }
@@ -36,14 +31,29 @@ button {
 
 div.monaco-editor {
   --vscode-focusBorder: transparent;
+  --vscode-editorLineHighlightBackground: rgb(248 250 252);
+  --vscode-editorLineHighlightBorder: transparent;
 }
 
-/* Canvas YAML preview: sky-100 current line; strip line-highlight border (Monaco applies these via DOM) */
-.canvas-yaml-monaco .monaco-editor .margin-view-overlays .current-line,
-.canvas-yaml-monaco .monaco-editor .view-overlays .current-line {
-  background-color: rgb(224 242 254) !important;
+/* Current line: slate-50 background only, no top/bottom border */
+div.monaco-editor .margin-view-overlays .current-line,
+div.monaco-editor .view-overlays .current-line {
+  background-color: rgb(248 250 252) !important;
   border: none !important;
   box-shadow: none !important;
+  outline: none !important;
+}
+
+.workflow-file-editor-monaco .monaco-editor {
+  --vscode-scrollbarSlider-background: rgb(2 6 23 / 0.2);
+  --vscode-scrollbarSlider-hoverBackground: rgb(2 6 23 / 0.4);
+  --vscode-scrollbarSlider-activeBackground: rgb(2 6 23 / 0.45);
+  --vscode-editorStickyScroll-shadow: rgb(2 6 23 / 0.1);
+  --vscode-editorStickyScroll-border: rgb(2 6 23 / 0.2);
+}
+
+.workflow-file-editor-monaco .monaco-editor .sticky-widget {
+  box-shadow: 0 3px 0 rgb(2 6 23 / 0.1) !important;
 }
 
 .canvas-conflict-current-line {
@@ -127,4 +137,39 @@ div.monaco-editor {
     transparent 1px,
     transparent 9px
   );
+}
+
+@keyframes tool-glow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-tool-glow {
+  animation: tool-glow 1.4s ease-in-out infinite;
+}
+
+@keyframes rotate-border {
+  0% {
+    box-shadow: 2px 0 0 0 currentColor, 0 2px 0 0 transparent, -2px 0 0 0 transparent, 0 -2px 0 0 transparent;
+  }
+  25% {
+    box-shadow: 2px 0 0 0 transparent, 0 2px 0 0 currentColor, -2px 0 0 0 transparent, 0 -2px 0 0 transparent;
+  }
+  50% {
+    box-shadow: 2px 0 0 0 transparent, 0 2px 0 0 transparent, -2px 0 0 0 currentColor, 0 -2px 0 0 transparent;
+  }
+  75% {
+    box-shadow: 2px 0 0 0 transparent, 0 2px 0 0 transparent, -2px 0 0 0 transparent, 0 -2px 0 0 currentColor;
+  }
+  100% {
+    box-shadow: 2px 0 0 0 currentColor, 0 2px 0 0 transparent, -2px 0 0 0 transparent, 0 -2px 0 0 transparent;
+  }
+}
+
+.animate-pulse-border {
+  animation: rotate-border 1.2s linear infinite;
 }

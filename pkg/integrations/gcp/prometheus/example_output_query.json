@@ -1,0 +1,18 @@
+{
+  "type": "gcp.prometheus.query",
+  "data": {
+    "resultType": "vector",
+    "seriesCount": 1,
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "10.0.0.5:9090",
+          "job": "prometheus"
+        },
+        "value": [1767225600, "1"]
+      }
+    ]
+  },
+  "timestamp": "2026-01-01T00:00:00Z"
+}

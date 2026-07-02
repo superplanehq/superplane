@@ -12,8 +12,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -197,7 +199,33 @@ func (c *IntegrationContext) ScheduleActionCall(actionName string, parameters an
 	}
 
 	runAt := time.Now().Add(interval)
-	return c.integration.CreateActionRequest(c.tx, actionName, parameters, &runAt)
+
+	//
+	// Enforce at-most-one pending request per (installation, action, parameters).
+	// Completing the matching pending rows in the same transaction that creates
+	// the successor also completes the in-flight request when the worker is
+	// driving a self-rescheduling loop, and collapses any accumulated chains of
+	// the same action (#5386). Distinct parameters are preserved, so legitimately
+	// different calls (e.g. AWS provisionRule for different detail types) are not
+	// affected.
+	//
+	// The installation row is locked first to serialize concurrent scheduling for
+	// it. The worker processes due requests in parallel, so without this lock two
+	// simultaneous refresh requests would each complete-then-insert under their own
+	// READ COMMITTED snapshot, neither seeing the other's new successor - leaving
+	// multiple chains that share a run_at and never drain.
+	//
+	return c.tx.Transaction(func(tx *gorm.DB) error {
+		if err := c.integration.LockInTransaction(tx); err != nil {
+			return err
+		}
+
+		if err := models.CompletePendingActionRequestsInTransaction(tx, c.integration.ID, actionName, parameters); err != nil {
+			return err
+		}
+
+		return c.integration.CreateActionRequest(tx, actionName, parameters, &runAt)
+	})
 }
 
 func (c *IntegrationContext) completeCurrentRequestForInstallation() error {
@@ -307,6 +335,7 @@ func (c *IntegrationContext) GetState() string {
 }
 
 func (c *IntegrationContext) Ready() {
+	c.integration.SetupState = nil
 	c.integration.State = models.IntegrationStateReady
 	c.integration.StateDescription = ""
 }
@@ -350,13 +379,38 @@ func (c *IntegrationContext) SetSecret(name string, value []byte) error {
 			UpdatedAt:      &now,
 		}
 
-		return c.tx.Create(&secret).Error
+		if err := c.tx.Create(&secret).Error; err != nil {
+			return err
+		}
+
+		c.recordSecretWrite(name, telemetry.IntegrationSecretOperationCreate)
+		return nil
 	}
 
 	secret.Value = encryptedValue
 	secret.UpdatedAt = &now
 
-	return c.tx.Save(&secret).Error
+	if err := c.tx.Save(&secret).Error; err != nil {
+		return err
+	}
+
+	c.recordSecretWrite(name, telemetry.IntegrationSecretOperationUpdate)
+	return nil
+}
+
+// recordSecretWrite emits the metric and structured log for a write to
+// app_installation_secrets. The secret value is never logged.
+func (c *IntegrationContext) recordSecretWrite(name, operation string) {
+	telemetry.RecordIntegrationSecretWrite(
+		context.Background(),
+		c.integration.AppName,
+		operation,
+	)
+
+	logging.ForIntegration(*c.integration).WithFields(map[string]any{
+		"secret_name": name,
+		"operation":   operation,
+	}).Info("Integration secret write")
 }
 
 func (c *IntegrationContext) GetSecrets() ([]core.IntegrationSecret, error) {
@@ -462,11 +516,7 @@ func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSub
 }
 
 func (c *IntegrationContext) LegacySetup() bool {
-	if c.integration.SetupState != nil {
-		return false
-	}
-
-	return len(c.integration.Capabilities) == 0
+	return c.integration.IsLegacy()
 }
 
 func (c *IntegrationContext) Properties() core.IntegrationPropertyStorage {

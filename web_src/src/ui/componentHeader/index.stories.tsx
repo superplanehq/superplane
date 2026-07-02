@@ -5,10 +5,7 @@ const createHeaderProps = (
   baseProps: Omit<ComponentHeaderProps, keyof import("../types/componentActions").ComponentActionsProps>,
 ): ComponentHeaderProps => ({
   ...baseProps,
-  onRun: () => console.log("Run clicked!"),
   onDuplicate: () => console.log("Duplicate clicked!"),
-  onEdit: () => console.log("Edit clicked!"),
-  onDeactivate: () => console.log("Deactivate clicked!"),
   onToggleView: () => console.log("Toggle view clicked!"),
   onDelete: () => console.log("Delete clicked!"),
 });
@@ -82,17 +79,8 @@ export const WithActionsDropdown: Story = {
     description: "This header includes action dropdown functionality",
     iconSlug: "cog",
     iconColor: "text-blue-700",
-    onRun: () => {
-      console.log("Run action triggered");
-    },
     onDuplicate: () => {
       console.log("Duplicate action triggered");
-    },
-    onEdit: () => {
-      console.log("Edit action triggered");
-    },
-    onDeactivate: () => {
-      console.log("Deactivate action triggered");
     },
     onToggleView: () => {
       console.log("Toggle view action triggered");

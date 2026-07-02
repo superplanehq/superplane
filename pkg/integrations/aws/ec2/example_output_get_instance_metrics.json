@@ -1,0 +1,16 @@
+{
+  "data": {
+    "avgCpuUsagePercent": 0.18,
+    "avgNetworkInBytesPerSec": 107.25,
+    "avgNetworkOutBytesPerSec": 11.63,
+    "end": "2026-05-29T08:50:49Z",
+    "instanceId": "i-0abc1234567890def",
+    "lookbackPeriod": "7d",
+    "region": "eu-north-1",
+    "start": "2026-05-22T08:50:49Z",
+    "totalNetworkInBytes": 64866070,
+    "totalNetworkOutBytes": 7032351
+  },
+  "timestamp": "2026-05-29T08:50:50.657831534Z",
+  "type": "aws.ec2.instance.metrics"
+}

@@ -10,6 +10,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
+  <LinkCard title="On Check Run" href="#on-check-run" description="Listen to GitHub Checks API check run events" />
+  <LinkCard title="On Commit Status" href="#on-commit-status" description="Listen to GitHub commit status events from the Commit Statuses API" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
   <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to PR conversation comment events" />
@@ -26,27 +28,37 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Add Issue Assignee" href="#add-issue-assignee" description="Add assignees to a GitHub issue" />
   <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to a GitHub issue" />
+  <LinkCard title="Add Pull Request Reviewers" href="#add-pull-request-reviewers" description="Add reviewers to a GitHub pull request" />
   <LinkCard title="Add Reaction" href="#add-reaction" description="Add a reaction to a GitHub comment" />
+  <LinkCard title="Create Deployment" href="#create-deployment" description="Create a GitHub deployment for a ref and environment (enables the PR deployment UI)" />
+  <LinkCard title="Create Deployment Status" href="#create-deployment-status" description="Update the status of a GitHub deployment (success, failure, inactive, etc.)" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
   <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
+  <LinkCard title="Create Pull Request" href="#create-pull-request" description="Create a new pull request in a GitHub repository" />
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
+  <LinkCard title="Get Combined Commit Status" href="#get-combined-commit-status" description="Get the combined GitHub commit status for a commit, branch, or tag" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
+  <LinkCard title="List Check Runs For Ref" href="#list-check-runs-for-ref" description="List GitHub Checks API check runs for a commit, branch, or tag" />
+  <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
+  <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
 </CardGrid>
 
 <a id="on-branch-created"></a>
 
 ## On Branch Created
+
+**Trigger key:** `github.onBranchCreated`
 
 The On Branch Created trigger starts a workflow execution when a new branch is created in a GitHub repository.
 
@@ -100,9 +112,192 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 }
 ```
 
+<a id="on-check-run"></a>
+
+## On Check Run
+
+**Trigger key:** `github.onCheckRun`
+
+The On Check Run trigger starts a workflow execution when a GitHub Checks API check run changes.
+
+GitHub check runs are created by GitHub Apps and power many pull request checks such as Cloudflare Pages, DCO, Sourcery, and GitHub Actions check runs. They are separate from legacy Commit Statuses API statuses. Use On Commit Status for legacy commit status events.
+
+### Use Cases
+
+- **Pull request automation**: React when Checks API checks complete or fail
+- **Quality gates**: Continue workflows only after a specific check run reaches the expected state
+- **Notifications**: Notify teams when app-provided checks fail or require action
+- **Merge orchestration**: Combine this trigger with List Check Runs For Ref to decide whether all checks are green
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Statuses**: Select check run statuses to listen for (queued, in_progress, completed, requested, waiting, pending)
+- **Conclusions** *(optional)*: Filter completed check runs by conclusion
+- **Names** *(optional)*: Filter check run names using predicates, e.g. equals "DCO" or matches "Cloudflare.*"
+- **Branches** *(optional)*: Filter check suite head branches using predicates
+- **Pull requests only**: Emit only check runs that GitHub associates with at least one pull request
+
+### Event Data
+
+Each event includes:
+- **action**: The check_run webhook action
+- **check_run**: Check run details, including name, status, conclusion, head SHA, app, pull requests, and URLs
+- **repository**: Repository information
+- **sender**: User or app actor associated with the webhook event
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Notes
+
+GitHub may return an empty pull_requests array for check runs created from forked repository pushes. When Pull requests only is enabled, those fork-originated check runs may be filtered out because GitHub does not include PR metadata in the webhook payload.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "completed",
+    "check_run": {
+      "app": {
+        "name": "DCO"
+      },
+      "check_suite": {
+        "head_branch": "feature/snake-updates",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+      },
+      "completed_at": "2026-06-01T12:02:00Z",
+      "conclusion": "success",
+      "details_url": "https://github.com/acme/snaketoy/runs/123456789",
+      "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "html_url": "https://github.com/acme/snaketoy/runs/123456789",
+      "id": 123456789,
+      "name": "DCO",
+      "pull_requests": [
+        {
+          "base": {
+            "ref": "main"
+          },
+          "head": {
+            "ref": "feature/snake-updates",
+            "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+          },
+          "html_url": "https://github.com/acme/snaketoy/pull/42",
+          "number": 42
+        }
+      ],
+      "started_at": "2026-06-01T12:00:00Z",
+      "status": "completed"
+    },
+    "repository": {
+      "full_name": "acme/snaketoy",
+      "html_url": "https://github.com/acme/snaketoy"
+    },
+    "sender": {
+      "html_url": "https://github.com/octocat",
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-06-01T12:02:01Z",
+  "type": "github.checkRun"
+}
+```
+
+<a id="on-commit-status"></a>
+
+## On Commit Status
+
+**Trigger key:** `github.onCommitStatus`
+
+The On Commit Status trigger starts a workflow execution when a GitHub commit status is created or updated.
+
+GitHub commit statuses are the legacy status objects created through the Commit Statuses API. They are separate from GitHub Checks API check runs, which power many PR checks from GitHub Apps such as Cloudflare Pages, DCO, and Sourcery. This trigger does not receive those check-run events. For GitHub Actions workflows, use the On Workflow Run trigger instead.
+
+### Use Cases
+
+- **Merge automation**: Re-evaluate pull request merge criteria when required status checks change
+- **CI/CD orchestration**: React to status updates from external CI systems
+- **Quality gates**: Route workflows based on commit status context and state
+- **Notifications**: Notify teams when important status checks fail or recover
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **States**: Select which commit status states to listen for (error, failure, pending, success)
+- **Contexts** *(optional)*: Configure which status contexts to listen for using predicates (e.g., equals "ci/build", matches "deploy/.*")
+- **Branches** *(optional)*: Configure which branch names to listen for using predicates. GitHub includes branches that contain the status SHA.
+
+### Event Data
+
+Each status event includes:
+- **state**: The new commit status state (error, failure, pending, success)
+- **context**: The status context, such as "ci/build"
+- **sha**: Commit SHA for the status
+- **description**: Optional status description
+- **target_url**: Optional link added to the status
+- **branches**: Branches containing the status SHA
+- **commit**: Commit information
+- **repository**: Repository information
+- **sender**: User who created the status event. This is not necessarily the commit author
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "branches": [
+      {
+        "commit": {
+          "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+          "url": "https://api.github.com/repos/acme-labs/snaketoy/commits/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+        },
+        "name": "main",
+        "protected": true
+      }
+    ],
+    "commit": {
+      "commit": {
+        "message": "Add checkout validation"
+      },
+      "html_url": "https://github.com/acme-labs/snaketoy/commit/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+    },
+    "context": "ci/build",
+    "created_at": "2026-01-16T17:56:16Z",
+    "description": "Build completed successfully",
+    "id": 15384176893,
+    "repository": {
+      "full_name": "acme-labs/snaketoy",
+      "html_url": "https://github.com/acme-labs/snaketoy",
+      "id": 101,
+      "name": "snaketoy"
+    },
+    "sender": {
+      "html_url": "https://github.com/octocat",
+      "id": 583231,
+      "login": "octocat"
+    },
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "state": "success",
+    "target_url": "https://github.com/acme-labs/snaketoy/actions/runs/123456789",
+    "updated_at": "2026-01-16T17:57:20Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.status"
+}
+```
+
 <a id="on-issue"></a>
 
 ## On Issue
+
+**Trigger key:** `github.onIssue`
 
 The On Issue trigger starts a workflow execution when issue events occur in a GitHub repository.
 
@@ -166,6 +361,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On Issue Comment
 
+**Trigger key:** `github.onIssueComment`
+
 The On Issue Comment trigger starts a workflow execution when comments are added to issues.
 
 ### Use Cases
@@ -227,6 +424,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 <a id="on-pr-comment"></a>
 
 ## On PR Comment
+
+**Trigger key:** `github.onPRComment`
 
 The On PR Comment trigger starts a workflow execution when comments are added on a pull request conversation.
 
@@ -535,6 +734,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 <a id="on-pr-review-comment"></a>
 
 ## On PR Review Comment
+
+**Trigger key:** `github.onPRReviewComment`
 
 The On PR Review Comment trigger starts a workflow execution when review comments are added to pull requests.
 
@@ -987,6 +1188,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On Pull Request
 
+**Trigger key:** `github.onPullRequest`
+
 The On Pull Request trigger starts a workflow execution when pull request events occur in a GitHub repository.
 
 ### Use Cases
@@ -999,12 +1202,13 @@ The On Pull Request trigger starts a workflow execution when pull request events
 ### Configuration
 
 - **Repository**: Select the GitHub repository to monitor
-- **Actions**: Select which PR actions to listen for (opened, closed, synchronize, etc.)
+- **Actions**: Select which PR actions to listen for (opened, edited, closed, synchronize, etc.)
 
 ### Event Data
 
 Each PR event includes:
-- **action**: The action that triggered the event (opened, closed, synchronize, etc.)
+- **action**: The action that triggered the event (opened, edited, closed, synchronize, etc.)
+- **changes**: When action is edited, includes what changed (title, body, base branch)
 - **pull_request**: Complete PR information including title, body, state, labels
 - **repository**: Repository information
 - **sender**: User who triggered the event
@@ -1050,6 +1254,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On Push
 
+**Trigger key:** `github.onPush`
+
 The On Push trigger starts a workflow execution when code is pushed to a GitHub repository.
 
 ### Use Cases
@@ -1063,13 +1269,14 @@ The On Push trigger starts a workflow execution when code is pushed to a GitHub 
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., `refs/heads/main`, `refs/tags/*`)
+- **Paths** *(optional)*: Glob patterns (GitHub Actions–style) for added, modified, and removed files. Use `!` prefix to exclude (for example `billing/**` with `!billing/**/*.md`). Patterns starting only with `!` assume an include of `**`. Lists stored as legacy ref-style predicates still honor `equals` values as globs; `matches` must be replaced with glob patterns. If the webhook has no per-commit file lists (empty `commits` or missing `added`/`modified`/`removed` arrays), a configured path filter cannot match and the trigger will not fire. Leave empty to fire on all pushes.
 
 ### Event Data
 
 Each push event includes:
 - **repository**: Repository information
 - **ref**: The branch or tag that was pushed to
-- **commits**: Array of commit information
+- **commits**: Array of commit information (each with `added`, `modified`, `removed` file arrays)
 - **pusher**: Information about who pushed
 - **before/after**: Commit SHAs before and after the push
 
@@ -1308,6 +1515,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On Release
 
+**Trigger key:** `github.onRelease`
+
 The On Release trigger starts a workflow execution when release events occur in a GitHub repository.
 
 ### Use Cases
@@ -1366,6 +1575,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On Tag Created
 
+**Trigger key:** `github.onTagCreated`
+
 The On Tag Created trigger starts a workflow execution when a new tag is created in a GitHub repository.
 
 ### Use Cases
@@ -1421,6 +1632,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 <a id="on-workflow-run"></a>
 
 ## On Workflow Run
+
+**Trigger key:** `github.onWorkflowRun`
 
 The On Workflow Run trigger starts a workflow execution when GitHub Actions workflow runs complete.
 
@@ -1645,6 +1858,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## Add Issue Assignee
 
+**Component key:** `github.addIssueAssignee`
+
 The Add Issue Assignee component adds one or more assignees to an existing GitHub issue without affecting existing assignees.
 
 ### Use Cases
@@ -1689,6 +1904,8 @@ Returns the updated issue object with all current information.
 
 ## Add Issue Label
 
+**Component key:** `github.addIssueLabel`
+
 The Add Issue Label component adds one or more labels to an existing GitHub issue without affecting existing labels.
 
 ### Use Cases
@@ -1732,9 +1949,83 @@ Returns the full list of labels currently on the issue after the addition.
 }
 ```
 
+<a id="add-pull-request-reviewers"></a>
+
+## Add Pull Request Reviewers
+
+**Component key:** `github.addPullRequestReviewers`
+
+The Add Pull Request Reviewers component adds individual users and/or teams as reviewers on a GitHub pull request.
+
+### Use Cases
+
+- **Automated reviewer assignment**: Request review from the relevant team when a pull request is opened
+- **Escalation workflows**: Add additional reviewers when a pull request needs attention
+- **On-call routing**: Request review from the current on-call engineer after checks pass
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to add reviewers to. Expressions are supported.
+- **Reviewers**: GitHub usernames to request as reviewers
+- **Team Reviewers**: Team slugs to request as team reviewers (optional)
+
+At least one reviewer or team reviewer is required.
+
+### Output
+
+Returns the updated pull request object with the current requested reviewers.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "base": {
+      "label": "acme:main",
+      "ref": "main"
+    },
+    "created_at": "2026-04-22T10:00:00Z",
+    "draft": false,
+    "head": {
+      "label": "acme:feature-branch",
+      "ref": "feature-branch"
+    },
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "id": 1234567890,
+    "number": 42,
+    "requested_reviewers": [
+      {
+        "html_url": "https://github.com/octocat",
+        "id": 1,
+        "login": "octocat"
+      }
+    ],
+    "requested_teams": [
+      {
+        "html_url": "https://github.com/orgs/acme/teams/justice-league",
+        "id": 1,
+        "slug": "justice-league"
+      }
+    ],
+    "state": "open",
+    "title": "Add new feature",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequest"
+}
+```
+
 <a id="add-reaction"></a>
 
 ## Add Reaction
+
+**Component key:** `github.addReaction`
 
 The Add Reaction component adds a reaction emoji to a GitHub comment.
 
@@ -1772,9 +2063,157 @@ Returns the created GitHub reaction object, including id, content, user, and tim
 }
 ```
 
+<a id="create-deployment"></a>
+
+## Create Deployment
+
+**Component key:** `github.createDeployment`
+
+The Create Deployment component registers a deployment with GitHub for a given ref and environment. This drives the **View deployment** button and environment box on pull requests—the same surface area used by Railway, Vercel, and Netlify.
+
+### Use Cases
+
+- **Preview environments**: Create a deployment when a PR opens, then post statuses after provision/build
+- **Environment history**: Let GitHub track deployment activity per environment name
+- **Ephemeral previews**: Set **Transient environment** so GitHub treats the deployment as short-lived
+
+### Configuration
+
+- **Repository**: GitHub repository for the deployment
+- **Ref**: Branch name, tag, or commit SHA to deploy
+- **Environment**: Environment name (for example preview-pr-42)
+- **Description**: Optional deployment description
+- **Task**: Optional deployment task (GitHub default is deploy if omitted)
+- **Transient environment**: Mark as ephemeral so GitHub can auto-clean inactive deployments
+- **Production environment**: Mark as production when applicable
+- **Auto merge** (default off): Whether GitHub may auto-merge the default branch into the ref if needed
+- **Required contexts**: Status check context names that must pass before the deployment is created (same names as commit status **context**). Leave empty to skip status gating (recommended for previews, avoids HTTP 409 when CI is pending). If you list one or more contexts, only those must be green. GitHub may respond with HTTP 202 while it prepares verification; this component retries automatically for a short period
+
+### Output
+
+Emits github.deployment with the created deployment, including id for **Create Deployment Status**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_at": "2024-01-01T00:00:00Z",
+    "creator": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "events_url": "https://api.github.com/users/example-user/events{/privacy}",
+      "followers_url": "https://api.github.com/users/example-user/followers",
+      "following_url": "https://api.github.com/users/example-user/following{/other_user}",
+      "gists_url": "https://api.github.com/users/example-user/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/example-user",
+      "id": 12345678,
+      "login": "example-user",
+      "node_id": "MDQ6VXNlcjEyMzQ1Njc4",
+      "organizations_url": "https://api.github.com/users/example-user/orgs",
+      "received_events_url": "https://api.github.com/users/example-user/received_events",
+      "repos_url": "https://api.github.com/users/example-user/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/example-user/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/example-user/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/example-user"
+    },
+    "description": "Test deployment",
+    "environment": "preview-pr-1",
+    "id": 1234567890,
+    "node_id": "DE_kwDOExampleNodeId12345",
+    "payload": {},
+    "ref": "feat/example-branch",
+    "repository_url": "https://api.github.com/repos/example-org/example-repo",
+    "sha": "abc123def456abc123def456abc123def456abc1",
+    "statuses_url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890/statuses",
+    "task": "deploy",
+    "updated_at": "2024-01-01T00:00:00Z",
+    "url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890"
+  },
+  "timestamp": "2024-01-01T00:00:00.000000000Z",
+  "type": "github.deployment"
+}
+```
+
+<a id="create-deployment-status"></a>
+
+## Create Deployment Status
+
+**Component key:** `github.createDeploymentStatus`
+
+The Create Deployment Status component posts a new status for an existing deployment. Use it after provisioning succeeds or fails, or to mark a preview as **inactive** when tearing down.
+
+### Use Cases
+
+- **Preview ready**: success with **Environment URL** for the **View deployment** link
+- **Failed build or deploy**: failure or error with **Log URL**
+- **Teardown**: inactive when the environment is removed
+
+### Configuration
+
+- **Repository**: GitHub repository
+- **Deployment ID**: Numeric deployment id (often from a prior **Create Deployment** step)
+- **State**: pending, queued, in_progress, success, failure, error, or inactive
+- **Description**: Optional status description
+- **Environment URL**: Live preview URL for **View deployment** (GitHub requires http(s); host-only values get https:// prepended)
+- **Log URL**: Link to logs (same http(s) rules; GitHub validates this like target_url)
+- **Environment**: Optional environment label override on the status
+
+### Output
+
+Emits github.deploymentStatus with the created status record.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_at": "2024-01-01T00:00:00Z",
+    "creator": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "events_url": "https://api.github.com/users/example-user/events{/privacy}",
+      "followers_url": "https://api.github.com/users/example-user/followers",
+      "following_url": "https://api.github.com/users/example-user/following{/other_user}",
+      "gists_url": "https://api.github.com/users/example-user/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/example-user",
+      "id": 12345678,
+      "login": "example-user",
+      "node_id": "MDQ6VXNlcjEyMzQ1Njc4",
+      "organizations_url": "https://api.github.com/users/example-user/orgs",
+      "received_events_url": "https://api.github.com/users/example-user/received_events",
+      "repos_url": "https://api.github.com/users/example-user/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/example-user/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/example-user/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/example-user"
+    },
+    "deployment_url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890",
+    "description": "Test deployment status check",
+    "environment": "preview-pr-1",
+    "environment_url": "https://example.com",
+    "id": 9876543210,
+    "log_url": "https://example.com",
+    "node_id": "DES_kwDOExampleNodeId12345",
+    "repository_url": "https://api.github.com/repos/example-org/example-repo",
+    "state": "success",
+    "target_url": "https://example.com",
+    "updated_at": "2024-01-01T00:00:00Z",
+    "url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890/statuses/9876543210"
+  },
+  "timestamp": "2024-01-01T00:00:00.000000000Z",
+  "type": "github.deploymentStatus"
+}
+```
+
 <a id="create-issue"></a>
 
 ## Create Issue
+
+**Component key:** `github.createIssue`
 
 The Create Issue component creates a new issue in a specified GitHub repository.
 
@@ -1825,6 +2264,8 @@ Returns the created issue object with details including:
 
 ## Create Issue Comment
 
+**Component key:** `github.createIssueComment`
+
 The Create Issue Comment component adds a comment to an existing GitHub issue or pull request.
 Issues and pull requests share the same comment API in GitHub.
 
@@ -1868,9 +2309,81 @@ Returns the created comment object including:
 }
 ```
 
+<a id="create-pull-request"></a>
+
+## Create Pull Request
+
+**Component key:** `github.createPullRequest`
+
+The Create Pull Request component creates a new pull request in a specified GitHub repository.
+
+### Use Cases
+
+- **Automated PR creation**: Open pull requests automatically as part of CI/CD pipelines
+- **Branch promotion**: Create PRs to promote changes between branches
+- **Workflow automation**: Generate PRs from external triggers or scheduled workflows
+
+### Configuration
+
+- **Repository**: Select the GitHub repository where the pull request will be created
+- **Head**: The branch containing the changes (source branch)
+- **Base**: The branch you want the changes pulled into (target branch, defaults to "main")
+- **Title**: The pull request title (supports expressions)
+- **Body**: Optional pull request description (supports markdown and expressions)
+- **Draft**: Whether to create the pull request as a draft
+
+### Output
+
+Returns the created pull request object with details including:
+- Pull request number
+- URL
+- State
+- Head and base branch information
+- Created timestamp
+
+### Limitations
+
+- Only same-repository pull requests are supported. Cross-repository
+  (fork) pull requests using GitHub's owner:branch head syntax are not
+  currently supported - both the head and base branch must live in the
+  selected repository.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "base": {
+      "label": "acme:main",
+      "ref": "main"
+    },
+    "created_at": "2026-04-22T10:00:00Z",
+    "draft": false,
+    "head": {
+      "label": "acme:feature-branch",
+      "ref": "feature-branch"
+    },
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "id": 1234567890,
+    "number": 42,
+    "state": "open",
+    "title": "Add new feature",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequest"
+}
+```
+
 <a id="create-release"></a>
 
 ## Create Release
+
+**Component key:** `github.createRelease`
 
 The Create Release component creates a new release in a GitHub repository.
 
@@ -1916,6 +2429,8 @@ Returns the created release object with all release information including tag, a
 <a id="create-review"></a>
 
 ## Create Review
+
+**Component key:** `github.createReview`
 
 The Create Review component submits a pull request review (approve, request changes, or comment) on a GitHub pull request.
 
@@ -1963,6 +2478,8 @@ Emits the submitted review object including:
 
 ## Delete Release
 
+**Component key:** `github.deleteRelease`
+
 The Delete Release component removes a release from a GitHub repository.
 
 ### Use Cases
@@ -2002,9 +2519,79 @@ Returns confirmation of the deletion.
 }
 ```
 
+<a id="get-combined-commit-status"></a>
+
+## Get Combined Commit Status
+
+**Component key:** `github.getCombinedCommitStatus`
+
+The Get Combined Commit Status component reads GitHub's combined commit status for a commit, branch, or tag.
+
+This component uses the Commit Statuses API. It summarizes legacy commit statuses, such as statuses posted by external CI systems through GitHub's statuses endpoint. It does not include GitHub Checks API check runs.
+
+### Use Cases
+
+- **Status gates**: Check whether all commit status contexts are green before continuing
+- **Pull request automation**: Pair with On Commit Status to re-evaluate a PR when one status changes
+- **Branch protection helpers**: Inspect the aggregate status for a branch head or merge commit
+- **Notifications**: Send concise status summaries when a commit is blocked by failed or pending statuses
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Ref**: Commit SHA, branch name, or tag name to inspect. Expressions are supported.
+
+### Output
+
+Emits a combined commit status object on the default output channel. The payload includes the combined **state**, **sha**, **total_count**, and the latest status for each status context in **statuses**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "commit_url": "https://api.github.com/repos/acme-labs/snaketoy/commits/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "repository_url": "https://api.github.com/repos/acme-labs/snaketoy",
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "state": "failure",
+    "statuses": [
+      {
+        "context": "ci/build",
+        "created_at": "2026-01-16T17:45:00Z",
+        "description": "Build passed",
+        "state": "success",
+        "target_url": "https://ci.example.com/builds/123",
+        "updated_at": "2026-01-16T17:45:10Z"
+      },
+      {
+        "context": "ci/lint",
+        "created_at": "2026-01-16T17:45:20Z",
+        "description": "Lint failed",
+        "state": "failure",
+        "target_url": "https://ci.example.com/builds/124",
+        "updated_at": "2026-01-16T17:46:00Z"
+      },
+      {
+        "context": "deploy/preview",
+        "created_at": "2026-01-16T17:46:10Z",
+        "description": "Deployment pending",
+        "state": "pending",
+        "target_url": "https://deploy.example.com/previews/42",
+        "updated_at": "2026-01-16T17:46:10Z"
+      }
+    ],
+    "total_count": 3
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.combinedCommitStatus"
+}
+```
+
 <a id="get-issue"></a>
 
 ## Get Issue
+
+**Component key:** `github.getIssue`
 
 The Get Issue component retrieves a specific issue from a GitHub repository by its issue number.
 
@@ -2053,6 +2640,8 @@ Returns the complete issue object including:
 <a id="get-release"></a>
 
 ## Get Release
+
+**Component key:** `github.getRelease`
 
 The Get Release component retrieves release information from a GitHub repository.
 
@@ -2121,6 +2710,8 @@ Returns release information including:
 
 ## Get Repository Permission
 
+**Component key:** `github.getRepositoryPermission`
+
 The Get Repository Permission component retrieves a user's effective permission level for a GitHub repository.
 
 ### Use Cases
@@ -2151,6 +2742,8 @@ The Get Repository Permission component retrieves a user's effective permission 
 <a id="get-workflow-usage"></a>
 
 ## Get Workflow Usage
+
+**Component key:** `github.getWorkflowUsage`
 
 The Get Workflow Usage component retrieves billable GitHub Actions usage (minutes) for the installation's organization.
 
@@ -2230,9 +2823,130 @@ The component stores repository information in node metadata:
 }
 ```
 
+<a id="list-check-runs-for-ref"></a>
+
+## List Check Runs For Ref
+
+**Component key:** `github.listCheckRunsForRef`
+
+The List Check Runs For Ref component retrieves GitHub Checks API check runs for a commit SHA, branch, or tag.
+
+Use it after On Check Run or other GitHub triggers to inspect the full set of Checks API results for the same ref before deciding whether to continue.
+
+### Use Cases
+
+- **PR quality gates**: Continue only when all check runs for a PR commit are complete and green
+- **Check aggregation**: Inspect the full Checks API state after one check run changes
+- **Notifications**: Build summaries for failed or pending check runs
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Ref**: Commit SHA, branch, or tag ref
+- **Check Name** *(optional)*: Return only check runs with this name
+- **Status** *(optional)*: Return only check runs with this status
+- **Filter**: Use latest to return the latest run per check suite, or all to include all matching runs
+
+### Output
+
+Returns GitHub's check run list response, including total_count and check_runs. Each check run includes its name, status, conclusion, URLs, app metadata, associated pull requests, and timestamps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "check_runs": [
+      {
+        "app": {
+          "name": "DCO"
+        },
+        "conclusion": "success",
+        "details_url": "https://github.com/acme/snaketoy/runs/123456789",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        "html_url": "https://github.com/acme/snaketoy/runs/123456789",
+        "id": 123456789,
+        "name": "DCO",
+        "pull_requests": [
+          {
+            "html_url": "https://github.com/acme/snaketoy/pull/42",
+            "number": 42
+          }
+        ],
+        "status": "completed"
+      },
+      {
+        "app": {
+          "name": "Cloudflare Pages"
+        },
+        "conclusion": "success",
+        "details_url": "https://dash.cloudflare.com/example",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        "html_url": "https://github.com/acme/snaketoy/runs/987654321",
+        "id": 987654321,
+        "name": "Cloudflare Pages",
+        "pull_requests": [
+          {
+            "html_url": "https://github.com/acme/snaketoy/pull/42",
+            "number": 42
+          }
+        ],
+        "status": "completed"
+      }
+    ],
+    "total_count": 2
+  },
+  "timestamp": "2026-06-01T12:02:02Z",
+  "type": "github.checkRuns"
+}
+```
+
+<a id="merge-pull-request"></a>
+
+## Merge Pull Request
+
+**Component key:** `github.mergePullRequest`
+
+The Merge Pull Request component merges an open pull request in a GitHub repository.
+
+### Use Cases
+
+- **Automated PR merge gates**: Merge a pull request after status checks or check runs pass
+- **Release automation**: Merge approved promotion branches into a release branch
+- **Queue workflows**: Merge pull requests from a controlled SuperPlane workflow
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to merge. Expressions are supported.
+- **Merge Method**: Merge strategy to use. Defaults to "merge".
+- **Expected SHA**: Optional head SHA guard. GitHub rejects the merge if the pull request head has changed.
+- **Commit Title**: Optional title for the merge commit, squash commit, or rebase commit.
+- **Commit Message**: Optional commit message for the merge commit or squash commit.
+
+### Output
+
+Returns GitHub's merge result, including whether the pull request was merged, the resulting commit SHA, and GitHub's message.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "merged": true,
+    "message": "Pull Request successfully merged",
+    "sha": "0e98bc41ab56cee9ff17883607b56f96e7814c98"
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequestMerge"
+}
+```
+
 <a id="publish-commit-status"></a>
 
 ## Publish Commit Status
+
+**Component key:** `github.publishCommitStatus`
 
 The Publish Commit Status component creates a status check on a GitHub commit, commonly used for CI/CD integrations.
 
@@ -2277,6 +2991,8 @@ Returns the created status object with all status information.
 
 ## Remove Issue Assignee
 
+**Component key:** `github.removeIssueAssignee`
+
 The Remove Issue Assignee component removes one or more assignees from an existing GitHub issue without affecting other assignees.
 
 ### Use Cases
@@ -2315,6 +3031,8 @@ Returns the updated issue object with all current information.
 <a id="remove-issue-label"></a>
 
 ## Remove Issue Label
+
+**Component key:** `github.removeIssueLabel`
 
 The Remove Issue Label component removes one or more labels from an existing GitHub issue without affecting other labels.
 
@@ -2355,6 +3073,8 @@ Returns the remaining list of labels on the issue after the removal.
 <a id="run-workflow"></a>
 
 ## Run Workflow
+
+**Component key:** `github.runWorkflow`
 
 The Run Workflow component triggers a GitHub Actions workflow and waits for it to complete.
 
@@ -2412,6 +3132,8 @@ The Run Workflow component triggers a GitHub Actions workflow and waits for it t
 
 ## Update Issue
 
+**Component key:** `github.updateIssue`
+
 The Update Issue component modifies an existing GitHub issue with new information.
 
 ### Use Cases
@@ -2452,9 +3174,83 @@ Returns the updated issue object with all current information.
 }
 ```
 
+<a id="update-issue-comment"></a>
+
+## Update Issue Comment
+
+**Component key:** `github.updateIssueComment`
+
+The **Update Issue Comment** component edits an existing comment on a GitHub issue or pull request.
+
+### Use Cases
+
+- **Status updates**: Update a summary comment on a PR instead of posting new comments on every run
+- **Living reports**: Keep a single comment with the latest test results, coverage, or review status
+- **Avoid spam**: Update one comment instead of flooding a PR with repeated bot comments
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Comment ID**: The numeric ID of the comment to update (supports expressions)
+- **Body**: The new comment text (supports Markdown and expressions)
+
+### Output
+
+Returns the updated comment object including comment ID, URL, body, and timestamps.
+
+### Notes
+
+- The comment ID is returned in the output of `github.createIssueComment` as `id`
+- You can store the comment ID in canvas memory on first run, then use it for subsequent updates
+- The authenticated user must have permission to edit the comment (must be the comment author or have admin access)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author_association": "NONE",
+    "body": "## Docs Review Summary\n\n**Verdict:** No update needed\n\nAll changes are internal refactors with no user-facing impact.",
+    "created_at": "2026-01-16T17:56:16Z",
+    "html_url": "https://github.com/acme/widgets/issues/42#issuecomment-1234567890",
+    "id": 1234567890,
+    "issue_url": "https://api.github.com/repos/acme/widgets/issues/42",
+    "node_id": "IC_kwDOExample",
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/acme/widgets/issues/comments/1234567890/reactions"
+    },
+    "updated_at": "2026-01-16T18:30:00Z",
+    "url": "https://api.github.com/repos/acme/widgets/issues/comments/1234567890",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "html_url": "https://github.com/apps/superplane-app",
+      "id": 12345678,
+      "login": "superplane-app[bot]",
+      "node_id": "BOT_kwExample",
+      "site_admin": false,
+      "type": "Bot",
+      "url": "https://api.github.com/users/superplane-app[bot]"
+    }
+  },
+  "timestamp": "2026-01-16T18:30:00.680755501Z",
+  "type": "github.issueComment"
+}
+```
+
 <a id="update-release"></a>
 
 ## Update Release
+
+**Component key:** `github.updateRelease`
 
 The Update Release component modifies an existing GitHub release.
 

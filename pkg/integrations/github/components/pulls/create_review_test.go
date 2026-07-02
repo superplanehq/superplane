@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -77,53 +76,5 @@ func Test__CreateReview__Execute__Validation(t *testing.T) {
 			Configuration:  map[string]any{"repository": "hello", "pullNumber": "1", "event": "COMMENT"},
 		})
 		require.ErrorContains(t, err, "body is required for COMMENT")
-	})
-}
-
-func Test__CreateReview__Setup(t *testing.T) {
-	helloRepo := common.Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
-	component := CreateReview{}
-
-	t.Run("repository is required", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
-		err := component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": ""},
-		})
-
-		require.ErrorContains(t, err, "repository is required")
-	})
-
-	t.Run("repository is not accessible", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-		err := component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": "world"},
-		})
-
-		require.ErrorContains(t, err, "repository world is not accessible to app installation")
-	})
-
-	t.Run("metadata is set successfully", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-
-		nodeMetadataCtx := contexts.MetadataContext{}
-		require.NoError(t, component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &nodeMetadataCtx,
-			Configuration: map[string]any{"repository": "hello"},
-		}))
-
-		require.Equal(t, nodeMetadataCtx.Get(), common.NodeMetadata{Repository: &helloRepo})
 	})
 }

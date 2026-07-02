@@ -130,6 +130,6 @@ func Test__GetWorkflowUsage__Execute(t *testing.T) {
 			Configuration:  map[string]any{},
 		})
 
-		require.ErrorContains(t, err, "failed to decode application metadata")
+		require.ErrorContains(t, err, "failed to decode metadata")
 	})
 }

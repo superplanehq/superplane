@@ -32,7 +32,6 @@ export function useIntegrationSetupActions({ route, state, progress, mutations }
   const handleSetupStepBack = useSetupStepBackAction({
     state,
     progress,
-    mutations,
     handleRevertCurrentStep,
   });
 
@@ -232,7 +231,7 @@ function useDiscardIntegrationAction({ route, state, mutations }: DiscardIntegra
     if (!integrationId) {
       return;
     }
-    if (!window.confirm("Discard this integration? It will be removed and this cannot be undone.")) {
+    if (!window.confirm("Delete this integration? It will be removed and this cannot be undone.")) {
       return;
     }
     try {
@@ -250,43 +249,15 @@ function useDiscardIntegrationAction({ route, state, mutations }: DiscardIntegra
 interface SetupStepBackActionParams {
   state: IntegrationSetupState;
   progress: IntegrationSetupProgress;
-  mutations: Pick<IntegrationSetupMutations, "deleteIntegrationMutation">;
   handleRevertCurrentStep: () => Promise<void>;
 }
 
-function useSetupStepBackAction({ state, progress, mutations, handleRevertCurrentStep }: SetupStepBackActionParams) {
+function useSetupStepBackAction({ state, progress, handleRevertCurrentStep }: SetupStepBackActionParams) {
   return useCallback(async () => {
     if (!progress.currentStep || !state.createdIntegration?.metadata?.id) {
       return;
     }
 
-    if (progress.canRevertCurrentStep) {
-      await handleRevertCurrentStep();
-      return;
-    }
-
-    if (
-      !window.confirm(
-        "Remove this partially configured integration? You'll return to naming and can start setup again.",
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await mutations.deleteIntegrationMutation.mutateAsync({
-        integrationName: state.createdIntegration?.metadata?.integrationName ?? "",
-      });
-      state.setCreatedIntegration(null);
-      state.setStepInputs({});
-    } catch {
-      showErrorToast("Failed to remove integration");
-    }
-  }, [
-    state,
-    progress.currentStep,
-    progress.canRevertCurrentStep,
-    mutations.deleteIntegrationMutation,
-    handleRevertCurrentStep,
-  ]);
+    await handleRevertCurrentStep();
+  }, [state, progress.currentStep, handleRevertCurrentStep]);
 }

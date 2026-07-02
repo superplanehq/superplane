@@ -1,0 +1,19 @@
+{
+  "data": {
+    "imageId": "ami-0215d085326c25744",
+    "instanceId": "i-0abc1234567890def",
+    "instanceType": "t3.micro",
+    "launchTime": "2026-05-28T09:41:14.000Z",
+    "name": "preview-pr-5",
+    "privateDnsName": "ip-10.0.1.25.eu-north-1.compute.internal",
+    "privateIpAddress": "10.0.1.25",
+    "publicDnsName": "ec2-54-198-10-42.eu-north-1.compute.amazonaws.com",
+    "publicIpAddress": "54.198.10.42",
+    "region": "eu-north-1",
+    "state": "running",
+    "subnetId": "subnet-0e7c8aa9b0a82aec5",
+    "vpcId": "vpc-0049650f5a479c14b"
+  },
+  "timestamp": "2026-05-28T09:41:26.29656651Z",
+  "type": "aws.ec2.instance.power.started"
+}

@@ -91,10 +91,9 @@ func Test__EventRetentionWorker_SkipsRootEventWithinRetentionWindow(t *testing.T
 		"created_at": time.Now().AddDate(0, 0, -29),
 	}).Error)
 
-	rootEventInDB, err := models.FindCanvasEvent(rootEventRecord.ID)
+	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
-
-	require.NoError(t, worker.LockAndProcessRootEvent(*rootEventInDB, time.Now()))
+	require.Equal(t, 0, deleted)
 
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 }
@@ -127,10 +126,9 @@ func Test__EventRetentionWorker_SkipsRootEventWithoutCachedRetentionWindow(t *te
 		"created_at": time.Now().AddDate(0, 0, -31),
 	}).Error)
 
-	rootEventInDB, err := models.FindCanvasEvent(rootEventRecord.ID)
+	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
-
-	require.NoError(t, worker.LockAndProcessRootEvent(*rootEventInDB, time.Now()))
+	require.Equal(t, 0, deleted)
 
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 }
@@ -171,7 +169,7 @@ func Test__EventRetentionWorker_CleansExpiredCompletedRootEventChain(t *testing.
 		"created_at": time.Now().AddDate(0, 0, -31),
 	}).Error)
 
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", execution.ID).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultPassed,
@@ -203,15 +201,160 @@ func Test__EventRetentionWorker_CleansExpiredCompletedRootEventChain(t *testing.
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	rootEventInDB, err := models.FindCanvasEvent(rootEvent.ID)
+	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
-
-	require.NoError(t, worker.LockAndProcessRootEvent(*rootEventInDB, time.Now()))
+	require.Equal(t, 1, deleted)
 
 	support.VerifyCanvasEventsCount(t, canvas.ID, 0)
 	support.VerifyNodeExecutionsCount(t, canvas.ID, 0)
 	support.VerifyNodeExecutionKVCount(t, canvas.ID, 0)
 	support.VerifyNodeRequestCount(t, canvas.ID, 0)
+}
+
+func Test__EventRetentionWorker_CleansMultipleExpiredCompletedRootEventChains(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
+	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "start"},
+				}),
+			},
+			{
+				NodeID: "component",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	createExpiredCompletedRootEventChain(t, canvas.ID)
+	createExpiredCompletedRootEventChain(t, canvas.ID)
+
+	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
+	require.NoError(t, err)
+	require.Equal(t, 2, deleted)
+
+	support.VerifyCanvasEventsCount(t, canvas.ID, 0)
+	support.VerifyNodeExecutionsCount(t, canvas.ID, 0)
+	support.VerifyNodeExecutionKVCount(t, canvas.ID, 0)
+	support.VerifyNodeRequestCount(t, canvas.ID, 0)
+}
+
+func Test__EventRetentionWorker_DoesNotDeleteUnrelatedCanvasData(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
+	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+
+	eligibleCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "start"},
+				}),
+			},
+			{
+				NodeID: "component",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	unrelatedCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "start"},
+				}),
+			},
+			{
+				NodeID: "component",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	createExpiredCompletedRootEventChain(t, eligibleCanvas.ID)
+	createCompletedRootEventChain(t, unrelatedCanvas.ID, 1)
+
+	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
+	require.NoError(t, err)
+	require.Equal(t, 1, deleted)
+
+	support.VerifyCanvasEventsCount(t, eligibleCanvas.ID, 0)
+	support.VerifyNodeExecutionsCount(t, eligibleCanvas.ID, 0)
+	support.VerifyNodeExecutionKVCount(t, eligibleCanvas.ID, 0)
+	support.VerifyNodeRequestCount(t, eligibleCanvas.ID, 0)
+
+	support.VerifyCanvasEventsCount(t, unrelatedCanvas.ID, 2)
+	support.VerifyNodeExecutionsCount(t, unrelatedCanvas.ID, 1)
+	support.VerifyNodeExecutionKVCount(t, unrelatedCanvas.ID, 1)
+	support.VerifyNodeRequestCount(t, unrelatedCanvas.ID, 1)
+}
+
+func Test__EventRetentionWorker_RespectsMaxRootEventsPerTick(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewEventRetentionWorker(&fakeEventRetentionUsageService{enabled: true})
+	cacheOrganizationRetentionWindowDays(t, r.Organization.ID, 30)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "start"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	createExpiredRootEventForWorker(t, canvas.ID)
+	createExpiredRootEventForWorker(t, canvas.ID)
+
+	deleted, err := worker.processRetentionBatches(context.Background(), time.Now(), 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, deleted)
+	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 }
 
 func Test__EventRetentionWorker_SkipsRootEventWithQueuedWork(t *testing.T) {
@@ -251,10 +394,9 @@ func Test__EventRetentionWorker_SkipsRootEventWithQueuedWork(t *testing.T) {
 	}).Error)
 	support.CreateQueueItem(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID)
 
-	rootEventInDB, err := models.FindCanvasEvent(rootEvent.ID)
+	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
-
-	require.NoError(t, worker.LockAndProcessRootEvent(*rootEventInDB, time.Now()))
+	require.Equal(t, 0, deleted)
 
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 	support.VerifyNodeQueueCount(t, canvas.ID, 1)
@@ -296,7 +438,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithPendingRequest(t *testing.T) {
 		"created_at": time.Now().AddDate(0, 0, -31),
 	}).Error)
 
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", execution.ID).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultPassed,
@@ -320,12 +462,72 @@ func Test__EventRetentionWorker_SkipsRootEventWithPendingRequest(t *testing.T) {
 	}
 	require.NoError(t, database.Conn().Create(&request).Error)
 
-	rootEventInDB, err := models.FindCanvasEvent(rootEvent.ID)
+	deleted, err := worker.LockAndProcessRootEvents(time.Now(), eventRetentionBatchSize)
 	require.NoError(t, err)
-
-	require.NoError(t, worker.LockAndProcessRootEvent(*rootEventInDB, time.Now()))
+	require.Equal(t, 0, deleted)
 
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
 	support.VerifyNodeExecutionsCount(t, canvas.ID, 1)
 	support.VerifyNodeRequestCount(t, canvas.ID, 1)
+}
+
+func createExpiredCompletedRootEventChain(t *testing.T, canvasID uuid.UUID) {
+	t.Helper()
+
+	createCompletedRootEventChain(t, canvasID, 31)
+}
+
+func createCompletedRootEventChain(t *testing.T, canvasID uuid.UUID, daysAgo int) {
+	t.Helper()
+
+	rootEvent := createRootEventForWorker(t, canvasID, daysAgo)
+	execution := support.CreateCanvasNodeExecution(t, canvasID, "component", rootEvent.ID, rootEvent.ID)
+	require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", execution.ID).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"created_at": time.Now().AddDate(0, 0, -daysAgo),
+		"updated_at": time.Now().AddDate(0, 0, -daysAgo),
+	}).Error)
+
+	childEvent := support.EmitCanvasEventForNode(t, canvasID, "component", "default", &execution.ID)
+	require.NoError(t, database.Conn().Model(&models.CanvasEvent{}).Where("id = ?", childEvent.ID).Updates(map[string]any{
+		"state":      models.CanvasEventStateRouted,
+		"created_at": time.Now().AddDate(0, 0, -daysAgo),
+	}).Error)
+
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(database.Conn(), canvasID, "component", execution.ID, "test-key", "test-value"))
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvasID,
+		NodeID:      "component",
+		ExecutionID: &execution.ID,
+		State:       models.NodeExecutionRequestStateCompleted,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{ActionName: "test", Parameters: map[string]any{}},
+		}),
+		RunAt:     time.Now().AddDate(0, 0, -daysAgo),
+		CreatedAt: time.Now().AddDate(0, 0, -daysAgo),
+		UpdatedAt: time.Now().AddDate(0, 0, -daysAgo),
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+}
+
+func createExpiredRootEventForWorker(t *testing.T, canvasID uuid.UUID) *models.CanvasEvent {
+	t.Helper()
+
+	return createRootEventForWorker(t, canvasID, 31)
+}
+
+func createRootEventForWorker(t *testing.T, canvasID uuid.UUID, daysAgo int) *models.CanvasEvent {
+	t.Helper()
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvasID, "trigger", "default", nil)
+	require.NoError(t, database.Conn().Model(&models.CanvasEvent{}).Where("id = ?", rootEvent.ID).Updates(map[string]any{
+		"state":      models.CanvasEventStateRouted,
+		"created_at": time.Now().AddDate(0, 0, -daysAgo),
+	}).Error)
+
+	return rootEvent
 }

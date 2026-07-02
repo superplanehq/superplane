@@ -7,6 +7,7 @@ import {
   Plus,
   Puzzle,
   RefreshCcw,
+  Repeat,
   StickyNote,
   TriangleAlert,
   X,
@@ -32,6 +33,7 @@ describe("utils", () => {
     expect(resolveIcon("expand_more")).toBe(ChevronDown);
     expect(resolveIcon("eye-closed")).toBe(EyeClosed);
     expect(resolveIcon("refresh-ccw")).toBe(RefreshCcw);
+    expect(resolveIcon("repeat")).toBe(Repeat);
     expect(resolveIcon("warning")).toBe(TriangleAlert);
     expect(resolveIcon("does-not-exist")).toBe(Puzzle);
   });

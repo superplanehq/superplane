@@ -1,0 +1,9 @@
+{
+  "type": "coolify.service.controlled",
+  "data": {
+    "serviceUuid": "svc111aaa222",
+    "operation": "restart",
+    "message": "Service restarting."
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

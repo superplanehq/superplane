@@ -2,72 +2,73 @@ package canvases
 
 import (
 	"context"
-	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
-func CreateCanvasVersion(ctx context.Context, organizationID string, canvasID string) (*pb.CreateCanvasVersionResponse, error) {
+func CreateCanvasVersion(
+	ctx context.Context,
+	organizationID string,
+	canvasID string,
+	displayName string,
+) (*pb.CreateCanvasVersionResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	orgUUID := uuid.MustParse(organizationID)
+	orgUUID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+	}
+
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
-	}
-
-	if canvas.IsTemplate {
-		return nil, status.Error(codes.FailedPrecondition, "templates are read-only")
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 
 	userUUID := uuid.MustParse(userID)
 	var version *models.CanvasVersion
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		liveVersion, liveVersionErr := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-		if liveVersionErr != nil {
-			if errors.Is(liveVersionErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.FailedPrecondition, "canvas live version not found")
-			}
-			return liveVersionErr
-		}
-
-		version, err = models.SaveCanvasDraftInTransaction(
+		var createErr error
+		version, createErr = models.CreateDraftBranchFromLiveInTransaction(
 			tx,
-			canvas.ID,
+			canvasUUID,
 			userUUID,
-			liveVersion.Nodes,
-			liveVersion.Edges,
+			strings.TrimSpace(displayName),
+			nil,
+			nil,
 		)
-
-		return err
+		return createErr
 	})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create canvas version: %v", err)
+		if grpcerrors.Code(err) != codes.Unknown {
+			return nil, err
+		}
+		return nil, grpcerrors.Internal(err, "failed to create canvas version")
 	}
 
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
+		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
 	}
 
 	return &pb.CreateCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID),
+		Version: SerializeCanvasVersion(version, organizationID, nil),
 	}, nil
 }

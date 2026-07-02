@@ -55,6 +55,7 @@ func setupPRCommentTrigger(ctx core.TriggerContext, webhookConfig common.Webhook
 	err := common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 	if err != nil {

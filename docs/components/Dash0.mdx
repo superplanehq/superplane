@@ -29,17 +29,27 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update HTTP Synthetic Check" href="#update-http-synthetic-check" description="Update an existing HTTP synthetic check in Dash0 by ID" />
 </CardGrid>
 
+## Instructions
+
+To connect Dash0 to Superplane:
+
+1. Go to **Settings → Auth Tokens → + Add** to create a new API token.
+2. Give the token a name, grant it access to the Default or all Datasets, all Signal types, and all Permissions.
+3. Click **Save** and copy the **Token** into the **API Token** field below.
+4. Go to **Settings → Endpoints → Prometheus API** and copy the **Endpoint** into the **Prometheus API Base URL** field below.
+5. Click **Connect** to finish setup.
+
 <a id="on-alert-notification"></a>
 
 ## On Alert Notification
+
+**Trigger key:** `dash0.onAlertNotification`
 
 The On Alert Notification trigger starts a workflow execution when Dash0 sends an alert notification webhook.
 
 ### Setup
 
-1. Configure the Dash0 integration in SuperPlane.
-2. Copy the webhook URL shown in the integration configuration.
-3. In Dash0, configure alert notifications to send HTTP POST requests to that URL.
+Connect the Dash0 integration in SuperPlane. A webhook notification channel is created automatically in Dash0 with routing for all alert check notifications. Add this trigger to a workflow and publish the canvas to start receiving events.
 
 ### Event Data
 
@@ -107,13 +117,13 @@ The trigger emits the full JSON payload received from Dash0 as `dash0.alertNotif
 
 ## On Synthetic Check Notification
 
+**Trigger key:** `dash0.onSyntheticCheckNotification`
+
 The On Synthetic Check Notification trigger starts a workflow execution when Dash0 sends a synthetic check notification webhook.
 
 ### Setup
 
-1. Configure the Dash0 integration in SuperPlane.
-2. Copy the webhook URL shown in the integration configuration.
-3. In Dash0, configure synthetic check notifications to send HTTP POST requests to that URL.
+Connect the Dash0 integration in SuperPlane. A webhook notification channel is created automatically in Dash0 with routing for all synthetic check notifications. Add this trigger to a workflow and publish the canvas to start receiving events.
 
 ### Event Data
 
@@ -217,6 +227,8 @@ The trigger normalizes these labels into a flat `{key: value}` map in the emitte
 
 ## Create Check Rule
 
+**Component key:** `dash0.createCheckRule`
+
 The Create Check Rule component creates a Prometheus-style alert check rule in Dash0 to monitor metrics and trigger alerts based on PromQL expressions.
 
 ### Use Cases
@@ -292,6 +304,8 @@ Returns the created check rule details from the Dash0 API, including the rule ID
 <a id="create-http-synthetic-check"></a>
 
 ## Create HTTP Synthetic Check
+
+**Component key:** `dash0.createHttpSyntheticCheck`
 
 The Create Synthetic Check component creates an HTTP synthetic check in Dash0 to monitor the availability and performance of your endpoints.
 
@@ -433,6 +447,8 @@ Returns the created synthetic check details from the Dash0 API, including the ch
 
 ## Delete Check Rule
 
+**Component key:** `dash0.deleteCheckRule`
+
 The Delete Check Rule component removes a check rule (Prometheus alert rule) from Dash0 by its ID or origin. Use the check rule ID from a Create/Get/Update output or from the Dash0 dashboard.
 
 ### Use Cases
@@ -467,6 +483,8 @@ Returns a confirmation payload indicating successful deletion.
 
 ## Delete HTTP Synthetic Check
 
+**Component key:** `dash0.deleteHttpSyntheticCheck`
+
 The Delete HTTP Synthetic Check component removes a synthetic check from Dash0 by its ID. Use the check ID from a Create/Get/Update output (e.g. metadata.labels["dash0.com/id"]) or from the Dash0 dashboard.
 
 ### Configuration
@@ -494,6 +512,8 @@ Returns a confirmation payload (e.g. deleted id).
 <a id="get-check-rule"></a>
 
 ## Get Check Rule
+
+**Component key:** `dash0.getCheckRule`
 
 The Get Check Rule component retrieves the full configuration of an existing check rule (Prometheus alert rule) from Dash0.
 
@@ -553,6 +573,8 @@ Returns the complete check rule configuration from the Dash0 API, including:
 <a id="get-http-synthetic-check"></a>
 
 ## Get HTTP Synthetic Check
+
+**Component key:** `dash0.getHttpSyntheticCheck`
 
 The Get HTTP Synthetic Check component retrieves the full configuration and operational metrics of an existing HTTP synthetic check from Dash0.
 
@@ -695,6 +717,8 @@ Note: Metrics are fetched on a best-effort basis. If Prometheus metrics are unav
 
 ## List Issues
 
+**Component key:** `dash0.listIssues`
+
 The List Issues component queries Dash0 to retrieve all current issues and routes execution based on issue severity.
 
 ### Use Cases
@@ -761,6 +785,8 @@ Returns a list of issues with:
 <a id="query-prometheus"></a>
 
 ## Query Prometheus
+
+**Component key:** `dash0.queryPrometheus`
 
 The Query Prometheus component executes PromQL queries against the Dash0 Prometheus API.
 
@@ -832,6 +858,8 @@ Returns the Prometheus query response including:
 
 ## Send Log Event
 
+**Component key:** `dash0.sendLogEvent`
+
 The Send Log Event component sends log records from workflows to Dash0 via OTLP HTTP ingestion.
 
 ### Use Cases
@@ -892,6 +920,8 @@ Returns a confirmation that the log was sent along with the log record details:
 
 ## Update Check Rule
 
+**Component key:** `dash0.updateCheckRule`
+
 The Update Check Rule component updates an existing check rule (Prometheus alert rule) in Dash0. Use the check rule ID from a previous Create Check Rule output or from the Dash0 dashboard.
 
 ### Use Cases
@@ -947,6 +977,8 @@ Returns the updated check rule details from the Dash0 API, including the rule ID
 <a id="update-http-synthetic-check"></a>
 
 ## Update HTTP Synthetic Check
+
+**Component key:** `dash0.updateHttpSyntheticCheck`
 
 The Update HTTP Synthetic Check component updates an existing synthetic check in Dash0. Use the check ID from a previous Create HTTP Synthetic Check output (e.g. metadata.labels["dash0.com/id"]) or from the Dash0 dashboard.
 

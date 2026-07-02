@@ -7,9 +7,9 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__DescribeOrganization(t *testing.T) {
@@ -17,10 +17,10 @@ func Test__DescribeOrganization(t *testing.T) {
 
 	t.Run("organization does not exist -> error", func(t *testing.T) {
 		_, err := DescribeOrganization(context.Background(), uuid.New().String())
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Equal(t, "organization not found", s.Message())
+		assert.Equal(t, codes.NotFound, code)
+		assert.Equal(t, "organization not found", msg)
 	})
 
 	t.Run("describe organization by ID", func(t *testing.T) {
@@ -35,7 +35,5 @@ func Test__DescribeOrganization(t *testing.T) {
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.Equal(t, *r.Organization.UpdatedAt, response.Organization.Metadata.UpdatedAt.AsTime())
 		require.NotNil(t, response.Organization.Spec)
-		require.NotNil(t, response.Organization.Spec.ChangeManagementEnabled)
-		assert.Equal(t, r.Organization.ChangeManagementEnabled, response.Organization.Spec.GetChangeManagementEnabled())
 	})
 }

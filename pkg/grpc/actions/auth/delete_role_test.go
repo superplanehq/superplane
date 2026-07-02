@@ -39,7 +39,7 @@ func Test_DeleteRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful custom role deletion", func(t *testing.T) {
-		roleDef, err := r.AuthService.GetRoleDefinition("test-custom-role-to-delete", models.DomainTypeOrganization, orgID)
+		roleDef, err := r.AuthService.GetRoleDefinition(context.Background(), "test-custom-role-to-delete", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role-to-delete", roleDef.Name)
 
@@ -47,7 +47,7 @@ func Test_DeleteRole(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		_, err = r.AuthService.GetRoleDefinition("test-custom-role-to-delete", models.DomainTypeOrganization, orgID)
+		_, err = r.AuthService.GetRoleDefinition(context.Background(), "test-custom-role-to-delete", models.DomainTypeOrganization, orgID)
 		assert.Error(t, err)
 	})
 
@@ -66,7 +66,7 @@ func Test_DeleteRole(t *testing.T) {
 	t.Run("invalid request - default role name", func(t *testing.T) {
 		_, err := DeleteRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.AuthService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot delete default role")
+		assert.Equal(t, "invalid role delete request", err.Error())
 	})
 
 	t.Run("invalid request - nonexistent role", func(t *testing.T) {
@@ -104,10 +104,10 @@ func Test_DeleteRole(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		_, err = r.AuthService.GetRoleDefinition("test-role-with-users", models.DomainTypeOrganization, orgID)
+		_, err = r.AuthService.GetRoleDefinition(context.Background(), "test-role-with-users", models.DomainTypeOrganization, orgID)
 		assert.Error(t, err)
 
-		userRoles, err := r.AuthService.GetUserRolesForOrg(userID, orgID)
+		userRoles, err := r.AuthService.GetUserRolesForOrg(context.Background(), userID, orgID)
 		require.NoError(t, err)
 		for _, role := range userRoles {
 			assert.NotEqual(t, "test-role-with-users", role.Name)
@@ -168,7 +168,7 @@ func Test_DeleteRole(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		groupRole, err := r.AuthService.GetGroupRole(orgID, models.DomainTypeOrganization, groupName)
+		groupRole, err := r.AuthService.GetGroupRole(context.Background(), orgID, models.DomainTypeOrganization, groupName)
 		require.NoError(t, err)
 		assert.Equal(t, models.RoleOrgViewer, groupRole)
 	})

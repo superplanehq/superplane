@@ -1,5 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Link } from "@/components/Link/link";
 import { Textarea } from "@/components/Textarea/textarea";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Key, Plus, Trash2 } from "lucide-react";
@@ -37,6 +38,8 @@ export function Secrets({ organizationId }: SecretsProps) {
 
   const { data: secrets = [], isLoading } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const createSecretMutation = useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+
+  useReportPageReady(!isLoading && !permissionsLoading);
 
   const handleCreateClick = () => {
     if (!canCreateSecrets) return;

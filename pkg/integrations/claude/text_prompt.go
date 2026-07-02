@@ -1,14 +1,18 @@
 package claude
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
 
 const MessagePayloadType = "claude.message"
@@ -21,15 +25,26 @@ type TextPromptSpec struct {
 	SystemMessage string   `json:"systemMessage"`
 	MaxTokens     int      `json:"maxTokens"`
 	Temperature   *float64 `json:"temperature"`
+	Files         []string `json:"files"`
+	OutputSchema  string   `json:"outputSchema"`
 }
 
 type MessagePayload struct {
 	ID         string                 `json:"id"`
 	Model      string                 `json:"model"`
 	Text       string                 `json:"text"`
+	Parsed     any                    `json:"parsed,omitempty"`
 	Usage      *MessageUsage          `json:"usage,omitempty"`
 	StopReason string                 `json:"stopReason,omitempty"`
 	Response   *CreateMessageResponse `json:"response"`
+}
+
+// TextPromptNodeMetadata is node-level metadata surfaced in the UI so the
+// configured model and options are visible on the node without opening it.
+type TextPromptNodeMetadata struct {
+	Model            string `json:"model" mapstructure:"model"`
+	MaxTokens        int    `json:"maxTokens" mapstructure:"maxTokens"`
+	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
 }
 
 func (c *TextPrompt) Name() string {
@@ -60,6 +75,7 @@ func (c *TextPrompt) Documentation() string {
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
 - **Max Tokens**: (Optional) Limit the length of the generated response.
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0).
+- **Structured Output**: (Optional) Provide a JSON Schema for the response. Claude is constrained to return JSON matching it, available on the parsed output. The schema is validated before the request; every object is sent with additionalProperties:false.
 
 ## Output
 
@@ -68,6 +84,7 @@ Returns a payload containing:
 - **usage**: Input and output token counts.
 - **stopReason**: Why the generation ended (e.g., "end_turn", "max_tokens").
 - **model**: The specific model version used.
+- **parsed**: When Structured Output is configured, the response parsed into an object (only on a normal end_turn completion).
 
 ## Notes
 
@@ -136,6 +153,26 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 			Default:     "1.0",
 			Description: "Amount of randomness injected into the response (0.0 to 1.0)",
 		},
+		{
+			Name:        "files",
+			Label:       "Files",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "File paths from the Files tab to include as context in the prompt",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "File path",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeRepositoryFile,
+					},
+				},
+			},
+		},
+		structuredoutput.ConfigField(
+			"outputSchema",
+			"Structured Output",
+			"A JSON Schema describing the response. Claude is constrained to return JSON matching it (available on the `parsed` output). Edit the default schema; it is validated before the request. Every object gets `additionalProperties: false`.",
+		),
 	}
 }
 
@@ -144,13 +181,60 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
-
 	if spec.Model == "" {
 		return fmt.Errorf("model is required")
 	}
 
 	if spec.Prompt == "" {
 		return fmt.Errorf("prompt is required")
+	}
+
+	// Validate that configured files exist in the repository
+	if len(spec.Files) > 0 {
+		if ctx.Files == nil {
+			return fmt.Errorf("files configured but file access is not available")
+		}
+		available, err := ctx.Files.List()
+		if err != nil {
+			return fmt.Errorf("failed to list repository files: %v", err)
+		}
+		fileSet := make(map[string]bool, len(available))
+		for _, f := range available {
+			if norm, err := gitprovider.NormalizePath(f); err == nil {
+				fileSet[norm] = true
+			}
+		}
+		for _, f := range spec.Files {
+			norm, err := gitprovider.ValidateUserPath(f)
+			if err != nil {
+				return fmt.Errorf("invalid file path %q: %v", f, err)
+			}
+			if !fileSet[norm] {
+				return fmt.Errorf("file %q not found in app repository", f)
+			}
+		}
+	}
+
+	// The schema field supports expressions (like the prompt), which are only
+	// resolved at execution. Validate it as JSON only when it has no unresolved
+	// expression; Execute re-parses the resolved value.
+	hasSchema := strings.TrimSpace(spec.OutputSchema) != ""
+	if hasSchema && !strings.Contains(spec.OutputSchema, "{{") {
+		if _, err := structuredoutput.Parse(spec.OutputSchema); err != nil {
+			return err
+		}
+	}
+
+	if ctx.Metadata != nil {
+		maxTokens := spec.MaxTokens
+		if maxTokens == 0 {
+			maxTokens = 4096
+		}
+		_ = ctx.Metadata.Set(TextPromptNodeMetadata{
+			Model:            spec.Model,
+			MaxTokens:        maxTokens,
+			StructuredOutput: hasSchema,
+		})
 	}
 
 	return nil
@@ -161,7 +245,6 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
-
 	if spec.Model == "" {
 		return fmt.Errorf("model is required")
 	}
@@ -177,9 +260,20 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("maxTokens must be at least 1")
 	}
 
+	schema, err := structuredoutput.Parse(spec.OutputSchema)
+	if err != nil {
+		return err
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
+	}
+
+	// Build message content: file documents + user prompt
+	userContent, err := buildUserContent(ctx, spec)
+	if err != nil {
+		return fmt.Errorf("failed to build user content: %v", err)
 	}
 
 	req := CreateMessageRequest{
@@ -188,7 +282,7 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		Messages: []Message{
 			{
 				Role:    "user",
-				Content: spec.Prompt,
+				Content: userContent,
 			},
 		},
 		Temperature: spec.Temperature,
@@ -196,6 +290,12 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 
 	if spec.SystemMessage != "" {
 		req.System = spec.SystemMessage
+	}
+
+	if schema != nil {
+		req.OutputConfig = &OutputConfig{
+			Format: &OutputFormat{Type: "json_schema", Schema: structuredoutput.Prepare(schema, false)},
+		}
 	}
 
 	response, err := client.CreateMessage(req)
@@ -212,6 +312,16 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		Usage:      &response.Usage,
 		StopReason: response.StopReason,
 		Response:   response,
+	}
+
+	// When a schema is configured, parse the model's JSON text into a structured
+	// object. Only trust the output on a normal completion (end_turn); a refusal
+	// or truncation (max_tokens) may not conform to the schema.
+	if schema != nil && response.StopReason == "end_turn" && text != "" {
+		var parsed any
+		if err := json.Unmarshal([]byte(text), &parsed); err == nil {
+			payload.Parsed = parsed
+		}
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -252,6 +362,68 @@ func extractMessageText(response *CreateMessageResponse) string {
 		}
 	}
 	return builder.String()
+}
+
+const maxFileSize = 100 * 1024      // 100KB per file
+const maxTotalFileSize = 500 * 1024 // 500KB total across all files
+
+// buildUserContent creates the message content for the user message.
+// When files are specified, it returns an array of content blocks
+// (documents + text prompt). Otherwise, it returns the prompt string.
+func buildUserContent(ctx core.ExecutionContext, spec TextPromptSpec) (any, error) {
+	if len(spec.Files) == 0 {
+		return spec.Prompt, nil
+	}
+
+	if ctx.Files == nil {
+		return nil, fmt.Errorf("files configured but file access is not available in this execution context")
+	}
+
+	blocks := make([]ContentBlock, 0, len(spec.Files)+1)
+	totalSize := 0
+
+	for _, path := range spec.Files {
+		normalized, normErr := gitprovider.ValidateUserPath(path)
+		if normErr != nil {
+			return nil, fmt.Errorf("invalid file path %q: %w", path, normErr)
+		}
+		reader, err := ctx.Files.Read(normalized)
+		if err != nil {
+			return nil, fmt.Errorf("read file %q: %w", path, err)
+		}
+
+		data, err := io.ReadAll(io.LimitReader(reader, maxFileSize+1))
+		reader.Close()
+		if err != nil {
+			return nil, fmt.Errorf("read file %q: %w", path, err)
+		}
+
+		if len(data) > maxFileSize {
+			return nil, fmt.Errorf("file %q exceeds maximum size of %d bytes", path, maxFileSize)
+		}
+		totalSize += len(data)
+		if totalSize > maxTotalFileSize {
+			return nil, fmt.Errorf("total file size exceeds maximum of %d bytes", maxTotalFileSize)
+		}
+
+		mediaType := "text/plain"
+		blocks = append(blocks, ContentBlock{
+			Type: "document",
+			Source: &ContentBlockSource{
+				Type:      "text",
+				MediaType: mediaType,
+				Data:      string(data),
+			},
+		})
+	}
+
+	// Add the user prompt as the final text block
+	blocks = append(blocks, ContentBlock{
+		Type: "text",
+		Text: spec.Prompt,
+	})
+
+	return blocks, nil
 }
 
 func (c *TextPrompt) Hooks() []core.Hook {

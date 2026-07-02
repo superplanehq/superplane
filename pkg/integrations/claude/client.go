@@ -21,17 +21,48 @@ type Client struct {
 	http    core.HTTPContext
 }
 
+// Message represents a Claude API message.
+// Content can be a plain string (for simple text) or []ContentBlock
+// (for multi-part content with documents and text).
 type Message struct {
 	Role    string `json:"role"`
-	Content string `json:"content"`
+	Content any    `json:"content"`
+}
+
+// ContentBlock represents a content block in a Claude message.
+// Used for text, documents, and other structured content.
+type ContentBlock struct {
+	Type   string              `json:"type"`
+	Text   string              `json:"text,omitempty"`
+	Source *ContentBlockSource `json:"source,omitempty"`
+}
+
+// ContentBlockSource describes the source of a document content block.
+type ContentBlockSource struct {
+	Type      string `json:"type"`       // "text" for inline content
+	MediaType string `json:"media_type"` // e.g. "text/plain", "text/markdown"
+	Data      string `json:"data"`       // the actual content
 }
 
 type CreateMessageRequest struct {
-	Model       string    `json:"model"`
-	Messages    []Message `json:"messages"`
-	System      string    `json:"system,omitempty"`
-	MaxTokens   int       `json:"max_tokens,omitempty"`
-	Temperature *float64  `json:"temperature,omitempty"`
+	Model        string        `json:"model"`
+	Messages     []Message     `json:"messages"`
+	System       string        `json:"system,omitempty"`
+	MaxTokens    int           `json:"max_tokens,omitempty"`
+	Temperature  *float64      `json:"temperature,omitempty"`
+	OutputConfig *OutputConfig `json:"output_config,omitempty"`
+}
+
+// OutputConfig configures Claude's response format (structured outputs).
+// See https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+type OutputConfig struct {
+	Format *OutputFormat `json:"format,omitempty"`
+}
+
+// OutputFormat constrains the final text response to a JSON schema.
+type OutputFormat struct {
+	Type   string `json:"type"`   // always "json_schema"
+	Schema any    `json:"schema"` // the JSON Schema object
 }
 
 type MessageContent struct {

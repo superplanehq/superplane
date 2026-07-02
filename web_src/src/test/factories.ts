@@ -1,6 +1,6 @@
 import type {
   CanvasesCanvas,
-  SuperplaneComponentsEdge as ComponentsEdge,
+  ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";

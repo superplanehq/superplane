@@ -48,6 +48,7 @@ export interface Suggestion {
 export interface GetSuggestionsOptions {
   includeFunctions?: boolean;
   includeGlobals?: boolean;
+  includeTopLevelGlobals?: boolean;
   limit?: number;
   allowInStrings?: boolean;
 }
@@ -58,6 +59,29 @@ type ExprFunction = {
   description: string;
   example: string;
 };
+
+const MEMORY_NAMESPACE_SUGGESTION: Suggestion = {
+  label: "memory",
+  kind: "variable",
+  insertText: "memory.",
+  detail: "namespace",
+  description: "Access canvas memory records by namespace and field matches.",
+};
+
+const MEMORY_METHODS: readonly ExprFunction[] = [
+  {
+    name: "find",
+    snippet: "find()",
+    description: "Returns all canvas memory records matching the namespace and match object.",
+    example: 'memory.find("machines", {"sandbox_id": "12121"})',
+  },
+  {
+    name: "findFirst",
+    snippet: "findFirst()",
+    description: "Returns the first canvas memory record matching the namespace and match object, or nil.",
+    example: 'memory.findFirst("machines", {"creator": "igor"}).sandbox_id',
+  },
+];
 
 /** Built-in functions (from expr-lang docs categories). */
 export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
@@ -528,13 +552,45 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   },
 ] as const;
 
+function suggestTopLevelGlobals<TGlobals extends Record<string, unknown>>(
+  globals: TGlobals,
+  prefix: string,
+): Suggestion[] {
+  const out: Suggestion[] = [];
+  const globalKeys = listGlobalKeys(globals);
+  for (const key of globalKeys) {
+    if (key === "$" || key.startsWith("__") || needsQuotingAsIdentifier(key)) {
+      continue;
+    }
+    if (prefix && !key.toLowerCase().startsWith(prefix)) {
+      continue;
+    }
+
+    const value = (globals as Record<string, unknown>)[key];
+    const tailDot = isExpandableValue(value) ? "." : "";
+    out.push({
+      label: key,
+      kind: "variable",
+      insertText: `${key}${tailDot}`,
+      detail: getValueTypeLabel(value),
+    });
+  }
+  return out;
+}
+
 export function getSuggestions<TGlobals extends Record<string, unknown>>(
   text: string,
   cursor: number,
   globals: TGlobals,
   options: GetSuggestionsOptions = {},
 ): Suggestion[] {
-  const { includeFunctions = true, includeGlobals = true, limit = 30, allowInStrings = false } = options;
+  const {
+    includeFunctions = true,
+    includeGlobals = true,
+    includeTopLevelGlobals = false,
+    limit = 30,
+    allowInStrings = false,
+  } = options;
   const left = text.slice(0, cursor);
   // 0) Env key trigger: after "$" or "$[" suggest keys immediately
   const envTrigger = detectEnvKeyTrigger(left);
@@ -592,6 +648,23 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   if (dotCtx) {
     const { baseExpr, memberPrefix, operator, isFunctionCall } = dotCtx;
     const mp = (memberPrefix ?? "").toLowerCase();
+
+    if (!isFunctionCall && extractTailPathExpression(baseExpr) === "memory") {
+      if (MEMORY_METHODS.some((m) => m.name.toLowerCase() === mp)) {
+        return [];
+      }
+
+      return MEMORY_METHODS.filter((m) => m.name.toLowerCase().startsWith(mp) && mp !== m.name.toLowerCase())
+        .slice(0, limit)
+        .map((m) => ({
+          label: m.name,
+          kind: "function" as const,
+          insertText: m.snippet ?? `${m.name}()`,
+          detail: "function",
+          description: m.description,
+          example: m.example,
+        }));
+    }
 
     // Handle function call method suggestions (e.g., now().Year())
     if (isFunctionCall) {
@@ -657,9 +730,18 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
         kind: "variable",
         insertText: "$",
         detail: getValueTypeLabel(globals),
-        description: "Root selector for accessing payload data from all connected components.",
+        description:
+          'Access event data emitted by connected components in a run, keyed by component name (e.g. $["Component Name"]).',
         nodeCount,
       });
+    }
+
+    if (!prefix || MEMORY_NAMESPACE_SUGGESTION.label.startsWith(prefix)) {
+      out.push(MEMORY_NAMESPACE_SUGGESTION);
+    }
+
+    if (includeTopLevelGlobals) {
+      out.push(...suggestTopLevelGlobals(globals, prefix));
     }
   }
 

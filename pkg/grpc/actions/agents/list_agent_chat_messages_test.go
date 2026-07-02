@@ -1,39 +1,86 @@
-package agents
+package agents_test
 
 import (
 	"context"
 	"testing"
-	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/agents"
+	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
-func Test__ListAgentChatMessages(t *testing.T) {
-	t.Run("successful response", func(t *testing.T) {
-		addr, _ := startMockAgentServer(t)
+func TestListAgentChatMessages_RequiresOwnership(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
 
-		resp, err := ListAgentChatMessages(context.Background(), addr, "org-1", "user-1", "canvas-1", "chat-1")
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		assert.Len(t, resp.Messages, 1)
-		assert.Equal(t, "msg-1", resp.Messages[0].Id)
+	svc := &stubService{
+		getSession: func(uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error) {
+			return nil, gorm.ErrRecordNotFound
+		},
+	}
+	_, err := actionsagents.ListAgentChatMessages(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.ListAgentChatMessagesRequest{
+		ChatId: uuid.NewString(),
 	})
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
+}
 
-	t.Run("closes gRPC connection after call", func(t *testing.T) {
-		addr, tracker := startMockAgentServer(t)
+func TestListAgentChatMessages_ReturnsMessagesAndForwardsCursor(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	chatID := uuid.New()
+	beforeID := uuid.New()
 
-		_, err := ListAgentChatMessages(context.Background(), addr, "org-1", "user-1", "canvas-1", "chat-1")
-		require.NoError(t, err)
-
-		assert.Eventually(t, func() bool { return tracker.open.Load() == 0 }, 2*time.Second, 10*time.Millisecond)
+	svc := &stubService{
+		getSession: func(_, _, id uuid.UUID) (*models.AgentSession, error) {
+			return &models.AgentSession{ID: chatID, CreatedAt: now()}, nil
+		},
+		listMessages: func(id, before uuid.UUID, limit int) ([]models.AgentSessionMessage, error) {
+			assert.Equal(t, chatID, id)
+			assert.Equal(t, beforeID, before)
+			assert.Equal(t, 25, limit)
+			return []models.AgentSessionMessage{
+				{ID: uuid.New(), Role: "user", Content: "hi", CreatedAt: now()},
+			}, nil
+		},
+	}
+	resp, err := actionsagents.ListAgentChatMessages(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.ListAgentChatMessagesRequest{
+		ChatId:   chatID.String(),
+		BeforeId: beforeID.String(),
+		Limit:    25,
 	})
+	require.NoError(t, err)
+	require.Len(t, resp.Messages, 1)
+	assert.False(t, resp.HasMore, "fewer rows than limit ⇒ no more pages")
+}
 
-	t.Run("returns unavailable when agent is down", func(t *testing.T) {
-		_, err := ListAgentChatMessages(context.Background(), "127.0.0.1:1", "org-1", "user-1", "canvas-1", "chat-1")
-		require.Error(t, err)
-		assert.Equal(t, codes.Unavailable, status.Code(err))
+func TestListAgentChatMessages_SignalsMorePagesWhenFull(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	chatID := uuid.New()
+
+	svc := &stubService{
+		getSession: func(uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error) {
+			return &models.AgentSession{ID: chatID, CreatedAt: now()}, nil
+		},
+		listMessages: func(uuid.UUID, uuid.UUID, int) ([]models.AgentSessionMessage, error) {
+			return []models.AgentSessionMessage{
+				{ID: uuid.New(), Role: "user", Content: "a", CreatedAt: now()},
+				{ID: uuid.New(), Role: "user", Content: "b", CreatedAt: now()},
+			}, nil
+		},
+	}
+	resp, err := actionsagents.ListAgentChatMessages(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.ListAgentChatMessagesRequest{
+		ChatId: chatID.String(),
+		Limit:  2,
 	})
+	require.NoError(t, err)
+	assert.True(t, resp.HasMore)
 }

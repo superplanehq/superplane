@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/pathfilter"
 )
 
 type OnPush struct{}
@@ -16,6 +16,7 @@ type OnPush struct{}
 type OnPushConfiguration struct {
 	Repository string                    `json:"repository" mapstructure:"repository"`
 	Refs       []configuration.Predicate `json:"refs" mapstructure:"refs"`
+	Paths      []string                  `json:"paths" mapstructure:"paths"`
 }
 
 func (p *OnPush) Name() string {
@@ -44,13 +45,14 @@ func (p *OnPush) Documentation() string {
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., ` + "`refs/heads/main`" + `, ` + "`refs/tags/*`" + `)
+- **Paths** *(optional)*: Glob patterns (GitHub Actions–style) for added, modified, and removed files. Use ` + "`!`" + ` prefix to exclude (for example ` + "`billing/**`" + ` with ` + "`!billing/**/*.md`" + `). Patterns starting only with ` + "`!`" + ` assume an include of ` + "`**`" + `. Lists stored as legacy ref-style predicates still honor ` + "`equals`" + ` values as globs; ` + "`matches`" + ` must be replaced with glob patterns. If the webhook has no per-commit file lists (empty ` + "`commits`" + ` or missing ` + "`added`" + `/` + "`modified`" + `/` + "`removed`" + ` arrays), a configured path filter cannot match and the trigger will not fire. Leave empty to fire on all pushes.
 
 ## Event Data
 
 Each push event includes:
 - **repository**: Repository information
 - **ref**: The branch or tag that was pushed to
-- **commits**: Array of commit information
+- **commits**: Array of commit information (each with ` + "`added`" + `, ` + "`modified`" + `, ` + "`removed`" + ` file arrays)
 - **pusher**: Information about who pushed
 - **before/after**: Commit SHAs before and after the push
 
@@ -98,6 +100,22 @@ func (p *OnPush) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "paths",
+			Label:       "Paths",
+			Description: "Optional. GitHub Actions–style globs for changed files. Prefix with ! to exclude. Exclude-only lists assume ** (all paths). Leave empty to fire on all pushes.",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Togglable:   true,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Pattern",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -105,6 +123,7 @@ func (p *OnPush) Setup(ctx core.TriggerContext) error {
 	err := common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 
@@ -112,8 +131,8 @@ func (p *OnPush) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	var config OnPushConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+	config, err := decodeOnPushConfigurationForStruct(ctx.Configuration)
+	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
@@ -135,8 +154,7 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	ctx = common.WithWebhookLogger(ctx, p.Name())
 	ctx.Logger.Infof("Received GitHub webhook")
 
-	config := OnPushConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
+	config, err := decodeOnPushConfigurationForStruct(ctx.Configuration)
 	if err != nil {
 		ctx.Logger.Errorf("Failed to decode configuration: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
@@ -191,6 +209,33 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusOK, nil, nil
 	}
 
+	pathPatterns := onPushPathsFromConfiguration(ctx.Configuration, config.Paths, ctx.Logger)
+	pathPatterns = pathfilter.TrimNonEmptyStrings(pathPatterns)
+	if len(pathPatterns) > 0 {
+		changedFiles := extractChangedFiles(data)
+		if !pathfilter.EvaluatePushPathGlobFilter(
+			pathPatterns,
+			changedFiles,
+			func(pat string) {
+				ctx.Logger.Warnf("Invalid path glob syntax (skipping pattern) %q", pat)
+			},
+			func(pat string, err error) {
+				ctx.Logger.Warnf("Path glob match error for pattern %q: %v", pat, err)
+			},
+			func(reason string) {
+				ctx.Logger.Warnf("github.onPush paths: %s", reason)
+			},
+		) {
+			if len(changedFiles) == 0 {
+				ctx.Logger.Infof("Ignoring event - path filter active but no changed files found in payload")
+			} else {
+				ctx.Logger.Infof("Ignoring event - no changed file matched path globs (%d patterns, %d file(s))",
+					len(pathPatterns), len(changedFiles))
+			}
+			return http.StatusOK, nil, nil
+		}
+	}
+
 	err = ctx.Events.Emit("github.push", data)
 
 	if err != nil {
@@ -217,4 +262,46 @@ func isBranchDeletionEvent(data map[string]any) bool {
 
 func (p *OnPush) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+// extractChangedFiles collects all added, modified, and removed file paths
+// from every commit in the push payload.
+func extractChangedFiles(data map[string]any) []string {
+	commitsRaw, ok := data["commits"]
+	if !ok {
+		return nil
+	}
+
+	commits, ok := commitsRaw.([]any)
+	if !ok {
+		return nil
+	}
+
+	var files []string
+	for _, c := range commits {
+		commit, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		for _, key := range []string{"added", "modified", "removed"} {
+			listRaw, ok := commit[key]
+			if !ok {
+				continue
+			}
+
+			list, ok := listRaw.([]any)
+			if !ok {
+				continue
+			}
+
+			for _, f := range list {
+				if path, ok := f.(string); ok {
+					files = append(files, path)
+				}
+			}
+		}
+	}
+
+	return files
 }

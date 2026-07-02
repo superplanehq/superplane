@@ -1,0 +1,427 @@
+export interface DropletNodeMetadata {
+  dropletId?: string;
+  dropletName?: string;
+}
+
+export interface SnapshotNodeMetadata {
+  snapshotId?: string;
+  snapshotName?: string;
+}
+
+export interface GetDropletConfiguration {
+  dropletId: string;
+}
+
+export interface DeleteDropletConfiguration {
+  dropletId: string;
+}
+
+export interface ManageDropletPowerConfiguration {
+  dropletId: string;
+  operation: string;
+}
+
+export interface DeleteSnapshotConfiguration {
+  snapshot: string;
+}
+
+export interface DNSRecordConfiguration {
+  domain?: string;
+  type?: string;
+  name?: string;
+  data?: string;
+  recordId?: string;
+}
+
+export interface DNSRecordNodeMetadata {
+  recordId?: number;
+  recordName?: string;
+}
+
+export interface LBNodeMetadata {
+  lbId?: string;
+  lbName?: string;
+}
+
+export interface DeleteLoadBalancerConfiguration {
+  loadBalancerID: string;
+}
+
+export interface AssignReservedIPConfiguration {
+  reservedIP: string;
+  action: string;
+  droplet?: string;
+}
+
+export interface CreateLoadBalancerConfiguration {
+  name: string;
+  region: string;
+}
+
+export interface AlertPolicyNodeMetadata {
+  policyUuid?: string;
+  policyDesc?: string;
+  scopedDroplets?: { dropletId: string; dropletName: string }[];
+}
+
+export interface CreateAlertPolicyConfiguration {
+  description?: string;
+  type?: string;
+  compare?: string;
+  value?: number;
+  window?: string;
+}
+
+export interface GetAlertPolicyConfiguration {
+  alertPolicy: string;
+}
+
+export interface DeleteAlertPolicyConfiguration {
+  alertPolicy: string;
+}
+
+export interface UpdateAlertPolicyConfiguration {
+  alertPolicy: string;
+  description?: string;
+  type?: string;
+  compare?: string;
+  value?: number;
+  window?: string;
+}
+
+export interface GetDropletMetricsConfiguration {
+  droplet: string;
+  lookbackPeriod: string;
+}
+
+interface AlertPolicySlackDetails {
+  channel?: string;
+  url?: string;
+}
+
+interface AlertPolicyNotifications {
+  email?: string[];
+  slack?: AlertPolicySlackDetails[];
+}
+
+export interface AlertPolicyOutput {
+  uuid?: string;
+  description?: string;
+  type?: string;
+  compare?: string;
+  value?: number;
+  window?: string;
+  enabled?: boolean;
+  alerts?: AlertPolicyNotifications;
+}
+
+export interface DeleteAlertPolicyOutput {
+  alertPolicyUuid?: string;
+}
+
+export interface GetDropletMetricsOutput {
+  dropletId?: string;
+  lookbackPeriod?: string;
+  start?: string;
+  end?: string;
+  avgCpuUsagePercent?: number;
+  avgMemoryUsagePercent?: number;
+  avgPublicOutboundBandwidthMbps?: number;
+  avgPublicInboundBandwidthMbps?: number;
+}
+
+export interface GetObjectConfiguration {
+  bucket?: string;
+  filePath?: string;
+  includeBody?: boolean;
+}
+
+export interface GetObjectOutput {
+  bucket?: string;
+  filePath?: string;
+  endpoint?: string;
+  contentType?: string;
+  size?: string;
+  lastModified?: string;
+  eTag?: string;
+  metadata?: Record<string, string>;
+  tags?: Record<string, string>;
+  body?: string;
+}
+
+export interface CopyObjectConfiguration {
+  sourceBucket?: string;
+  sourceFilePath?: string;
+  destinationBucket?: string;
+  destinationFilePath?: string;
+  deleteSource?: boolean;
+}
+
+export interface CopyObjectOutput {
+  sourceBucket?: string;
+  sourceFilePath?: string;
+  destinationBucket?: string;
+  destinationFilePath?: string;
+  endpoint?: string;
+  eTag?: string;
+  moved?: boolean;
+}
+
+export interface DeleteObjectConfiguration {
+  bucket?: string;
+  filePath?: string;
+}
+
+export interface DeleteObjectOutput {
+  bucket?: string;
+  filePath?: string;
+  deleted?: boolean;
+}
+
+export interface PutObjectConfiguration {
+  bucket?: string;
+  filePath?: string;
+  body?: string;
+  acl?: string;
+  metadata?: Record<string, string>;
+  tags?: Record<string, string>;
+}
+
+export interface PutObjectOutput {
+  bucket?: string;
+  filePath?: string;
+  endpoint?: string;
+  eTag?: string;
+  contentType?: string;
+  size?: string;
+  metadata?: Record<string, string>;
+  tags?: Record<string, string>;
+}
+
+export interface AppNodeMetadata {
+  appId?: string;
+  appName?: string;
+}
+
+export interface DatabaseNodeMetadata {
+  databaseClusterId?: string;
+  databaseClusterName?: string;
+  databaseName?: string;
+}
+
+export interface CreateDatabaseConfiguration {
+  databaseCluster: string;
+  name: string;
+}
+
+export interface DeleteDatabaseConfiguration {
+  databaseCluster: string;
+  database: string;
+}
+
+export interface DatabaseClusterNodeMetadata {
+  databaseClusterId?: string;
+  databaseClusterName?: string;
+}
+
+export interface GetDatabaseConfiguration {
+  databaseCluster: string;
+  database: string;
+}
+
+export interface CreateDatabaseClusterConfiguration {
+  name?: string;
+  engine?: string;
+  version?: string;
+  region?: string;
+  size?: string;
+  numNodes?: string;
+}
+
+export interface GetDatabaseClusterConfiguration {
+  databaseCluster: string;
+}
+
+export interface CreateAppConfiguration {
+  name: string;
+  region: string;
+  sourceProvider?: string;
+  gitHubRepo?: string;
+  gitHubBranch?: string;
+  gitLabRepo?: string;
+  gitLabBranch?: string;
+  bitbucketRepo?: string;
+  bitbucketBranch?: string;
+  envVars?: string[];
+}
+
+export interface GetAppConfiguration {
+  app: string;
+}
+
+export interface DeleteAppConfiguration {
+  app: string;
+}
+
+export interface UpdateAppConfiguration {
+  app: string;
+  envVars?: string[];
+  gitHubBranch?: string;
+}
+
+export interface GetKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface GetKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+}
+
+export interface IndexKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface IndexKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+}
+
+export interface AddDSNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface AddDataSourceConfiguration {
+  knowledgeBase: string;
+  type?: string;
+  indexAfterAdding?: boolean;
+}
+
+export interface DeleteDSNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+  dataSourceId?: string;
+  dataSourceName?: string;
+}
+
+export interface DeleteDataSourceConfiguration {
+  knowledgeBase: string;
+  dataSource: string;
+}
+
+export interface KBNodeMetadata {
+  agentId?: string;
+  agentName?: string;
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface CreateKnowledgeBaseConfiguration {
+  name: string;
+  embeddingModel: string;
+  region: string;
+  project: string;
+  tags?: string[];
+  databaseOption?: string;
+  database?: string;
+  dataSources?: KnowledgeBaseDataSource[];
+}
+
+export interface DeleteKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface DeleteKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+  deleteOpenSearchDatabase?: boolean;
+}
+
+export interface EvalNodeMetadata {
+  testCaseId?: string;
+  testCaseName?: string;
+  agentId?: string;
+  agentName?: string;
+}
+
+export interface RunEvaluationConfiguration {
+  testCase: string;
+  agent: string;
+  runName: string;
+}
+
+export interface KnowledgeBaseDataSource {
+  type: "spaces" | "web";
+  spacesBucket?: string;
+  spacesRegion?: string;
+  webURL?: string;
+  crawlType?: string;
+  crawlingOption?: string;
+  webEmbedMedia?: boolean;
+  chunkingAlgorithm?: string;
+  maxChunkSize?: number;
+  semanticThreshold?: number;
+  parentChunkSize?: number;
+  childChunkSize?: number;
+}
+
+export interface GetGPUDropletConfiguration {
+  gpuDroplet: string;
+}
+
+export interface UpdateGPUDropletConfiguration {
+  gpuDroplet: string;
+  name?: string;
+  gpuSize?: string;
+}
+
+export interface DeleteGPUDropletConfiguration {
+  gpuDroplet: string;
+}
+
+export interface CreateGPUDropletConfiguration {
+  name?: string;
+  gpuRegion?: string;
+  gpuSize?: string;
+  imageType?: string;
+  oneClickGPUImage?: string;
+  baseGPUImage?: string;
+}
+
+export interface NetworkV4 {
+  ip_address?: string;
+  netmask?: string;
+  gateway?: string;
+  type?: string;
+}
+
+export interface DropletRegion {
+  name?: string;
+  slug?: string;
+}
+
+export interface DropletImage {
+  name?: string;
+  slug?: string;
+}
+
+export interface DropletData {
+  id?: number;
+  name?: string;
+  status?: string;
+  region?: DropletRegion;
+  size_slug?: string;
+  image?: DropletImage;
+  memory?: number;
+  vcpus?: number;
+  disk?: number;
+  networks?: {
+    v4?: NetworkV4[];
+  };
+  tags?: string[];
+}
+
+export interface DeleteGPUDropletResult {
+  dropletId?: number;
+}

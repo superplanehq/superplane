@@ -69,19 +69,8 @@ func (h *GitHubWebhookHandler) Merge(current, requested any) (any, bool, error) 
 }
 
 func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
-	metadata := common.Metadata{}
-	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
-	if err != nil {
-		return nil, err
-	}
-
 	config := common.WebhookConfiguration{}
-	err = mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
+	err := mapstructure.Decode(ctx.Webhook.GetConfiguration(), &config)
 	if err != nil {
 		return nil, err
 	}
@@ -107,22 +96,21 @@ func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		},
 	}
 
-	createdHook, _, err := client.Repositories.CreateHook(context.Background(), metadata.Owner, config.Repository, hook)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return nil, err
+	}
+
+	newHook, _, err := client.CreateHook(context.Background(), config.Repository, hook)
 	if err != nil {
 		return nil, fmt.Errorf("error creating webhook: %v", err)
 	}
 
-	return &Webhook{ID: createdHook.GetID(), WebhookName: *createdHook.Name}, nil
+	return &Webhook{ID: newHook.GetID(), WebhookName: *newHook.Name}, nil
 }
 
 func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
-	metadata := common.Metadata{}
-	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
-	if err != nil {
-		return err
-	}
-
-	client, err := common.NewClient(ctx.Integration, metadata.GitHubApp.ID, metadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return err
 	}
@@ -139,8 +127,12 @@ func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		return err
 	}
 
-	_, err = client.Repositories.DeleteHook(context.Background(), metadata.Owner, configuration.Repository, webhook.ID)
+	_, err = client.DeleteHook(context.Background(), configuration.Repository, webhook.ID)
 	if err != nil {
+		if common.IsNotFoundError(err) {
+			return nil
+		}
+
 		return fmt.Errorf("error deleting webhook: %v", err)
 	}
 

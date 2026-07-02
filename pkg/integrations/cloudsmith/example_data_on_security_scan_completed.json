@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-06-18T14:17:58Z",
+  "type": "cloudsmith.package.securityScanned",
+  "data": {
+    "event": "package.security_scanned",
+    "namespace": "weskk",
+    "repository": "superplane-compliance",
+    "name": "sp-compliance-gpl",
+    "version": "1.0.0",
+    "slug_perm": "f3XvJCI9ufJa",
+    "format": "npm",
+    "security_scan_status": "2 Vulnerabilities Detected",
+    "vulnerability_scan_results_url": "https://api.cloudsmith.io/v1/vulnerabilities/weskk/superplane-compliance/f3XvJCI9ufJa/",
+    "has_vulnerabilities": true,
+    "max_severity": "High",
+    "num_vulnerabilities": 2
+  }
+}

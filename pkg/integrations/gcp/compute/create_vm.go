@@ -20,6 +20,8 @@ import (
 type Client interface {
 	Get(ctx context.Context, path string) ([]byte, error)
 	Post(ctx context.Context, path string, body any) ([]byte, error)
+	Patch(ctx context.Context, path string, body any) ([]byte, error)
+	Delete(ctx context.Context, path string) ([]byte, error)
 	GetURL(ctx context.Context, fullURL string) ([]byte, error)
 	ProjectID() string
 }

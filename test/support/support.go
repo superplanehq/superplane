@@ -2,8 +2,6 @@ package support
 
 import (
 	"encoding/json"
-	"maps"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +11,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/git/inmemory"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -23,6 +23,7 @@ import (
 	// Import components, triggers, and integrations to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
+	_ "github.com/superplanehq/superplane/pkg/components/display"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/graphql"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
@@ -30,7 +31,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
-	_ "github.com/superplanehq/superplane/pkg/components/send_email"
+	_ "github.com/superplanehq/superplane/pkg/components/runner"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
 	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
@@ -52,6 +53,7 @@ type ResourceRegistry struct {
 	Encryptor    crypto.Encryptor
 	AuthService  *authorization.AuthService
 	Registry     *registry.Registry
+	GitProvider  git.Provider
 }
 
 func (r *ResourceRegistry) Close() {}
@@ -84,6 +86,7 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		Encryptor:   encryptor,
 		Registry:    registry,
 		AuthService: AuthService(t),
+		GitProvider: inmemory.NewProvider(),
 	}
 
 	//
@@ -151,6 +154,29 @@ func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]strin
 	return secret, nil
 }
 
+func CreateIntegrationWithCapabilities(
+	t require.TestingT,
+	organizationID uuid.UUID,
+	capabilities []models.CapabilityState,
+) *models.Integration {
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		organizationID,
+		"github",
+		RandomName("integration"),
+		nil,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, database.Conn().
+		Model(integration).
+		Update("capabilities", datatypes.NewJSONSlice(capabilities)).
+		Error)
+
+	integration.Capabilities = datatypes.NewJSONSlice(capabilities)
+	return integration
+}
+
 func RandomName(prefix string) string {
 	return prefix + "-" + uuid.New().String()
 }
@@ -213,7 +239,7 @@ func EmitCanvasEventForNodeWithData(
 		WorkflowID:  canvasID,
 		NodeID:      nodeID,
 		Channel:     channel,
-		Data:        datatypes.NewJSONType[any](data),
+		Data:        models.NewJSONValue(data),
 		State:       models.CanvasEventStatePending,
 		ExecutionID: executionID,
 		CreatedAt:   &now,
@@ -245,22 +271,20 @@ func CreateNodeExecutionWithConfiguration(
 	nodeID string,
 	rootEventID uuid.UUID,
 	eventID uuid.UUID,
-	parentExecutionID *uuid.UUID,
 	configuration map[string]any,
 ) *models.CanvasNodeExecution {
 	ensureCanvasNodeExists(t, workflowID, nodeID)
 
 	now := time.Now()
 	execution := models.CanvasNodeExecution{
-		WorkflowID:        workflowID,
-		NodeID:            nodeID,
-		RootEventID:       rootEventID,
-		EventID:           eventID,
-		ParentExecutionID: parentExecutionID,
-		State:             models.CanvasNodeExecutionStatePending,
-		Configuration:     datatypes.NewJSONType(configuration),
-		CreatedAt:         &now,
-		UpdatedAt:         &now,
+		WorkflowID:    workflowID,
+		NodeID:        nodeID,
+		RootEventID:   rootEventID,
+		EventID:       eventID,
+		State:         models.CanvasNodeExecutionStatePending,
+		Configuration: datatypes.NewJSONType(configuration),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
 	}
 
 	require.NoError(t, database.Conn().Create(&execution).Error)
@@ -273,21 +297,19 @@ func CreateCanvasNodeExecution(
 	nodeID string,
 	rootEventID uuid.UUID,
 	eventID uuid.UUID,
-	parentExecutionID *uuid.UUID,
 ) *models.CanvasNodeExecution {
 	ensureCanvasNodeExists(t, canvasID, nodeID)
 
 	now := time.Now()
 	execution := models.CanvasNodeExecution{
-		WorkflowID:        canvasID,
-		NodeID:            nodeID,
-		RootEventID:       rootEventID,
-		EventID:           eventID,
-		ParentExecutionID: parentExecutionID,
-		State:             models.CanvasNodeExecutionStatePending,
-		Configuration:     datatypes.NewJSONType(map[string]any{}),
-		CreatedAt:         &now,
-		UpdatedAt:         &now,
+		WorkflowID:    canvasID,
+		NodeID:        nodeID,
+		RootEventID:   rootEventID,
+		EventID:       eventID,
+		State:         models.CanvasNodeExecutionStatePending,
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
 	}
 
 	require.NoError(t, database.Conn().Create(&execution).Error)
@@ -324,8 +346,6 @@ func CreateNextNodeExecution(
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()
-	changeManagementEnabled, err := models.IsChangeManagementEnabled(orgID)
-	require.NoError(t, err)
 
 	inputNodes := make([]models.Node, len(nodes))
 	for i, node := range nodes {
@@ -345,22 +365,15 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 	// Create canvas
 	//
 	workflow := &models.Canvas{
-		ID:                      uuid.New(),
-		OrganizationID:          orgID,
-		LiveVersionID:           &liveVersionID,
-		ChangeManagementEnabled: changeManagementEnabled,
-		Name:                    RandomName("canvas"),
-		Description:             "Test canvas",
-		CreatedBy:               &userID,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		LiveVersionID:  &liveVersionID,
+		Name:           RandomName("canvas"),
+		Description:    "Test canvas",
+		CreatedBy:      &userID,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
 	}
-
-	//
-	// Expand blueprint nodes (convert WorkflowNode to Node, expand, then back to WorkflowNode)
-	//
-	expandedNodes, err := expandBlueprintNodes(t, orgID, inputNodes)
-	require.NoError(t, err)
 
 	var createdNodes []models.CanvasNode
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -368,17 +381,10 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			return err
 		}
 
-		for _, node := range expandedNodes {
-			var parentNodeID *string
-			if idx := strings.Index(node.ID, ":"); idx != -1 {
-				parent := node.ID[:idx]
-				parentNodeID = &parent
-			}
-
+		for _, node := range inputNodes {
 			canvasNode := models.CanvasNode{
 				WorkflowID:    workflow.ID,
 				NodeID:        node.ID,
-				ParentNodeID:  parentNodeID,
 				Name:          node.Name,
 				State:         models.CanvasNodeStateReady,
 				Type:          node.Type,
@@ -398,56 +404,23 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 		}
 
 		version := models.CanvasVersion{
-			ID:                      liveVersionID,
-			WorkflowID:              workflow.ID,
-			OwnerID:                 &userID,
-			State:                   models.CanvasVersionStatePublished,
-			Name:                    workflow.Name,
-			Description:             workflow.Description,
-			ChangeManagementEnabled: workflow.ChangeManagementEnabled,
-			ChangeRequestApprovers:  datatypes.NewJSONSlice(models.DefaultCanvasChangeRequestApprovers()),
-			PublishedAt:             &now,
-			Nodes:                   datatypes.NewJSONSlice(expandedNodes),
-			Edges:                   datatypes.NewJSONSlice(edges),
-			CreatedAt:               &now,
-			UpdatedAt:               &now,
+			ID:          liveVersionID,
+			WorkflowID:  workflow.ID,
+			OwnerID:     &userID,
+			State:       models.CanvasVersionStatePublished,
+			Name:        workflow.Name,
+			Description: workflow.Description,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice(inputNodes),
+			Edges:       datatypes.NewJSONSlice(edges),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
 		}
 
 		return tx.Create(&version).Error
 	}))
 
 	return workflow, createdNodes
-}
-
-func SetCanvasChangeManagementEnabled(t require.TestingT, canvasID uuid.UUID, enabled bool) {
-	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
-	require.NoError(t, err)
-	require.NotNil(t, canvas.LiveVersionID)
-
-	require.NoError(t, database.Conn().
-		Model(&models.CanvasVersion{}).
-		Where("id = ?", *canvas.LiveVersionID).
-		Update("change_management_enabled", enabled).
-		Error)
-}
-
-func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {
-	now := time.Now()
-
-	blueprint := models.Blueprint{
-		ID:             uuid.New(),
-		OrganizationID: orgID,
-		Name:           RandomName("blueprint"),
-		Nodes:          datatypes.NewJSONSlice(nodes),
-		Edges:          datatypes.NewJSONSlice(edges),
-		OutputChannels: datatypes.NewJSONSlice(outputChannels),
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-
-	require.NoError(t, database.Conn().Create(&blueprint).Error)
-
-	return &blueprint
 }
 
 func VerifyCanvasEventsCount(t require.TestingT, canvasID uuid.UUID, expected int) {
@@ -529,6 +502,39 @@ func VerifyNodeRequestCount(t require.TestingT, workflowID uuid.UUID, expected i
 	require.Equal(t, expected, int(actual))
 }
 
+func CreateCanvasWithRepository(t *testing.T, r *ResourceRegistry, status string, register bool) (*models.Canvas, *models.Repository) {
+	t.Helper()
+
+	canvas, _ := CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	repoID := r.GitProvider.GetRepositoryID(git.RepositoryOptions{
+		OrganizationID: canvas.OrganizationID,
+		CanvasID:       canvas.ID,
+	})
+
+	_, err := canvas.CreatePendingRepository(r.GitProvider.Name(), repoID)
+	require.NoError(t, err)
+
+	if register {
+		_, err := r.GitProvider.CreateRepository(t.Context(), repoID)
+		require.NoError(t, err)
+	}
+
+	repository, err := models.FindRepository(r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+
+	switch status {
+	case models.RepositoryStatusReady:
+		require.NoError(t, repository.MarkReady(database.Conn()))
+	case models.RepositoryStatusError:
+		require.NoError(t, repository.MarkError(database.Conn()))
+	}
+
+	repository, err = models.FindRepository(r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+
+	return canvas, repository
+}
+
 func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID string) {
 	var existingNode models.CanvasNode
 	err := database.Conn().
@@ -557,43 +563,4 @@ func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID str
 	}
 
 	require.NoError(t, database.Conn().Create(&node).Error)
-}
-
-func expandBlueprintNodes(t require.TestingT, orgID uuid.UUID, nodes []models.Node) ([]models.Node, error) {
-	expanded := make([]models.Node, 0, len(nodes))
-
-	for _, n := range nodes {
-		expanded = append(expanded, n)
-
-		if n.Type != models.NodeTypeBlueprint || n.Ref.Blueprint == nil {
-			continue
-		}
-
-		blueprintID := n.Ref.Blueprint.ID
-		if blueprintID == "" {
-			continue
-		}
-
-		b, err := models.FindBlueprint(orgID.String(), blueprintID)
-		if err != nil {
-			continue
-		}
-
-		for _, bn := range b.Nodes {
-			internal := models.Node{
-				ID:            n.ID + ":" + bn.ID,
-				Name:          bn.Name,
-				Type:          bn.Type,
-				Ref:           bn.Ref,
-				Configuration: bn.Configuration,
-				Metadata:      maps.Clone(bn.Metadata),
-				Position:      bn.Position,
-				IsCollapsed:   bn.IsCollapsed,
-			}
-
-			expanded = append(expanded, internal)
-		}
-	}
-
-	return expanded, nil
 }

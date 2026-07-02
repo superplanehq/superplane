@@ -1,0 +1,71 @@
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
+import type {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../types";
+import type { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import { jiraComponentBaseProps } from "./base";
+import { addDetail, addProjectMetadata, getIssueLabel, getIssueUrl } from "./utils";
+import type { CreateIssueConfiguration, JiraIssue, JiraNodeMetadata } from "./types";
+
+export const createIssueMapper: ComponentBaseMapper = {
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    return jiraComponentBaseProps(context, metadataList(context.node));
+  },
+
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const details: Record<string, string> = {
+      "Executed At": context.execution.createdAt ? new Date(context.execution.createdAt).toLocaleString() : "-",
+    };
+
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const issue = outputs?.default?.[0]?.data as JiraIssue | undefined;
+    if (!issue) return details;
+
+    addDetail(details, "Key", issue.key);
+    addDetail(details, "Issue URL", getIssueUrl(issue));
+    addDetail(details, "Summary", issue.fields?.summary);
+    addDetail(details, "Status", issue.fields?.status?.name);
+    addDetail(details, "Issue Type", issue.fields?.issuetype?.name);
+    addDetail(details, "Assignee", issue.fields?.assignee?.displayName);
+
+    return details;
+  },
+
+  subtitle(context: SubtitleContext): string | React.ReactNode {
+    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+    const issue = outputs?.default?.[0]?.data as JiraIssue | undefined;
+    const label = getIssueLabel(issue);
+    if (label) return label;
+    if (context.execution.createdAt) {
+      return renderTimeAgo(new Date(context.execution.createdAt));
+    }
+    return "";
+  },
+};
+
+function metadataList(node: NodeInfo): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  const nodeMetadata = node.metadata as JiraNodeMetadata | undefined;
+  const configuration = node.configuration as CreateIssueConfiguration | undefined;
+
+  addProjectMetadata(metadata, nodeMetadata?.project, configuration?.project);
+
+  const issueType = nodeMetadata?.issueType || configuration?.issueType;
+  if (issueType) {
+    metadata.push({ icon: "tag", label: issueType });
+  }
+
+  const status = nodeMetadata?.status || configuration?.status;
+  if (status) {
+    metadata.push({ icon: "flag", label: status });
+  }
+
+  return metadata;
+}

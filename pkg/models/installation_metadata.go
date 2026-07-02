@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -16,24 +15,17 @@ type InstallationMetadata struct {
 	ID                        int    `gorm:"primary_key"`
 	InstallationID            string `gorm:"type:varchar(64)"`
 	AllowPrivateNetworkAccess bool
+	SignupsEnabled            bool
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 }
 
-func GetInstallationMetadata() (*InstallationMetadata, error) {
-	return GetInstallationMetadataInTransaction(database.Conn())
+func GetInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error) {
+	return findOrCreateInstallationMetadata(tx)
 }
 
-func GetInstallationID() (string, error) {
-	return GetInstallationIDInTransaction(database.Conn())
-}
-
-func GetInstallationMetadataInTransaction(tx *gorm.DB) (*InstallationMetadata, error) {
-	return findOrCreateInstallationMetadataInTransaction(tx)
-}
-
-func GetInstallationIDInTransaction(tx *gorm.DB) (string, error) {
-	metadata, err := findOrCreateInstallationMetadataInTransaction(tx)
+func GetInstallationID(tx *gorm.DB) (string, error) {
+	metadata, err := findOrCreateInstallationMetadata(tx)
 	if err != nil {
 		return "", err
 	}
@@ -41,12 +33,8 @@ func GetInstallationIDInTransaction(tx *gorm.DB) (string, error) {
 	return metadata.InstallationID, nil
 }
 
-func UpdateInstallationMetadata(metadata *InstallationMetadata) error {
-	return UpdateInstallationMetadataInTransaction(database.Conn(), metadata)
-}
-
-func UpdateInstallationMetadataInTransaction(tx *gorm.DB, metadata *InstallationMetadata) error {
-	if _, err := findOrCreateInstallationMetadataInTransaction(tx); err != nil {
+func UpdateInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) error {
+	if _, err := findOrCreateInstallationMetadata(tx); err != nil {
 		return err
 	}
 
@@ -54,12 +42,13 @@ func UpdateInstallationMetadataInTransaction(tx *gorm.DB, metadata *Installation
 		Where("id = ?", installationMetadataID).
 		Updates(map[string]any{
 			"allow_private_network_access": metadata.AllowPrivateNetworkAccess,
+			"signups_enabled":              metadata.SignupsEnabled,
 			"updated_at":                   metadata.UpdatedAt,
 		}).
 		Error
 }
 
-func findOrCreateInstallationMetadataInTransaction(tx *gorm.DB) (*InstallationMetadata, error) {
+func findOrCreateInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error) {
 	var metadata InstallationMetadata
 	err := tx.Where("id = ?", installationMetadataID).First(&metadata).Error
 	if err == nil {
@@ -72,6 +61,7 @@ func findOrCreateInstallationMetadataInTransaction(tx *gorm.DB) (*InstallationMe
 	metadata = InstallationMetadata{
 		ID:             installationMetadataID,
 		InstallationID: uuid.NewString(),
+		SignupsEnabled: true,
 	}
 
 	if err := tx.Clauses(clause.OnConflict{

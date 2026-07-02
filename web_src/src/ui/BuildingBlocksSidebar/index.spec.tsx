@@ -127,6 +127,23 @@ describe("BuildingBlocksSidebar", () => {
       expect(onEnterSubmit).not.toHaveBeenCalled();
     });
 
+    it("renders Debugging directly after Core", () => {
+      const blocks: BuildingBlockCategory[] = [
+        { name: "Memory", blocks: [{ name: "addmemory", label: "Add Memory", type: "component" }] },
+        { name: "Debugging", blocks: [{ name: "display", label: "Display", type: "component" }] },
+        { name: "AWS", blocks: [{ name: "lambda", label: "Lambda", type: "component", integrationName: "aws" }] },
+        { name: "Core", blocks: [{ name: "filter", label: "Filter", type: "component" }] },
+      ];
+
+      render(<BuildingBlocksSidebar {...defaultProps} blocks={blocks} />);
+
+      const categoryNames = Array.from(document.querySelectorAll("details > summary span.font-medium")).map(
+        (element) => element.textContent ?? "",
+      );
+
+      expect(categoryNames).toEqual(["Core", "Debugging", "Memory", "AWS"]);
+    });
+
     it("is a no-op when the sidebar is disabled", () => {
       const onEnterSubmit = vi.fn();
       render(

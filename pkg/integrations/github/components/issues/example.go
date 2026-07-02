@@ -13,6 +13,9 @@ var exampleOutputCreateIssueBytes []byte
 //go:embed payloads/create_issue_comment.json
 var exampleOutputCreateIssueCommentBytes []byte
 
+//go:embed payloads/update_issue_comment.json
+var exampleOutputUpdateIssueCommentBytes []byte
+
 //go:embed payloads/get_issue.json
 var exampleOutputGetIssueBytes []byte
 
@@ -42,6 +45,9 @@ var exampleOutputCreateIssue map[string]any
 
 var exampleOutputCreateIssueCommentOnce sync.Once
 var exampleOutputCreateIssueComment map[string]any
+
+var exampleOutputUpdateIssueCommentOnce sync.Once
+var exampleOutputUpdateIssueComment map[string]any
 
 var exampleOutputGetIssueOnce sync.Once
 var exampleOutputGetIssue map[string]any
@@ -73,6 +79,10 @@ func (c *CreateIssue) ExampleOutput() map[string]any {
 
 func (c *CreateIssueComment) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueCommentOnce, exampleOutputCreateIssueCommentBytes, &exampleOutputCreateIssueComment)
+}
+
+func (c *UpdateIssueComment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueCommentOnce, exampleOutputUpdateIssueCommentBytes, &exampleOutputUpdateIssueComment)
 }
 
 func (c *GetIssue) ExampleOutput() map[string]any {

@@ -1,0 +1,30 @@
+{
+  "data": {
+    "acknowledged": false,
+    "actions": [],
+    "alias": "alias",
+    "count": 2,
+    "createdAt": "2026-01-19T12:00:00Z",
+    "description": "description",
+    "entity": "an entity",
+    "extraProperties": {},
+    "id": "439aa701-7cd6-4549-8992-d06650561222-1779166598474",
+    "integrationName": "",
+    "integrationType": "",
+    "lastOccuredAt": "2026-01-19T12:00:00Z",
+    "message": "message",
+    "owner": "",
+    "priority": "P2",
+    "responders": [],
+    "seen": false,
+    "services": [],
+    "snoozed": false,
+    "source": "source",
+    "status": "open",
+    "tags": ["test-tag"],
+    "tinyId": "4",
+    "updatedAt": "2026-01-19T12:00:00Z"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.created"
+}

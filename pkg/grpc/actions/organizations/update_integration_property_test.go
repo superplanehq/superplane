@@ -10,11 +10,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__UpdateIntegrationProperty(t *testing.T) {
@@ -63,17 +63,17 @@ func Test__UpdateIntegrationProperty(t *testing.T) {
 	t.Run("invalid organization ID -> invalid argument", func(t *testing.T) {
 		_, err := UpdateIntegrationProperty(ctx, r.Registry, "not-a-uuid", uuid.NewString(), "repo", "x")
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("invalid integration ID -> invalid argument", func(t *testing.T) {
 		_, err := UpdateIntegrationProperty(ctx, r.Registry, r.Organization.ID.String(), "bad-id", "repo", "x")
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("property not found -> not found", func(t *testing.T) {
@@ -95,10 +95,10 @@ func Test__UpdateIntegrationProperty(t *testing.T) {
 		_, err = UpdateIntegrationProperty(ctx, r.Registry, r.Organization.ID.String(), integrationID, "missing_prop", "v")
 		require.Error(t, err)
 
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "property missing_prop not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "property missing_prop not found")
 	})
 
 	t.Run("property not editable -> invalid argument", func(t *testing.T) {
@@ -131,10 +131,10 @@ func Test__UpdateIntegrationProperty(t *testing.T) {
 		_, err = UpdateIntegrationProperty(ctx, r.Registry, r.Organization.ID.String(), integration.ID.String(), "not_editable", "v")
 		require.Error(t, err)
 
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "not editable")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "not editable")
 	})
 
 	t.Run("existing property -> success", func(t *testing.T) {

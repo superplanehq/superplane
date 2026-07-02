@@ -5,10 +5,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func DeleteSecret(ctx context.Context, domainType, domainID, idOrName string) (*pb.DeleteSecretResponse, error) {
@@ -21,12 +20,12 @@ func DeleteSecret(ctx context.Context, domainType, domainID, idOrName string) (*
 	}
 
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "secret not found")
+		return nil, grpcerrors.InvalidArgument(nil, "secret not found")
 	}
 
 	err = secret.Delete()
 	if err != nil {
-		return nil, status.Error(codes.Internal, "error deleting secret")
+		return nil, grpcerrors.Internal(err, "error deleting secret")
 	}
 
 	return &pb.DeleteSecretResponse{}, nil

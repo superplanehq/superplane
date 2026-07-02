@@ -89,7 +89,6 @@ export function PayloadPreview({
           open={isExpanded}
           onOpenChange={setIsExpanded}
           title={dialogTitle}
-          label={label}
           payloadString={payloadString}
         />
       )}

@@ -48,6 +48,7 @@ func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.T
 			Description:    action.Description(),
 			Configuration:  action.Configuration(),
 			OutputChannels: action.OutputChannels(nil),
+			ExampleOutput:  action.ExampleOutput(),
 		})
 	}
 	for _, trigger := range triggers {
@@ -57,6 +58,7 @@ func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.T
 			Label:         trigger.Label(),
 			Description:   trigger.Description(),
 			Configuration: trigger.Configuration(),
+			ExampleData:   trigger.ExampleData(),
 		})
 	}
 

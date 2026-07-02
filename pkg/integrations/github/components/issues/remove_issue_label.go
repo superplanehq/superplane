@@ -132,6 +132,7 @@ func (c *RemoveIssueLabel) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -147,24 +148,13 @@ func (c *RemoveIssueLabel) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("issue number is not a number: %v", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
 	for _, label := range config.Labels {
-		_, err = client.Issues.RemoveLabelForIssue(
-			context.Background(),
-			appMetadata.Owner,
-			config.Repository,
-			issueNumber,
-			label,
-		)
+		_, err = client.RemoveLabelForIssue(context.Background(), config.Repository, issueNumber, label)
 		if err != nil {
 			if !config.FailIfNotFound {
 				continue
@@ -174,13 +164,7 @@ func (c *RemoveIssueLabel) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	remainingLabels, _, err := client.Issues.ListLabelsByIssue(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		issueNumber,
-		nil,
-	)
+	remainingLabels, _, err := client.ListLabelsForIssue(context.Background(), config.Repository, issueNumber)
 	if err != nil {
 		return fmt.Errorf("failed to list remaining labels: %w", err)
 	}

@@ -18,10 +18,11 @@ import (
 )
 
 type githubManifest struct {
-	DefaultEvents []string `json:"default_events"`
+	DefaultEvents      []string          `json:"default_events"`
+	DefaultPermissions map[string]string `json:"default_permissions"`
 }
 
-func Test__GitHub__Setup(t *testing.T) {
+func Test__GitHub__Sync(t *testing.T) {
 	g := &GitHub{}
 
 	t.Run("personal scope", func(t *testing.T) {
@@ -153,4 +154,5 @@ func assertManifestContainsDefaultEvents(t *testing.T, manifestJSON string) {
 	var manifest githubManifest
 	require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifest))
 	require.Equal(t, defaultGitHubAppEvents, manifest.DefaultEvents)
+	require.Equal(t, "read", manifest.DefaultPermissions["checks"])
 }

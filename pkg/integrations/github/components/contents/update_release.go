@@ -185,6 +185,7 @@ func (c *UpdateRelease) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -200,12 +201,7 @@ func (c *UpdateRelease) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -213,7 +209,7 @@ func (c *UpdateRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	// Fetch the existing release based on the selected strategy
 	//
-	release, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, config.TagName)
+	release, err := fetchReleaseByStrategy(client, config.Repository, config.ReleaseStrategy, config.TagName)
 	if err != nil {
 		return err
 	}
@@ -230,7 +226,7 @@ func (c *UpdateRelease) Execute(ctx core.ExecutionContext) error {
 
 	// Handle body/notes logic
 	if config.GenerateReleaseNotes {
-		generatedNotes, err := c.generateReleaseNotes(ctx, client, appMetadata.Owner, config.Repository, release.GetTagName())
+		generatedNotes, err := c.generateReleaseNotes(client, config.Repository, release.GetTagName())
 		if err != nil {
 			return fmt.Errorf("failed to generate release notes: %w", err)
 		}
@@ -261,13 +257,7 @@ func (c *UpdateRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	// Update the release
 	//
-	updatedRelease, _, err := client.Repositories.EditRelease(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		release.GetID(),
-		releaseRequest,
-	)
+	updatedRelease, _, err := client.EditRelease(context.Background(), config.Repository, release.GetID(), releaseRequest)
 	if err != nil {
 		return fmt.Errorf("failed to update release: %w", err)
 	}
@@ -282,17 +272,12 @@ func (c *UpdateRelease) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *UpdateRelease) generateReleaseNotes(_ core.ExecutionContext, client *github.Client, owner, repo, tagName string) (string, error) {
+func (c *UpdateRelease) generateReleaseNotes(client *common.Client, repository, tagName string) (string, error) {
 	opts := &github.GenerateNotesOptions{
 		TagName: tagName,
 	}
 
-	notes, _, err := client.Repositories.GenerateReleaseNotes(
-		context.Background(),
-		owner,
-		repo,
-		opts,
-	)
+	notes, _, err := client.GenerateReleaseNotes(context.Background(), repository, opts)
 	if err != nil {
 		return "", err
 	}

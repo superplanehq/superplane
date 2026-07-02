@@ -1,4 +1,5 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,7 +11,7 @@ import { Input } from "../../../components/Input/input";
 import { Table, TableBody, TableCell, TableRow } from "../../../components/Table/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import {
   useOrganizationGroup,
   useOrganizationGroupUsers,
@@ -57,6 +58,10 @@ export function GroupMembersPage() {
 
   const loading = loadingGroup || loadingMembers;
   const error = groupError || membersError;
+
+  useReportPageReady(!loading && !permissionsLoading, {
+    failed: !!error,
+  });
 
   const handleBackToGroups = () => {
     navigate(`/${orgId}/settings/groups`);

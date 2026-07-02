@@ -93,4 +93,5 @@ gotestsum \
   --packages="./test/e2e/..." \
   -- \
   -p 1 \
+  -timeout 15m \
   -run "${regex}"

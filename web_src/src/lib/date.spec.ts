@@ -20,4 +20,9 @@ describe("date", () => {
     expect(formatTimeAgo(new Date("2026-03-29T10:00:00.000Z"))).toBe("2h ago");
     expect(formatTimeAgo(new Date("2026-03-27T12:00:00.000Z"))).toBe("2d ago");
   });
+
+  it("omits the ago suffix when includeAgo is false", () => {
+    expect(formatTimeAgo(new Date("2026-03-29T11:59:45.000Z"), false)).toBe("15s");
+    expect(formatTimeAgo(new Date("2026-03-29T11:30:00.000Z"), false)).toBe("30m");
+  });
 });

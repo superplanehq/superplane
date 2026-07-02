@@ -8,8 +8,10 @@ export const meKeys = {
     ["me", organizationId, includePermissions] as const,
 };
 
-export const useMe = (includePermissions: boolean = true) => {
-  const organizationId = useOrganizationId();
+export const useMe = (includePermissions: boolean = true, organizationIdOverride?: string | null) => {
+  const organizationIdFromRoute = useOrganizationId();
+  const organizationId = organizationIdOverride !== undefined ? organizationIdOverride : organizationIdFromRoute;
+
   return useQuery({
     queryKey: organizationId ? meKeys.me(organizationId, includePermissions) : ["me", "unknown"],
     queryFn: async () => {

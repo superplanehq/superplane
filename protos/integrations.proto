@@ -5,6 +5,7 @@ package Superplane.Integrations;
 import "actions.proto";
 import "configuration.proto";
 import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/integrations";
@@ -75,6 +76,8 @@ message CapabilityDefinition {
   string description = 4;
   repeated Configuration.Field configuration = 5;
   repeated Actions.OutputChannel output_channels = 6;
+  google.protobuf.Struct example_output = 7;
+  google.protobuf.Struct example_data = 8;
 }
 
 message CapabilityGroup {

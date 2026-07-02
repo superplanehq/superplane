@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
+	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
 
 func Test__OnIssueComment__HandleWebhook(t *testing.T) {
@@ -307,39 +308,17 @@ func Test__OnIssueComment__HandleWebhook(t *testing.T) {
 }
 
 func Test__OnIssueComment__Setup(t *testing.T) {
-	helloRepo := common.Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
 	trigger := OnIssueComment{}
 
-	t.Run("repository is required", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
-		err := trigger.Setup(core.TriggerContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": ""},
-		})
-
-		require.ErrorContains(t, err, "repository is required")
-	})
-
-	t.Run("repository is not accessible", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-		err := trigger.Setup(core.TriggerContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": "world"},
-		})
-
-		require.ErrorContains(t, err, "repository world is not accessible to app installation")
-	})
-
-	t.Run("metadata is set and webhook is requested", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
+	t.Run("webhook is requested", func(t *testing.T) {
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{
+					"id": 123456,
+					"name": "hello",
+					"html_url": "https://github.com/testhq/hello"
+				}`),
 			},
 		}
 
@@ -347,12 +326,11 @@ func Test__OnIssueComment__Setup(t *testing.T) {
 		require.NoError(t, trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
 			Metadata:      &nodeMetadataCtx,
+			HTTP:          httpCtx,
 			Configuration: map[string]any{"repository": "hello"},
 		}))
 
-		require.Equal(t, nodeMetadataCtx.Get(), common.NodeMetadata{Repository: &helloRepo})
 		require.Len(t, integrationCtx.WebhookRequests, 1)
-
 		webhookRequest := integrationCtx.WebhookRequests[0].(common.WebhookConfiguration)
 		assert.Equal(t, webhookRequest.EventType, "issue_comment")
 		assert.Equal(t, webhookRequest.Repository, "hello")

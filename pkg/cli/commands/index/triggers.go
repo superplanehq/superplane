@@ -19,7 +19,10 @@ func newTriggersCommand(options core.BindOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "triggers",
 		Short: "List or describe available triggers",
-		Args:  cobra.NoArgs,
+		Long: `List or describe available triggers.
+
+Use -o json or -o yaml with --name to inspect nested schema fields, enum options, defaults, and conditions.`,
+		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringVar(&from, "from", "", "integration definition name")
 	cmd.Flags().StringVar(&name, "name", "", "trigger name")
@@ -189,6 +192,7 @@ func triggersFromCapabilities(capabilities []openapi_client.IntegrationsCapabili
 			Label:         capability.Label,
 			Description:   capability.Description,
 			Configuration: capability.Configuration,
+			ExampleData:   capability.ExampleData,
 		})
 	}
 	return triggers

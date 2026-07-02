@@ -11,6 +11,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	CanvasMemorySourceNode   = "node"
+	CanvasMemorySourceManual = "manual"
+)
+
 type CanvasMemory struct {
 	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	CreatedAt time.Time
@@ -18,24 +23,90 @@ type CanvasMemory struct {
 	CanvasID  uuid.UUID
 	Namespace string
 	Values    datatypes.JSONType[any]
+	Source    string
 }
 
 func (CanvasMemory) TableName() string {
 	return "canvas_memories"
 }
 
-func AddCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, values any) error {
+func AddCanvasMemoryRecordInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, values any) (CanvasMemory, error) {
+	return AddCanvasMemoryRecordWithSourceInTransaction(tx, canvasID, namespace, values, CanvasMemorySourceNode)
+}
+
+func AddCanvasMemoryRecordWithSourceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, values any, source string) (CanvasMemory, error) {
+	if source == "" {
+		source = CanvasMemorySourceNode
+	}
+
 	record := CanvasMemory{
 		CanvasID:  canvasID,
 		Namespace: namespace,
 		Values:    datatypes.NewJSONType(values),
+		Source:    source,
 	}
 
-	return tx.Create(&record).Error
+	err := tx.Create(&record).Error
+	return record, err
+}
+
+func AddCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, values any) error {
+	_, err := AddCanvasMemoryRecordInTransaction(tx, canvasID, namespace, values)
+	return err
 }
 
 func AddCanvasMemory(canvasID uuid.UUID, namespace string, values any) error {
 	return AddCanvasMemoryInTransaction(database.Conn(), canvasID, namespace, values)
+}
+
+// CanvasMemoryNamespaceSourceInTransaction returns the source associated with
+// existing rows in a namespace, or empty string if the namespace has no rows.
+func CanvasMemoryNamespaceSourceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string) (string, error) {
+	var source string
+	err := tx.
+		Model(&CanvasMemory{}).
+		Where("canvas_id = ? AND namespace = ?", canvasID, namespace).
+		Limit(1).
+		Pluck("source", &source).
+		Error
+	if err != nil {
+		return "", err
+	}
+
+	return source, nil
+}
+
+func CanvasMemoryNamespaceSource(canvasID uuid.UUID, namespace string) (string, error) {
+	return CanvasMemoryNamespaceSourceInTransaction(database.Conn(), canvasID, namespace)
+}
+
+// ReplaceManualCanvasMemoryNamespaceInTransaction replaces all manual-source
+// rows in a namespace with one row per entry. Used by both create (no
+// existing rows) and update (existing manual rows). The caller is
+// responsible for enforcing origin-lock before invoking this.
+func ReplaceManualCanvasMemoryNamespaceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, entries []any) error {
+	err := tx.
+		Where("canvas_id = ? AND namespace = ? AND source = ?", canvasID, namespace, CanvasMemorySourceManual).
+		Delete(&CanvasMemory{}).
+		Error
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		_, err := AddCanvasMemoryRecordWithSourceInTransaction(tx, canvasID, namespace, entry, CanvasMemorySourceManual)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func ReplaceManualCanvasMemoryNamespace(canvasID uuid.UUID, namespace string, entries []any) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return ReplaceManualCanvasMemoryNamespaceInTransaction(tx, canvasID, namespace, entries)
+	})
 }
 
 func ListCanvasMemoriesInTransaction(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasMemory, error) {
@@ -228,4 +299,43 @@ func UpdateCanvasMemoriesByNamespaceAndMatchesInTransaction(
 
 func UpdateCanvasMemoriesByNamespaceAndMatches(canvasID uuid.UUID, namespace string, matches map[string]any, values map[string]any) ([]CanvasMemory, error) {
 	return UpdateCanvasMemoriesByNamespaceAndMatchesInTransaction(database.Conn(), canvasID, namespace, matches, values)
+}
+
+func UpdateCanvasMemoriesByNamespaceInTransaction(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	namespace string,
+	values map[string]any,
+) ([]CanvasMemory, error) {
+	if len(values) == 0 {
+		return []CanvasMemory{}, fmt.Errorf("at least one value expression is required")
+	}
+
+	valuesJSON, err := json.Marshal(values)
+	if err != nil {
+		return nil, err
+	}
+
+	var updatedRecords []CanvasMemory
+	err = tx.Raw(
+		`WITH updated AS (
+			UPDATE canvas_memories
+			SET values = values || ?::jsonb, updated_at = NOW()
+			WHERE canvas_id = ? AND namespace = ?
+			RETURNING *
+		)
+		SELECT * FROM updated ORDER BY created_at DESC`,
+		valuesJSON,
+		canvasID,
+		namespace,
+	).Scan(&updatedRecords).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedRecords, nil
+}
+
+func UpdateCanvasMemoriesByNamespace(canvasID uuid.UUID, namespace string, values map[string]any) ([]CanvasMemory, error) {
+	return UpdateCanvasMemoriesByNamespaceInTransaction(database.Conn(), canvasID, namespace, values)
 }

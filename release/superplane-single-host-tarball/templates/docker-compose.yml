@@ -7,6 +7,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      supergit:
+        condition: service_healthy
     env_file:
       - superplane.env
     volumes:
@@ -61,10 +63,29 @@ services:
       timeout: 5s
       retries: 10
 
+  supergit:
+    image: ghcr.io/superplanehq/supergit:0.1.1
+    restart: always
+    environment:
+      SUPERGIT_ROOT: /var/lib/supergit/repos
+      SUPERGIT_PORT: "8080"
+      SUPERGIT_DEFAULT_BRANCH: main
+      SUPERGIT_MAX_FILE_BYTES: "10485760"
+      SUPERGIT_MAX_COMMIT_BYTES: "26214400"
+    volumes:
+      - supergit-data:/var/lib/supergit/repos
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres-data:
     driver: local
   caddy-data:
     driver: local
   caddy-config:
+    driver: local
+  supergit-data:
     driver: local

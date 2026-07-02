@@ -7,27 +7,38 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type Organization struct {
-	ID                       uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name                     string    `gorm:"uniqueIndex"`
-	Description              string
-	AllowedProviders         datatypes.JSONSlice[string]
-	ChangeManagementEnabled  bool
-	UsageSyncedAt            *time.Time
-	UsageRetentionWindowDays *int32
-	UsageLimitsSyncedAt      *time.Time
-	CreatedAt                *time.Time
-	UpdatedAt                *time.Time
-	DeletedAt                gorm.DeletedAt `gorm:"index"`
+	ID                          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name                        string    `gorm:"uniqueIndex"`
+	Description                 string
+	AllowedProviders            datatypes.JSONSlice[string]
+	EnabledExperimentalFeatures datatypes.JSONSlice[string]
+	UsageSyncedAt               *time.Time
+	UsageRetentionWindowDays    *int32
+	UsageLimitsSyncedAt         *time.Time
+	CreatedAt                   *time.Time
+	UpdatedAt                   *time.Time
+	DeletedAt                   gorm.DeletedAt `gorm:"index"`
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
 	return slices.Contains(o.AllowedProviders, provider)
+}
+
+// HasExperimentalFeature reports whether the given feature id is active for
+// this organization. Released features (per the features registry) are always
+// considered active regardless of per-organization state.
+func (o *Organization) HasExperimentalFeature(id string) bool {
+	if features.IsReleased(id) {
+		return true
+	}
+	return slices.Contains(o.EnabledExperimentalFeatures, id)
 }
 
 type OrganizationWithCounts struct {
@@ -166,12 +177,12 @@ func CreateOrganization(name, description string) (*Organization, error) {
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
-		Name:                    name,
-		Description:             description,
-		AllowedProviders:        datatypes.JSONSlice[string]{ProviderGitHub},
-		ChangeManagementEnabled: false,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		Name:                        name,
+		Description:                 description,
+		AllowedProviders:            datatypes.JSONSlice[string]{ProviderGitHub},
+		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{},
+		CreatedAt:                   &now,
+		UpdatedAt:                   &now,
 	}
 
 	err := tx.
@@ -472,20 +483,90 @@ func ListOrganizationsPendingUsageLimitsRefreshInTransaction(
 	return organizations, nil
 }
 
-func IsChangeManagementEnabled(organizationID uuid.UUID) (bool, error) {
-	return IsChangeManagementEnabledInTransaction(database.Conn(), organizationID)
+// EnableExperimentalFeature adds the given feature id to the organization's
+// enabled set, deduping. The caller is responsible for validating that the
+// feature id exists in the registry.
+func EnableExperimentalFeature(orgID uuid.UUID, featureID string) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return EnableExperimentalFeatureInTransaction(tx, orgID, featureID)
+	})
 }
 
-func IsChangeManagementEnabledInTransaction(tx *gorm.DB, organizationID uuid.UUID) (bool, error) {
-	var organization Organization
-	err := tx.
-		Select("change_management_enabled").
-		Where("id = ?", organizationID).
-		First(&organization).
+func EnableExperimentalFeatureInTransaction(tx *gorm.DB, orgID uuid.UUID, featureID string) error {
+	organization, err := FindOrganizationByIDInTransaction(
+		tx.Clauses(clause.Locking{Strength: "UPDATE"}),
+		orgID.String(),
+	)
+	if err != nil {
+		return err
+	}
+
+	if slices.Contains(organization.EnabledExperimentalFeatures, featureID) {
+		return nil
+	}
+
+	updated := append(append(datatypes.JSONSlice[string]{}, organization.EnabledExperimentalFeatures...), featureID)
+	now := time.Now()
+	return tx.
+		Model(&Organization{}).
+		Where("id = ?", orgID).
+		Updates(map[string]any{
+			"enabled_experimental_features": updated,
+			"updated_at":                    &now,
+		}).
 		Error
+}
+
+// DisableExperimentalFeature removes the given feature id from the
+// organization's enabled set. Disabling an id that is not enabled is a no-op.
+func DisableExperimentalFeature(orgID uuid.UUID, featureID string) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return DisableExperimentalFeatureInTransaction(tx, orgID, featureID)
+	})
+}
+
+func DisableExperimentalFeatureInTransaction(tx *gorm.DB, orgID uuid.UUID, featureID string) error {
+	organization, err := FindOrganizationByIDInTransaction(
+		tx.Clauses(clause.Locking{Strength: "UPDATE"}),
+		orgID.String(),
+	)
+	if err != nil {
+		return err
+	}
+
+	if !slices.Contains(organization.EnabledExperimentalFeatures, featureID) {
+		return nil
+	}
+
+	updated := datatypes.JSONSlice[string]{}
+	for _, id := range organization.EnabledExperimentalFeatures {
+		if id != featureID {
+			updated = append(updated, id)
+		}
+	}
+
+	now := time.Now()
+	return tx.
+		Model(&Organization{}).
+		Where("id = ?", orgID).
+		Updates(map[string]any{
+			"enabled_experimental_features": updated,
+			"updated_at":                    &now,
+		}).
+		Error
+}
+
+// HasExperimentalFeature reports whether the given feature id is active for
+// the organization with the given id. Released features are reported true
+// without loading the organization from the database.
+func HasExperimentalFeature(orgID uuid.UUID, featureID string) (bool, error) {
+	if features.IsReleased(featureID) {
+		return true, nil
+	}
+
+	organization, err := FindOrganizationByID(orgID.String())
 	if err != nil {
 		return false, err
 	}
-
-	return organization.ChangeManagementEnabled, nil
+	return organization.HasExperimentalFeature(featureID), nil
 }

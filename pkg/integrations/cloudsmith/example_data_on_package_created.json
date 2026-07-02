@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-06-17T14:50:00Z",
+  "type": "cloudsmith.package.created",
+  "data": {
+    "event": "package.created",
+    "namespace": "weskk",
+    "repository": "superplane-compliance",
+    "name": "sp-compliance-mit",
+    "version": "1.0.0",
+    "slug_perm": "wxu9RDqPfCj0",
+    "format": "npm",
+    "license": "MIT",
+    "uploader": "superplane-dnig",
+    "uploaded_at": "2026-06-17T14:50:00.843111Z",
+    "status": "Completed"
+  }
+}
