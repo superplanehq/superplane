@@ -74,11 +74,23 @@ func Test__RunCodeAgent__validateRepository(t *testing.T) {
 	for _, v := range valid {
 		assert.NoError(t, validateRepository(v), v)
 	}
-	// ssh:// and git:// are rejected because token auth only works over https.
-	invalid := []string{"not a repo", "owner/repo extra", "https://github.com/o/r.git\ninjection", "ssh://git@github.com/o/r.git", "git://github.com/o/r.git"}
+	// Non-github hosts, ssh:// and git:// are rejected: the GitHub token is
+	// embedded in the clone URL, so it must only ever target github.com.
+	invalid := []string{
+		"not a repo", "owner/repo extra", "https://github.com/o/r.git\ninjection",
+		"ssh://git@github.com/o/r.git", "git://github.com/o/r.git",
+		"https://evil.com/o/r.git", "https://gitlab.com/o/r.git",
+	}
 	for _, v := range invalid {
 		assert.Error(t, validateRepository(v), v)
 	}
+}
+
+func Test__RunCodeAgent__authenticatedCloneURL(t *testing.T) {
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git", authenticatedCloneURL("owner/repo"))
+	assert.Equal(t, "https://x-access-token:$GITHUB_TOKEN@github.com/o/r.git", authenticatedCloneURL("https://github.com/o/r.git"))
+	// A non-github URL must never receive the token.
+	assert.Equal(t, "https://evil.com/o/r.git", authenticatedCloneURL("https://evil.com/o/r.git"))
 }
 
 func Test__RunCodeAgent__parsePRURL(t *testing.T) {

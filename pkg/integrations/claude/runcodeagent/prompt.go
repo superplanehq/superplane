@@ -93,7 +93,9 @@ func authenticatedCloneURL(repository string) string {
 	if repoOwnerRepoPattern.MatchString(repository) {
 		return fmt.Sprintf("https://x-access-token:$GITHUB_TOKEN@github.com/%s.git", repository)
 	}
-	if strings.HasPrefix(repository, "https://") {
+	// Only embed the token for github.com; anything else is returned unchanged
+	// (unauthenticated) so the credential can never reach a non-GitHub host.
+	if strings.HasPrefix(repository, "https://github.com/") {
 		return "https://x-access-token:$GITHUB_TOKEN@" + strings.TrimPrefix(repository, "https://")
 	}
 	return repository

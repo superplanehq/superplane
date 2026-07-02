@@ -373,9 +373,9 @@ func provisionVault(client *runagent.Client, ctx core.ExecutionContext, spec Spe
 		return "", fmt.Errorf("failed to create vault: %w", err)
 	}
 
-	githubHosts := append([]string{}, defaultGitHubHosts...)
-	githubHosts = append(githubHosts, spec.AllowedHosts...)
-	if err := client.CreateEnvVarCredential(vaultID, "GITHUB_TOKEN", "GITHUB_TOKEN", token, githubHosts); err != nil {
+	// Restrict the token to GitHub hosts only (never the user's extra allowedHosts)
+	// so it can never be sent to another host at the egress layer.
+	if err := client.CreateEnvVarCredential(vaultID, "GITHUB_TOKEN", "GITHUB_TOKEN", token, defaultGitHubHosts); err != nil {
 		return vaultID, fmt.Errorf("failed to inject GitHub token: %w", err)
 	}
 	return vaultID, nil
@@ -540,13 +540,13 @@ func validateRepository(repository string) error {
 	if repoOwnerRepoPattern.MatchString(repository) {
 		return nil
 	}
-	// Only owner/repo and https:// URLs are accepted: the agent authenticates
-	// with the injected token over HTTPS, so ssh:// / git:// URLs would clone
-	// unauthenticated and fail on private repositories.
-	if strings.HasPrefix(repository, "https://") {
+	// Only owner/repo and https://github.com URLs are accepted. The GitHub token
+	// is embedded in the clone URL, so pointing at any other host would leak the
+	// credential to a non-GitHub server.
+	if strings.HasPrefix(repository, "https://github.com/") {
 		return nil
 	}
-	return fmt.Errorf("repository must be owner/repo or an https:// git URL")
+	return fmt.Errorf("repository must be owner/repo or an https://github.com/ URL")
 }
 
 func setNodeMetadata(ctx core.SetupContext, spec Spec) error {
