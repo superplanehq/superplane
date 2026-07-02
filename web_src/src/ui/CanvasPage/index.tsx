@@ -70,7 +70,11 @@ import {
   normalizeCanvasHeaderMode,
 } from "@/pages/app/viewState";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/app/mappers/safeMappers";
-import { LIVE_CANVAS_FIT_VIEW_OPTIONS, RUN_CANVAS_FIT_VIEW_OPTIONS } from "@/ui/CanvasPage/canvasFitOptions";
+import {
+  CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS,
+  LIVE_CANVAS_FIT_VIEW_OPTIONS,
+  RUN_CANVAS_FIT_VIEW_OPTIONS,
+} from "@/ui/CanvasPage/canvasFitOptions";
 import { Sentry } from "@/sentry";
 import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -95,6 +99,7 @@ import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
+import { applyCanvasViewportCulling, useCanvasViewportCulling } from "./useCanvasViewportCulling";
 import type { TriggerActionModal } from "@/pages/app/mappers/types";
 
 export interface SidebarData {
@@ -2452,7 +2457,7 @@ function CanvasContent({
         selected: node.id === focusRequest.nodeId,
       })),
     );
-    void fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 }).then(
+    void fitView({ nodes: [targetNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS }).then(
       () => {
         const nextViewport = getViewport();
         viewportRef.current = nextViewport;
@@ -2509,7 +2514,7 @@ function CanvasContent({
       const targetNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       if (!targetNode) return;
       stateRef.current.setNodes((nodes) => nodes.map((n) => ({ ...n, selected: n.id === nodeId })));
-      fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
+      fitView({ nodes: [targetNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
     };
     window.addEventListener("agent:focus-node", handler);
     return () => window.removeEventListener("agent:focus-node", handler);
@@ -2596,7 +2601,7 @@ function CanvasContent({
         const focusNode = focusNodeId ? stateRef.current.nodes?.find((node) => node.id === focusNodeId) : null;
 
         if (focusNode) {
-          fitView({ nodes: [focusNode], duration: 500, maxZoom: 1.2 });
+          fitView({ nodes: [focusNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
         } else if (hasNodes) {
           fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 500 });
         }
@@ -2937,6 +2942,12 @@ function CanvasContent({
     });
   }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
 
+  const { visibleNodeIds, visibleEdgeIds } = useCanvasViewportCulling(nodesWithCallbacks, styledEdges ?? [], true);
+  const { nodes: culledNodes, edges: culledEdges } = useMemo(
+    () => applyCanvasViewportCulling(nodesWithCallbacks, styledEdges ?? [], visibleNodeIds, visibleEdgeIds),
+    [nodesWithCallbacks, styledEdges, visibleNodeIds, visibleEdgeIds],
+  );
+
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
   const { onNodesChange, onEdgesChange } = state;
 
@@ -3114,8 +3125,8 @@ function CanvasContent({
       <div className="h-full">
         <div className="h-full w-full">
           <ReactFlow
-            nodes={nodesWithCallbacks}
-            edges={styledEdges}
+            nodes={culledNodes}
+            edges={culledEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             minZoom={MIN_CANVAS_ZOOM}
@@ -3134,7 +3145,6 @@ function CanvasContent({
             nodesDraggable={!isReadOnly}
             nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
-            onlyRenderVisibleElements={true}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={isConnectionEditingEnabled ? handleConnect : undefined}

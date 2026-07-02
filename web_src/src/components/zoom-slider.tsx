@@ -18,6 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { LIVE_CANVAS_FIT_VIEW_OPTIONS } from "@/ui/CanvasPage/canvasFitOptions";
 
 export const ZoomSlider = memo(function ZoomSlider({
   className,
@@ -118,7 +119,7 @@ export const ZoomSlider = memo(function ZoomSlider({
       // Fit view: Ctrl/Cmd + 1
       else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "1") {
         e.preventDefault();
-        fitView({ duration: 300 });
+        fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS });
       }
       // Screenshot: Ctrl/Cmd + Shift + S
       else if (screenshotName && (e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "s") {
@@ -190,7 +191,12 @@ export const ZoomSlider = memo(function ZoomSlider({
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => fitView({ duration: 300 })}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="h-7 w-7"
+            onClick={() => fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS })}
+          >
             <Eye className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
