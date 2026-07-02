@@ -191,7 +191,7 @@ describe("CanvasPage connection drop", () => {
     };
   });
 
-  it("does not enable React Flow viewport culling, which can hide nodes near the canvas edge", () => {
+  it("uses padded viewport culling instead of React Flow onlyRenderVisibleElements", () => {
     render(
       <MemoryRouter>
         <CanvasPage
