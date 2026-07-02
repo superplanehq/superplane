@@ -289,7 +289,7 @@ export function AppPage() {
   // terms of active-version state (no selected version), so we can't derive it.
   const previewingCurrentVersionRef = useRef(false);
   const publishCanvasVersionMutation = usePublishCanvasVersion(canvasId!);
-  const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
+  const updateCanvasVersionMutation = useUpdateCanvasVersion(canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
   const [isPreparingVersionAction, setIsPreparingVersionAction] = useState(false);
@@ -1137,8 +1137,6 @@ export function AppPage() {
         const response = await updateCanvasVersionMutation.mutateAsync({
           versionId: request.savingVersionId,
           canvasYaml: materializeCanvasSpec(request.workflow),
-          preserveLocalCanvasState: true,
-          invalidateRelatedQueries: false,
         });
 
         if (canvasSaveSessionRef.current !== saveSession) {
