@@ -120,12 +120,14 @@ func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client 
 
 	out := buildOutput(sess.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
+		// Never tear down on an emit failure: the session still holds the agent
+		// output (PR URL, summary), so a transient emit failure must remain
+		// recoverable. Retry via polling while within budget; past it, surface
+		// the error without destroying the session.
+		ctx.Logger.Warnf("Failed to emit result for session %s: %v.", meta.Session.ID, err)
 		if attempt <= maxPollAttempts {
-			// Preserve the session (it holds the result) and retry the emit.
-			ctx.Logger.Warnf("Failed to emit result for session %s: %v. Retrying poll.", meta.Session.ID, err)
 			return a.scheduleNextPoll(ctx, attempt+1, errs)
 		}
-		a.teardown(client, meta, false, ctx.Logger.Warnf)
 		return err
 	}
 
@@ -150,6 +152,7 @@ func (a *RunCodeAgent) Cancel(ctx core.ExecutionContext) error {
 	}
 	client, err := runagent.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
+		ctx.Logger.Warnf("Cancel: cannot build client to reclaim managed agent resources: %v", err)
 		return nil
 	}
 	a.teardown(client, meta, true, ctx.Logger.Warnf)

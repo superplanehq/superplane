@@ -34,7 +34,6 @@ type RunCodeAgentPayloadData = {
   sessionId?: string;
   prUrl?: string;
   branch?: string;
-  summary?: string;
   lastMessage?: string;
 };
 

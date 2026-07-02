@@ -73,8 +73,12 @@ function buildPropsContext(overrides?: Partial<ComponentBaseContext>): Component
 
 describe("runCodeAgentMapper.getExecutionDetails", () => {
   it("does not throw when outputs are missing", () => {
-    expect(() => runCodeAgentMapper.getExecutionDetails(buildDetailsCtx({ execution: { outputs: undefined } }))).not.toThrow();
-    expect(() => runCodeAgentMapper.getExecutionDetails(buildDetailsCtx({ execution: { outputs: { default: [] } } }))).not.toThrow();
+    expect(() =>
+      runCodeAgentMapper.getExecutionDetails(buildDetailsCtx({ execution: { outputs: undefined } })),
+    ).not.toThrow();
+    expect(() =>
+      runCodeAgentMapper.getExecutionDetails(buildDetailsCtx({ execution: { outputs: { default: [] } } })),
+    ).not.toThrow();
   });
 
   it("surfaces executed-at first, then status, pull request, and branch", () => {
@@ -129,7 +133,9 @@ describe("runCodeAgentMapper.props", () => {
 
   it("falls back to configuration when metadata is absent", () => {
     const props = runCodeAgentMapper.props(
-      buildPropsContext({ node: buildNode({ metadata: {}, configuration: { sourceMode: "repository", repository: "acme/widgets" } }) }),
+      buildPropsContext({
+        node: buildNode({ metadata: {}, configuration: { sourceMode: "repository", repository: "acme/widgets" } }),
+      }),
     );
     expect(props.metadata).toEqual([{ icon: "git-branch", label: "acme/widgets" }]);
   });

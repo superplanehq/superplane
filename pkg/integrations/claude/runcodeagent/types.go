@@ -18,9 +18,11 @@ const (
 	sessionStatusIdle       = "idle"
 	sessionStatusTerminated = "terminated"
 
-	initialPoll       = 15 * time.Second
-	maxPollInterval   = 5 * time.Minute
-	maxPollAttempts   = 200
+	initialPoll     = 15 * time.Second
+	maxPollInterval = 3 * time.Minute
+	// maxPollAttempts caps a run at roughly 4 hours of polling (exponential
+	// backoff up to maxPollInterval) before it is declared a timeout.
+	maxPollAttempts   = 80
 	maxPollErrors     = 5
 	finalMessageReads = 15
 	finalMessageDelay = 2 * time.Second
@@ -103,7 +105,6 @@ type OutputPayload struct {
 	SessionID   string `json:"sessionId"`
 	PrURL       string `json:"prUrl"`
 	Branch      string `json:"branch"`
-	Summary     string `json:"summary"`
 	LastMessage string `json:"lastMessage"`
 }
 
@@ -151,7 +152,6 @@ func buildOutput(status, sessionID, branch string, sm *runagent.SessionMessages,
 	out := OutputPayload{Status: status, SessionID: sessionID, Branch: branch, PrURL: fallbackPrURL}
 	if sm != nil {
 		out.LastMessage = sm.LastMessage
-		out.Summary = sm.LastMessage
 		if pr := extractPRURL(sm.Messages, sm.LastMessage); pr != "" {
 			out.PrURL = pr
 		}

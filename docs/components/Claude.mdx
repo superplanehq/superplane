@@ -76,7 +76,7 @@ The **Run Code Agent** component runs an autonomous Claude coding agent using [C
 ### Modes
 
 - **Repository** — start new work: the agent branches from the base branch, implements the task, and opens a PR.
-- **Pull request** — update an existing PR: the agent checks out the PR's branch, applies the task, and pushes to it.
+- **Pull request** — update an existing PR: the agent checks out the PR's branch, applies the task, and pushes to it. Only same-repository pull requests are supported; PRs opened from forks are rejected.
 
 ### Output
 
@@ -91,8 +91,7 @@ Emits the final **status**, the **pull request URL**, the working **branch**, an
     "lastMessage": "Done. PR_URL=https://github.com/owner/repo/pull/42",
     "prUrl": "https://github.com/owner/repo/pull/42",
     "sessionId": "sess_01ExampleCodeSession",
-    "status": "idle",
-    "summary": "Implemented the requested change and opened a pull request."
+    "status": "idle"
   },
   "timestamp": "2026-07-02T12:00:00Z",
   "type": "claude.runCodeAgent"

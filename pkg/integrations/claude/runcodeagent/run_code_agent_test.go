@@ -245,6 +245,59 @@ func Test__RunCodeAgent__Execute__cleansUpOnSessionFailure(t *testing.T) {
 	assert.True(t, agentArchived, "agent should be archived")
 }
 
+func Test__RunCodeAgent__Execute__prModeSchedulesPoll(t *testing.T) {
+	a := &RunCodeAgent{}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"number":5,"state":"open","html_url":"https://github.com/o/r/pull/5","head":{"ref":"feature","repo":{"full_name":"o/r"}},"base":{"ref":"main","repo":{"full_name":"o/r"}}}`), // resolve PR
+		resp(`{"id":"agent_1"}`),                   // create agent
+		resp(`{"id":"env_1"}`),                     // create environment
+		resp(`{"id":"vault_1"}`),                   // create vault
+		resp(`{}`),                                 // credential
+		resp(`{"id":"sess_1","status":"running"}`), // create session
+		resp(`{}`),                                 // send message
+		resp(`{"id":"sess_1","status":"running"}`), // get session (fast-path)
+	}}
+	metadataCtx := &contexts.MetadataContext{}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	requestsCtx := &contexts.RequestContext{}
+	execCtx := core.ExecutionContext{
+		ID: uuid.New(),
+		Configuration: map[string]any{
+			"sourceMode":  "pr",
+			"prUrl":       "https://github.com/o/r/pull/5",
+			"task":        "address the review",
+			"githubToken": map[string]any{"secret": "gh", "key": "token"},
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{"gh/token": []byte("ghp_123")}},
+		Metadata:       metadataCtx,
+		ExecutionState: execState,
+		Requests:       requestsCtx,
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.Execute(execCtx))
+	assert.Equal(t, "poll", requestsCtx.Action)
+
+	md := ExecutionMetadata{}
+	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &md))
+	assert.Equal(t, "https://github.com/o/r/pull/5", md.PrURL)
+	assert.Equal(t, "feature", md.Branch)
+
+	// The prompt updates the PR branch in place, not a new PR.
+	var sendReq *http.Request
+	for _, r := range httpCtx.Requests {
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/events") {
+			sendReq = r
+		}
+	}
+	require.NotNil(t, sendReq)
+	body, _ := io.ReadAll(sendReq.Body)
+	assert.Contains(t, string(body), "git switch feature")
+	assert.Contains(t, string(body), "do NOT open a new pull request")
+}
+
 // --- poll ---
 
 func terminalMeta() *contexts.MetadataContext {
