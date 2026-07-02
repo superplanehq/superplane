@@ -215,9 +215,14 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		}
 	}
 
-	schema, err := structuredoutput.Parse(spec.OutputSchema)
-	if err != nil {
-		return err
+	// The schema field supports expressions (like the prompt), which are only
+	// resolved at execution. Validate it as JSON only when it has no unresolved
+	// expression; Execute re-parses the resolved value.
+	hasSchema := strings.TrimSpace(spec.OutputSchema) != ""
+	if hasSchema && !strings.Contains(spec.OutputSchema, "{{") {
+		if _, err := structuredoutput.Parse(spec.OutputSchema); err != nil {
+			return err
+		}
 	}
 
 	if ctx.Metadata != nil {
@@ -228,7 +233,7 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		_ = ctx.Metadata.Set(TextPromptNodeMetadata{
 			Model:            spec.Model,
 			MaxTokens:        maxTokens,
-			StructuredOutput: schema != nil,
+			StructuredOutput: hasSchema,
 		})
 	}
 

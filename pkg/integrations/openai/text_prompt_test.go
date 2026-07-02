@@ -51,6 +51,11 @@ func Test__CreateResponse__Setup__fieldValidation(t *testing.T) {
 			schema:      `{"type":"object"}`,
 			expectError: true,
 		},
+		{
+			name:        "unresolved expression is allowed",
+			schema:      `{"type":"object","properties":{"x":{"type":"string","description":"{{ inputs.desc }}"}}}`,
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {

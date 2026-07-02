@@ -110,6 +110,15 @@ func TestTextPrompt_Setup(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "Schema with unresolved expression is allowed",
+			config: map[string]interface{}{
+				"model":        "claude-3-opus",
+				"prompt":       "Hello",
+				"outputSchema": `{"type":"object","properties":{"x":{"type":"string","description":"{{ inputs.desc }}"}}}`,
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
