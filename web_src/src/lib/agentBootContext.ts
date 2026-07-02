@@ -3,14 +3,6 @@ const AGENT_BOOT_INITIAL_MESSAGES_KEY = "agent-boot-initial-messages";
 export const PLACEHOLDER_NODE_CONTEXT_KEY = "add-placeholder-node";
 export const AGENT_BOOT_CONTEXT_READY_EVENT = "agent-boot-context-ready";
 
-// Opening or refreshing a canvas must never invoke the agent. Without an explicit
-// boot context (a template install), we send no message so the agent stays idle and
-// spends no tokens until the user asks for something. A static greeting (rendered
-// client-side in AgentTabPanel) welcomes the user instead.
-const DEFAULT_BOOT_MESSAGE = "";
-
-const BLANK_BOOT_MESSAGE = ""; // No agent boot message for blank canvas — static greeting only
-
 const BLANK_INITIAL_MESSAGE =
   "You can describe the workflow you want to build, or click on the 'New Component' node on the canvas to get started. I'm here to help!";
 
@@ -44,18 +36,23 @@ export function setAgentBootContext(canvasId: string, message: string | Template
   sessionStorage.setItem(AGENT_BOOT_CONTEXT_KEY, JSON.stringify(context));
 }
 
+// Returns the message to auto-send to the agent on canvas boot, or "" to send nothing.
+// Opening or refreshing a canvas must never invoke the agent: without an explicit boot
+// context (a template install) we return "", so the agent stays idle and spends no tokens
+// until the user asks for something. A static greeting (rendered client-side in
+// AgentTabPanel) welcomes the user instead.
 export function getAgentBootMessage(canvasId: string): string {
-  if (typeof window === "undefined") return DEFAULT_BOOT_MESSAGE;
+  if (typeof window === "undefined") return "";
   const raw = sessionStorage.getItem(AGENT_BOOT_CONTEXT_KEY);
-  if (!raw) return DEFAULT_BOOT_MESSAGE;
+  if (!raw) return "";
 
   try {
     const context = JSON.parse(raw) as AgentBootContext;
-    if (context.canvasId !== canvasId) return DEFAULT_BOOT_MESSAGE;
-    if (context.message === "blank") return BLANK_BOOT_MESSAGE;
+    if (context.canvasId !== canvasId) return "";
+    if (context.message === "blank") return ""; // Blank canvas — static greeting only.
     return context.message;
   } catch {
-    return DEFAULT_BOOT_MESSAGE;
+    return "";
   }
 }
 
@@ -76,7 +73,7 @@ export function getAgentBootInitialMessage(canvasId: string): string | null {
 }
 
 function buildTemplateBootMessage({ instructions, initialMessage }: TemplateAgentBootContext): string {
-  if (!initialMessage) return instructions || DEFAULT_BOOT_MESSAGE;
+  if (!initialMessage) return instructions ?? "";
 
   return [
     "The UI has already shown the user the template introduction.",
