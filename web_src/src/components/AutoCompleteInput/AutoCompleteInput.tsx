@@ -942,6 +942,37 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       measureCursorPixelPosition();
     }, [measureCursorPixelPosition]);
 
+    // Keep the fixed-position dropdown anchored to the input while any ancestor
+    // scrolls or the window resizes. Without this the dropdown detaches from the
+    // input when the surrounding panel scrolls (issue #3615).
+    useEffect(() => {
+      if (!isOpen || suggestions.length === 0) {
+        return;
+      }
+
+      let frame = 0;
+      const reposition = () => {
+        if (frame) {
+          return;
+        }
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          measureCursorPixelPosition();
+        });
+      };
+
+      // Capture phase so scrolling of any scrollable ancestor is observed, not just window.
+      window.addEventListener("scroll", reposition, true);
+      window.addEventListener("resize", reposition);
+      return () => {
+        if (frame) {
+          cancelAnimationFrame(frame);
+        }
+        window.removeEventListener("scroll", reposition, true);
+        window.removeEventListener("resize", reposition);
+      };
+    }, [isOpen, suggestions.length, measureCursorPixelPosition]);
+
     useEffect(() => {
       setInputValue(value);
     }, [value]);
@@ -1368,7 +1399,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">$ (Event Data)</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          Root selector for accessing payload data from all connected components.
+                          {highlightedSuggestion.description}
                         </div>
                         <div className={twMerge(valuePreviewCodeBlockClassName, "text-sky-700")}>
                           {highlightedSuggestion.nodeCount ?? 0} node

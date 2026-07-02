@@ -143,6 +143,7 @@ import {
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import { runPositionAutoSave } from "./runPositionAutoSave";
+import { syncRunInspectionViewportTransition } from "./lib/run-inspection-viewport";
 import {
   clearRunDetailNodeSearchParams,
   getCanvasLogNodesSignature,
@@ -288,7 +289,7 @@ export function AppPage() {
   // terms of active-version state (no selected version), so we can't derive it.
   const previewingCurrentVersionRef = useRef(false);
   const publishCanvasVersionMutation = usePublishCanvasVersion(canvasId!);
-  const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
+  const updateCanvasVersionMutation = useUpdateCanvasVersion(canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
   const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
   const [isPreparingVersionAction, setIsPreparingVersionAction] = useState(false);
@@ -517,9 +518,6 @@ export function AppPage() {
     activateBranch,
   });
 
-  const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
-  const [canvasFitAllNonce, setCanvasFitAllNonce] = useState(0);
-  const wasRunInspectionModeRef = useRef(false);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(
     () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
@@ -663,7 +661,7 @@ export function AppPage() {
    */
   const viewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
   const runsViewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
-  const lastRunsViewportKeyRef = useRef<string | null>(null);
+  const lastRunsViewportKeyRef = useRef<"runs" | null>(null);
 
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
@@ -1139,8 +1137,6 @@ export function AppPage() {
         const response = await updateCanvasVersionMutation.mutateAsync({
           versionId: request.savingVersionId,
           canvasYaml: materializeCanvasSpec(request.workflow),
-          preserveLocalCanvasState: true,
-          invalidateRelatedQueries: false,
         });
 
         if (canvasSaveSessionRef.current !== saveSession) {
@@ -1669,30 +1665,14 @@ export function AppPage() {
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
-  const runsViewportKey = isRunInspectionMode ? "runs" : null;
-  if (lastRunsViewportKeyRef.current !== runsViewportKey) {
-    runsHasFitToViewRef.current = false;
-    runsViewportRef.current = undefined;
-    lastRunsViewportKeyRef.current = runsViewportKey;
-  }
-
-  const runCanvasFitKey = useMemo(() => {
-    if (!isRunInspectionMode || !selectedRunId || !runCanvasData) return null;
-    return `${selectedRunId}|${runCanvasData.participantNodeIds.slice().sort().join("|")}`;
-  }, [isRunInspectionMode, selectedRunId, runCanvasData]);
-
-  useEffect(() => {
-    if (!isRunInspectionMode) return;
-    if (!runCanvasFitKey) return;
-    setRunsFitAllNonce((n) => n + 1);
-  }, [isRunInspectionMode, runCanvasFitKey]);
-
-  useEffect(() => {
-    if (wasRunInspectionModeRef.current && !isRunInspectionMode) {
-      setCanvasFitAllNonce((n) => n + 1);
-    }
-    wasRunInspectionModeRef.current = isRunInspectionMode;
-  }, [isRunInspectionMode]);
+  syncRunInspectionViewportTransition({
+    isRunInspectionMode,
+    liveViewportRef: viewportRef,
+    runsViewportRef,
+    liveHasFitToViewRef: hasFitToViewRef,
+    runsHasFitToViewRef,
+    lastRunsViewportKeyRef,
+  });
 
   useEffect(() => {
     if (
@@ -1800,6 +1780,7 @@ export function AppPage() {
   const [focusRequest, setFocusRequest] = useState<{
     nodeId: string;
     requestId: number;
+    targetMode: "live" | "runs";
     tab?: "latest" | "settings";
   } | null>(null);
   const handleSidebarChange = useCallback(
@@ -1845,7 +1826,7 @@ export function AppPage() {
   const handleLogNodeSelect = useCallback(
     (nodeId: string) => {
       handleSidebarChange(true, nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), tab: "settings" });
+      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "live", tab: "settings" });
     },
     [handleSidebarChange],
   );
@@ -1853,7 +1834,7 @@ export function AppPage() {
   const handleLogRunNodeSelect = useCallback(
     (nodeId: string) => {
       handleSidebarChange(true, nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), tab: "latest" });
+      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "live", tab: "latest" });
     },
     [handleSidebarChange],
   );
@@ -3771,6 +3752,7 @@ export function AppPage() {
       exitEditableVersionForRunInspection();
       clearDismissedRunDetail();
       setRunDetailNodeId(null);
+      setFocusRequest(null);
       startTransition(() => {
         setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
       });
@@ -3788,15 +3770,18 @@ export function AppPage() {
   });
 
   const handleSelectRunFromSidebarEvent = useCallback(
-    (runId: string) => {
+    (runId: string, options?: { nodeId?: string }) => {
       exitEditableVersionForRunInspection();
       clearDismissedRunDetail();
-      const inspectorNodeId = searchParams.get("sidebar") === "1" ? searchParams.get("node") : null;
+      const inspectorNodeId =
+        options?.nodeId ?? (searchParams.get("sidebar") === "1" ? searchParams.get("node") : null);
       if (inspectorNodeId) {
         preserveRunDetailNodeOnNextRunChangeRef.current = true;
         setRunDetailNodeId(inspectorNodeId);
+        setFocusRequest({ nodeId: inspectorNodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
       } else {
         setRunDetailNodeId(null);
+        setFocusRequest(null);
       }
 
       setSearchParams(
@@ -3817,6 +3802,7 @@ export function AppPage() {
       clearDismissedRunDetail();
       preserveRunDetailNodeOnNextRunChangeRef.current = true;
       setRunDetailNodeId(options.nodeId);
+      setFocusRequest({ nodeId: options.nodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
       setSearchParams(
         (current) =>
           applyRunInspectionNavigationSearchParams(current, {
@@ -3849,6 +3835,7 @@ export function AppPage() {
 
   const handleClearRunInspection = useCallback(() => {
     setRunDetailNodeId(null);
+    setFocusRequest(null);
     startTransition(() => {
       setSearchParams(
         (current) => {
@@ -3866,6 +3853,10 @@ export function AppPage() {
   const handleRunNodeDetailSelection = useCallback(
     (nodeId: string | null) => {
       setRunDetailNodeId(nodeId);
+      if (!nodeId) {
+        setFocusRequest(null);
+      }
+
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);
@@ -3882,6 +3873,14 @@ export function AppPage() {
       );
     },
     [setRunDetailNodeId, setSearchParams],
+  );
+
+  const handleRunNodeDetailNavigate = useCallback(
+    (nodeId: string) => {
+      handleRunNodeDetailSelection(nodeId);
+      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
+    },
+    [handleRunNodeDetailSelection],
   );
 
   useStaleRunInspectionUrlCleanup({
@@ -4335,7 +4334,7 @@ export function AppPage() {
     initialOpenDetail: openRunDetailOnMount,
     detailDismissedForRunId,
     selectedNodeId: runDetailNodeId,
-    onSelectNode: handleRunNodeDetailSelection,
+    onSelectNode: handleRunNodeDetailNavigate,
     hasNextPage: !!infiniteRunsQuery.hasNextPage,
     isFetchingNextPage: infiniteRunsQuery.isFetchingNextPage,
     onLoadMore: () => infiniteRunsQuery.fetchNextPage(),
@@ -4428,11 +4427,16 @@ export function AppPage() {
         />
         <CanvasPage
           key={canvasRenderKey}
-          // Persist right sidebar in query params
-          initialSidebar={{
-            isOpen: searchParams.get("sidebar") === "1",
-            nodeId: searchParams.get("node") || null,
-          }}
+          // In run inspection, sidebar/node params restore the run detail pane,
+          // not the live node inspector.
+          initialSidebar={
+            isRunInspectionMode
+              ? { isOpen: false, nodeId: null }
+              : {
+                  isOpen: searchParams.get("sidebar") === "1",
+                  nodeId: searchParams.get("node") || null,
+                }
+          }
           onSidebarChange={handleSidebarChange}
           onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || "Canvas"}
@@ -4488,7 +4492,6 @@ export function AppPage() {
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunInspectionMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          fitAllRequest={isRunInspectionMode ? runsFitAllNonce : canvasFitAllNonce > 0 ? canvasFitAllNonce : null}
           fitAllFocusNodeIds={
             isRunInspectionMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
               ? runCanvasData.participantNodeIds
@@ -4504,7 +4507,7 @@ export function AppPage() {
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
           onRunNodeDetailClose={() => handleRunNodeDetailSelection(null)}
-          onRunNodeDetailNavigate={handleRunNodeDetailSelection}
+          onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           runNodeDetailPaneHeight={runNodeDetailPaneHeight}
           onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
           onShowDiff={onShowDiff}

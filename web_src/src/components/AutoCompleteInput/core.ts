@@ -737,7 +737,8 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
         kind: "variable",
         insertText: "$",
         detail: getValueTypeLabel(globals),
-        description: "Root selector for accessing payload data from all connected components.",
+        description:
+          'Access event data emitted by connected components in a run, keyed by component name (e.g. $["Component Name"]).',
         nodeCount,
       });
     }

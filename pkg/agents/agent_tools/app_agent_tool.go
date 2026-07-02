@@ -99,6 +99,10 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 				Type:        "boolean",
 				Description: "For read. Include console.yaml in the response.",
 			},
+			"include_canvas_yaml": {
+				Type:        "boolean",
+				Description: "For read. Defaults to false so read stays compact; set true only when you need the complete canvas.yaml text. Compact reads still return summary, version_id, canvas_yaml_bytes, and canvas_yaml_omitted.",
+			},
 			"include_integrations": {
 				Type:        "boolean",
 				Description: "For read. Include connected integration IDs, names, vendors, and state.",
@@ -157,8 +161,8 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"resource": {
 				Type:        "string",
-				Enum:        []string{"memory", "runs", "event_executions", "node_executions", "node_queue_items", "node_events"},
-				Description: "For read_runtime. Defaults to memory. Selects the canvas-scoped runtime data to read.",
+				Enum:        []string{"memory", "runs", "event_executions", "node_executions", "node_queue_items", "node_events", "runner_logs"},
+				Description: "For read_runtime. Defaults to memory. Selects the canvas-scoped runtime data to read. Use runner_logs to fetch bounded logs for a runner execution, run, or latest node execution.",
 			},
 			"namespace": {
 				Type:        "string",
@@ -174,11 +178,15 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"execution_id": {
 				Type:        "string",
-				Description: "Reserved for future runtime resources that target a specific execution.",
+				Description: "For read_runtime resource runner_logs. Fetch logs for a specific node execution.",
+			},
+			"run_id": {
+				Type:        "string",
+				Description: "For read_runtime resource runner_logs. Fetch logs for runner executions in a run; combine with node_id to target one node in that run.",
 			},
 			"limit": {
 				Type:        "integer",
-				Description: "For read_runtime paginated resources and list_resources. Backend defaults apply when omitted; list_resources caps results to keep responses concise.",
+				Description: "For read_runtime paginated resources, runner_logs, and list_resources. Backend defaults apply when omitted; list_resources and runner_logs cap results to keep responses concise.",
 			},
 			"before": {
 				Type:        "string",
