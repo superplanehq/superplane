@@ -366,7 +366,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                 ) : (
                   <div
                     className={cn(
-                      "nodrag h-full w-full overflow-auto text-left select-text",
+                      "nodrag nowheel h-full w-full overflow-auto text-left select-text",
                       isNoteEditable ? "cursor-text" : "cursor-default",
                       textStyles,
                     )}
@@ -410,7 +410,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                                 <div className="absolute right-1 top-1 z-10 rounded bg-slate-700">
                                   <CopyButton text={code} dark data-testid="note-code-copy" />
                                 </div>
-                                <pre className="nodrag select-text overflow-x-auto whitespace-pre px-2.5 py-2 pr-9 text-xs leading-relaxed font-mono [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:cursor-pointer [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-thumb:hover]:bg-white/60">
+                                <pre className="nodrag nowheel select-text overflow-x-auto whitespace-pre px-2.5 py-2 pr-9 text-xs leading-relaxed font-mono [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:cursor-pointer [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-thumb:hover]:bg-white/60">
                                   {children}
                                 </pre>
                               </div>
