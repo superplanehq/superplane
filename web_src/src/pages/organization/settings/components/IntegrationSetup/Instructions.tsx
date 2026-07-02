@@ -1,10 +1,10 @@
-import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/ui/CopyButton";
+import { extractCodeBlock, extractTextFromNode } from "@/lib/markdownCode";
 
 const INSTRUCTIONS_V2_CLASSES =
   "text-sm text-gray-800 dark:text-gray-200 [&_a]:!underline [&_a]:underline-offset-2 [&_a]:decoration-2 [&_a]:decoration-current [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1";
@@ -20,47 +20,6 @@ export interface InstructionsProps {
   description?: string | null;
   onContinue?: () => void;
   className?: string;
-}
-
-function extractTextFromNode(node: React.ReactNode): string {
-  if (typeof node === "string" || typeof node === "number") {
-    return String(node);
-  }
-
-  if (Array.isArray(node)) {
-    return node.map(extractTextFromNode).join("");
-  }
-
-  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
-    return extractTextFromNode(node.props.children);
-  }
-
-  return "";
-}
-
-function extractCodeBlock(children: React.ReactNode): { code: string; language?: string } {
-  const childArray = React.Children.toArray(children);
-
-  const codeElement = childArray.find(
-    (
-      child,
-    ): child is React.ReactElement<{
-      className?: string;
-      children?: React.ReactNode;
-    }> => React.isValidElement(child) && child.type === "code",
-  );
-
-  if (!codeElement) {
-    return { code: extractTextFromNode(children).replace(/\n$/, "") };
-  }
-
-  const className = codeElement.props.className;
-  const language = className?.startsWith("language-") ? className.slice("language-".length) : undefined;
-
-  return {
-    code: extractTextFromNode(codeElement.props.children).replace(/\n$/, ""),
-    language,
-  };
 }
 
 export function Instructions({ description, onContinue, className = "" }: InstructionsProps) {
