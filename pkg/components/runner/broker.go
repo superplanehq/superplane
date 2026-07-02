@@ -69,7 +69,7 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 //
 // Example request:
 // {
-//   "fleet_id": "aws-standard-1",
+//   "fleet_id": "e1-large-amd64",
 //   "commands": ["echo \"Hello, World!\""],
 //   "environment": [{"name": "APP_ENV", "value": "production"}],
 //   "webhook_url": "https://example.com/webhook",
