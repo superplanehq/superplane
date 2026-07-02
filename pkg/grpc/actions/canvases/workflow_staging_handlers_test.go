@@ -84,13 +84,54 @@ func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 	canvasUUID := uuid.MustParse(canvasID)
 	versionUUID := uuid.MustParse(versionID)
 
+	canvas, err := models.FindCanvas(r.Organization.ID, canvasUUID)
+	require.NoError(t, err)
+
 	original, err := models.FindCanvasVersion(canvasUUID, versionUUID)
 	require.NoError(t, err)
 
 	baseline, err := ReadRepositorySpecFile(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	renamed := strings.Replace(baseline, "name: "+original.Name, "name: "+original.Name+"-staged", 1)
+	staged := baseline + "\n# staged edit\n"
+
+	_, err = StageRepositorySpecFileOperations(ctx, orgID, canvasID, versionID, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(staged)},
+	})
+	require.NoError(t, err)
+
+	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	require.NoError(t, err)
+	assert.False(t, resp.GetStagingSummary().GetHasStaging())
+
+	updatedCanvas, err := models.FindCanvas(r.Organization.ID, canvasUUID)
+	require.NoError(t, err)
+	assert.Equal(t, canvas.Name, updatedCanvas.Name)
+
+	_, err = models.FindCanvasVersion(canvasUUID, versionUUID)
+	require.NoError(t, err)
+
+	hasStaging, err := models.HasWorkflowStaging(original.ID)
+	require.NoError(t, err)
+	assert.False(t, hasStaging)
+}
+
+func TestCommitCanvasStagingIgnoresRenamedCanvasInYAML(t *testing.T) {
+	r, ctx, canvasID, versionID := setupStagingDraft(t)
+	orgID := r.Organization.ID.String()
+
+	canvasUUID := uuid.MustParse(canvasID)
+
+	canvas, err := models.FindCanvas(r.Organization.ID, canvasUUID)
+	require.NoError(t, err)
+
+	original, err := models.FindCanvasVersion(canvasUUID, uuid.MustParse(versionID))
+	require.NoError(t, err)
+
+	baseline, err := ReadRepositorySpecFile(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+
+	renamed := strings.Replace(baseline, "name: "+canvas.Name, "name: "+canvas.Name+"-staged", 1)
 	require.NotEqual(t, baseline, renamed, "expected canvas name to appear in materialized yaml")
 
 	_, err = StageRepositorySpecFileOperations(ctx, orgID, canvasID, versionID, []*pb.CanvasRepositoryFileOperation{
@@ -98,17 +139,14 @@ func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
+	_, err = CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, versionID, "", r.AuthService)
 	require.NoError(t, err)
-	assert.False(t, resp.GetStagingSummary().GetHasStaging())
-	assert.Equal(t, original.Name+"-staged", resp.GetVersion().GetMetadata().GetName())
 
-	// Version row is updated and staging is cleared.
-	updated, err := models.FindCanvasVersion(canvasUUID, versionUUID)
+	updatedCanvas, err := models.FindCanvas(r.Organization.ID, canvasUUID)
 	require.NoError(t, err)
-	assert.Equal(t, original.Name+"-staged", updated.Name)
+	assert.Equal(t, canvas.Name, updatedCanvas.Name)
 
-	hasStaging, err := models.HasWorkflowStaging(updated.ID)
+	hasStaging, err := models.HasWorkflowStaging(original.ID)
 	require.NoError(t, err)
 	assert.False(t, hasStaging)
 }
