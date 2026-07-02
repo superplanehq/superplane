@@ -21,7 +21,7 @@ func TestListFleetsReturnsMetadata(t *testing.T) {
 	defer ts.Close()
 
 	regBody, err := json.Marshal(api.RegisterFleetRequest{
-		ID:          "aws-standard-amd64",
+		ID:          "e1-tiny-amd64",
 		Provisioner: "aws",
 		Arch:        "amd64",
 		Size:        "t3.micro",
@@ -67,7 +67,7 @@ func TestListFleetsReturnsMetadata(t *testing.T) {
 		t.Fatalf("fleets: %#v", fleets)
 	}
 	got := fleets[0]
-	if got.ID != "aws-standard-amd64" || got.Provisioner != "aws" || got.Arch != "amd64" || got.Size != "t3.micro" {
+	if got.ID != "e1-tiny-amd64" || got.Provisioner != "aws" || got.Arch != "amd64" || got.Size != "t3.micro" {
 		t.Fatalf("fleet metadata: %#v", got)
 	}
 	if got.CreatedAt == 0 {
@@ -76,7 +76,7 @@ func TestListFleetsReturnsMetadata(t *testing.T) {
 
 	// Upsert updates catalog fields visible on list.
 	upsertBody, err := json.Marshal(api.RegisterFleetRequest{
-		ID:          "aws-standard-amd64",
+		ID:          "e1-tiny-amd64",
 		Provisioner: "aws",
 		Arch:        "amd64",
 		Size:        "t3.small",

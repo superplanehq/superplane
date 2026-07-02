@@ -221,7 +221,7 @@ curl -X POST http://127.0.0.1:8081/v1/fleets \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
-    "id": "aws-standard-amd64",
+    "id": "e1-tiny-amd64",
     "provisioner": "aws",
     "arch": "amd64",
     "size": "t3.micro"
@@ -231,7 +231,7 @@ curl -X POST http://127.0.0.1:8081/v1/fleets \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
-    "id": "aws-standard-arm64",
+    "id": "e1-tiny-arm64",
     "provisioner": "aws",
     "arch": "arm64",
     "size": "t4g.micro"
@@ -241,7 +241,7 @@ curl -X POST http://127.0.0.1:8081/v1/tasks \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
-    "fleet_id": "aws-standard-arm64",
+    "fleet_id": "e1-tiny-arm64",
     "commands": ["uname -m", "echo \"$COMMIT_AUTHOR\""],
     "environment": [{"name": "COMMIT_AUTHOR", "value": "alice@example.com"}],
     "webhook_url": "https://example.com/your-hook"

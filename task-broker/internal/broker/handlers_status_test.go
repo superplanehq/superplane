@@ -14,7 +14,7 @@ func TestTaskStatusResponseIncludesTimelineAndFleet(t *testing.T) {
 	lease := claimed.Add(10 * time.Minute)
 	task := &models.Task{
 		ID:            "task-1",
-		FleetID:       "aws-standard-1",
+		FleetID:       "e1-tiny-amd64",
 		Status:        models.StatusClaimed,
 		CreatedAt:     created,
 		ClaimedAt:     &claimed,
@@ -25,7 +25,7 @@ func TestTaskStatusResponseIncludesTimelineAndFleet(t *testing.T) {
 	}
 
 	resp := taskStatusResponse(task, &Server{})
-	if resp.FleetID != "aws-standard-1" {
+	if resp.FleetID != "e1-tiny-amd64" {
 		t.Fatalf("fleet_id: %q", resp.FleetID)
 	}
 	if resp.RunnerID != "i-0abc123" {
