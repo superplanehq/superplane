@@ -194,14 +194,19 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  /** True when the active draft has uncommitted staged spec edits. Shows the Commit/Reset controls. */
+  /** True when the active edit session has uncommitted staged spec edits (shows Commit/Reset). */
   hasStagingChanges?: boolean;
-  /** Commits staged canvas.yaml/console.yaml edits into the draft version row. */
+  /** Staging is based on an outdated main-branch commit; only discard is allowed. */
+  stagingStale?: boolean;
+  /** Commits staged canvas.yaml/console.yaml edits into the main branch. */
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
   resetStagingPending?: boolean;
-  /** Discards staged edits, reverting to the last committed draft. */
+  /** Discards staged edits, reverting to the last commit. */
   onResetStaging?: () => void;
+  /** Discard stale staging after main moved forward. */
+  onDiscardStaleStaging?: () => void;
+  discardStaleStagingPending?: boolean;
   headerMode?: "default" | "version-live" | "console" | "memory" | "files";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
@@ -1347,10 +1352,13 @@ function CanvasPage(props: CanvasPageProps) {
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           hasStagingChanges={props.hasStagingChanges}
+          stagingStale={props.stagingStale}
           onCommitStaging={props.onCommitStaging}
           commitStagingPending={props.commitStagingPending}
           resetStagingPending={props.resetStagingPending}
           onResetStaging={props.onResetStaging}
+          onDiscardStaleStaging={props.onDiscardStaleStaging}
+          discardStaleStagingPending={props.discardStaleStagingPending}
           headerMode={props.headerMode}
           isEditing={props.isEditing}
           isEditSessionActive={props.isEditSessionActive}
@@ -1825,10 +1833,13 @@ function CanvasContentHeader({
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   hasStagingChanges,
+  stagingStale,
   onCommitStaging,
   commitStagingPending,
   resetStagingPending,
   onResetStaging,
+  onDiscardStaleStaging,
+  discardStaleStagingPending,
   headerMode,
   isEditing,
   isEditSessionActive,
@@ -1887,10 +1898,13 @@ function CanvasContentHeader({
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   hasStagingChanges?: boolean;
+  stagingStale?: boolean;
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
   resetStagingPending?: boolean;
   onResetStaging?: () => void;
+  onDiscardStaleStaging?: () => void;
+  discardStaleStagingPending?: boolean;
   headerMode?: CanvasPageProps["headerMode"];
   isEditing?: boolean;
   isEditSessionActive?: boolean;
@@ -1941,10 +1955,13 @@ function CanvasContentHeader({
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       hasStagingChanges={hasStagingChanges}
+      stagingStale={stagingStale}
       onCommitStaging={onCommitStaging}
       commitStagingPending={commitStagingPending}
       resetStagingPending={resetStagingPending}
       onResetStaging={onResetStaging}
+      onDiscardStaleStaging={onDiscardStaleStaging}
+      discardStaleStagingPending={discardStaleStagingPending}
       mode={headerMode}
       isEditing={isEditing}
       isEditSessionActive={isEditSessionActive}

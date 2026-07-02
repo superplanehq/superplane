@@ -200,7 +200,6 @@ func (s *Server) tryWriteStagedRepositoryFile(
 		authCtx,
 		user.OrganizationID.String(),
 		canvas.ID.String(),
-		versionID,
 		path,
 	)
 	if stagedErr != nil {

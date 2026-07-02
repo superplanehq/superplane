@@ -8,10 +8,12 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { executeResetStaging } from "./lib/reset-staging-flow";
 
-type CommitMutation = { mutateAsync: () => Promise<unknown> };
+type CommitMutation = {
+  mutateAsync: (commitMessage: string) => Promise<{ version?: CanvasesCanvasVersion }>;
+};
 type DiscardMutation = { mutateAsync: (input: undefined) => Promise<unknown> };
 
-async function runDraftStagingAction(
+async function runStagingAction(
   setActionPending: Dispatch<SetStateAction<boolean>>,
   setIsPreparingVersionAction: Dispatch<SetStateAction<boolean>>,
   action: () => Promise<void>,
@@ -43,7 +45,7 @@ type UseDraftStagingActionsOptions = {
   flushRepositoryFileStaging?: () => Promise<void>;
   cancelPendingCanvasSaves?: () => void;
   onCanvasDraftRestoredToCommitted?: (version: CanvasesCanvasVersion) => void;
-  recoverIfDraftMissing?: (error: unknown, versionId: string) => Promise<boolean>;
+  onCommittedVersionId?: (versionId: string) => void;
   registerIgnoredCanvasVersionUpdatedEcho?: (versionId?: string) => () => void;
 };
 
@@ -65,60 +67,69 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     flushRepositoryFileStaging,
     cancelPendingCanvasSaves,
     onCanvasDraftRestoredToCommitted,
-    recoverIfDraftMissing: recoverIfDraftMissingOption,
+    onCommittedVersionId,
     registerIgnoredCanvasVersionUpdatedEcho,
   } = options;
   const queryClient = useQueryClient();
   const [commitStagingPending, setCommitStagingPending] = useState(false);
   const [resetStagingPending, setResetStagingPending] = useState(false);
 
-  const handleCommitStaging = useCallback(async () => {
-    if (!hasEditableVersion || !activeCanvasVersionId) {
-      return;
-    }
+  const handleCommitStaging = useCallback(
+    async (commitMessage: string) => {
+      if (!hasEditableVersion || !activeCanvasVersionId) {
+        return;
+      }
 
-    try {
-      await runDraftStagingAction(setCommitStagingPending, setIsPreparingVersionAction, async () => {
-        const committed = await executeCommitStaging({
-          organizationId,
-          canvasId,
-          activeCanvasVersionId,
-          queryClient,
-          commitCanvasStagingMutation,
-          consoleMutationGenerationRef,
-          draftCanvasSpecsRef,
-          setDraftCanvasSpec,
-          setStagingResetNonce,
-          ensureVersionActionDraftReady,
-          flushRepositoryFileStaging,
-          registerIgnoredCanvasVersionUpdatedEcho,
+      const trimmedMessage = commitMessage.trim();
+      if (!trimmedMessage) {
+        showErrorToast("Commit message is required");
+        return;
+      }
+
+      try {
+        await runStagingAction(setCommitStagingPending, setIsPreparingVersionAction, async () => {
+          const committed = await executeCommitStaging({
+            organizationId,
+            canvasId,
+            activeCanvasVersionId,
+            commitMessage: trimmedMessage,
+            queryClient,
+            commitCanvasStagingMutation,
+            consoleMutationGenerationRef,
+            draftCanvasSpecsRef,
+            setDraftCanvasSpec,
+            setStagingResetNonce,
+            ensureVersionActionDraftReady,
+            flushRepositoryFileStaging,
+            registerIgnoredCanvasVersionUpdatedEcho,
+            onCommittedVersionId,
+          });
+          if (committed) {
+            showSuccessToast("Changes committed");
+          }
         });
-        if (committed) {
-          showSuccessToast("Changes committed");
-        }
-      });
-    } catch (error) {
-      if (!(await recoverIfDraftMissingOption?.(error, activeCanvasVersionId))) {
+      } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
       }
-    }
-  }, [
-    activeCanvasVersionId,
-    canvasId,
-    commitCanvasStagingMutation,
-    consoleMutationGenerationRef,
-    draftCanvasSpecsRef,
-    ensureVersionActionDraftReady,
-    flushRepositoryFileStaging,
-    hasEditableVersion,
-    organizationId,
-    queryClient,
-    recoverIfDraftMissingOption,
-    registerIgnoredCanvasVersionUpdatedEcho,
-    setDraftCanvasSpec,
-    setIsPreparingVersionAction,
-    setStagingResetNonce,
-  ]);
+    },
+    [
+      activeCanvasVersionId,
+      canvasId,
+      commitCanvasStagingMutation,
+      consoleMutationGenerationRef,
+      draftCanvasSpecsRef,
+      ensureVersionActionDraftReady,
+      flushRepositoryFileStaging,
+      hasEditableVersion,
+      onCommittedVersionId,
+      organizationId,
+      queryClient,
+      registerIgnoredCanvasVersionUpdatedEcho,
+      setDraftCanvasSpec,
+      setIsPreparingVersionAction,
+      setStagingResetNonce,
+    ],
+  );
 
   const handleResetStaging = useCallback(async () => {
     if (!hasEditableVersion || !activeCanvasVersionId) {
@@ -126,7 +137,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     }
 
     try {
-      await runDraftStagingAction(setResetStagingPending, setIsPreparingVersionAction, async () => {
+      await runStagingAction(setResetStagingPending, setIsPreparingVersionAction, async () => {
         await executeResetStaging({
           organizationId,
           canvasId,
@@ -144,9 +155,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
         showSuccessToast("Reverted to last commit");
       });
     } catch (error) {
-      if (!(await recoverIfDraftMissingOption?.(error, activeCanvasVersionId))) {
-        showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"));
-      }
+      showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"));
     }
   }, [
     activeCanvasVersionId,
@@ -159,7 +168,6 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     onCanvasDraftRestoredToCommitted,
     organizationId,
     queryClient,
-    recoverIfDraftMissingOption,
     setActiveCanvasVersion,
     setDraftCanvasSpec,
     setIsPreparingVersionAction,

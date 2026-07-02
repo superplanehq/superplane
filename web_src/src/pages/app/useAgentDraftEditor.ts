@@ -2,11 +2,9 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
 import { useQueryClient } from "@tanstack/react-query";
 import type { CanvasesCanvasVersion } from "@/api-client";
 import { showErrorToast, showInfoToast } from "@/lib/toast";
-import { draftVersionId } from "@/lib/draftVersion";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import type { CanvasPageHeaderMode } from "./viewState";
 import { isCanvasWorkflowTab } from "./viewState";
-import { isDraftVersion } from "./lib/canvas-versions";
 import { canvasVersionExists, fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
 import { isNotFoundError } from "./workflowPageHelpers";
 
@@ -32,7 +30,6 @@ type UseAgentDraftEditorArgs = {
   hasLocalSaveActivity: boolean;
   activeCanvasVersionIdRef: { current: string };
   activateCanvasVersionForEditing: (versionId: string, version: CanvasesCanvasVersion) => boolean;
-  setSuppressUnpublishedDraftDiscard: (value: boolean) => void;
   // Full recovery (clears state + ref, exits to live) when the draft the user is
   // actively editing turns out to be deleted.
   onActiveDraftMissing: (versionId: string) => void | Promise<void>;
@@ -50,9 +47,6 @@ function useLoadAgentDraftVersion(
       if (!canvasId) {
         return;
       }
-      queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId), (current = []) =>
-        current.filter((branch) => draftVersionId(branch) !== versionId),
-      );
       queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.versionList(canvasId), (current = []) =>
         current.filter((version) => version.metadata?.id !== versionId),
       );
@@ -85,15 +79,6 @@ function useLoadAgentDraftVersion(
           }
           return [loadedVersion, ...current];
         });
-
-        if (isDraftVersion(loadedVersion)) {
-          queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.draftBranches(canvasId), (current = []) => {
-            if (current.some((branch) => draftVersionId(branch) === versionId)) {
-              return current;
-            }
-            return [loadedVersion, ...current];
-          });
-        }
 
         return { version: loadedVersion, notFound: false };
       } catch (error) {
@@ -167,7 +152,6 @@ export function useAgentDraftEditor({
   hasLocalSaveActivity,
   activeCanvasVersionIdRef,
   activateCanvasVersionForEditing,
-  setSuppressUnpublishedDraftDiscard,
   onActiveDraftMissing,
 }: UseAgentDraftEditorArgs) {
   const [pendingAutoOpenVersionId, setPendingAutoOpenVersionId] = useState<string | null>(null);
@@ -226,14 +210,6 @@ export function useAgentDraftEditor({
         return handleMissingDraft(versionId, source, notFound);
       }
 
-      if (!isDraftVersion(version)) {
-        if (source === "button") {
-          showErrorToast("Agent draft is no longer available");
-        }
-        return "unavailable";
-      }
-
-      setSuppressUnpublishedDraftDiscard(false);
       return activateCanvasVersionForEditing(versionId, version) ? "opened" : "skipped";
     },
     [
@@ -245,7 +221,6 @@ export function useAgentDraftEditor({
       headerMode,
       isRunInspectionMode,
       loadAgentDraftVersion,
-      setSuppressUnpublishedDraftDiscard,
     ],
   );
 

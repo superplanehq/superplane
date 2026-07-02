@@ -7,9 +7,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"github.com/superplanehq/superplane/pkg/telemetry"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -19,38 +16,21 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		owner = canvasVersionOwnerRef(organizationID, version.OwnerID.String(), ownersByID)
 	}
 
-	state := pb.CanvasVersion_STATE_UNSPECIFIED
-	switch version.State {
-	case models.CanvasVersionStateDraft:
-		state = pb.CanvasVersion_STATE_DRAFT
-	case models.CanvasVersionStatePublished:
-		state = pb.CanvasVersion_STATE_PUBLISHED
-	case models.CanvasVersionStateSnapshot:
-		state = pb.CanvasVersion_STATE_SNAPSHOT
-	}
-
 	metadata := &pb.CanvasVersion_Metadata{
-		Id:          version.ID.String(),
-		CanvasId:    version.WorkflowID.String(),
-		Owner:       owner,
-		State:       state,
-		Name:        version.Name,
-		Description: version.Description,
+		Id:            version.ID.String(),
+		CanvasId:      version.WorkflowID.String(),
+		Owner:         owner,
+		Name:          version.Name,
+		Description:   version.Description,
+		CommitMessage: version.CommitMessage,
 	}
 
-	if version.PublishedAt != nil {
-		metadata.PublishedAt = timestamppb.New(*version.PublishedAt)
-	}
 	if version.CreatedAt != nil {
 		metadata.CreatedAt = timestamppb.New(*version.CreatedAt)
 	}
 	if version.UpdatedAt != nil {
 		metadata.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
-	if models.IsRegisteredDraftVersion(version) {
-		metadata.BranchName = version.GitBranch
-	}
-	metadata.DisplayName = version.DisplayName
 
 	return &pb.CanvasVersion{
 		Metadata: metadata,
@@ -112,10 +92,6 @@ func ownersByIDForCanvasVersions(ctx context.Context, orgID string, versions []m
 }
 
 func serializeCanvasVersions(ctx context.Context, versions []models.CanvasVersion, organizationID string) []*pb.CanvasVersion {
-	var err error
-	ctx, done := telemetry.Span(ctx, "canvases.serialize_versions")
-	defer done(&err)
-
 	ownersByID, ownersErr := ownersByIDForCanvasVersions(ctx, organizationID, versions)
 	if ownersErr != nil {
 		ownersByID = nil
@@ -124,10 +100,6 @@ func serializeCanvasVersions(ctx context.Context, versions []models.CanvasVersio
 	protoVersions := make([]*pb.CanvasVersion, 0, len(versions))
 	for i := range versions {
 		protoVersions = append(protoVersions, SerializeCanvasVersion(&versions[i], organizationID, ownersByID))
-	}
-
-	if span := trace.SpanFromContext(ctx); span.IsRecording() {
-		span.SetAttributes(attribute.Int("canvases.version_count", len(versions)))
 	}
 
 	return protoVersions

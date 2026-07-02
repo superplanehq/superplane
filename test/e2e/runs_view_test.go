@@ -167,17 +167,16 @@ func (s *runsViewSteps) givenOlderPublishedVersions(count int) {
 	for i := 0; i < count; i++ {
 		publishedAt := now.Add(-time.Duration(i) * time.Minute)
 		version := models.CanvasVersion{
-			ID:          uuid.New(),
-			WorkflowID:  s.canvas.WorkflowID,
-			OwnerID:     liveVersion.OwnerID,
-			State:       models.CanvasVersionStatePublished,
-			Name:        fmt.Sprintf("Seeded version %02d", i+1),
-			Description: liveVersion.Description,
-			PublishedAt: &publishedAt,
-			Nodes:       liveVersion.Nodes,
-			Edges:       liveVersion.Edges,
-			CreatedAt:   &publishedAt,
-			UpdatedAt:   &publishedAt,
+			ID:            uuid.New(),
+			WorkflowID:    s.canvas.WorkflowID,
+			OwnerID:       liveVersion.OwnerID,
+			Name:          liveVersion.Name,
+			Description:   liveVersion.Description,
+			CommitMessage: fmt.Sprintf("Seeded version %02d", i+1),
+			Nodes:         liveVersion.Nodes,
+			Edges:         liveVersion.Edges,
+			CreatedAt:     &publishedAt,
+			UpdatedAt:     &publishedAt,
 		}
 		require.NoError(s.t, database.Conn().Create(&version).Error)
 	}

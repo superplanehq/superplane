@@ -320,7 +320,7 @@ describe("useCanvasWebsocket", () => {
     });
   });
 
-  it("invalidates draft branch queries for canvas version deletions", () => {
+  it("invalidates canvas staging queries for canvas version deletions", () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
 
@@ -334,7 +334,7 @@ describe("useCanvasWebsocket", () => {
       queryKey: canvasKeys.versionList(testCanvasId),
     });
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.draftBranches(testCanvasId),
+      queryKey: canvasKeys.canvasStaging(testCanvasId),
     });
     expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({
       queryKey: canvasKeys.consoleAll(testCanvasId),
@@ -402,9 +402,7 @@ describe("useCanvasWebsocket", () => {
       { canvasId: testCanvasId, versionId: "version-1" },
       "staging_updated",
     );
-    expect(
-      getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionStaging(testCanvasId, "version-1")),
-    ).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.canvasStaging(testCanvasId))).toHaveLength(1);
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.repositoryFiles(testCanvasId))).toHaveLength(1);
 
     const [stagedPredicate] = getInvalidationPredicates(invalidateQueriesSpy);
@@ -457,8 +455,6 @@ describe("useCanvasWebsocket", () => {
     });
 
     expect(onCanvasStagingEvent).toHaveBeenCalledOnce();
-    expect(
-      getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionStaging(testCanvasId, "version-1")),
-    ).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.canvasStaging(testCanvasId))).toHaveLength(0);
   });
 });

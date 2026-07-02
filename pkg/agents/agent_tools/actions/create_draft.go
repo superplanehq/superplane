@@ -3,7 +3,6 @@ package actions
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/agents"
@@ -24,22 +23,24 @@ func (createDraftAction) Execute(_ context.Context, session agents.AgentSessionC
 		return updateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
-	draft, err := models.CreateDraftBranchFromLive(
-		canvasID,
-		uuid.MustParse(session.UserID),
-		strings.TrimSpace(input.DisplayName),
-		nil,
-		nil,
-	)
+	canvas, err := models.FindCanvas(uuid.MustParse(session.OrganizationID), canvasID)
 	if err != nil {
-		return updateResult{}, fmt.Errorf("create draft: %w", err)
+		return updateResult{}, fmt.Errorf("load canvas: %w", err)
+	}
+	if canvas.LiveVersionID == nil {
+		return updateResult{}, fmt.Errorf("canvas has no live version")
+	}
+
+	liveVersion, err := models.FindCanvasVersion(canvasID, *canvas.LiveVersionID)
+	if err != nil {
+		return updateResult{}, fmt.Errorf("load live version: %w", err)
 	}
 
 	return updateResult{
 		Action:    createDraftActionName,
 		CanvasID:  session.CanvasID,
-		VersionID: draft.ID.String(),
-		Draft:     draftResult{VersionID: draft.ID.String(), DisplayName: draft.DisplayName, BranchName: draft.GitBranch},
-		Summary:   summarizeCanvasVersion(nil, draft),
+		VersionID: liveVersion.ID.String(),
+		Draft:     draftResult{VersionID: liveVersion.ID.String()},
+		Summary:   summarizeCanvasVersion(nil, liveVersion),
 	}, nil
 }

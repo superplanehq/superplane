@@ -201,11 +201,10 @@ func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionCont
 		return nil
 	}
 
-	if _, err := canvasRepository.StageRepositorySpecFileOperations(
+	if _, err := canvasRepository.PutCanvasStaging(
 		ctx,
 		session.OrganizationID,
 		session.CanvasID,
-		target.draft.ID.String(),
 		operations,
 	); err != nil {
 		return fmt.Errorf("stage patched draft files: %w", err)
@@ -219,7 +218,7 @@ func newPatchDraftResult(session agents.AgentSessionContext, draft *models.Canva
 		Action:     patchDraftActionName,
 		CanvasID:   session.CanvasID,
 		VersionID:  draft.ID.String(),
-		Draft:      draftResult{VersionID: draft.ID.String(), DisplayName: draft.DisplayName, BranchName: draft.GitBranch},
+		Draft:      draftResult{VersionID: draft.ID.String()},
 		NodeIssues: collectNodeIssues(patched.Nodes),
 		Summary:    summarizeParsedCanvas(patched.Name, patched.Nodes, patched.Edges),
 	}

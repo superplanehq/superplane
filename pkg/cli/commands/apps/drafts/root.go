@@ -8,41 +8,34 @@ import (
 func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
 		Use:     "drafts",
-		Short:   "Manage app drafts",
+		Short:   "Manage staged app edits",
 		Aliases: []string{"draft"},
-		Long: `Create, list, and delete draft versions for an app.
+		Long: `Inspect and discard per-user staged edits for an app.
 
-Drafts are in-progress app versions (canvas.yaml and console.yaml) owned by a user.
-Use "superplane apps drafts list" to find draft ids, then pass --draft-id to canvas
-and console commands.`,
+Use "superplane apps drafts list" to see staged paths, then commit from the UI
+or with canvas update without --draft-id.`,
 	}
 
 	var createName string
 	createCmd := &cobra.Command{
 		Use:   "create [app]",
-		Short: "Create a new draft for an app",
+		Short: "Show the live version used for staging",
 		Args:  cobra.MaximumNArgs(1),
 	}
-	createCmd.Flags().StringVar(&createName, "name", "", "display name for the draft")
+	createCmd.Flags().StringVar(&createName, "name", "", "ignored; kept for compatibility")
 	core.Bind(createCmd, &createCommand{name: &createName}, options)
 
-	var listAll bool
 	listCmd := &cobra.Command{
 		Use:   "list [app]",
-		Short: "List drafts for an app",
+		Short: "List staged changes for an app",
 		Args:  cobra.MaximumNArgs(1),
 	}
-	listCmd.Flags().BoolVar(&listAll, "all", false, "list drafts for all owners (best-effort)")
-	core.Bind(listCmd, &listCommand{all: &listAll}, options)
+	core.Bind(listCmd, &listCommand{}, options)
 
 	deleteCmd := &cobra.Command{
-		Use:   "delete <draft-id> [app]",
-		Short: "Delete a draft",
-		Long: `Delete a draft.
-
-The app is taken from the optional [app] argument, falling back to the active app
-configured with "superplane apps active".`,
-		Args: cobra.RangeArgs(1, 2),
+		Use:   "delete [app]",
+		Short: "Discard staged changes for an app",
+		Args:  cobra.MaximumNArgs(1),
 	}
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 

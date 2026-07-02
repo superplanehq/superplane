@@ -17,7 +17,7 @@ import {
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
-import { useCanvas, useCanvasVersion, useCanvasVersions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import { useCanvas, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
@@ -492,16 +492,8 @@ function ComposerWithCanvasData({
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
-  const { data: versions } = useCanvasVersions(organizationId, canvasId);
-  const latestVersion = versions?.[0];
-  const isDraft = latestVersion?.metadata?.state === "STATE_DRAFT";
-  const { data: draftVersion } = useCanvasVersion(organizationId, canvasId, latestVersion?.metadata?.id ?? "", isDraft);
 
-  // Use draft nodes if a draft exists, otherwise fall back to published
-  const nodes = useMemo(
-    () => (isDraft && draftVersion?.spec?.nodes ? draftVersion.spec.nodes : canvas?.spec?.nodes) ?? [],
-    [isDraft, draftVersion, canvas],
-  );
+  const nodes = useMemo(() => canvas?.spec?.nodes ?? [], [canvas]);
 
   const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);
   const runs = useMemo(() => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [], [runsQuery.data]);

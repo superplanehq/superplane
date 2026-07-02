@@ -24,6 +24,7 @@ func UpdateConsole(
 	modelPanels []models.ConsolePanel,
 	modelLayout []models.ConsoleLayoutItem,
 	discardStaging bool,
+	commitTarget bool,
 ) (*models.CanvasVersion, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
@@ -68,7 +69,7 @@ func UpdateConsole(
 			return loadErr
 		}
 
-		if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
+		if err := ensureVersionIsEditable(userUUID, canvas, version, commitTarget); err != nil {
 			return err
 		}
 
@@ -80,7 +81,7 @@ func UpdateConsole(
 		newVersion = v
 
 		if discardStaging {
-			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+			return models.DiscardWorkflowStagingForUserInTransaction(tx, canvas.ID, userUUID, nil)
 		}
 
 		return nil

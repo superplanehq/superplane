@@ -76,6 +76,30 @@ describe("syncCommittedCanvasDraftState", () => {
       spec: committedVersion.spec,
     });
   });
+
+  it("prepends a new committed version when the version list cache is empty", async () => {
+    const committedVersion: CanvasesCanvasVersion = {
+      metadata: { id: "version-2" },
+      spec: { nodes: [], edges: [] },
+    };
+    vi.mocked(fetchCanvasVersionWithSpec).mockResolvedValue(committedVersion);
+
+    const setQueryData = vi.fn();
+    const queryClient = { setQueryData } as unknown as QueryClient;
+
+    await syncCommittedCanvasDraftState({
+      queryClient,
+      organizationId: "org-1",
+      canvasId: "canvas-1",
+      versionId: "version-2",
+    });
+
+    const updateVersionList = setQueryData.mock.calls.find(
+      ([key]) => JSON.stringify(key) === JSON.stringify(canvasKeys.versionList("canvas-1")),
+    )?.[1] as (current: CanvasesCanvasVersion[] | undefined) => CanvasesCanvasVersion[] | undefined;
+
+    expect(updateVersionList(undefined)).toEqual([committedVersion]);
+  });
 });
 
 describe("syncCommittedConsoleCaches", () => {

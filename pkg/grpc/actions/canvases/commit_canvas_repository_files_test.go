@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -184,26 +183,28 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 	})
 }
 
-func Test__CommitCanvasRepositoryFiles_DiscardsStaging(t *testing.T) {
+func Test__CommitCanvasRepositoryFiles_RejectsDirectSpecCommitAndPreservesStaging(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-	draftVersion, err := models.CreateDraftBranchFromLiveInTransaction(database.Conn(), canvas.ID, r.User, "", nil, nil)
+	liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 	require.NoError(t, err)
 
 	_, err = models.UpsertWorkflowStagingPath(
-		draftVersion.ID,
+		nil,
+		canvas.ID,
+		r.User,
+		liveVersion.ID,
 		r.Organization.ID,
 		ConsoleYAMLRepositoryPath,
 		"stale staged content",
-		"",
 		&r.User,
 	)
 	require.NoError(t, err)
 
-	hasStaging, err := models.HasWorkflowStaging(draftVersion.ID)
+	hasStaging, err := models.HasWorkflowStagingForUser(nil, canvas.ID, r.User)
 	require.NoError(t, err)
 	require.True(t, hasStaging)
 
@@ -225,16 +226,19 @@ spec:
 		r,
 		r.Organization.ID.String(),
 		canvas.ID.String(),
-		draftVersion.ID.String(),
+		liveVersion.ID.String(),
 		"",
 		"Update canvas.yaml",
 		[]*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(yamlText)},
 		},
 	)
-	require.NoError(t, err)
+	code, msg, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+	assert.Contains(t, msg, "direct version updates are not supported")
 
-	hasStaging, err = models.HasWorkflowStaging(draftVersion.ID)
+	hasStaging, err = models.HasWorkflowStagingForUser(nil, canvas.ID, r.User)
 	require.NoError(t, err)
-	assert.False(t, hasStaging, "direct commit should discard existing staged changes")
+	assert.True(t, hasStaging, "direct spec commit should leave staged changes intact")
 }

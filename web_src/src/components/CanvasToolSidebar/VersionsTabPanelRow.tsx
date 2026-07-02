@@ -3,7 +3,7 @@ import { TimeAgo } from "@/components/TimeAgo";
 import { cn } from "@/lib/utils";
 import { useCallback } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { formatVersionLabel, formatVersionTimestamp } from "@/pages/app/lib/canvas-versions";
+import { formatVersionLabel } from "@/pages/app/lib/canvas-versions";
 import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 export function VersionRow({
@@ -76,8 +76,8 @@ function deriveVersionRowFields(version: CanvasesCanvasVersion, isFirstCanvasVer
   return {
     versionID: version.metadata?.id ?? "",
     ownerName: version.metadata?.owner?.name || "Unknown owner",
-    versionLabel: isFirstCanvasVersion ? "v1" : formatVersionTimestamp(version) || formatVersionLabel(version),
-    timestamp: version.metadata?.publishedAt || version.metadata?.updatedAt || version.metadata?.createdAt,
+    versionLabel: isFirstCanvasVersion ? "v1" : formatVersionLabel(version),
+    timestamp: version.metadata?.updatedAt || version.metadata?.createdAt,
   };
 }
 

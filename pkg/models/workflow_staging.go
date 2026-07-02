@@ -1,7 +1,6 @@
 package models
 
 import (
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,11 +11,12 @@ import (
 
 type WorkflowStaging struct {
 	ID             uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
+	WorkflowID     uuid.UUID `gorm:"type:uuid;not null"`
+	UserID         uuid.UUID `gorm:"type:uuid;not null"`
 	VersionID      uuid.UUID `gorm:"type:uuid;not null"`
 	OrganizationID uuid.UUID `gorm:"type:uuid;not null"`
 	Path           string    `gorm:"type:text;not null"`
 	Content        string    `gorm:"type:text;not null;default:''"`
-	BaseHeadSHA    string    `gorm:"column:base_head_sha;type:varchar(40);not null;default:''"`
 	// Deleted marks a staged file removal (row kept). Effective read returns empty
 	// content when true. DiscardWorkflowStaging hard-deletes rows to revert staging.
 	Deleted   bool       `gorm:"not null;default:false"`
@@ -29,64 +29,94 @@ func (WorkflowStaging) TableName() string {
 }
 
 func UpsertWorkflowStagingPath(
-	versionID, organizationID uuid.UUID,
-	path, content, baseHeadSHA string,
+	tx *gorm.DB,
+	workflowID, userID, baseVersionID, organizationID uuid.UUID,
+	path, content string,
 	updatedBy *uuid.UUID,
 ) (*WorkflowStaging, error) {
+	if tx == nil {
+		tx = database.Conn()
+	}
 	return UpsertWorkflowStagingPathInTransaction(
-		database.Conn(),
-		versionID,
+		tx,
+		workflowID,
+		userID,
+		baseVersionID,
 		organizationID,
 		path,
 		content,
-		baseHeadSHA,
 		updatedBy,
 	)
 }
 
 func MarkWorkflowStagingPathDeleted(
-	versionID, organizationID uuid.UUID,
-	path, baseHeadSHA string,
+	tx *gorm.DB,
+	workflowID, userID, baseVersionID, organizationID uuid.UUID,
+	path string,
 	updatedBy *uuid.UUID,
 ) error {
+	if tx == nil {
+		tx = database.Conn()
+	}
 	return MarkWorkflowStagingPathDeletedInTransaction(
-		database.Conn(),
-		versionID,
+		tx,
+		workflowID,
+		userID,
+		baseVersionID,
 		organizationID,
 		path,
-		baseHeadSHA,
 		updatedBy,
 	)
 }
 
-func ListWorkflowStaging(versionID uuid.UUID) ([]WorkflowStaging, error) {
-	return ListWorkflowStagingInTransaction(database.Conn(), versionID)
+func ListWorkflowStagingForUser(tx *gorm.DB, workflowID, userID uuid.UUID) ([]WorkflowStaging, error) {
+	if tx == nil {
+		tx = database.Conn()
+	}
+	return ListWorkflowStagingForUserInTransaction(tx, workflowID, userID)
 }
 
-func DiscardWorkflowStaging(versionID uuid.UUID, paths []string) error {
-	return DiscardWorkflowStagingInTransaction(database.Conn(), versionID, paths)
+func DiscardWorkflowStagingForUser(tx *gorm.DB, workflowID, userID uuid.UUID, paths []string) error {
+	if tx == nil {
+		tx = database.Conn()
+	}
+	return DiscardWorkflowStagingForUserInTransaction(tx, workflowID, userID, paths)
 }
 
-func HasWorkflowStaging(versionID uuid.UUID) (bool, error) {
-	return HasWorkflowStagingInTransaction(database.Conn(), versionID)
+func HasWorkflowStagingForUser(tx *gorm.DB, workflowID, userID uuid.UUID) (bool, error) {
+	if tx == nil {
+		tx = database.Conn()
+	}
+	return HasWorkflowStagingForUserInTransaction(tx, workflowID, userID)
 }
 
-func FindWorkflowStagingPath(versionID uuid.UUID, path string) (*WorkflowStaging, error) {
-	return FindWorkflowStagingPathInTransaction(database.Conn(), versionID, path)
+func FindWorkflowStagingPathForUser(tx *gorm.DB, workflowID, userID uuid.UUID, path string) (*WorkflowStaging, error) {
+	if tx == nil {
+		tx = database.Conn()
+	}
+	return FindWorkflowStagingPathForUserInTransaction(tx, workflowID, userID, path)
+}
+
+func StagingBaseVersionID(rows []WorkflowStaging) uuid.UUID {
+	if len(rows) == 0 {
+		return uuid.Nil
+	}
+	return rows[0].VersionID
 }
 
 func UpsertWorkflowStagingPathInTransaction(
 	tx *gorm.DB,
-	versionID, organizationID uuid.UUID,
-	path, content, baseHeadSHA string,
+	workflowID, userID, baseVersionID, organizationID uuid.UUID,
+	path, content string,
 	updatedBy *uuid.UUID,
 ) (*WorkflowStaging, error) {
 	row := WorkflowStaging{
-		VersionID:      versionID,
+		WorkflowID:     workflowID,
+		UserID:         userID,
+		VersionID:      baseVersionID,
 		OrganizationID: organizationID,
 		Path:           path,
 		Content:        content,
-		BaseHeadSHA:    strings.TrimSpace(baseHeadSHA),
 		Deleted:        false,
 		UpdatedBy:      updatedBy,
 		UpdatedAt:      time.Now(),
@@ -94,7 +124,8 @@ func UpsertWorkflowStagingPathInTransaction(
 
 	err := tx.Clauses(clause.OnConflict{
 		Columns: []clause.Column{
-			{Name: "version_id"},
+			{Name: "workflow_id"},
+			{Name: "user_id"},
 			{Name: "path"},
 		},
 		DoUpdates: clause.Assignments(map[string]any{
@@ -102,34 +133,28 @@ func UpsertWorkflowStagingPathInTransaction(
 			"deleted":    false,
 			"updated_by": updatedBy,
 			"updated_at": time.Now(),
-			"base_head_sha": gorm.Expr(
-				"CASE WHEN workflow_staged_files.base_head_sha = '' THEN ? ELSE workflow_staged_files.base_head_sha END",
-				strings.TrimSpace(baseHeadSHA),
-			),
 		}),
 	}).Create(&row).Error
 	if err != nil {
 		return nil, err
 	}
 
-	return FindWorkflowStagingPathInTransaction(tx, versionID, path)
+	return FindWorkflowStagingPathForUserInTransaction(tx, workflowID, userID, path)
 }
 
-// MarkWorkflowStagingPathDeletedInTransaction stages removal of a path before commit.
-// The row is kept with deleted=true so effective read can distinguish "not staged"
-// (fall back to the draft version row) from "staged as deleted" (empty content).
 func MarkWorkflowStagingPathDeletedInTransaction(
 	tx *gorm.DB,
-	versionID, organizationID uuid.UUID,
-	path, baseHeadSHA string,
+	workflowID, userID, baseVersionID, organizationID uuid.UUID,
+	path string,
 	updatedBy *uuid.UUID,
 ) error {
 	row := WorkflowStaging{
-		VersionID:      versionID,
+		WorkflowID:     workflowID,
+		UserID:         userID,
+		VersionID:      baseVersionID,
 		OrganizationID: organizationID,
 		Path:           path,
 		Content:        "",
-		BaseHeadSHA:    strings.TrimSpace(baseHeadSHA),
 		Deleted:        true,
 		UpdatedBy:      updatedBy,
 		UpdatedAt:      time.Now(),
@@ -137,7 +162,8 @@ func MarkWorkflowStagingPathDeletedInTransaction(
 
 	return tx.Clauses(clause.OnConflict{
 		Columns: []clause.Column{
-			{Name: "version_id"},
+			{Name: "workflow_id"},
+			{Name: "user_id"},
 			{Name: "path"},
 		},
 		DoUpdates: clause.Assignments(map[string]any{
@@ -145,18 +171,14 @@ func MarkWorkflowStagingPathDeletedInTransaction(
 			"deleted":    true,
 			"updated_by": updatedBy,
 			"updated_at": time.Now(),
-			"base_head_sha": gorm.Expr(
-				"CASE WHEN workflow_staged_files.base_head_sha = '' THEN ? ELSE workflow_staged_files.base_head_sha END",
-				strings.TrimSpace(baseHeadSHA),
-			),
 		}),
 	}).Create(&row).Error
 }
 
-func ListWorkflowStagingInTransaction(tx *gorm.DB, versionID uuid.UUID) ([]WorkflowStaging, error) {
+func ListWorkflowStagingForUserInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID) ([]WorkflowStaging, error) {
 	var rows []WorkflowStaging
 	err := tx.
-		Where("version_id = ?", versionID).
+		Where("workflow_id = ? AND user_id = ?", workflowID, userID).
 		Order("path ASC").
 		Find(&rows).
 		Error
@@ -167,11 +189,8 @@ func ListWorkflowStagingInTransaction(tx *gorm.DB, versionID uuid.UUID) ([]Workf
 	return rows, nil
 }
 
-// DiscardWorkflowStagingInTransaction removes staging rows to revert pending edits.
-// This is not the same as MarkWorkflowStagingPathDeleted, which keeps a row to
-// record an intentional staged file deletion until commit.
-func DiscardWorkflowStagingInTransaction(tx *gorm.DB, versionID uuid.UUID, paths []string) error {
-	query := tx.Where("version_id = ?", versionID)
+func DiscardWorkflowStagingForUserInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID, paths []string) error {
+	query := tx.Where("workflow_id = ? AND user_id = ?", workflowID, userID)
 	if len(paths) > 0 {
 		query = query.Where("path IN ?", paths)
 	}
@@ -179,10 +198,10 @@ func DiscardWorkflowStagingInTransaction(tx *gorm.DB, versionID uuid.UUID, paths
 	return query.Delete(&WorkflowStaging{}).Error
 }
 
-func HasWorkflowStagingInTransaction(tx *gorm.DB, versionID uuid.UUID) (bool, error) {
+func HasWorkflowStagingForUserInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID) (bool, error) {
 	var count int64
 	err := tx.Model(&WorkflowStaging{}).
-		Where("version_id = ?", versionID).
+		Where("workflow_id = ? AND user_id = ?", workflowID, userID).
 		Count(&count).
 		Error
 	if err != nil {
@@ -192,10 +211,10 @@ func HasWorkflowStagingInTransaction(tx *gorm.DB, versionID uuid.UUID) (bool, er
 	return count > 0, nil
 }
 
-func FindWorkflowStagingPathInTransaction(tx *gorm.DB, versionID uuid.UUID, path string) (*WorkflowStaging, error) {
+func FindWorkflowStagingPathForUserInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID, path string) (*WorkflowStaging, error) {
 	var row WorkflowStaging
 	err := tx.
-		Where("version_id = ? AND path = ?", versionID, path).
+		Where("workflow_id = ? AND user_id = ? AND path = ?", workflowID, userID, path).
 		First(&row).
 		Error
 	if err != nil {

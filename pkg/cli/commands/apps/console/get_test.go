@@ -67,7 +67,7 @@ func expectValidateDraftVersion(canvasID, versionID string) requestExpectation {
 		path:   "/api/v1/canvases/" + canvasID + "/versions/" + versionID,
 		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `","state":"STATE_DRAFT","canvasId":"` + canvasID + `","owner":{"id":"` + cliTestUserID + `"}}}}`))
+			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `","canvasId":"` + canvasID + `"}}}`))
 		},
 	}
 }
@@ -200,7 +200,7 @@ func TestGetErrorsWhenNoCanvasAndNoActive(t *testing.T) {
 	require.Contains(t, err.Error(), "app-name-or-id")
 }
 
-func TestGetDraftIDSelectsExplicitDraftVersion(t *testing.T) {
+func TestGetDraftIDSelectsExplicitVersion(t *testing.T) {
 	server := newAPITestServer(
 		t,
 		requestExpectation{
@@ -208,28 +208,13 @@ func TestGetDraftIDSelectsExplicitDraftVersion(t *testing.T) {
 			path:   testDescribeCanvas,
 			handle: describeCanvasResponse,
 		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testMePath,
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"user":{"id":"user-1"}}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions/draft-2",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-2","state":"STATE_DRAFT","owner":{"id":"user-1"}}}}`))
-			},
-		},
+		expectValidateDraftVersion(testCanvasID, "version-2"),
 		requestExpectation{
 			method: http.MethodGet,
 			path:   repositoryConsoleFilePath(testCanvasID),
 			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
-				require.Equal(t, "draft-2", r.URL.Query().Get("version_id"))
+				require.Equal(t, "version-2", r.URL.Query().Get("version_id"))
 				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 				_, _ = w.Write([]byte(sampleConsoleYAMLBody))
 			},
@@ -239,7 +224,7 @@ func TestGetDraftIDSelectsExplicitDraftVersion(t *testing.T) {
 	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
 	ctx.Args = []string{testCanvasID}
 
-	draftID := "draft-2"
+	draftID := "version-2"
 	require.NoError(t, (&getCommand{draftID: &draftID}).Execute(ctx))
-	require.Contains(t, stdout.String(), "Version ID: draft-2")
+	require.Contains(t, stdout.String(), "Version ID: version-2")
 }

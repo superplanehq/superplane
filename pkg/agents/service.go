@@ -626,38 +626,8 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 }
 
 func getDraftStatus(canvasID uuid.UUID) string {
-	drafts, err := models.ListDraftCanvasVersions(canvasID)
-	if err != nil {
-		log.WithError(err).Warn("failed to list draft canvas versions")
-		return "[Draft Status]\nUnable to determine draft status."
-	}
-
-	if len(drafts) > 0 {
-		result := "[Draft Status]\n"
-		for _, draft := range drafts {
-			result += fmt.Sprintf(
-				"- Existing draft: version %s (created %s)\n",
-				draft.ID.String(),
-				draftCreatedAt(draft),
-			)
-		}
-		result += "These drafts may belong to other sessions or users. To continue a known draft branch, pass its version_id to 'superplane_app' actions 'read' and 'patch_draft'. patch_draft always requires version_id. Use 'create_draft' when read returned live/no version_id, or when the user explicitly wants another draft branch. Do not assume an unrelated draft is yours.\n"
-		return result
-	}
-
-	latestPublished, err := models.FindLatestPublishedCanvasVersion(canvasID)
-	if err != nil {
-		return noActiveDraftStatus
-	}
-	if !wasRecentlyPublished(latestPublished.PublishedAt) {
-		return noActiveDraftStatus
-	}
-
-	return fmt.Sprintf(
-		"[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
-		latestPublished.ID.String(),
-		latestPublished.PublishedAt.UTC().Format(time.RFC3339),
-	)
+	_ = canvasID
+	return "[Edit Status]\nEdits are staged per user. Use superplane_app actions to stage repository files, then commit with a message. There are no separate draft branches."
 }
 
 func buildCanvasSnapshot(session *models.AgentSession) string {
@@ -743,16 +713,15 @@ func appendDraftSnapshotStatus(builder *strings.Builder, draft *models.CanvasVer
 	}
 
 	if draft == nil {
-		builder.WriteString("owned_draft: none\n")
+		builder.WriteString("owned_staging: none\n")
 		return "live", true
 	}
 
 	builder.WriteString(fmt.Sprintf("owned_draft_version_id: %s\n", draft.ID.String()))
-	builder.WriteString(fmt.Sprintf("owned_draft_display_name: %s\n", draft.DisplayName))
-	return "draft", true
+	return "live", true
 }
 
-const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you need to edit the app, call 'superplane_app' action 'create_draft' first, then pass the returned version_id to 'patch_draft'. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
+const noActiveDraftStatus = "[Edit Status]\nChanges are committed directly to the main branch. Stage edits, then commit with a message."
 
 func draftCreatedAt(draft models.CanvasVersion) string {
 	if draft.CreatedAt == nil {

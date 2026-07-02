@@ -25,14 +25,13 @@ type Canvas struct {
 	Name           string
 	// The `->` tag marks fields as read-only in GORM. These values are projected
 	// from the live version via SELECT aliases; they are not stored on workflows.
-	Description            string                    `gorm:"column:description;->"`
-	Nodes                  datatypes.JSONSlice[Node] `gorm:"column:nodes;->"`
-	Edges                  datatypes.JSONSlice[Edge] `gorm:"column:edges;->"`
-	CreatedBy              *uuid.UUID
-	NextDraftDisplayNumber int `gorm:"column:next_draft_display_number;not null;default:1"`
-	CreatedAt              *time.Time
-	UpdatedAt              *time.Time
-	DeletedAt              gorm.DeletedAt `gorm:"index"`
+	Description string                    `gorm:"column:description;->"`
+	Nodes       datatypes.JSONSlice[Node] `gorm:"column:nodes;->"`
+	Edges       datatypes.JSONSlice[Edge] `gorm:"column:edges;->"`
+	CreatedBy   *uuid.UUID
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) TableName() string {

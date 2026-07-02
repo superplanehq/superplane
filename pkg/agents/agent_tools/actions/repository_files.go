@@ -137,7 +137,6 @@ func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessio
 			ctx,
 			session.OrganizationID,
 			session.CanvasID,
-			versionID,
 			path,
 		)
 		if err != nil {
@@ -199,11 +198,10 @@ func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionC
 		return fileStageResult{}, err
 	}
 
-	state, err := canvasRepository.StageRepositorySpecFileOperations(
+	state, err := canvasRepository.PutCanvasStaging(
 		ctx,
 		session.OrganizationID,
 		session.CanvasID,
-		draft.ID.String(),
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Content: []byte(input.Content)}},
 	)
 	if err != nil {
@@ -236,11 +234,10 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 		return fileStageResult{}, err
 	}
 
-	state, err := canvasRepository.StageRepositorySpecFileOperations(
+	state, err := canvasRepository.PutCanvasStaging(
 		ctx,
 		session.OrganizationID,
 		session.CanvasID,
-		draft.ID.String(),
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Delete: true}},
 	)
 	if err != nil {
@@ -287,10 +284,9 @@ func (a commitFilesAction) Execute(ctx context.Context, session agents.AgentSess
 		a.deps.Registry,
 		session.OrganizationID,
 		session.CanvasID,
-		draft.ID.String(),
+		strings.TrimSpace(input.Message),
 		a.deps.WebhookBaseURL,
 		a.deps.AuthService,
-		strings.TrimSpace(input.Message),
 	)
 	if err != nil {
 		return fileCommitResult{}, err
@@ -301,9 +297,7 @@ func (a commitFilesAction) Execute(ctx context.Context, session agents.AgentSess
 		CanvasID:  session.CanvasID,
 		VersionID: draft.ID.String(),
 		Draft: draftResult{
-			VersionID:   draft.ID.String(),
-			DisplayName: draft.DisplayName,
-			BranchName:  draft.GitBranch,
+			VersionID: draft.ID.String(),
 		},
 		StagingSummary: serializeStagingSummary(response.GetStagingSummary()),
 	}, nil

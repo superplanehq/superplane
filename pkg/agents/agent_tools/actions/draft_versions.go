@@ -10,79 +10,63 @@ import (
 )
 
 func ownedDraftVersions(canvasID, userID uuid.UUID) ([]models.CanvasVersion, error) {
-	drafts, err := models.ListDraftCanvasVersions(canvasID)
-	if err != nil {
-		return nil, err
-	}
-	owned := make([]models.CanvasVersion, 0, len(drafts))
-	for i := range drafts {
-		if models.IsUserOwnedDraftVersion(&drafts[i], userID) && models.IsRegisteredDraftVersion(&drafts[i]) {
-			owned = append(owned, drafts[i])
-		}
-	}
-	return owned, nil
+	_ = canvasID
+	_ = userID
+	return nil, nil
 }
 
 func resolveTargetDraftVersion(canvasID, userID uuid.UUID, input Input) (*models.CanvasVersion, error) {
-	requested, err := requestedDraftVersionID(input)
-	if err != nil {
-		return nil, err
-	}
-	if requested == uuid.Nil {
-		return nil, draftVersionRequiredError(input.Action)
-	}
-	return validatedOwnedDraftVersion(canvasID, userID, requested)
+	return liveCanvasVersion(canvasID, userID, input)
 }
 
 func draftVersionRequiredError(action string) error {
 	switch strings.TrimSpace(action) {
 	case patchDraftActionName:
-		return fmt.Errorf("version_id is required for patch_draft; pass the version_id returned by read, create_draft, or the previous patch_draft; if read returned live with no version_id, call create_draft first")
+		return fmt.Errorf("version_id is optional for patch_draft; edits are staged against the live canvas")
 	case "":
-		return fmt.Errorf("version_id is required; pass the version_id returned by read, create_draft, or the previous draft update; if read returned live with no version_id, call create_draft first")
+		return fmt.Errorf("version_id is optional; edits are staged against the live canvas")
 	default:
-		return fmt.Errorf("version_id is required for %s; pass the version_id returned by read, create_draft, or the previous draft update; if read returned live with no version_id, call create_draft first", strings.TrimSpace(action))
+		return fmt.Errorf("version_id is optional for %s; edits are staged against the live canvas", strings.TrimSpace(action))
 	}
 }
 
 func resolveReadableDraftVersion(canvasID, userID uuid.UUID, input Input) (*models.CanvasVersion, error) {
+	if input.UseDraft != nil && !*input.UseDraft {
+		return nil, nil
+	}
+	return liveCanvasVersion(canvasID, userID, input)
+}
+
+func liveCanvasVersion(canvasID, userID uuid.UUID, input Input) (*models.CanvasVersion, error) {
+	_ = userID
 	requested, err := requestedDraftVersionID(input)
 	if err != nil {
 		return nil, err
 	}
-	if requested != uuid.Nil {
-		return validatedOwnedDraftVersion(canvasID, userID, requested)
+
+	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("load canvas: %w", err)
+	}
+	if canvas.LiveVersionID == nil {
+		return nil, fmt.Errorf("canvas has no live version")
 	}
 
-	drafts, err := ownedDraftVersions(canvasID, userID)
+	liveVersion, err := models.FindCanvasVersion(canvasID, *canvas.LiveVersionID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load live version: %w", err)
 	}
-	switch len(drafts) {
-	case 0:
-		return nil, nil
-	case 1:
-		return &drafts[0], nil
-	default:
-		return nil, fmt.Errorf("multiple owned drafts exist for this app; pass version_id to read a specific draft or use use_draft=false to read live")
+
+	if requested != uuid.Nil && requested != liveVersion.ID {
+		return nil, fmt.Errorf("version_id %s is not the current live version", requested)
 	}
+
+	return liveVersion, nil
 }
 
 func validatedOwnedDraftVersion(canvasID, userID, versionID uuid.UUID) (*models.CanvasVersion, error) {
-	draft, err := models.FindCanvasVersion(canvasID, versionID)
-	if err != nil {
-		return nil, fmt.Errorf("load draft version %s: %w", versionID, err)
-	}
-	if draft.State != models.CanvasVersionStateDraft {
-		return nil, fmt.Errorf("draft version %s is not a draft", versionID)
-	}
-	if !models.IsRegisteredDraftVersion(draft) {
-		return nil, fmt.Errorf("draft version %s is not a registered draft branch", versionID)
-	}
-	if !models.IsUserOwnedDraftVersion(draft, userID) {
-		return nil, fmt.Errorf("draft version %s does not belong to the current user", versionID)
-	}
-	return draft, nil
+	input := Input{VersionID: versionID.String()}
+	return liveCanvasVersion(canvasID, userID, input)
 }
 
 func requestedDraftVersionID(input Input) (uuid.UUID, error) {

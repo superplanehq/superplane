@@ -8,9 +8,9 @@ to the CLI for common app operations.
 
 Prefer adding an action to `superplane_app` when the capability is app-related:
 
-- reading app/canvas or Console YAML (served from the effective staged draft content the UI editor reads: the draft's pending staged edits when present, otherwise the committed draft)
+- reading app/canvas or Console YAML (served from the effective staged content the UI editor reads: the user's pending staged edits when present, otherwise the live version)
 - listing, reading, staging, deleting, or committing normal app repository files such as `README.md`, `AGENTS.md`, or scripts used by file-backed components
-- updating the draft app (`patch_draft` saves graph, Console, and layout edits as the draft's pending staged changes instead of committing them to the draft, exactly like edits made in the UI editor, so the user reviews and commits them)
+- updating the app (`patch_draft` saves graph, Console, and layout edits as pending staged changes against the live canvas, exactly like edits made in the UI editor, so the user reviews and commits them)
 - inspecting agent token permissions (`access`) and runtime state (`read_runtime`)
 - listing connected integrations for the current app context
 - validating or preparing app-specific backend state
@@ -65,9 +65,9 @@ Action rules:
 
 - Always stay scoped to the current `AgentSessionContext`.
 - Reject or ignore attempts to operate on another canvas.
-- Never publish drafts from an agent action. `patch_draft` saves graph, Console, and layout edits as the draft's pending staged changes (exactly like edits made in the UI editor) and never commits the draft or publishes; the user reviews and commits the staged changes.
+- Never commit from an agent action without an explicit user-driven commit step. `patch_draft` saves graph, Console, and layout edits as pending staged changes (exactly like edits made in the UI editor) and never commits or goes live; the user reviews and commits the staged changes with a message.
 - Treat `canvas.yaml` and `console.yaml` as spec files. Agents should update them through `patch_draft`; normal repository file actions are for additional app files.
-- When exposing repository file reads, preserve the same draft semantics as `read`: if exactly one owned draft exists, read its effective staged content; if multiple owned drafts exist, require an explicit `version_id`.
+- When exposing repository file reads, preserve the same staging semantics as `read`: serve effective staged content for the current user when present.
 - Return concise JSON payloads; avoid dumping large unrelated data.
 - Prefer backend APIs and model methods over invoking the CLI.
 
@@ -87,8 +87,8 @@ Managed agents treat these repository file names as context candidates:
 When an app task involves repository files, the agent should use
 `superplane_app` action `list_files`, read any returned context files with
 `read_file`, and then stage normal file edits with `write_file` or
-`delete_file`. `commit_files` commits the staged draft file changes; it does not
-publish the app.
+`delete_file`. `commit_files` commits staged repository file changes to git; it does not
+commit canvas staging or go live.
 
 ## Adding a Top-Level Agent Tool
 

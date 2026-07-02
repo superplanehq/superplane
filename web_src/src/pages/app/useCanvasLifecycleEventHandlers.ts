@@ -1,8 +1,9 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+import type { CanvasesCanvasVersion } from "@/api-client";
 import { consumeLocalStagingWrite } from "@/lib/canvasStagingEcho";
-import { canvasKeys, pruneDeletedDraftBranchFromCache } from "@/hooks/useCanvasData";
+import { canvasKeys } from "@/hooks/useCanvasData";
 
 import { processCanvasLifecycleEvent } from "./lib/canvas-version-lifecycle";
 
@@ -11,7 +12,7 @@ type UseCanvasLifecycleEventHandlersOptions = {
   activeCanvasVersionId: string;
   isEditing: boolean;
   editSessionActive: boolean;
-  isCreatingDraftBranch: boolean;
+  isCreatingDraftBranch?: boolean;
   hasLocalSaveActivity: boolean;
   isViewingLiveVersion: boolean;
   canvasDeletedRemotely: boolean;
@@ -29,7 +30,7 @@ export function useCanvasLifecycleEventHandlers({
   activeCanvasVersionId,
   isEditing,
   editSessionActive,
-  isCreatingDraftBranch,
+  isCreatingDraftBranch = false,
   hasLocalSaveActivity,
   isViewingLiveVersion,
   canvasDeletedRemotely,
@@ -46,7 +47,8 @@ export function useCanvasLifecycleEventHandlers({
   const invalidateCanvasVersionData = useCallback(
     (targetCanvasId: string, targetVersionId?: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(targetCanvasId) });
       if (targetVersionId) {
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(targetCanvasId, targetVersionId) });
       }
@@ -60,7 +62,10 @@ export function useCanvasLifecycleEventHandlers({
         return;
       }
 
-      void pruneDeletedDraftBranchFromCache(queryClient, canvasId, targetVersionId);
+      queryClient.setQueryData<CanvasesCanvasVersion[]>(canvasKeys.versionList(canvasId), (current = []) =>
+        current.filter((version) => version.metadata?.id !== targetVersionId),
+      );
+      queryClient.removeQueries({ queryKey: canvasKeys.versionDetail(canvasId, targetVersionId) });
     },
     [canvasId, queryClient],
   );

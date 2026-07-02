@@ -76,7 +76,7 @@ function isDraftRepositoryFileQuery(queryKey: readonly unknown[], canvasId: stri
 // consoleStaged and staged repositoryFileContent keys all end with "staged";
 // repositoryFile keys feed the visible Files tab editor and include the draft id.
 function invalidateStagedCanvasQueries(queryClient: QueryClient, canvasId: string, versionId: string): void {
-  queryClient.invalidateQueries({ queryKey: canvasKeys.versionStaging(canvasId, versionId) });
+  queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
   queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
   queryClient.invalidateQueries({
     predicate: (query) => {
@@ -151,7 +151,6 @@ export function useCanvasWebsocket(
       }
 
       if (eventName === "canvas_version_deleted") {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
         return;
       }
 

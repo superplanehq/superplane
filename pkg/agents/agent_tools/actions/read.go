@@ -79,9 +79,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 
 	if draft != nil {
 		result.Draft = &draftResult{
-			VersionID:   draft.ID.String(),
-			DisplayName: draft.DisplayName,
-			BranchName:  draft.GitBranch,
+			VersionID: draft.ID.String(),
 		}
 	}
 
