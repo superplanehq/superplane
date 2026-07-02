@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/attachments"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
@@ -167,7 +168,7 @@ func (c *CreateResponse) Setup(ctx core.SetupContext) error {
 
 		// Read the files now so unsupported types, empty files, and size limits
 		// are caught at config time rather than on every execution.
-		if _, err := readAttachments(ctx.Files, spec.Files); err != nil {
+		if _, err := attachments.Read(ctx.Files, spec.Files); err != nil {
 			return err
 		}
 	}
@@ -194,11 +195,11 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	attachments, err := readAttachments(ctx.Files, spec.Files)
+	atts, err := attachments.Read(ctx.Files, spec.Files)
 	if err != nil {
 		return fmt.Errorf("failed to read attachments: %v", err)
 	}
-	input, fileIDs, err := buildInput(client, attachments, spec.Input)
+	input, fileIDs, err := buildInput(client, atts, spec.Input)
 	if err != nil {
 		return err
 	}
@@ -229,15 +230,15 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 // Responses API input: a plain string when there are no attachments, otherwise
 // a user message carrying input_text + input_image/input_file parts referenced
 // by file_id. The returned file IDs should be cleaned up after the request.
-func buildInput(client *Client, attachments []attachment, prompt string) (any, []string, error) {
-	if len(attachments) == 0 {
+func buildInput(client *Client, atts []attachments.Attachment, prompt string) (any, []string, error) {
+	if len(atts) == 0 {
 		return prompt, nil, nil
 	}
 
-	parts := make([]InputPart, 0, len(attachments)+1)
+	parts := make([]InputPart, 0, len(atts)+1)
 	parts = append(parts, InputPart{Type: "input_text", Text: prompt})
-	fileIDs := make([]string, 0, len(attachments))
-	for _, att := range attachments {
+	fileIDs := make([]string, 0, len(atts))
+	for _, att := range atts {
 		purpose := "user_data"
 		if att.IsImage() {
 			purpose = "vision"
