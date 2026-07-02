@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -29,14 +28,6 @@ type Canvas struct {
 	CreatedAt              *time.Time
 	UpdatedAt              *time.Time
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
-
-	//
-	// The `->` tag marks fields as read-only in GORM. Nodes and edges are projected
-	// from the live version via SELECT aliases when using queryCanvasWithLiveVersion.
-	// They are stored in workflow_versions, not on workflows.
-	//
-	Nodes datatypes.JSONSlice[Node] `gorm:"column:nodes;->"`
-	Edges datatypes.JSONSlice[Edge] `gorm:"column:edges;->"`
 }
 
 func (c *Canvas) TableName() string {
@@ -54,17 +45,6 @@ func MapCanvasNameUniqueConstraintError(err error) error {
 	}
 
 	return err
-}
-
-func queryCanvasWithLiveVersion(tx *gorm.DB) *gorm.DB {
-	return tx.
-		Model(&Canvas{}).
-		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
-		Select(
-			"workflows.*",
-			"live_version.nodes AS nodes",
-			"live_version.edges AS edges",
-		)
 }
 
 func withActiveCanvas(tx *gorm.DB, workflowIDColumn string) *gorm.DB {
@@ -290,27 +270,11 @@ func ListCanvases(orgID string) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func ListCanvasesWithLiveVersion(orgID string) ([]Canvas, error) {
-	var canvases []Canvas
-	err := queryCanvasWithLiveVersion(database.Conn()).
-		Where("workflows.organization_id = ?", orgID).
-		Order("workflows.name ASC").
-		Find(&canvases).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return canvases, nil
-}
-
 func ListDeletedCanvases() ([]Canvas, error) {
 	var canvases []Canvas
 	err := database.Conn().
 		Model(&Canvas{}).
 		Unscoped().
-		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
 		Joins("JOIN organizations ON organizations.id = workflows.organization_id").
 		Select(
 			"workflows.id",
