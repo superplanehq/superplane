@@ -6,8 +6,8 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { Search, Settings2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSidebarLayoutStore, useSidebarLayoutViewport, useSidebarMount } from "@/stores/sidebarLayoutStore";
-import { CategorySection, normalizeIntegrationName } from "./CategorySection";
-import { findFirstVisibleBlock } from "./filter";
+import { CategorySection } from "./CategorySection";
+import { findFirstVisibleBlock, normalizeIntegrationName } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 import { useSidebarSettings } from "./useSidebarSettings";
 

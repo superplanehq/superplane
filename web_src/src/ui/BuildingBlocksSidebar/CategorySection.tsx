@@ -5,7 +5,7 @@ import { ChevronRight, Plug } from "lucide-react";
 import { memo, useState, type DragEvent } from "react";
 import { toTestId } from "../../lib/testID";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIconMaps";
-import { filterBlocksInCategory, type TypeFilter } from "./filter";
+import { filterBlocksInCategory, normalizeIntegrationName, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 const TYPE_HOVER_BG: Record<string, string> = {
@@ -152,7 +152,8 @@ export function CategorySection({
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
   const CategoryIcon = categoryIconSrc ? null : resolveCategoryIcon(category.name, integrationName);
-  const integrationStatusColorClass = INTEGRATION_STATE_COLOR[resolveIntegrationState(category, integrations, firstBlock)];
+  const integrationStatusColorClass =
+    INTEGRATION_STATE_COLOR[resolveIntegrationState(category, integrations, firstBlock)];
 
   return (
     <details
@@ -185,10 +186,6 @@ export function CategorySection({
       </ItemGroup>
     </details>
   );
-}
-
-export function normalizeIntegrationName(value?: string) {
-  return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function resolveIntegrationState(
