@@ -32,7 +32,6 @@ import {
   canvasesStageCanvasRepositoryFile,
   canvasesCommitCanvasStaging,
   canvasesDiscardCanvasStaging,
-  canvasesApplyCanvasAutoLayout,
   triggersListTriggers,
   triggersDescribeTrigger,
   widgetsListWidgets,
@@ -48,8 +47,6 @@ import type {
   CanvasesCanvasVersion,
   CanvasesCanvasRepositoryFileOperation,
   CanvasesListCanvasRepositoryFilesResponse,
-  SuperplaneComponentsNode,
-  ComponentsPosition,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { registerLocalStagingWrite } from "../lib/canvasStagingEcho";
@@ -74,8 +71,6 @@ function versionWithSpecFromYaml(
 ): CanvasesCanvasVersion | undefined {
   return canvasVersionWithSpecFromYaml(version, canvasYaml);
 }
-
-type SpecAutoLayout = { algorithm?: string; scope?: string; nodeIds?: string[] };
 
 // stageSpecOperations writes canvas.yaml/console.yaml edits to the draft
 // version's staging layer without mutating the committed version row.
@@ -103,17 +98,6 @@ async function discardStagedPaths(canvasId: string, versionId: string, paths: st
   );
 }
 
-// applyCanvasStagingAutoLayout lays out the staged canvas.yaml and re-stages it.
-async function applyCanvasStagingAutoLayout(canvasId: string, versionId: string, autoLayout: SpecAutoLayout) {
-  registerLocalStagingWrite(canvasId, versionId);
-  await canvasesApplyCanvasAutoLayout(
-    withOrganizationHeader({
-      path: { canvasId, versionId },
-      body: { autoLayout },
-    }),
-  );
-}
-
 // commitCanvasStaging parses the staged spec files into the draft version row
 // and clears staging.
 async function commitCanvasStaging(canvasId: string, versionId: string) {
@@ -125,20 +109,15 @@ async function commitCanvasStaging(canvasId: string, versionId: string) {
   );
 }
 
-// stageCommitSpecOperations stages spec edits, optionally lays out the staged
-// canvas, then commits staging into the draft version row. This preserves the
-// "edit spec -> draft version updated" behavior on top of the staging layer.
+// stageCommitSpecOperations stages spec edits, then commits staging into the
+// draft version row. This preserves the "edit spec -> draft version updated"
+// behavior on top of the staging layer.
 async function stageCommitSpecOperations(
   canvasId: string,
   versionId: string,
   operations: CanvasesCanvasRepositoryFileOperation[],
-  autoLayout?: SpecAutoLayout,
 ) {
   await stageSpecOperations(canvasId, versionId, operations);
-  const touchesCanvasYaml = operations.some((operation) => operation.path === CANVAS_YAML_PATH && !operation.delete);
-  if (autoLayout && touchesCanvasYaml) {
-    await applyCanvasStagingAutoLayout(canvasId, versionId, autoLayout);
-  }
   await commitCanvasStaging(canvasId, versionId);
 }
 
@@ -495,11 +474,6 @@ export const useCanvasVersionStaging = (canvasId: string, versionId: string | un
 type CanvasGraphData = {
   nodes?: unknown[];
   edges?: unknown[];
-};
-
-type PositionedNode = SuperplaneComponentsNode & {
-  id: string;
-  position: ComponentsPosition;
 };
 
 const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
@@ -1017,24 +991,18 @@ export const usePublishCanvasVersion = (canvasId: string) => {
   });
 };
 
-export const useUpdateCanvasVersion = (organizationId: string, canvasId: string) => {
+export const useUpdateCanvasVersion = (canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: {
-      versionId?: string;
-      canvasYaml: string;
-      autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
-      preserveLocalCanvasState?: boolean;
-      invalidateRelatedQueries?: boolean;
-    }) => {
+    mutationFn: async (data: { versionId?: string; canvasYaml: string }) => {
       if (!data.versionId) {
         throw new Error("version id is required");
       }
 
-      // Stage-only: write canvas.yaml to the draft's staging layer and (when
-      // requested) lay it out. The committed version row is only updated by an
-      // explicit Commit (useCommitCanvasStaging).
+      // Stage-only: write canvas.yaml to the draft's staging layer. The
+      // committed version row is only updated by an explicit Commit
+      // (useCommitCanvasStaging).
       const canvasMatchesCommitted = await matchesCommittedCanvasYaml(canvasId, data.versionId, data.canvasYaml);
       if (canvasMatchesCommitted) {
         await discardStagedPaths(canvasId, data.versionId, [CANVAS_YAML_PATH]);
@@ -1045,9 +1013,6 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
             content: encodeRepositoryFileContent(data.canvasYaml),
           },
         ]);
-      }
-      if (data.autoLayout && !canvasMatchesCommitted) {
-        await applyCanvasStagingAutoLayout(canvasId, data.versionId, data.autoLayout);
       }
 
       const [describeResponse, canvasYaml] = await Promise.all([
@@ -1106,73 +1071,6 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         next.sort((left, right) => versionSortTimestamp(right) - versionSortTimestamp(left));
         return next;
       });
-
-      if (!variables.preserveLocalCanvasState) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
-          if (!current) {
-            return current;
-          }
-
-          const currentNodeMetadataById = new Map(
-            (current.spec?.nodes ?? [])
-              .filter((node) => Boolean(node.id) && node.metadata !== undefined && node.metadata !== null)
-              .map((node) => [node.id as string, node.metadata] as const),
-          );
-
-          const mergeServerNodeWithLocalMetadata = (serverNode: SuperplaneComponentsNode): SuperplaneComponentsNode => {
-            if (!serverNode.id) {
-              return serverNode;
-            }
-
-            const localMetadata = currentNodeMetadataById.get(serverNode.id);
-            if (localMetadata === undefined || localMetadata === null || serverNode.metadata !== undefined) {
-              return serverNode;
-            }
-
-            return { ...serverNode, metadata: localMetadata };
-          };
-
-          // When the server computed a new layout (autoLayout), accept the
-          // server positions as authoritative. Otherwise preserve current
-          // local node positions to avoid overwriting positions that changed
-          // while the save was in flight.
-          if (variables.autoLayout) {
-            const mergedNodes = (version.spec?.nodes ?? []).map(mergeServerNodeWithLocalMetadata);
-            return { ...current, spec: { ...current.spec, ...version.spec, nodes: mergedNodes } };
-          }
-
-          const currentPositionsByNodeId = new Map(
-            (current.spec?.nodes ?? [])
-              .filter((node): node is PositionedNode => Boolean(node.id && node.position))
-              .map((node) => [node.id, node.position] as const),
-          );
-
-          const mergedNodes = (version.spec?.nodes ?? []).map((rawServerNode) => {
-            const serverNode = mergeServerNodeWithLocalMetadata(rawServerNode);
-            if (!serverNode.id) {
-              return serverNode;
-            }
-
-            const localPosition = currentPositionsByNodeId.get(serverNode.id);
-            if (localPosition) {
-              return { ...serverNode, position: localPosition };
-            }
-            return serverNode;
-          });
-
-          return {
-            ...current,
-            spec: { ...current.spec, ...version.spec, nodes: mergedNodes },
-          };
-        });
-      }
-
-      if (variables.invalidateRelatedQueries !== false) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-        queryClient.invalidateQueries({
-          queryKey: canvasKeys.repositoryFile(canvasId, CANVAS_YAML_PATH, variables.versionId),
-        });
-      }
     },
   });
 };
@@ -1964,13 +1862,12 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
       operations: CanvasesCanvasRepositoryFileOperation[];
       expectedHeadSha?: string;
       versionId?: string;
-      autoLayout?: SpecAutoLayout;
     }) => {
       if (!input.versionId) {
         throw new Error("version id is required");
       }
 
-      await stageCommitSpecOperations(canvasId, input.versionId, input.operations, input.autoLayout);
+      await stageCommitSpecOperations(canvasId, input.versionId, input.operations);
       return undefined;
     },
     onSuccess: (_data, input) => {
