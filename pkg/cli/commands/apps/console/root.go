@@ -49,7 +49,7 @@ YAML source resolution order:
 		Args: cobra.MaximumNArgs(2),
 	}
 	setCmd.Flags().StringVarP(&setFile, "file", "f", "", `console YAML file path, or "-" for stdin`)
-	setCmd.Flags().StringVar(&setDraftID, "draft-id", "", "target a specific draft by id; skips change-request creation (see `superplane apps drafts list`)")
+	setCmd.Flags().StringVar(&setDraftID, "draft-id", "", "target a specific draft by id instead of auto-publishing (see `superplane apps drafts list`)")
 	core.Bind(setCmd, &setCommand{file: &setFile, draftID: &setDraftID}, options)
 
 	root.AddCommand(getCmd)
