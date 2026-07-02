@@ -16,6 +16,7 @@ const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.ho
       onPaneClick?: (...args: unknown[]) => unknown;
       onEdgeMouseEnter?: (...args: unknown[]) => unknown;
       onEdgeMouseLeave?: (...args: unknown[]) => unknown;
+      onlyRenderVisibleElements?: boolean;
     },
   },
 }));
@@ -188,6 +189,25 @@ describe("CanvasPage connection drop", () => {
       unobserve() {}
       disconnect() {}
     };
+  });
+
+  it("uses padded viewport culling instead of React Flow onlyRenderVisibleElements", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          onEdgeCreate={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(reactFlowPropsRef.current?.onlyRenderVisibleElements).not.toBe(true);
   });
 
   it("does not close the building blocks sidebar from the pane click that follows a connection drop", () => {
