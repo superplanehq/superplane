@@ -699,8 +699,8 @@ func FindLiveCanvasSpecsByCanvasIDs(tx *gorm.DB, canvasIDs []uuid.UUID) (map[uui
 
 	for _, row := range rows {
 		specs[row.WorkflowID] = LiveCanvasSpec{
-			Nodes: append([]Node(nil), row.Nodes...),
-			Edges: append([]Edge(nil), row.Edges...),
+			Nodes: row.Nodes,
+			Edges: row.Edges,
 		}
 	}
 

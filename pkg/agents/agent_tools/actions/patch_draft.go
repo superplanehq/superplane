@@ -58,7 +58,8 @@ func (a patchDraftAction) Execute(ctx context.Context, session agents.AgentSessi
 		return updateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
-	canvas, err := models.FindCanvas(target.organizationID, canvasID)
+	tx := database.DB(ctx)
+	canvas, err := models.FindCanvasInTransaction(tx, target.organizationID, canvasID)
 	if err != nil {
 		return updateResult{}, fmt.Errorf("load canvas: %w", err)
 	}
