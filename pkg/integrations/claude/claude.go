@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/claude/runagent"
+	"github.com/superplanehq/superplane/pkg/integrations/claude/runcodeagent"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -53,6 +54,7 @@ func (i *Claude) Actions() []core.Action {
 	return []core.Action{
 		&TextPrompt{},
 		&runagent.RunAgent{},
+		&runcodeagent.RunCodeAgent{},
 	}
 }
 
