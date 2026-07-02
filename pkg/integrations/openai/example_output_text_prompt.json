@@ -3,6 +3,10 @@
     "data": {
         "id": "cmpl-1234567890",
         "model": "gpt-5.2",
+        "parsed": {
+            "summary": "Hello, world!",
+            "language": "en"
+        },
         "text": "Hello, world!",
         "usage": {
             "input_tokens": 10,
