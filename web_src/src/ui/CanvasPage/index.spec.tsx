@@ -16,6 +16,7 @@ const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.ho
       onPaneClick?: (...args: unknown[]) => unknown;
       onEdgeMouseEnter?: (...args: unknown[]) => unknown;
       onEdgeMouseLeave?: (...args: unknown[]) => unknown;
+      onInit?: (instance: { setViewport: (viewport: unknown) => void }) => void;
       onlyRenderVisibleElements?: boolean;
     },
   },
@@ -585,5 +586,171 @@ describe("CanvasPage connection drop", () => {
     expect(screen.getByTestId("live-node-detail-pane")).toBeInTheDocument();
     expect(screen.getByTestId("live-bottom-inspector-empty")).toBeInTheDocument();
     expect(screen.getByText("Select component to inspect")).toBeInTheDocument();
+  });
+});
+
+describe("CanvasPage fit-to-view on canvas/version switch", () => {
+  beforeEach(() => {
+    reactFlowPropsRef.current = null;
+    fitViewMock.mockClear();
+    fitViewMock.mockResolvedValue(true);
+    getNodesMock.mockReset();
+    getNodesMock.mockReturnValue([]);
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  });
+
+  const singleNode = [
+    {
+      id: "node-1",
+      position: { x: 0, y: 0 },
+      data: { label: "Node", state: "pending" as const, type: "component" as const },
+    },
+  ];
+
+  function renderCanvas(overrides: {
+    fitViewContentKey?: string;
+    hasFitToViewRef: { current: boolean };
+    lastFittedContentKeyRef: { current: string | null };
+  }) {
+    return render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={singleNode}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="v1"
+          {...overrides}
+        />
+      </MemoryRouter>,
+    );
+  }
+
+  it("fits to view and stamps the content key on first initialization", () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    renderCanvas({ fitViewContentKey: "canvas-1:v1", hasFitToViewRef, lastFittedContentKeyRef });
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+    expect(lastFittedContentKeyRef.current).toBe("canvas-1:v1");
+  });
+
+  it("re-fits when the content key changes (canvas/version switch)", () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    const { rerender } = renderCanvas({
+      fitViewContentKey: "canvas-1:v1",
+      hasFitToViewRef,
+      lastFittedContentKeyRef,
+    });
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+
+    // Simulate switching to another version: refs persist across the remount.
+    rerender(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={singleNode}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="v2"
+          fitViewContentKey="canvas-1:v2"
+          hasFitToViewRef={hasFitToViewRef}
+          lastFittedContentKeyRef={lastFittedContentKeyRef}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(2);
+    expect(lastFittedContentKeyRef.current).toBe("canvas-1:v2");
+  });
+
+  it("re-fits without a remount once the previewed version's nodes arrive", () => {
+    vi.useFakeTimers();
+    try {
+      const hasFitToViewRef = { current: false };
+      const lastFittedContentKeyRef = { current: null as string | null };
+      const workflowNodes = [{ id: "node-1", type: "TYPE_ACTION" as const, name: "Node" }];
+
+      const canvas = (fitViewContentKey: string) => (
+        <MemoryRouter>
+          <CanvasPage
+            title="Canvas"
+            headerMode="version-live"
+            nodes={singleNode}
+            edges={[]}
+            buildingBlocks={[]}
+            isEditing={false}
+            activeCanvasVersionId="v1"
+            fitViewContentKey={fitViewContentKey}
+            hasFitToViewRef={hasFitToViewRef}
+            lastFittedContentKeyRef={lastFittedContentKeyRef}
+            workflowNodes={workflowNodes}
+          />
+        </MemoryRouter>
+      );
+
+      // Previewing a published version renders the stale live graph first.
+      const { rerender } = render(canvas("canvas-1:live"));
+      act(() => {
+        reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+      });
+      expect(fitViewMock).toHaveBeenCalledTimes(1);
+      expect(lastFittedContentKeyRef.current).toBe("canvas-1:live");
+
+      // The version's spec loads without a remount: the content key flips to the
+      // version, so the graph must re-fit to the real nodes rather than stay stale.
+      rerender(canvas("canvas-1:v2"));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(fitViewMock).toHaveBeenCalledTimes(2);
+      expect(lastFittedContentKeyRef.current).toBe("canvas-1:v2");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("restores the stored viewport instead of re-fitting when the content key is unchanged", () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    renderCanvas({ fitViewContentKey: "canvas-1:v1", hasFitToViewRef, lastFittedContentKeyRef });
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+
+    const setViewport = vi.fn();
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport });
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+    expect(setViewport).toHaveBeenCalled();
   });
 });
