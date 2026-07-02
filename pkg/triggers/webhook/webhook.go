@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MaxEventSize             = 64 * 1024
+	MaxEventSize             = 512 * 1024
 	DefaultHeaderTokenName   = "X-Webhook-Token"
 	DefaultSignatureHeader   = "X-Signature-256"
 	MinSignatureHeaderLength = 1
@@ -83,7 +83,7 @@ The webhook payload includes:
 
 - Each webhook has a unique secret key for authentication
 - Secrets can be reset using the "Reset Authentication" action
-- Maximum payload size: 64KB
+- Maximum payload size: 512KB
 
 ## Example Usage
 

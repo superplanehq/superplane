@@ -24,9 +24,9 @@ func TestMaxEmitCount(t *testing.T) {
 }
 
 func TestMaxPayloadSize(t *testing.T) {
-	t.Run("defaults to 64 KiB", func(t *testing.T) {
+	t.Run("defaults to 512 KiB", func(t *testing.T) {
 		t.Setenv("SUPERPLANE_MAX_PAYLOAD_SIZE", "")
-		assert.Equal(t, 64*1024, MaxPayloadSize())
+		assert.Equal(t, 512*1024, MaxPayloadSize())
 	})
 
 	t.Run("reads SUPERPLANE_MAX_PAYLOAD_SIZE", func(t *testing.T) {
@@ -36,6 +36,6 @@ func TestMaxPayloadSize(t *testing.T) {
 
 	t.Run("ignores invalid env values", func(t *testing.T) {
 		t.Setenv("SUPERPLANE_MAX_PAYLOAD_SIZE", "not-a-number")
-		assert.Equal(t, 64*1024, MaxPayloadSize())
+		assert.Equal(t, 512*1024, MaxPayloadSize())
 	})
 }
