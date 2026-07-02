@@ -1,11 +1,37 @@
 import { describe, expect, it } from "vitest";
+import type { InternalNode, Node } from "@xyflow/react";
 import {
   CANVAS_VIEWPORT_CULL_PADDING_PX,
   getPaddedViewportScreenRect,
   getVisibleEdgeIdsInPaddedViewport,
   getVisibleNodeIdsInPaddedViewport,
+  includeCanvasNodesThatMustStayMounted,
   shouldKeepCanvasNodeVisible,
 } from "./canvasViewportCulling";
+
+function internalNode(
+  id: string,
+  position: { x: number; y: number },
+  options: Partial<InternalNode<Node>> = {},
+): InternalNode<Node> {
+  const userNode: Node = {
+    id,
+    position,
+    data: {},
+  };
+
+  return {
+    ...userNode,
+    measured: { width: 240, height: 120 },
+    internals: {
+      positionAbsolute: position,
+      handleBounds: { source: [], target: [] },
+      userNode,
+      z: 0,
+    },
+    ...options,
+  };
+}
 
 describe("canvasViewportCulling", () => {
   it("expands the viewport rect by the configured padding", () => {
@@ -19,42 +45,9 @@ describe("canvasViewportCulling", () => {
 
   it("keeps nodes inside the padded viewport visible", () => {
     const nodeLookup = new Map([
-      [
-        "on-screen",
-        {
-          id: "on-screen",
-          measured: { width: 240, height: 120 },
-          internals: {
-            positionAbsolute: { x: 100, y: 100 },
-            handleBounds: { source: [], target: [] },
-            z: 0,
-          },
-        },
-      ],
-      [
-        "near-edge",
-        {
-          id: "near-edge",
-          measured: { width: 240, height: 120 },
-          internals: {
-            positionAbsolute: { x: 980, y: 100 },
-            handleBounds: { source: [], target: [] },
-            z: 0,
-          },
-        },
-      ],
-      [
-        "far-offscreen",
-        {
-          id: "far-offscreen",
-          measured: { width: 240, height: 120 },
-          internals: {
-            positionAbsolute: { x: 5000, y: 5000 },
-            handleBounds: { source: [], target: [] },
-            z: 0,
-          },
-        },
-      ],
+      ["on-screen", internalNode("on-screen", { x: 100, y: 100 })],
+      ["near-edge", internalNode("near-edge", { x: 980, y: 100 })],
+      ["far-offscreen", internalNode("far-offscreen", { x: 5000, y: 5000 })],
     ]);
 
     const visibleNodeIds = getVisibleNodeIdsInPaddedViewport(nodeLookup, 1000, 800, [0, 0, 1]);
@@ -62,6 +55,51 @@ describe("canvasViewportCulling", () => {
     expect(visibleNodeIds.has("on-screen")).toBe(true);
     expect(visibleNodeIds.has("near-edge")).toBe(true);
     expect(visibleNodeIds.has("far-offscreen")).toBe(false);
+  });
+
+  it("allows previously hidden nodes to become visible again", () => {
+    const nodeLookup = new Map([
+      ["hidden-on-screen", internalNode("hidden-on-screen", { x: 100, y: 100 }, { hidden: true })],
+    ]);
+
+    const visibleNodeIds = getVisibleNodeIdsInPaddedViewport(nodeLookup, 1000, 800, [0, 0, 1]);
+
+    expect(visibleNodeIds.has("hidden-on-screen")).toBe(true);
+  });
+
+  it("keeps nodes visible while they are waiting for measurement", () => {
+    const nodeLookup = new Map([
+      ["unmeasured", internalNode("unmeasured", { x: 5000, y: 5000 }, { measured: { width: 0, height: 0 } })],
+    ]);
+
+    const visibleNodeIds = getVisibleNodeIdsInPaddedViewport(nodeLookup, 1000, 800, [0, 0, 1]);
+
+    expect(visibleNodeIds.has("unmeasured")).toBe(true);
+  });
+
+  it("keeps prop nodes visible until React Flow adds them to the lookup", () => {
+    const visibleNodeIds = includeCanvasNodesThatMustStayMounted(
+      new Set(["known-visible"]),
+      new Map([["known-hidden", internalNode("known-hidden", { x: 5000, y: 5000 })]]),
+      [
+        { id: "known-hidden", position: { x: 5000, y: 5000 }, data: {} },
+        { id: "not-yet-measured", position: { x: 100, y: 100 }, data: {} },
+      ],
+    );
+
+    expect(visibleNodeIds.has("known-visible")).toBe(true);
+    expect(visibleNodeIds.has("known-hidden")).toBe(false);
+    expect(visibleNodeIds.has("not-yet-measured")).toBe(true);
+  });
+
+  it("keeps interactive prop nodes visible even when they are outside the viewport", () => {
+    const visibleNodeIds = includeCanvasNodesThatMustStayMounted(
+      new Set<string>(),
+      new Map([["selected", internalNode("selected", { x: 5000, y: 5000 })]]),
+      [{ id: "selected", position: { x: 5000, y: 5000 }, data: {}, selected: true }],
+    );
+
+    expect(visibleNodeIds.has("selected")).toBe(true);
   });
 
   it("keeps edges visible when either endpoint is visible", () => {
