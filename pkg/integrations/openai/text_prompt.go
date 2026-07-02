@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/integrations/structuredoutput"
 )
 
 const ResponsePayloadType = "openai.response"
