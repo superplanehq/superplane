@@ -72,7 +72,7 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import type { CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
-import { computeFitViewContentKey } from "@/ui/CanvasPage/fitView";
+import { resolveFitViewVersionId } from "@/ui/CanvasPage/fitView";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -4489,7 +4489,7 @@ export function AppPage() {
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunInspectionMode ? runsViewportRef : viewportRef}
-          fitViewContentKey={computeFitViewContentKey({ isRunInspectionMode, canvasId, canvasViewKey })}
+          fitViewContentKey={`${canvasId}:${resolveFitViewVersionId({ liveCanvasVersionId, activeCanvasVersionId, isViewingDraftVersion, draftSpec: draftSpecToRender, selectedVersion: selectedCanvasVersion })}`}
           lastFittedContentKeyRef={lastFittedContentKeyRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           fitAllFocusNodeIds={

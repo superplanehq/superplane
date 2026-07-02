@@ -2073,7 +2073,7 @@ function CanvasContent({
   onZoomChange,
   hasFitToViewRef,
   viewportRefProp,
-  fitViewContentKey,
+  fitViewContentKey: fitViewContentKeyProp,
   lastFittedContentKeyRef,
   onPendingConnectionNodeClick,
   onNodeClick,
@@ -2163,6 +2163,9 @@ function CanvasContent({
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
+  // Run inspection keeps its own dedicated fit/viewport handling, so the
+  // content-key driven re-fit only applies to the live/version canvas.
+  const fitViewContentKey = isRunInspectionMode ? undefined : fitViewContentKeyProp;
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
   // Similar to existing keyboard shortcuts that check (e.ctrlKey || e.metaKey)
@@ -2667,6 +2670,35 @@ function CanvasContent({
       lastFittedContentKeyRef,
     ],
   );
+
+  // Re-fit when the displayed content changes without a remount. `handleInit` only
+  // runs on mount, so previewing a published version whose spec loads afterwards (or
+  // any switch whose nodes arrive late) would otherwise keep the stale viewport. We
+  // wait for the real nodes for the new content key to be present, then fit and stamp.
+  useEffect(() => {
+    if (!hasReactFlowInitialized || !hasFitToViewRef.current) return;
+    if (fitViewContentKey === undefined) return;
+    if ((lastFittedContentKeyRef?.current ?? null) === fitViewContentKey) return;
+    if ((workflowNodes?.length ?? 0) === 0) return;
+    const id = window.setTimeout(() => {
+      fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 500 });
+      const viewport = getViewport();
+      viewportRef.current = viewport;
+      reportZoom(viewport.zoom);
+      stampFittedContentKey(lastFittedContentKeyRef, fitViewContentKey);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [
+    fitViewContentKey,
+    lastFittedContentKeyRef,
+    workflowNodes,
+    hasReactFlowInitialized,
+    hasFitToViewRef,
+    fitView,
+    getViewport,
+    reportZoom,
+    viewportRef,
+  ]);
 
   // Fit all currently-rendered nodes into view whenever the parent bumps `fitAllRequest`.
   // Wait a microtask so ReactFlow has measured the just-swapped node set (e.g. switching

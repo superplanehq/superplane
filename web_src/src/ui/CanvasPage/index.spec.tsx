@@ -687,6 +687,53 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
     expect(lastFittedContentKeyRef.current).toBe("canvas-1:v2");
   });
 
+  it("re-fits without a remount once the previewed version's nodes arrive", () => {
+    vi.useFakeTimers();
+    try {
+      const hasFitToViewRef = { current: false };
+      const lastFittedContentKeyRef = { current: null as string | null };
+      const workflowNodes = [{ id: "node-1", type: "TYPE_ACTION" as const, name: "Node" }];
+
+      const canvas = (fitViewContentKey: string) => (
+        <MemoryRouter>
+          <CanvasPage
+            title="Canvas"
+            headerMode="version-live"
+            nodes={singleNode}
+            edges={[]}
+            buildingBlocks={[]}
+            isEditing={false}
+            activeCanvasVersionId="v1"
+            fitViewContentKey={fitViewContentKey}
+            hasFitToViewRef={hasFitToViewRef}
+            lastFittedContentKeyRef={lastFittedContentKeyRef}
+            workflowNodes={workflowNodes}
+          />
+        </MemoryRouter>
+      );
+
+      // Previewing a published version renders the stale live graph first.
+      const { rerender } = render(canvas("canvas-1:live"));
+      act(() => {
+        reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+      });
+      expect(fitViewMock).toHaveBeenCalledTimes(1);
+      expect(lastFittedContentKeyRef.current).toBe("canvas-1:live");
+
+      // The version's spec loads without a remount: the content key flips to the
+      // version, so the graph must re-fit to the real nodes rather than stay stale.
+      rerender(canvas("canvas-1:v2"));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(fitViewMock).toHaveBeenCalledTimes(2);
+      expect(lastFittedContentKeyRef.current).toBe("canvas-1:v2");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("restores the stored viewport instead of re-fitting when the content key is unchanged", () => {
     const hasFitToViewRef = { current: false };
     const lastFittedContentKeyRef = { current: null as string | null };
