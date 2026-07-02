@@ -1,6 +1,7 @@
 package runcodeagent
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -414,4 +415,68 @@ func Test__RunCodeAgent__poll__errorReclaims(t *testing.T) {
 		}
 	}
 	assert.True(t, deleted, "session should be reclaimed after repeated poll errors")
+}
+
+// failingEmitState wraps the execution-state double to force Emit to fail,
+// without modifying the shared test-support package.
+type failingEmitState struct {
+	*contexts.ExecutionStateContext
+	err error
+}
+
+func (f *failingEmitState) Emit(channel, payloadType string, payloads []any) error {
+	return f.err
+}
+
+func Test__RunCodeAgent__poll__timeoutEmitFailurePreservesSession(t *testing.T) {
+	a := &RunCodeAgent{}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"sess_1","status":"running"}`), // get session (still running)
+	}}
+	execState := &failingEmitState{
+		ExecutionStateContext: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		err:                   fmt.Errorf("boom"),
+	}
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(maxPollAttempts + 1), "errors": float64(0)},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       terminalMeta(),
+		ExecutionState: execState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.Error(t, a.HandleHook(hookCtx))
+	assert.False(t, execState.Finished)
+	// The session must NOT be deleted when the emit fails, so a retry can recover.
+	for _, r := range httpCtx.Requests {
+		assert.NotEqual(t, http.MethodDelete, r.Method, "session must survive an emit failure")
+	}
+}
+
+func Test__RunCodeAgent__poll__missingSessionFinishesError(t *testing.T) {
+	a := &RunCodeAgent{}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{}`), resp(`{}`), resp(`{}`), // teardown of stray env/vault/agent
+	}}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{Metadata: ExecutionMetadata{
+		AgentID: "agent_1", EnvironmentID: "env_1", VaultID: "vault_1", Branch: "b",
+	}}
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(0)},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       metadataCtx,
+		ExecutionState: execState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, execState.Finished)
+	assert.Equal(t, "error", execState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
 }
