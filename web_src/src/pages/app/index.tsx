@@ -544,6 +544,10 @@ export function AppPage() {
     const totalCount = pages[0]?.totalCount || 0;
     return { runs, totalCount };
   }, [infiniteRunsQuery.data]);
+  const runningRunsCount = useMemo(
+    () => runsData.runs.filter((run) => run.state === "STATE_STARTED").length,
+    [runsData.runs],
+  );
   const logRunsData = useMemo(() => {
     const pages = infiniteLogRunsQuery.data?.pages || [];
     const seen = new Set<string>();
@@ -3771,6 +3775,27 @@ export function AppPage() {
     infiniteRunsPages: infiniteRunsQuery.data?.pages,
   });
 
+  // Unified inspector: when a live node is selected, resolve the latest run it
+  // participated in so the inspector's Runs tab can show that run's steps. Runs
+  // from the list already carry their per-node executions (and the trigger node
+  // via rootEvent), so we can match directly without loading per-node activity.
+  const liveInspectorNodeId =
+    liveSidebarRunLookupEnabled && searchParams.get("sidebar") === "1" ? searchParams.get("node") : null;
+  const liveSelectedNodeRun = useMemo(() => {
+    if (!liveInspectorNodeId) return null;
+    let latest: CanvasesCanvasRun | null = null;
+    for (const run of runsData.runs) {
+      const participates =
+        run.rootEvent?.nodeId === liveInspectorNodeId ||
+        (run.executions ?? []).some((execution) => execution.nodeId === liveInspectorNodeId);
+      if (!participates) continue;
+      if (!latest || (run.createdAt ?? "") > (latest.createdAt ?? "")) {
+        latest = run;
+      }
+    }
+    return latest;
+  }, [liveInspectorNodeId, runsData.runs]);
+
   const handleSelectRunFromSidebarEvent = useCallback(
     (runId: string, options?: { nodeId?: string }) => {
       exitEditableVersionForRunInspection();
@@ -3897,6 +3922,25 @@ export function AppPage() {
   const handleSelectLiveCanvas = useCallback(() => {
     handleClearRunInspection();
   }, [handleClearRunInspection]);
+
+  // Exits run inspection back to the live canvas in a single interaction. Unlike
+  // handleClearRunInspection, the URL params are cleared urgently (not inside a
+  // transition) so an expanded run step is dropped and inspection is left in one
+  // click rather than two.
+  const handleExitRunInspectionToLiveCanvas = useCallback(() => {
+    setRunDetailNodeId(null);
+    setFocusRequest(null);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("run");
+        next.delete("sidebar");
+        next.delete("node");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setRunDetailNodeId, setFocusRequest, setSearchParams]);
 
   const { handleSelectConsoleMode, handleExitConsoleMode } = useConsoleModeActions({
     setIsConsoleAddPanelOpen,
@@ -4509,7 +4553,10 @@ export function AppPage() {
           runNodeDetailRun={isRunInspectionMode ? selectedRun : null}
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
+          liveSelectedNodeRun={liveSelectedNodeRun}
+          runningRunsCount={runningRunsCount}
           onRunNodeDetailClose={() => handleRunNodeDetailSelection(null)}
+          onExitRunInspection={handleExitRunInspectionToLiveCanvas}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           runNodeDetailPaneHeight={runNodeDetailPaneHeight}
           onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}

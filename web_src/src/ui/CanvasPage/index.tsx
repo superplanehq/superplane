@@ -82,9 +82,7 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
-import { RunInspectionSidePanel } from "../Runs/RunInspectionSidePanel";
-import { ResizableBottomPane } from "./ResizableBottomPane";
-import { LiveBottomInspectorEmptyState } from "./LiveBottomInspectorEmptyState";
+import { RunPanel } from "../Runs/RunPanel";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -342,8 +340,14 @@ export interface CanvasPageProps {
   runNodeDetailRun?: CanvasesCanvasRun | null;
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
+  /** Live mode: the latest run the currently selected live node participated in (drives the unified Runs tab). */
+  liveSelectedNodeRun?: CanvasesCanvasRun | null;
+  /** Count of currently running runs, shown as an animated badge on the runs-sidebar toggle. */
+  runningRunsCount?: number;
   onRunNodeDetailClose?: () => void;
   onRunNodeDetailNavigate?: (nodeId: string) => void;
+  /** Exits run inspection entirely and returns to the live canvas. */
+  onExitRunInspection?: () => void;
   runNodeDetailPaneHeight?: number;
   onRunNodeDetailPaneHeightChange?: (height: number) => void;
 
@@ -741,7 +745,6 @@ function CanvasPage(props: CanvasPageProps) {
   const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
-  const [liveNodeDetailPaneHeight, setLiveNodeDetailPaneHeight] = useState(320);
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const localHasFitToViewRef = useRef(false);
@@ -787,6 +790,7 @@ function CanvasPage(props: CanvasPageProps) {
   const runsSidebarState = {
     ...runsSidebarBaseState,
     showRunsSidebarToggle: showRunsSidebar,
+    runningRunsCount: props.runningRunsCount,
   };
   const isRunsSidebarOpen = showRunsSidebar && runsSidebarBaseState.isRunsSidebarOpen;
 
@@ -1215,14 +1219,27 @@ function CanvasPage(props: CanvasPageProps) {
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
 
-  const liveBottomInspectorOpen = !props.isRunInspectionMode && !props.isEditing && state.componentSidebar.isOpen;
+  // On the live canvas the inspector only exists while a node is selected;
+  // clicking empty canvas clears the selection and closes the panel entirely
+  // (no "select a component" placeholder).
+  const liveBottomInspectorOpen =
+    !props.isRunInspectionMode &&
+    !props.isEditing &&
+    state.componentSidebar.isOpen &&
+    !!state.componentSidebar.selectedNodeId;
 
   // The run's step accordion now lives in a right-side panel that opens as soon
   // as a run is selected (a node does not need to be picked yet). The expanded
   // step, if any, is driven by runNodeDetailNodeId.
   const runInspectionPanelOpen = props.isRunInspectionMode && !!props.runNodeDetailRun && !!props.runNodeDetailCanvasId;
 
-  const bottomDetailPaneOpen = liveBottomInspectorOpen;
+  const liveSelectedNodeId = state.componentSidebar.selectedNodeId;
+  const [liveExpandedNodeId, setLiveExpandedNodeId] = useState<string | null>(null);
+
+  // A newly selected live node starts with its own step expanded in the run panel.
+  useEffect(() => {
+    setLiveExpandedNodeId(null);
+  }, [liveSelectedNodeId]);
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1313,7 +1330,7 @@ function CanvasPage(props: CanvasPageProps) {
     <div
       ref={canvasWrapperRef}
       className={cn(
-        "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
+        "h-full w-full overflow-hidden sp-canvas relative flex flex-row",
         (props.headerMode === "version-live" ||
           props.headerMode === "console" ||
           props.headerMode === "memory" ||
@@ -1323,225 +1340,245 @@ function CanvasPage(props: CanvasPageProps) {
         props.isEditing && "sp-canvas-editing",
       )}
     >
-      {/* Header at the top spanning full width */}
-      <div className="relative z-40">
-        <CanvasContentHeader
-          canvasName={props.title ?? ""}
-          organizationId={props.organizationId}
-          onPublishVersion={props.onPublishVersion}
-          onDiscardVersion={props.onDiscardVersion}
-          onShowDiff={props.onShowDiff}
-          onShowConsoleDiff={props.onShowConsoleDiff}
-          visualDiffEnabled={props.visualDiffEnabled}
-          draftVisualDiff={props.draftVisualDiff}
-          draftConsoleDiff={props.draftConsoleDiff}
-          onToggleVisualDiff={props.onToggleVisualDiff}
-          publishVersionDisabled={props.publishVersionDisabled}
-          publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
-          discardVersionDisabled={props.discardVersionDisabled}
-          discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
-          hasStagingChanges={props.hasStagingChanges}
-          onCommitStaging={props.onCommitStaging}
-          commitStagingPending={props.commitStagingPending}
-          resetStagingPending={props.resetStagingPending}
-          onResetStaging={props.onResetStaging}
-          headerMode={props.headerMode}
-          isEditing={props.isEditing}
-          isEditSessionActive={props.isEditSessionActive}
-          onSelectCanvasView={props.onSelectCanvasView}
-          onEnterEditMode={props.onEnterEditMode}
-          enterEditModeDisabled={props.enterEditModeDisabled}
-          enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
-          onExitEditMode={props.onExitEditMode}
-          exitEditModeDisabled={props.exitEditModeDisabled}
-          exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          onSelectConsole={props.onSelectConsole}
-          onSelectMemory={props.onSelectMemory}
-          onSelectFiles={props.onSelectFiles}
-          filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
-          publishVersionLabel={props.publishVersionLabel}
-          hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
-          hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
-          hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
-          hasFilesStagingChanges={props.hasFilesStagingChanges}
-          hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
-          hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
-          hasUncommittedFilesDraftChanges={props.hasUncommittedFilesDraftChanges}
-          hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
-          hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
-          hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
-          editTabTone={props.editTabTone}
-          activeDraftBranchLabel={props.activeDraftBranchLabel}
-          activeDraftBranchShortSha={props.activeDraftBranchShortSha}
-          showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          toolSidebarState={toolSidebarState}
-          runsSidebarState={runsSidebarState}
-          versionsSidebarState={versionsSidebarState}
-        />
-        {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
-      </div>
+      {/* Left column: header + main content, pushed to the left half when a panel is open */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {/* Header at the top spanning full width */}
+        <div className="relative z-40">
+          <CanvasContentHeader
+            canvasName={props.title ?? ""}
+            organizationId={props.organizationId}
+            onPublishVersion={props.onPublishVersion}
+            onDiscardVersion={props.onDiscardVersion}
+            onShowDiff={props.onShowDiff}
+            onShowConsoleDiff={props.onShowConsoleDiff}
+            visualDiffEnabled={props.visualDiffEnabled}
+            draftVisualDiff={props.draftVisualDiff}
+            draftConsoleDiff={props.draftConsoleDiff}
+            onToggleVisualDiff={props.onToggleVisualDiff}
+            publishVersionDisabled={props.publishVersionDisabled}
+            publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+            discardVersionDisabled={props.discardVersionDisabled}
+            discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+            hasStagingChanges={props.hasStagingChanges}
+            onCommitStaging={props.onCommitStaging}
+            commitStagingPending={props.commitStagingPending}
+            resetStagingPending={props.resetStagingPending}
+            onResetStaging={props.onResetStaging}
+            headerMode={props.headerMode}
+            isEditing={props.isEditing}
+            isEditSessionActive={props.isEditSessionActive}
+            onSelectCanvasView={props.onSelectCanvasView}
+            onEnterEditMode={props.onEnterEditMode}
+            enterEditModeDisabled={props.enterEditModeDisabled}
+            enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+            onExitEditMode={props.onExitEditMode}
+            exitEditModeDisabled={props.exitEditModeDisabled}
+            exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
+            onSelectConsole={props.onSelectConsole}
+            onSelectMemory={props.onSelectMemory}
+            onSelectFiles={props.onSelectFiles}
+            filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
+            publishVersionLabel={props.publishVersionLabel}
+            hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+            hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
+            hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
+            hasFilesStagingChanges={props.hasFilesStagingChanges}
+            hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
+            hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
+            hasUncommittedFilesDraftChanges={props.hasUncommittedFilesDraftChanges}
+            hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
+            hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
+            hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
+            editTabTone={props.editTabTone}
+            activeDraftBranchLabel={props.activeDraftBranchLabel}
+            activeDraftBranchShortSha={props.activeDraftBranchShortSha}
+            showCanvasSettingsMenu={props.showCanvasSettingsMenu}
+            toolSidebarState={toolSidebarState}
+            runsSidebarState={runsSidebarState}
+            versionsSidebarState={versionsSidebarState}
+          />
+          {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
+        </div>
 
-      {/* Main content area with sidebar and canvas */}
-      <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <CanvasToolSidebar toolSidebarState={toolSidebarState} />
+        {/* Main content area with sidebar and canvas */}
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+          <CanvasToolSidebar toolSidebarState={toolSidebarState} />
 
-        <CanvasRunsSidebar isOpen={isRunsSidebarOpen}>{props.toolSidebarRunsContent ?? null}</CanvasRunsSidebar>
+          <CanvasRunsSidebar isOpen={isRunsSidebarOpen}>{props.toolSidebarRunsContent ?? null}</CanvasRunsSidebar>
 
-        <CanvasVersionsSidebar isOpen={isVersionsSidebarOpen}>
-          {props.toolSidebarVersionsContent ?? null}
-        </CanvasVersionsSidebar>
+          <CanvasVersionsSidebar isOpen={isVersionsSidebarOpen}>
+            {props.toolSidebarVersionsContent ?? null}
+          </CanvasVersionsSidebar>
 
-        {isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
-          props.headerMode === "console" ? null : (
+          {isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
+            props.headerMode === "console" ? null : (
+              <RightSideControls
+                mode="edit"
+                canvasEditControls
+                onSidebarOpen={handleBuildingBlocksShortcutOpen}
+                onAddNote={handleAddNote}
+              />
+            )
+          ) : (
             <RightSideControls
-              mode="edit"
-              canvasEditControls
+              mode={readOnly ? "live" : "edit"}
               onSidebarOpen={handleBuildingBlocksShortcutOpen}
               onAddNote={handleAddNote}
             />
-          )
-        ) : (
-          <RightSideControls
-            mode={readOnly ? "live" : "edit"}
-            onSidebarOpen={handleBuildingBlocksShortcutOpen}
-            onAddNote={handleAddNote}
-          />
-        )}
-        {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
-          <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen && !!props.isEditing && allowsBuildingBlocksSidebar(workflowHeaderMode)}
-            onToggle={handleSidebarToggle}
-            blocks={props.buildingBlocks || []}
-            integrations={props.integrations}
-            canvasZoom={canvasZoom}
-            disabled={readOnly}
-            disabledMessage="You don't have permission to edit this canvas."
-            onBlockClick={handleBuildingBlockSelect}
-            onEnterSubmit={handleBuildingBlockSelect}
-          />
-        )}
-
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="relative min-h-0 flex-1">
-            {props.runCanvasLoading && props.isRunInspectionMode ? (
-              <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
-                <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm">
-                  <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
-                </div>
-              </div>
-            ) : null}
-            {showPreviewFloatingBar ? (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
-                <div className="pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-full bg-gray-500 pl-3 pr-1.5 py-1.5">
-                  <span className="flex min-w-0 max-w-full shrink-0 truncate items-center gap-1 text-[13px] font-medium text-white">
-                    Previewing previous version
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    className="shrink-0 border-0 shadow-none"
-                    onClick={() => {
-                      props.onSeeCurrentVersion?.();
-                    }}
-                  >
-                    See Current Version
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-            {props.headerMode === "files" ? (
-              <div className="absolute inset-0 bg-slate-50" data-testid="canvas-files-backdrop" aria-hidden />
-            ) : (
-              <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
-                <CanvasContent
-                  state={state}
-                  onNodeDelete={handleNodeDelete}
-                  onNodesDelete={handleNodesDelete}
-                  onDuplicateNodes={props.onDuplicateNodes}
-                  onAutoLayoutNodes={props.onAutoLayoutNodes}
-                  onEdgeCreate={props.onEdgeCreate}
-                  onToggleView={handleToggleView}
-                  onShowNodeDiff={props.onShowNodeDiff}
-                  onDuplicate={props.onDuplicate}
-                  onAnnotationUpdate={props.onAnnotationUpdate}
-                  onAnnotationBlur={props.onAnnotationBlur}
-                  onBuildingBlockDrop={handleBuildingBlockDrop}
-                  onBuildingBlocksSidebarToggle={handleSidebarToggle}
-                  onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
-                  onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-                  onNodeClick={props.onNodeClick}
-                  onZoomChange={setCanvasZoom}
-                  hasFitToViewRef={hasFitToViewRef}
-                  viewportRefProp={props.viewportRef}
-                  workflowNodes={props.workflowNodes}
-                  setCurrentTab={setCurrentTab}
-                  showBottomStatusControls={props.showBottomStatusControls}
-                  isRunInspectionMode={props.isRunInspectionMode}
-                  isEditing={props.isEditing}
-                  isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
-                  onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
-                  autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
-                  autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
-                  readOnly={props.readOnly}
-                  logEntries={props.logEntries}
-                  focusRequest={props.focusRequest}
-                  initialFocusNodeId={props.initialFocusNodeId}
-                  fitAllRequest={props.fitAllRequest}
-                  fitAllFocusNodeIds={props.fitAllFocusNodeIds}
-                  runParticipantNodeIds={props.runParticipantNodeIds}
-                  runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
-                  runNodeDetailPaneOpen={bottomDetailPaneOpen}
-                  logRuns={props.logRuns}
-                  runsNodes={props.runsNodes}
-                  runsComponentIconMap={props.runsComponentIconMap}
-                  onRunNodeSelect={props.onRunNodeSelect}
-                  onRunExecutionSelect={props.onRunExecutionSelect}
-                  onAcknowledgeErrors={props.onAcknowledgeErrors}
-                  missingIntegrations={props.missingIntegrations}
-                  onConnectIntegration={props.onConnectIntegration}
-                  canCreateIntegrations={props.canCreateIntegrations}
-                />
-              </ReactFlowProvider>
-            )}
-            {isComponentSidebarVisibleMode(props.headerMode) && !props.isRunInspectionMode && props.isEditing
-              ? renderInspectorSidebar("sidebar")
-              : null}
-          </div>
-          {liveBottomInspectorOpen ? (
-            <ResizableBottomPane
-              height={liveNodeDetailPaneHeight}
-              onHeightChange={setLiveNodeDetailPaneHeight}
-              testId="live-node-detail-pane"
-              resizeHandleTestId="live-node-detail-pane-resize-handle"
-            >
-              {state.componentSidebar.selectedNodeId ? (
-                renderInspectorSidebar("bottom")
-              ) : (
-                <LiveBottomInspectorEmptyState onClose={handleSidebarClose} />
-              )}
-            </ResizableBottomPane>
-          ) : null}
-        </div>
-
-        {runInspectionPanelOpen ? (
-          <RunInspectionSidePanel
-            canvasId={props.runNodeDetailCanvasId!}
-            run={props.runNodeDetailRun!}
-            workflowNodes={props.workflowNodes ?? []}
-            componentIconMap={props.runsComponentIconMap}
-            expandedNodeId={props.runNodeDetailNodeId ?? null}
-            onToggleNode={(nodeId) => {
-              if (nodeId === props.runNodeDetailNodeId) {
-                props.onRunNodeDetailClose?.();
-                return;
+          )}
+          {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
+            <BuildingBlocksSidebar
+              isOpen={
+                isBuildingBlocksSidebarOpen && !!props.isEditing && allowsBuildingBlocksSidebar(workflowHeaderMode)
               }
-              props.onRunNodeDetailNavigate?.(nodeId);
-            }}
-            onClose={() => props.onRunNodeDetailClose?.()}
-          />
-        ) : null}
+              onToggle={handleSidebarToggle}
+              blocks={props.buildingBlocks || []}
+              integrations={props.integrations}
+              canvasZoom={canvasZoom}
+              disabled={readOnly}
+              disabledMessage="You don't have permission to edit this canvas."
+              onBlockClick={handleBuildingBlockSelect}
+              onEnterSubmit={handleBuildingBlockSelect}
+            />
+          )}
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="relative min-h-0 flex-1">
+              {props.runCanvasLoading && props.isRunInspectionMode ? (
+                <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+                  <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm">
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                  </div>
+                </div>
+              ) : null}
+              {showPreviewFloatingBar ? (
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
+                  <div className="pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-full bg-gray-500 pl-3 pr-1.5 py-1.5">
+                    <span className="flex min-w-0 max-w-full shrink-0 truncate items-center gap-1 text-[13px] font-medium text-white">
+                      Previewing previous version
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      className="shrink-0 border-0 shadow-none"
+                      onClick={() => {
+                        props.onSeeCurrentVersion?.();
+                      }}
+                    >
+                      See Current Version
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              {props.headerMode === "files" ? (
+                <div className="absolute inset-0 bg-slate-50" data-testid="canvas-files-backdrop" aria-hidden />
+              ) : (
+                <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
+                  <CanvasContent
+                    state={state}
+                    onNodeDelete={handleNodeDelete}
+                    onNodesDelete={handleNodesDelete}
+                    onDuplicateNodes={props.onDuplicateNodes}
+                    onAutoLayoutNodes={props.onAutoLayoutNodes}
+                    onEdgeCreate={props.onEdgeCreate}
+                    onToggleView={handleToggleView}
+                    onShowNodeDiff={props.onShowNodeDiff}
+                    onDuplicate={props.onDuplicate}
+                    onAnnotationUpdate={props.onAnnotationUpdate}
+                    onAnnotationBlur={props.onAnnotationBlur}
+                    onBuildingBlockDrop={handleBuildingBlockDrop}
+                    onBuildingBlocksSidebarToggle={handleSidebarToggle}
+                    onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+                    onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+                    onNodeClick={props.onNodeClick}
+                    onZoomChange={setCanvasZoom}
+                    hasFitToViewRef={hasFitToViewRef}
+                    viewportRefProp={props.viewportRef}
+                    workflowNodes={props.workflowNodes}
+                    setCurrentTab={setCurrentTab}
+                    showBottomStatusControls={props.showBottomStatusControls}
+                    isRunInspectionMode={props.isRunInspectionMode}
+                    isEditing={props.isEditing}
+                    isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+                    onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                    autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+                    autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                    readOnly={props.readOnly}
+                    logEntries={props.logEntries}
+                    focusRequest={props.focusRequest}
+                    initialFocusNodeId={props.initialFocusNodeId}
+                    fitAllRequest={props.fitAllRequest}
+                    fitAllFocusNodeIds={props.fitAllFocusNodeIds}
+                    runParticipantNodeIds={props.runParticipantNodeIds}
+                    runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
+                    runNodeDetailPaneOpen={false}
+                    logRuns={props.logRuns}
+                    runsNodes={props.runsNodes}
+                    runsComponentIconMap={props.runsComponentIconMap}
+                    onRunNodeSelect={props.onRunNodeSelect}
+                    onRunExecutionSelect={props.onRunExecutionSelect}
+                    onAcknowledgeErrors={props.onAcknowledgeErrors}
+                    missingIntegrations={props.missingIntegrations}
+                    onConnectIntegration={props.onConnectIntegration}
+                    canCreateIntegrations={props.canCreateIntegrations}
+                  />
+                </ReactFlowProvider>
+              )}
+              {isComponentSidebarVisibleMode(props.headerMode) && !props.isRunInspectionMode && props.isEditing
+                ? renderInspectorSidebar("sidebar")
+                : null}
+            </div>
+          </div>
+        </div>
       </div>
+
+      {liveBottomInspectorOpen ? (
+        <div
+          className="flex h-full min-h-0 w-1/2 shrink-0 flex-col overflow-hidden border-l border-slate-950/10 bg-white"
+          data-testid="live-node-detail-panel"
+        >
+          <div className="flex min-h-0 flex-1 flex-col">
+            <RunPanel
+              canvasId={props.runNodeDetailCanvasId ?? ""}
+              run={props.liveSelectedNodeRun ?? null}
+              workflowNodes={props.workflowNodes ?? []}
+              componentIconMap={props.runsComponentIconMap}
+              expandedNodeId={liveExpandedNodeId ?? liveSelectedNodeId}
+              onToggleNode={(nodeId) =>
+                setLiveExpandedNodeId((prev) => ((prev ?? liveSelectedNodeId) === nodeId ? null : nodeId))
+              }
+              onClose={handleSidebarClose}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {runInspectionPanelOpen ? (
+        <div
+          className="flex h-full min-h-0 w-1/2 shrink-0 flex-col overflow-hidden border-l border-slate-950/10 bg-white"
+          data-testid="run-inspection-side-panel"
+        >
+          <div className="flex min-h-0 flex-1 flex-col">
+            <RunPanel
+              canvasId={props.runNodeDetailCanvasId!}
+              run={props.runNodeDetailRun!}
+              workflowNodes={props.workflowNodes ?? []}
+              componentIconMap={props.runsComponentIconMap}
+              expandedNodeId={props.runNodeDetailNodeId ?? null}
+              onToggleNode={(nodeId) => {
+                if (nodeId === props.runNodeDetailNodeId) {
+                  props.onRunNodeDetailClose?.();
+                  return;
+                }
+                props.onRunNodeDetailNavigate?.(nodeId);
+              }}
+              onClose={() => (props.onExitRunInspection ?? props.onRunNodeDetailClose)?.()}
+              closeLabel="Back to live canvas"
+            />
+          </div>
+        </div>
+      ) : null}
 
       {/* Edit existing node modal - now handled by settings sidebar */}
 
@@ -1556,6 +1593,37 @@ function CanvasPage(props: CanvasPageProps) {
       </Dialog>
     </div>
   );
+}
+
+function buildComponentDocsData(
+  editingNodeData: NodeEditData | null | undefined,
+  components?: ActionsAction[],
+  triggers?: TriggersTrigger[],
+) {
+  const blockName = editingNodeData?.blockName;
+  if (!blockName) return null;
+
+  const matchedComponent = components?.find((c) => c.name === blockName);
+  if (matchedComponent) {
+    return buildSidebarComponentDocsPayload(blockName, editingNodeData, {
+      label: matchedComponent.label,
+      description: matchedComponent.description,
+      examplePayload: matchedComponent.exampleOutput,
+      payloadLabel: "Example Output",
+    });
+  }
+
+  const matchedTrigger = triggers?.find((t) => t.name === blockName);
+  if (matchedTrigger) {
+    return buildSidebarComponentDocsPayload(blockName, editingNodeData, {
+      label: matchedTrigger.label,
+      description: matchedTrigger.description,
+      examplePayload: matchedTrigger.exampleData,
+      payloadLabel: "Example Data",
+    });
+  }
+
+  return null;
 }
 
 function Sidebar({
@@ -1688,38 +1756,16 @@ function Sidebar({
     return getAutocompleteExampleObj(state.componentSidebar.selectedNodeId);
   }, [state.componentSidebar.selectedNodeId, getAutocompleteExampleObj]);
 
-  const componentDocsData = useMemo(() => {
-    const blockName = editingNodeData?.blockName;
-    if (!blockName) return null;
-
-    const matchedComponent = components?.find((c) => c.name === blockName);
-    if (matchedComponent) {
-      return buildSidebarComponentDocsPayload(blockName, editingNodeData, {
-        label: matchedComponent.label,
-        description: matchedComponent.description,
-        examplePayload: matchedComponent.exampleOutput,
-        payloadLabel: "Example Output",
-      });
-    }
-
-    const matchedTrigger = triggers?.find((t) => t.name === blockName);
-    if (matchedTrigger) {
-      return buildSidebarComponentDocsPayload(blockName, editingNodeData, {
-        label: matchedTrigger.label,
-        description: matchedTrigger.description,
-        examplePayload: matchedTrigger.exampleData,
-        payloadLabel: "Example Data",
-      });
-    }
-
-    return null;
-  }, [editingNodeData, components, triggers]);
+  const componentDocsData = useMemo(
+    () => buildComponentDocsData(editingNodeData, components, triggers),
+    [editingNodeData, components, triggers],
+  );
 
   if (!sidebarData) {
     return null;
   }
 
-  // Show loading state when data is being fetched (skip for annotation nodes)
+  // Show loading state when data is being fetched (skip for annotation nodes).
   if (sidebarData.isLoading && currentTab === "latest" && shouldShowRunsSidebar) {
     return <ComponentSidebarLoadingSkeleton layout={layout} />;
   }

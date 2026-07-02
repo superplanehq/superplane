@@ -49,4 +49,6 @@ export function useCanvasRunsSidebarState() {
 
 export type CanvasRunsSidebarState = ReturnType<typeof useCanvasRunsSidebarState> & {
   showRunsSidebarToggle: boolean;
+  /** Number of currently running runs, surfaced as an animated badge on the toggle. */
+  runningRunsCount?: number;
 };
