@@ -308,14 +308,94 @@ func (c *Client) execPackageRequest(method, requestURL string, body io.Reader) (
 	return &pkg, nil
 }
 
+// VulnerabilityPackageRef is the package reference embedded in a vulnerability scan result.
+type VulnerabilityPackageRef struct {
+	Identifier string `json:"identifier"`
+	Name       string `json:"name"`
+	Version    string `json:"version"`
+	URL        string `json:"url"`
+}
+
+// VulnerabilityScanResult is one entry returned by the /vulnerabilities/ endpoint.
+// Each entry represents a completed scan for a specific package version.
+type VulnerabilityScanResult struct {
+	Identifier         string                   `json:"identifier"`
+	CreatedAt          string                   `json:"created_at"`
+	Package            *VulnerabilityPackageRef `json:"package"`
+	ScanID             *string                  `json:"scan_id"`
+	HasVulnerabilities bool                     `json:"has_vulnerabilities"`
+	NumVulnerabilities int                      `json:"num_vulnerabilities"`
+	MaxSeverity        string                   `json:"max_severity,omitempty"`
+}
+
+// ScanPackage schedules a vulnerability scan for the given package.
+func (c *Client) ScanPackage(owner, repo, identifier string) error {
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/scan/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	_, err := c.execRequest(http.MethodPost, requestURL, nil)
+	return err
+}
+
+// PackageQuarantineRequest is the request body for the quarantine endpoint.
+type PackageQuarantineRequest struct {
+	Release bool `json:"release"`
+}
+
+// QuarantinePackage quarantines or releases a package.
+// Set release=true to release a previously quarantined package.
+func (c *Client) QuarantinePackage(owner, repo, identifier string, release bool) (*Package, error) {
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/quarantine/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	body, err := json.Marshal(PackageQuarantineRequest{Release: release})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	var pkg Package
+	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+	return &pkg, nil
+}
+
+// GetPackageVulnerabilities fetches vulnerability scan results for a package.
+// Uses the /vulnerabilities/{owner}/{repo}/{package}/ endpoint, which is a separate
+// top-level resource from the /packages/ sub-resource tree.
+// Returns the full list of scan results (most recent first).
+func (c *Client) GetPackageVulnerabilities(owner, repo, identifier string) ([]VulnerabilityScanResult, error) {
+	requestURL := fmt.Sprintf("%s/vulnerabilities/%s/%s/%s/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []VulnerabilityScanResult
+	if err := json.Unmarshal(responseBody, &results); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return results, nil
+}
+
 const packagePageSize = 100
 
 // ListPackages returns all packages in the given repository, following pagination.
 func (c *Client) ListPackages(owner, repo string) ([]Package, error) {
+	return c.ListPackagesWithFilters(owner, repo, "")
+}
+
+// ListPackagesWithFilters returns packages filtered by a Lucene-style query string,
+// following pagination. An empty query returns all packages.
+func (c *Client) ListPackagesWithFilters(owner, repo, query string) ([]Package, error) {
 	var all []Package
 
 	for page := 1; ; page++ {
 		requestURL := fmt.Sprintf("%s/packages/%s/%s/?page=%d&page_size=%d", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), page, packagePageSize)
+		if query != "" {
+			requestURL += "&query=" + url.QueryEscape(query)
+		}
+
 		responseBody, err := c.execRequest(http.MethodGet, requestURL, nil)
 		if err != nil {
 			return nil, err
@@ -334,6 +414,51 @@ func (c *Client) ListPackages(owner, repo string) ([]Package, error) {
 	}
 
 	return all, nil
+}
+
+// CopyPackage copies a package to a destination repository within the same namespace.
+// Returns the copied package in the destination.
+func (c *Client) CopyPackage(owner, repo, identifier, destinationRepo string) (*Package, error) {
+	payload, err := json.Marshal(map[string]string{"destination": destinationRepo})
+	if err != nil {
+		return nil, fmt.Errorf("error encoding request: %v", err)
+	}
+
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/copy/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	var pkg Package
+	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &pkg, nil
+}
+
+// MovePackage moves a package to a destination repository within the same namespace.
+// The package is removed from the source repository after a successful move.
+// Returns the moved package in the destination.
+func (c *Client) MovePackage(owner, repo, identifier, destinationRepo string) (*Package, error) {
+	payload, err := json.Marshal(map[string]string{"destination": destinationRepo})
+	if err != nil {
+		return nil, fmt.Errorf("error encoding request: %v", err)
+	}
+
+	requestURL := fmt.Sprintf("%s/packages/%s/%s/%s/move/", c.BaseURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(identifier))
+	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	var pkg Package
+	if err := json.Unmarshal(responseBody, &pkg); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &pkg, nil
 }
 
 var errInvalidRepositoryID = errors.New("must be in the form 'owner/repository'")

@@ -9,6 +9,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	var appID string
 	var nodeID string
 	var executionID string
+	var runID string
 	var limit int64
 	var before string
 
@@ -48,8 +49,27 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		ExecutionID: &executionID,
 	}, options)
 
+	logsCmd := &cobra.Command{
+		Use:   "logs",
+		Short: "Fetch runner logs for an execution, run, or node",
+		Args:  cobra.NoArgs,
+	}
+	core.BindAppIDFlag(logsCmd, &appID, "app ID")
+	logsCmd.Flags().StringVar(&executionID, "execution-id", "", "execution ID")
+	logsCmd.Flags().StringVar(&runID, "run-id", "", "run ID")
+	logsCmd.Flags().StringVar(&nodeID, "node-id", "", "node ID")
+	logsCmd.Flags().Int64Var(&limit, "limit", 200, "maximum number of log records to return per execution")
+	core.Bind(logsCmd, &LogsCommand{
+		CanvasID:    &appID,
+		ExecutionID: &executionID,
+		RunID:       &runID,
+		NodeID:      &nodeID,
+		Limit:       &limit,
+	}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(cancelCmd)
+	root.AddCommand(logsCmd)
 
 	return root
 }
