@@ -13,8 +13,9 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
+import { CopyButton } from "@/ui/CopyButton";
 import { useAccount } from "@/contexts/useAccount";
-import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
+import { showErrorToast } from "@/lib/toast.ts";
 import { ChangePasswordDialog } from "./components/ChangePasswordDialog";
 
 export function Profile() {
@@ -48,17 +49,6 @@ export function Profile() {
       setActionError(err instanceof Error ? err.message : "Failed to regenerate token");
     } finally {
       setRegeneratingToken(false);
-    }
-  };
-
-  const copyToken = async () => {
-    if (!token) return;
-
-    try {
-      await navigator.clipboard.writeText(token);
-      showSuccessToast("API token copied.");
-    } catch {
-      showErrorToast("Failed to copy API token.");
     }
   };
 
@@ -205,10 +195,13 @@ export function Profile() {
                   >
                     <Icon name={tokenVisible ? "eye-closed" : "eye"} />
                   </Button>
-                  <Button variant="outline" onClick={copyToken} className="flex items-center gap-1">
-                    <Icon name="copy" />
+                  <CopyButton
+                    variant="button"
+                    text={token}
+                    onCopyError={() => showErrorToast("Failed to copy API token.")}
+                  >
                     Copy
-                  </Button>
+                  </CopyButton>
                 </div>
                 <div className="bg-orange-50 dark:bg-amber-900/20 border border-amber-950/15 dark:border-amber-100/15 rounded-lg p-3">
                   <div className="flex items-start gap-2">

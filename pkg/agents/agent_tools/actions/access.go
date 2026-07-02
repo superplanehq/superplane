@@ -102,11 +102,12 @@ func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessi
 		{name: listFilesActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: readFileActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: listIntegrationsActionName, resource: "integrations", operation: "read"},
+		{name: listResourcesActionName, resource: "integrations", operation: "read"},
 		{name: createDraftActionName, resource: "canvases", operation: "update_version", scoped: true},
 		{name: writeFileActionName, resource: "canvases", operation: "update_version", scoped: true},
 		{name: deleteFileActionName, resource: "canvases", operation: "update_version", scoped: true},
 		{name: commitFilesActionName, resource: "canvases", operation: "update_version", scoped: true},
-		{name: updateDraftActionName, resource: "canvases", operation: "update_version", scoped: true},
+		{name: patchDraftActionName, resource: "canvases", operation: "update_version", scoped: true},
 	}
 
 	results := make([]toolAccessResult, 0, len(actions))

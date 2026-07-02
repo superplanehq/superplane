@@ -52,7 +52,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 
 	// Read the effective staged content (staged edits when present, the
 	// materialized version row otherwise) so the agent observes the same draft
-	// state the UI edits and the same edits it stages through update_draft.
+	// state the UI edits and the same edits it stages through patch_draft.
 	canvasYAML, err := readRepositorySpecFileForSource(ctx, session.OrganizationID, session.CanvasID, versionID, canvasRepository.CanvasYAMLRepositoryPath, source)
 	if err != nil {
 		return readResult{}, fmt.Errorf("read canvas yaml: %w", err)
@@ -64,12 +64,17 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	}
 
 	result := readResult{
-		Action:     "read",
-		CanvasID:   session.CanvasID,
-		Source:     source,
-		VersionID:  versionID,
-		Summary:    a.summarize(session.OrganizationID, canvas, version, source, canvasYAML),
-		CanvasYAML: canvasYAML,
+		Action:            "read",
+		CanvasID:          session.CanvasID,
+		Source:            source,
+		VersionID:         versionID,
+		Summary:           a.summarize(session.OrganizationID, canvas, version, source, canvasYAML),
+		CanvasYAMLBytes:   len(canvasYAML),
+		CanvasYAMLOmitted: !input.IncludeCanvasYAML,
+	}
+
+	if input.IncludeCanvasYAML {
+		result.CanvasYAML = canvasYAML
 	}
 
 	if draft != nil {
@@ -89,7 +94,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	}
 
 	if input.IncludeIntegrations {
-		integrations, integrationsErr := listConnectedIntegrations(uuid.MustParse(session.OrganizationID))
+		integrations, integrationsErr := listConnectedIntegrations(ctx, uuid.MustParse(session.OrganizationID))
 		if integrationsErr != nil {
 			return readResult{}, integrationsErr
 		}

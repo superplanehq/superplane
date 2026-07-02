@@ -36,12 +36,7 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 		return nil, grpcerrors.Internal(err, "failed to load canvas")
 	}
 
-	var records []models.CanvasMemory
-	err = telemetry.RunSpan(ctx, "memories.list", func(ctx context.Context) error {
-		var listErr error
-		records, listErr = models.ListCanvasMemoriesInTransaction(database.DB(ctx), canvasUUID)
-		return listErr
-	})
+	records, err := listCanvasMemories(ctx, canvasUUID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list canvas memories")
 	}
@@ -56,27 +51,29 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 	}, nil
 }
 
-func serializeCanvasMemories(ctx context.Context, records []models.CanvasMemory) ([]*pb.CanvasMemory, error) {
-	var items []*pb.CanvasMemory
-	err := telemetry.RunSpan(ctx, "memories.serialize", func(ctx context.Context) error {
-		items = make([]*pb.CanvasMemory, 0, len(records))
-		for _, record := range records {
-			item, itemErr := canvasMemoryToProto(record)
-			if itemErr != nil {
-				return itemErr
-			}
+func listCanvasMemories(ctx context.Context, canvasUUID uuid.UUID) (records []models.CanvasMemory, err error) {
+	ctx, done := telemetry.Span(ctx, "memories.list")
+	defer done(&err)
 
-			items = append(items, item)
+	return models.ListCanvasMemoriesInTransaction(database.DB(ctx), canvasUUID)
+}
+
+func serializeCanvasMemories(ctx context.Context, records []models.CanvasMemory) (items []*pb.CanvasMemory, err error) {
+	ctx, done := telemetry.Span(ctx, "memories.serialize")
+	defer done(&err)
+
+	items = make([]*pb.CanvasMemory, 0, len(records))
+	for _, record := range records {
+		item, itemErr := canvasMemoryToProto(record)
+		if itemErr != nil {
+			return nil, itemErr
 		}
 
-		if span := trace.SpanFromContext(ctx); span.IsRecording() {
-			span.SetAttributes(attribute.Int("memories.count", len(records)))
-		}
+		items = append(items, item)
+	}
 
-		return nil
-	})
-	if err != nil {
-		return nil, err
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(attribute.Int("memories.count", len(records)))
 	}
 
 	return items, nil

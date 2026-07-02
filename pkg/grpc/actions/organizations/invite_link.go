@@ -1,19 +1,22 @@
 package organizations
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
-func GetInviteLink(orgID string) (*pb.GetInviteLinkResponse, error) {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(orgID)
+func GetInviteLink(ctx context.Context, orgID string) (*pb.GetInviteLinkResponse, error) {
+	db := database.DB(ctx)
+	inviteLink, err := models.FindInviteLinkByOrganizationID(db, orgID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			orgUUID, parseErr := uuid.Parse(orgID)
@@ -35,8 +38,9 @@ func GetInviteLink(orgID string) (*pb.GetInviteLinkResponse, error) {
 	}, nil
 }
 
-func UpdateInviteLink(orgID string, enabled bool) (*pb.UpdateInviteLinkResponse, error) {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(orgID)
+func UpdateInviteLink(ctx context.Context, orgID string, enabled bool) (*pb.UpdateInviteLinkResponse, error) {
+	db := database.DB(ctx)
+	inviteLink, err := models.FindInviteLinkByOrganizationID(db, orgID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "invite link not found")
 	}
@@ -52,8 +56,9 @@ func UpdateInviteLink(orgID string, enabled bool) (*pb.UpdateInviteLinkResponse,
 	}, nil
 }
 
-func ResetInviteLink(orgID string) (*pb.ResetInviteLinkResponse, error) {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(orgID)
+func ResetInviteLink(ctx context.Context, orgID string) (*pb.ResetInviteLinkResponse, error) {
+	db := database.DB(ctx)
+	inviteLink, err := models.FindInviteLinkByOrganizationID(db, orgID)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "invite link not found")
 	}

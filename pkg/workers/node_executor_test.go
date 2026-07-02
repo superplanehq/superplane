@@ -15,6 +15,20 @@ import (
 	"gorm.io/gorm"
 )
 
+func newTestNodeExecutor(t *testing.T, r *support.ResourceRegistry) *NodeExecutor {
+	t.Helper()
+	return NewNodeExecutor(
+		r.Encryptor,
+		r.Registry,
+		r.GitProvider,
+		support.NewOIDCProvider(),
+		"http://localhost",
+		"http://localhost",
+		"",
+		r.AuthService,
+	)
+}
+
 func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
 
@@ -60,12 +74,12 @@ func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the execution concurrently.
 	//
 	go func() {
-		executor1 := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
+		executor1 := newTestNodeExecutor(t, r)
 		results <- executor1.LockAndProcessNodeExecution(execution.ID)
 	}()
 
 	go func() {
-		executor2 := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
+		executor2 := newTestNodeExecutor(t, r)
 		results <- executor2.LockAndProcessNodeExecution(execution.ID)
 	}()
 
@@ -117,7 +131,7 @@ func Test__NodeExecutor_DoesNotProcessExecutionForSoftDeletedOrganization(t *tes
 		assert.NotEqual(t, execution.ID, pending.ID)
 	}
 
-	executor := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
+	executor := newTestNodeExecutor(t, r)
 	err = executor.LockAndProcessNodeExecution(execution.ID)
 	assert.ErrorIs(t, err, ErrRecordLocked)
 
@@ -182,7 +196,7 @@ func Test__NodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	// Process the execution and verify the execution is started but NOT finished.
 	// The approval component doesn't call Pass() in Execute(), so it should remain in started state.
 	//
-	executor := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
+	executor := newTestNodeExecutor(t, r)
 	err = executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 
@@ -249,7 +263,7 @@ func Test__NodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	// Process the execution and verify the execution is both started AND finished.
 	// The noop component calls Pass() in Execute(), which should finish the execution.
 	//
-	executor := NewNodeExecutor(r.Encryptor, r.Registry, r.GitProvider, "http://localhost", "http://localhost", "", r.AuthService)
+	executor := newTestNodeExecutor(t, r)
 	err := executor.LockAndProcessNodeExecution(execution.ID)
 	require.NoError(t, err)
 

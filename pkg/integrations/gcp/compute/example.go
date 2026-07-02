@@ -52,6 +52,15 @@ var exampleOutputCreateLoadBalancerBytes []byte
 //go:embed example_output_delete_load_balancer.json
 var exampleOutputDeleteLoadBalancerBytes []byte
 
+//go:embed example_output_create_firewall_rule.json
+var exampleOutputCreateFirewallRuleBytes []byte
+
+//go:embed example_output_update_firewall_rule.json
+var exampleOutputUpdateFirewallRuleBytes []byte
+
+//go:embed example_output_delete_firewall_rule.json
+var exampleOutputDeleteFirewallRuleBytes []byte
+
 var (
 	exampleOutputCreateVMOnce sync.Once
 	exampleOutputCreateVM     map[string]any
@@ -97,6 +106,15 @@ var (
 
 	exampleOutputDeleteLoadBalancerOnce sync.Once
 	exampleOutputDeleteLoadBalancer     map[string]any
+
+	exampleOutputCreateFirewallRuleOnce sync.Once
+	exampleOutputCreateFirewallRule     map[string]any
+
+	exampleOutputUpdateFirewallRuleOnce sync.Once
+	exampleOutputUpdateFirewallRule     map[string]any
+
+	exampleOutputDeleteFirewallRuleOnce sync.Once
+	exampleOutputDeleteFirewallRule     map[string]any
 )
 
 func (c *CreateVM) ExampleOutput() map[string]any {
@@ -157,4 +175,16 @@ func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
 
 func (d *DeleteLoadBalancer) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteLoadBalancerOnce, exampleOutputDeleteLoadBalancerBytes, &exampleOutputDeleteLoadBalancer)
+}
+
+func (c *CreateFirewall) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateFirewallRuleOnce, exampleOutputCreateFirewallRuleBytes, &exampleOutputCreateFirewallRule)
+}
+
+func (u *UpdateFirewall) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateFirewallRuleOnce, exampleOutputUpdateFirewallRuleBytes, &exampleOutputUpdateFirewallRule)
+}
+
+func (d *DeleteFirewall) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteFirewallRuleOnce, exampleOutputDeleteFirewallRuleBytes, &exampleOutputDeleteFirewallRule)
 }

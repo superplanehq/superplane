@@ -41,6 +41,9 @@ import { deleteImageMapper } from "./delete_image";
 import { createStaticIPMapper, deleteStaticIPMapper, manageStaticIPMapper } from "./static_ip";
 import { createLoadBalancerMapper } from "./create_load_balancer";
 import { deleteLoadBalancerMapper } from "./delete_load_balancer";
+import { createFirewallRuleMapper } from "./create_firewall_rule";
+import { updateFirewallRuleMapper } from "./update_firewall_rule";
+import { deleteFirewallRuleMapper } from "./delete_firewall_rule";
 import {
   createDatabaseMapper,
   getDatabaseMapper,
@@ -99,6 +102,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "compute.manageStaticIP": manageStaticIPMapper,
   "compute.createLoadBalancer": createLoadBalancerMapper,
   "compute.deleteLoadBalancer": deleteLoadBalancerMapper,
+  "compute.createFirewallRule": createFirewallRuleMapper,
+  "compute.updateFirewallRule": updateFirewallRuleMapper,
+  "compute.deleteFirewallRule": deleteFirewallRuleMapper,
   "cloudsql.createDatabase": createDatabaseMapper,
   "cloudsql.getDatabase": getDatabaseMapper,
   "cloudsql.deleteDatabase": deleteDatabaseMapper,
@@ -157,6 +163,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "compute.manageStaticIP": buildActionStateRegistry("completed"),
   "compute.createLoadBalancer": buildActionStateRegistry("created"),
   "compute.deleteLoadBalancer": buildActionStateRegistry("deleted"),
+  "compute.createFirewallRule": buildActionStateRegistry("created"),
+  "compute.updateFirewallRule": buildActionStateRegistry("updated"),
+  "compute.deleteFirewallRule": buildActionStateRegistry("deleted"),
   "cloudsql.createDatabase": CLOUDSQL_CREATED_STATE_REGISTRY,
   "cloudsql.getDatabase": CLOUDSQL_FETCHED_STATE_REGISTRY,
   "cloudsql.deleteDatabase": CLOUDSQL_DELETED_STATE_REGISTRY,

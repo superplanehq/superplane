@@ -16,6 +16,7 @@ const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.ho
       onPaneClick?: (...args: unknown[]) => unknown;
       onEdgeMouseEnter?: (...args: unknown[]) => unknown;
       onEdgeMouseLeave?: (...args: unknown[]) => unknown;
+      onlyRenderVisibleElements?: boolean;
     },
   },
 }));
@@ -190,6 +191,25 @@ describe("CanvasPage connection drop", () => {
     };
   });
 
+  it("uses padded viewport culling instead of React Flow onlyRenderVisibleElements", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          onEdgeCreate={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(reactFlowPropsRef.current?.onlyRenderVisibleElements).not.toBe(true);
+  });
+
   it("does not close the building blocks sidebar from the pane click that follows a connection drop", () => {
     const onPlaceholderAdd = vi.fn(() => new Promise<string>(() => {}));
 
@@ -314,34 +334,6 @@ describe("CanvasPage connection drop", () => {
 
     expect(onPlaceholderAdd).not.toHaveBeenCalled();
     expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
-  });
-
-  it("opens the canvas YAML modal without switching to the Files tab", async () => {
-    const onYamlOpen = vi.fn();
-    const onSelectFiles = vi.fn();
-
-    render(
-      <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          headerMode="version-live"
-          nodes={[]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing={true}
-          activeCanvasVersionId="draft-version"
-          onYamlOpen={onYamlOpen}
-          onSelectFiles={onSelectFiles}
-        />
-      </MemoryRouter>,
-    );
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("canvas-yaml-button"));
-    });
-
-    expect(onYamlOpen).toHaveBeenCalledTimes(1);
-    expect(onSelectFiles).not.toHaveBeenCalled();
   });
 
   it("loads node run data only while the component sidebar is open in live mode", async () => {

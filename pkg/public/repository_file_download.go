@@ -57,17 +57,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var allowed bool
-	err = telemetry.RunSpan(ctx, "repository.check_permission", func(ctx context.Context) error {
-		var checkErr error
-		allowed, checkErr = s.authService.CheckOrganizationPermission(ctx,
-			user.ID.String(),
-			user.OrganizationID.String(),
-			"canvases",
-			"read",
-		)
-		return checkErr
-	})
+	allowed, err := s.checkRepositoryReadPermission(ctx, user)
 	if err != nil {
 		log.Errorf("Failed to check permission: %v", err)
 		http.Error(w, "Unauthorized", http.StatusForbidden)
@@ -80,44 +70,13 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var canvas *models.Canvas
-	err = telemetry.RunSpan(ctx, "repository.find_canvas", func(ctx context.Context) error {
-		var findErr error
-		canvas, findErr = models.FindCanvasInTransaction(database.DB(ctx), user.OrganizationID, canvasID)
-		return findErr
-	})
+	canvas, err := s.findRepositoryCanvas(ctx, user, canvasID)
 	if err != nil {
 		http.Error(w, "Canvas not found", http.StatusNotFound)
 		return
 	}
 
-	err = telemetry.RunSpan(ctx, "repository.read_file", func(ctx context.Context) error {
-		if span := trace.SpanFromContext(ctx); span.IsRecording() {
-			span.SetAttributes(
-				attribute.String("repository.file_path", path),
-				attribute.Bool("repository.staged", stage),
-			)
-			if versionID != "" {
-				span.SetAttributes(attribute.String("repository.version_id", versionID))
-			}
-		}
-
-		if canvases.IsRepositorySpecFilePath(path) {
-			return s.writeRepositorySpecFile(ctx, w, user, canvas, canvasID, path, versionID, stage)
-		}
-
-		if stage && versionID != "" {
-			written, readErr := s.tryWriteStagedRepositoryFile(ctx, w, user, canvas, canvasID, path, versionID)
-			if readErr != nil {
-				return readErr
-			}
-			if written {
-				return nil
-			}
-		}
-
-		return s.writeRepositoryGitFile(ctx, w, user.OrganizationID, canvas, canvasID, path)
-	})
+	err = s.readRepositoryFile(ctx, w, user, canvas, canvasID, path, versionID, stage)
 	if errors.Is(err, errRepositoryFileNotFound) {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
@@ -166,6 +125,65 @@ func (s *Server) writeRepositorySpecFile(
 	}
 
 	return nil
+}
+
+func (s *Server) checkRepositoryReadPermission(ctx context.Context, user *models.User) (allowed bool, err error) {
+	ctx, done := telemetry.Span(ctx, "repository.check_permission")
+	defer done(&err)
+
+	return s.authService.CheckOrganizationPermission(ctx,
+		user.ID.String(),
+		user.OrganizationID.String(),
+		"canvases",
+		"read",
+	)
+}
+
+func (s *Server) findRepositoryCanvas(ctx context.Context, user *models.User, canvasID uuid.UUID) (canvas *models.Canvas, err error) {
+	ctx, done := telemetry.Span(ctx, "repository.find_canvas")
+	defer done(&err)
+
+	return models.FindCanvasInTransaction(database.DB(ctx), user.OrganizationID, canvasID)
+}
+
+func (s *Server) readRepositoryFile(
+	ctx context.Context,
+	w http.ResponseWriter,
+	user *models.User,
+	canvas *models.Canvas,
+	canvasID uuid.UUID,
+	path string,
+	versionID string,
+	stage bool,
+) (err error) {
+	ctx, done := telemetry.Span(ctx, "repository.read_file")
+	defer done(&err)
+
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(
+			attribute.String("repository.file_path", path),
+			attribute.Bool("repository.staged", stage),
+		)
+		if versionID != "" {
+			span.SetAttributes(attribute.String("repository.version_id", versionID))
+		}
+	}
+
+	if canvases.IsRepositorySpecFilePath(path) {
+		return s.writeRepositorySpecFile(ctx, w, user, canvas, canvasID, path, versionID, stage)
+	}
+
+	if stage && versionID != "" {
+		written, readErr := s.tryWriteStagedRepositoryFile(ctx, w, user, canvas, canvasID, path, versionID)
+		if readErr != nil {
+			return readErr
+		}
+		if written {
+			return nil
+		}
+	}
+
+	return s.writeRepositoryGitFile(ctx, w, user.OrganizationID, canvas, canvasID, path)
 }
 
 func (s *Server) tryWriteStagedRepositoryFile(
