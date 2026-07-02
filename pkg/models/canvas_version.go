@@ -34,8 +34,6 @@ type CanvasVersion struct {
 	WorkflowID            uuid.UUID
 	OwnerID               *uuid.UUID
 	State                 string
-	Name                  string
-	Description           string
 	PublishedAt           *time.Time
 	Nodes                 datatypes.JSONSlice[Node]
 	Edges                 datatypes.JSONSlice[Edge]
@@ -475,14 +473,12 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 	}
 
 	canvas.LiveVersionID = &version.ID
-	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 	return MapCanvasNameUniqueConstraintError(tx.
 		Model(&Canvas{}).
 		Where("id = ?", canvas.ID).
 		Updates(map[string]any{
 			"live_version_id": version.ID,
-			"name":            version.Name,
 			"updated_at":      now,
 		}).
 		Error)
@@ -550,8 +546,6 @@ func CreateDraftBranchFromLiveInTransaction(
 		WorkflowID:  canvasID,
 		OwnerID:     &userID,
 		State:       CanvasVersionStateDraft,
-		Name:        liveVersion.Name,
-		Description: liveVersion.Description,
 		Nodes:       datatypes.NewJSONSlice(nodes),
 		Edges:       datatypes.NewJSONSlice(edges),
 		GitBranch:   branchName,
@@ -582,16 +576,14 @@ func CreateCanvasSnapshotVersionInTransaction(
 
 	now := time.Now()
 	version := CanvasVersion{
-		ID:          uuid.New(),
-		WorkflowID:  workflowID,
-		OwnerID:     &ownerID,
-		State:       CanvasVersionStateSnapshot,
-		Name:        sourceVersion.Name,
-		Description: sourceVersion.Description,
-		Nodes:       datatypes.NewJSONSlice(nodes),
-		Edges:       datatypes.NewJSONSlice(edges),
-		CreatedAt:   &now,
-		UpdatedAt:   &now,
+		ID:         uuid.New(),
+		WorkflowID: workflowID,
+		OwnerID:    &ownerID,
+		State:      CanvasVersionStateSnapshot,
+		Nodes:      datatypes.NewJSONSlice(nodes),
+		Edges:      datatypes.NewJSONSlice(edges),
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
 	}
 	copyVersionConsoleFields(sourceVersion, &version)
 
@@ -632,7 +624,6 @@ func PublishCanvasDraftInTransaction(
 	}
 
 	canvas.LiveVersionID = &version.ID
-	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 
 	if err := tx.
@@ -640,7 +631,6 @@ func PublishCanvasDraftInTransaction(
 		Where("id = ?", canvas.ID).
 		Updates(map[string]any{
 			"live_version_id": version.ID,
-			"name":            version.Name,
 			"updated_at":      now,
 		}).
 		Error; err != nil {
@@ -678,6 +668,45 @@ func FindLiveCanvasSpecInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Node,
 	return nodes, edges, nil
 }
 
+type LiveCanvasSpec struct {
+	Nodes []Node
+	Edges []Edge
+}
+
+type liveCanvasSpecRow struct {
+	WorkflowID uuid.UUID `gorm:"column:workflow_id"`
+	Nodes      datatypes.JSONSlice[Node]
+	Edges      datatypes.JSONSlice[Edge]
+}
+
+func FindLiveCanvasSpecsByCanvasIDsInTransaction(tx *gorm.DB, canvasIDs []uuid.UUID) (map[uuid.UUID]LiveCanvasSpec, error) {
+	specs := make(map[uuid.UUID]LiveCanvasSpec, len(canvasIDs))
+	if len(canvasIDs) == 0 {
+		return specs, nil
+	}
+
+	var rows []liveCanvasSpecRow
+	err := tx.
+		Table("workflows").
+		Select("workflows.id AS workflow_id", "live_version.nodes", "live_version.edges").
+		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
+		Where("workflows.id IN ?", canvasIDs).
+		Where("workflows.live_version_id IS NOT NULL").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		specs[row.WorkflowID] = LiveCanvasSpec{
+			Nodes: append([]Node(nil), row.Nodes...),
+			Edges: append([]Edge(nil), row.Edges...),
+		}
+	}
+
+	return specs, nil
+}
+
 const canvasDraftBranchNamePrefix = "drafts/"
 
 func newDraftBranchName() string {
@@ -688,20 +717,6 @@ func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*C
 	var canvas Canvas
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
-		// This locks workflows directly, so select only columns that physically
-		// exist on workflows; metadata fields are projected from live versions.
-		Select(
-			"id",
-			"organization_id",
-			"live_version_id",
-			"folder_id",
-			"name",
-			"next_draft_display_number",
-			"created_by",
-			"created_at",
-			"updated_at",
-			"deleted_at",
-		).
 		Where("id = ?", workflowID).
 		First(&canvas).
 		Error

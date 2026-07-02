@@ -73,7 +73,10 @@ func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRe
 
 	versionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
 
-	_, err := UpdateCanvasVersion(
+	canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
+	require.NoError(t, err)
+
+	_, err = UpdateCanvasVersion(
 		ctx,
 		r.Encryptor,
 		r.Registry,
@@ -81,7 +84,7 @@ func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRe
 		canvasID,
 		versionID,
 		&pb.Canvas{
-			Metadata: &pb.Canvas_Metadata{Name: "Test Canvas"},
+			Metadata: &pb.Canvas_Metadata{Name: canvas.Name},
 			Spec: &pb.Canvas_Spec{
 				Nodes: []*componentpb.Node{
 					{
