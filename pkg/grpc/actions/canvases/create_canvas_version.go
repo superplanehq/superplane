@@ -69,6 +69,6 @@ func CreateCanvasVersion(
 	}
 
 	return &pb.CreateCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, organizationID, nil),
+		Version: SerializeCanvasVersion(canvas, version, organizationID, nil),
 	}, nil
 }

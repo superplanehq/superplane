@@ -133,7 +133,7 @@ func effectiveSpecYAML(
 	case CanvasYAMLRepositoryPath:
 		return canvasYAMLFromVersion(canvas, version, organizationID)
 	case ConsoleYAMLRepositoryPath:
-		return consoleYAMLFromVersion(version)
+		return consoleYAMLFromVersion(canvas, version)
 	default:
 		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", path))
 	}
