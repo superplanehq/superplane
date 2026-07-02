@@ -370,8 +370,3 @@ func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitC
 		s.authService,
 	)
 }
-
-func (s *CanvasService) ApplyCanvasAutoLayout(ctx context.Context, req *pb.ApplyCanvasAutoLayoutRequest) (*pb.ApplyCanvasAutoLayoutResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ApplyCanvasAutoLayout(ctx, organizationID, req.CanvasId, req.VersionId, req.AutoLayout)
-}
