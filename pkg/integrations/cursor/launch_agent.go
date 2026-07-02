@@ -31,7 +31,13 @@ func (c *LaunchAgent) Documentation() string {
 ## How It Works
 1. Launches a Cursor Cloud Agent with the specified prompt and configuration
 2. Waits for the agent to complete (monitored via webhook and polling)
-3. Emits output with the agent result (success or failure)`
+3. On success, fetches the agent's conversation and emits the result together with the messages
+
+## Output
+On completion the component emits:
+- **status**, **agentId**, **prUrl**, **summary**, **branchName**
+- **messages**: the agent's full conversation history (chronological); each message has an ` + "`id`, `type`" + ` (` + "`user_message`" + ` or ` + "`assistant_message`" + `) and ` + "`text`" + `
+- **lastMessage**: convenience pointer to the final assistant reply (use this, or select from ` + "`messages`" + ` via an expression)`
 }
 
 func (c *LaunchAgent) Icon() string { return "cpu" }
