@@ -679,7 +679,7 @@ type liveCanvasSpecRow struct {
 	Edges      datatypes.JSONSlice[Edge]
 }
 
-func FindLiveCanvasSpecsByCanvasIDsInTransaction(tx *gorm.DB, canvasIDs []uuid.UUID) (map[uuid.UUID]LiveCanvasSpec, error) {
+func FindLiveCanvasSpecsByCanvasIDs(tx *gorm.DB, canvasIDs []uuid.UUID) (map[uuid.UUID]LiveCanvasSpec, error) {
 	specs := make(map[uuid.UUID]LiveCanvasSpec, len(canvasIDs))
 	if len(canvasIDs) == 0 {
 		return specs, nil

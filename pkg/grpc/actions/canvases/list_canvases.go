@@ -60,7 +60,7 @@ func serializeCanvasSummaries(db *gorm.DB, canvases []models.Canvas) ([]*pb.Canv
 		canvasIDs[i] = canvas.ID
 	}
 
-	liveSpecs, err := models.FindLiveCanvasSpecsByCanvasIDsInTransaction(db, canvasIDs)
+	liveSpecs, err := models.FindLiveCanvasSpecsByCanvasIDs(db, canvasIDs)
 	if err != nil {
 		return nil, err
 	}
