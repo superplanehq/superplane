@@ -118,7 +118,7 @@ func (g *GCP) Instructions() string {
 
 - ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
 - ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics, ` + "`roles/cloudsql.admin`" + ` to manage Cloud SQL databases and instances, ` + "`roles/storage.admin`" + ` to manage Cloud Storage buckets)`
+- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/compute.securityAdmin`" + ` to create, update, and delete firewall rules, ` + "`roles/iam.serviceAccountViewer`" + ` to populate the firewall service-account picker, ` + "`roles/monitoring.viewer`" + ` to read VM metrics, ` + "`roles/cloudsql.admin`" + ` to manage Cloud SQL databases and instances, ` + "`roles/storage.admin`" + ` to manage Cloud Storage buckets)`
 }
 
 func (g *GCP) Configuration() []configuration.Field {
@@ -191,6 +191,9 @@ func (g *GCP) Actions() []core.Action {
 		&compute.ManageStaticIP{},
 		&compute.CreateLoadBalancer{},
 		&compute.DeleteLoadBalancer{},
+		&compute.CreateFirewall{},
+		&compute.UpdateFirewall{},
+		&compute.DeleteFirewall{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
@@ -993,6 +996,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListForwardingRuleResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeServiceAccount:
+		return compute.ListServiceAccountResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeInstance:
 		return compute.ListInstanceResources(reqCtx, client, p["project"])
 	case clouddns.ResourceTypeManagedZone:
