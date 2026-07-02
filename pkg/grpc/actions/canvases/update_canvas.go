@@ -83,7 +83,7 @@ func updateCanvasInTransaction(
 	name *string,
 	description *string,
 ) error {
-	canvas, err := models.FindCanvasInTransaction(tx, organizationUUID, canvasID)
+	canvas, err := models.LockCanvasForUpdate(tx, organizationUUID, canvasID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return grpcerrors.NotFound(err, "canvas not found")
@@ -91,67 +91,40 @@ func updateCanvasInTransaction(
 		return err
 	}
 
-	changed, err := applyCanvasMetadataUpdates(canvas, name, description)
+	updates, err := buildCanvasMetadataUpdates(canvas, name, description)
 	if err != nil {
 		return err
 	}
 
-	if !changed {
+	if len(updates) == 0 {
 		return nil
 	}
 
-	return saveCanvasMetadataUpdate(tx, canvas)
+	updates["updated_at"] = time.Now()
+
+	return mapCanvasNameUniqueConstraintError(
+		tx.Model(&models.Canvas{}).
+			Where("organization_id = ? AND id = ?", organizationUUID, canvasID).
+			Updates(updates).Error,
+	)
 }
 
-func applyCanvasMetadataUpdates(
-	canvas *models.Canvas,
-	name *string,
-	description *string,
-) (bool, error) {
-	nameChanged, err := applyCanvasNameUpdate(canvas, name)
-	if err != nil {
-		return false, err
+func buildCanvasMetadataUpdates(canvas *models.Canvas, name *string, description *string) (map[string]any, error) {
+	updates := map[string]any{}
+
+	if name != nil {
+		nextName := strings.TrimSpace(*name)
+		if nextName == "" {
+			return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
+		}
+		if canvas.Name != nextName {
+			updates["name"] = nextName
+		}
 	}
 
-	descriptionChanged := applyCanvasDescriptionUpdate(canvas, description)
-
-	return nameChanged || descriptionChanged, nil
-}
-
-func applyCanvasNameUpdate(canvas *models.Canvas, name *string) (bool, error) {
-	if name == nil {
-		return false, nil
+	if description != nil && canvas.Description != *description {
+		updates["description"] = *description
 	}
 
-	nextName := strings.TrimSpace(*name)
-	if nextName == "" {
-		return false, grpcerrors.InvalidArgument(nil, "canvas name is required")
-	}
-
-	if canvas.Name == nextName {
-		return false, nil
-	}
-
-	canvas.Name = nextName
-	return true, nil
-}
-
-func applyCanvasDescriptionUpdate(canvas *models.Canvas, description *string) bool {
-	if description == nil || canvas.Description == *description {
-		return false
-	}
-
-	canvas.Description = *description
-	return true
-}
-
-func saveCanvasMetadataUpdate(tx *gorm.DB, canvas *models.Canvas) error {
-	now := time.Now()
-	canvas.UpdatedAt = &now
-
-	if err := tx.Save(canvas).Error; err != nil {
-		return mapCanvasNameUniqueConstraintError(err)
-	}
-
-	return nil
+	return updates, nil
 }
