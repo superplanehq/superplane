@@ -45,11 +45,24 @@ type ContentBlockSource struct {
 }
 
 type CreateMessageRequest struct {
-	Model       string    `json:"model"`
-	Messages    []Message `json:"messages"`
-	System      string    `json:"system,omitempty"`
-	MaxTokens   int       `json:"max_tokens,omitempty"`
-	Temperature *float64  `json:"temperature,omitempty"`
+	Model        string        `json:"model"`
+	Messages     []Message     `json:"messages"`
+	System       string        `json:"system,omitempty"`
+	MaxTokens    int           `json:"max_tokens,omitempty"`
+	Temperature  *float64      `json:"temperature,omitempty"`
+	OutputConfig *OutputConfig `json:"output_config,omitempty"`
+}
+
+// OutputConfig configures Claude's response format (structured outputs).
+// See https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+type OutputConfig struct {
+	Format *OutputFormat `json:"format,omitempty"`
+}
+
+// OutputFormat constrains the final text response to a JSON schema.
+type OutputFormat struct {
+	Type   string `json:"type"`   // always "json_schema"
+	Schema any    `json:"schema"` // the JSON Schema object
 }
 
 type MessageContent struct {
