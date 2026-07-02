@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -168,7 +169,35 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 		}
 	}
 
+	if str, ok := value.(string); ok && field.Type == configuration.FieldTypeText {
+		if language, ok := codeFieldLanguage(field); ok {
+			return b.ResolveCodeTemplateExpressions(str, language)
+		}
+	}
+
 	return b.resolveValue(value)
+}
+
+// codeFieldLanguage returns the field's language and whether it's one we apply
+// type-aware literal substitution for (as opposed to prose fields or
+// non-executed languages like "json").
+func codeFieldLanguage(field configuration.Field) (string, bool) {
+	if field.TypeOptions == nil || field.TypeOptions.Text == nil {
+		return "", false
+	}
+
+	language := field.TypeOptions.Text.Language
+	if !isCodeLanguage(language) {
+		return "", false
+	}
+
+	return language, true
+}
+
+var codeLanguages = []string{"javascript", "python", "shell"}
+
+func isCodeLanguage(language string) bool {
+	return slices.Contains(codeLanguages, strings.ToLower(language))
 }
 
 func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {
@@ -269,6 +298,79 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 	}
 
 	return result, nil
+}
+
+// ResolveCodeTemplateExpressions is like ResolveTemplateExpressions, but for
+// fields holding source code. A bare placeholder is substituted as a valid,
+// correctly-typed literal for the given language instead of a naive stringified
+// value. A placeholder already inside the author's own quotes is left as-is,
+// to avoid double-quoting.
+func (b *NodeConfigurationBuilder) ResolveCodeTemplateExpressions(expression string, language string) (any, error) {
+	locations := expressionRegex.FindAllStringSubmatchIndex(expression, -1)
+	if len(locations) == 0 {
+		return expression, nil
+	}
+
+	var buf strings.Builder
+	lastEnd := 0
+
+	for _, loc := range locations {
+		matchStart, matchEnd := loc[0], loc[1]
+		innerStart, innerEnd := loc[2], loc[3]
+
+		buf.WriteString(expression[lastEnd:matchStart])
+
+		value, err := b.ResolveExpression(expression[innerStart:innerEnd])
+		if err != nil {
+			return nil, err
+		}
+
+		if isInsideQuotedLiteral(expression, matchStart) {
+			buf.WriteString(formatTemplateValue(value))
+		} else {
+			literal, err := formatCodeLiteral(value, language)
+			if err != nil {
+				return nil, fmt.Errorf("formatting %s literal: %w", language, err)
+			}
+			buf.WriteString(literal)
+		}
+
+		lastEnd = matchEnd
+	}
+
+	buf.WriteString(expression[lastEnd:])
+
+	return buf.String(), nil
+}
+
+// isInsideQuotedLiteral reports whether byte offset pos in source falls inside
+// an open single/double/backtick-quoted literal, by scanning from the start
+// of source and tracking quote/escape state.
+func isInsideQuotedLiteral(source string, pos int) bool {
+	var openQuote byte
+	escaped := false
+
+	for i := 0; i < pos && i < len(source); i++ {
+		c := source[i]
+
+		if openQuote != 0 {
+			switch {
+			case escaped:
+				escaped = false
+			case c == '\\':
+				escaped = true
+			case c == openQuote:
+				openQuote = 0
+			}
+			continue
+		}
+
+		if c == '\'' || c == '"' || c == '`' {
+			openQuote = c
+		}
+	}
+
+	return openQuote != 0
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
@@ -661,6 +763,130 @@ func formatTemplateValue(value any) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
+}
+
+// formatCodeLiteral renders value as a syntactically valid, type-preserving
+// literal for the given source-code language.
+func formatCodeLiteral(value any, language string) (string, error) {
+	switch strings.ToLower(language) {
+	case "python":
+		return formatPythonLiteral(value)
+	case "shell":
+		return formatShellLiteral(value)
+	default:
+		// JSON literal syntax is a valid subset of JavaScript's, so this also
+		// covers "javascript" and any other code language added later.
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return "", err
+		}
+		return string(encoded), nil
+	}
+}
+
+// formatPythonLiteral renders value as a valid Python literal (None/True/False
+// instead of JSON's null/true/false).
+func formatPythonLiteral(value any) (string, error) {
+	switch v := value.(type) {
+	case nil:
+		return "None", nil
+	case bool:
+		if v {
+			return "True", nil
+		}
+		return "False", nil
+	case string:
+		encoded, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return string(encoded), nil
+	case map[string]any:
+		return formatPythonDict(v)
+	case []any:
+		return formatPythonList(v)
+	default:
+		return formatTemplateValue(v), nil
+	}
+}
+
+func formatPythonDict(value map[string]any) (string, error) {
+	keys := make([]string, 0, len(value))
+	for key := range value {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var buf strings.Builder
+	buf.WriteByte('{')
+	for i, key := range keys {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+
+		encodedKey, err := json.Marshal(key)
+		if err != nil {
+			return "", err
+		}
+		buf.Write(encodedKey)
+		buf.WriteString(": ")
+
+		literal, err := formatPythonLiteral(value[key])
+		if err != nil {
+			return "", err
+		}
+		buf.WriteString(literal)
+	}
+	buf.WriteByte('}')
+
+	return buf.String(), nil
+}
+
+func formatPythonList(value []any) (string, error) {
+	var buf strings.Builder
+	buf.WriteByte('[')
+	for i, item := range value {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+
+		literal, err := formatPythonLiteral(item)
+		if err != nil {
+			return "", err
+		}
+		buf.WriteString(literal)
+	}
+	buf.WriteByte(']')
+
+	return buf.String(), nil
+}
+
+// formatShellLiteral renders value as a single, single-quoted POSIX shell
+// word, so it survives as one token regardless of embedded whitespace or
+// shell-special characters.
+func formatShellLiteral(value any) (string, error) {
+	var text string
+
+	switch v := value.(type) {
+	case nil:
+		text = ""
+	case string:
+		text = v
+	case map[string]any, []any:
+		encoded, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		text = string(encoded)
+	default:
+		text = formatTemplateValue(v)
+	}
+
+	return shellQuote(text), nil
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 type resolvedNodeRefs struct {
