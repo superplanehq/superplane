@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
@@ -8,7 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/attachments"
 	"github.com/superplanehq/superplane/pkg/core"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 )
 
 const ResponsePayloadType = "openai.response"
@@ -16,8 +19,9 @@ const ResponsePayloadType = "openai.response"
 type CreateResponse struct{}
 
 type CreateResponseSpec struct {
-	Model string `json:"model"`
-	Input string `json:"input"`
+	Model string   `json:"model"`
+	Input string   `json:"input"`
+	Files []string `json:"files"`
 }
 
 type ResponsePayload struct {
@@ -54,6 +58,7 @@ func (c *CreateResponse) Documentation() string {
 
 - **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
 - **Prompt**: The text prompt to send to the model (supports expressions)
+- **Files**: (Optional) Attach files from the Files tab (images, PDFs, or text). They are uploaded to the OpenAI Files API and sent alongside the prompt.
 
 ## Output
 
@@ -105,6 +110,21 @@ func (c *CreateResponse) Configuration() []configuration.Field {
 			Required:    true,
 			Placeholder: "Enter the prompt text",
 		},
+		{
+			Name:        "files",
+			Label:       "Files",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Files from the Files tab to attach to the prompt (images, PDFs, or text)",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "File path",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeRepositoryFile,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -120,6 +140,37 @@ func (c *CreateResponse) Setup(ctx core.SetupContext) error {
 
 	if spec.Input == "" {
 		return fmt.Errorf("input is required")
+	}
+
+	if len(spec.Files) > 0 {
+		if ctx.Files == nil {
+			return fmt.Errorf("files configured but file access is not available")
+		}
+		available, err := ctx.Files.List()
+		if err != nil {
+			return fmt.Errorf("failed to list repository files: %v", err)
+		}
+		fileSet := make(map[string]bool, len(available))
+		for _, f := range available {
+			if norm, err := gitprovider.NormalizePath(f); err == nil {
+				fileSet[norm] = true
+			}
+		}
+		for _, f := range spec.Files {
+			norm, err := gitprovider.ValidateUserPath(f)
+			if err != nil {
+				return fmt.Errorf("invalid file path %q: %v", f, err)
+			}
+			if !fileSet[norm] {
+				return fmt.Errorf("file %q not found in app repository", f)
+			}
+		}
+
+		// Read the files now so unsupported types, empty files, and size limits
+		// are caught at config time rather than on every execution.
+		if _, err := attachments.Read(ctx.Files, spec.Files); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -144,7 +195,17 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	response, err := client.CreateResponse(spec.Model, spec.Input)
+	atts, err := attachments.Read(ctx.Files, spec.Files)
+	if err != nil {
+		return fmt.Errorf("failed to read attachments: %v", err)
+	}
+	input, fileIDs, err := buildInput(client, atts, spec.Input)
+	if err != nil {
+		return err
+	}
+	defer cleanupFiles(client, fileIDs)
+
+	response, err := client.CreateResponse(CreateResponseRequest{Model: spec.Model, Input: input})
 	if err != nil {
 		return err
 	}
@@ -163,6 +224,47 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 		ResponsePayloadType,
 		[]any{payload},
 	)
+}
+
+// buildInput uploads each attachment to the OpenAI Files API and builds the
+// Responses API input: a plain string when there are no attachments, otherwise
+// a user message carrying input_text + input_image/input_file parts referenced
+// by file_id. The returned file IDs should be cleaned up after the request.
+func buildInput(client *Client, atts []attachments.Attachment, prompt string) (any, []string, error) {
+	if len(atts) == 0 {
+		return prompt, nil, nil
+	}
+
+	parts := make([]InputPart, 0, len(atts)+1)
+	parts = append(parts, InputPart{Type: "input_text", Text: prompt})
+	fileIDs := make([]string, 0, len(atts))
+	for _, att := range atts {
+		purpose := "user_data"
+		if att.IsImage() {
+			purpose = "vision"
+		}
+		fileID, err := client.UploadFile(bytes.NewReader(att.Data), att.Name, purpose, att.UploadMIME())
+		if err != nil {
+			cleanupFiles(client, fileIDs)
+			return nil, nil, fmt.Errorf("upload file %q: %w", att.Name, err)
+		}
+		fileIDs = append(fileIDs, fileID)
+
+		if att.IsImage() {
+			parts = append(parts, InputPart{Type: "input_image", FileID: fileID})
+		} else {
+			parts = append(parts, InputPart{Type: "input_file", FileID: fileID})
+		}
+	}
+
+	return []InputMessage{{Role: "user", Content: parts}}, fileIDs, nil
+}
+
+// cleanupFiles best-effort deletes uploaded files after the request completes.
+func cleanupFiles(client *Client, fileIDs []string) {
+	for _, id := range fileIDs {
+		_ = client.DeleteFile(id)
+	}
 }
 
 func (c *CreateResponse) Cancel(ctx core.ExecutionContext) error {
