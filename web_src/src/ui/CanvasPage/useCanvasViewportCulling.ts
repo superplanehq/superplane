@@ -5,6 +5,7 @@ import { shallow } from "zustand/shallow";
 import {
   getVisibleEdgeIdsInPaddedViewport,
   getVisibleNodeIdsInPaddedViewport,
+  includeCanvasNodesThatMustStayMounted,
   shouldKeepCanvasNodeVisible,
 } from "./canvasViewportCulling";
 
@@ -28,17 +29,15 @@ export function useCanvasViewportCulling(nodes: Node[], edges: Edge[], enabled: 
   );
 
   return useMemo(() => {
-    if (!enabled) {
+    if (!enabled || !nodeLookup || width == null || height == null || !transform) {
       return { visibleNodeIds: null, visibleEdgeIds: null };
     }
 
-    const visibleNodeIds = getVisibleNodeIdsInPaddedViewport(nodeLookup, width, height, transform);
-
-    for (const node of nodes) {
-      if (shouldKeepCanvasNodeVisible(node)) {
-        visibleNodeIds.add(node.id);
-      }
-    }
+    const visibleNodeIds = includeCanvasNodesThatMustStayMounted(
+      getVisibleNodeIdsInPaddedViewport(nodeLookup, width, height, transform),
+      nodeLookup,
+      nodes,
+    );
 
     const visibleEdgeIds = getVisibleEdgeIdsInPaddedViewport(edges, visibleNodeIds);
 

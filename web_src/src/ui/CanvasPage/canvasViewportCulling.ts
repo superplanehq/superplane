@@ -1,4 +1,4 @@
-import { getNodesInside, type EdgeBase, type InternalNodeBase, type NodeBase, type Transform } from "@xyflow/system";
+import type { Edge, InternalNode, Node, Rect, Transform } from "@xyflow/react";
 
 /**
  * Screen-space padding around the viewport when culling off-screen nodes.
@@ -19,8 +19,8 @@ export function getPaddedViewportScreenRect(
   };
 }
 
-export function getVisibleNodeIdsInPaddedViewport<NodeType extends NodeBase = NodeBase>(
-  nodeLookup: Map<string, InternalNodeBase<NodeType>>,
+export function getVisibleNodeIdsInPaddedViewport<NodeType extends Node = Node>(
+  nodeLookup: ReadonlyMap<string, InternalNode<NodeType>>,
   width: number,
   height: number,
   transform: Transform,
@@ -30,17 +30,19 @@ export function getVisibleNodeIdsInPaddedViewport<NodeType extends NodeBase = No
     return new Set(nodeLookup.keys());
   }
 
-  const visibleNodes = getNodesInside(
-    nodeLookup,
-    getPaddedViewportScreenRect(width, height, paddingPx),
-    transform,
-    true,
-  );
+  const viewportRect = getRendererRect(getPaddedViewportScreenRect(width, height, paddingPx), transform);
+  const visibleNodeIds = new Set<string>();
 
-  return new Set(visibleNodes.map((node) => node.id));
+  for (const node of nodeLookup.values()) {
+    if (isNodeInsideRect(node, viewportRect)) {
+      visibleNodeIds.add(node.id);
+    }
+  }
+
+  return visibleNodeIds;
 }
 
-export function getVisibleEdgeIdsInPaddedViewport<EdgeType extends EdgeBase = EdgeBase>(
+export function getVisibleEdgeIdsInPaddedViewport<EdgeType extends Edge = Edge>(
   edges: EdgeType[],
   visibleNodeIds: Set<string>,
 ): Set<string> {
@@ -55,6 +57,22 @@ export function getVisibleEdgeIdsInPaddedViewport<EdgeType extends EdgeBase = Ed
   return visibleEdgeIds;
 }
 
+export function includeCanvasNodesThatMustStayMounted<NodeType extends Node>(
+  visibleNodeIds: Set<string>,
+  nodeLookup: ReadonlyMap<string, InternalNode<NodeType>>,
+  nodes: NodeType[],
+): Set<string> {
+  const nextVisibleNodeIds = new Set(visibleNodeIds);
+
+  for (const node of nodes) {
+    if (!nodeLookup.has(node.id) || shouldKeepCanvasNodeVisible(node)) {
+      nextVisibleNodeIds.add(node.id);
+    }
+  }
+
+  return nextVisibleNodeIds;
+}
+
 export function shouldKeepCanvasNodeVisible(node: {
   id: string;
   dragging?: boolean;
@@ -67,4 +85,37 @@ export function shouldKeepCanvasNodeVisible(node: {
 
   const data = node.data;
   return Boolean(data?.isTemplate || data?.isPendingConnection);
+}
+
+function getRendererRect(screenRect: Rect, [tx, ty, scale]: Transform): Rect {
+  return {
+    x: (screenRect.x - tx) / scale,
+    y: (screenRect.y - ty) / scale,
+    width: screenRect.width / scale,
+    height: screenRect.height / scale,
+  };
+}
+
+function isNodeInsideRect(node: InternalNode<Node>, rect: Rect): boolean {
+  if (!node.internals.handleBounds || node.dragging) {
+    return true;
+  }
+
+  return getOverlappingArea(rect, getNodeRect(node)) > 0;
+}
+
+function getNodeRect(node: InternalNode<Node>): Rect {
+  return {
+    x: node.internals.positionAbsolute.x,
+    y: node.internals.positionAbsolute.y,
+    width: node.measured.width ?? node.width ?? node.initialWidth ?? 0,
+    height: node.measured.height ?? node.height ?? node.initialHeight ?? 0,
+  };
+}
+
+function getOverlappingArea(rectA: Rect, rectB: Rect): number {
+  const xOverlap = Math.max(0, Math.min(rectA.x + rectA.width, rectB.x + rectB.width) - Math.max(rectA.x, rectB.x));
+  const yOverlap = Math.max(0, Math.min(rectA.y + rectA.height, rectB.y + rectB.height) - Math.max(rectA.y, rectB.y));
+
+  return Math.ceil(xOverlap * yOverlap);
 }
