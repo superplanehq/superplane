@@ -3134,7 +3134,6 @@ function CanvasContent({
             nodesDraggable={!isReadOnly}
             nodesConnectable={isConnectionEditingEnabled}
             elementsSelectable={true}
-            onlyRenderVisibleElements={true}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={isConnectionEditingEnabled ? handleConnect : undefined}
