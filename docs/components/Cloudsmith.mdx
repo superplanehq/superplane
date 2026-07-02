@@ -18,10 +18,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Delete Package" href="#delete-package" description="Delete a package from a Cloudsmith repository" />
   <LinkCard title="Get Package" href="#get-package" description="Retrieve metadata for a specific Cloudsmith package" />
+  <LinkCard title="Get Package Vulnerabilities" href="#get-package-vulnerabilities" description="Retrieve the latest vulnerability scan result for a specific Cloudsmith package" />
   <LinkCard title="Get Repository" href="#get-repository" description="Fetch details of a Cloudsmith repository" />
   <LinkCard title="List Packages" href="#list-packages" description="List packages in a Cloudsmith repository with optional filtering by sync status, quarantine, and vulnerability" />
   <LinkCard title="Promote Package" href="#promote-package" description="Copy or move a package from one Cloudsmith repository to another" />
+  <LinkCard title="Quarantine Package" href="#quarantine-package" description="Quarantine or release a Cloudsmith package" />
   <LinkCard title="Resync Package" href="#resync-package" description="Schedule a Cloudsmith package for resynchronization" />
+  <LinkCard title="Scan Package" href="#scan-package" description="Schedule a vulnerability scan for a specific Cloudsmith package" />
   <LinkCard title="Tag Package" href="#tag-package" description="Add, replace, clear, or remove tags for a Cloudsmith package" />
 </CardGrid>
 
@@ -266,6 +269,66 @@ Returns the complete package object including:
 }
 ```
 
+<a id="get-package-vulnerabilities"></a>
+
+## Get Package Vulnerabilities
+
+**Component key:** `cloudsmith.getPackageVulnerabilities`
+
+The Get Package Vulnerabilities component retrieves the most recent vulnerability scan
+result for a specific Cloudsmith package.
+
+### Use Cases
+
+- **Release gating**: Block promotion of packages that have known vulnerabilities
+- **Audit reporting**: Record vulnerability counts and max severity for compliance dashboards
+- **Automated response**: Route critical findings to an on-call team or trigger quarantine
+- **Scan verification**: Confirm a scan has completed and check its outcome after **Scan Package**
+
+### Configuration
+
+- **Repository** (required): The repository containing the package, in the form `owner/repository`.
+- **Package** (required): The unique package identifier (`slug_perm`). Supports expressions — use
+  `{{ $['On Vulnerability Scan Completed'].data.slug_perm }}` to reference an upstream trigger.
+
+### Output
+
+Returns the most recent scan result for the package:
+- **identifier**: Unique ID for this scan result entry
+- **created_at**: When the scan was completed (ISO 8601)
+- **has_vulnerabilities**: Whether any vulnerabilities were detected
+- **num_vulnerabilities**: Total number of vulnerabilities found
+- **max_severity**: Highest severity level detected (e.g. `Critical`, `High`, `Medium`, `Low`)
+- **scan_id**: Internal scan identifier (may be `null`)
+- **package**: Nested object with the scanned package details:
+  - **identifier**: Package `slug_perm`
+  - **name**: Package name
+  - **version**: Package version or digest
+  - **url**: Direct API URL for the package
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_at": "2026-01-01T02:00:00Z",
+    "has_vulnerabilities": true,
+    "identifier": "example-scan-identifier",
+    "max_severity": "High",
+    "num_vulnerabilities": 1,
+    "package": {
+      "identifier": "EXAMPLE123",
+      "name": "example-app",
+      "url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/EXAMPLE123/",
+      "version": "example-version"
+    },
+    "scan_id": null
+  },
+  "timestamp": "2026-01-01T02:05:00Z",
+  "type": "cloudsmith.package.vulnerabilities"
+}
+```
+
 <a id="get-repository"></a>
 
 ## Get Repository
@@ -485,6 +548,76 @@ Returns the promoted package as it appears in the destination repository, includ
 }
 ```
 
+<a id="quarantine-package"></a>
+
+## Quarantine Package
+
+**Component key:** `cloudsmith.quarantinePackage`
+
+The Quarantine Package component quarantines or releases a Cloudsmith package.
+
+### Actions
+
+- **Quarantine**: Makes the package unavailable for download while keeping it in the repository.
+  Useful when a package has known vulnerabilities or should not be consumed.
+- **Release**: Removes the quarantine on a previously quarantined package, making it available
+  for download again once any remediation steps are complete.
+
+### Use Cases
+
+- **Vulnerability response**: Automatically quarantine packages when critical vulnerabilities are detected
+- **Policy enforcement**: Quarantine packages that violate license or security policies
+- **Incident response**: Immediately isolate a compromised package version
+- **Remediation workflow**: Release a package after confirming vulnerabilities have been addressed
+
+### Configuration
+
+- **Repository** (required): The repository containing the package, in the form `owner/repository`.
+- **Package** (required): The unique package identifier (`slug_perm`). Supports expressions — use
+  `{{ $['On Vulnerability Scan Completed'].data.slug_perm }}` to reference an upstream trigger.
+- **Action** (required): Whether to quarantine or release the package.
+
+### Output
+
+Returns the updated Cloudsmith package object reflecting the new quarantine state, including:
+- **name** / **version**: Package identifiers
+- **status** / **status_str**: Updated status — `Quarantined` after quarantine, or the previous
+  status (e.g. `Available`) after release
+- **format**: Package format
+- **cdn_url** / **self_html_url**: Download and web UI URLs
+
+### Example Output
+
+```json
+{
+  "data": {
+    "cdn_url": "https://dl.cloudsmith.io/basic/example-owner/example-repo/docker/manifest.json",
+    "checksum_md5": "00000000000000000000000000000000",
+    "checksum_sha1": "0000000000000000000000000000000000000000",
+    "checksum_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "checksum_sha512": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "description": "Example quarantined package record",
+    "format": "docker",
+    "name": "example-app",
+    "namespace": "example-owner",
+    "repository": "example-repo",
+    "self_html_url": "https://cloudsmith.io/~example-owner/repos/example-repo/packages/detail/docker/example-app/example-version/",
+    "self_url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/EXAMPLE123/",
+    "size": 123456,
+    "size_str": "",
+    "slug": "example-app-er5g",
+    "slug_perm": "EXAMPLE123",
+    "status": 7,
+    "status_str": "Quarantined",
+    "summary": "",
+    "uploaded_at": "2026-01-01T01:00:00Z",
+    "version": "example-version-hash"
+  },
+  "timestamp": "2026-01-01T01:05:00Z",
+  "type": "cloudsmith.package.quarantined"
+}
+```
+
 <a id="resync-package"></a>
 
 ## Resync Package
@@ -542,6 +675,44 @@ Emits the package returned by Cloudsmith on the default channel.
   },
   "timestamp": "2026-01-01T00:05:00Z",
   "type": "cloudsmith.package.resynced"
+}
+```
+
+<a id="scan-package"></a>
+
+## Scan Package
+
+**Component key:** `cloudsmith.scanPackage`
+
+The Scan Package component schedules a vulnerability scan for a specific Cloudsmith package.
+
+### Use Cases
+
+- **On-demand scanning**: Trigger a fresh scan after a package is uploaded or updated
+- **Pre-promotion checks**: Scan a package before promoting it to a production repository
+- **Scheduled audits**: Periodically re-scan packages to catch newly published CVEs
+
+### Configuration
+
+- **Repository** (required): The repository containing the package, in the form `owner/repository`.
+- **Package** (required): The unique package identifier (`slug_perm`). Supports expressions.
+
+### Output
+
+Emits the repository and package identifiers confirming the scan was scheduled. Scan results
+are asynchronous — use the **On Vulnerability Scan Completed** trigger or the
+**Get Package Vulnerabilities** action to retrieve results once the scan finishes.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "package": "example-package-id",
+    "repository": "example-owner/example-repo"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "cloudsmith.package.scan_scheduled"
 }
 ```
 

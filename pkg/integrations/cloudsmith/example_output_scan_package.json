@@ -1,0 +1,8 @@
+{
+  "data": {
+    "package": "example-package-id",
+    "repository": "example-owner/example-repo"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "cloudsmith.package.scan_scheduled"
+}
