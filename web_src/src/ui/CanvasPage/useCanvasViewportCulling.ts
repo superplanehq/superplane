@@ -28,7 +28,7 @@ export function useCanvasViewportCulling(nodes: Node[], edges: Edge[], enabled: 
   );
 
   return useMemo(() => {
-    if (!enabled) {
+    if (!enabled || !nodeLookup || width == null || height == null || !transform) {
       return { visibleNodeIds: null, visibleEdgeIds: null };
     }
 
