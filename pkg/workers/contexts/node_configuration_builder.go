@@ -168,7 +168,28 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 		}
 	}
 
+	if _, ok := value.(string); ok && isCodeField(field) {
+		return value, nil
+	}
+
 	return b.resolveValue(value)
+}
+
+// isCodeField reports whether field holds source code (e.g. a runner script)
+// rather than prose. {{ ... }} placeholders are not resolved in these fields
+// and are left as literal text: substituting them safely would require
+// language-aware quoting/escaping that's easy to get wrong across languages.
+func isCodeField(field configuration.Field) bool {
+	if field.Type != configuration.FieldTypeText || field.TypeOptions == nil || field.TypeOptions.Text == nil {
+		return false
+	}
+
+	switch strings.ToLower(field.TypeOptions.Text.Language) {
+	case "javascript", "python", "shell":
+		return true
+	default:
+		return false
+	}
 }
 
 func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {
