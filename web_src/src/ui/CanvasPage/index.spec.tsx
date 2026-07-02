@@ -734,6 +734,47 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
     }
   });
 
+  it("does not re-fit while editing when the draft version changes", () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    const canvas = (fitViewContentKey: string) => (
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={singleNode}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-1"
+          fitViewContentKey={fitViewContentKey}
+          hasFitToViewRef={hasFitToViewRef}
+          lastFittedContentKeyRef={lastFittedContentKeyRef}
+        />
+      </MemoryRouter>
+    );
+
+    const { rerender } = render(canvas("canvas-1:draft-1"));
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+    // First mount still performs the initial fit so a freshly opened editor is framed.
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+
+    // Entering edit mode / saving churns the draft version id. That must not move
+    // the viewport, otherwise coordinate-based interactions (e.g. deleting an edge)
+    // would land on the wrong place.
+    rerender(canvas("canvas-1:draft-2"));
+    const setViewport = vi.fn();
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport });
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+    expect(setViewport).toHaveBeenCalled();
+  });
+
   it("restores the stored viewport instead of re-fitting when the content key is unchanged", () => {
     const hasFitToViewRef = { current: false };
     const lastFittedContentKeyRef = { current: null as string | null };

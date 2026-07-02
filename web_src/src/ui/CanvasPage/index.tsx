@@ -2163,9 +2163,11 @@ function CanvasContent({
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
-  // Run inspection keeps its own dedicated fit/viewport handling, so the
-  // content-key driven re-fit only applies to the live/version canvas.
-  const fitViewContentKey = isRunInspectionMode ? undefined : fitViewContentKeyProp;
+  // The content-key driven re-fit only applies when viewing the live/version
+  // canvas. Run inspection keeps its own dedicated fit/viewport handling, and
+  // while editing the viewport must stay put (the draft is the same graph the
+  // user was already looking at, and re-fitting would disrupt interactions).
+  const fitViewContentKey = isRunInspectionMode || isEditing ? undefined : fitViewContentKeyProp;
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
   // Similar to existing keyboard shortcuts that check (e.ctrlKey || e.metaKey)
