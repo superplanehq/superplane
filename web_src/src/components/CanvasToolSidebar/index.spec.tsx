@@ -1,21 +1,27 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasToolSidebar } from ".";
 import { CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT } from "./events";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
-const { sendMutation, chatState } = vi.hoisted(() => ({
-  sendMutation: {
-    isPending: false,
-    mutateAsync: vi.fn(),
-  },
-  chatState: {
+const { sendMutation, chatState, chatRefetch } = vi.hoisted(() => {
+  const state = {
     status: "idle",
-  },
-}));
+    refetchStatus: "idle",
+  };
+
+  return {
+    sendMutation: {
+      isPending: false,
+      mutateAsync: vi.fn(),
+    },
+    chatState: state,
+    chatRefetch: vi.fn(async () => ({ data: { id: "chat-1", status: state.refetchStatus } })),
+  };
+});
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvas: () => ({ data: { spec: { nodes: [] } } }),
@@ -25,7 +31,11 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 vi.mock("@/hooks/useAgentChats", () => ({
-  useCanvasAgentChat: () => ({ data: { id: "chat-1", status: chatState.status }, isLoading: false }),
+  useCanvasAgentChat: () => ({
+    data: { id: "chat-1", status: chatState.status },
+    isLoading: false,
+    refetch: chatRefetch,
+  }),
   useAgentChatMessages: () => ({
     data: {
       pages: [
@@ -89,10 +99,16 @@ describe("CanvasToolSidebar", () => {
   beforeEach(() => {
     richMessageRenderSpy.mockClear();
     chatState.status = "idle";
+    chatState.refetchStatus = "idle";
+    chatRefetch.mockClear();
     sendMutation.isPending = false;
     sendMutation.mutateAsync.mockReset();
     sendMutation.mutateAsync.mockResolvedValue(null);
     sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("renders the agent panel when the sidebar is open", async () => {
@@ -180,5 +196,43 @@ describe("CanvasToolSidebar", () => {
       resolveSend?.();
     });
     expect(input).toHaveValue("second");
+  });
+
+  it("clears stale streaming state when a durable chat refetch returns idle", async () => {
+    vi.useFakeTimers();
+    chatState.status = "streaming";
+    chatState.refetchStatus = "streaming";
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+
+    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+    expect(screen.getByText("Agent is running...")).toBeInTheDocument();
+
+    chatState.refetchStatus = "idle";
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(screen.queryByTestId("agent-thinking")).not.toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-stop-button")).not.toBeInTheDocument();
+  });
+
+  it("keeps streaming state while durable chat refetches are still streaming", async () => {
+    vi.useFakeTimers();
+    chatState.status = "streaming";
+    chatState.refetchStatus = "streaming";
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+
+    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+    expect(screen.getByText("Agent is running...")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
   });
 });
