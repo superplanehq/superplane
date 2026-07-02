@@ -35,10 +35,8 @@ type patchDraftTarget struct {
 }
 
 type stagedDraftCanvas struct {
-	name        string
-	description string
-	nodes       []models.Node
-	edges       []models.Edge
+	nodes []models.Node
+	edges []models.Edge
 }
 
 func newPatchDraftAction(deps Dependencies) patchDraftAction {
@@ -55,6 +53,16 @@ func (a patchDraftAction) Execute(ctx context.Context, session agents.AgentSessi
 		return updateResult{}, err
 	}
 
+	canvasID, err := uuid.Parse(session.CanvasID)
+	if err != nil {
+		return updateResult{}, fmt.Errorf("invalid session canvas id: %w", err)
+	}
+
+	canvas, err := models.FindCanvas(target.organizationID, canvasID)
+	if err != nil {
+		return updateResult{}, fmt.Errorf("load canvas: %w", err)
+	}
+
 	stagedCanvas, err := a.readStagedDraftCanvas(ctx, session, target.draft)
 	if err != nil {
 		return updateResult{}, err
@@ -65,11 +73,11 @@ func (a patchDraftAction) Execute(ctx context.Context, session agents.AgentSessi
 		return updateResult{}, err
 	}
 
-	if err := stagePatchedDraftFiles(ctx, session, target, patched); err != nil {
+	if err := stagePatchedDraftFiles(ctx, session, target, canvas, patched); err != nil {
 		return updateResult{}, err
 	}
 
-	return newPatchDraftResult(session, target.draft, patched), nil
+	return newPatchDraftResult(session, target.draft, canvas, patched), nil
 }
 
 func resolvePatchDraftTarget(session agents.AgentSessionContext, input Input) (patchDraftTarget, error) {
@@ -140,10 +148,8 @@ func (a patchDraftAction) readStagedDraftCanvas(ctx context.Context, session age
 	}
 
 	return stagedDraftCanvas{
-		name:        pbCanvas.GetMetadata().GetName(),
-		description: pbCanvas.GetMetadata().GetDescription(),
-		nodes:       nodes,
-		edges:       edges,
+		nodes: nodes,
+		edges: edges,
 	}, nil
 }
 
@@ -152,8 +158,6 @@ func (a patchDraftAction) applyPatchToStagedCanvas(
 	stagedCanvas stagedDraftCanvas,
 ) (*models.CanvasVersion, error) {
 	patchedDraft := *target.draft
-	patchedDraft.Name = stagedCanvas.name
-	patchedDraft.Description = stagedCanvas.description
 	patchedDraft.Nodes = stagedCanvas.nodes
 	patchedDraft.Edges = stagedCanvas.edges
 
@@ -179,10 +183,10 @@ func (a patchDraftAction) applyPatchToStagedCanvas(
 	return patched, nil
 }
 
-func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionContext, target patchDraftTarget, patched *models.CanvasVersion) error {
+func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionContext, target patchDraftTarget, canvas *models.Canvas, patched *models.CanvasVersion) error {
 	operations := make([]*pb.CanvasRepositoryFileOperation, 0, 2)
 	if target.changeset != nil || target.autoLayoutInput != nil {
-		patchedYAML, err := serializePatchedDraftYAML(patched, session.CanvasID)
+		patchedYAML, err := serializePatchedDraftYAML(canvas, patched, session.CanvasID)
 		if err != nil {
 			return fmt.Errorf("serialize patched canvas yaml: %w", err)
 		}
@@ -214,14 +218,14 @@ func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionCont
 	return nil
 }
 
-func newPatchDraftResult(session agents.AgentSessionContext, draft *models.CanvasVersion, patched *models.CanvasVersion) updateResult {
+func newPatchDraftResult(session agents.AgentSessionContext, draft *models.CanvasVersion, canvas *models.Canvas, patched *models.CanvasVersion) updateResult {
 	return updateResult{
 		Action:     patchDraftActionName,
 		CanvasID:   session.CanvasID,
 		VersionID:  draft.ID.String(),
 		Draft:      draftResult{VersionID: draft.ID.String(), DisplayName: draft.DisplayName, BranchName: draft.GitBranch},
 		NodeIssues: collectNodeIssues(patched.Nodes),
-		Summary:    summarizeParsedCanvas(patched.Name, patched.Nodes, patched.Edges),
+		Summary:    summarizeParsedCanvas(canvas.Name, patched.Nodes, patched.Edges),
 	}
 }
 
@@ -470,16 +474,12 @@ func defaultPatchDraftAutoLayoutNodeIDs(
 	return nodeIDs
 }
 
-func serializePatchedDraftYAML(version *models.CanvasVersion, canvasID string) (string, error) {
+func serializePatchedDraftYAML(canvas *models.Canvas, version *models.CanvasVersion, canvasID string) (string, error) {
 	positioned := &pb.CanvasVersion{
-		Metadata: &pb.CanvasVersion_Metadata{
-			Name:        version.Name,
-			Description: version.Description,
-		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: grpcactions.NodesToProto(version.Nodes),
 			Edges: grpcactions.EdgesToProto(version.Edges),
 		},
 	}
-	return canvasyaml.CanvasResourceYAML(positioned, canvasID)
+	return canvasyaml.CanvasResourceYAML(positioned, canvasID, canvas.Name, canvas.Description)
 }

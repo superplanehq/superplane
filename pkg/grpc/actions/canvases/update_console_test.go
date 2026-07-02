@@ -196,7 +196,7 @@ func Test__UpdateConsole(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		yamlText, err := consoleYAMLFromVersion(resp)
+		yamlText, err := consoleYAMLFromVersion(canvas, resp)
 		require.NoError(t, err)
 		doc, err := models.ConsoleFromYML([]byte(yamlText))
 		require.NoError(t, err)
