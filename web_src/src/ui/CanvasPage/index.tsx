@@ -95,6 +95,7 @@ import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
+import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
@@ -329,6 +330,14 @@ export interface CanvasPageProps {
   hasUserToggledSidebarRef?: React.MutableRefObject<boolean>;
   isSidebarOpenRef?: React.MutableRefObject<boolean | null>;
   viewportRef?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
+  /**
+   * Identifies the canvas/version currently displayed. When it changes (switching
+   * canvas or version), the viewport is re-fit to the whole graph instead of
+   * restoring the previous canvas/version viewport from `viewportRef`.
+   */
+  fitViewContentKey?: string;
+  /** Tracks the content key the persisted viewport was fitted for. Paired with `fitViewContentKey`. */
+  lastFittedContentKeyRef?: React.MutableRefObject<string | null>;
 
   // Optional: control and observe component sidebar state
   onSidebarChange?: (isOpen: boolean, selectedNodeId: string | null) => void;
@@ -1480,6 +1489,8 @@ function CanvasPage(props: CanvasPageProps) {
                   onZoomChange={setCanvasZoom}
                   hasFitToViewRef={hasFitToViewRef}
                   viewportRefProp={props.viewportRef}
+                  fitViewContentKey={props.fitViewContentKey}
+                  lastFittedContentKeyRef={props.lastFittedContentKeyRef}
                   workflowNodes={props.workflowNodes}
                   setCurrentTab={setCurrentTab}
                   showBottomStatusControls={props.showBottomStatusControls}
@@ -2062,6 +2073,8 @@ function CanvasContent({
   onZoomChange,
   hasFitToViewRef,
   viewportRefProp,
+  fitViewContentKey,
+  lastFittedContentKeyRef,
   onPendingConnectionNodeClick,
   onNodeClick,
   workflowNodes,
@@ -2115,6 +2128,8 @@ function CanvasContent({
   onZoomChange?: (zoom: number) => void;
   hasFitToViewRef: React.MutableRefObject<boolean>;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
+  fitViewContentKey?: string;
+  lastFittedContentKeyRef?: React.MutableRefObject<string | null>;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
   onNodeClick?: (nodeId: string) => void;
   workflowNodes?: ComponentsNode[];
@@ -2594,7 +2609,15 @@ function CanvasContent({
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
     (reactFlowInstance: { setViewport: (viewport: Viewport) => void }) => {
-      if (!hasFitToViewRef.current) {
+      // Switching to a different canvas/version must re-fit the whole graph instead of
+      // reusing the previous content's viewport, matching the first-load behavior.
+      const needsInitialFit = shouldRefitOnInit({
+        hasFittedBefore: hasFitToViewRef.current,
+        fitViewContentKey,
+        lastFittedContentKey: lastFittedContentKeyRef?.current ?? null,
+      });
+
+      if (needsInitialFit) {
         const hasNodes = (stateRef.current.nodes?.length ?? 0) > 0;
 
         const focusNodeId = initialFocusNodeId;
@@ -2611,6 +2634,9 @@ function CanvasContent({
           const initialViewport = getViewport();
           viewportRef.current = initialViewport;
           reportZoom(initialViewport.zoom);
+          // Only stamp once real nodes were fitted; while the switched content is still
+          // loading (no nodes yet), leave the key stale so the next init re-fits.
+          stampFittedContentKey(lastFittedContentKeyRef, fitViewContentKey);
         } else {
           const defaultViewport = viewportRef.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
           viewportRef.current = defaultViewport;
@@ -2630,7 +2656,16 @@ function CanvasContent({
         setHasReactFlowInitialized(true);
       }
     },
-    [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],
+    [
+      fitView,
+      getViewport,
+      reportZoom,
+      hasFitToViewRef,
+      viewportRef,
+      initialFocusNodeId,
+      fitViewContentKey,
+      lastFittedContentKeyRef,
+    ],
   );
 
   // Fit all currently-rendered nodes into view whenever the parent bumps `fitAllRequest`.
