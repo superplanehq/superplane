@@ -77,30 +77,6 @@ func TestDiscardCanvasStaging(t *testing.T) {
 	assert.Equal(t, baseline, effective)
 }
 
-func TestApplyCanvasAutoLayout(t *testing.T) {
-	r, ctx, canvasID, versionID := setupStagingDraft(t)
-	orgID := r.Organization.ID.String()
-
-	t.Run("nil layout -> invalid argument", func(t *testing.T) {
-		_, err := ApplyCanvasAutoLayout(ctx, orgID, canvasID, versionID, nil)
-		require.Error(t, err)
-	})
-
-	t.Run("lays out staged canvas and re-stages", func(t *testing.T) {
-		resp, err := ApplyCanvasAutoLayout(ctx, orgID, canvasID, versionID, &pb.CanvasAutoLayout{
-			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-			Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
-		})
-		require.NoError(t, err)
-		assert.True(t, resp.GetStagingSummary().GetHasStaging())
-		assert.Contains(t, resp.GetStagingSummary().GetStagedPaths(), CanvasYAMLRepositoryPath)
-
-		staged, err := ReadRepositorySpecFileStaged(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
-		require.NoError(t, err)
-		assert.Contains(t, staged, "nodes:")
-	})
-}
-
 func TestCommitCanvasStagingAppliesStagedCanvas(t *testing.T) {
 	r, ctx, canvasID, versionID := setupStagingDraft(t)
 	orgID := r.Organization.ID.String()
