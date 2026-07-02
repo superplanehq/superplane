@@ -38,7 +38,7 @@ import type { AgentMessage, AgentOutgoingImage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
 
-const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 3000;
+const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 15000;
 
 type ChatConversationProps = {
   chatId: string;
@@ -248,41 +248,42 @@ function useStreamingStatusReconciler(
   setStatus: (value: string) => void,
   refreshChatStatus: () => Promise<string | undefined>,
 ) {
+  const activeRef = useRef(false);
+  const inFlightRef = useRef(false);
+  const reconcile = useCallback(async () => {
+    if (inFlightRef.current) {
+      return;
+    }
+
+    inFlightRef.current = true;
+    try {
+      const nextStatus = await refreshChatStatus();
+      if (activeRef.current && nextStatus && nextStatus !== "streaming") {
+        setStatus(nextStatus);
+      }
+    } catch {
+      // Websocket events remain the primary status path; refetch only repairs missed terminal events.
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [refreshChatStatus, setStatus]);
+
   useEffect(() => {
     if (status !== "streaming") {
       return;
     }
 
-    let active = true;
-    let inFlight = false;
-    const reconcile = async () => {
-      if (inFlight) {
-        return;
-      }
-
-      inFlight = true;
-      try {
-        const nextStatus = await refreshChatStatus();
-        if (active && nextStatus && nextStatus !== "streaming") {
-          setStatus(nextStatus);
-        }
-      } catch {
-        // Websocket events remain the primary status path; refetch only repairs missed terminal events.
-      } finally {
-        inFlight = false;
-      }
-    };
-
+    activeRef.current = true;
     void reconcile();
     const intervalId = window.setInterval(() => {
       void reconcile();
     }, STREAMING_STATUS_RECONCILE_INTERVAL_MS);
 
     return () => {
-      active = false;
+      activeRef.current = false;
       window.clearInterval(intervalId);
     };
-  }, [refreshChatStatus, setStatus, status]);
+  }, [reconcile, status]);
 }
 
 function useAgentBootKickoff({

@@ -210,7 +210,7 @@ describe("CanvasToolSidebar", () => {
 
     chatState.refetchStatus = "idle";
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(15000);
     });
 
     expect(screen.queryByTestId("agent-thinking")).not.toBeInTheDocument();
@@ -228,7 +228,7 @@ describe("CanvasToolSidebar", () => {
     expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(15000);
     });
 
     expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
