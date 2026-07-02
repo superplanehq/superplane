@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 	"errors"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -12,7 +13,7 @@ import (
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -92,6 +93,11 @@ func publishDraftVersionInTransaction(
 	var publishedVersion *models.CanvasVersion
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, err := models.LockCanvasForUpdate(tx, organizationUUID, canvasUUID)
+		if err != nil {
+			return err
+		}
+
 		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
 		if findErr != nil {
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {
@@ -115,14 +121,6 @@ func publishDraftVersionInTransaction(
 
 		if hasStaging {
 			return grpcerrors.FailedPrecondition(nil, "draft version has staged changes")
-		}
-
-		nameErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, version.Name)
-		if errors.Is(nameErr, models.ErrCanvasNameAlreadyExists) {
-			return grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
-		}
-		if nameErr != nil {
-			return nameErr
 		}
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
