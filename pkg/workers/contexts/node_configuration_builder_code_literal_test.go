@@ -60,6 +60,17 @@ func Test_NodeConfigurationBuilder_CodeField_JavaScriptScalarTypes(t *testing.T)
 	)
 }
 
+func Test_NodeConfigurationBuilder_CodeField_JavaScriptFloat(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{"price": 10.5}).
+		WithConfigurationFields([]configuration.Field{codeTextField("script", "javascript")})
+
+	result, err := builder.Build(map[string]any{"script": "const p = {{ root().price }};"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "const p = 10.5;", result["script"])
+}
+
 func Test_NodeConfigurationBuilder_CodeField_PythonLiterals(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithRootPayload(map[string]any{
@@ -78,6 +89,19 @@ func Test_NodeConfigurationBuilder_CodeField_PythonLiterals(t *testing.T) {
 	assert.Equal(t, "ok = True\nm = None\nobj = {\"a\": None, \"b\": True}", result["script"])
 }
 
+func Test_NodeConfigurationBuilder_CodeField_PythonNumericTypes(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{"price": 10.5, "count": 42}).
+		WithConfigurationFields([]configuration.Field{codeTextField("script", "python")})
+
+	result, err := builder.Build(map[string]any{
+		"script": "p = {{ root().price }}\nn = {{ root().count }}",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "p = 10.5\nn = 42", result["script"])
+}
+
 func Test_NodeConfigurationBuilder_CodeField_ShellQuoting(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithRootPayload(map[string]any{
@@ -92,6 +116,68 @@ func Test_NodeConfigurationBuilder_CodeField_ShellQuoting(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, `echo 'hello world'`, result["commands"])
+}
+
+func Test_NodeConfigurationBuilder_CodeField_ShellQuoteEscapesEmbeddedQuote(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{"name": "it's a test"}).
+		WithConfigurationFields([]configuration.Field{codeTextField("commands", "shell")})
+
+	result, err := builder.Build(map[string]any{"commands": "echo {{ root().name }}"})
+
+	require.NoError(t, err)
+	assert.Equal(t, `echo 'it'\''s a test'`, result["commands"])
+}
+
+func Test_NodeConfigurationBuilder_CodeField_ShellBacktickIsNotAQuote(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{"cmd": "hello world"}).
+		WithConfigurationFields([]configuration.Field{codeTextField("commands", "shell")})
+
+	result, err := builder.Build(map[string]any{"commands": "result=`{{ root().cmd }}`"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "result=`'hello world'`", result["commands"])
+}
+
+func Test_NodeConfigurationBuilder_CodeField_ShellSingleQuoteHasNoEscapes(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{"x": "unsafe value"}).
+		WithConfigurationFields([]configuration.Field{codeTextField("commands", "shell")})
+
+	// In POSIX shell, 'a\' is a complete string ("a\") followed by the string
+	// end; the backslash has no escaping power inside single quotes. So the
+	// placeholder below is bare (outside any quotes) and must get quoted.
+	result, err := builder.Build(map[string]any{"commands": `echo 'a\' {{ root().x }}`})
+
+	require.NoError(t, err)
+	assert.Equal(t, `echo 'a\' 'unsafe value'`, result["commands"])
+}
+
+func Test_NodeConfigurationBuilder_CodeField_ShellHeredocBodyStaysRaw(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{"name": "John Smith"}).
+		WithConfigurationFields([]configuration.Field{codeTextField("script", "shell")})
+
+	result, err := builder.Build(map[string]any{
+		"script": "cat <<EOF\nHello {{ root().name }}\nEOF\necho done",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "cat <<EOF\nHello John Smith\nEOF\necho done", result["script"])
+}
+
+func Test_NodeConfigurationBuilder_CodeField_ShellBitShiftIsNotMistakenForHeredoc(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{"x": "hello world"}).
+		WithConfigurationFields([]configuration.Field{codeTextField("script", "shell")})
+
+	result, err := builder.Build(map[string]any{
+		"script": "echo $(( 1 << n ))\necho {{ root().x }}",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "echo $(( 1 << n ))\necho 'hello world'", result["script"])
 }
 
 func Test_NodeConfigurationBuilder_CodeField_ShellArithmeticExpansionStaysUnquoted(t *testing.T) {

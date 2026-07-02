@@ -343,13 +343,21 @@ func (b *NodeConfigurationBuilder) ResolveCodeTemplateExpressions(expression str
 	return buf.String(), nil
 }
 
-// isInsideQuotedLiteral reports whether byte offset pos in source falls inside
-// an open single/double/backtick-quoted literal, by scanning from the start
-// of source and tracking quote/escape state. For Python, a triple-quote
-// delimiter (three repeated quote characters) is treated as one token rather
-// than as independent open/close events.
+// isInsideQuotedLiteral reports whether byte offset pos in source falls
+// inside an open string literal (or, for shell, a heredoc body), by scanning
+// from the start of source and tracking quote/escape state. Language-specific
+// rules are applied: JS backticks and Python triple-quotes are treated as
+// their own delimiters, and POSIX single-quoted shell strings have no escape
+// sequences at all (a backslash there is a literal character, not an escape).
 func isInsideQuotedLiteral(source string, pos int, language string) bool {
-	tripleQuotesAllowed := strings.EqualFold(language, "python")
+	language = strings.ToLower(language)
+	isShell := language == "shell"
+	tripleQuotesAllowed := language == "python"
+	backtickIsQuote := language == "javascript"
+
+	if isShell && isInsideShellHeredocBody(source, pos) {
+		return true
+	}
 
 	var openQuote byte
 	tripleQuoted := false
@@ -365,17 +373,21 @@ func isInsideQuotedLiteral(source string, pos int, language string) bool {
 				i += 3
 				continue
 			}
-			if c == '\'' || c == '"' || c == '`' {
+			if c == '\'' || c == '"' || (c == '`' && backtickIsQuote) {
 				openQuote = c
 			}
 			i++
 			continue
 		}
 
+		// POSIX single-quoted shell strings can't contain escapes; every other
+		// quote type (and every other language) does support backslash escapes.
+		escapesEnabled := !(isShell && openQuote == '\'')
+
 		switch {
-		case escaped:
+		case escapesEnabled && escaped:
 			escaped = false
-		case c == '\\':
+		case escapesEnabled && c == '\\':
 			escaped = true
 		case tripleQuoted && c == openQuote:
 			if !isTripleQuoteAt(source, i, openQuote) {
@@ -394,6 +406,74 @@ func isInsideQuotedLiteral(source string, pos int, language string) bool {
 
 func isTripleQuoteAt(source string, i int, quote byte) bool {
 	return i+2 < len(source) && source[i+1] == quote && source[i+2] == quote
+}
+
+// shellHeredocOpenerPattern matches a heredoc redirection (<<WORD, <<-WORD,
+// <<'WORD', <<"WORD"). Only quoted or ALL_CAPS delimiters are recognized, to
+// avoid mistaking arithmetic left-shift (e.g. $(( 1 << n ))) for a heredoc.
+var shellHeredocOpenerPattern = regexp.MustCompile(`(?m)<<-?[ \t]*(['"]?)([A-Za-z_][A-Za-z0-9_]*)['"]?`)
+
+func isInsideShellHeredocBody(source string, pos int) bool {
+	for _, body := range shellHeredocBodyRanges(source) {
+		if pos >= body[0] && pos < body[1] {
+			return true
+		}
+	}
+	return false
+}
+
+// shellHeredocBodyRanges returns the [start, end) byte ranges of heredoc
+// bodies in source, which are treated as raw text (not shell code) since
+// they aren't subject to normal shell word-quoting rules.
+func shellHeredocBodyRanges(source string) [][2]int {
+	var ranges [][2]int
+
+	for _, m := range shellHeredocOpenerPattern.FindAllStringSubmatchIndex(source, -1) {
+		quoted := m[2] != m[3]
+		delimiter := source[m[4]:m[5]]
+		if !quoted && !isShoutingIdentifier(delimiter) {
+			continue
+		}
+
+		lineEnd := strings.IndexByte(source[m[1]:], '\n')
+		if lineEnd == -1 {
+			continue
+		}
+		bodyStart := m[1] + lineEnd + 1
+		bodyEnd := len(source)
+
+		for pos := bodyStart; pos <= len(source); {
+			next := strings.IndexByte(source[pos:], '\n')
+			line := source[pos:]
+			if next != -1 {
+				line = source[pos : pos+next]
+			}
+			if strings.TrimSpace(line) == delimiter {
+				bodyEnd = pos
+				break
+			}
+			if next == -1 {
+				break
+			}
+			pos += next + 1
+		}
+
+		ranges = append(ranges, [2]int{bodyStart, bodyEnd})
+	}
+
+	return ranges
+}
+
+// isShoutingIdentifier reports whether s looks like a conventional heredoc
+// delimiter (EOF, END, SCRIPT_EOF, ...): letters, digits, underscores, with
+// no lowercase letters.
+func isShoutingIdentifier(s string) bool {
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			return false
+		}
+	}
+	return true
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
