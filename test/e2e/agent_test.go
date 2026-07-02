@@ -29,10 +29,6 @@ func TestAgentE2E(t *testing.T) {
 	t.Run("sends a message and renders the streamed assistant response", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return agentAssistantTurn("Agent ready for e2e"), nil
-			}
-
 			return agentAssistantTurn("E2E assistant response for: " + call.Message), nil
 		})
 
@@ -47,10 +43,6 @@ func TestAgentE2E(t *testing.T) {
 	t.Run("switches to build mode before sending a message", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			return agentAssistantTurn("Builder mode acknowledged"), nil
 		})
 
@@ -65,10 +57,6 @@ func TestAgentE2E(t *testing.T) {
 	t.Run("renders tool activity from provider events", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			return []agents.ProviderEvent{
 				agentToolStartedEvent("tool-1", "bash", "superplane apps canvas get"),
 				agentToolFinishedEvent("tool-1", "bash"),
@@ -89,10 +77,6 @@ func TestAgentE2E(t *testing.T) {
 	t.Run("stops a running turn", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			return nil, nil
 		})
 
@@ -118,10 +102,6 @@ func TestAgentE2E(t *testing.T) {
 	t.Run("sends a follow-up message while a turn is still running", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			return nil, nil
 		})
 
@@ -141,10 +121,6 @@ func TestAgentE2E(t *testing.T) {
 		var approvalReceived bool
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			if isAgentSystemMessage(call.Message) {
-				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
-			}
-
 			if call.Message == "Specs approved. Start building." {
 				approvalReceived = true
 				return agentAssistantTurn("Building now."), nil
@@ -209,9 +185,24 @@ func (s *agentSteps) openAgent() {
 
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
 	s.waitForAgentInput()
-	s.waitForSendCall(func(call support.AgentProviderSendMessageCall) bool {
-		return isAgentSystemMessage(call.Message)
-	})
+
+	// Opening or refreshing a canvas must not invoke the agent: it no longer sends a
+	// boot message (see web_src/src/lib/agentBootContext.ts). Sync on the provisioned
+	// session instead of a boot round-trip, then assert nothing was auto-sent.
+	s.currentAgentSession()
+	s.assertNoBootMessageSent()
+}
+
+func (s *agentSteps) assertNoBootMessageSent() {
+	require.Never(s.t, func() bool {
+		for _, call := range ctx.AgentProvider.SendMessageCalls() {
+			if isAgentSystemMessage(call.Message) {
+				return true
+			}
+		}
+
+		return false
+	}, 2*time.Second, agentPollInterval, "agent must not auto-send a boot message on canvas open")
 }
 
 func (s *agentSteps) waitForAgentInput() {
