@@ -34,8 +34,6 @@ type CanvasVersion struct {
 	WorkflowID            uuid.UUID
 	OwnerID               *uuid.UUID
 	State                 string
-	Name                  string
-	Description           string
 	PublishedAt           *time.Time
 	Nodes                 datatypes.JSONSlice[Node]
 	Edges                 datatypes.JSONSlice[Edge]
@@ -475,14 +473,12 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 	}
 
 	canvas.LiveVersionID = &version.ID
-	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 	return MapCanvasNameUniqueConstraintError(tx.
 		Model(&Canvas{}).
 		Where("id = ?", canvas.ID).
 		Updates(map[string]any{
 			"live_version_id": version.ID,
-			"name":            version.Name,
 			"updated_at":      now,
 		}).
 		Error)
@@ -550,8 +546,6 @@ func CreateDraftBranchFromLiveInTransaction(
 		WorkflowID:  canvasID,
 		OwnerID:     &userID,
 		State:       CanvasVersionStateDraft,
-		Name:        liveVersion.Name,
-		Description: liveVersion.Description,
 		Nodes:       datatypes.NewJSONSlice(nodes),
 		Edges:       datatypes.NewJSONSlice(edges),
 		GitBranch:   branchName,
@@ -582,16 +576,14 @@ func CreateCanvasSnapshotVersionInTransaction(
 
 	now := time.Now()
 	version := CanvasVersion{
-		ID:          uuid.New(),
-		WorkflowID:  workflowID,
-		OwnerID:     &ownerID,
-		State:       CanvasVersionStateSnapshot,
-		Name:        sourceVersion.Name,
-		Description: sourceVersion.Description,
-		Nodes:       datatypes.NewJSONSlice(nodes),
-		Edges:       datatypes.NewJSONSlice(edges),
-		CreatedAt:   &now,
-		UpdatedAt:   &now,
+		ID:         uuid.New(),
+		WorkflowID: workflowID,
+		OwnerID:    &ownerID,
+		State:      CanvasVersionStateSnapshot,
+		Nodes:      datatypes.NewJSONSlice(nodes),
+		Edges:      datatypes.NewJSONSlice(edges),
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
 	}
 	copyVersionConsoleFields(sourceVersion, &version)
 
@@ -632,7 +624,6 @@ func PublishCanvasDraftInTransaction(
 	}
 
 	canvas.LiveVersionID = &version.ID
-	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 
 	if err := tx.
@@ -640,7 +631,6 @@ func PublishCanvasDraftInTransaction(
 		Where("id = ?", canvas.ID).
 		Updates(map[string]any{
 			"live_version_id": version.ID,
-			"name":            version.Name,
 			"updated_at":      now,
 		}).
 		Error; err != nil {
@@ -696,6 +686,7 @@ func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*C
 			"live_version_id",
 			"folder_id",
 			"name",
+			"description",
 			"next_draft_display_number",
 			"created_by",
 			"created_at",

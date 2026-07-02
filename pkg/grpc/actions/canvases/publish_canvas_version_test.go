@@ -193,9 +193,11 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
 
 		require.NoError(t, database.Conn().
-			Model(&models.CanvasVersion{}).
-			Where("id = ?", uuid.MustParse(draftVersionID)).
-			Update("name", "publish-draft-in-folder-renamed").
+			Model(&models.Canvas{}).
+			Where("id = ?", uuid.MustParse(canvasID)).
+			Updates(map[string]any{
+				"name": "publish-draft-in-folder-renamed",
+			}).
 			Error)
 
 		folder, err := models.CreateCanvasFolder(r.Organization.ID, "Publish Folder", models.CanvasFolderColorBlue)
@@ -225,8 +227,8 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvasID, "")
 
 		require.NoError(t, database.Conn().
-			Model(&models.CanvasVersion{}).
-			Where("id = ?", uuid.MustParse(draftVersionID)).
+			Model(&models.Canvas{}).
+			Where("id = ?", uuid.MustParse(canvasID)).
 			Updates(map[string]any{
 				"name":        "publish-metadata-only-renamed",
 				"description": "updated through metadata-only publish",
@@ -288,39 +290,28 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Equal(t, "published console", panels[0].Content["body"])
 	})
 
-	t.Run("draft version with duplicate name -> error", func(t *testing.T) {
+	t.Run("canvas.yaml name is ignored", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		existingCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-
-		require.NoError(t, database.Conn().
-			Model(&models.CanvasVersion{}).
-			Where("id = ?", *existingCanvas.LiveVersionID).
-			Update("name", "publish-duplicate-live").
-			Error)
-		require.NoError(t, database.Conn().
-			Model(&models.Canvas{}).
-			Where("id = ?", existingCanvas.ID).
-			Update("name", "publish-duplicate-live").
-			Error)
-
 		draftVersionID := createDraftVersionID(ctx, t, r.Organization.ID.String(), canvas.ID.String(), "")
 
-		require.NoError(t, database.Conn().
-			Model(&models.CanvasVersion{}).
-			Where("id = ?", uuid.MustParse(draftVersionID)).
-			Update("name", "publish-duplicate-live").
-			Error)
-
-		_, err := PublishCanvasVersion(
+		_, err := UpdateCanvasVersion(
 			ctx,
-			r.Encryptor, r.Registry, r.GitProvider,
-			r.Organization.ID.String(), canvas.ID.String(), draftVersionID,
-			testWebhookBaseURL, r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersionID,
+			testPbCanvas("renamed-through-yaml"),
+			nil,
+			testWebhookBaseURL,
+			r.AuthService,
 		)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.AlreadyExists, code)
+		require.NoError(t, err)
+
+		refreshedCanvas, findErr := models.FindCanvas(r.Organization.ID, canvas.ID)
+		require.NoError(t, findErr)
+		assert.Equal(t, canvas.Name, refreshedCanvas.Name)
 	})
 
 }

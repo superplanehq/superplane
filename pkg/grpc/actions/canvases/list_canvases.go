@@ -17,7 +17,7 @@ import (
 )
 
 func ListCanvases(ctx context.Context, registry *registry.Registry, organizationID string) (*pb.ListCanvasesResponse, error) {
-	canvases, err := models.ListCanvases(organizationID)
+	canvases, err := models.ListCanvasesWithLiveVersion(organizationID)
 	if err != nil {
 		log.Errorf("failed to list canvases for organization %s: %v", organizationID, err)
 		return nil, grpcerrors.Internal(err, "failed to list canvases")
