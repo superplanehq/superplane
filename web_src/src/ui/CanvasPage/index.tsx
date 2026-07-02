@@ -70,7 +70,11 @@ import {
   normalizeCanvasHeaderMode,
 } from "@/pages/app/viewState";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/app/mappers/safeMappers";
-import { LIVE_CANVAS_FIT_VIEW_OPTIONS, RUN_CANVAS_FIT_VIEW_OPTIONS } from "@/ui/CanvasPage/canvasFitOptions";
+import {
+  CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS,
+  LIVE_CANVAS_FIT_VIEW_OPTIONS,
+  RUN_CANVAS_FIT_VIEW_OPTIONS,
+} from "@/ui/CanvasPage/canvasFitOptions";
 import { Sentry } from "@/sentry";
 import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
@@ -2453,7 +2457,7 @@ function CanvasContent({
         selected: node.id === focusRequest.nodeId,
       })),
     );
-    void fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 }).then(
+    void fitView({ nodes: [targetNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS }).then(
       () => {
         const nextViewport = getViewport();
         viewportRef.current = nextViewport;
@@ -2510,7 +2514,7 @@ function CanvasContent({
       const targetNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       if (!targetNode) return;
       stateRef.current.setNodes((nodes) => nodes.map((n) => ({ ...n, selected: n.id === nodeId })));
-      fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
+      fitView({ nodes: [targetNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
     };
     window.addEventListener("agent:focus-node", handler);
     return () => window.removeEventListener("agent:focus-node", handler);
@@ -2597,7 +2601,7 @@ function CanvasContent({
         const focusNode = focusNodeId ? stateRef.current.nodes?.find((node) => node.id === focusNodeId) : null;
 
         if (focusNode) {
-          fitView({ nodes: [focusNode], duration: 500, maxZoom: 1.2 });
+          fitView({ nodes: [focusNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
         } else if (hasNodes) {
           fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 500 });
         }

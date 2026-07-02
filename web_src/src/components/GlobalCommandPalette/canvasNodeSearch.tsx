@@ -1,6 +1,7 @@
 import type { BuiltInEdge, Node } from "@xyflow/react";
 import { useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo } from "react";
+import { CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS } from "@/ui/CanvasPage/canvasFitOptions";
 import { registerCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
 import type { CanvasNodeSearchProvider, CanvasNodeSearchResult } from "./canvasNodeSearchStore";
 
@@ -24,7 +25,7 @@ export function GlobalCommandPaletteCanvasNodeSearch({ onSearch, onSelectNode }:
         setNodes((nodes) =>
           nodes.map((current) => (current.id === node.id ? { ...current, selected: true } : current)),
         );
-        fitView({ nodes: [node], duration: 500 });
+        fitView({ nodes: [node], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
         onSelectNode?.(node);
       },
     }),

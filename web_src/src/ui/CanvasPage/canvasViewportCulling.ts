@@ -1,6 +1,9 @@
 import { getNodesInside, type EdgeBase, type InternalNodeBase, type NodeBase, type Transform } from "@xyflow/system";
 
-/** Screen-space padding around the viewport when culling off-screen nodes. */
+/**
+ * Screen-space padding around the viewport when culling off-screen nodes.
+ * Roughly one component node width so edge-adjacent nodes stay mounted while panning.
+ */
 export const CANVAS_VIEWPORT_CULL_PADDING_PX = 320;
 
 export function getPaddedViewportScreenRect(

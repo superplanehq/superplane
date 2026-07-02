@@ -301,7 +301,12 @@ describe("CanvasPage run inspection", () => {
     });
 
     await waitFor(() => {
-      expect(fitViewMock).toHaveBeenCalledWith({ nodes: [runNode], duration: 500, maxZoom: 1.2 });
+      expect(fitViewMock).toHaveBeenCalledWith({
+        nodes: [runNode],
+        duration: 500,
+        includeHiddenNodes: true,
+        maxZoom: 1.2,
+      });
     });
     await waitFor(() => {
       expect(viewportRef.current).toEqual(focusedViewport);
