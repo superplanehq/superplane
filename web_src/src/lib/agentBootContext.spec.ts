@@ -11,21 +11,22 @@ import {
   setAgentBootContext,
 } from "./agentBootContext";
 
-const DEFAULT_BOOT_MESSAGE =
-  "Session ready. Use the [Canvas Snapshot] from the session context to greet the user. Do not run CLI commands or fetch the canvas just to summarize it. Only check connected integrations if the user asks for integration-specific work.";
-
 describe("agent boot context", () => {
   beforeEach(() => {
     sessionStorage.clear();
   });
 
-  it("defaults to using the backend canvas snapshot without CLI fetches", () => {
-    const message = getAgentBootMessage("canvas-1");
+  it("sends no boot message by default so opening a canvas never invokes the agent", () => {
+    expect(getAgentBootMessage("canvas-1")).toBe("");
+  });
 
-    expect(message).toBe(DEFAULT_BOOT_MESSAGE);
-    expect(message).toContain("[Canvas Snapshot]");
-    expect(message).toContain("Do not run CLI commands");
-    expect(message).toContain("fetch the canvas");
+  it("sends no boot message when the stored context is for a different canvas", () => {
+    setAgentBootContext("canvas-1", {
+      instructions: "This template deploys preview environments.",
+      initialMessage: "Here's what you've got on this canvas.",
+    });
+
+    expect(getAgentBootMessage("canvas-2")).toBe("");
   });
 
   it("blocks boot while a placeholder node is pending for the canvas", () => {
@@ -59,7 +60,7 @@ describe("agent boot context", () => {
 
     expect(isAgentBootReady("canvas-1")).toBe(true);
     expect(sessionStorage.getItem(PLACEHOLDER_NODE_CONTEXT_KEY)).toBeNull();
-    expect(getAgentBootMessage("canvas-1")).toBe(DEFAULT_BOOT_MESSAGE);
+    expect(getAgentBootMessage("canvas-1")).toBe("");
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: { canvasId: "canvas-1" } }));
 
     window.removeEventListener(AGENT_BOOT_CONTEXT_READY_EVENT, listener);
@@ -101,6 +102,6 @@ describe("agent boot context", () => {
     clearAgentBootContext("canvas-1");
 
     expect(getAgentBootInitialMessage("canvas-1")).toBe("Here's what you've got on this canvas.");
-    expect(getAgentBootMessage("canvas-1")).toBe(DEFAULT_BOOT_MESSAGE);
+    expect(getAgentBootMessage("canvas-1")).toBe("");
   });
 });
