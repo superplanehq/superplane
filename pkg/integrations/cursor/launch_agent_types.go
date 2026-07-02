@@ -27,6 +27,10 @@ const (
 	LaunchAgentMaxPollAttempts        = 100
 	LaunchAgentMaxPollErrors          = 5
 	LaunchAgentWebhookSignatureHeader = "X-Webhook-Signature"
+
+	// Conversation message types returned by GET /v0/agents/{id}/conversation.
+	ConversationMessageTypeUser      = "user_message"
+	ConversationMessageTypeAssistant = "assistant_message"
 )
 
 // --- CONFIGURATION STRUCTS ---
@@ -147,6 +151,12 @@ type LaunchAgentOutputPayload struct {
 	PrURL      string `json:"prUrl,omitempty"`
 	Summary    string `json:"summary,omitempty"`
 	BranchName string `json:"branchName,omitempty"`
+	// Messages is the agent's full conversation history (chronological), attached
+	// on successful completion. LastMessage is a convenience pointer to the final
+	// assistant reply (or the last message if none), so downstream steps can use
+	// either the array (e.g. messages[-1] via an expression) or lastMessage.
+	Messages    []ConversationMessage `json:"messages,omitempty"`
+	LastMessage *ConversationMessage  `json:"lastMessage,omitempty"`
 }
 
 // --- HELPER FUNCTIONS ---
