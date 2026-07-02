@@ -176,6 +176,11 @@ func (c *RunPython) Configuration() []configuration.Field {
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "enable_setup_commands", Values: []string{"true"}},
 			},
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "shell",
+				},
+			},
 		},
 		{
 			Name:        "script",

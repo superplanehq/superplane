@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -168,7 +169,35 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 		}
 	}
 
+	if str, ok := value.(string); ok && field.Type == configuration.FieldTypeText {
+		if language, ok := codeFieldLanguage(field); ok {
+			return b.ResolveCodeTemplateExpressions(str, language)
+		}
+	}
+
 	return b.resolveValue(value)
+}
+
+// codeFieldLanguage returns the field's language and whether it's one we apply
+// type-aware literal substitution for (as opposed to prose fields or
+// non-executed languages like "json").
+func codeFieldLanguage(field configuration.Field) (string, bool) {
+	if field.TypeOptions == nil || field.TypeOptions.Text == nil {
+		return "", false
+	}
+
+	language := field.TypeOptions.Text.Language
+	if !isCodeLanguage(language) {
+		return "", false
+	}
+
+	return language, true
+}
+
+var codeLanguages = []string{"javascript", "python", "shell"}
+
+func isCodeLanguage(language string) bool {
+	return slices.Contains(codeLanguages, strings.ToLower(language))
 }
 
 func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {
@@ -269,6 +298,182 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 	}
 
 	return result, nil
+}
+
+// ResolveCodeTemplateExpressions is like ResolveTemplateExpressions, but for
+// fields holding source code. A bare placeholder is substituted as a valid,
+// correctly-typed literal for the given language instead of a naive stringified
+// value. A placeholder already inside the author's own quotes is left as-is,
+// to avoid double-quoting.
+func (b *NodeConfigurationBuilder) ResolveCodeTemplateExpressions(expression string, language string) (any, error) {
+	locations := expressionRegex.FindAllStringSubmatchIndex(expression, -1)
+	if len(locations) == 0 {
+		return expression, nil
+	}
+
+	var buf strings.Builder
+	lastEnd := 0
+
+	for _, loc := range locations {
+		matchStart, matchEnd := loc[0], loc[1]
+		innerStart, innerEnd := loc[2], loc[3]
+
+		buf.WriteString(expression[lastEnd:matchStart])
+
+		value, err := b.ResolveExpression(expression[innerStart:innerEnd])
+		if err != nil {
+			return nil, err
+		}
+
+		if isInsideQuotedLiteral(expression, matchStart, language) {
+			buf.WriteString(formatTemplateValue(value))
+		} else {
+			literal, err := formatCodeLiteral(value, language)
+			if err != nil {
+				return nil, fmt.Errorf("formatting %s literal: %w", language, err)
+			}
+			buf.WriteString(literal)
+		}
+
+		lastEnd = matchEnd
+	}
+
+	buf.WriteString(expression[lastEnd:])
+
+	return buf.String(), nil
+}
+
+// isInsideQuotedLiteral reports whether byte offset pos in source falls
+// inside an open string literal (or, for shell, a heredoc body), by scanning
+// from the start of source and tracking quote/escape state. Language-specific
+// rules are applied: JS backticks and Python triple-quotes are treated as
+// their own delimiters, and POSIX single-quoted shell strings have no escape
+// sequences at all (a backslash there is a literal character, not an escape).
+func isInsideQuotedLiteral(source string, pos int, language string) bool {
+	language = strings.ToLower(language)
+	isShell := language == "shell"
+	tripleQuotesAllowed := language == "python"
+	backtickIsQuote := language == "javascript"
+
+	if isShell && isInsideShellHeredocBody(source, pos) {
+		return true
+	}
+
+	var openQuote byte
+	tripleQuoted := false
+	escaped := false
+
+	i := 0
+	for i < pos && i < len(source) {
+		c := source[i]
+
+		if openQuote == 0 {
+			if tripleQuotesAllowed && (c == '\'' || c == '"') && isTripleQuoteAt(source, i, c) {
+				openQuote, tripleQuoted = c, true
+				i += 3
+				continue
+			}
+			if c == '\'' || c == '"' || (c == '`' && backtickIsQuote) {
+				openQuote = c
+			}
+			i++
+			continue
+		}
+
+		// POSIX single-quoted shell strings can't contain escapes; every other
+		// quote type (and every other language) does support backslash escapes.
+		escapesEnabled := !(isShell && openQuote == '\'')
+
+		switch {
+		case escapesEnabled && escaped:
+			escaped = false
+		case escapesEnabled && c == '\\':
+			escaped = true
+		case tripleQuoted && c == openQuote:
+			if !isTripleQuoteAt(source, i, openQuote) {
+				break // a lone quote char inside a triple-quoted string doesn't close it
+			}
+			openQuote, tripleQuoted = 0, false
+			i += 2 // consume the other two quote chars; the trailing i++ below covers the third
+		case c == openQuote:
+			openQuote = 0
+		}
+		i++
+	}
+
+	return openQuote != 0
+}
+
+func isTripleQuoteAt(source string, i int, quote byte) bool {
+	return i+2 < len(source) && source[i+1] == quote && source[i+2] == quote
+}
+
+// shellHeredocOpenerPattern matches a heredoc redirection (<<WORD, <<-WORD,
+// <<'WORD', <<"WORD"). Only quoted or ALL_CAPS delimiters are recognized, to
+// avoid mistaking arithmetic left-shift (e.g. $(( 1 << n ))) for a heredoc.
+var shellHeredocOpenerPattern = regexp.MustCompile(`(?m)<<-?[ \t]*(['"]?)([A-Za-z_][A-Za-z0-9_]*)['"]?`)
+
+func isInsideShellHeredocBody(source string, pos int) bool {
+	for _, body := range shellHeredocBodyRanges(source) {
+		if pos >= body[0] && pos < body[1] {
+			return true
+		}
+	}
+	return false
+}
+
+// shellHeredocBodyRanges returns the [start, end) byte ranges of heredoc
+// bodies in source, which are treated as raw text (not shell code) since
+// they aren't subject to normal shell word-quoting rules.
+func shellHeredocBodyRanges(source string) [][2]int {
+	var ranges [][2]int
+
+	for _, m := range shellHeredocOpenerPattern.FindAllStringSubmatchIndex(source, -1) {
+		quoted := m[2] != m[3]
+		delimiter := source[m[4]:m[5]]
+		if !quoted && !isShoutingIdentifier(delimiter) {
+			continue
+		}
+
+		lineEnd := strings.IndexByte(source[m[1]:], '\n')
+		if lineEnd == -1 {
+			continue
+		}
+		bodyStart := m[1] + lineEnd + 1
+		bodyEnd := len(source)
+
+		for pos := bodyStart; pos <= len(source); {
+			next := strings.IndexByte(source[pos:], '\n')
+			line := source[pos:]
+			if next != -1 {
+				line = source[pos : pos+next]
+			}
+			if strings.TrimSpace(line) == delimiter {
+				bodyEnd = pos
+				break
+			}
+			if next == -1 {
+				break
+			}
+			pos += next + 1
+		}
+
+		ranges = append(ranges, [2]int{bodyStart, bodyEnd})
+	}
+
+	return ranges
+}
+
+// isShoutingIdentifier reports whether s looks like a conventional heredoc
+// delimiter (EOF, END, SCRIPT_EOF, ...): letters, digits, underscores, with
+// no lowercase letters.
+func isShoutingIdentifier(s string) bool {
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			return false
+		}
+	}
+	return true
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
@@ -661,6 +866,139 @@ func formatTemplateValue(value any) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
+}
+
+// formatCodeLiteral renders value as a syntactically valid, type-preserving
+// literal for the given source-code language.
+func formatCodeLiteral(value any, language string) (string, error) {
+	switch strings.ToLower(language) {
+	case "python":
+		return formatPythonLiteral(value)
+	case "shell":
+		return formatShellLiteral(value)
+	default:
+		// JSON literal syntax is a valid subset of JavaScript's, so this also
+		// covers "javascript" and any other code language added later.
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return "", err
+		}
+		return string(encoded), nil
+	}
+}
+
+// formatPythonLiteral renders value as a valid Python literal (None/True/False
+// instead of JSON's null/true/false).
+func formatPythonLiteral(value any) (string, error) {
+	switch v := value.(type) {
+	case nil:
+		return "None", nil
+	case bool:
+		if v {
+			return "True", nil
+		}
+		return "False", nil
+	case string:
+		encoded, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return string(encoded), nil
+	case map[string]any:
+		return formatPythonDict(v)
+	case []any:
+		return formatPythonList(v)
+	default:
+		return formatTemplateValue(v), nil
+	}
+}
+
+func formatPythonDict(value map[string]any) (string, error) {
+	keys := make([]string, 0, len(value))
+	for key := range value {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var buf strings.Builder
+	buf.WriteByte('{')
+	for i, key := range keys {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+
+		encodedKey, err := json.Marshal(key)
+		if err != nil {
+			return "", err
+		}
+		buf.Write(encodedKey)
+		buf.WriteString(": ")
+
+		literal, err := formatPythonLiteral(value[key])
+		if err != nil {
+			return "", err
+		}
+		buf.WriteString(literal)
+	}
+	buf.WriteByte('}')
+
+	return buf.String(), nil
+}
+
+func formatPythonList(value []any) (string, error) {
+	var buf strings.Builder
+	buf.WriteByte('[')
+	for i, item := range value {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+
+		literal, err := formatPythonLiteral(item)
+		if err != nil {
+			return "", err
+		}
+		buf.WriteString(literal)
+	}
+	buf.WriteByte(']')
+
+	return buf.String(), nil
+}
+
+// shellSafeWordPattern matches characters that never need quoting in a POSIX
+// shell word (mirrors Python's shlex.quote _find_unsafe allow-list).
+var shellSafeWordPattern = regexp.MustCompile(`^[\w@%+=:,./-]+$`)
+
+// formatShellLiteral renders value as a shell word, quoting it only when
+// necessary (empty, or containing whitespace/shell-special characters).
+// Plain numeric/word tokens are left bare so they still work in contexts like
+// $(( {{ x }} + 1 )) arithmetic expansion.
+func formatShellLiteral(value any) (string, error) {
+	var text string
+
+	switch v := value.(type) {
+	case nil:
+		text = ""
+	case string:
+		text = v
+	case map[string]any, []any:
+		encoded, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		text = string(encoded)
+	default:
+		text = formatTemplateValue(v)
+	}
+
+	if text != "" && shellSafeWordPattern.MatchString(text) {
+		return text, nil
+	}
+
+	return shellQuote(text), nil
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 type resolvedNodeRefs struct {
