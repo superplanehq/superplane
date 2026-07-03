@@ -31,6 +31,7 @@ The Text Prompt component generates text responses using OpenAI's language model
 
 - **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
 - **Prompt**: The text prompt to send to the model (supports expressions)
+- **Files**: (Optional) Attach files from the Files tab (images, PDFs, or text). They are uploaded to the OpenAI Files API and sent alongside the prompt.
 - **Structured Output**: (Optional) Provide a JSON Schema for the response and the model returns JSON matching it, available on the parsed output. The schema is validated before the request and sent in OpenAI strict mode; strict mode marks every property required, so express optional fields by making their type nullable.
 
 ### Output
