@@ -211,6 +211,27 @@ describe("CanvasPage connection drop", () => {
     expect(reactFlowPropsRef.current?.onlyRenderVisibleElements).not.toBe(true);
   });
 
+  it("does not open the versions sidebar as the initial edit-session view", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          isEditSessionActive={true}
+          activeCanvasVersionId="draft-version"
+          toolSidebarVersionsContent={<div>Version history</div>}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId("canvas-versions-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByText("Version history")).not.toBeInTheDocument();
+  });
+
   it("does not close the building blocks sidebar from the pane click that follows a connection drop", () => {
     const onPlaceholderAdd = vi.fn(() => new Promise<string>(() => {}));
 
