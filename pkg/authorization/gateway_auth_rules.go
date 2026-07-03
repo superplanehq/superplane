@@ -343,6 +343,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "POST", Pattern: "/api/v1/agents/canvases/{canvas_id}/chat/reset"}: {
+			Resource:                     "agents",
+			Action:                       "create",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+		},
 		{Method: "POST", Pattern: "/api/v1/agents/chats/{chat_id}/interrupt"}: {
 			Resource:                     "agents",
 			Action:                       "create",
