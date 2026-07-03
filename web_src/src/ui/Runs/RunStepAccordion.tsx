@@ -6,8 +6,9 @@ import type {
   CanvasesCanvasRun,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
+import Editor from "@monaco-editor/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useEventExecutions } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
@@ -79,14 +80,53 @@ export function HeaderIconButton({
   );
 }
 
-export function JsonDetailBox({ title, value }: { title: string; value: unknown }) {
+/** Read-only JSON viewer with line folding, sized to fill its container. */
+export function PayloadMonaco({ value }: { value: string }) {
+  return (
+    <Editor
+      height="100%"
+      defaultLanguage="json"
+      value={value}
+      theme="vs"
+      options={{
+        readOnly: true,
+        domReadOnly: true,
+        minimap: { enabled: false },
+        fontSize: 13,
+        lineNumbers: "on",
+        wordWrap: "on",
+        folding: true,
+        showFoldingControls: "always",
+        scrollBeyondLastLine: false,
+        renderWhitespace: "none",
+        scrollbar: { vertical: "auto", horizontal: "auto" },
+      }}
+    />
+  );
+}
+
+export function JsonDetailBox({
+  title,
+  value,
+  nodeName,
+  nodeIcon,
+}: {
+  title: string;
+  value: unknown;
+  /** Step/node name shown in the expanded modal header to indicate the source. */
+  nodeName?: string;
+  /** Step/node icon shown in the expanded modal header. */
+  nodeIcon?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [modalCopied, setModalCopied] = useState(false);
+  const payloadString = useMemo(() => JSON.stringify(value, null, 2), [value]);
 
-  const handleCopy = () => {
-    void navigator.clipboard?.writeText(JSON.stringify(value, null, 2)).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  const copyPayload = (markCopied: (copied: boolean) => void) => {
+    void navigator.clipboard?.writeText(payloadString).catch(() => {});
+    markCopied(true);
+    setTimeout(() => markCopied(false), 1500);
   };
 
   const actions = (
@@ -95,7 +135,7 @@ export function JsonDetailBox({ title, value }: { title: string; value: unknown 
       <HeaderIconButton
         label={copied ? "Copied" : "Copy"}
         icon={copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-        onClick={handleCopy}
+        onClick={() => copyPayload(setCopied)}
       />
       <HeaderIconButton label="Expand" icon={<Maximize2 className="h-3.5 w-3.5" />} onClick={() => setOpen(true)} />
     </>
@@ -108,12 +148,32 @@ export function JsonDetailBox({ title, value }: { title: string; value: unknown 
       </DetailBox>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[70vh] overflow-auto">
-            <JsonView value={value as object} collapsed={false} displayDataTypes={false} style={{ fontSize: 12 }} />
+        <DialogContent
+          size="large"
+          className="flex h-[80vh] w-[60vw] max-w-[60vw] flex-col gap-0 overflow-hidden p-0"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 pr-10">
+            <div className="flex min-w-0 items-center gap-1.5">
+              {nodeIcon}
+              {nodeName ? <span className="truncate text-[12px] font-medium text-slate-700">{nodeName}</span> : null}
+              <DialogTitle className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                {title}
+              </DialogTitle>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <HeaderIconButton label="Send to AI" icon={<Sparkles className="h-3.5 w-3.5" />} />
+              <HeaderIconButton
+                label={modalCopied ? "Copied" : "Copy"}
+                icon={
+                  modalCopied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />
+                }
+                onClick={() => copyPayload(setModalCopied)}
+              />
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <PayloadMonaco value={payloadString} />
           </div>
         </DialogContent>
       </Dialog>
@@ -146,7 +206,9 @@ export function ErrorDetailBox({
     <div className="overflow-hidden rounded border border-red-200 bg-white">
       <div className="flex items-center gap-1.5 border-b border-red-200 bg-red-50 px-3 py-1.5">
         <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-red-600">Error</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-red-600">
+          Error - Output not emitted
+        </span>
       </div>
       <div className="flex flex-col gap-1.5 px-3 py-2.5 text-[13px]">
         {message ? <span className="min-w-0 break-all font-medium text-red-600">{message}</span> : null}

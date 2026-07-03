@@ -171,7 +171,7 @@ export function getAdjacentRunNodeId(
   return chain[nextIndex] ?? null;
 }
 
-function extractExecutionPayload(execution: CanvasesCanvasNodeExecution): unknown {
+export function extractExecutionPayload(execution: CanvasesCanvasNodeExecution): unknown {
   if (!execution.outputs || Object.keys(execution.outputs).length === 0) {
     return undefined;
   }

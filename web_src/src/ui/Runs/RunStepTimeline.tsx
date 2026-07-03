@@ -1,6 +1,9 @@
 import {
   AlignLeft,
   Braces,
+  Check,
+  CircleHelp,
+  Copy,
   GitCommitVertical,
   SlidersHorizontal,
   Sparkles,
@@ -14,17 +17,130 @@ import type {
   CanvasesCanvasRun,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
 import { RUN_NODE_ICON_SIZE, RunNodeIcon } from "./RunNodeIcon";
-import { DetailBox, ErrorDetailBox, HeaderIconButton, JsonDetailBox } from "./RunStepAccordion";
-import { buildExecutionChain, buildStepStatusTimeline, isErrorValue, type StepStatusEntry } from "./runNodeDetailModel";
+import { DetailBox, ErrorDetailBox, HeaderIconButton, JsonDetailBox, PayloadMonaco } from "./RunStepAccordion";
+import {
+  buildExecutionChain,
+  buildStepStatusTimeline,
+  extractExecutionPayload,
+  isErrorValue,
+  type StepStatusEntry,
+} from "./runNodeDetailModel";
 import { formatEventTimestamp, formatRelativeOffset, formatStepElapsed } from "./runSummary";
 import { useRunNodeDetailPresentation } from "./useRunNodeDetailPresentation";
 
 function hasData(value: unknown): boolean {
   return !!value && typeof value === "object" && Object.keys(value as object).length > 0;
+}
+
+interface InputChainStep {
+  nodeId: string;
+  name: string;
+  icon: ReactNode;
+  payload: unknown;
+}
+
+/**
+ * Payload inspector for a step's input chain: left rail of vertical tabs listing
+ * the preceding steps (most recent on top), with the selected step's payload shown
+ * in a read-only Monaco editor.
+ */
+function InputChainModal({
+  open,
+  onOpenChange,
+  steps,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  steps: InputChainStep[];
+}) {
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const selected = steps.find((step) => step.nodeId === selectedNodeId) ?? steps[0];
+  const payloadString = useMemo(() => JSON.stringify(selected?.payload ?? {}, null, 2), [selected?.payload]);
+
+  const copyPayload = () => {
+    void navigator.clipboard?.writeText(payloadString).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="large"
+        className="flex h-[80vh] w-[70vw] max-w-[70vw] flex-col gap-0 overflow-hidden p-0"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <DialogTitle className="sr-only">Input chain</DialogTitle>
+        <div className="flex min-h-0 flex-1">
+          <div className="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-slate-200 bg-slate-50 p-2">
+            <div className="flex items-center gap-1 px-2 py-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Input chain</span>
+              <HoverCard openDelay={100}>
+                <HoverCardTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="What is the input chain?"
+                    className="text-slate-400 transition-colors hover:text-slate-600"
+                  >
+                    <CircleHelp className="h-3.5 w-3.5" />
+                  </button>
+                </HoverCardTrigger>
+                <HoverCardContent side="right" className="w-64 text-[12px] leading-snug text-slate-600">
+                  The list of outputs this component has access to from upstream nodes.
+                </HoverCardContent>
+              </HoverCard>
+            </div>
+            {steps.map((step) => (
+              <button
+                key={step.nodeId}
+                type="button"
+                onClick={() => setSelectedNodeId(step.nodeId)}
+                className={cn(
+                  "flex items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] transition-colors",
+                  selected?.nodeId === step.nodeId
+                    ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200"
+                    : "text-slate-600 hover:bg-slate-100",
+                )}
+              >
+                {step.icon}
+                <span className="min-w-0 truncate">{step.name}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 pr-10">
+              <div className="flex min-w-0 items-center gap-1.5">
+                {selected?.icon}
+                <span className="truncate text-[12px] font-medium text-slate-700">{selected?.name}</span>
+                <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Output
+                </span>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <HeaderIconButton label="Send to AI" icon={<Sparkles className="h-3.5 w-3.5" />} />
+                <HeaderIconButton
+                  label={copied ? "Copied" : "Copy"}
+                  icon={copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                  onClick={copyPayload}
+                />
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <PayloadMonaco value={payloadString} />
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 /**
@@ -84,15 +200,6 @@ function useTimelineToggle(key: TimelineToggleKey, defaultOpen: boolean): [boole
   return [open, toggle];
 }
 
-/** Trigger-style name chip, mirroring the runs-sidebar trigger badge. */
-function StepNameChip({ children }: { children: ReactNode }) {
-  return (
-    <span className="max-w-[12rem] shrink-0 truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-      {children}
-    </span>
-  );
-}
-
 /** A single node on the step timeline: circular marker, connector line, a header row with a right-aligned timestamp, and optional expanded content. */
 function TimelineItem({
   marker,
@@ -135,12 +242,18 @@ function InputItem({
   moreCount,
   payload,
   timestamp,
+  nodeName,
+  nodeIcon,
+  onOpenChain,
 }: {
   isTrigger: boolean;
   chipLabel: string;
   moreCount: number;
   payload: unknown;
   timestamp: string | null;
+  nodeName: string;
+  nodeIcon: ReactNode;
+  onOpenChain?: () => void;
 }) {
   const [open, toggleOpen] = useTimelineToggle("input", false);
   const canShowPayload = hasData(payload);
@@ -154,12 +267,14 @@ function InputItem({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Input</span>
           <button
             type="button"
-            onClick={() => {}}
-            className="flex min-w-0 items-center gap-1.5 rounded py-0.5 pr-1 transition-colors hover:bg-slate-100"
+            onClick={onOpenChain}
+            disabled={!onOpenChain}
             title={isTrigger ? "Triggering event" : "Open input chain"}
+            className="flex min-w-0 items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-default disabled:hover:bg-slate-100 disabled:hover:text-slate-600"
           >
-            <StepNameChip>{chipLabel}</StepNameChip>
-            {moreCount > 0 ? <span className="shrink-0 text-[11px] text-slate-500">+{moreCount} more</span> : null}
+            <Braces className="h-3 w-3 shrink-0 text-slate-400" />
+            <span className="max-w-[10rem] truncate">{chipLabel}</span>
+            {moreCount > 0 ? <span className="shrink-0 text-slate-500">+{moreCount} more</span> : null}
           </button>
           {canShowPayload ? (
             <HeaderIconButton
@@ -173,7 +288,9 @@ function InputItem({
         </>
       }
     >
-      {open && canShowPayload ? <JsonDetailBox title="Input" value={payload} /> : null}
+      {open && canShowPayload ? (
+        <JsonDetailBox title="Input" value={payload} nodeName={nodeName} nodeIcon={nodeIcon} />
+      ) : null}
     </TimelineItem>
   );
 }
@@ -208,6 +325,7 @@ function ActionItem({
   config,
   statusTimeline,
   timestamp,
+  nodeName,
 }: {
   marker: ReactNode;
   badge: { badgeColor: string; label: string };
@@ -218,6 +336,7 @@ function ActionItem({
   config: unknown;
   statusTimeline: StepStatusEntry[];
   timestamp: string | null;
+  nodeName: string;
 }) {
   const [showSummary, toggleSummary] = useTimelineToggle("summary", false);
   const [showConfig, toggleConfig] = useTimelineToggle("config", false);
@@ -272,7 +391,9 @@ function ActionItem({
             <RunNodeDetailDetailsView details={summaryDetails} statusBadge={statusBadge} relativeTime={relativeTime} />
           </DetailBox>
         ) : null}
-        {showConfig && canShowConfig ? <JsonDetailBox title="Runtime Config" value={config} /> : null}
+        {showConfig && canShowConfig ? (
+          <JsonDetailBox title="Runtime Config" value={config} nodeName={nodeName} nodeIcon={marker} />
+        ) : null}
       </div>
     </TimelineItem>
   );
@@ -286,6 +407,8 @@ function OutputItem({
   errorMetadata,
   payload,
   timestamp,
+  nodeName,
+  nodeIcon,
 }: {
   isError: boolean;
   errorMessage?: string;
@@ -293,6 +416,8 @@ function OutputItem({
   errorMetadata?: Record<string, unknown>;
   payload: unknown;
   timestamp: string | null;
+  nodeName: string;
+  nodeIcon: ReactNode;
 }) {
   // Errored output is always expanded by default and can be dismissed per-step, but that
   // dismissal is intentionally *not* persisted (unlike the payload toggle) so a fresh error
@@ -330,7 +455,7 @@ function OutputItem({
         isError ? (
           <ErrorDetailBox message={errorMessage} reason={errorReason} metadata={errorMetadata} />
         ) : canShowPayload ? (
-          <JsonDetailBox title="Output" value={payload} />
+          <JsonDetailBox title="Output" value={payload} nodeName={nodeName} nodeIcon={nodeIcon} />
         ) : null
       ) : null}
     </TimelineItem>
@@ -398,6 +523,38 @@ export function RunStepTimeline({
     [execution, presentation.workflowNode],
   );
 
+  const [chainModalOpen, setChainModalOpen] = useState(false);
+  const inputChainSteps = useMemo<InputChainStep[]>(() => {
+    if (currentIndex <= 0) return [];
+    return chain
+      .slice(0, currentIndex)
+      .map((id) => {
+        const node = workflowNodes.find((item) => item.id === id);
+        const stepExecution = executions.find((item) => item.nodeId === id);
+        const payload =
+          id === triggerNodeId
+            ? run.rootEvent?.data
+            : stepExecution
+              ? (extractExecutionPayload(stepExecution) ?? stepExecution.rootEvent?.data)
+              : undefined;
+        return {
+          nodeId: id,
+          name: node?.name || id,
+          icon: (
+            <RunNodeIcon
+              iconSrc={getHeaderIconSrc(node?.component)}
+              iconSlug={node?.component ? componentIconMap[node.component] : undefined}
+              alt={node?.name || id}
+              size={RUN_NODE_ICON_SIZE}
+              className="h-3.5 w-3.5 shrink-0"
+            />
+          ),
+          payload,
+        };
+      })
+      .reverse();
+  }, [chain, currentIndex, workflowNodes, executions, triggerNodeId, run.rootEvent?.data, componentIconMap]);
+
   return (
     <div className="bg-slate-50 px-3 py-3">
       <InputItem
@@ -406,7 +563,13 @@ export function RunStepTimeline({
         moreCount={inputMoreCount}
         payload={inputPayload}
         timestamp={inputTimestamp}
+        nodeName={presentation.nodeName}
+        nodeIcon={actionMarker}
+        onOpenChain={inputChainSteps.length > 0 ? () => setChainModalOpen(true) : undefined}
       />
+      {inputChainSteps.length > 0 ? (
+        <InputChainModal open={chainModalOpen} onOpenChange={setChainModalOpen} steps={inputChainSteps} />
+      ) : null}
       {!isTrigger && execution ? (
         <ActionItem
           marker={actionMarker}
@@ -418,6 +581,7 @@ export function RunStepTimeline({
           config={presentation.tabData?.configuration}
           statusTimeline={statusTimeline}
           timestamp={formatEventTimestamp(execution.createdAt)}
+          nodeName={presentation.nodeName}
         />
       ) : null}
       <OutputItem
@@ -427,6 +591,8 @@ export function RunStepTimeline({
         errorMetadata={execution?.metadata as Record<string, unknown> | undefined}
         payload={presentation.tabData?.payload}
         timestamp={formatEventTimestamp(execution?.updatedAt ?? execution?.createdAt ?? run.rootEvent?.createdAt)}
+        nodeName={presentation.nodeName}
+        nodeIcon={actionMarker}
       />
     </div>
   );

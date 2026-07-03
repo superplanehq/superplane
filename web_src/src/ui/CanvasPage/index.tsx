@@ -1238,9 +1238,19 @@ function CanvasPage(props: CanvasPageProps) {
   // The run's step accordion now lives in a right-side panel that opens as soon
   // as a run is selected (a node does not need to be picked yet). The expanded
   // step, if any, is driven by runNodeDetailNodeId.
-  const runInspectionPanelOpen = Boolean(
+  const isRunInspectionActive = Boolean(
     props.isRunInspectionMode && !!props.runNodeDetailRun && !!props.runNodeDetailCanvasId,
   );
+  // In run inspection the close button collapses the panel (like the live canvas)
+  // rather than exiting back to the live canvas; exiting stays available via the
+  // inspection banner. Collapsing keeps the historical canvas + banner visible.
+  const [runInspectionPanelCollapsed, setRunInspectionPanelCollapsed] = useState(false);
+  const runInspectionPanelOpen = isRunInspectionActive && !runInspectionPanelCollapsed;
+
+  // Selecting a run or a node reopens the panel after it was collapsed.
+  useEffect(() => {
+    setRunInspectionPanelCollapsed(false);
+  }, [props.runNodeDetailRun?.id, props.runNodeDetailNodeId]);
 
   const liveSelectedNodeId = state.componentSidebar.selectedNodeId;
   const [liveExpandedNodeId, setLiveExpandedNodeId] = useState<string | null>(null);
@@ -1264,7 +1274,8 @@ function CanvasPage(props: CanvasPageProps) {
   // In run inspection the canvas reflects a historical run's state, not the live
   // canvas. Surface a prominent way back to the live canvas, mirroring the
   // version-preview bar. Hidden in full-page mode (canvas isn't visible then).
-  const showRunInspectionBar = runInspectionPanelOpen && runPanelSize !== "full" && Boolean(props.onExitRunInspection);
+  const showRunInspectionBar =
+    isRunInspectionActive && !(runInspectionPanelOpen && runPanelSize === "full") && Boolean(props.onExitRunInspection);
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1509,6 +1520,7 @@ function CanvasPage(props: CanvasPageProps) {
                       size="xs"
                       className="shrink-0 border-0 shadow-none"
                       onClick={() => {
+                        runsSidebarBaseState.closeRunsSidebar();
                         props.onExitRunInspection?.();
                       }}
                     >
@@ -1565,6 +1577,7 @@ function CanvasPage(props: CanvasPageProps) {
                     onRunNodeSelect={props.onRunNodeSelect}
                     onRunExecutionSelect={props.onRunExecutionSelect}
                     onAcknowledgeErrors={props.onAcknowledgeErrors}
+                    onRunInspectionPaneClick={() => setRunInspectionPanelCollapsed(true)}
                     missingIntegrations={props.missingIntegrations}
                     onConnectIntegration={props.onConnectIntegration}
                     canCreateIntegrations={props.canCreateIntegrations}
@@ -1641,8 +1654,8 @@ function CanvasPage(props: CanvasPageProps) {
                 props.onRunNodeDetailNavigate?.(nodeId);
               }}
               onExpandNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
-              onClose={() => (props.onExitRunInspection ?? props.onRunNodeDetailClose)?.()}
-              closeLabel="Back to live canvas"
+              onClose={() => setRunInspectionPanelCollapsed(true)}
+              closeLabel="Close"
               displayMode={runPanelSize}
               onSetDisplayMode={setRunPanelSize}
               onPrevRun={props.onSelectPrevRun}
@@ -2207,6 +2220,7 @@ function CanvasContent({
   onRunNodeSelect,
   onRunExecutionSelect,
   onAcknowledgeErrors,
+  onRunInspectionPaneClick,
   missingIntegrations,
   onConnectIntegration,
   canCreateIntegrations,
@@ -2260,6 +2274,7 @@ function CanvasContent({
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: { runId: string; nodeId: string }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
+  onRunInspectionPaneClick?: () => void;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
@@ -2682,7 +2697,12 @@ function CanvasContent({
 
     previouslySelectedRef.current = new Set();
 
-    if (isRunInspectionMode && runSelectedNodeId) {
+    if (isRunInspectionMode) {
+      // Keep the historical node selected (and the canvas in inspection mode),
+      // but collapse the run panel — mirroring how clicking the live canvas
+      // background closes the run inspector. Fires regardless of whether a step
+      // is selected so the empty-canvas click always closes the panel.
+      onRunInspectionPaneClick?.();
       return;
     }
 
@@ -2718,7 +2738,7 @@ function CanvasContent({
     if (onBuildingBlocksSidebarToggle) {
       onBuildingBlocksSidebarToggle(false);
     }
-  }, [isEditMode, isRunInspectionMode, onBuildingBlocksSidebarToggle, runSelectedNodeId]);
+  }, [isEditMode, isRunInspectionMode, onBuildingBlocksSidebarToggle, onRunInspectionPaneClick]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
