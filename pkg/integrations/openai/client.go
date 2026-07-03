@@ -180,7 +180,8 @@ func (c *Client) GetUsage(path string, params url.Values) ([]UsageBucket, error)
 		params.Set("page", page.NextPage)
 	}
 
-	return buckets, nil
+	// Truncating silently would report incomplete totals as a success.
+	return nil, fmt.Errorf("usage response exceeded %d pages; narrow the date range", maxUsagePages)
 }
 
 func (c *Client) ListModels() ([]Model, error) {
