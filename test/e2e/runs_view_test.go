@@ -170,8 +170,6 @@ func (s *runsViewSteps) givenOlderPublishedVersions(count int) {
 			ID:            uuid.New(),
 			WorkflowID:    s.canvas.WorkflowID,
 			OwnerID:       liveVersion.OwnerID,
-			Name:          liveVersion.Name,
-			Description:   liveVersion.Description,
 			CommitMessage: fmt.Sprintf("Seeded version %02d", i+1),
 			Nodes:         liveVersion.Nodes,
 			Edges:         liveVersion.Edges,

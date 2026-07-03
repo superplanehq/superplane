@@ -613,9 +613,7 @@ message CanvasVersion {
     UserRef owner = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
-    string name = 6;
-    string description = 7;
-    string commit_message = 8;
+    string commit_message = 6;
   }
 
   Metadata metadata = 1;

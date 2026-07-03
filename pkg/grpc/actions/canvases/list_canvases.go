@@ -55,6 +55,16 @@ func serializeCanvasSummaries(db *gorm.DB, canvases []models.Canvas) ([]*pb.Canv
 		usersByID[user.ID.String()] = user
 	}
 
+	canvasIDs := make([]uuid.UUID, len(canvases))
+	for i, canvas := range canvases {
+		canvasIDs[i] = canvas.ID
+	}
+
+	liveSpecs, err := models.FindLiveCanvasSpecsByCanvasIDs(db, canvasIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	//
 	// Serialize all canvases now
 	//
@@ -66,13 +76,15 @@ func serializeCanvasSummaries(db *gorm.DB, canvases []models.Canvas) ([]*pb.Canv
 			user = &u
 		}
 
+		liveSpec := liveSpecs[canvas.ID]
+
 		protoCanvases[i] = &pb.CanvasSummary{
 			Id:          canvas.ID.String(),
 			Name:        canvas.Name,
 			Description: canvas.Description,
 			CreatedAt:   timestamppb.New(*canvas.CreatedAt),
 			UpdatedAt:   timestamppb.New(*canvas.UpdatedAt),
-			Edges:       actions.EdgesToProto(canvas.Edges),
+			Edges:       actions.EdgesToProto(liveSpec.Edges),
 			Nodes:       []*pb.CanvasSummary_Node{},
 		}
 
@@ -80,7 +92,7 @@ func serializeCanvasSummaries(db *gorm.DB, canvases []models.Canvas) ([]*pb.Canv
 			protoCanvases[i].CreatedBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
 		}
 
-		for _, node := range canvas.Nodes {
+		for _, node := range liveSpec.Nodes {
 			protoCanvases[i].Nodes = append(protoCanvases[i].Nodes, &pb.CanvasSummary_Node{
 				Id:       node.ID,
 				Position: &componentpb.Position{X: int32(node.Position.X), Y: int32(node.Position.Y)},

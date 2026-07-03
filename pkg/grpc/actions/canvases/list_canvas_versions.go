@@ -43,7 +43,8 @@ func ListCanvasVersionsPaginated(
 		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
 
-	if err := checkCanvasExistence(ctx, database.DB(ctx), orgUUID, canvasUUID); err != nil {
+	_, err = loadCanvas(ctx, database.DB(ctx), orgUUID, canvasUUID)
+	if err != nil {
 		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
 

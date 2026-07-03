@@ -14,7 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
@@ -137,24 +137,7 @@ func UpdateCanvasVersionWithUsage(
 			return err
 		}
 
-		nextName := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
-		if nextName == "" {
-			return grpcerrors.InvalidArgument(nil, "canvas name is required")
-		}
-
-		if version.Name != nextName {
-			findErr := ensureCanvasNameAvailableInTransaction(tx, organizationUUID, canvasUUID, nextName)
-			if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
-				return grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
-			}
-			if findErr != nil {
-				return findErr
-			}
-		}
-
 		now := time.Now()
-		version.Name = nextName
-		version.Description = pbCanvas.GetMetadata().GetDescription()
 		version.Nodes = datatypes.NewJSONSlice(nodes)
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now

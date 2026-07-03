@@ -431,8 +431,8 @@ export function AppPage() {
         metadata: {
           ...(liveCanvas?.metadata ?? {}),
           id: liveCanvas?.metadata?.id ?? canvasId,
-          name: selectedCanvasVersion?.metadata?.name || liveCanvas?.metadata?.name || "Canvas",
-          description: selectedCanvasVersion?.metadata?.description ?? liveCanvas?.metadata?.description ?? "",
+          name: liveCanvas?.metadata?.name || "Canvas",
+          description: liveCanvas?.metadata?.description ?? "",
         },
         spec: draftSpecToRender,
       };

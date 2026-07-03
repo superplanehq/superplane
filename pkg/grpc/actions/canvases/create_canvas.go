@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
@@ -127,20 +126,13 @@ func CreateCanvasWithSeedFiles(
 		OrganizationID: organizationID,
 		LiveVersionID:  &versionID,
 		Name:           name,
+		Description:    pbCanvas.Metadata.Description,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		findErr := ensureCanvasNameAvailableInTransaction(tx, organizationID, canvasID, name)
-		if errors.Is(findErr, models.ErrCanvasNameAlreadyExists) {
-			return grpcerrors.AlreadyExists(nil, "Canvas with the same name already exists")
-		}
-		if findErr != nil {
-			return findErr
-		}
-
 		//
 		// Create the workflow record
 		//
@@ -153,15 +145,13 @@ func CreateCanvasWithSeedFiles(
 		// Create new empty canvas version record
 		//
 		emptyVersion := models.CanvasVersion{
-			ID:          versionID,
-			WorkflowID:  canvasID,
-			OwnerID:     &createdBy,
-			Name:        name,
-			Description: pbCanvas.Metadata.Description,
-			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
-			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:         versionID,
+			WorkflowID: canvasID,
+			OwnerID:    &createdBy,
+			Nodes:      datatypes.NewJSONSlice([]models.Node{}),
+			Edges:      datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
 		}
 
 		if err := tx.Create(&emptyVersion).Error; err != nil {

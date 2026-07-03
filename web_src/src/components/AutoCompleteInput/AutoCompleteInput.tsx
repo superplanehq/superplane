@@ -942,6 +942,37 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       measureCursorPixelPosition();
     }, [measureCursorPixelPosition]);
 
+    // Keep the fixed-position dropdown anchored to the input while any ancestor
+    // scrolls or the window resizes. Without this the dropdown detaches from the
+    // input when the surrounding panel scrolls (issue #3615).
+    useEffect(() => {
+      if (!isOpen || suggestions.length === 0) {
+        return;
+      }
+
+      let frame = 0;
+      const reposition = () => {
+        if (frame) {
+          return;
+        }
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          measureCursorPixelPosition();
+        });
+      };
+
+      // Capture phase so scrolling of any scrollable ancestor is observed, not just window.
+      window.addEventListener("scroll", reposition, true);
+      window.addEventListener("resize", reposition);
+      return () => {
+        if (frame) {
+          cancelAnimationFrame(frame);
+        }
+        window.removeEventListener("scroll", reposition, true);
+        window.removeEventListener("resize", reposition);
+      };
+    }, [isOpen, suggestions.length, measureCursorPixelPosition]);
+
     useEffect(() => {
       setInputValue(value);
     }, [value]);

@@ -73,7 +73,7 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 //   "commands": ["echo \"Hello, World!\""],
 //   "environment": [{"name": "APP_ENV", "value": "production"}],
 //   "webhook_url": "https://example.com/webhook",
-//   "webhook_payload_size_limit": 65536,
+//   "webhook_payload_size_limit": 524288,
 //   "execution_mode": "host",
 //   "docker_image": "debian:bookworm-slim",
 //   "execution_timeout_seconds": 600

@@ -17,8 +17,6 @@ type CanvasVersion struct {
 	ID            uuid.UUID
 	WorkflowID    uuid.UUID
 	OwnerID       *uuid.UUID
-	Name          string
-	Description   string
 	CommitMessage string
 	Nodes         datatypes.JSONSlice[Node]
 	Edges         datatypes.JSONSlice[Edge]
@@ -216,8 +214,6 @@ func CreateCommitVersionFromLiveInTransaction(
 		ID:            uuid.New(),
 		WorkflowID:    liveVersion.WorkflowID,
 		OwnerID:       &userID,
-		Name:          liveVersion.Name,
-		Description:   liveVersion.Description,
 		CommitMessage: strings.TrimSpace(commitMessage),
 		Nodes:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Nodes)),
 		Edges:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Edges)),
@@ -258,8 +254,6 @@ func CreateCommitVersionWithSpecInTransaction(
 		ID:            uuid.New(),
 		WorkflowID:    canvasID,
 		OwnerID:       &userID,
-		Name:          liveVersion.Name,
-		Description:   liveVersion.Description,
 		CommitMessage: strings.TrimSpace(commitMessage),
 		Nodes:         datatypes.NewJSONSlice(nodes),
 		Edges:         datatypes.NewJSONSlice(edges),
@@ -290,14 +284,12 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 	}
 
 	canvas.LiveVersionID = &version.ID
-	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 	return MapCanvasNameUniqueConstraintError(tx.
 		Model(&Canvas{}).
 		Where("id = ?", canvas.ID).
 		Updates(map[string]any{
 			"live_version_id": version.ID,
-			"name":            version.Name,
 			"updated_at":      now,
 		}).
 		Error)
@@ -338,21 +330,49 @@ func IsLiveCanvasVersion(tx *gorm.DB, canvas *Canvas, version *CanvasVersion) bo
 	return *canvas.LiveVersionID == version.ID
 }
 
+type LiveCanvasSpec struct {
+	Nodes []Node
+	Edges []Edge
+}
+
+type liveCanvasSpecRow struct {
+	WorkflowID uuid.UUID `gorm:"column:workflow_id"`
+	Nodes      datatypes.JSONSlice[Node]
+	Edges      datatypes.JSONSlice[Edge]
+}
+
+func FindLiveCanvasSpecsByCanvasIDs(tx *gorm.DB, canvasIDs []uuid.UUID) (map[uuid.UUID]LiveCanvasSpec, error) {
+	specs := make(map[uuid.UUID]LiveCanvasSpec, len(canvasIDs))
+	if len(canvasIDs) == 0 {
+		return specs, nil
+	}
+
+	var rows []liveCanvasSpecRow
+	err := tx.
+		Table("workflows").
+		Select("workflows.id AS workflow_id", "live_version.nodes", "live_version.edges").
+		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
+		Where("workflows.id IN ?", canvasIDs).
+		Where("workflows.live_version_id IS NOT NULL").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		specs[row.WorkflowID] = LiveCanvasSpec{
+			Nodes: row.Nodes,
+			Edges: row.Edges,
+		}
+	}
+
+	return specs, nil
+}
+
 func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
-		Select(
-			"id",
-			"organization_id",
-			"live_version_id",
-			"folder_id",
-			"name",
-			"created_by",
-			"created_at",
-			"updated_at",
-			"deleted_at",
-		).
 		Where("id = ?", workflowID).
 		First(&canvas).
 		Error

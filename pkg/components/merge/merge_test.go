@@ -304,14 +304,12 @@ func (s *MergeTestSteps) CreateWorkflow() {
 		}
 
 		return tx.Create(&models.CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  wf.ID,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice(nodes),
-			Edges:       datatypes.NewJSONSlice(edges),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:         liveVersionID,
+			WorkflowID: wf.ID,
+			Nodes:      datatypes.NewJSONSlice(nodes),
+			Edges:      datatypes.NewJSONSlice(edges),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
 		}).Error
 	}))
 
@@ -386,14 +384,12 @@ func (s *MergeTestSteps) CreateWorkflowSingleSourceMultipleEdges() {
 		}
 
 		return tx.Create(&models.CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  wf.ID,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice(nodes),
-			Edges:       datatypes.NewJSONSlice(edges),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:         liveVersionID,
+			WorkflowID: wf.ID,
+			Nodes:      datatypes.NewJSONSlice(nodes),
+			Edges:      datatypes.NewJSONSlice(edges),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
 		}).Error
 	}))
 
