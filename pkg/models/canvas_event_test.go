@@ -148,8 +148,6 @@ func createRetentionCanvas(t *testing.T, orgID uuid.UUID) *models.Canvas {
 			ID:          versionID,
 			WorkflowID:  canvas.ID,
 			State:       models.CanvasVersionStatePublished,
-			Name:        canvas.Name,
-			Description: "test canvas",
 			PublishedAt: &now,
 			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
 			Edges:       datatypes.NewJSONSlice([]models.Edge{}),

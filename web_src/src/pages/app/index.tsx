@@ -473,8 +473,8 @@ export function AppPage() {
         metadata: {
           ...(liveCanvas?.metadata ?? {}),
           id: liveCanvas?.metadata?.id ?? canvasId,
-          name: selectedCanvasVersion?.metadata?.name || liveCanvas?.metadata?.name || "Canvas",
-          description: selectedCanvasVersion?.metadata?.description ?? liveCanvas?.metadata?.description ?? "",
+          name: liveCanvas?.metadata?.name || "Canvas",
+          description: liveCanvas?.metadata?.description ?? "",
         },
         spec: draftSpecToRender,
       };
@@ -1312,11 +1312,6 @@ export function AppPage() {
 
         return {
           ...current,
-          metadata: {
-            ...current.metadata,
-            name: loadedVersion.metadata?.name ?? current.metadata?.name,
-            description: loadedVersion.metadata?.description ?? current.metadata?.description,
-          },
           spec: { ...current.spec, ...loadedVersion.spec },
         };
       });
