@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 
-import { resolveConsoleNode, useConsoleContext } from "./ConsoleContext";
+import { useConsoleContext, type resolveConsoleNode } from "./ConsoleContext";
 import { confirmConsoleTriggerNode } from "./confirmConsoleTriggerNode";
 import { buildConsoleTriggerParameters, triggerHasParameters } from "./consoleTriggerParameters";
 
