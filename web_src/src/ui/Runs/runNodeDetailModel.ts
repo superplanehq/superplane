@@ -6,7 +6,7 @@ import type {
 import { flattenObject } from "@/lib/utils";
 import { getExecutionDetails, getState, getStateMap, getTriggerRenderer } from "@/pages/app/mappers";
 import { buildEventInfo, buildExecutionInfo } from "@/pages/app/utils";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 
 export type RunNodeDetailTabKey = "details" | "payload" | "configuration";
 
@@ -65,12 +65,21 @@ export function eventBadgeForTriggeredTrigger(node: ComponentsNode | undefined):
   return { badgeColor: style.badgeColor, label: style.label ?? "triggered" };
 }
 
+/** The component-derived event state for an execution (running / queued / success / error / ...). */
+export function getExecutionEventState(
+  node: ComponentsNode | undefined,
+  execution: CanvasesCanvasNodeExecution,
+): EventState {
+  const name = workflowComponentName(node);
+  return getState(name)(buildExecutionInfo(execution));
+}
+
 export function eventBadgeForExecution(
   node: ComponentsNode | undefined,
   execution: CanvasesCanvasNodeExecution,
 ): { badgeColor: string; label: string } {
   const name = workflowComponentName(node);
-  const eventState = getState(name)(buildExecutionInfo(execution));
+  const eventState = getExecutionEventState(node, execution);
   const stateMap = getStateMap(name);
   const style = stateMap[eventState] ?? DEFAULT_EVENT_STATE_MAP.neutral;
   return { badgeColor: style.badgeColor, label: style.label ?? String(eventState) };

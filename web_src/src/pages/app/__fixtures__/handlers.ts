@@ -23,6 +23,82 @@ interface CanvasAppFixture {
 
 const fixture = raw as CanvasAppFixture;
 
+type FixtureExecution = Record<string, unknown> & { nodeId?: string; state?: string; result?: string };
+type FixtureRun = {
+  state?: string;
+  result?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  rootEvent?: { id?: string };
+  executions?: FixtureExecution[];
+};
+
+// The capture is a couple of days old, so a still-running run's elapsed time
+// (now - createdAt) would read as days. Re-anchor each running run's start to a
+// realistic few-minutes-ago so the "Running for …" / duration reads sensibly.
+const runningRunElapsedMs = [3 * 60_000 + 20_000, 11 * 60_000 + 5_000, 47_000];
+let runningRunSeen = 0;
+for (const run of (fixture.runs as { runs?: FixtureRun[] }).runs ?? []) {
+  if (run.state !== "STATE_STARTED") continue;
+  const elapsed = runningRunElapsedMs[runningRunSeen % runningRunElapsedMs.length];
+  runningRunSeen += 1;
+  run.createdAt = new Date(Date.now() - elapsed).toISOString();
+  run.updatedAt = new Date().toISOString();
+}
+
+// The capture stores each run's own step executions inline (reflecting that
+// run's real state: passed runs are all-passed, running runs have an in-flight
+// step, failed runs carry their errored step). Those inline executions are lean
+// though — only the shared top-level `executions` capture has display extras
+// (outputs/configuration/metadata). We key executions by the run's rootEvent id
+// so the run-inspection panel serves the *selected* run's steps (previously
+// every run replayed the same shared capture, so they all looked identical),
+// enriching each step with the matching node's display extras.
+const displayExtrasByNode = new Map<string, Partial<FixtureExecution>>();
+for (const exec of (fixture.executions as { executions?: FixtureExecution[] }).executions ?? []) {
+  if (typeof exec.nodeId === "string") {
+    displayExtrasByNode.set(exec.nodeId, {
+      outputs: exec.outputs,
+      configuration: exec.configuration,
+      metadata: exec.metadata,
+    });
+  }
+}
+
+// The capture only ever carried a single errored step per run. Promote a second
+// finished step to errored on one failed run so the multi-error banner (one
+// banner per errored step, rather than a single "+N more" summary) is
+// demonstrable in the AppPage stories.
+const failedRunWithExtraStep = (fixture.runs as { runs?: FixtureRun[] }).runs?.find(
+  (run) =>
+    run.result === "RESULT_FAILED" &&
+    (run.executions ?? []).filter((exec) => exec.result === "RESULT_FAILED").length === 1 &&
+    (run.executions ?? []).some((exec) => exec.state === "STATE_FINISHED" && exec.result !== "RESULT_FAILED"),
+);
+const secondErrorStep = failedRunWithExtraStep?.executions?.find(
+  (exec) => exec.state === "STATE_FINISHED" && exec.result !== "RESULT_FAILED",
+);
+if (secondErrorStep) {
+  secondErrorStep.result = "RESULT_FAILED";
+  secondErrorStep.resultReason = "RESULT_REASON_ERROR";
+  secondErrorStep.resultMessage = "Step failed: exited with code 1";
+}
+
+const executionsByEventId = new Map<string, FixtureExecution[]>();
+for (const run of (fixture.runs as { runs?: FixtureRun[] }).runs ?? []) {
+  const eventId = run.rootEvent?.id;
+  if (!eventId || !run.executions) {
+    continue;
+  }
+  executionsByEventId.set(
+    eventId,
+    run.executions.map((exec) => ({
+      ...(typeof exec.nodeId === "string" ? displayExtrasByNode.get(exec.nodeId) : undefined),
+      ...exec,
+    })),
+  );
+}
+
 export const canvasAppIds = {
   organizationId: fixture.organizationId,
   canvasId: fixture.canvasId,
@@ -93,7 +169,13 @@ const routes: Array<{ pattern: RegExp; resolve: (match: RegExpExecArray, url: UR
   // Run detail (`/runs/:runId`) is a distinct path from the list (`/runs`).
   { pattern: re(`${CANVAS}/runs/([^/]+)`), resolve: () => ({ json: fixture.runDetail }) },
   { pattern: re(`${CANVAS}/runs`), resolve: () => ({ json: fixture.runs }) },
-  { pattern: re(`${CANVAS}/events/([^/]+)/executions`), resolve: () => ({ json: fixture.executions }) },
+  {
+    pattern: re(`${CANVAS}/events/([^/]+)/executions`),
+    resolve: (m) => {
+      const executions = executionsByEventId.get(m[1]);
+      return { json: executions ? { executions } : fixture.executions };
+    },
+  },
   { pattern: re(`${CANVAS}/memory`), resolve: () => ({ json: { memory: [] } }) },
   // Repository files (canvas.yaml / console.yaml) return raw text; empty content
   // means "no console dashboard configured".

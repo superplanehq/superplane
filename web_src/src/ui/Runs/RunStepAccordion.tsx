@@ -20,6 +20,7 @@ import {
   hasObjectValue,
   isErrorValue,
 } from "./runNodeDetailModel";
+import { formatStepDuration } from "./runSummary";
 import { useRunNodeDetailPresentation } from "./useRunNodeDetailPresentation";
 
 export function StatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
@@ -268,6 +269,8 @@ export function AccordionRow({
       ? eventBadgeForExecution(workflowNode, execution)
       : null;
 
+  const duration = !isTrigger && execution ? formatStepDuration(execution) : null;
+
   return (
     <div
       role="button"
@@ -298,6 +301,7 @@ export function AccordionRow({
         className={cn("h-3.5 w-3.5 shrink-0", isExpanded ? "text-gray-800" : "text-gray-500")}
       />
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800">{nodeName}</span>
+      {duration ? <span className="shrink-0 text-[11px] tabular-nums text-gray-400">{duration}</span> : null}
       {badge ? <StatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}
     </div>
   );

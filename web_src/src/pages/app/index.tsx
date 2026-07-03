@@ -3766,6 +3766,25 @@ export function AppPage() {
     [clearDismissedRunDetail, exitEditableVersionForRunInspection, setSearchParams, setRunDetailNodeId],
   );
 
+  // Run inspection prev/next: navigate within the currently loaded runs list
+  // (matches the runs sidebar order); disabled at the loaded boundaries.
+  const selectedRunListIndex = useMemo(
+    () => (selectedRunId ? runsData.runs.findIndex((run) => run.id === selectedRunId) : -1),
+    [runsData.runs, selectedRunId],
+  );
+  const hasPrevRun = selectedRunListIndex > 0;
+  const hasNextRun = selectedRunListIndex >= 0 && selectedRunListIndex < runsData.runs.length - 1;
+  const handleSelectPrevRun = useCallback(() => {
+    if (selectedRunListIndex <= 0) return;
+    const prevRun = runsData.runs[selectedRunListIndex - 1];
+    if (prevRun?.id) handleSelectRun(prevRun.id);
+  }, [handleSelectRun, runsData.runs, selectedRunListIndex]);
+  const handleSelectNextRun = useCallback(() => {
+    if (selectedRunListIndex < 0 || selectedRunListIndex >= runsData.runs.length - 1) return;
+    const nextRun = runsData.runs[selectedRunListIndex + 1];
+    if (nextRun?.id) handleSelectRun(nextRun.id);
+  }, [handleSelectRun, runsData.runs, selectedRunListIndex]);
+
   const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
     enabled: liveSidebarRunLookupEnabled,
     canvasId,
@@ -4558,6 +4577,10 @@ export function AppPage() {
           onRunNodeDetailClose={() => handleRunNodeDetailSelection(null)}
           onExitRunInspection={handleExitRunInspectionToLiveCanvas}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
+          onSelectPrevRun={isRunInspectionMode ? handleSelectPrevRun : undefined}
+          onSelectNextRun={isRunInspectionMode ? handleSelectNextRun : undefined}
+          hasPrevRun={isRunInspectionMode ? hasPrevRun : undefined}
+          hasNextRun={isRunInspectionMode ? hasNextRun : undefined}
           runNodeDetailPaneHeight={runNodeDetailPaneHeight}
           onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
           onShowDiff={onShowDiff}

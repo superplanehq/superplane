@@ -29,7 +29,7 @@ export const RUN_STATUS_META = {
     icon: Clock,
   },
   failed: {
-    label: "Failed",
+    label: "Error",
     badgeClassName: "bg-red-50 text-red-700 ring-red-200",
     dotClassName: "bg-red-500",
     icon: AlertTriangle,
@@ -136,7 +136,11 @@ export function buildRunPresentation(run: CanvasesCanvasRun, nodeMap: Map<string
   const triggerRenderer = getTriggerRenderer(triggerNode?.component || "");
   const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "" };
   const status = getRunStatus(run);
-  const displayTitle = title || rootEvent?.customName || `Run ${shortId(run.id)}`;
+  // The GitHub PR trigger formats titles as `#123 - feat: ...`. The PR number
+  // is redundant in the runs list (the trigger badge already says "On Pull
+  // Request" and the number lives in the run URL/details), so drop the prefix.
+  const strippedTitle = title ? title.replace(/^#\d+\s*-\s*/, "") : title;
+  const displayTitle = strippedTitle || rootEvent?.customName || `Run ${shortId(run.id)}`;
 
   return {
     run,

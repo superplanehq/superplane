@@ -35,7 +35,7 @@ const ACTION_NODE_SPECS: ActionNodeSpec[] = [
   { id: "action-lint", name: "Lint code", component: "lint" },
   { id: "action-scan", name: "Security scan", component: "scan" },
   { id: "action-migrate", name: "Run migrations", component: "migrate" },
-  { id: "action-approve", name: "Manual approval", component: "approve" },
+  { id: "action-approve", name: "Manual approval", component: "approval" },
   { id: "action-deploy-prod", name: "Deploy to production", component: "deploy" },
   { id: "action-smoke", name: "Smoke tests", component: "test" },
   { id: "action-slack", name: "Post to Slack", component: "notify" },
@@ -74,15 +74,15 @@ function nodeStatesForRun(category: RunCategory, count: number): NodeState[] {
     return states;
   }
 
+  // Each category's steps reflect its status: passed runs are all success, failed
+  // runs carry a single errored step, and running runs have their latest step
+  // still executing (plus any approval step left waiting - handled in buildRun).
   if (category === "failed") {
     states[Math.min(count - 1, Math.floor(count / 2))] = "error";
   }
 
   if (category === "running") {
     states[count - 1] = "running";
-    if (count > 2) {
-      states[1] = "error";
-    }
   }
 
   return states;
@@ -169,6 +169,13 @@ function buildRun(config: {
   const specs = pickActionSpecs(executionCount, offset);
   const states = nodeStatesForRun(category, executionCount);
 
+  // A still-running run that routes through an approval step leaves that step in a
+  // STATE_STARTED execution, which the approval mapper reports as "waiting".
+  if (category === "running") {
+    const approvalIndex = specs.findIndex((spec) => spec.component === "approval");
+    if (approvalIndex !== -1) states[approvalIndex] = "running";
+  }
+
   const executions: CanvasesCanvasNodeExecution[] = specs.map((spec, index) =>
     buildExecution({
       runId: id,
@@ -189,6 +196,7 @@ function buildRun(config: {
     canvasId: RUNS_STORY_CANVAS_ID,
     state,
     result,
+    versionId: `v-${String((offset % 8) + 1).padStart(2, "0")}`,
     createdAt,
     finishedAt: category === "running" ? undefined : secondsAfter(createdAt, (executionCount + 1) * 45),
     rootEvent: {

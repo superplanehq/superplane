@@ -1,15 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { X } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { toast } from "sonner";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import { LiveCanvasSidebarRow } from "@/components/CanvasToolSidebar/LiveCanvasSidebarRow";
 import { RunsTabListView } from "@/components/CanvasToolSidebar/RunsTabListView";
 import { useRunFilters } from "@/components/CanvasToolSidebar/useRunFilters";
-import { TimeAgo } from "@/components/TimeAgo";
-import { buildNodeMap, buildRunPresentation } from "./runPresentation";
-import { AccordionNodeList } from "./storybooks/accordionParts";
+import { cn } from "@/lib/utils";
+import { RunPanel, type RunDetailContext, type RunDisplayMode } from "./RunPanel";
+import { shortId } from "./runPresentation";
 import { RunCanvas } from "./storybooks/RunCanvas";
 import {
   DEPLOY_NODE_ID,
@@ -21,9 +21,11 @@ import {
 
 /**
  * Runs list stays permanently in the left sidebar. Selecting a run opens a
- * 40%-width panel from the right (the canvas shrinks to make room) that lists
- * the run's steps as an accordion; expanding a step unrolls its detail boxes
- * (summary / payload / runtime config) inline in the same panel.
+ * run-detail "page" from the right that reads like a dedicated page: a
+ * peek-style chrome row (display-mode toggle + prev/next + overflow), a
+ * run-focused identity header, an at-a-glance summary strip, a conditional
+ * failure banner, and the filterable run-step accordion. Toggling the
+ * display mode expands the panel to a full-width page (canvas hidden).
  */
 
 function RunsListSidebar({
@@ -71,58 +73,6 @@ function RunsListSidebar({
   );
 }
 
-function RunStepsRightPanel({
-  canvasId,
-  run,
-  workflowNodes,
-  expandedNodeId,
-  onToggleNode,
-  onClose,
-}: {
-  canvasId: string;
-  run: CanvasesCanvasRun;
-  workflowNodes: ComponentsNode[];
-  expandedNodeId: string | null;
-  onToggleNode: (nodeId: string) => void;
-  onClose: () => void;
-}) {
-  const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
-  const presentation = useMemo(() => buildRunPresentation(run, nodeMap), [run, nodeMap]);
-
-  return (
-    <aside className="flex h-full w-2/5 min-w-0 shrink-0 flex-col border-l border-border bg-white">
-      <div className="flex shrink-0 items-start justify-between gap-2 border-b border-b-slate-950/10 px-4 py-3">
-        <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-gray-900">{presentation.title}</p>
-          {run.createdAt ? (
-            <span className="text-xs text-gray-500">
-              <TimeAgo date={run.createdAt} />
-            </span>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          aria-label="Close run inspection"
-          onClick={onClose}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <AccordionNodeList
-          canvasId={canvasId}
-          run={run}
-          workflowNodes={workflowNodes}
-          expandedNodeId={expandedNodeId}
-          onToggleNode={onToggleNode}
-        />
-      </div>
-    </aside>
-  );
-}
-
 function CanvasPlaceholder() {
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-50">
@@ -134,14 +84,20 @@ function CanvasPlaceholder() {
 function RunInspectionRightPanelPlayground({
   initialRunId = null,
   initialNodeId = null,
+  initialDisplayMode = "split",
+  context = "inspection",
 }: {
   initialRunId?: string | null;
   initialNodeId?: string | null;
+  initialDisplayMode?: RunDisplayMode;
+  context?: RunDetailContext;
 }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(initialRunId);
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(initialNodeId);
+  const [displayMode, setDisplayMode] = useState<RunDisplayMode>(initialDisplayMode);
 
   const selectedRun = useMemo(() => mockRuns.find((run) => run.id === selectedRunId) ?? null, [selectedRunId]);
+  const selectedIndex = useMemo(() => mockRuns.findIndex((run) => run.id === selectedRunId), [selectedRunId]);
 
   const handleSelectRun = useCallback((runId: string) => {
     setSelectedRunId(runId);
@@ -151,43 +107,78 @@ function RunInspectionRightPanelPlayground({
   const handleSelectLiveCanvas = useCallback(() => {
     setSelectedRunId(null);
     setExpandedNodeId(null);
+    setDisplayMode("split");
   }, []);
 
   const toggleNode = useCallback((nodeId: string) => {
     setExpandedNodeId((current) => (current === nodeId ? null : nodeId));
   }, []);
 
-  const selectNode = useCallback((nodeId: string) => setExpandedNodeId(nodeId), []);
+  const expandNode = useCallback((nodeId: string) => setExpandedNodeId(nodeId), []);
+
+  const goToRunAt = useCallback((index: number) => {
+    const run = mockRuns[index];
+    if (!run?.id) return;
+    setSelectedRunId(run.id);
+    setExpandedNodeId(null);
+  }, []);
+
+  const isFull = displayMode === "full" && Boolean(selectedRun);
+  const panelWidthClass = displayMode === "full" ? "w-full" : displayMode === "min" ? "w-1/4" : "w-1/2";
 
   return (
     <div className="flex h-screen min-h-0 bg-white">
-      <CanvasRunsSidebar isOpen>
-        <RunsListSidebar
-          runs={mockRuns}
-          workflowNodes={mockWorkflowNodes}
-          selectedRunId={selectedRunId}
-          onSelectRun={handleSelectRun}
-          onSelectLiveCanvas={handleSelectLiveCanvas}
-        />
-      </CanvasRunsSidebar>
+      {!isFull ? (
+        <CanvasRunsSidebar isOpen>
+          <RunsListSidebar
+            runs={mockRuns}
+            workflowNodes={mockWorkflowNodes}
+            selectedRunId={selectedRunId}
+            onSelectRun={handleSelectRun}
+            onSelectLiveCanvas={handleSelectLiveCanvas}
+          />
+        </CanvasRunsSidebar>
+      ) : null}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {selectedRun ? (
-          <RunCanvas run={selectedRun} selectedNodeId={expandedNodeId} onSelectNode={selectNode} />
-        ) : (
-          <CanvasPlaceholder />
-        )}
-      </div>
+      {!isFull ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {selectedRun ? (
+            <RunCanvas run={selectedRun} selectedNodeId={expandedNodeId} onSelectNode={expandNode} />
+          ) : (
+            <CanvasPlaceholder />
+          )}
+        </div>
+      ) : null}
 
       {selectedRun ? (
-        <RunStepsRightPanel
-          canvasId={RUNS_STORY_CANVAS_ID}
-          run={selectedRun}
-          workflowNodes={mockWorkflowNodes}
-          expandedNodeId={expandedNodeId}
-          onToggleNode={toggleNode}
-          onClose={handleSelectLiveCanvas}
-        />
+        <aside className={cn("flex h-full min-w-0 shrink-0 flex-col border-l border-border bg-white", panelWidthClass)}>
+          <RunPanel
+            canvasId={RUNS_STORY_CANVAS_ID}
+            run={selectedRun}
+            workflowNodes={mockWorkflowNodes}
+            context={context}
+            expandedNodeId={expandedNodeId}
+            onToggleNode={toggleNode}
+            onExpandNode={expandNode}
+            onClose={handleSelectLiveCanvas}
+            displayMode={displayMode}
+            onSetDisplayMode={setDisplayMode}
+            onPrevRun={() => goToRunAt(selectedIndex - 1)}
+            onNextRun={() => goToRunAt(selectedIndex + 1)}
+            hasPrevRun={selectedIndex > 0}
+            hasNextRun={selectedIndex >= 0 && selectedIndex < mockRuns.length - 1}
+            onViewOnCanvas={() =>
+              toast.info("Inspect on canvas", {
+                description: `Mock: highlight run ${shortId(selectedRun.id)} on the canvas`,
+              })
+            }
+            onAskAgent={() =>
+              toast.info("Ask agent", {
+                description: `Mock: open agent with run ${shortId(selectedRun.id)} mentioned`,
+              })
+            }
+          />
+        </aside>
       ) : null}
     </div>
   );
@@ -223,4 +214,26 @@ export const RunSelected: Story = {
 
 export const StepExpanded: Story = {
   render: () => <RunInspectionRightPanelPlayground initialRunId="run-passed" initialNodeId={DEPLOY_NODE_ID} />,
+};
+
+export const FailedRun: Story = {
+  render: () => <RunInspectionRightPanelPlayground initialRunId="run-failed" />,
+};
+
+export const RunningRun: Story = {
+  render: () => <RunInspectionRightPanelPlayground initialRunId="run-running" />,
+};
+
+export const FullPage: Story = {
+  render: () => <RunInspectionRightPanelPlayground initialRunId="run-failed" initialDisplayMode="full" />,
+};
+
+export const Minimized: Story = {
+  render: () => <RunInspectionRightPanelPlayground initialRunId="run-passed" initialDisplayMode="min" />,
+};
+
+export const LiveNodeInspector: Story = {
+  render: () => (
+    <RunInspectionRightPanelPlayground initialRunId="run-passed" initialNodeId={DEPLOY_NODE_ID} context="live" />
+  ),
 };

@@ -5,9 +5,8 @@ import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
-import { Link as LinkIcon } from "lucide-react";
+import { formatRunDuration } from "@/ui/Runs/runSummary";
 import { Link, useParams } from "react-router-dom";
-import { toast } from "sonner";
 import { isNormalClick } from "@/lib/linkHelpers";
 import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
@@ -36,6 +35,7 @@ export function RunRow({
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
   const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?run=${run.id}`) : "#";
+  const duration = formatRunDuration(run);
 
   return (
     <div
@@ -87,28 +87,17 @@ export function RunRow({
           {title}
         </span>
       </span>
-      <button
-        type="button"
-        title="Copy link to run"
-        className="relative z-10 hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
-        onClick={(event) => {
-          event.stopPropagation();
-          void (async () => {
-            const copyUrl = new URL(runHref, window.location.origin);
-            try {
-              await navigator.clipboard.writeText(copyUrl.toString());
-              toast.success("Run link copied");
-            } catch {
-              toast.error("Failed to copy run link");
-            }
-          })();
-        }}
-      >
-        <LinkIcon className="h-3 w-3" />
-      </button>
+      {duration ? (
+        <span
+          className="pointer-events-none relative shrink-0 text-[11px] tabular-nums text-gray-400"
+          title="Run duration"
+        >
+          {duration}
+        </span>
+      ) : null}
       {run.createdAt ? (
         <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-500">
-          <TimeAgo date={run.createdAt} includeAgo={false} />
+          <TimeAgo date={run.createdAt} />
         </span>
       ) : null}
     </div>
