@@ -2,7 +2,6 @@ package organizations
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,26 +10,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"gorm.io/gorm"
 )
 
 func GetInviteLink(ctx context.Context, orgID string) (*pb.GetInviteLinkResponse, error) {
 	db := database.DB(ctx)
-	inviteLink, err := models.FindInviteLinkByOrganizationID(db, orgID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			orgUUID, parseErr := uuid.Parse(orgID)
-			if parseErr != nil {
-				return nil, grpcerrors.InvalidArgument(nil, "invalid organization id")
-			}
+	orgUUID, parseErr := uuid.Parse(orgID)
+	if parseErr != nil {
+		return nil, grpcerrors.InvalidArgument(nil, "invalid organization id")
+	}
 
-			inviteLink, err = models.CreateInviteLink(orgUUID)
-			if err != nil {
-				return nil, grpcerrors.Internal(err, "failed to create invite link")
-			}
-		} else {
-			return nil, grpcerrors.Internal(err, "failed to fetch invite link")
-		}
+	inviteLink, err := models.FindOrCreateInviteLink(db, orgUUID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to get invite link")
 	}
 
 	return &pb.GetInviteLinkResponse{
@@ -47,7 +38,7 @@ func UpdateInviteLink(ctx context.Context, orgID string, enabled bool) (*pb.Upda
 
 	inviteLink.Enabled = enabled
 	inviteLink.UpdatedAt = time.Now()
-	if err := models.SaveInviteLink(inviteLink); err != nil {
+	if err := models.SaveInviteLink(db, inviteLink); err != nil {
 		return nil, grpcerrors.Internal(err, "failed to update invite link")
 	}
 
@@ -65,7 +56,7 @@ func ResetInviteLink(ctx context.Context, orgID string) (*pb.ResetInviteLinkResp
 
 	inviteLink.Token = uuid.New()
 	inviteLink.UpdatedAt = time.Now()
-	if err := models.SaveInviteLink(inviteLink); err != nil {
+	if err := models.SaveInviteLink(db, inviteLink); err != nil {
 		return nil, grpcerrors.Internal(err, "failed to reset invite link")
 	}
 
