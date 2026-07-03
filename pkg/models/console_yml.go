@@ -484,6 +484,11 @@ func validateNodePanelContent(panel ConsolePanel) error {
 			return fmt.Errorf("panel %q content.showRun must be a boolean", panel.ID)
 		}
 	}
+	if rawPrompt, ok := panel.Content["promptConfirmation"]; ok && rawPrompt != nil {
+		if _, ok := rawPrompt.(bool); !ok {
+			return fmt.Errorf("panel %q content.promptConfirmation must be a boolean", panel.ID)
+		}
+	}
 	return nil
 }
 
@@ -531,6 +536,11 @@ func validateNodesPanelEntry(panelID string, index int, raw any) error {
 	if rawShowRun, present := entry["showRun"]; present && rawShowRun != nil {
 		if _, ok := rawShowRun.(bool); !ok {
 			return fmt.Errorf("panel %q content.nodes[%d].showRun must be a boolean", panelID, index)
+		}
+	}
+	if rawPrompt, present := entry["promptConfirmation"]; present && rawPrompt != nil {
+		if _, ok := rawPrompt.(bool); !ok {
+			return fmt.Errorf("panel %q content.nodes[%d].promptConfirmation must be a boolean", panelID, index)
 		}
 	}
 	return nil

@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { CircleDot, Play } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,6 +13,7 @@ import { TypedPanelShell } from "./TypedPanelShell";
 import { WidgetEmptyState } from "./WidgetEmptyState";
 import { useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
 import { confirmConsoleTriggerNode } from "./confirmConsoleTriggerNode";
+import { buildConsoleTriggerParameters, triggerHasParameters } from "./consoleTriggerParameters";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import type { NodePanelContent } from "./panelTypes";
 
@@ -89,10 +90,10 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
 }
 
 /**
- * Run button + confirm dialog for the single-node panel. Mirrors the Key
- * Nodes panel: the click always opens {@link NodeRunConfirmDialog} (even
- * when the resolved Start template has no parameters) so the operator gets
- * a payload preview and a chance to cancel before the trigger fires.
+ * Run button + confirm dialog for the single-node panel. A template with
+ * input fields always opens {@link NodeRunConfirmDialog} so the operator can
+ * fill them in. A parameter-less template only prompts when the panel opts in
+ * via `promptConfirmation`; otherwise the click fires the trigger directly.
  */
 function NodePanelRunControl({
   content,
@@ -103,30 +104,58 @@ function NodePanelRunControl({
 }) {
   const ctx = useConsoleContext();
   const [open, setOpen] = useState(false);
+  const [running, setRunning] = useState(false);
   const canRun = (ctx?.canRunNodes ?? false) && Boolean(resolved);
+  const shouldPrompt = triggerHasParameters(resolved?.node, content.triggerName) || Boolean(content.promptConfirmation);
+
+  // Single run path for both the direct click and the confirm dialog: the
+  // Run button owns the loading state while the trigger executes.
+  // `confirmConsoleTriggerNode` already surfaces failures via a toast, so we
+  // swallow the rethrow to keep this fire-and-forget call free of unhandled
+  // rejections.
+  const runTrigger = async (parameters: Record<string, unknown>) => {
+    if (!resolved?.node?.id) return;
+    setRunning(true);
+    try {
+      await confirmConsoleTriggerNode(ctx, resolved.node.id, content.triggerName, parameters);
+    } catch {
+      // Already reported to the user.
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleClick = () => {
+    if (shouldPrompt) {
+      setOpen(true);
+      return;
+    }
+    if (!resolved?.node) return;
+    void runTrigger(buildConsoleTriggerParameters(resolved.node, "run", content.triggerName));
+  };
+
   return (
     <>
-      <Button
+      <LoadingButton
         type="button"
         size="xs"
         variant="outline"
-        onClick={() => setOpen(true)}
-        disabled={!canRun}
+        loading={running}
+        loadingText="Running…"
+        onClick={handleClick}
+        disabled={!canRun || running}
         title={canRun ? undefined : "You do not have permission to run this node"}
         data-testid="node-panel-run"
       >
         <Play className="mr-1 h-3.5 w-3.5" />
         Run
-      </Button>
+      </LoadingButton>
       <NodeRunConfirmDialog
         open={open}
         onOpenChange={setOpen}
         resolved={resolved}
         templateName={content.triggerName}
-        onConfirm={async (parameters) => {
-          if (!resolved?.node?.id) return;
-          await confirmConsoleTriggerNode(ctx, resolved.node.id, content.triggerName, parameters);
-        }}
+        onConfirm={(parameters) => void runTrigger(parameters)}
         testId="node-panel-run-dialog"
       />
     </>
@@ -137,6 +166,7 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
   const ctx = useConsoleContext();
   const nodes = ctx?.nodes ?? [];
   const showRunId = useId();
+  const promptConfirmationId = useId();
   const resolved = resolveConsoleNode(ctx, value.node);
   const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
   return (
@@ -192,14 +222,27 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
             </Label>
           </div>
           {value.showRun ? (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600">Trigger template (optional)</Label>
-              <Input
-                value={value.triggerName ?? ""}
-                onChange={(e) => onChange({ ...value, triggerName: e.target.value || undefined })}
-                placeholder="e.g. manual"
-              />
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-600">Trigger template (optional)</Label>
+                <Input
+                  value={value.triggerName ?? ""}
+                  onChange={(e) => onChange({ ...value, triggerName: e.target.value || undefined })}
+                  placeholder="e.g. manual"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={promptConfirmationId}
+                  checked={Boolean(value.promptConfirmation)}
+                  onCheckedChange={(checked) => onChange({ ...value, promptConfirmation: checked === true })}
+                  className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+                />
+                <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700">
+                  Prompt confirmation before running (templates with input fields always prompt).
+                </Label>
+              </div>
+            </>
           ) : null}
         </>
       ) : value.node && resolved ? (
@@ -218,5 +261,6 @@ function normalizeContent(raw: Record<string, unknown> | undefined): NodePanelCo
     label: typeof raw?.label === "string" ? raw.label : undefined,
     showRun: typeof raw?.showRun === "boolean" ? raw.showRun : false,
     triggerName: typeof raw?.triggerName === "string" ? raw.triggerName : undefined,
+    promptConfirmation: typeof raw?.promptConfirmation === "boolean" ? raw.promptConfirmation : false,
   };
 }

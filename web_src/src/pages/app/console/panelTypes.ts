@@ -118,6 +118,12 @@ export interface NodePanelContent {
   showRun?: boolean;
   /** Optional override for the trigger template name (for nodes with multiple triggers). */
   triggerName?: string;
+  /**
+   * When true, clicking Run always opens the confirm dialog — even for
+   * templates with no input fields. When false (default), a parameter-less
+   * template fires immediately; templates with input fields always prompt.
+   */
+  promptConfirmation?: boolean;
 }
 
 export interface TablePanelContent {
@@ -318,6 +324,22 @@ export function asObject(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+/** Error string for an optional field that, when present, must be a string. */
+function optionalStringError(field: string, value: unknown): string | null {
+  if (value !== undefined && value !== null && typeof value !== "string") {
+    return `${field} must be a string.`;
+  }
+  return null;
+}
+
+/** Error string for an optional field that, when present, must be a boolean. */
+function optionalBooleanError(field: string, value: unknown): string | null {
+  if (value !== undefined && typeof value !== "boolean") {
+    return `${field} must be a boolean.`;
+  }
+  return null;
+}
+
 function validateNodeContent(content: unknown): string | null {
   const obj = asObject(content);
   if (!obj) return "content must be an object.";
@@ -327,19 +349,13 @@ function validateNodeContent(content: unknown): string | null {
   if (typeof obj.node !== "string") {
     return "content.node must be a string (canvas node id or name).";
   }
-  if (obj.title !== undefined && obj.title !== null && typeof obj.title !== "string") {
-    return "content.title must be a string.";
-  }
-  if (obj.label !== undefined && obj.label !== null && typeof obj.label !== "string") {
-    return "content.label must be a string.";
-  }
-  if (obj.showRun !== undefined && typeof obj.showRun !== "boolean") {
-    return "content.showRun must be a boolean.";
-  }
-  if (obj.triggerName !== undefined && obj.triggerName !== null && typeof obj.triggerName !== "string") {
-    return "content.triggerName must be a string.";
-  }
-  return null;
+  return (
+    optionalStringError("content.title", obj.title) ??
+    optionalStringError("content.label", obj.label) ??
+    optionalBooleanError("content.showRun", obj.showRun) ??
+    optionalStringError("content.triggerName", obj.triggerName) ??
+    optionalBooleanError("content.promptConfirmation", obj.promptConfirmation)
+  );
 }
 
 export function validateDataSource(value: unknown): string | null {

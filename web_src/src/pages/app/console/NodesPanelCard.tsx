@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { Network, Play, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,6 +15,7 @@ import { TypedPanelShell } from "./TypedPanelShell";
 import { WidgetEmptyState } from "./WidgetEmptyState";
 import { useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
 import { confirmConsoleTriggerNode } from "./confirmConsoleTriggerNode";
+import { buildConsoleTriggerParameters, triggerHasParameters } from "./consoleTriggerParameters";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import type { NodesPanelContent, NodesPanelNode } from "./nodesPanelContent";
 
@@ -111,11 +113,10 @@ function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
 }
 
 /**
- * Run button + confirm dialog for a single Key Nodes row. Opens
- * {@link NodeRunConfirmDialog} so the operator can preview the merged
- * trigger payload (and fill in any declared template parameters) before the
- * trigger is fired. We never trigger directly from the row click anymore —
- * the dialog confirm is the single submission path.
+ * Run button + confirm dialog for a single Key Nodes row. A template with
+ * input fields always opens {@link NodeRunConfirmDialog} so the operator can
+ * fill them in. A parameter-less template only prompts when the row opts in
+ * via `promptConfirmation`; otherwise the click fires the trigger directly.
  */
 function NodesPanelRunControl({
   entry,
@@ -126,31 +127,59 @@ function NodesPanelRunControl({
 }) {
   const ctx = useConsoleContext();
   const [open, setOpen] = useState(false);
+  const [running, setRunning] = useState(false);
   const canRun = (ctx?.canRunNodes ?? false) && Boolean(resolved);
+  const shouldPrompt = triggerHasParameters(resolved?.node, entry.triggerName) || Boolean(entry.promptConfirmation);
+
+  // Single run path for both the direct click and the confirm dialog: the
+  // Run button owns the loading state while the trigger executes.
+  // `confirmConsoleTriggerNode` already surfaces failures via a toast, so we
+  // swallow the rethrow to keep this fire-and-forget call free of unhandled
+  // rejections.
+  const runTrigger = async (parameters: Record<string, unknown>) => {
+    if (!resolved?.node?.id) return;
+    setRunning(true);
+    try {
+      await confirmConsoleTriggerNode(ctx, resolved.node.id, entry.triggerName, parameters);
+    } catch {
+      // Already reported to the user.
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleClick = () => {
+    if (shouldPrompt) {
+      setOpen(true);
+      return;
+    }
+    if (!resolved?.node) return;
+    void runTrigger(buildConsoleTriggerParameters(resolved.node, "run", entry.triggerName));
+  };
+
   return (
     <>
-      <Button
+      <LoadingButton
         type="button"
         size="xs"
         variant="outline"
-        onClick={() => setOpen(true)}
-        disabled={!canRun}
+        loading={running}
+        loadingText="Running…"
+        onClick={handleClick}
+        disabled={!canRun || running}
         title={canRun ? undefined : "You do not have permission to run this node"}
         data-testid="nodes-panel-row-run"
         className="shrink-0"
       >
         <Play className="mr-1 h-3 w-3" />
         Run
-      </Button>
+      </LoadingButton>
       <NodeRunConfirmDialog
         open={open}
         onOpenChange={setOpen}
         resolved={resolved}
         templateName={entry.triggerName}
-        onConfirm={async (parameters) => {
-          if (!resolved?.node?.id) return;
-          await confirmConsoleTriggerNode(ctx, resolved.node.id, entry.triggerName, parameters);
-        }}
+        onConfirm={(parameters) => void runTrigger(parameters)}
         testId="nodes-panel-row-run-dialog"
       />
     </>
@@ -226,6 +255,7 @@ function NodesPanelEntryRow({
   const ctx = useConsoleContext();
   const nodes = ctx?.nodes ?? [];
   const showRunId = useId();
+  const promptConfirmationId = useId();
   const resolved = resolveConsoleNode(ctx, entry.node);
   const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
 
@@ -295,15 +325,28 @@ function NodesPanelEntryRow({
             </Label>
           </div>
           {entry.showRun ? (
-            <div className="space-y-1.5">
-              <Label className="text-[11px] font-medium text-slate-600">Trigger template (optional)</Label>
-              <Input
-                value={entry.triggerName ?? ""}
-                onChange={(e) => onChange({ triggerName: e.target.value || undefined })}
-                placeholder="e.g. manual"
-                className="h-8"
-              />
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-medium text-slate-600">Trigger template (optional)</Label>
+                <Input
+                  value={entry.triggerName ?? ""}
+                  onChange={(e) => onChange({ triggerName: e.target.value || undefined })}
+                  placeholder="e.g. manual"
+                  className="h-8"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={promptConfirmationId}
+                  checked={Boolean(entry.promptConfirmation)}
+                  onCheckedChange={(checked) => onChange({ promptConfirmation: checked === true })}
+                  className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+                />
+                <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700">
+                  Prompt confirmation before running (templates with input fields always prompt).
+                </Label>
+              </div>
+            </>
           ) : null}
         </>
       ) : entry.node && resolved ? (
@@ -332,5 +375,6 @@ function normalizeEntry(raw: unknown): NodesPanelNode | null {
     description: typeof obj.description === "string" ? obj.description : undefined,
     showRun: typeof obj.showRun === "boolean" ? obj.showRun : false,
     triggerName: typeof obj.triggerName === "string" ? obj.triggerName : undefined,
+    promptConfirmation: typeof obj.promptConfirmation === "boolean" ? obj.promptConfirmation : false,
   };
 }
