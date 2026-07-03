@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"mime"
 	"testing"
 )
 
@@ -79,6 +80,37 @@ func TestRead_EmptyPaths(t *testing.T) {
 func TestRead_NilContext(t *testing.T) {
 	if _, err := Read(nil, []string{"a.png"}); err == nil {
 		t.Error("expected error when file context is nil")
+	}
+}
+
+func TestRead_SourceFileWithMisleadingExtensionMapping(t *testing.T) {
+	// System MIME tables map some plaintext source extensions to non-text
+	// types (Debian maps .ts to video/mp2t). Pin that mapping so the test is
+	// deterministic across environments, and check that content sniffing
+	// rescues the file as text.
+	if err := mime.AddExtensionType(".ts", "video/mp2t"); err != nil {
+		t.Fatalf("register extension: %v", err)
+	}
+	files := &fakeFiles{data: map[string][]byte{"main.ts": []byte("export const x = 1\n")}}
+	atts, err := Read(files, []string{"main.ts"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := atts[0].UploadMIME(); got != "text/plain" {
+		t.Errorf("expected text/plain upload type, got %q (detected %q)", got, atts[0].Mime)
+	}
+}
+
+func TestRead_TooManyFiles(t *testing.T) {
+	data := map[string][]byte{}
+	paths := make([]string, 0, MaxFiles+1)
+	for i := 0; i <= MaxFiles; i++ {
+		name := fmt.Sprintf("f%d.txt", i)
+		data[name] = []byte("x")
+		paths = append(paths, name)
+	}
+	if _, err := Read(&fakeFiles{data: data}, paths); err == nil {
+		t.Error("expected error when exceeding the file count limit")
 	}
 }
 

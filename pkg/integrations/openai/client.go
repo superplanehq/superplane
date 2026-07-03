@@ -61,10 +61,9 @@ type InputMessage struct {
 
 // InputPart is a content part: input_text, input_image, or input_file.
 type InputPart struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
-	ImageURL string `json:"image_url,omitempty"`
-	FileID   string `json:"file_id,omitempty"`
+	Type   string `json:"type"`
+	Text   string `json:"text,omitempty"`
+	FileID string `json:"file_id,omitempty"`
 }
 
 // ResponseTextConfig carries the structured-output format for the Responses API.

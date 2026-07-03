@@ -20,9 +20,15 @@ import (
 
 const (
 	// MaxFileSize is the per-file cap when reading an attachment from the repo.
+	// The provider Files APIs accept far larger uploads (hundreds of MB), but
+	// attachments are buffered fully in memory here, so the caps bound memory
+	// use and request size rather than what the providers allow.
 	MaxFileSize = 25 * 1024 * 1024 // 25 MB
 	// MaxTotalSize caps the combined size of all attachments on one execution.
 	MaxTotalSize = 50 * 1024 * 1024 // 50 MB
+	// MaxFiles caps how many files one execution may attach; each attachment
+	// costs a separate Files API upload call.
+	MaxFiles = 20
 )
 
 // Attachment is a repository file read and classified, ready to upload.
@@ -89,6 +95,9 @@ func Read(files core.RepositoryFilesContext, paths []string) ([]Attachment, erro
 	if files == nil {
 		return nil, fmt.Errorf("files configured but file access is not available")
 	}
+	if len(paths) > MaxFiles {
+		return nil, fmt.Errorf("too many files: %d configured, maximum is %d", len(paths), MaxFiles)
+	}
 
 	out := make([]Attachment, 0, len(paths))
 	total := 0
@@ -129,11 +138,16 @@ func Read(files core.RepositoryFilesContext, paths []string) ([]Attachment, erro
 }
 
 // detectMIME prefers the file extension (accurate for text/code) and falls back
-// to content sniffing.
+// to content sniffing. The extension mapping is trusted only when it yields a
+// supported type: system MIME tables misclassify some plaintext source files
+// (e.g. .ts as video/mp2t, .tsx as application/x-tiled-tsx), and sniffing the
+// bytes identifies those as text.
 func detectMIME(path string, data []byte) string {
 	if ext := strings.ToLower(filepath.Ext(path)); ext != "" {
 		if t := mime.TypeByExtension(ext); t != "" {
-			return stripParams(t)
+			if base := stripParams(t); supported(base) {
+				return base
+			}
 		}
 	}
 	return stripParams(http.DetectContentType(data))
