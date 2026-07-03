@@ -15,6 +15,7 @@ const { sendMutation, chatState, chatRefetch } = vi.hoisted(() => {
     isLoading: false,
     status: "idle",
     refetchStatus: "idle",
+    error: null as unknown,
   };
 
   return {
@@ -37,6 +38,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
 vi.mock("@/hooks/useAgentChats", () => ({
   useCanvasAgentChat: () => ({
     data: chatState.hasChat ? { id: "chat-1", status: chatState.status } : undefined,
+    error: chatState.error,
     isError: chatState.isError,
     isFetching: chatState.isFetching,
     isLoading: chatState.isLoading,
@@ -113,6 +115,7 @@ describe("CanvasToolSidebar", () => {
     chatState.isLoading = false;
     chatState.status = "idle";
     chatState.refetchStatus = "idle";
+    chatState.error = null;
     chatRefetch.mockClear();
     sendMutation.isPending = false;
     sendMutation.mutateAsync.mockReset();
@@ -150,11 +153,31 @@ describe("CanvasToolSidebar", () => {
     chatState.hasChat = false;
     chatState.isError = true;
     chatState.isFetching = false;
+    chatState.error = { code: 14, message: "agents are not enabled on this installation" };
 
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentUnavailable })} />);
 
     expect(await screen.findByText("The SuperPlane agent isn't available on this instance.")).toBeInTheDocument();
     await waitFor(() => expect(markAgentUnavailable).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps non-disabled chat setup failures retryable", async () => {
+    const user = userEvent.setup();
+    const markAgentUnavailable = vi.fn();
+    chatState.hasChat = false;
+    chatState.isError = true;
+    chatState.isFetching = false;
+    chatState.error = { code: 7, message: "agent chat is not allowed" };
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentUnavailable })} />);
+
+    expect(
+      await screen.findByText("I couldn't set up the SuperPlane agent. Try again in a moment."),
+    ).toBeInTheDocument();
+    expect(markAgentUnavailable).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(chatRefetch).toHaveBeenCalledTimes(1);
   });
 
   it("allows retrying a failed session", async () => {
