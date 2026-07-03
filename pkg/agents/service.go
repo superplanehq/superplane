@@ -87,7 +87,7 @@ func (s *Service) ResetSession(ctx context.Context, organizationID, userID, canv
 		}
 		if existing != nil {
 			oldProviderSession = existing.ProviderSessionID
-			if err := models.DeleteAgentSessionForUserCanvasInTransaction(tx, organizationID, userID, canvasID); err != nil {
+			if err := models.DeleteAgentSessionForUserCanvas(tx, organizationID, userID, canvasID); err != nil {
 				return err
 			}
 		}

@@ -232,7 +232,9 @@ func DeleteAgentSessionsForCanvasInTransaction(tx *gorm.DB, organizationID, canv
 		Error
 }
 
-func DeleteAgentSessionForUserCanvasInTransaction(tx *gorm.DB, organizationID, userID, canvasID uuid.UUID) error {
+// DeleteAgentSessionForUserCanvas takes an explicit *gorm.DB per the transaction
+// guidelines (no InTransaction suffix / conn wrapper); pass a tx or database.DB(ctx).
+func DeleteAgentSessionForUserCanvas(tx *gorm.DB, organizationID, userID, canvasID uuid.UUID) error {
 	return tx.
 		Where("organization_id = ?", organizationID).
 		Where("user_id = ?", userID).
