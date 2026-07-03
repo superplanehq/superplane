@@ -88,8 +88,10 @@ Rules:
 
   :::staging-actions
   canvasId: <the-session-canvas-id>
-  message: Staging ready — added retry logic to Call Target API
+  message: Added retry logic to Call Target API
   :::
+
+  The message field is the commit message: describe what changed in the app. Do not prefix it with "Staging ready" or similar status text.
 
 - You can add, remove, or modify nodes and edges with 'patch_staging' patch_operations. Graph patches auto-layout affected connected components by default.
 - You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Read it with 'superplane_app' include_console and save it with action 'patch_staging' using console_yaml.

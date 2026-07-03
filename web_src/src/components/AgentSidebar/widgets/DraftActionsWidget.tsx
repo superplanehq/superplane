@@ -9,23 +9,23 @@ export interface DraftActionsWidgetProps {
   organizationId: string;
   isEditing: boolean;
   onDismiss?: () => void;
+  onViewStaging?: () => boolean | void | Promise<boolean> | Promise<void>;
+  onCommitStaging?: (commitMessage: string) => Promise<boolean>;
 }
 
 export function DraftActionsWidget({
-  versionId,
   message,
   canvasId,
   organizationId,
   isEditing,
   onDismiss,
+  onViewStaging,
+  onCommitStaging,
 }: DraftActionsWidgetProps) {
   const [busy, setBusy] = useState<"commit" | "discard" | null>(null);
 
   const handleViewInEditor = () => {
-    if (!versionId) {
-      return;
-    }
-    window.dispatchEvent(new CustomEvent("agent:view-version", { detail: { versionId } }));
+    void onViewStaging?.();
   };
 
   const sendRequest = (method: string, url: string, body?: string) =>
@@ -39,15 +39,12 @@ export function DraftActionsWidget({
       ...(body !== undefined ? { body } : {}),
     });
 
-  const runAction = async (action: "commit" | "discard", run: () => Promise<Response>) => {
+  const runAction = async (action: "commit" | "discard", run: () => Promise<boolean>) => {
     setBusy(action);
     try {
-      const response = await run();
-      if (response.ok) {
+      const succeeded = await run();
+      if (succeeded) {
         onDismiss?.();
-      } else {
-        const text = await response.text();
-        console.error(`${action} failed:`, response.status, text);
       }
     } catch (err) {
       console.error(`Failed to ${action}:`, err);
@@ -59,16 +56,40 @@ export function DraftActionsWidget({
   const handleCommit = () =>
     runAction("commit", async () => {
       const commitMessage = message?.trim() || "Apply agent changes";
-      return sendRequest("POST", `/api/v1/canvases/${canvasId}/staging/commit`, JSON.stringify({ commitMessage }));
+      if (onCommitStaging) {
+        return onCommitStaging(commitMessage);
+      }
+
+      const response = await sendRequest(
+        "POST",
+        `/api/v1/canvases/${canvasId}/staging/commit`,
+        JSON.stringify({ commitMessage }),
+      );
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("commit failed:", response.status, text);
+        return false;
+      }
+      return true;
     });
 
-  const handleDiscard = () => runAction("discard", () => sendRequest("DELETE", `/api/v1/canvases/${canvasId}/staging`));
+  const handleDiscard = () =>
+    runAction("discard", async () => {
+      const response = await sendRequest("DELETE", `/api/v1/canvases/${canvasId}/staging`);
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("discard failed:", response.status, text);
+        return false;
+      }
+      return true;
+    });
+
+  const displayMessage = message?.trim() || "Review staged changes";
 
   return (
     <div className="flex items-center gap-2">
-      {message && <span className="text-xs text-slate-600 flex-1 truncate">{message}</span>}
-      {!message && <span className="text-xs text-slate-600 flex-1">Staging ready</span>}
-      {!isEditing && versionId && (
+      <span className="text-xs text-slate-600 flex-1 truncate">{displayMessage}</span>
+      {!isEditing && (
         <Button
           variant="outline"
           size="sm"

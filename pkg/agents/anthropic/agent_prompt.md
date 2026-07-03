@@ -351,5 +351,5 @@ The rich-ui-widgets skill has the full syntax.
 ## App Update Rules
 
 - **ALWAYS** stage edits only. Use `superplane_app` action `patch_staging` with `patch_operations` for graph changes and `console_yaml` for Console changes. Use `write_file` / `delete_file` for other repository files. It never commits staging.
-- After successful staging updates, output `:::staging-actions` with the session `canvasId`
+- After successful staging updates, output `:::staging-actions` with the session `canvasId` and a `message` that describes what changed (this becomes the commit message; do not prefix with "Staging ready")
 - After staging, verify once with compact `superplane_app` action `read`

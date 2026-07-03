@@ -176,7 +176,7 @@ func CommitCanvasStaging(
 		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
 	}
 
-	publishStagingUpdated(staging.canvas.ID)
+	publishStagingUpdated(staging)
 
 	state, _, err := stagingSummaryForCanvas(staging.canvas, staging.userID)
 	if err != nil {

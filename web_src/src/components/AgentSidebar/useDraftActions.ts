@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseAgentContent, type DraftActionsSegment } from "./widgets/parser";
 import type { AgentMessage } from "@/components/CanvasToolSidebar/types";
+import { buildAgentStagingAutoOpenKey, releaseAgentStagingAutoOpen } from "@/pages/app/lib/agent-staging-auto-open";
 
 type StagingSummaryResponse = {
   stagingSummary?: {
@@ -75,7 +76,7 @@ export function useDraftActions({
         setAutoDetectedDraft({
           type: "staging-actions",
           canvasId,
-          message: "Outcome complete — staging ready to commit",
+          message: "Outcome complete — review staged changes",
         });
       } catch {
         // Ignore transient lookup failures and keep the bar hidden.
@@ -124,6 +125,7 @@ export function useDraftActions({
   const dismiss = useCallback(() => {
     if (!effectiveDraft) return;
 
+    releaseAgentStagingAutoOpen(buildAgentStagingAutoOpenKey(effectiveDraft.canvasId, effectiveDraft.message));
     dismissCanvas(effectiveDraft.canvasId);
     clearAutoDetectedDraft(effectiveDraft.canvasId);
     onVersionPublished?.();

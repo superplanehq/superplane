@@ -323,14 +323,19 @@ export function useCanvasWebsocket(
           // the staged caches so the diff badge, console and files tabs reflect
           // the uncommitted changes.
           const stagingMessage = payload as Partial<CanvasWebsocketPayload>;
-          if (!stagingMessage.canvasId || stagingMessage.canvasId !== canvasId || !stagingMessage.versionId) {
+          if (!stagingMessage.canvasId || stagingMessage.canvasId !== canvasId) {
             break;
           }
 
           const shouldInvalidateStagingQueries =
             onCanvasStagingEvent?.(stagingMessage as CanvasWebsocketPayload, "staging_updated") !== false;
           if (shouldInvalidateStagingQueries) {
-            invalidateStagedCanvasQueries(queryClient, canvasId, stagingMessage.versionId);
+            if (stagingMessage.versionId) {
+              invalidateStagedCanvasQueries(queryClient, canvasId, stagingMessage.versionId);
+            } else {
+              queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
+              queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+            }
           }
           break;
         }

@@ -315,6 +315,12 @@ export interface CanvasPageProps {
   isEditSessionActive?: boolean;
   /** Active canvas version id (draft when editing); drives agent build mode. */
   activeCanvasVersionId: string;
+  /** Live canvas version id; used by the agent staging bar to enter edit mode. */
+  liveCanvasVersionId?: string;
+  /** Enter edit mode when the agent finishes staging changes. */
+  onAgentStagingReady?: () => boolean | Promise<boolean>;
+  /** Commit staged agent changes from the agent sidebar bar. */
+  onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
@@ -791,6 +797,11 @@ function CanvasPage(props: CanvasPageProps) {
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
+    liveCanvasVersionId: props.liveCanvasVersionId,
+    headerMode: props.headerMode,
+    isRunInspectionMode: props.isRunInspectionMode,
+    onAgentStagingReady: props.onAgentStagingReady,
+    onAgentStagingCommit: props.onAgentStagingCommit,
   });
   const runsSidebarBaseState = useCanvasRunsSidebarState();
   const showRunsSidebar = isCanvasWorkflowTab(props.headerMode) && props.toolSidebarRunsContent != null;

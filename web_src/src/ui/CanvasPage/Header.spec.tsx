@@ -29,6 +29,11 @@ vi.mock("./components/CanvasModeToggle", () => ({
 const toolSidebarState = {
   canvasId: "canvas-1",
   organizationId: "org-1",
+  liveCanvasVersionId: undefined,
+  headerMode: undefined,
+  isRunInspectionMode: false,
+  onAgentStagingReady: undefined,
+  onAgentStagingCommit: undefined,
   isEditing: false,
   readOnly: false,
   isToolSidebarOpen: true,

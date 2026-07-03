@@ -20,7 +20,7 @@ type UseCanvasLifecycleEventHandlersOptions = {
   consumeIgnoredCreateDraftEcho: (targetCanvasId?: string, eventVersionId?: string) => boolean;
   consumeIgnoredCanvasVersionUpdatedEcho: (versionId?: string) => boolean;
   resyncDraftToCommitted: (versionId: string) => Promise<void>;
-  resyncDraftToStaged: (versionId: string) => Promise<void>;
+  onRemoteStagingUpdated?: (versionId?: string) => void;
   setCanvasDeletedRemotely: (value: boolean) => void;
   setRemoteCanvasUpdatePending: (value: boolean) => void;
 };
@@ -38,7 +38,7 @@ export function useCanvasLifecycleEventHandlers({
   consumeIgnoredCreateDraftEcho,
   consumeIgnoredCanvasVersionUpdatedEcho,
   resyncDraftToCommitted,
-  resyncDraftToStaged,
+  onRemoteStagingUpdated,
   setCanvasDeletedRemotely,
   setRemoteCanvasUpdatePending,
 }: UseCanvasLifecycleEventHandlersOptions) {
@@ -117,23 +117,19 @@ export function useCanvasLifecycleEventHandlers({
 
   const handleCanvasStagingEvent = useCallback(
     (payload: { canvasId: string; versionId?: string }) => {
-      if (!payload.versionId) {
+      if (payload.versionId && consumeLocalStagingWrite(canvasId, payload.versionId)) {
         return false;
       }
 
-      if (consumeLocalStagingWrite(canvasId, payload.versionId)) {
-        return false;
-      }
-
-      if (payload.versionId === activeCanvasVersionId && hasLocalSaveActivity) {
+      if (payload.versionId && payload.versionId === activeCanvasVersionId && hasLocalSaveActivity) {
         setRemoteCanvasUpdatePending(true);
         return true;
       }
 
-      void resyncDraftToStaged(payload.versionId);
+      onRemoteStagingUpdated?.(payload.versionId);
       return true;
     },
-    [activeCanvasVersionId, canvasId, hasLocalSaveActivity, resyncDraftToStaged, setRemoteCanvasUpdatePending],
+    [activeCanvasVersionId, canvasId, hasLocalSaveActivity, onRemoteStagingUpdated, setRemoteCanvasUpdatePending],
   );
 
   return {

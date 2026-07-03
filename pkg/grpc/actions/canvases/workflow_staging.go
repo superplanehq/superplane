@@ -27,8 +27,15 @@ type canvasStagingContext struct {
 	rows        []models.WorkflowStaging
 }
 
-func publishStagingUpdated(canvasID uuid.UUID) {
-	if err := messages.NewCanvasVersionUpdatedMessage(canvasID.String(), "").PublishStagingUpdated(); err != nil {
+func publishStagingUpdated(staging *canvasStagingContext) {
+	if staging == nil || staging.liveVersion == nil {
+		return
+	}
+
+	if err := messages.NewCanvasVersionUpdatedMessage(
+		staging.canvas.ID.String(),
+		staging.liveVersion.ID.String(),
+	).PublishStagingUpdated(); err != nil {
 		log.Errorf("failed to publish canvas staging updated RabbitMQ message: %v", err)
 	}
 }
@@ -227,7 +234,7 @@ func PutCanvasStaging(
 		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}
 
-	publishStagingUpdated(staging.canvas.ID)
+	publishStagingUpdated(staging)
 
 	return buildStagingSummary(staging.canvas, rows), nil
 }
@@ -265,7 +272,7 @@ func DeleteCanvasStaging(
 		return nil, err
 	}
 
-	publishStagingUpdated(staging.canvas.ID)
+	publishStagingUpdated(staging)
 
 	return state, nil
 }

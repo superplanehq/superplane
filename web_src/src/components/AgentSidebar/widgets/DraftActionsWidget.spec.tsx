@@ -8,26 +8,22 @@ describe("DraftActionsWidget", () => {
     vi.restoreAllMocks();
   });
 
-  it("dispatches a view event when the user asks to see changes", async () => {
+  it("calls onViewStaging when the user asks to see changes", async () => {
     const user = userEvent.setup();
-    const dispatchEvent = vi.spyOn(window, "dispatchEvent");
+    const onViewStaging = vi.fn();
 
-    render(<DraftActionsWidget versionId="live-1" canvasId="canvas-1" organizationId="org-1" isEditing={false} />);
+    render(
+      <DraftActionsWidget canvasId="canvas-1" organizationId="org-1" isEditing={false} onViewStaging={onViewStaging} />,
+    );
 
     await user.click(screen.getByRole("button", { name: /see changes/i }));
 
-    expect(dispatchEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "agent:view-version",
-        detail: { versionId: "live-1" },
-      }),
-    );
+    expect(onViewStaging).toHaveBeenCalledTimes(1);
   });
 
-  it("commits staging with the widget message", async () => {
+  it("commits staging through the shared commit handler", async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" } as Response);
-    vi.stubGlobal("fetch", fetchMock);
+    const onCommitStaging = vi.fn().mockResolvedValue(true);
     const onDismiss = vi.fn();
 
     render(
@@ -36,36 +32,35 @@ describe("DraftActionsWidget", () => {
         organizationId="org-1"
         isEditing={false}
         message="Added health checks"
+        onCommitStaging={onCommitStaging}
         onDismiss={onDismiss}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: /commit/i }));
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/canvases/canvas-1/staging/commit");
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({
-      method: "POST",
-      body: JSON.stringify({ commitMessage: "Added health checks" }),
-    });
+    expect(onCommitStaging).toHaveBeenCalledWith("Added health checks");
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it("does not dismiss when committing staging fails", async () => {
     const user = userEvent.setup();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: false, status: 400, text: async () => "bad staging" } as Response);
-    vi.stubGlobal("fetch", fetchMock);
+    const onCommitStaging = vi.fn().mockResolvedValue(false);
     const onDismiss = vi.fn();
 
-    render(<DraftActionsWidget canvasId="canvas-1" organizationId="org-1" isEditing={false} onDismiss={onDismiss} />);
+    render(
+      <DraftActionsWidget
+        canvasId="canvas-1"
+        organizationId="org-1"
+        isEditing={false}
+        onCommitStaging={onCommitStaging}
+        onDismiss={onDismiss}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: /commit/i }));
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/canvases/canvas-1/staging/commit");
+    expect(onCommitStaging).toHaveBeenCalledTimes(1);
     expect(onDismiss).not.toHaveBeenCalled();
   });
 });

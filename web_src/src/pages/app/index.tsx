@@ -82,16 +82,16 @@ import { useFilesHeaderState } from "./files/useFilesHeaderState";
 import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
-import { useAgentDraftEditor } from "./useAgentDraftEditor";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
-import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
+import { shouldApplyPreservedDraftSpec, shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { sortVersionsDesc } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandlers";
 import { useDraftStagingActions } from "./useDraftStagingActions";
+import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { buildCanvasYamlExportPayload, materializeCanvasSpec } from "./lib/workflow-spec-files";
@@ -376,17 +376,37 @@ export function AppPage() {
     if (!isEditing || !activeCanvasVersionId) {
       return;
     }
+
+    const awaitingStagedVersionLoad =
+      !!activeCanvasVersion && !loadedCanvasVersion && (loadedCanvasVersionLoading || loadedCanvasVersionFetching);
+    if (awaitingStagedVersionLoad) {
+      return;
+    }
+
     const preservedDraftSpec = draftCanvasSpecsRef.current.get(activeCanvasVersionId);
-    if (preservedDraftSpec) {
+    const nextDraftSpec = selectedCanvasVersion?.spec ?? null;
+
+    if (shouldApplyPreservedDraftSpec(preservedDraftSpec, nextDraftSpec)) {
       setDraftCanvasSpec(preservedDraftSpec);
       return;
     }
-    const nextDraftSpec = selectedCanvasVersion?.spec ?? null;
+
     if (nextDraftSpec) {
       draftCanvasSpecsRef.current.set(activeCanvasVersionId, nextDraftSpec);
+    } else {
+      draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
     }
     setDraftCanvasSpec(nextDraftSpec);
-  }, [isEditing, activeCanvasVersionId, selectedCanvasVersion?.metadata?.id, selectedCanvasVersion?.spec]);
+  }, [
+    isEditing,
+    activeCanvasVersionId,
+    activeCanvasVersion,
+    loadedCanvasVersion,
+    loadedCanvasVersionLoading,
+    loadedCanvasVersionFetching,
+    selectedCanvasVersion?.metadata?.id,
+    selectedCanvasVersion?.spec,
+  ]);
   useEffect(() => {
     if (!isEditing || !activeCanvasVersionId || !liveCanvas?.spec) {
       return;
@@ -611,6 +631,8 @@ export function AppPage() {
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const consoleMutationGenerationRef = useRef(0);
+  const handleRemoteStagingUpdatedRef = useRef<(versionId?: string) => Promise<void>>(async () => {});
+  const enterLiveEditSessionInFlightRef = useRef<Promise<boolean> | null>(null);
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
   const {
@@ -1682,7 +1704,9 @@ export function AppPage() {
       consumeIgnoredCreateDraftEcho,
       consumeIgnoredCanvasVersionUpdatedEcho,
       resyncDraftToCommitted,
-      resyncDraftToStaged,
+      onRemoteStagingUpdated: (versionId) => {
+        void handleRemoteStagingUpdatedRef.current(versionId);
+      },
       setCanvasDeletedRemotely,
       setRemoteCanvasUpdatePending,
     });
@@ -3259,6 +3283,58 @@ export function AppPage() {
     [handleCommitStaging],
   );
 
+  const handleAgentSidebarStagingCommit = useCallback(
+    async (commitMessage: string) => {
+      if (!organizationId || !canvasId) {
+        return false;
+      }
+
+      const versionId = activeCanvasVersionId || effectiveLiveCanvasVersionId || "";
+      if (!versionId) {
+        return false;
+      }
+
+      const trimmedMessage = commitMessage.trim();
+      if (!trimmedMessage) {
+        return false;
+      }
+
+      try {
+        return await executeCommitStaging({
+          organizationId,
+          canvasId,
+          activeCanvasVersionId: versionId,
+          commitMessage: trimmedMessage,
+          queryClient,
+          commitCanvasStagingMutation,
+          consoleMutationGenerationRef,
+          draftCanvasSpecsRef,
+          setDraftCanvasSpec,
+          setStagingResetNonce,
+          ensureVersionActionDraftReady,
+          flushRepositoryFileStaging,
+          registerIgnoredCanvasVersionUpdatedEcho,
+          onCommittedVersionId: handleCommittedVersionId,
+        });
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
+        return false;
+      }
+    },
+    [
+      organizationId,
+      canvasId,
+      activeCanvasVersionId,
+      effectiveLiveCanvasVersionId,
+      queryClient,
+      commitCanvasStagingMutation,
+      ensureVersionActionDraftReady,
+      flushRepositoryFileStaging,
+      handleCommittedVersionId,
+      registerIgnoredCanvasVersionUpdatedEcho,
+    ],
+  );
+
   const handleDiscardStaleStaging = useCallback(async () => {
     await handleResetStaging();
   }, [handleResetStaging]);
@@ -3279,6 +3355,13 @@ export function AppPage() {
       const previousVersionId = activeCanvasVersionIdRef.current;
       if (previousVersionId && draftCanvasSpec) {
         draftCanvasSpecsRef.current.set(previousVersionId, draftCanvasSpec);
+      }
+
+      if (isCurrentLive) {
+        draftCanvasSpecsRef.current.delete(versionId);
+        void queryClient.invalidateQueries({
+          queryKey: canvasKeys.versionStagedDetail(canvasId, versionId),
+        });
       }
 
       if (!isCurrentLive) {
@@ -3398,28 +3481,81 @@ export function AppPage() {
       isViewingCurrentLiveVersion,
     });
 
-  const enterEditSessionForAgentStaging = useCallback(() => {
-    if (!canUpdateCanvas || !effectiveLiveCanvasVersionId) {
+  const enterLiveEditSession = useCallback(async (): Promise<boolean> => {
+    if (enterLiveEditSessionInFlightRef.current) {
+      return enterLiveEditSessionInFlightRef.current;
+    }
+
+    const enterPromise = (async (): Promise<boolean> => {
+      if (!organizationId || !canvasId || !canUpdateCanvas) {
+        return false;
+      }
+
+      if (!effectiveLiveCanvasVersionId) {
+        return false;
+      }
+
+      if (!selectableVersionsById.has(effectiveLiveCanvasVersionId)) {
+        return false;
+      }
+
+      setEditSessionActive(true);
+      previewingCurrentVersionRef.current = true;
+      handleUseVersion(effectiveLiveCanvasVersionId);
+      await resyncDraftToStaged(effectiveLiveCanvasVersionId, { bumpResetNonce: false });
+      return true;
+    })();
+
+    enterLiveEditSessionInFlightRef.current = enterPromise;
+    try {
+      return await enterPromise;
+    } finally {
+      enterLiveEditSessionInFlightRef.current = null;
+    }
+  }, [
+    organizationId,
+    canvasId,
+    canUpdateCanvas,
+    effectiveLiveCanvasVersionId,
+    selectableVersionsById,
+    handleUseVersion,
+    resyncDraftToStaged,
+  ]);
+
+  handleRemoteStagingUpdatedRef.current = async (versionId?: string) => {
+    const targetVersionId = versionId || effectiveLiveCanvasVersionId;
+    if (!targetVersionId || targetVersionId !== effectiveLiveCanvasVersionId) {
       return;
     }
 
-    setEditSessionActive(true);
-    previewingCurrentVersionRef.current = true;
-  }, [canUpdateCanvas, effectiveLiveCanvasVersionId]);
+    if (editSessionActive && isViewingCurrentLiveVersion) {
+      await resyncDraftToStaged(targetVersionId, { bumpResetNonce: false });
+      return;
+    }
 
-  useAgentDraftEditor({
-    canvasId,
-    liveCanvasVersionId: effectiveLiveCanvasVersionId,
-    headerMode,
-    isRunInspectionMode: urlViewFlags.isRunInspectionMode,
-    selectableVersionsById,
-    hasEditableVersion,
-    hasLocalSaveActivity,
-    activeCanvasVersionIdRef,
-    activateCanvasVersionForEditing,
-    enterEditSession: enterEditSessionForAgentStaging,
-    onActiveDraftMissing: async () => {},
-  });
+    if (!editSessionActive) {
+      await enterLiveEditSession();
+    }
+  };
+
+  const handleAgentStagingReady = useCallback(async (): Promise<boolean> => {
+    if (!effectiveLiveCanvasVersionId) {
+      return false;
+    }
+
+    if (editSessionActive && isViewingCurrentLiveVersion) {
+      await resyncDraftToStaged(effectiveLiveCanvasVersionId, { bumpResetNonce: false });
+      return true;
+    }
+
+    return enterLiveEditSession();
+  }, [
+    editSessionActive,
+    effectiveLiveCanvasVersionId,
+    enterLiveEditSession,
+    isViewingCurrentLiveVersion,
+    resyncDraftToStaged,
+  ]);
 
   const handleToggleEditMode = useCallback(async () => {
     if (!organizationId || !canvasId) {
@@ -3447,9 +3583,7 @@ export function AppPage() {
       return;
     }
 
-    setEditSessionActive(true);
-    previewingCurrentVersionRef.current = true;
-    handleUseVersion(effectiveLiveCanvasVersionId);
+    void enterLiveEditSession();
   }, [
     organizationId,
     canvasId,
@@ -3458,6 +3592,7 @@ export function AppPage() {
     effectiveLiveCanvasVersionId,
     liveCanvasVersion,
     isLiveVersionLoading,
+    enterLiveEditSession,
     handleUseVersion,
   ]);
 
@@ -4133,6 +4268,9 @@ export function AppPage() {
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}
           activeCanvasVersionId={activeCanvasVersionId}
+          liveCanvasVersionId={effectiveLiveCanvasVersionId}
+          onAgentStagingReady={handleAgentStagingReady}
+          onAgentStagingCommit={handleAgentSidebarStagingCommit}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
           onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}

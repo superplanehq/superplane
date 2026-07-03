@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { persistAgentMode, readInitialAgentMode, type AgentMode } from "@/components/AgentSidebar/agentMode";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import type { CanvasPageHeaderMode } from "@/pages/app/viewState";
 
 // Keep in sync with pkg/features/features.go.
 export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
@@ -16,11 +17,18 @@ function readInitialToolSidebarOpen(): boolean {
   }
 }
 
+export type AgentStagingReadyHandler = () => boolean | Promise<boolean>;
+
 export type UseCanvasToolSidebarStateOptions = {
   isEditing: boolean;
   readOnly: boolean;
   canvasId?: string;
   organizationId?: string;
+  liveCanvasVersionId?: string;
+  headerMode?: CanvasPageHeaderMode;
+  isRunInspectionMode?: boolean;
+  onAgentStagingReady?: AgentStagingReadyHandler;
+  onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
   /** When true (e.g. template canvas picker), hides the tool sidebar toggle and clears open state. */
   hideCanvasToolSidebar?: boolean;
   /** Keeps the tool sidebar available even when managed agents are disabled (runs/versions flows). */
@@ -34,6 +42,11 @@ export function useCanvasToolSidebarState({
   readOnly,
   canvasId,
   organizationId,
+  liveCanvasVersionId,
+  headerMode,
+  isRunInspectionMode = false,
+  onAgentStagingReady,
+  onAgentStagingCommit,
   hideCanvasToolSidebar,
   forceEnable = false,
   onBeforeClose,
@@ -109,6 +122,11 @@ export function useCanvasToolSidebarState({
   return {
     canvasId,
     organizationId,
+    liveCanvasVersionId,
+    headerMode,
+    isRunInspectionMode,
+    onAgentStagingReady,
+    onAgentStagingCommit,
     isEditing,
     readOnly,
     isToolSidebarOpen,

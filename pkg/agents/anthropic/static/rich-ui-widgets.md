@@ -57,9 +57,11 @@ Categories with `##` headings. Criteria should be functional requirements, not i
 ```
 :::staging-actions
 canvasId: <session-canvas-id>
-message: Staging ready — added health check nodes
+message: Added health check nodes
 :::
 ```
+
+`message` is the commit message shown in the UI — describe the app change only (no "Staging ready" prefix).
 
 `canvasId` must match the current session canvas ID from the preamble.
 ## Chart

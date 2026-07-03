@@ -25,6 +25,7 @@ import {
   getAgentBootMessage,
   isAgentBootReady,
 } from "@/lib/agentBootContext";
+import { isCanvasWorkflowTab, type CanvasPageHeaderMode } from "@/pages/app/viewState";
 import { ConversationTranscript } from "./AgentConversationTranscript";
 import {
   createWebsocketCallbacks,
@@ -35,7 +36,12 @@ import {
   useThinkingIndicator,
 } from "./agentConversationState";
 import type { AgentMessage, AgentOutgoingImage } from "./types";
-import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
+import type { AgentStagingReadyHandler, CanvasToolSidebarState } from "./useCanvasToolSidebarState";
+import {
+  buildAgentStagingAutoOpenKey,
+  claimAgentStagingAutoOpen,
+  releaseAgentStagingAutoOpen,
+} from "@/pages/app/lib/agent-staging-auto-open";
 import { groupMessages } from "./agentMessageGroups";
 
 const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 15000;
@@ -49,6 +55,11 @@ type ChatConversationProps = {
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
+  onAgentStagingReady?: AgentStagingReadyHandler;
+  onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
+  liveCanvasVersionId?: string;
+  headerMode?: CanvasPageHeaderMode;
+  isRunInspectionMode?: boolean;
 };
 
 type DraftActionsBarProps = {
@@ -58,6 +69,11 @@ type DraftActionsBarProps = {
   isEditing: boolean;
   outcomePassed?: boolean;
   onVersionPublished?: () => void;
+  onAgentStagingReady?: AgentStagingReadyHandler;
+  onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
+  liveCanvasVersionId?: string;
+  headerMode?: CanvasPageHeaderMode;
+  isRunInspectionMode?: boolean;
 };
 
 type ConversationHandlers = {
@@ -107,6 +123,11 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
       agentMode={toolSidebarState.agentMode}
       onModeSwitch={toolSidebarState.switchAgentMode}
       isEditing={toolSidebarState.isEditing}
+      onAgentStagingReady={toolSidebarState.onAgentStagingReady}
+      onAgentStagingCommit={toolSidebarState.onAgentStagingCommit}
+      liveCanvasVersionId={toolSidebarState.liveCanvasVersionId}
+      headerMode={toolSidebarState.headerMode}
+      isRunInspectionMode={toolSidebarState.isRunInspectionMode}
     />
   );
 }
@@ -120,6 +141,11 @@ function ChatConversation({
   agentMode,
   onModeSwitch,
   isEditing,
+  onAgentStagingReady,
+  onAgentStagingCommit,
+  liveCanvasVersionId,
+  headerMode,
+  isRunInspectionMode,
 }: ChatConversationProps) {
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
@@ -223,6 +249,11 @@ function ChatConversation({
         isEditing={isEditing}
         outcomePassed={outcomeState?.phase === "passed"}
         onVersionPublished={() => setOutcomeState(null)}
+        onAgentStagingReady={onAgentStagingReady}
+        onAgentStagingCommit={onAgentStagingCommit}
+        liveCanvasVersionId={liveCanvasVersionId}
+        headerMode={headerMode}
+        isRunInspectionMode={isRunInspectionMode}
       />
 
       <ComposerWithCanvasData
@@ -435,6 +466,11 @@ function DraftActionsBar({
   isEditing,
   outcomePassed,
   onVersionPublished,
+  onAgentStagingReady,
+  onAgentStagingCommit,
+  liveCanvasVersionId,
+  headerMode,
+  isRunInspectionMode = false,
 }: DraftActionsBarProps) {
   const { latestDraft, dismiss } = useDraftActions({
     messages,
@@ -444,17 +480,43 @@ function DraftActionsBar({
     onVersionPublished,
   });
 
+  const openedStagingKeyRef = useRef<string | null>(null);
+  const onAgentStagingReadyRef = useRef(onAgentStagingReady);
+  onAgentStagingReadyRef.current = onAgentStagingReady;
+
   useEffect(() => {
     if (!latestDraft) {
+      openedStagingKeyRef.current = null;
       return;
     }
 
-    window.dispatchEvent(
-      new CustomEvent("agent:draft-ready", {
-        detail: { canvasId: latestDraft.canvasId, versionId: latestDraft.versionId },
-      }),
-    );
-  }, [canvasId, latestDraft]);
+    if (!onAgentStagingReadyRef.current || !liveCanvasVersionId) {
+      return;
+    }
+
+    if (!isCanvasWorkflowTab(headerMode) || isRunInspectionMode) {
+      return;
+    }
+
+    const stagingKey = buildAgentStagingAutoOpenKey(latestDraft.canvasId, latestDraft.message);
+    if (openedStagingKeyRef.current === stagingKey || !claimAgentStagingAutoOpen(stagingKey)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void Promise.resolve(onAgentStagingReadyRef.current()).then((ready) => {
+      if (cancelled || ready === false) {
+        releaseAgentStagingAutoOpen(stagingKey);
+        return;
+      }
+      openedStagingKeyRef.current = stagingKey;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [headerMode, isRunInspectionMode, latestDraft, liveCanvasVersionId]);
 
   if (!latestDraft) return null;
 
@@ -468,6 +530,8 @@ function DraftActionsBar({
           organizationId={organizationId}
           isEditing={isEditing}
           onDismiss={dismiss}
+          onViewStaging={onAgentStagingReady}
+          onCommitStaging={onAgentStagingCommit}
         />
       </div>
     </div>

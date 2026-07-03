@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
@@ -23,8 +23,13 @@ interface UseCanvasDraftResyncOptions {
 
 interface CanvasDraftResync {
   resyncDraftToCommitted: (versionId: string) => Promise<void>;
-  resyncDraftToStaged: (versionId: string) => Promise<void>;
+  resyncDraftToStaged: (versionId: string, options?: ResyncDraftOptions) => Promise<void>;
 }
+
+type ResyncDraftOptions = {
+  /** Bumps stagingResetNonce so file/console baselines reset. Avoid when entering edit from agent staging — it remounts CanvasPage and can loop auto-open. */
+  bumpResetNonce?: boolean;
+};
 
 // Re-applies a draft version's effective spec (committed or staged) to the
 // active editor state after a remote change. The rendered graph reads React
@@ -45,6 +50,7 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
     setStagingResetNonce,
   } = options;
   const queryClient = useQueryClient();
+  const resyncStagedInFlightRef = useRef(new Map<string, Promise<void>>());
 
   // Applies an already-loaded spec to the active draft and treats it as the
   // saved baseline so it is not re-detected as a local edit (which would
@@ -129,34 +135,54 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
   // graph reads React state, so the active draft needs its effective staged
   // spec re-applied here.
   const resyncDraftToStaged = useCallback(
-    async (versionId: string) => {
+    async (versionId: string, options?: ResyncDraftOptions) => {
       if (!organizationId || !canvasId) {
         return;
       }
 
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
-
-      if (activeCanvasVersionIdRef.current !== versionId) {
-        draftCanvasSpecsRef.current.delete(versionId);
+      const inFlight = resyncStagedInFlightRef.current.get(versionId);
+      if (inFlight) {
+        await inFlight;
         return;
       }
 
-      consoleMutationGenerationRef.current += 1;
-      const stagedVersion = await fetchCanvasVersionWithSpec(canvasId, versionId, true);
-      const stagedSpec = stagedVersion?.spec ?? null;
+      const bumpResetNonce = options?.bumpResetNonce ?? true;
 
-      if (stagedVersion) {
-        queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, versionId), stagedVersion);
-      }
-      if (stagedSpec) {
-        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) =>
-          current ? { ...current, spec: { ...current.spec, ...stagedSpec } } : current,
-        );
-      }
-      applyResyncedSpec(versionId, stagedSpec);
+      const resyncPromise = (async () => {
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
 
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) });
-      setStagingResetNonce((nonce) => nonce + 1);
+        if (activeCanvasVersionIdRef.current !== versionId) {
+          draftCanvasSpecsRef.current.delete(versionId);
+          return;
+        }
+
+        consoleMutationGenerationRef.current += 1;
+        const stagedVersion = await fetchCanvasVersionWithSpec(canvasId, versionId, true);
+        const stagedSpec = stagedVersion?.spec ?? null;
+
+        if (stagedVersion) {
+          queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, versionId), stagedVersion);
+        }
+        if (stagedSpec) {
+          queryClient.setQueryData<CanvasesCanvas | undefined>(
+            canvasKeys.detail(organizationId, canvasId),
+            (current) => (current ? { ...current, spec: { ...current.spec, ...stagedSpec } } : current),
+          );
+        }
+        applyResyncedSpec(versionId, stagedSpec);
+
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) });
+        if (bumpResetNonce) {
+          setStagingResetNonce((nonce) => nonce + 1);
+        }
+      })();
+
+      resyncStagedInFlightRef.current.set(versionId, resyncPromise);
+      try {
+        await resyncPromise;
+      } finally {
+        resyncStagedInFlightRef.current.delete(versionId);
+      }
     },
     [
       organizationId,
