@@ -56,6 +56,86 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 	return s.provisionSession(ctx, organizationID, userID, canvasID)
 }
 
+// ResetSession deletes the current session (and its messages) for the given
+// canvas and provisions a brand-new session on the provider.
+//
+// This is used by the `/clear` UX to give the user a fresh chat with no rewind.
+func (s *Service) ResetSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
+	if err := s.checkAgentPermission(ctx, userID.String(), organizationID.String()); err != nil {
+		return nil, err
+	}
+
+	// Cheap pre-check so we don't create a provider session just to throw it
+	// away when the current turn is still streaming. The advisory-locked check
+	// inside the transaction below is the authoritative one that closes the race.
+	existing, err := findCanvasSession(database.Conn(), organizationID, userID, canvasID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil && existing.Status == models.AgentSessionStatusStreaming {
+		return nil, ErrSessionBusy
+	}
+
+	upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{
+		Title: sessionTitle(organizationID, canvasID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create provider session: %w", err)
+	}
+
+	var (
+		session            *models.AgentSession
+		oldProviderSession string
+	)
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
+			return err
+		}
+
+		locked, err := findCanvasSession(tx, organizationID, userID, canvasID)
+		if err != nil {
+			return err
+		}
+		if locked != nil {
+			// Authoritative streaming guard under the advisory lock: never delete
+			// a session whose turn is still streaming out from under the worker.
+			if locked.Status == models.AgentSessionStatusStreaming {
+				return ErrSessionBusy
+			}
+			oldProviderSession = locked.ProviderSessionID
+			if err := models.DeleteAgentSessionForUserCanvas(tx, organizationID, userID, canvasID); err != nil {
+				return err
+			}
+		}
+
+		now := time.Now()
+		session = &models.AgentSession{
+			OrganizationID:          organizationID,
+			UserID:                  userID,
+			CanvasID:                canvasID,
+			Provider:                s.provider.Name(),
+			ProviderSessionID:       upstream.ProviderSessionID,
+			AgentToolSchemaRevision: s.currentToolSchemaRevision(),
+			Status:                  models.AgentSessionStatusIdle,
+			// Set so new sessions never trigger the rewind path.
+			ContextReplayedAt: &now,
+		}
+		return models.CreateAgentSessionInTransaction(tx, session)
+	})
+	if err != nil {
+		s.cleanupProviderSession(ctx, upstream.ProviderSessionID)
+		return nil, fmt.Errorf("reset session: %w", err)
+	}
+
+	// Best-effort: stop / archive the old provider session to avoid wasted work.
+	if strings.TrimSpace(oldProviderSession) != "" {
+		_ = s.provider.InterruptSession(ctx, oldProviderSession)
+		s.archiveProviderSession(ctx, oldProviderSession)
+	}
+
+	return session, nil
+}
+
 func (s *Service) provisionSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
 	var session *models.AgentSession
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
