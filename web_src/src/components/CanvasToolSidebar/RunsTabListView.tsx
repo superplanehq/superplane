@@ -31,6 +31,8 @@ interface RunsTabListViewProps {
   selectedStatuses: Set<RunStatusFilter>;
   selectedTriggerIds: Set<string>;
   triggerOptions: TriggerOption[];
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
   onToggleStatus: (status: RunStatusFilter) => void;
   onClearStatuses: () => void;
   onToggleTrigger: (triggerId: string) => void;
@@ -55,6 +57,8 @@ export function RunsTabListView({
   selectedStatuses,
   selectedTriggerIds,
   triggerOptions,
+  searchQuery,
+  onSearchChange,
   onToggleStatus,
   onClearStatuses,
   onToggleTrigger,
@@ -70,6 +74,8 @@ export function RunsTabListView({
         selectedStatuses={selectedStatuses}
         selectedTriggerIds={selectedTriggerIds}
         triggerOptions={triggerOptions}
+        searchQuery={searchQuery}
+        onSearchChange={onSearchChange}
         onToggleStatus={onToggleStatus}
         onClearStatuses={onClearStatuses}
         onToggleTrigger={onToggleTrigger}

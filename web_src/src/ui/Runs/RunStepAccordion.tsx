@@ -209,11 +209,14 @@ export function ErrorDetailBox({
 
   return (
     <div className="overflow-hidden rounded border border-red-200 bg-white">
-      <div className="flex items-center gap-1.5 border-b border-red-200 bg-red-50 px-3 py-1.5">
-        <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-red-600">
-          Error - Output not emitted
+      <div className="flex items-center justify-between gap-1.5 border-b border-red-200 bg-red-50 px-3 py-1.5">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />
+          <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-red-600">
+            Error - Output not emitted
+          </span>
         </span>
+        <HeaderIconButton label="Ask agent" icon={<Sparkles className="h-3.5 w-3.5" />} />
       </div>
       <div className="flex flex-col gap-1.5 px-3 py-2.5 text-[13px]">
         {message ? <span className="min-w-0 break-all font-medium text-red-600">{message}</span> : null}

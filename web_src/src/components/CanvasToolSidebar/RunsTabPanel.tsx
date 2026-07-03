@@ -198,6 +198,8 @@ export function RunsTabPanel({
           selectedStatuses={filterState.selectedStatuses}
           selectedTriggerIds={filterState.selectedTriggerIds}
           triggerOptions={filterState.triggerOptions}
+          searchQuery={filterState.searchQuery}
+          onSearchChange={filterState.setSearchQuery}
           onToggleStatus={filterState.toggleStatus}
           onClearStatuses={filterState.clearStatuses}
           onToggleTrigger={filterState.toggleTrigger}

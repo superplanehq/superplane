@@ -63,6 +63,8 @@ function RunsListSidebar({
           selectedStatuses={filters.selectedStatuses}
           selectedTriggerIds={filters.selectedTriggerIds}
           triggerOptions={filters.triggerOptions}
+          searchQuery={filters.searchQuery}
+          onSearchChange={filters.setSearchQuery}
           onToggleStatus={filters.toggleStatus}
           onClearStatuses={filters.clearStatuses}
           onToggleTrigger={filters.toggleTrigger}
