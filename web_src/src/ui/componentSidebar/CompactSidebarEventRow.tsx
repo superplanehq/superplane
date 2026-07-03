@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type MouseEvent } from "react";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 import { RUNS_SIDEBAR_ROW_CLASS } from "@/components/CanvasToolSidebar/runsSidebarRowLayout";
 import { appPath } from "@/lib/appPaths";
 import { isNormalClick } from "@/lib/linkHelpers";
@@ -118,6 +118,15 @@ export function CompactSidebarEventRow({
     clickEvent.stopPropagation();
     void selectRun();
   };
+  const handleTimestampClick = (clickEvent: MouseEvent<HTMLSpanElement>) => {
+    if (!isNormalClick(clickEvent)) {
+      return;
+    }
+
+    clickEvent.preventDefault();
+    clickEvent.stopPropagation();
+    void selectRun();
+  };
 
   return (
     <div
@@ -180,8 +189,8 @@ export function CompactSidebarEventRow({
         </div>
       ) : null}
       {event.receivedAt ? (
-        <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-500">
-          <TimeAgo date={event.receivedAt} includeAgo={false} />
+        <span className="relative z-20 shrink-0 text-xs tabular-nums text-gray-500" onClick={handleTimestampClick}>
+          <Timestamp date={event.receivedAt} display="relative" relativeStyle="abbreviated" includeAgo={false} />
         </span>
       ) : null}
     </div>

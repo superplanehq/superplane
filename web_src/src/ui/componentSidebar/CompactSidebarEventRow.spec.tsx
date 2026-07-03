@@ -57,6 +57,19 @@ describe("CompactSidebarEventRow", () => {
     expect(onSelectRun).toHaveBeenCalledWith("run-1");
   });
 
+  it("selects the run when the timestamp is clicked", async () => {
+    const user = userEvent.setup();
+    const onSelectRun = vi.fn();
+
+    renderRow({ runId: "run-1", onSelectRun });
+
+    const timestamp = document.querySelector('time[datetime="2026-02-06T15:28:05.000Z"]') as HTMLElement;
+    await user.click(timestamp);
+
+    expect(onSelectRun).toHaveBeenCalledTimes(1);
+    expect(onSelectRun).toHaveBeenCalledWith("run-1");
+  });
+
   it("selects the run with node context when the row belongs to a selected node", async () => {
     const user = userEvent.setup();
     const onSelectRun = vi.fn();

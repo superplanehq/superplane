@@ -106,6 +106,21 @@ describe("RunsTabPanel", () => {
     expect(within(rows[1]).getByText("Completed run")).toBeInTheDocument();
   });
 
+  it("selects a run when its timestamp is clicked", async () => {
+    const user = userEvent.setup();
+    const onSelectRun = vi.fn();
+
+    render(<RunsTabPanel runs={[makeRun()]} selectedRunId={null} {...baseProps} onSelectRun={onSelectRun} />, {
+      wrapper: routerWrapper,
+    });
+
+    const timestamp = document.querySelector('time[datetime="2026-05-01T12:00:00.000Z"]') as HTMLElement;
+    await user.click(timestamp);
+
+    expect(onSelectRun).toHaveBeenCalledTimes(1);
+    expect(onSelectRun).toHaveBeenCalledWith("run-1");
+  });
+
   it("filters runs by status", () => {
     render(
       <RunsTabPanel
