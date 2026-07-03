@@ -161,6 +161,22 @@ describe("CanvasToolSidebar", () => {
     await waitFor(() => expect(markAgentUnavailable).toHaveBeenCalledTimes(1));
   });
 
+  it.each([
+    [{ response: { data: { code: 14, message: "agents are not enabled on this installation" } } }],
+    [{ error: { code: 14, message: "agents are not enabled on this installation" } }],
+  ])("marks the agent unavailable when the disabled status is nested", async (error) => {
+    const markAgentUnavailable = vi.fn();
+    chatState.hasChat = false;
+    chatState.isError = true;
+    chatState.isFetching = false;
+    chatState.error = error;
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentUnavailable })} />);
+
+    expect(await screen.findByText("The SuperPlane agent isn't available on this instance.")).toBeInTheDocument();
+    await waitFor(() => expect(markAgentUnavailable).toHaveBeenCalledTimes(1));
+  });
+
   it("keeps non-disabled chat setup failures retryable", async () => {
     const user = userEvent.setup();
     const markAgentUnavailable = vi.fn();

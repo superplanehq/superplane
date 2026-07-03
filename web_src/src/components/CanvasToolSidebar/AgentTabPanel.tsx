@@ -157,10 +157,31 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
 }
 
 function isAgentsDisabledError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
+  return getErrorStatusCandidates(error).some((status) => {
+    if (!status || typeof status !== "object") return false;
 
-  const status = error as { code?: unknown; message?: unknown };
-  return status.code === AGENTS_DISABLED_CODE && status.message === AGENTS_DISABLED_MESSAGE;
+    const maybeStatus = status as { code?: unknown; message?: unknown };
+    return maybeStatus.code === AGENTS_DISABLED_CODE && maybeStatus.message === AGENTS_DISABLED_MESSAGE;
+  });
+}
+
+function getErrorStatusCandidates(error: unknown, seen = new Set<object>()): unknown[] {
+  if (!error || typeof error !== "object" || seen.has(error)) return [];
+  seen.add(error);
+
+  const record = error as Record<string, unknown>;
+  return [
+    error,
+    ...getNestedErrorStatusCandidates(record.response, seen),
+    ...getNestedErrorStatusCandidates(record.error, seen),
+  ];
+}
+
+function getNestedErrorStatusCandidates(error: unknown, seen: Set<object>): unknown[] {
+  if (!error || typeof error !== "object") return [];
+
+  const record = error as Record<string, unknown>;
+  return [error, ...getErrorStatusCandidates(record.data, seen), ...getErrorStatusCandidates(record.error, seen)];
 }
 
 function ChatConversation({
