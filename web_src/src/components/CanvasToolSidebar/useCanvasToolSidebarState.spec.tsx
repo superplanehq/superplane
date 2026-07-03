@@ -6,11 +6,12 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({ has: () => false, enabledExperimentalFeatures: [] }),
 }));
 
-function Harness({ onBeforeClose }: { onBeforeClose: () => void }) {
+function Harness({ onBeforeClose, canvasId }: { onBeforeClose: () => void; canvasId?: string }) {
   const state = useCanvasToolSidebarState({
     isEditing: false,
     readOnly: false,
     forceEnable: true,
+    canvasId,
     onBeforeClose,
   });
 
@@ -58,6 +59,24 @@ describe("useCanvasToolSidebarState", () => {
 
     expect(onBeforeClose).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+  });
+
+  it("reads and persists the open state per canvas", () => {
+    window.localStorage.setItem("canvasAgentSidebarOpen:canvas-a", "true");
+    window.localStorage.setItem("canvasAgentSidebarOpen:canvas-b", "false");
+
+    const { rerender } = render(<Harness onBeforeClose={vi.fn()} canvasId="canvas-a" />);
+    expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+
+    rerender(<Harness onBeforeClose={vi.fn()} canvasId="canvas-b" />);
+    expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+
+    fireEvent.click(screen.getByRole("button", { name: "toggle" }));
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+    expect(window.localStorage.getItem("canvasAgentSidebarOpen:canvas-b")).toBe("true");
+    // The other canvas preference is untouched.
+    expect(window.localStorage.getItem("canvasAgentSidebarOpen:canvas-a")).toBe("true");
   });
 
   it("ignores Cmd/Ctrl+B while typing in an input", () => {

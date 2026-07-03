@@ -815,15 +815,9 @@ function CanvasPage(props: CanvasPageProps) {
   };
   const isVersionsSidebarOpen = versionsContentAvailable && versionsSidebarBaseState.isVersionsSidebarOpen;
 
-  // The collapse state is intentionally not persisted: the versions sidebar always
-  // starts expanded whenever the user (re)enters an edit session.
-  const isEditSessionActive = props.isEditSessionActive;
-  const { openVersionsSidebar } = versionsSidebarBaseState;
-  useEffect(() => {
-    if (isEditSessionActive) {
-      openVersionsSidebar();
-    }
-  }, [isEditSessionActive, openVersionsSidebar]);
+  // The versions/history sidebar is never auto-opened: canvas history is not a
+  // useful starting point (issue #5803), so it stays collapsed until the user
+  // opens it with the header toggle. New apps open with the agent panel instead.
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);

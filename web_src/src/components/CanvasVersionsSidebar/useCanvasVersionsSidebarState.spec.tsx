@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { useCanvasVersionsSidebarState } from "./useCanvasVersionsSidebarState";
 
 describe("useCanvasVersionsSidebarState", () => {
-  it("opens the versions sidebar by default", () => {
+  it("keeps the versions sidebar collapsed by default", () => {
     const { result } = renderHook(() => useCanvasVersionsSidebarState());
 
-    expect(result.current.isVersionsSidebarOpen).toBe(true);
+    expect(result.current.isVersionsSidebarOpen).toBe(false);
   });
 
   it("toggles the open state without persisting it", () => {
@@ -15,12 +15,12 @@ describe("useCanvasVersionsSidebarState", () => {
     act(() => {
       result.current.handleVersionsSidebarToggle();
     });
-    expect(result.current.isVersionsSidebarOpen).toBe(false);
+    expect(result.current.isVersionsSidebarOpen).toBe(true);
 
     act(() => {
       result.current.handleVersionsSidebarToggle();
     });
-    expect(result.current.isVersionsSidebarOpen).toBe(true);
+    expect(result.current.isVersionsSidebarOpen).toBe(false);
 
     expect(localStorage.getItem("canvasVersionsSidebarOpen")).toBeNull();
   });
