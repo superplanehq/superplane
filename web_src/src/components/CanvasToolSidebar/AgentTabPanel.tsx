@@ -28,6 +28,7 @@ import {
   isAgentBootReady,
 } from "@/lib/agentBootContext";
 import { ConversationTranscript } from "./AgentConversationTranscript";
+import { ChatHeader } from "./ChatHeader";
 import {
   createWebsocketCallbacks,
   isOutcomeActive,
@@ -170,6 +171,8 @@ function ChatConversation({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <ChatHeader onClearChat={() => void handlers.handleSend("/clear")} clearing={resetMutation.isPending} />
+
       <ConversationTranscript
         error={error}
         notice={notice}

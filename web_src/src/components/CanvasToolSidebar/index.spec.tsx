@@ -125,6 +125,16 @@ describe("CanvasToolSidebar", () => {
     expect(await screen.findByPlaceholderText("Ask the agent…")).toBeInTheDocument();
   });
 
+  it("clears the chat when the header reset button is clicked", async () => {
+    const user = userEvent.setup();
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+
+    await user.click(await screen.findByTestId("agent-clear-chat-button"));
+
+    expect(resetMutation.mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
   it("allows retrying a failed session", async () => {
     const user = userEvent.setup();
     chatState.status = "failed";
