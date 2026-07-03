@@ -796,7 +796,7 @@ function CanvasPage(props: CanvasPageProps) {
     canvasId: props.canvasId,
     organizationId: props.organizationId,
   });
-  const runsSidebarBaseState = useCanvasRunsSidebarState();
+  const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
   const showRunsSidebar = isCanvasWorkflowTab(props.headerMode) && props.toolSidebarRunsContent != null;
   const runsSidebarState = {
     ...runsSidebarBaseState,
