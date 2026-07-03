@@ -23,6 +23,7 @@ function agentDraftAutoOpenKey(canvasId: string, versionId: string): string {
 
 type UseAgentDraftEditorArgs = {
   canvasId: string;
+  liveCanvasVersionId?: string;
   headerMode: CanvasPageHeaderMode;
   isRunInspectionMode: boolean;
   selectableVersionsById: Map<string, CanvasesCanvasVersion>;
@@ -30,6 +31,7 @@ type UseAgentDraftEditorArgs = {
   hasLocalSaveActivity: boolean;
   activeCanvasVersionIdRef: { current: string };
   activateCanvasVersionForEditing: (versionId: string, version: CanvasesCanvasVersion) => boolean;
+  enterEditSession?: () => void;
   // Full recovery (clears state + ref, exits to live) when the draft the user is
   // actively editing turns out to be deleted.
   onActiveDraftMissing: (versionId: string) => void | Promise<void>;
@@ -102,11 +104,13 @@ function usePendingAgentDraftAutoOpen({
   pendingAutoOpenVersionId,
   setPendingAutoOpenVersionId,
   openAgentDraftVersion,
+  enterEditSession,
 }: {
   canvasId: string;
   pendingAutoOpenVersionId: string | null;
   setPendingAutoOpenVersionId: Dispatch<SetStateAction<string | null>>;
   openAgentDraftVersion: (versionId: string, source: "auto") => Promise<AgentDraftOpenResult>;
+  enterEditSession?: () => void;
 }) {
   useEffect(() => {
     if (!pendingAutoOpenVersionId || !canvasId) {
@@ -129,6 +133,7 @@ function usePendingAgentDraftAutoOpen({
       if (result === "opened") {
         autoOpenedAgentDraftKeys.add(key);
         setPendingAutoOpenVersionId(null);
+        enterEditSession?.();
         return;
       }
 
@@ -140,11 +145,12 @@ function usePendingAgentDraftAutoOpen({
     return () => {
       cancelled = true;
     };
-  }, [canvasId, openAgentDraftVersion, pendingAutoOpenVersionId, setPendingAutoOpenVersionId]);
+  }, [canvasId, enterEditSession, openAgentDraftVersion, pendingAutoOpenVersionId, setPendingAutoOpenVersionId]);
 }
 
 export function useAgentDraftEditor({
   canvasId,
+  liveCanvasVersionId,
   headerMode,
   isRunInspectionMode,
   selectableVersionsById,
@@ -152,6 +158,7 @@ export function useAgentDraftEditor({
   hasLocalSaveActivity,
   activeCanvasVersionIdRef,
   activateCanvasVersionForEditing,
+  enterEditSession,
   onActiveDraftMissing,
 }: UseAgentDraftEditorArgs) {
   const [pendingAutoOpenVersionId, setPendingAutoOpenVersionId] = useState<string | null>(null);
@@ -229,6 +236,7 @@ export function useAgentDraftEditor({
     pendingAutoOpenVersionId,
     setPendingAutoOpenVersionId,
     openAgentDraftVersion,
+    enterEditSession,
   });
 
   useEffect(() => {
@@ -239,9 +247,14 @@ export function useAgentDraftEditor({
     };
 
     const handleDraftReady = (event: Event) => {
-      const versionId = (event as CustomEvent<{ versionId?: string }>).detail?.versionId;
-      if (!versionId) return;
-      if (!canvasId) return;
+      const detail = (event as CustomEvent<{ versionId?: string; canvasId?: string }>).detail;
+      const eventCanvasId = detail?.canvasId;
+      if (eventCanvasId && eventCanvasId !== canvasId) {
+        return;
+      }
+
+      const versionId = detail?.versionId ?? liveCanvasVersionId;
+      if (!versionId || !canvasId) return;
       if (autoOpenedAgentDraftKeys.has(agentDraftAutoOpenKey(canvasId, versionId))) return;
       setPendingAutoOpenVersionId(versionId);
     };
@@ -252,5 +265,5 @@ export function useAgentDraftEditor({
       window.removeEventListener("agent:view-version", handleViewVersion);
       window.removeEventListener("agent:draft-ready", handleDraftReady);
     };
-  }, [canvasId, openAgentDraftVersion]);
+  }, [canvasId, liveCanvasVersionId, openAgentDraftVersion]);
 }

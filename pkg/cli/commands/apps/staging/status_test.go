@@ -17,7 +17,7 @@ func stagingPath(canvasID string) string {
 	return "/api/v1/canvases/" + canvasID + "/staging"
 }
 
-func TestListCommandPrintsStagedPaths(t *testing.T) {
+func TestStatusCommandPrintsStagedPaths(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == stagingPath(testAppID) {
 			w.Header().Set("Content-Type", "application/json")
@@ -31,13 +31,12 @@ func TestListCommandPrintsStagedPaths(t *testing.T) {
 	ctx, stdout := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{testAppID}
 
-	err := (&listCommand{}).Execute(ctx)
+	err := (&statusCommand{}).Execute(ctx)
 	require.NoError(t, err)
-	require.Contains(t, stdout.String(), "canvas.yaml")
-	require.Contains(t, stdout.String(), "console.yaml")
+	require.Equal(t, "M canvas.yaml\nM console.yaml\n", stdout.String())
 }
 
-func TestListCommandPrintsNothingWhenEmpty(t *testing.T) {
+func TestStatusCommandPrintsNothingWhenEmpty(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == stagingPath(testAppID) {
 			w.Header().Set("Content-Type", "application/json")
@@ -51,7 +50,7 @@ func TestListCommandPrintsNothingWhenEmpty(t *testing.T) {
 	ctx, stdout := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{testAppID}
 
-	err := (&listCommand{}).Execute(ctx)
+	err := (&statusCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Empty(t, stdout.String())
 }

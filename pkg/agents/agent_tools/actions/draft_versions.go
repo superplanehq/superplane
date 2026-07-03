@@ -21,20 +21,13 @@ func resolveTargetDraftVersion(canvasID, userID uuid.UUID, input Input) (*models
 
 func draftVersionRequiredError(action string) error {
 	switch strings.TrimSpace(action) {
-	case patchDraftActionName:
-		return fmt.Errorf("version_id is optional for patch_draft; edits are staged against the live canvas")
+	case patchStagingActionName:
+		return fmt.Errorf("version_id is optional for patch_staging; edits are staged against the live canvas")
 	case "":
 		return fmt.Errorf("version_id is optional; edits are staged against the live canvas")
 	default:
 		return fmt.Errorf("version_id is optional for %s; edits are staged against the live canvas", strings.TrimSpace(action))
 	}
-}
-
-func resolveReadableDraftVersion(canvasID, userID uuid.UUID, input Input) (*models.CanvasVersion, error) {
-	if input.UseDraft != nil && !*input.UseDraft {
-		return nil, nil
-	}
-	return liveCanvasVersion(canvasID, userID, input)
 }
 
 func liveCanvasVersion(canvasID, userID uuid.UUID, input Input) (*models.CanvasVersion, error) {

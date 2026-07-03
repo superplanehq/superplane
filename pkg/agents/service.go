@@ -627,7 +627,7 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 
 func getDraftStatus(canvasID uuid.UUID) string {
 	_ = canvasID
-	return "[Edit Status]\nEdits are staged per user. Use superplane_app actions to stage repository files, then commit with a message. There are no separate draft branches."
+	return "[Edit Status]\nEdits are staged per user. Use superplane_app actions to stage changes; the user reviews and commits or discards them in the UI. There are no separate draft branches."
 }
 
 func buildCanvasSnapshot(session *models.AgentSession) string {

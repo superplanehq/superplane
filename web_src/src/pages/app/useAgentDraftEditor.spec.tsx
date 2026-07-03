@@ -42,36 +42,39 @@ function makePublishedVersion(versionId: string): CanvasesCanvasVersion {
   } as CanvasesCanvasVersion;
 }
 
-function dispatchDraftReady(versionId: string) {
+function dispatchDraftReady(detail: { versionId?: string; canvasId?: string }) {
   act(() => {
-    window.dispatchEvent(new CustomEvent("agent:draft-ready", { detail: { versionId } }));
+    window.dispatchEvent(new CustomEvent("agent:draft-ready", { detail }));
   });
 }
 
 function setupHook({
   canvasId,
   versionId,
+  liveCanvasVersionId,
   headerMode = "version-live",
   isRunInspectionMode = false,
   hasEditableVersion = false,
   hasLocalSaveActivity = false,
   activeCanvasVersionId = "live-version",
   activateCanvasVersionForEditing = vi.fn(() => true),
+  enterEditSession = vi.fn(),
   selectableVersionsById = new Map<string, CanvasesCanvasVersion>([[versionId, makeDraftVersion(versionId)]]),
 }: {
   canvasId: string;
   versionId: string;
+  liveCanvasVersionId?: string;
   headerMode?: CanvasPageHeaderMode;
   isRunInspectionMode?: boolean;
   hasEditableVersion?: boolean;
   hasLocalSaveActivity?: boolean;
   activeCanvasVersionId?: string;
   activateCanvasVersionForEditing?: (versionId: string, version: CanvasesCanvasVersion) => boolean;
+  enterEditSession?: () => void;
   selectableVersionsById?: Map<string, CanvasesCanvasVersion>;
 }) {
   const queryClient = new QueryClient();
   const activeCanvasVersionIdRef = { current: activeCanvasVersionId };
-  const setSuppressUnpublishedDraftDiscard = vi.fn();
   const onActiveDraftMissing = vi.fn();
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -79,6 +82,7 @@ function setupHook({
 
   const initialProps = {
     canvasId,
+    liveCanvasVersionId,
     headerMode,
     isRunInspectionMode,
     selectableVersionsById,
@@ -86,7 +90,7 @@ function setupHook({
     hasLocalSaveActivity,
     activeCanvasVersionIdRef,
     activateCanvasVersionForEditing,
-    setSuppressUnpublishedDraftDiscard,
+    enterEditSession,
     onActiveDraftMissing,
   };
 
@@ -96,8 +100,8 @@ function setupHook({
     ...hook,
     activeCanvasVersionIdRef,
     activateCanvasVersionForEditing,
+    enterEditSession,
     selectableVersionsById,
-    setSuppressUnpublishedDraftDiscard,
     onActiveDraftMissing,
     updateProps: (overrides: Partial<typeof initialProps>) => hook.rerender({ ...initialProps, ...overrides }),
   };
@@ -116,7 +120,7 @@ describe("useAgentDraftEditor", () => {
       headerMode: "memory",
     });
 
-    dispatchDraftReady(versionId);
+    dispatchDraftReady({ versionId });
 
     await act(async () => undefined);
     expect(hook.activateCanvasVersionForEditing).not.toHaveBeenCalled();
@@ -124,6 +128,7 @@ describe("useAgentDraftEditor", () => {
     hook.updateProps({ headerMode: "version-live" });
 
     await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1));
+    expect(hook.enterEditSession).toHaveBeenCalledTimes(1);
     expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledWith(
       versionId,
       hook.selectableVersionsById.get(versionId),
@@ -138,7 +143,7 @@ describe("useAgentDraftEditor", () => {
       isRunInspectionMode: true,
     });
 
-    dispatchDraftReady(versionId);
+    dispatchDraftReady({ versionId });
 
     await act(async () => undefined);
     expect(hook.activateCanvasVersionForEditing).not.toHaveBeenCalled();
@@ -162,7 +167,7 @@ describe("useAgentDraftEditor", () => {
       activeCanvasVersionId: "other-draft",
     });
 
-    dispatchDraftReady(versionId);
+    dispatchDraftReady({ versionId });
 
     await act(async () => undefined);
     expect(hook.activateCanvasVersionForEditing).not.toHaveBeenCalled();
@@ -183,11 +188,11 @@ describe("useAgentDraftEditor", () => {
       versionId,
     });
 
-    dispatchDraftReady(versionId);
+    dispatchDraftReady({ versionId });
 
     await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1));
 
-    dispatchDraftReady(versionId);
+    dispatchDraftReady({ versionId });
 
     await act(async () => undefined);
     expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1);
@@ -202,7 +207,7 @@ describe("useAgentDraftEditor", () => {
       activateCanvasVersionForEditing,
     });
 
-    dispatchDraftReady(versionId);
+    dispatchDraftReady({ versionId });
 
     await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1));
 
@@ -212,21 +217,44 @@ describe("useAgentDraftEditor", () => {
     await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(2));
   });
 
-  it("does not show an error when auto-open finds the agent draft was already published", async () => {
-    const versionId = "draft-published-before-auto-open";
+  it("uses the live version id when staging-actions omit versionId", async () => {
+    const liveVersionId = "live-version-fallback";
+    const hook = setupHook({
+      canvasId: "canvas-live-fallback",
+      versionId: liveVersionId,
+      liveCanvasVersionId: liveVersionId,
+      selectableVersionsById: new Map([[liveVersionId, makePublishedVersion(liveVersionId)]]),
+    });
+
+    dispatchDraftReady({ canvasId: "canvas-live-fallback" });
+
+    await waitFor(() => expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledTimes(1));
+    expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledWith(
+      liveVersionId,
+      hook.selectableVersionsById.get(liveVersionId),
+    );
+    expect(hook.enterEditSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the live version for editing when auto-open loads a published version", async () => {
+    const versionId = "live-version-for-staging";
     vi.mocked(fetchCanvasVersionWithSpec).mockResolvedValue(makePublishedVersion(versionId));
     const hook = setupHook({
-      canvasId: "canvas-published-before-auto-open",
+      canvasId: "canvas-live-for-staging",
       versionId,
       selectableVersionsById: new Map(),
     });
 
-    dispatchDraftReady(versionId);
+    dispatchDraftReady({ versionId });
 
     await waitFor(() =>
-      expect(fetchCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-published-before-auto-open", versionId),
+      expect(fetchCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-live-for-staging", versionId),
     );
-    expect(hook.activateCanvasVersionForEditing).not.toHaveBeenCalled();
-    expect(showErrorToast).not.toHaveBeenCalledWith("Agent draft is no longer available");
+    expect(hook.activateCanvasVersionForEditing).toHaveBeenCalledWith(
+      versionId,
+      makePublishedVersion(versionId),
+    );
+    expect(hook.enterEditSession).toHaveBeenCalledTimes(1);
+    expect(showErrorToast).not.toHaveBeenCalled();
   });
 });

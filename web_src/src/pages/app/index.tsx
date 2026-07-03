@@ -3398,8 +3398,18 @@ export function AppPage() {
       isViewingCurrentLiveVersion,
     });
 
+  const enterEditSessionForAgentStaging = useCallback(() => {
+    if (!canUpdateCanvas || !effectiveLiveCanvasVersionId) {
+      return;
+    }
+
+    setEditSessionActive(true);
+    previewingCurrentVersionRef.current = true;
+  }, [canUpdateCanvas, effectiveLiveCanvasVersionId]);
+
   useAgentDraftEditor({
     canvasId,
+    liveCanvasVersionId: effectiveLiveCanvasVersionId,
     headerMode,
     isRunInspectionMode: urlViewFlags.isRunInspectionMode,
     selectableVersionsById,
@@ -3407,6 +3417,7 @@ export function AppPage() {
     hasLocalSaveActivity,
     activeCanvasVersionIdRef,
     activateCanvasVersionForEditing,
+    enterEditSession: enterEditSessionForAgentStaging,
     onActiveDraftMissing: async () => {},
   });
 

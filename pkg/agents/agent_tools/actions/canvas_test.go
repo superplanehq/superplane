@@ -3,7 +3,6 @@ package actions
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -68,7 +67,7 @@ func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *te
 		},
 	})
 
-	layout := resolvePatchDraftAutoLayout(
+	layout := resolvePatchStagingAutoLayout(
 		nil,
 		changeset,
 		[]models.Edge{{SourceID: "kept-node", TargetID: "deleted-node", Channel: "default"}},
@@ -82,7 +81,7 @@ func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *te
 }
 
 func TestResolvePatchDraftAutoLayout_PreservesExplicitSettings(t *testing.T) {
-	layout := resolvePatchDraftAutoLayout(
+	layout := resolvePatchStagingAutoLayout(
 		&AutoLayoutInput{Scope: "full_canvas"},
 		nil,
 		nil,
@@ -107,7 +106,7 @@ func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
 		},
 	})
 
-	layout := resolvePatchDraftAutoLayout(
+	layout := resolvePatchStagingAutoLayout(
 		&AutoLayoutInput{},
 		changeset,
 		nil,
@@ -120,7 +119,7 @@ func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
 }
 
 func TestResolvePatchDraftAutoLayout_DefaultsLayoutOnlyUpdatesToFullCanvas(t *testing.T) {
-	layout := resolvePatchDraftAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}})
+	layout := resolvePatchStagingAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}})
 
 	require.NotNil(t, layout)
 	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
@@ -135,13 +134,13 @@ func TestResolveTargetDraftVersion_ResolvesLiveVersion(t *testing.T) {
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	liveVersion := requireLiveVersion(t, canvas.ID)
 
-	resolved, err := resolveTargetDraftVersion(canvas.ID, r.User, Input{Action: "patch_draft"})
+	resolved, err := resolveTargetDraftVersion(canvas.ID, r.User, Input{Action: "patch_staging"})
 	require.NoError(t, err)
 	require.NotNil(t, resolved)
 	assert.Equal(t, liveVersion.ID, resolved.ID)
 
 	resolved, err = resolveTargetDraftVersion(canvas.ID, r.User, Input{
-		Action:    "patch_draft",
+		Action:    "patch_staging",
 		VersionID: liveVersion.ID.String(),
 	})
 	require.NoError(t, err)
@@ -150,7 +149,7 @@ func TestResolveTargetDraftVersion_ResolvesLiveVersion(t *testing.T) {
 
 	wrongVersionID := uuid.New()
 	_, err = resolveTargetDraftVersion(canvas.ID, r.User, Input{
-		Action:    "patch_draft",
+		Action:    "patch_staging",
 		VersionID: wrongVersionID.String(),
 	})
 	require.Error(t, err)
@@ -158,12 +157,12 @@ func TestResolveTargetDraftVersion_ResolvesLiveVersion(t *testing.T) {
 }
 
 func TestPatchDraftAction_ReturnsInvalidUserIDError(t *testing.T) {
-	_, err := (patchDraftAction{}).Execute(context.Background(), agents.AgentSessionContext{
+	_, err := (patchStagingAction{}).Execute(context.Background(), agents.AgentSessionContext{
 		SessionID:      "session-1",
 		OrganizationID: uuid.NewString(),
 		UserID:         "not-a-uuid",
 		CanvasID:       uuid.NewString(),
-	}, Input{Action: "patch_draft"})
+	}, Input{Action: "patch_staging"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid session user id")
@@ -212,22 +211,7 @@ func TestSummarizeNodes_UsesYamlComponentFieldName(t *testing.T) {
 	assert.NotContains(t, string(data), `"ref"`)
 }
 
-func TestSelectedVersion_ReturnsLiveVersionLoadErrors(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	missingVersionID := uuid.New()
-	canvas.LiveVersionID = &missingVersionID
-
-	version, err := selectedVersion(canvas, nil, "live")
-
-	require.Error(t, err)
-	assert.Nil(t, version)
-	assert.Contains(t, err.Error(), "load live canvas version summary")
-}
-
-func TestAppAgentTool_PatchDraftStagesSmallGraphEdits(t *testing.T) {
+func TestAppAgentTool_PatchStagingStagesSmallGraphEdits(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -248,7 +232,7 @@ func TestAppAgentTool_PatchDraftStagesSmallGraphEdits(t *testing.T) {
 		UserID:         r.User.String(),
 		CanvasID:       canvas.ID.String(),
 	}, Input{
-		Action: "patch_draft",
+		Action: "patch_staging",
 		PatchOperations: []PatchOperation{
 			{
 				Op: "add_node",
@@ -280,7 +264,7 @@ func TestAppAgentTool_PatchDraftStagesSmallGraphEdits(t *testing.T) {
 	require.NoError(t, err)
 	update, ok := result.(updateResult)
 	require.True(t, ok)
-	assert.Equal(t, "patch_draft", update.Action)
+	assert.Equal(t, "patch_staging", update.Action)
 	assert.Equal(t, liveVersion.ID.String(), update.VersionID)
 	assert.Equal(t, 2, update.Summary.NodeCount)
 	assert.Equal(t, 1, update.Summary.EdgeCount)
@@ -308,7 +292,7 @@ func TestAppAgentTool_PatchDraftStagesSmallGraphEdits(t *testing.T) {
 	assert.Equal(t, "default", patched.GetSpec().GetEdges()[0].GetChannel())
 }
 
-func TestAppAgentTool_PatchDraftAddsIntegrationBackedNode(t *testing.T) {
+func TestAppAgentTool_PatchStagingAddsIntegrationBackedNode(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -332,7 +316,7 @@ func TestAppAgentTool_PatchDraftAddsIntegrationBackedNode(t *testing.T) {
 		UserID:         r.User.String(),
 		CanvasID:       canvas.ID.String(),
 	}, Input{
-		Action:    "patch_draft",
+		Action:    "patch_staging",
 		VersionID: liveVersion.ID.String(),
 		PatchOperations: []PatchOperation{
 			{
@@ -374,7 +358,7 @@ func TestAppAgentTool_PatchDraftAddsIntegrationBackedNode(t *testing.T) {
 	assert.Equal(t, integration.ID.String(), *node.GetIntegration().Id)
 }
 
-func TestAppAgentTool_PatchDraftStagesConsoleYAML(t *testing.T) {
+func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -404,7 +388,7 @@ func TestAppAgentTool_PatchDraftStagesConsoleYAML(t *testing.T) {
 		UserID:         r.User.String(),
 		CanvasID:       canvas.ID.String(),
 	}, Input{
-		Action:      "patch_draft",
+		Action:      "patch_staging",
 		VersionID:   liveVersion.ID.String(),
 		ConsoleYAML: consoleYAML,
 	})
@@ -412,10 +396,10 @@ func TestAppAgentTool_PatchDraftStagesConsoleYAML(t *testing.T) {
 	require.NoError(t, err)
 	update, ok := result.(updateResult)
 	require.True(t, ok)
-	assert.Equal(t, "patch_draft", update.Action)
+	assert.Equal(t, "patch_staging", update.Action)
 	assert.Equal(t, liveVersion.ID.String(), update.VersionID)
 
-	// patch_draft writes to the UI staging layer instead of committing into the
+	// patch_staging writes to the UI staging layer instead of committing into the
 	// live version row, so the edit shows up as pending staging that the user
 	// reviews and publishes, exactly like an edit made in the UI editor.
 	staging, err := canvasRepository.GetCanvasStaging(ctx, r.Organization.ID.String(), canvas.ID.String())
@@ -490,40 +474,7 @@ func TestAppAgentTool_ListResources(t *testing.T) {
 	}, resources.Resources[0])
 }
 
-func TestAppAgentTool_CreateDraftReturnsLiveVersion(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-	liveVersion := requireLiveVersion(t, canvas.ID)
-
-	registry := NewDefaultRegistry(Dependencies{
-		Encryptor:      r.Encryptor,
-		Registry:       r.Registry,
-		AuthService:    r.AuthService,
-		WebhookBaseURL: "https://hooks.example.test",
-	})
-
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	result, err := registry.Execute(ctx, agents.AgentSessionContext{
-		SessionID:      "session-1",
-		OrganizationID: r.Organization.ID.String(),
-		UserID:         r.User.String(),
-		CanvasID:       canvas.ID.String(),
-	}, Input{
-		Action:      "create_draft",
-		DisplayName: "Experiment",
-	})
-
-	require.NoError(t, err)
-	created, ok := result.(updateResult)
-	require.True(t, ok)
-	assert.Equal(t, "create_draft", created.Action)
-	assert.Equal(t, liveVersion.ID.String(), created.VersionID)
-	assert.Equal(t, liveVersion.ID.String(), created.Draft.VersionID)
-}
-
-func TestAppAgentTool_PatchDraftWithLiveVersionIDStagesChanges(t *testing.T) {
+func TestAppAgentTool_PatchStagingWithLiveVersionIDStagesChanges(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -544,7 +495,7 @@ func TestAppAgentTool_PatchDraftWithLiveVersionIDStagesChanges(t *testing.T) {
 		UserID:         r.User.String(),
 		CanvasID:       canvas.ID.String(),
 	}, Input{
-		Action:    "patch_draft",
+		Action:    "patch_staging",
 		VersionID: liveVersion.ID.String(),
 		PatchOperations: []PatchOperation{{
 			Op: "add_node",
@@ -566,7 +517,7 @@ func TestAppAgentTool_PatchDraftWithLiveVersionIDStagesChanges(t *testing.T) {
 	assert.True(t, hasStaging)
 }
 
-func TestAppAgentTool_PatchDraftWithoutVersionIDSucceeds(t *testing.T) {
+func TestAppAgentTool_PatchStagingWithoutVersionIDSucceeds(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -587,7 +538,7 @@ func TestAppAgentTool_PatchDraftWithoutVersionIDSucceeds(t *testing.T) {
 		UserID:         r.User.String(),
 		CanvasID:       canvas.ID.String(),
 	}, Input{
-		Action: "patch_draft",
+		Action: "patch_staging",
 		PatchOperations: []PatchOperation{{
 			Op: "add_node",
 			Node: &PatchNode{
@@ -638,10 +589,8 @@ func TestAppAgentTool_ReadReturnsUserStagingOnLiveVersion(t *testing.T) {
 	require.NoError(t, err)
 	read, ok := result.(readResult)
 	require.True(t, ok)
-	assert.Equal(t, "draft", read.Source)
+	assert.Equal(t, "staging", read.Source)
 	assert.Equal(t, liveVersion.ID.String(), read.VersionID)
-	require.NotNil(t, read.Draft)
-	assert.Equal(t, liveVersion.ID.String(), read.Draft.VersionID)
 	assert.Equal(t, "draft: staged\n", read.CanvasYAML)
 	assert.Equal(t, len("draft: staged\n"), read.CanvasYAMLBytes)
 }
@@ -678,46 +627,8 @@ func TestAppAgentTool_ReadOmitsCanvasYAMLByDefault(t *testing.T) {
 	assert.Empty(t, read.CanvasYAML)
 	assert.True(t, read.CanvasYAMLOmitted)
 	assert.Equal(t, len("draft: compact\n"), read.CanvasYAMLBytes)
-	assert.Equal(t, "draft", read.Source)
+	assert.Equal(t, "staging", read.Source)
 	assert.Equal(t, liveVersion.ID.String(), read.VersionID)
-}
-
-func TestAppAgentTool_ReadUseDraftFalseIgnoresStaging(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-	liveVersion := requireLiveVersion(t, canvas.ID)
-	upsertUserStagingYAML(t, canvas, r.User, "draft: selected\n")
-
-	registry := NewDefaultRegistry(Dependencies{
-		Encryptor:      r.Encryptor,
-		Registry:       r.Registry,
-		AuthService:    r.AuthService,
-		WebhookBaseURL: "https://hooks.example.test",
-	})
-
-	useDraft := false
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	result, err := registry.Execute(ctx, agents.AgentSessionContext{
-		SessionID:      "session-1",
-		OrganizationID: r.Organization.ID.String(),
-		UserID:         r.User.String(),
-		CanvasID:       canvas.ID.String(),
-	}, Input{
-		Action:            "read",
-		UseDraft:          &useDraft,
-		VersionID:         liveVersion.ID.String(),
-		IncludeCanvasYAML: true,
-	})
-
-	require.NoError(t, err)
-	read, ok := result.(readResult)
-	require.True(t, ok)
-	assert.Equal(t, "live", read.Source)
-	assert.Empty(t, read.VersionID)
-	assert.Nil(t, read.Draft)
-	assert.NotEqual(t, "draft: selected\n", read.CanvasYAML)
 }
 
 func TestAppAgentTool_ListFilesReportsContextFiles(t *testing.T) {
@@ -797,7 +708,7 @@ func TestAppAgentTool_ReadFileReturnsStagedDraftContent(t *testing.T) {
 	require.Len(t, read.Files, 1)
 	assert.Equal(t, "README.md", read.Files[0].Path)
 	assert.Equal(t, "draft readme\n", read.Files[0].Content)
-	assert.Equal(t, "draft", read.Files[0].Source)
+	assert.Equal(t, "staging", read.Files[0].Source)
 }
 
 func TestAppAgentTool_ReadFileUsesLiveVersionWhenVersionOmitted(t *testing.T) {
@@ -835,59 +746,7 @@ func TestAppAgentTool_ReadFileUsesLiveVersionWhenVersionOmitted(t *testing.T) {
 	require.Len(t, read.Files, 1)
 	assert.Equal(t, liveVersion.ID.String(), read.Files[0].VersionID)
 	assert.Equal(t, "draft readme\n", read.Files[0].Content)
-	assert.Equal(t, "draft", read.Files[0].Source)
-}
-
-func TestAppAgentTool_CommitFilesPersistsStagedRepositoryFile(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-	liveVersion := requireLiveVersion(t, canvas.ID)
-
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	registry := NewDefaultRegistry(Dependencies{
-		Encryptor:      r.Encryptor,
-		Registry:       r.Registry,
-		GitProvider:    r.GitProvider,
-		AuthService:    r.AuthService,
-		WebhookBaseURL: "https://hooks.example.test",
-	})
-	session := agents.AgentSessionContext{
-		SessionID:      "session-1",
-		OrganizationID: r.Organization.ID.String(),
-		UserID:         r.User.String(),
-		CanvasID:       canvas.ID.String(),
-	}
-
-	result, err := registry.Execute(ctx, session, Input{
-		Action:    "write_file",
-		VersionID: liveVersion.ID.String(),
-		Path:      "docs/guide.md",
-		Content:   "# Guide\n",
-	})
-	require.NoError(t, err)
-	staged, ok := result.(fileStageResult)
-	require.True(t, ok)
-	assert.True(t, staged.StagingSummary.HasStaging)
-	assert.Contains(t, staged.StagingSummary.StagedPaths, "docs/guide.md")
-
-	result, err = registry.Execute(ctx, session, Input{
-		Action:    "commit_files",
-		VersionID: liveVersion.ID.String(),
-		Message:   "Add guide",
-	})
-	require.NoError(t, err)
-	committed, ok := result.(fileCommitResult)
-	require.True(t, ok)
-	assert.False(t, committed.StagingSummary.HasStaging)
-
-	reader, err := r.GitProvider.GetFile(context.Background(), repository.RepoID, "docs/guide.md", "")
-	require.NoError(t, err)
-	content, err := io.ReadAll(reader)
-	require.NoError(t, err)
-	require.NoError(t, reader.Close())
-	assert.Equal(t, "# Guide\n", string(content))
+	assert.Equal(t, "staging", read.Files[0].Source)
 }
 
 func TestAppAgentTool_WriteFileRejectsSpecFiles(t *testing.T) {
@@ -912,7 +771,7 @@ func TestAppAgentTool_WriteFileRejectsSpecFiles(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "use patch_draft")
+	assert.Contains(t, err.Error(), "use patch_staging")
 }
 
 func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
@@ -951,12 +810,10 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	assert.Contains(t, unavailable, "POST /api/v1/canvases")
 
 	toolActions := toolAccessByAction(result.ToolActions)
-	require.Contains(t, toolActions, "create_draft")
-	assert.True(t, toolActions["create_draft"].Allowed)
 	require.Contains(t, toolActions, "list_resources")
 	assert.True(t, toolActions["list_resources"].Allowed)
-	require.Contains(t, toolActions, "patch_draft")
-	assert.True(t, toolActions["patch_draft"].Allowed)
+	require.Contains(t, toolActions, "patch_staging")
+	assert.True(t, toolActions["patch_staging"].Allowed)
 	require.Contains(t, toolActions, "read_runtime")
 	assert.True(t, toolActions["read_runtime"].Allowed)
 	require.Contains(t, toolActions, "list_files")
@@ -967,8 +824,6 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	assert.True(t, toolActions["write_file"].Allowed)
 	require.Contains(t, toolActions, "delete_file")
 	assert.True(t, toolActions["delete_file"].Allowed)
-	require.Contains(t, toolActions, "commit_files")
-	assert.True(t, toolActions["commit_files"].Allowed)
 }
 
 func TestReadRuntimeAction_ParseFilters(t *testing.T) {

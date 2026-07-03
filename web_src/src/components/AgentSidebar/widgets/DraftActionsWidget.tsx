@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export interface DraftActionsWidgetProps {
-  versionId: string;
+  versionId?: string;
   message?: string;
   canvasId: string;
   organizationId: string;
@@ -19,9 +19,12 @@ export function DraftActionsWidget({
   isEditing,
   onDismiss,
 }: DraftActionsWidgetProps) {
-  const [busy, setBusy] = useState<"publish" | "discard" | null>(null);
+  const [busy, setBusy] = useState<"commit" | "discard" | null>(null);
 
   const handleViewInEditor = () => {
+    if (!versionId) {
+      return;
+    }
     window.dispatchEvent(new CustomEvent("agent:view-version", { detail: { versionId } }));
   };
 
@@ -36,7 +39,7 @@ export function DraftActionsWidget({
       ...(body !== undefined ? { body } : {}),
     });
 
-  const runAction = async (action: "publish" | "discard", run: () => Promise<Response>) => {
+  const runAction = async (action: "commit" | "discard", run: () => Promise<Response>) => {
     setBusy(action);
     try {
       const response = await run();
@@ -53,32 +56,19 @@ export function DraftActionsWidget({
     }
   };
 
-  // The agent writes draft edits into workflow_staged_files (the same layer the UI
-  // editor stages into), and publish materializes the draft version row only.
-  // Commit any pending staging before publishing so the agent's staged edits
-  // are included; otherwise publish would ship the last committed version and
-  // silently drop them. Commit is a no-op when there is nothing staged.
-  const handlePublish = () =>
-    runAction("publish", async () => {
-      const commitResponse = await sendRequest(
-        "POST",
-        `/api/v1/canvases/${canvasId}/versions/${versionId}/staging/commit`,
-        "{}",
-      );
-      if (!commitResponse.ok) {
-        return commitResponse;
-      }
-      return sendRequest("PATCH", `/api/v1/canvases/${canvasId}/versions/${versionId}/publish`, "{}");
+  const handleCommit = () =>
+    runAction("commit", async () => {
+      const commitMessage = message?.trim() || "Apply agent changes";
+      return sendRequest("POST", `/api/v1/canvases/${canvasId}/staging/commit`, JSON.stringify({ commitMessage }));
     });
 
-  const handleDiscard = () =>
-    runAction("discard", () => sendRequest("DELETE", `/api/v1/canvases/${canvasId}/versions/${versionId}`));
+  const handleDiscard = () => runAction("discard", () => sendRequest("DELETE", `/api/v1/canvases/${canvasId}/staging`));
 
   return (
     <div className="flex items-center gap-2">
       {message && <span className="text-xs text-slate-600 flex-1 truncate">{message}</span>}
-      {!message && <span className="text-xs text-slate-600 flex-1">Draft ready</span>}
-      {!isEditing && (
+      {!message && <span className="text-xs text-slate-600 flex-1">Staging ready</span>}
+      {!isEditing && versionId && (
         <Button
           variant="outline"
           size="sm"
@@ -100,15 +90,9 @@ export function DraftActionsWidget({
         <Trash2 size={12} />
         {busy === "discard" ? "Discarding..." : "Discard"}
       </Button>
-      <Button
-        variant="default"
-        size="sm"
-        onClick={handlePublish}
-        disabled={busy !== null}
-        className="text-xs h-7 gap-1"
-      >
+      <Button variant="default" size="sm" onClick={handleCommit} disabled={busy !== null} className="text-xs h-7 gap-1">
         <Rocket size={12} />
-        {busy === "publish" ? "Publishing..." : "Publish"}
+        {busy === "commit" ? "Committing..." : "Commit"}
       </Button>
     </div>
   );

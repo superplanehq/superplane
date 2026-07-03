@@ -11,19 +11,19 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "Manage staged app edits",
 		Long: `Stage, inspect, and commit uncommitted app changes.
 
-Use "superplane apps staging list" to see staged paths, "staging update" to
+Use "superplane apps staging status" to see staged paths, "staging update" to
 stage files, and "staging commit" to publish staged edits.
 
 To commit a single file directly without a separate staging step, pass
 --message to "superplane apps canvas update" or "superplane apps console set".`,
 	}
 
-	listCmd := &cobra.Command{
-		Use:   "list [app]",
-		Short: "List staged changes for an app",
+	statusCmd := &cobra.Command{
+		Use:   "status [app]",
+		Short: "Show staged changes for an app",
 		Args:  cobra.MaximumNArgs(1),
 	}
-	core.Bind(listCmd, &listCommand{}, options)
+	core.Bind(statusCmd, &statusCommand{}, options)
 
 	var updateFiles []string
 	updateCmd := &cobra.Command{
@@ -49,7 +49,7 @@ Each --file path is mapped to a repository path using the file name only
 	_ = commitCmd.MarkFlagRequired("message")
 	core.Bind(commitCmd, &commitCommand{message: &commitMessage}, options)
 
-	root.AddCommand(listCmd)
+	root.AddCommand(statusCmd)
 	root.AddCommand(updateCmd)
 	root.AddCommand(commitCmd)
 

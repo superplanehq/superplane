@@ -20,13 +20,13 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const patchDraftActionName = "patch_draft"
+const patchStagingActionName = "patch_staging"
 
-type patchDraftAction struct {
+type patchStagingAction struct {
 	deps Dependencies
 }
 
-type patchDraftTarget struct {
+type patchStagingTarget struct {
 	organizationID  uuid.UUID
 	draft           *models.CanvasVersion
 	changeset       *changesets.CanvasChangeset
@@ -39,16 +39,16 @@ type stagedDraftCanvas struct {
 	edges []models.Edge
 }
 
-func newPatchDraftAction(deps Dependencies) patchDraftAction {
-	return patchDraftAction{deps: deps}
+func newPatchStagingAction(deps Dependencies) patchStagingAction {
+	return patchStagingAction{deps: deps}
 }
 
-func (a patchDraftAction) Name() string {
-	return patchDraftActionName
+func (a patchStagingAction) Name() string {
+	return patchStagingActionName
 }
 
-func (a patchDraftAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	target, err := resolvePatchDraftTarget(session, input)
+func (a patchStagingAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
+	target, err := resolvePatchStagingTarget(session, input)
 	if err != nil {
 		return updateResult{}, err
 	}
@@ -78,46 +78,46 @@ func (a patchDraftAction) Execute(ctx context.Context, session agents.AgentSessi
 		return updateResult{}, err
 	}
 
-	return newPatchDraftResult(session, target.draft, canvas, patched), nil
+	return newPatchStagingResult(session, target.draft, canvas, patched), nil
 }
 
-func resolvePatchDraftTarget(session agents.AgentSessionContext, input Input) (patchDraftTarget, error) {
+func resolvePatchStagingTarget(session agents.AgentSessionContext, input Input) (patchStagingTarget, error) {
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
-		return patchDraftTarget{}, fmt.Errorf("invalid session canvas id: %w", err)
+		return patchStagingTarget{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
 	organizationID, err := uuid.Parse(session.OrganizationID)
 	if err != nil {
-		return patchDraftTarget{}, fmt.Errorf("invalid session organization id: %w", err)
+		return patchStagingTarget{}, fmt.Errorf("invalid session organization id: %w", err)
 	}
 
 	userID, err := uuid.Parse(session.UserID)
 	if err != nil {
-		return patchDraftTarget{}, fmt.Errorf("invalid session user id: %w", err)
+		return patchStagingTarget{}, fmt.Errorf("invalid session user id: %w", err)
 	}
 
 	draft, err := resolveTargetDraftVersion(canvasID, userID, input)
 	if err != nil {
-		return patchDraftTarget{}, fmt.Errorf("ensure draft: %w", err)
+		return patchStagingTarget{}, fmt.Errorf("resolve live version: %w", err)
 	}
 
 	changeset, err := buildDraftChangeset(input.PatchOperations)
 	if err != nil {
-		return patchDraftTarget{}, err
+		return patchStagingTarget{}, err
 	}
 
 	consoleYAML := strings.TrimSpace(input.ConsoleYAML)
 	if changeset == nil && consoleYAML == "" && input.AutoLayout == nil {
-		return patchDraftTarget{}, fmt.Errorf("patch_operations, console_yaml, or auto_layout is required for patch_draft")
+		return patchStagingTarget{}, fmt.Errorf("patch_operations, console_yaml, or auto_layout is required for patch_staging")
 	}
 	if consoleYAML != "" {
 		if err := canvasRepository.ValidateConsoleYAML(input.ConsoleYAML); err != nil {
-			return patchDraftTarget{}, err
+			return patchStagingTarget{}, err
 		}
 	}
 
-	return patchDraftTarget{
+	return patchStagingTarget{
 		organizationID:  organizationID,
 		draft:           draft,
 		changeset:       changeset,
@@ -126,7 +126,7 @@ func resolvePatchDraftTarget(session agents.AgentSessionContext, input Input) (p
 	}, nil
 }
 
-func (a patchDraftAction) readStagedDraftCanvas(ctx context.Context, session agents.AgentSessionContext, draft *models.CanvasVersion) (stagedDraftCanvas, error) {
+func (a patchStagingAction) readStagedDraftCanvas(ctx context.Context, session agents.AgentSessionContext, draft *models.CanvasVersion) (stagedDraftCanvas, error) {
 	canvasYAML, err := canvasRepository.ReadRepositorySpecFileStaged(
 		ctx,
 		session.OrganizationID,
@@ -154,8 +154,8 @@ func (a patchDraftAction) readStagedDraftCanvas(ctx context.Context, session age
 	}, nil
 }
 
-func (a patchDraftAction) applyPatchToStagedCanvas(
-	target patchDraftTarget,
+func (a patchStagingAction) applyPatchToStagedCanvas(
+	target patchStagingTarget,
 	stagedCanvas stagedDraftCanvas,
 ) (*models.CanvasVersion, error) {
 	patchedDraft := *target.draft
@@ -171,7 +171,7 @@ func (a patchDraftAction) applyPatchToStagedCanvas(
 		patched = patcher.GetVersion()
 	}
 
-	autoLayout := resolvePatchDraftAutoLayout(target.autoLayoutInput, target.changeset, stagedCanvas.edges, patched.Nodes)
+	autoLayout := resolvePatchStagingAutoLayout(target.autoLayoutInput, target.changeset, stagedCanvas.edges, patched.Nodes)
 	if autoLayout != nil {
 		nodes, edges, err := canvasLayout.ApplyLayout(patched.Nodes, patched.Edges, autoLayout)
 		if err != nil {
@@ -184,7 +184,7 @@ func (a patchDraftAction) applyPatchToStagedCanvas(
 	return patched, nil
 }
 
-func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionContext, target patchDraftTarget, canvas *models.Canvas, patched *models.CanvasVersion) error {
+func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionContext, target patchStagingTarget, canvas *models.Canvas, patched *models.CanvasVersion) error {
 	operations := make([]*pb.CanvasRepositoryFileOperation, 0, 2)
 	if target.changeset != nil || target.autoLayoutInput != nil {
 		patchedYAML, err := serializePatchedDraftYAML(canvas, patched, session.CanvasID)
@@ -218,9 +218,9 @@ func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionCont
 	return nil
 }
 
-func newPatchDraftResult(session agents.AgentSessionContext, draft *models.CanvasVersion, canvas *models.Canvas, patched *models.CanvasVersion) updateResult {
+func newPatchStagingResult(session agents.AgentSessionContext, draft *models.CanvasVersion, canvas *models.Canvas, patched *models.CanvasVersion) updateResult {
 	return updateResult{
-		Action:     patchDraftActionName,
+		Action:     patchStagingActionName,
 		CanvasID:   session.CanvasID,
 		VersionID:  draft.ID.String(),
 		Draft:      draftResult{VersionID: draft.ID.String()},
@@ -362,14 +362,14 @@ func patchChangeEdge(operation PatchOperation) (*changesets.ChangeEdge, error) {
 	return edge, nil
 }
 
-func resolvePatchDraftAutoLayout(
+func resolvePatchStagingAutoLayout(
 	input *AutoLayoutInput,
 	changeset *changesets.CanvasChangeset,
 	originalEdges []models.Edge,
 	finalNodes []models.Node,
 ) *pb.CanvasAutoLayout {
 	if input == nil {
-		nodeIDs := defaultPatchDraftAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
+		nodeIDs := defaultPatchStagingAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
 		if len(nodeIDs) == 0 {
 			return nil
 		}
@@ -381,7 +381,7 @@ func resolvePatchDraftAutoLayout(
 	}
 
 	if isEmptyAutoLayoutInput(input) {
-		nodeIDs := defaultPatchDraftAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
+		nodeIDs := defaultPatchStagingAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
 		if len(nodeIDs) > 0 {
 			return &pb.CanvasAutoLayout{
 				Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
@@ -404,7 +404,7 @@ func isEmptyAutoLayoutInput(input *AutoLayoutInput) bool {
 		len(input.NodeIDs) == 0
 }
 
-func defaultPatchDraftAutoLayoutNodeIDs(
+func defaultPatchStagingAutoLayoutNodeIDs(
 	changeset *changesets.CanvasChangeset,
 	originalEdges []models.Edge,
 	finalNodes []models.Node,

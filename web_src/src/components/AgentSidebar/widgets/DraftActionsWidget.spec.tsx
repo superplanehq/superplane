@@ -12,19 +12,19 @@ describe("DraftActionsWidget", () => {
     const user = userEvent.setup();
     const dispatchEvent = vi.spyOn(window, "dispatchEvent");
 
-    render(<DraftActionsWidget versionId="draft-1" canvasId="canvas-1" organizationId="org-1" isEditing={false} />);
+    render(<DraftActionsWidget versionId="live-1" canvasId="canvas-1" organizationId="org-1" isEditing={false} />);
 
     await user.click(screen.getByRole("button", { name: /see changes/i }));
 
     expect(dispatchEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "agent:view-version",
-        detail: { versionId: "draft-1" },
+        detail: { versionId: "live-1" },
       }),
     );
   });
 
-  it("commits staged edits before publishing so the agent's staged changes are included", async () => {
+  it("commits staging with the widget message", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" } as Response);
     vi.stubGlobal("fetch", fetchMock);
@@ -32,25 +32,26 @@ describe("DraftActionsWidget", () => {
 
     render(
       <DraftActionsWidget
-        versionId="draft-1"
         canvasId="canvas-1"
         organizationId="org-1"
         isEditing={false}
+        message="Added health checks"
         onDismiss={onDismiss}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /publish/i }));
+    await user.click(screen.getByRole("button", { name: /commit/i }));
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/canvases/canvas-1/versions/draft-1/staging/commit");
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "POST" });
-    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/canvases/canvas-1/versions/draft-1/publish");
-    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "PATCH" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/canvases/canvas-1/staging/commit");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      method: "POST",
+      body: JSON.stringify({ commitMessage: "Added health checks" }),
+    });
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it("does not publish when committing staged edits fails", async () => {
+  it("does not dismiss when committing staging fails", async () => {
     const user = userEvent.setup();
     vi.spyOn(console, "error").mockImplementation(() => {});
     const fetchMock = vi
@@ -59,20 +60,12 @@ describe("DraftActionsWidget", () => {
     vi.stubGlobal("fetch", fetchMock);
     const onDismiss = vi.fn();
 
-    render(
-      <DraftActionsWidget
-        versionId="draft-1"
-        canvasId="canvas-1"
-        organizationId="org-1"
-        isEditing={false}
-        onDismiss={onDismiss}
-      />,
-    );
+    render(<DraftActionsWidget canvasId="canvas-1" organizationId="org-1" isEditing={false} onDismiss={onDismiss} />);
 
-    await user.click(screen.getByRole("button", { name: /publish/i }));
+    await user.click(screen.getByRole("button", { name: /commit/i }));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/canvases/canvas-1/versions/draft-1/staging/commit");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/canvases/canvas-1/staging/commit");
     expect(onDismiss).not.toHaveBeenCalled();
   });
 });

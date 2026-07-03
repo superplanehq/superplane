@@ -9,9 +9,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-type listCommand struct{}
+type statusCommand struct{}
 
-func (c *listCommand) Execute(ctx core.CommandContext) error {
+func (c *statusCommand) Execute(ctx core.CommandContext) error {
 	appArg := ""
 	if len(ctx.Args) == 1 {
 		appArg = strings.TrimSpace(ctx.Args[0])
@@ -37,7 +37,7 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 		}
 
 		for _, path := range summary.GetStagedPaths() {
-			if _, err := fmt.Fprintln(stdout, path); err != nil {
+			if _, err := fmt.Fprintln(stdout, formatStagedPathLine(stdout, path)); err != nil {
 				return err
 			}
 		}

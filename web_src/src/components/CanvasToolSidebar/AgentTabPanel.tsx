@@ -449,7 +449,11 @@ function DraftActionsBar({
       return;
     }
 
-    window.dispatchEvent(new CustomEvent("agent:draft-ready", { detail: { versionId: latestDraft.versionId } }));
+    window.dispatchEvent(
+      new CustomEvent("agent:draft-ready", {
+        detail: { canvasId: latestDraft.canvasId, versionId: latestDraft.versionId },
+      }),
+    );
   }, [canvasId, latestDraft]);
 
   if (!latestDraft) return null;
