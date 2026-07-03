@@ -744,95 +744,6 @@ const nodeTypes = {
   default: DefaultNodeRenderer,
 };
 
-const RUN_PANEL_SLIDE_DURATION_MS = 300;
-
-/**
- * Builds `fitView` padding that reserves extra space on the right edge for the
- * run panel overlay, so fitted/focused nodes land in the uncovered left area.
- * Returns the plain numeric padding unchanged when nothing is reserved.
- */
-function reservedFitPadding(basePadding: number, reservedFraction: number) {
-  if (reservedFraction <= 0) {
-    return basePadding;
-  }
-  const pct = (fraction: number): `${number}%` => `${Math.round(fraction * 100)}%`;
-  return {
-    top: pct(basePadding),
-    bottom: pct(basePadding),
-    left: pct(basePadding),
-    right: pct(basePadding + reservedFraction),
-  };
-}
-
-/**
- * Keeps a panel mounted through its slide-out animation. Returns `mounted`
- * (render the panel) and `entered` (slide it into view). On open it mounts then
- * flips `entered` true on the next frame; on close it flips `entered` false and
- * unmounts once the transition finishes.
- */
-function useSlidePresence(open: boolean, durationMs = RUN_PANEL_SLIDE_DURATION_MS) {
-  const [mounted, setMounted] = useState(open);
-  const [entered, setEntered] = useState(open);
-
-  useEffect(() => {
-    if (open) {
-      setMounted(true);
-      const frame = requestAnimationFrame(() => setEntered(true));
-      return () => cancelAnimationFrame(frame);
-    }
-    setEntered(false);
-    const timer = setTimeout(() => setMounted(false), durationMs);
-    return () => clearTimeout(timer);
-  }, [open, durationMs]);
-
-  return { mounted, entered };
-}
-
-/**
- * A run panel rendered as an animated overlay on the right of the canvas: it
- * floats over the canvas (never shrinks it) and slides in/out on the X axis.
- */
-function RunPanelSlideOver({
-  open,
-  widthClass,
-  testId,
-  children,
-}: {
-  open: boolean;
-  widthClass: string;
-  testId: string;
-  children: ReactNode;
-}) {
-  const { mounted, entered } = useSlidePresence(open);
-  if (!mounted) {
-    return null;
-  }
-
-  return (
-    <div
-      data-testid={testId}
-      className={cn(
-        "absolute inset-y-0 right-0 z-40 flex h-full min-h-0 flex-col overflow-hidden border-l border-slate-950/10 bg-white shadow-xl",
-        "transition-transform duration-300 ease-out will-change-transform",
-        widthClass,
-        entered ? "translate-x-0" : "translate-x-full",
-      )}
-    >
-      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-    </div>
-  );
-}
-
-/** Retains the last non-null value while `active` is false, so a panel keeps its
- * content during the slide-out animation instead of flashing empty. */
-function useRetainedWhileActive<T>(active: boolean, value: T): T {
-  const ref = useRef(value);
-  if (active) {
-    ref.current = value;
-  }
-  return active ? value : ref.current;
-}
-
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
@@ -1339,24 +1250,21 @@ function CanvasPage(props: CanvasPageProps) {
     setLiveExpandedNodeId(null);
   }, [liveSelectedNodeId]);
 
-  // The run panel floats over the canvas as an overlay (it never shrinks the
-  // canvas) and can expand to a full-width page. The chosen size is persisted so
+  // The run panel is a flex sibling that pushes/shrinks the canvas. It can
+  // expand to a full-width page (canvas hidden). The chosen size is persisted so
   // it survives closing/reopening the panel and page reloads.
   const anyRunPanelOpen = liveBottomInspectorOpen || runInspectionPanelOpen;
   const [runPanelSize, setRunPanelSize] = useState<RunDisplayMode>(loadRunPanelSize);
+  const isRunPanelFull = runPanelSize === "full" && anyRunPanelOpen;
   const runPanelWidthClass = runPanelSize === "full" ? "w-full" : runPanelSize === "min" ? "w-1/4" : "w-1/2";
-  // While the panel overlays the canvas, reserve that width on the right when
-  // fitting/focusing nodes so the selected node stays visible beside the panel.
-  const runPanelReservedFraction =
-    anyRunPanelOpen && runPanelSize !== "full" ? (runPanelSize === "min" ? 0.25 : 0.5) : 0;
   useEffect(() => {
     saveRunPanelSize(runPanelSize);
   }, [runPanelSize]);
 
-  // Retain each panel's run through its slide-out animation so it doesn't flash
-  // empty while closing.
-  const retainedLiveRun = useRetainedWhileActive(liveBottomInspectorOpen, props.liveSelectedNodeRun ?? null);
-  const retainedInspectionRun = useRetainedWhileActive(runInspectionPanelOpen, props.runNodeDetailRun ?? null);
+  // In run inspection the canvas reflects a historical run's state, not the live
+  // canvas. Surface a prominent way back to the live canvas, mirroring the
+  // version-preview bar. Hidden in full-page mode (canvas isn't visible then).
+  const showRunInspectionBar = runInspectionPanelOpen && runPanelSize !== "full" && Boolean(props.onExitRunInspection);
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1457,9 +1365,9 @@ function CanvasPage(props: CanvasPageProps) {
         props.isEditing && "sp-canvas-editing",
       )}
     >
-      {/* Left column: header + main content. Stays full width; the run panel
-          overlays it on the right (covering it entirely in full-page mode). */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* Left column: header + main content, pushed to the left when a panel is
+          open, and hidden entirely when the run panel expands to a full page. */}
+      <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", isRunPanelFull && "hidden")}>
         {/* Header at the top spanning full width */}
         <div className="relative z-40">
           <CanvasContentHeader
@@ -1589,6 +1497,26 @@ function CanvasPage(props: CanvasPageProps) {
                   </div>
                 </div>
               ) : null}
+              {showRunInspectionBar ? (
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
+                  <div className="pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-full bg-gray-500 pl-3 pr-1.5 py-1.5">
+                    <span className="flex min-w-0 max-w-full shrink-0 truncate items-center gap-1 text-[13px] font-medium text-white">
+                      Previewing previous run
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      className="shrink-0 border-0 shadow-none"
+                      onClick={() => {
+                        props.onExitRunInspection?.();
+                      }}
+                    >
+                      Back to Live Canvas
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               {props.headerMode === "files" ? (
                 <div className="absolute inset-0 bg-slate-50" data-testid="canvas-files-backdrop" aria-hidden />
               ) : (
@@ -1630,7 +1558,6 @@ function CanvasPage(props: CanvasPageProps) {
                     fitAllFocusNodeIds={props.fitAllFocusNodeIds}
                     runParticipantNodeIds={props.runParticipantNodeIds}
                     runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
-                    runPanelReservedFraction={runPanelReservedFraction}
                     runNodeDetailPaneOpen={false}
                     logRuns={props.logRuns}
                     runsNodes={props.runsNodes}
@@ -1652,54 +1579,70 @@ function CanvasPage(props: CanvasPageProps) {
         </div>
       </div>
 
-      <RunPanelSlideOver open={liveBottomInspectorOpen} widthClass={runPanelWidthClass} testId="live-node-detail-panel">
-        <RunPanel
-          canvasId={props.runNodeDetailCanvasId ?? ""}
-          run={retainedLiveRun}
-          workflowNodes={props.workflowNodes ?? []}
-          componentIconMap={props.runsComponentIconMap}
-          context="live"
-          expandedNodeId={liveExpandedNodeId ?? liveSelectedNodeId}
-          onToggleNode={(nodeId) =>
-            setLiveExpandedNodeId((prev) => ((prev ?? liveSelectedNodeId) === nodeId ? null : nodeId))
-          }
-          onExpandNode={(nodeId) => setLiveExpandedNodeId(nodeId)}
-          onClose={handleSidebarClose}
-          displayMode={runPanelSize}
-          onSetDisplayMode={setRunPanelSize}
-        />
-      </RunPanelSlideOver>
+      {liveBottomInspectorOpen ? (
+        <div
+          className={cn(
+            "flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-l border-slate-950/10 bg-white",
+            runPanelWidthClass,
+          )}
+          data-testid="live-node-detail-panel"
+        >
+          <div className="flex min-h-0 flex-1 flex-col">
+            <RunPanel
+              canvasId={props.runNodeDetailCanvasId ?? ""}
+              run={props.liveSelectedNodeRun ?? null}
+              workflowNodes={props.workflowNodes ?? []}
+              componentIconMap={props.runsComponentIconMap}
+              context="live"
+              expandedNodeId={liveExpandedNodeId ?? liveSelectedNodeId}
+              onToggleNode={(nodeId) =>
+                setLiveExpandedNodeId((prev) => ((prev ?? liveSelectedNodeId) === nodeId ? null : nodeId))
+              }
+              onExpandNode={(nodeId) => setLiveExpandedNodeId(nodeId)}
+              onClose={handleSidebarClose}
+              displayMode={runPanelSize}
+              onSetDisplayMode={setRunPanelSize}
+            />
+          </div>
+        </div>
+      ) : null}
 
-      <RunPanelSlideOver
-        open={runInspectionPanelOpen}
-        widthClass={runPanelWidthClass}
-        testId="run-inspection-side-panel"
-      >
-        <RunPanel
-          canvasId={props.runNodeDetailCanvasId!}
-          run={retainedInspectionRun}
-          workflowNodes={props.workflowNodes ?? []}
-          componentIconMap={props.runsComponentIconMap}
-          context="inspection"
-          expandedNodeId={props.runNodeDetailNodeId ?? null}
-          onToggleNode={(nodeId) => {
-            if (nodeId === props.runNodeDetailNodeId) {
-              props.onRunNodeDetailClose?.();
-              return;
-            }
-            props.onRunNodeDetailNavigate?.(nodeId);
-          }}
-          onExpandNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
-          onClose={() => (props.onExitRunInspection ?? props.onRunNodeDetailClose)?.()}
-          closeLabel="Back to live canvas"
-          displayMode={runPanelSize}
-          onSetDisplayMode={setRunPanelSize}
-          onPrevRun={props.onSelectPrevRun}
-          onNextRun={props.onSelectNextRun}
-          hasPrevRun={props.hasPrevRun}
-          hasNextRun={props.hasNextRun}
-        />
-      </RunPanelSlideOver>
+      {runInspectionPanelOpen ? (
+        <div
+          className={cn(
+            "flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-l border-slate-950/10 bg-white",
+            runPanelWidthClass,
+          )}
+          data-testid="run-inspection-side-panel"
+        >
+          <div className="flex min-h-0 flex-1 flex-col">
+            <RunPanel
+              canvasId={props.runNodeDetailCanvasId!}
+              run={props.runNodeDetailRun!}
+              workflowNodes={props.workflowNodes ?? []}
+              componentIconMap={props.runsComponentIconMap}
+              context="inspection"
+              expandedNodeId={props.runNodeDetailNodeId ?? null}
+              onToggleNode={(nodeId) => {
+                if (nodeId === props.runNodeDetailNodeId) {
+                  props.onRunNodeDetailClose?.();
+                  return;
+                }
+                props.onRunNodeDetailNavigate?.(nodeId);
+              }}
+              onExpandNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
+              onClose={() => (props.onExitRunInspection ?? props.onRunNodeDetailClose)?.()}
+              closeLabel="Back to live canvas"
+              displayMode={runPanelSize}
+              onSetDisplayMode={setRunPanelSize}
+              onPrevRun={props.onSelectPrevRun}
+              onNextRun={props.onSelectNextRun}
+              hasPrevRun={props.hasPrevRun}
+              hasNextRun={props.hasNextRun}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {/* Edit existing node modal - now handled by settings sidebar */}
 
@@ -2247,7 +2190,6 @@ function CanvasContent({
   fitAllFocusNodeIds,
   runParticipantNodeIds,
   runSelectedNodeId,
-  runPanelReservedFraction = 0,
   runNodeDetailPaneOpen,
   logRuns,
   runsNodes,
@@ -2301,9 +2243,6 @@ function CanvasContent({
   fitAllFocusNodeIds?: string[];
   runParticipantNodeIds?: string[];
   runSelectedNodeId?: string | null;
-  /** Fraction of the viewport width covered by the run panel overlay, so
-   * fitView calls can reserve that space on the right and keep nodes visible. */
-  runPanelReservedFraction?: number;
   runNodeDetailPaneOpen?: boolean;
   logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
@@ -2631,7 +2570,7 @@ function CanvasContent({
       nodes: [targetNode],
       duration: 500,
       maxZoom: 1.2,
-      padding: reservedFitPadding(0.1, runPanelReservedFraction),
+      padding: 0.1,
     }).then(
       () => {
         const nextViewport = getViewport();
@@ -2649,7 +2588,6 @@ function CanvasContent({
     isRunInspectionMode,
     reportZoom,
     runCanvasNodeIdsKey,
-    runPanelReservedFraction,
     viewportRef,
   ]);
 
@@ -2694,12 +2632,12 @@ function CanvasContent({
         nodes: [targetNode],
         duration: 500,
         maxZoom: 1.2,
-        padding: reservedFitPadding(0.1, runPanelReservedFraction),
+        padding: 0.1,
       });
     };
     window.addEventListener("agent:focus-node", handler);
     return () => window.removeEventListener("agent:focus-node", handler);
-  }, [fitView, runPanelReservedFraction]);
+  }, [fitView]);
 
   useEffect(() => {
     return () => {
@@ -2786,13 +2724,12 @@ function CanvasContent({
             nodes: [focusNode],
             duration: 500,
             maxZoom: 1.2,
-            padding: reservedFitPadding(0.1, runPanelReservedFraction),
+            padding: 0.1,
           });
         } else if (hasNodes) {
           fitView({
             ...LIVE_CANVAS_FIT_VIEW_OPTIONS,
             duration: 500,
-            padding: reservedFitPadding(LIVE_CANVAS_FIT_VIEW_OPTIONS.padding, runPanelReservedFraction),
           });
         }
 
@@ -2820,7 +2757,7 @@ function CanvasContent({
         setHasReactFlowInitialized(true);
       }
     },
-    [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId, runPanelReservedFraction],
+    [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],
   );
 
   // Fit all currently-rendered nodes into view whenever the parent bumps `fitAllRequest`.
@@ -2845,19 +2782,10 @@ function CanvasContent({
         ...(nodeSubset && nodeSubset.length > 0 ? { nodes: nodeSubset } : {}),
         ...fitOptions,
         duration: 500,
-        padding: reservedFitPadding(fitOptions.padding, runPanelReservedFraction),
       });
     }, 0);
     return () => window.clearTimeout(id);
-  }, [
-    fitAllRequest,
-    fitAllFocusNodeIds,
-    fitView,
-    getNodes,
-    hasFitToViewRef,
-    isRunInspectionMode,
-    runPanelReservedFraction,
-  ]);
+  }, [fitAllRequest, fitAllFocusNodeIds, fitView, getNodes, hasFitToViewRef, isRunInspectionMode]);
 
   const showHeader = !isReadOnly;
 

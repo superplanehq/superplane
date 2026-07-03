@@ -181,12 +181,18 @@ function RunActionsMenu({ run, onAskAgent }: { run: CanvasesCanvasRun; onAskAgen
     }
   }, [run.id]);
 
+  const sendToAgent = useCallback(() => {
+    if (onAskAgent) {
+      onAskAgent();
+      return;
+    }
+    toast.info("Send to agent", { description: "Ask the agent about this run" });
+  }, [onAskAgent]);
+
   return (
     <>
       <ChromeIconButton label="Copy link" icon={<LinkIcon className="h-4 w-4" />} onClick={copyRunLink} />
-      {onAskAgent ? (
-        <ChromeIconButton label="Send to AI" icon={<Sparkles className="h-4 w-4" />} onClick={onAskAgent} />
-      ) : null}
+      <ChromeIconButton label="Send to agent" icon={<Sparkles className="h-4 w-4" />} onClick={sendToAgent} />
     </>
   );
 }
