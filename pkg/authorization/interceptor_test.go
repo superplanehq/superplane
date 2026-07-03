@@ -190,6 +190,7 @@ func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	routes := []HTTPRoute{
 		{Method: http.MethodGet, Pattern: "/api/v1/agents/canvases/{canvas_id}/chat"},
+		{Method: http.MethodPost, Pattern: "/api/v1/agents/canvases/{canvas_id}/chat/reset"},
 		{Method: http.MethodPost, Pattern: "/api/v1/agents/chats/{chat_id}/messages"},
 		{Method: http.MethodGet, Pattern: "/api/v1/agents/chats/{chat_id}/messages"},
 	}
