@@ -39,7 +39,7 @@ import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
 import { useGreetedMessages } from "./useGreetedMessages";
 import { AgentSetupNotice } from "./AgentSetupState";
-import { getAgentSetupState } from "./agentSetupStateModel";
+import { getAgentSetupState, isSessionBusyError } from "./agentSetupStateModel";
 
 const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 15000;
 
@@ -387,7 +387,13 @@ function useConversationHandlers({
           return;
         }
         await reset.mutateAsync().catch((error) => {
-          setError(error instanceof Error ? error.message : "failed to clear chat");
+          // The backend also guards against a busy session; if local status hadn't
+          // caught up yet, show the intentional notice rather than a raw error.
+          if (isSessionBusyError(error)) {
+            setNotice("Wait for the agent to finish before clearing the chat.");
+          } else {
+            setError(error instanceof Error ? error.message : "failed to clear chat");
+          }
           throw error;
         });
         // Only after a successful reset: scoped so the fresh session can't auto-boot
