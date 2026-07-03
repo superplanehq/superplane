@@ -355,6 +355,12 @@ func validateUpdateAlarmFields(rawConfiguration any, config UpdateAlarmConfigura
 		}
 	}
 
+	if hasConfigKey(rawConfiguration, "treatMissingData") {
+		if _, err := requireTreatMissingData(config.TreatMissingData); err != nil {
+			return err
+		}
+	}
+
 	if hasConfigKey(rawConfiguration, "period") && config.Period <= 0 {
 		return fmt.Errorf("period must be greater than 0")
 	}
@@ -443,7 +449,7 @@ func buildUpdateAlarmInput(
 	}
 
 	if hasConfigKey(rawConfiguration, "treatMissingData") {
-		input.TreatMissingData = config.TreatMissingData
+		input.TreatMissingData = strings.TrimSpace(config.TreatMissingData)
 	}
 
 	if hasConfigKey(rawConfiguration, "alarmAction") || hasConfigKey(rawConfiguration, "snsTopic") {

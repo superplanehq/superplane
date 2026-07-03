@@ -104,6 +104,15 @@ func requireStatistic(value string) (string, error) {
 	return statistic, nil
 }
 
+func requireTreatMissingData(value string) (string, error) {
+	treatMissingData := strings.TrimSpace(value)
+	if treatMissingData == "" {
+		return "", fmt.Errorf("treat missing data is required")
+	}
+
+	return treatMissingData, nil
+}
+
 func hasConfigKey(configuration any, key string) bool {
 	configurationMap, ok := configuration.(map[string]any)
 	if !ok {
