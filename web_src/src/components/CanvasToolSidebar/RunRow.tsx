@@ -40,14 +40,20 @@ export function RunRow({
   const selectRun = () => {
     if (run.id) onSelectRun(run.id);
   };
+  const openRunInNewTab = () => {
+    if (runHref === "#") return;
+    window.open(runHref, "_blank", "noopener,noreferrer");
+  };
   const handleTimestampClick = (event: MouseEvent<HTMLSpanElement>) => {
-    if (!isNormalClick(event)) {
+    if (isNormalClick(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      selectRun();
       return;
     }
 
-    event.preventDefault();
     event.stopPropagation();
-    selectRun();
+    openRunInNewTab();
   };
 
   return (
@@ -120,7 +126,11 @@ export function RunRow({
         <LinkIcon className="h-3 w-3" />
       </button>
       {run.createdAt ? (
-        <span className="relative z-10 shrink-0 text-xs tabular-nums text-gray-500" onClick={handleTimestampClick}>
+        <span
+          className="relative z-10 shrink-0 text-xs tabular-nums text-gray-500"
+          onClick={handleTimestampClick}
+          onAuxClick={handleTimestampClick}
+        >
           <Timestamp date={run.createdAt} display="relative" relativeStyle="abbreviated" includeAgo={false} />
         </span>
       ) : null}

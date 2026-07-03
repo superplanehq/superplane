@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -68,6 +68,21 @@ describe("CompactSidebarEventRow", () => {
 
     expect(onSelectRun).toHaveBeenCalledTimes(1);
     expect(onSelectRun).toHaveBeenCalledWith("run-1");
+  });
+
+  it("opens the run in a new tab when the timestamp is modified-clicked", () => {
+    const onSelectRun = vi.fn();
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    renderRow({ runId: "run-1", onSelectRun });
+
+    const timestamp = document.querySelector('time[datetime="2026-02-06T15:28:05.000Z"]') as HTMLElement;
+    fireEvent.click(timestamp, { metaKey: true });
+
+    expect(onSelectRun).not.toHaveBeenCalled();
+    expect(open).toHaveBeenCalledWith("/org-1/apps/app-1?run=run-1", "_blank", "noopener,noreferrer");
+
+    open.mockRestore();
   });
 
   it("selects the run with node context when the row belongs to a selected node", async () => {

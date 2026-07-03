@@ -119,13 +119,17 @@ export function CompactSidebarEventRow({
     void selectRun();
   };
   const handleTimestampClick = (clickEvent: MouseEvent<HTMLSpanElement>) => {
-    if (!isNormalClick(clickEvent)) {
+    if (isNormalClick(clickEvent)) {
+      clickEvent.preventDefault();
+      clickEvent.stopPropagation();
+      void selectRun();
       return;
     }
 
-    clickEvent.preventDefault();
     clickEvent.stopPropagation();
-    void selectRun();
+    if (runHref) {
+      window.open(runHref, "_blank", "noopener,noreferrer");
+    }
   };
 
   return (
@@ -189,7 +193,11 @@ export function CompactSidebarEventRow({
         </div>
       ) : null}
       {event.receivedAt ? (
-        <span className="relative z-20 shrink-0 text-xs tabular-nums text-gray-500" onClick={handleTimestampClick}>
+        <span
+          className="relative z-20 shrink-0 text-xs tabular-nums text-gray-500"
+          onClick={handleTimestampClick}
+          onAuxClick={handleTimestampClick}
+        >
           <Timestamp date={event.receivedAt} display="relative" relativeStyle="abbreviated" includeAgo={false} />
         </span>
       ) : null}
