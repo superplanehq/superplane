@@ -130,9 +130,6 @@ func (a readAction) summarize(organizationID string, canvas *models.Canvas, vers
 	if canvas != nil {
 		name = canvas.Name
 	}
-	if name == "" && version != nil {
-		name = version.Name
-	}
 	return summarizeParsedCanvas(name, nodes, edges)
 }
 

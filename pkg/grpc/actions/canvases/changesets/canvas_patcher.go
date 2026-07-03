@@ -62,8 +62,6 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 		WorkflowID:    p.originalVersion.WorkflowID,
 		OwnerID:       p.originalVersion.OwnerID,
 		State:         p.originalVersion.State,
-		Name:          p.originalVersion.Name,
-		Description:   p.originalVersion.Description,
 		PublishedAt:   p.originalVersion.PublishedAt,
 		ConsolePanels: p.originalVersion.ConsolePanels,
 		ConsoleLayout: p.originalVersion.ConsoleLayout,
