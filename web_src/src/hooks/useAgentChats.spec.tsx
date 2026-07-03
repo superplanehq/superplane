@@ -2,12 +2,17 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { agentsListAgentChatMessages, agentsSendAgentChatMessage } from "@/api-client/sdk.gen";
+import {
+  agentsListAgentChatMessages,
+  agentsResetCanvasAgentChat,
+  agentsSendAgentChatMessage,
+} from "@/api-client/sdk.gen";
 import type { AgentMessagesPage } from "./useAgentChats";
 import { agentChatKeys, useAgentChatMessages, useResetCanvasAgentChat, useSendAgentChatMessage } from "./useAgentChats";
 
 vi.mock("@/api-client/sdk.gen", () => ({
   agentsListAgentChatMessages: vi.fn(),
+  agentsResetCanvasAgentChat: vi.fn(),
   agentsSendAgentChatMessage: vi.fn(),
 }));
 
@@ -356,6 +361,22 @@ describe("useAgentChatMessages", () => {
 
 describe("useResetCanvasAgentChat", () => {
   it("replaces the canvas chat and clears message caches", async () => {
+    type ResetCanvasAgentChatResult = Awaited<ReturnType<typeof agentsResetCanvasAgentChat>>;
+    vi.mocked(agentsResetCanvasAgentChat).mockResolvedValue({
+      data: {
+        chat: {
+          id: "chat-new",
+          canvasId: "canvas-1",
+          provider: "anthropic",
+          status: "idle",
+          createdAt: null,
+          updatedAt: null,
+        },
+      },
+      request: new Request("https://superplane.test"),
+      response: new Response(),
+    } as ResetCanvasAgentChatResult);
+
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.setQueryData(agentChatKeys.forCanvas("canvas-1"), {
       id: "chat-old",
@@ -378,22 +399,6 @@ describe("useResetCanvasAgentChat", () => {
       pageParams: [""],
     });
 
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        chat: {
-          id: "chat-new",
-          canvasId: "canvas-1",
-          provider: "anthropic",
-          status: "idle",
-          createdAt: null,
-          updatedAt: null,
-        },
-      }),
-    })) as unknown as typeof fetch;
-    vi.stubGlobal("fetch", fetchMock);
-
     const { result } = renderHook(() => useResetCanvasAgentChat("org-1", "canvas-1"), {
       wrapper: wrapper(queryClient),
     });
@@ -402,7 +407,5 @@ describe("useResetCanvasAgentChat", () => {
     const nextChat = queryClient.getQueryData(agentChatKeys.forCanvas("canvas-1")) as any;
     expect(nextChat?.id).toBe("chat-new");
     expect(queryClient.getQueryData(agentChatKeys.messages("chat-old"))).toBeUndefined();
-
-    vi.unstubAllGlobals();
   });
 });
