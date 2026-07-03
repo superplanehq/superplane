@@ -150,7 +150,7 @@ function ChatConversation({
     agentMode,
     chatId,
     canvasId,
-    isStreaming: status === "streaming",
+    isBusy: status === "streaming" || outcomeMutation.isPending || isOutcomeActive(outcomeState),
     outcomeMutation,
     interruptMutation,
     resetMutation,
@@ -338,7 +338,7 @@ function useConversationHandlers({
   agentMode,
   chatId,
   canvasId,
-  isStreaming,
+  isBusy,
   outcomeMutation,
   interruptMutation,
   resetMutation,
@@ -350,7 +350,7 @@ function useConversationHandlers({
   agentMode: AgentMode;
   chatId: string;
   canvasId: string;
-  isStreaming: boolean;
+  isBusy: boolean;
   outcomeMutation: ReturnType<typeof useDefineAgentOutcome>;
   interruptMutation: ReturnType<typeof useInterruptAgentChat>;
   resetMutation: ReturnType<typeof useResetCanvasAgentChat>;
@@ -361,11 +361,11 @@ function useConversationHandlers({
 }): ConversationHandlers {
   // React Query mutation objects are new on every render; keep latest refs in
   // a ref so the handler callbacks stay stable across parent re-renders
-  // (canvas zoom/pan ticks the parent often). isStreaming rides along too.
+  // (canvas zoom/pan ticks the parent often). isBusy rides along too.
   const mutationsRef = useRef({ sendMutation, interruptMutation, outcomeMutation, resetMutation });
   mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation, resetMutation };
-  const isStreamingRef = useRef(isStreaming);
-  isStreamingRef.current = isStreaming;
+  const isBusyRef = useRef(isBusy);
+  isBusyRef.current = isBusy;
 
   const handleSend = useCallback(
     async (content: string, images?: AgentOutgoingImage[]) => {
@@ -378,8 +378,8 @@ function useConversationHandlers({
         if (reset.isPending) return;
         setError(null);
         setNotice(null);
-        if (isStreamingRef.current) {
-          setNotice("Stop the current response before clearing the chat.");
+        if (isBusyRef.current) {
+          setNotice("Wait for the agent to finish before clearing the chat.");
           return;
         }
         if (send.isPending) {
