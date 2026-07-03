@@ -127,6 +127,43 @@ func Test__GetUsage__Execute(t *testing.T) {
 		assert.Equal(t, "3", httpContext.Requests[0].URL.Query().Get("limit"))
 	})
 
+	t.Run("group by none is not sent", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(usagePageBody)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey":   "test-key",
+				"adminKey": "test-admin-key",
+			},
+		}
+
+		executionStateCtx := &contexts.ExecutionStateContext{}
+
+		execCtx := core.ExecutionContext{
+			ID: uuid.New(),
+			Configuration: map[string]any{
+				"groupBy": "none",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: executionStateCtx,
+			Logger:         logrus.NewEntry(logrus.New()),
+		}
+
+		err := c.Execute(execCtx)
+		require.NoError(t, err)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.False(t, httpContext.Requests[0].URL.Query().Has("group_by"))
+	})
+
 	t.Run("group by model is sent as group_by", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

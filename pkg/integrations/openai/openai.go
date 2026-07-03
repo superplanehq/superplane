@@ -78,7 +78,23 @@ func (o *OpenAI) Triggers() []core.Trigger {
 }
 
 func (o *OpenAI) Instructions() string {
-	return ""
+	return `## OpenAI API Key
+
+Create an [OpenAI API key](https://platform.openai.com/api-keys) and copy it.
+
+- Used for model components like Text Prompt.
+- For OpenAI-compatible providers (e.g. Azure OpenAI, Ollama, vLLM), set a custom **Base URL** below.
+
+## Admin API Key (optional)
+
+Only required for the **Get Usage Data** component.
+
+Create an [Admin API key](https://platform.openai.com/settings/organization/admin-keys) and copy it (starts with ` + "`sk-admin-`" + `).
+
+- Only **Organization Owners** can create admin keys.
+- Admin keys can read organization usage and costs but cannot call model endpoints.
+
+> **Note:** Both keys are shown only once — store them somewhere safe before continuing.`
 }
 
 func (o *OpenAI) Cleanup(ctx core.IntegrationCleanupContext) error {

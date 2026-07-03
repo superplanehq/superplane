@@ -48,7 +48,7 @@ var usageTypeOptions = []configuration.FieldOption{
 }
 
 var groupByOptions = []configuration.FieldOption{
-	{Label: "None", Value: ""},
+	{Label: "None", Value: "none"},
 	{Label: "Model", Value: "model"},
 	{Label: "Project", Value: "project_id"},
 	{Label: "Line Item (Costs only)", Value: "line_item"},
@@ -195,7 +195,7 @@ func (c *GetUsage) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeSelect,
 			Description: "Group results by model or project",
 			Required:    false,
-			Default:     "",
+			Default:     "none",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: groupByOptions,
@@ -227,7 +227,7 @@ func (c *GetUsage) Setup(ctx core.SetupContext) error {
 // for the given usage type, so misconfigurations fail at config time.
 func validateGroupBy(usageType, groupBy string) error {
 	switch groupBy {
-	case "", "project_id":
+	case "", "none", "project_id":
 		return nil
 	case "line_item":
 		if usageType != usageTypeCosts {
@@ -324,7 +324,7 @@ func (c *GetUsage) Execute(ctx core.ExecutionContext) error {
 	params.Set("end_time", strconv.FormatInt(endDate.Unix(), 10))
 	params.Set("bucket_width", "1d")
 	params.Set("limit", strconv.Itoa(bucketLimit(usageType, startDate, endDate)))
-	if spec.GroupBy != "" {
+	if spec.GroupBy != "" && spec.GroupBy != "none" {
 		params.Set("group_by", spec.GroupBy)
 	}
 
