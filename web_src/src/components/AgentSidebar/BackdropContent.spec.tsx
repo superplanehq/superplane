@@ -11,4 +11,18 @@ describe("BackdropContent", () => {
     expect(mention.className).not.toMatch(/\bp[trblxy]?-/);
     expect(mention.className).not.toMatch(/\bfont-(?:medium|semibold|bold|extrabold|black)\b/);
   });
+
+  it("highlights a /clear slash command like a mention", () => {
+    render(<BackdropContent text="/clear" mentions={[]} />);
+
+    const command = screen.getByText("/clear");
+    expect(command).toHaveClass("bg-blue-100", "text-blue-700");
+    expect(command.className).not.toMatch(/\bp[trblxy]?-/);
+  });
+
+  it("does not highlight a partial slash command", () => {
+    render(<BackdropContent text="/cle" mentions={[]} />);
+
+    expect(screen.queryByText("/clear")).not.toBeInTheDocument();
+  });
 });
