@@ -9,6 +9,12 @@ describe("useCanvasVersionsSidebarState", () => {
     expect(result.current.isVersionsSidebarOpen).toBe(true);
   });
 
+  it("supports a collapsed default state", () => {
+    const { result } = renderHook(() => useCanvasVersionsSidebarState({ defaultOpen: false }));
+
+    expect(result.current.isVersionsSidebarOpen).toBe(false);
+  });
+
   it("toggles the open state without persisting it", () => {
     const { result } = renderHook(() => useCanvasVersionsSidebarState());
 
