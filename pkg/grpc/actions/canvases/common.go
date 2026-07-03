@@ -79,23 +79,6 @@ func loadCanvasStatus(ctx context.Context, db *gorm.DB, canvasID uuid.UUID) (can
 	}, nil
 }
 
-func ensureCanvasNameAvailableInTransaction(
-	tx *gorm.DB,
-	organizationID uuid.UUID,
-	canvasID uuid.UUID,
-	name string,
-) error {
-	existingCanvas, err := models.FindCanvasByNameInTransaction(tx, name, organizationID)
-	if err == nil && existingCanvas.ID != canvasID {
-		return models.ErrCanvasNameAlreadyExists
-	}
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-
-	return nil
-}
-
 func mapCanvasNameUniqueConstraintError(err error) error {
 	if err == nil {
 		return nil

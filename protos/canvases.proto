@@ -672,10 +672,8 @@ message CanvasVersion {
     google.protobuf.Timestamp published_at = 5;
     google.protobuf.Timestamp created_at = 6;
     google.protobuf.Timestamp updated_at = 7;
-    string name = 8;
-    string description = 9;
-    string branch_name = 10;
-    string display_name = 11;
+    string branch_name = 8;
+    string display_name = 9;
   }
 
   Metadata metadata = 1;

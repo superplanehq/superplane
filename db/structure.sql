@@ -666,8 +666,6 @@ CREATE TABLE public.workflow_versions (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     state character varying(32) NOT NULL,
-    name character varying(128) DEFAULT ''::character varying NOT NULL,
-    description text DEFAULT ''::text NOT NULL,
     console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
     display_name text DEFAULT ''::text NOT NULL,
@@ -692,7 +690,8 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     live_version_id uuid NOT NULL,
     folder_id uuid,
-    next_draft_display_number integer DEFAULT 1 NOT NULL
+    next_draft_display_number integer DEFAULT 1 NOT NULL,
+    description text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2068,7 +2067,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260624035629	f
+20260702122631	f
 \.
 
 
