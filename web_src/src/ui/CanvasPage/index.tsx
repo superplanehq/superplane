@@ -815,16 +815,6 @@ function CanvasPage(props: CanvasPageProps) {
   };
   const isVersionsSidebarOpen = versionsContentAvailable && versionsSidebarBaseState.isVersionsSidebarOpen;
 
-  // The collapse state is intentionally not persisted: the versions sidebar always
-  // starts expanded whenever the user (re)enters an edit session.
-  const isEditSessionActive = props.isEditSessionActive;
-  const { openVersionsSidebar } = versionsSidebarBaseState;
-  useEffect(() => {
-    if (isEditSessionActive) {
-      openVersionsSidebar();
-    }
-  }, [isEditSessionActive, openVersionsSidebar]);
-
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [canvasModalRequest, setCanvasModalRequest] = useState<CanvasModalRequest | null>(null);
