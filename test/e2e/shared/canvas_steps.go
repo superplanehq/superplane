@@ -79,11 +79,10 @@ func (s *CanvasSteps) ExitEditMode() {
 	s.session.Sleep(500)
 }
 
-// OpenVersionsSidebar reveals the versions sidebar. The sidebar no longer
-// auto-opens when an edit session starts (issue #5803): it starts collapsed and
-// is shown via the header toggle. If no edit session is active yet, this enters
-// edit mode (selecting the latest draft or creating one) to make the toggle
-// available, then clicks it to reveal the sidebar.
+// OpenVersionsSidebar reveals the versions sidebar, which is shown while an edit
+// session is active (unless the agent panel is the active side panel). If no
+// edit session is active yet, it enters edit mode (selecting the latest draft or
+// creating one) to reveal the sidebar.
 func (s *CanvasSteps) OpenVersionsSidebar() {
 	sidebar := q.TestID("canvas-versions-sidebar").Run(s.session)
 	if visible, _ := sidebar.IsVisible(); visible {
@@ -92,12 +91,6 @@ func (s *CanvasSteps) OpenVersionsSidebar() {
 	}
 
 	s.EnterEditMode()
-
-	if visible, _ := sidebar.IsVisible(); !visible {
-		toggle := q.TestID("canvas-versions-sidebar-toggle").Run(s.session)
-		require.NoError(s.t, toggle.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	}
-
 	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
 	s.session.Sleep(300)
 }

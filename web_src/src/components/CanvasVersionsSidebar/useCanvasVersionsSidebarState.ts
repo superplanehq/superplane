@@ -1,9 +1,7 @@
 import { useCallback, useState } from "react";
 
 export function useCanvasVersionsSidebarState() {
-  // The versions/history sidebar starts collapsed; it is never auto-opened as
-  // the initial view (see issue #5803) and is only shown via the header toggle.
-  const [isVersionsSidebarOpen, setIsVersionsSidebarOpen] = useState(false);
+  const [isVersionsSidebarOpen, setIsVersionsSidebarOpen] = useState(true);
 
   const handleVersionsSidebarToggle = useCallback(() => {
     setIsVersionsSidebarOpen((current) => !current);
