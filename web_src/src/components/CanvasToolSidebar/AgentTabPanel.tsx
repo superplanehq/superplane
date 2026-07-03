@@ -14,6 +14,7 @@ import {
   useCanvasAgentChat,
   useDefineAgentOutcome,
   useInterruptAgentChat,
+  useResetCanvasAgentChat,
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
@@ -21,6 +22,7 @@ import { useCanvas, useCanvasVersion, useCanvasVersions, useInfiniteCanvasRuns }
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
+  clearAgentBootContextForCanvas,
   getAgentBootInitialMessage,
   getAgentBootMessage,
   isAgentBootReady,
@@ -125,56 +127,32 @@ function ChatConversation({
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
   const interruptMutation = useInterruptAgentChat(organizationId);
   const outcomeMutation = useDefineAgentOutcome(organizationId);
+  const resetMutation = useResetCanvasAgentChat(organizationId, canvasId);
   const [status, setStatus] = useState<string>(initialStatus || "idle");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [outcomeState, setOutcomeState] = useStoredOutcomeState(chatId);
   const rawMessages = useConversationMessages(messagesQuery.data);
-  const { account } = useContext(AccountContext);
-  const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
-  const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
+  const messages = useGreetedMessages(rawMessages, canvasId);
 
+  // Reset on chatId too: after /clear the parent swaps in a fresh session whose
+  // initialStatus may coincide with the old value, so depending on initialStatus
+  // alone would leave a stale "streaming" status (and its thinking indicator) up.
   useEffect(() => {
     setStatus(initialStatus || "idle");
-  }, [initialStatus]);
+  }, [initialStatus, chatId]);
   useStreamingStatusReconciler(status, setStatus, refreshChatStatus);
-
-  // Prepend a synthetic greeting as the first message so it never disappears
-  const messages = useMemo(() => {
-    const greeting: AgentMessage = {
-      id: "__greeting__",
-      role: "assistant",
-      content: `Hi ${greetingFirstName}! I'm your SuperPlane agent. I'll help you build and modify this canvas.`,
-      createdAt: rawMessages[0]?.createdAt ?? null,
-      toolCallId: "",
-      toolName: "",
-      toolStatus: "",
-    };
-
-    if (!bootInitialMessage) {
-      return [greeting, ...rawMessages];
-    }
-
-    const templateIntro: AgentMessage = {
-      id: "__boot_initial_message__",
-      role: "assistant",
-      content: bootInitialMessage,
-      createdAt: rawMessages[0]?.createdAt ?? null,
-      toolCallId: "",
-      toolName: "",
-      toolStatus: "",
-    };
-
-    return [greeting, templateIntro, ...rawMessages];
-  }, [rawMessages, greetingFirstName, bootInitialMessage]);
 
   const showThinking = useThinkingIndicator(rawMessages, status);
   useAgentBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, agentMode });
   const handlers = useConversationHandlers({
     agentMode,
     chatId,
+    canvasId,
+    isStreaming: status === "streaming",
     outcomeMutation,
     interruptMutation,
+    resetMutation,
     sendMutation,
     setError,
     setNotice,
@@ -190,7 +168,7 @@ function ChatConversation({
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
   const outcomeActive = isOutcomeActive(outcomeState);
-  const agentBusy = status === "streaming" || outcomeMutation.isPending || outcomeActive;
+  const agentBusy = status === "streaming" || outcomeMutation.isPending || resetMutation.isPending || outcomeActive;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -231,15 +209,59 @@ function ChatConversation({
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
         sending={agentBusy}
-        sendPending={sendMutation.isPending}
+        sendPending={sendMutation.isPending || resetMutation.isPending}
         stopping={interruptMutation.isPending}
-        statusLabel={sendMutation.isPending ? "Starting agent..." : statusLabel(status)}
+        statusLabel={resolveComposerStatusLabel(resetMutation.isPending, sendMutation.isPending, status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
         modeDisabled={agentBusy}
       />
     </div>
   );
+}
+
+// Prepend a synthetic greeting (and optional template intro) so it never disappears.
+// The boot intro is read fresh each render (a cheap sessionStorage lookup) so a
+// same-canvas session swap (e.g. /clear) immediately drops it once it has been
+// cleared for this canvas; the value-compared string keeps the memo below stable.
+function useGreetedMessages(rawMessages: AgentMessage[], canvasId: string): AgentMessage[] {
+  const { account } = useContext(AccountContext);
+  const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
+  const bootInitialMessage = getAgentBootInitialMessage(canvasId);
+
+  return useMemo(() => {
+    const greeting: AgentMessage = {
+      id: "__greeting__",
+      role: "assistant",
+      content: `Hi ${greetingFirstName}! I'm your SuperPlane agent. I'll help you build and modify this canvas.`,
+      createdAt: rawMessages[0]?.createdAt ?? null,
+      toolCallId: "",
+      toolName: "",
+      toolStatus: "",
+    };
+
+    if (!bootInitialMessage) {
+      return [greeting, ...rawMessages];
+    }
+
+    const templateIntro: AgentMessage = {
+      id: "__boot_initial_message__",
+      role: "assistant",
+      content: bootInitialMessage,
+      createdAt: rawMessages[0]?.createdAt ?? null,
+      toolCallId: "",
+      toolName: "",
+      toolStatus: "",
+    };
+
+    return [greeting, templateIntro, ...rawMessages];
+  }, [rawMessages, greetingFirstName, bootInitialMessage]);
+}
+
+function resolveComposerStatusLabel(resetPending: boolean, sendPending: boolean, status: string): string {
+  if (resetPending) return "Clearing chat...";
+  if (sendPending) return "Starting agent...";
+  return statusLabel(status);
 }
 
 function useStreamingStatusReconciler(
@@ -350,8 +372,11 @@ function useAgentBootKickoff({
 function useConversationHandlers({
   agentMode,
   chatId,
+  canvasId,
+  isStreaming,
   outcomeMutation,
   interruptMutation,
+  resetMutation,
   sendMutation,
   setError,
   setNotice,
@@ -359,8 +384,11 @@ function useConversationHandlers({
 }: {
   agentMode: AgentMode;
   chatId: string;
+  canvasId: string;
+  isStreaming: boolean;
   outcomeMutation: ReturnType<typeof useDefineAgentOutcome>;
   interruptMutation: ReturnType<typeof useInterruptAgentChat>;
+  resetMutation: ReturnType<typeof useResetCanvasAgentChat>;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   setError: (value: string | null) => void;
   setNotice: (value: string | null) => void;
@@ -368,22 +396,48 @@ function useConversationHandlers({
 }): ConversationHandlers {
   // React Query mutation objects are new on every render; keep latest refs in
   // a ref so the handler callbacks stay stable across parent re-renders
-  // (canvas zoom/pan ticks the parent often).
-  const mutationsRef = useRef({ sendMutation, interruptMutation, outcomeMutation });
-  mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation };
+  // (canvas zoom/pan ticks the parent often). isStreaming rides along so /clear
+  // can refuse mid-turn without re-creating the callbacks each status tick.
+  const mutationsRef = useRef({ sendMutation, interruptMutation, outcomeMutation, resetMutation });
+  mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation, resetMutation };
+  const isStreamingRef = useRef(isStreaming);
+  isStreamingRef.current = isStreaming;
 
   const handleSend = useCallback(
     async (content: string, images?: AgentOutgoingImage[]) => {
-      const { sendMutation: send } = mutationsRef.current;
-      if ((!content.trim() && (images?.length ?? 0) === 0) || send.isPending) return;
+      const trimmed = content.trim();
+      const { sendMutation: send, resetMutation: reset } = mutationsRef.current;
+      if ((!trimmed && (images?.length ?? 0) === 0) || send.isPending || reset.isPending) return;
       setError(null);
       setNotice(null);
+
+      if (trimmed === "/clear") {
+        // Don't delete the session out from under an in-flight turn; make the
+        // user stop it first so we never reset while work is still streaming.
+        if (isStreamingRef.current) {
+          setNotice("Stop the current response before clearing the chat.");
+          return;
+        }
+        // Drop this canvas's boot context (scoped, incl. the stored template
+        // intro) so the kickoff effect can't auto-boot the fresh, empty session
+        // and the sidebar stops showing the old intro. Other canvases are left
+        // untouched.
+        clearAgentBootContextForCanvas(canvasId);
+        await reset.mutateAsync().catch((error) => {
+          setError(error instanceof Error ? error.message : "failed to clear chat");
+          throw error;
+        });
+        _setOutcomeState(null);
+        setNotice("Chat cleared. You’re in a fresh session.");
+        return;
+      }
+
       await send.mutateAsync({ chatId, content, mode: agentMode, images }).catch((error) => {
         setError(error instanceof Error ? error.message : "failed to send message");
         throw error;
       });
     },
-    [agentMode, chatId, setError, setNotice],
+    [agentMode, chatId, canvasId, setError, setNotice, _setOutcomeState],
   );
 
   const handleStop = useCallback(() => {
