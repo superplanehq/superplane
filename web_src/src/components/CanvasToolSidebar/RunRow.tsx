@@ -1,5 +1,5 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
@@ -107,8 +107,8 @@ export function RunRow({
         <LinkIcon className="h-3 w-3" />
       </button>
       {run.createdAt ? (
-        <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-500">
-          <TimeAgo date={run.createdAt} includeAgo={false} />
+        <span className="relative z-10 shrink-0 text-xs tabular-nums text-gray-500">
+          <Timestamp date={run.createdAt} display="relative" relativeStyle="abbreviated" includeAgo={false} />
         </span>
       ) : null}
     </div>
