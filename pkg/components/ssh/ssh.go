@@ -287,7 +287,7 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Name:                 "commandFile",
 			Label:                "Command file",
 			Type:                 configuration.FieldTypeRepositoryFile,
-			Description:          "Path to a file in the app's repository whose contents are run as the SSH command (e.g. scripts/deploy.sh). The file is piped to bash on the remote host (bash -s), so the whole script is always interpreted by bash regardless of any #! shebang line — write bash, not another language. Multi-line scripts, comments, and bash features (pipefail, declare -A, process substitution) all work. {{ ... }} syntax inside the script (Docker inspect, Helm, Go templates) is preserved. Use Environment variables below to inject values from upstream nodes.",
+			Description:          "Path to a file in the app's repository (e.g. scripts/deploy.sh). Contents are piped to bash on the remote host (bash -s); use Environment variables below to inject values from upstream nodes.",
 			Required:             false,
 			VisibilityConditions: []configuration.VisibilityCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
 			RequiredConditions:   []configuration.RequiredCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
