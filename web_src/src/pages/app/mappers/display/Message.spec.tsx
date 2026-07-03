@@ -34,4 +34,3 @@ describe("Message", () => {
     expect(screen.getByText("hello")).toBeInTheDocument();
   });
 });
-
