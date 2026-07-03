@@ -571,7 +571,7 @@ export const ConfigurationFieldRenderer = ({
       </div>
       {isEnabled && (
         <div className="flex items-center gap-2">
-          <div className="flex-1">{renderField()}</div>
+          <div className="flex-1 min-w-0">{renderField()}</div>
         </div>
       )}
 
