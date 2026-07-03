@@ -1,9 +1,39 @@
-import React from "react";
+import React, { useEffect, useReducer } from "react";
 import { twMerge } from "tailwind-merge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { CopyButton } from "@/ui/CopyButton";
-import { TimeAgo } from "@/components/TimeAgo";
 import { formatAbsolute, formatISO, formatRelative, formatUTC, toDate, type TimestampInput } from "@/lib/datetime";
+
+// A single shared 1s ticker drives every relative label so a page with many
+// timestamps doesn't spin up an interval per instance (mirrors `TimeAgo`).
+const relativeTickListeners = new Set<() => void>();
+let relativeTickInterval: ReturnType<typeof setInterval> | null = null;
+
+function subscribeRelativeTick(listener: () => void): () => void {
+  relativeTickListeners.add(listener);
+  if (!relativeTickInterval) {
+    relativeTickInterval = setInterval(() => {
+      relativeTickListeners.forEach((cb) => cb());
+    }, 1000);
+  }
+  return () => {
+    relativeTickListeners.delete(listener);
+    if (relativeTickInterval && relativeTickListeners.size === 0) {
+      clearInterval(relativeTickInterval);
+      relativeTickInterval = null;
+    }
+  };
+}
+
+/**
+ * Live-updating relative label. Uses `formatRelative` (not `TimeAgo`) so future
+ * timestamps render as "in …" instead of being clamped to "0s ago".
+ */
+function RelativeLabel({ date, iso }: { date: Date; iso: string }) {
+  const [, tick] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => subscribeRelativeTick(tick), []);
+  return <time dateTime={iso}>{formatRelative(date)}</time>;
+}
 
 interface TimestampProps {
   /** Accepts a `Date`, ISO string, or epoch milliseconds. */
@@ -58,7 +88,7 @@ export const Timestamp = React.memo(function Timestamp({
       <HoverCardTrigger asChild>
         <span className={twMerge(hintClasses, className)}>
           {display === "relative" ? (
-            <TimeAgo date={resolved} />
+            <RelativeLabel date={resolved} iso={iso} />
           ) : (
             <time dateTime={iso}>{formatAbsolute(resolved)}</time>
           )}

@@ -20,9 +20,14 @@ describe("Timestamp", () => {
     expect(screen.getByText(/2026/).closest("span")).not.toHaveClass("decoration-dashed");
   });
 
-  it("renders relative text when display is relative", () => {
-    render(<Timestamp date={new Date()} display="relative" />);
+  it("renders past times as '… ago' when display is relative", () => {
+    render(<Timestamp date={new Date(Date.now() - 5000)} display="relative" />);
     expect(screen.getByText(/ago$/)).toBeInTheDocument();
+  });
+
+  it("renders future times as 'in …' instead of clamping to zero", () => {
+    render(<Timestamp date={new Date(Date.now() + 3 * 60 * 60 * 1000)} display="relative" />);
+    expect(screen.getByText(/^in /)).toBeInTheDocument();
   });
 
   it("renders the fallback for missing or invalid dates", () => {
