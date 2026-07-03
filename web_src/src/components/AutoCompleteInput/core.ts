@@ -98,6 +98,13 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
       "Returns the payload from the immediate predecessor that emitted this event. Provide depth to walk upstream.",
     example: "previous(2).data.image.version",
   },
+  {
+    name: "secrets",
+    snippet: 'secrets("${1:secret-name}").',
+    description:
+      "Returns the keys of an organization secret as a map. Resolved at execution time so the secret value never reaches the stored configuration.",
+    example: 'secrets("api").token',
+  },
   // String
   {
     name: "trim",
