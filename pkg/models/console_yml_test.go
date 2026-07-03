@@ -1322,6 +1322,41 @@ func TestValidateConsoleContent_RejectsNodesPanelWithBadShowRun(t *testing.T) {
 	assert.Contains(t, err.Error(), "content.nodes[0].showRun must be a boolean")
 }
 
+func TestValidateConsoleContent_RejectsNodesPanelWithBadPromptConfirmation(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "key-nodes",
+			Type: ConsolePanelTypeNodes,
+			Content: map[string]any{
+				"nodes": []any{
+					map[string]any{"node": "deploy-prod", "promptConfirmation": "yes"},
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.nodes[0].promptConfirmation must be a boolean")
+}
+
+func TestValidateConsoleContent_RejectsNodePanelWithBadPromptConfirmation(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "deploy",
+			Type: ConsolePanelTypeNode,
+			Content: map[string]any{
+				"node":               "deploy-prod",
+				"promptConfirmation": "yes",
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.promptConfirmation must be a boolean")
+}
+
 func TestValidateConsoleContent_AcceptsNodePanelWithLabel(t *testing.T) {
 	panels := []ConsolePanel{
 		{

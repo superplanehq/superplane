@@ -17,6 +17,21 @@ const NODE_NO_PARAMS: SuperplaneComponentsNode = {
   },
 };
 
+const NODE_WITH_PARAMS: SuperplaneComponentsNode = {
+  id: "node-1",
+  name: "deploy-prod",
+  type: "TYPE_TRIGGER",
+  configuration: {
+    templates: [
+      {
+        name: "manual",
+        payload: { reason: "console" },
+        parameters: [{ name: "branch", type: "string", defaultString: "main" }],
+      },
+    ],
+  },
+};
+
 const NODE_ACTION: SuperplaneComponentsNode = {
   id: "node-2",
   name: "publish-artifact",
@@ -31,6 +46,18 @@ const PANEL: ConsolePanel = {
     node: "deploy-prod",
     showRun: true,
     triggerName: "manual",
+  },
+};
+
+const PANEL_PROMPT: ConsolePanel = {
+  id: "deploy",
+  type: "node",
+  content: {
+    title: "Deploy",
+    node: "deploy-prod",
+    showRun: true,
+    triggerName: "manual",
+    promptConfirmation: true,
   },
 };
 
@@ -59,17 +86,58 @@ function renderPanel({
 }
 
 describe("NodePanelCard run flow", () => {
-  it("opens the confirm dialog instead of triggering immediately", () => {
+  it("triggers immediately for a parameter-less template when confirmation is not required", async () => {
     const onTrigger = vi.fn();
     renderPanel({ canRunNodes: true, onTriggerNode: onTrigger });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("node-panel-run"));
+    });
+    await waitFor(() => expect(onTrigger).toHaveBeenCalledTimes(1));
+    expect(onTrigger).toHaveBeenCalledWith("node-1", {
+      hookName: "run",
+      templateName: "manual",
+      parameters: { template: "manual" },
+    });
+    expect(screen.queryByTestId("node-panel-run-dialog-submit")).toBeNull();
+  });
+
+  it("locks the Run button with a loading state while the direct trigger is in flight", async () => {
+    let resolveTrigger: (() => void) | undefined;
+    const onTrigger = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveTrigger = resolve;
+        }),
+    );
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger });
+    fireEvent.click(screen.getByTestId("node-panel-run"));
+    await waitFor(() => expect(screen.getByTestId("node-panel-run")).toBeDisabled());
+    await act(async () => {
+      resolveTrigger?.();
+    });
+    await waitFor(() => expect(screen.getByTestId("node-panel-run")).not.toBeDisabled());
+  });
+
+  it("opens the confirm dialog for a parameter-less template when promptConfirmation is enabled", () => {
+    const onTrigger = vi.fn();
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, panel: PANEL_PROMPT });
     fireEvent.click(screen.getByTestId("node-panel-run"));
     expect(onTrigger).not.toHaveBeenCalled();
     expect(screen.getByTestId("node-panel-run-dialog-submit")).toBeTruthy();
   });
 
+  it("opens the confirm dialog for templates with input fields even without promptConfirmation", () => {
+    const onTrigger = vi.fn();
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, nodes: [NODE_WITH_PARAMS] });
+    fireEvent.click(screen.getByTestId("node-panel-run"));
+    expect(onTrigger).not.toHaveBeenCalled();
+    expect(screen.getByTestId("node-panel-run-dialog-submit")).toBeTruthy();
+    expect(screen.getByLabelText("branch")).toBeTruthy();
+  });
+
   it("submits the preview parameters via ctx.onTriggerNode on confirm", async () => {
     const onTrigger = vi.fn();
-    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger });
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, panel: PANEL_PROMPT });
     fireEvent.click(screen.getByTestId("node-panel-run"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("node-panel-run-dialog-submit"));
@@ -82,15 +150,23 @@ describe("NodePanelCard run flow", () => {
     });
   });
 
-  it("keeps the confirm dialog open when onTriggerNode rejects", async () => {
-    const onTrigger = vi.fn().mockRejectedValue(new Error("API failed"));
-    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger });
+  it("closes the dialog on confirm and drives the loading state on the widget button", async () => {
+    let resolveTrigger: (() => void) | undefined;
+    const onTrigger = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveTrigger = resolve;
+        }),
+    );
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, panel: PANEL_PROMPT });
     fireEvent.click(screen.getByTestId("node-panel-run"));
+    fireEvent.click(screen.getByTestId("node-panel-run-dialog-submit"));
+    await waitFor(() => expect(screen.queryByTestId("node-panel-run-dialog-submit")).toBeNull());
+    expect(screen.getByTestId("node-panel-run")).toBeDisabled();
     await act(async () => {
-      fireEvent.click(screen.getByTestId("node-panel-run-dialog-submit"));
+      resolveTrigger?.();
     });
-    await waitFor(() => expect(onTrigger).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId("node-panel-run-dialog-submit")).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId("node-panel-run")).not.toBeDisabled());
   });
 
   it("disables the Run button when the viewer cannot run nodes", () => {

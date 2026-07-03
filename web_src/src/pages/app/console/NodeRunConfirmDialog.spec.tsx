@@ -37,7 +37,7 @@ function resolvedFor(node: SuperplaneComponentsNode) {
 }
 
 describe("NodeRunConfirmDialog", () => {
-  it("renders a read-only payload preview when the template declares no parameters", () => {
+  it("renders a bare confirmation (no fields, no payload preview) when the template declares no parameters", () => {
     render(
       <NodeRunConfirmDialog
         open
@@ -48,34 +48,9 @@ describe("NodeRunConfirmDialog", () => {
       />,
     );
     expect(screen.queryByTestId("node-run-confirm-fields")).toBeNull();
-    // The payload preview is collapsed by default; expand it before asserting.
     expect(screen.queryByTestId("node-run-confirm-parameters")).toBeNull();
-    fireEvent.click(screen.getByTestId("node-run-confirm-payload-toggle"));
-    const preview = screen.getByTestId("node-run-confirm-parameters");
-    expect(preview.textContent).toContain('"template": "manual"');
-  });
-
-  it("keeps long parameter values inside a horizontally scrollable preview", () => {
-    render(
-      <NodeRunConfirmDialog
-        open
-        onOpenChange={() => undefined}
-        resolved={resolvedFor({
-          ...NODE_NO_PARAMS,
-          configuration: {
-            templates: [{ name: "manual", payload: { token: "a".repeat(200) } }],
-          },
-        })}
-        templateName="manual"
-        onConfirm={vi.fn().mockResolvedValue(undefined)}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId("node-run-confirm-payload-toggle"));
-    const preview = screen.getByTestId("node-run-confirm-parameters");
-    expect(preview.getAttribute("class")).toContain("overflow-x-auto");
-    expect(preview.getAttribute("class")).toContain("whitespace-pre");
-    expect(preview.getAttribute("class")).not.toContain("break-all");
+    expect(screen.queryByTestId("node-run-confirm-payload-toggle")).toBeNull();
+    expect(screen.getByTestId("node-run-confirm-confirm-message").textContent).toContain("deploy-prod");
   });
 
   it("submits coerced parameter values along with the template name", async () => {
@@ -111,8 +86,8 @@ describe("NodeRunConfirmDialog", () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 
-  it("keeps the dialog open and shows the error when onConfirm rejects", async () => {
-    const onConfirm = vi.fn().mockRejectedValue(new Error("boom"));
+  it("hands off the template and closes immediately on confirm (no internal loading state)", async () => {
+    const onConfirm = vi.fn();
     const onOpenChange = vi.fn();
     render(
       <NodeRunConfirmDialog
@@ -126,9 +101,8 @@ describe("NodeRunConfirmDialog", () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId("node-run-confirm-submit"));
     });
-    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
-    expect(onOpenChange).not.toHaveBeenCalledWith(false);
-    expect(screen.getByTestId("node-run-confirm-submit")).toBeTruthy();
-    expect(screen.getByTestId("node-run-confirm-error").textContent).toBe("boom");
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith({ template: "manual" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

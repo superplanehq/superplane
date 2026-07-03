@@ -23,10 +23,37 @@ const NODE: SuperplaneComponentsNode = {
   },
 };
 
+const NODE_NO_PARAMS: SuperplaneComponentsNode = {
+  id: "node-1",
+  name: "deploy-prod",
+  type: "TYPE_TRIGGER",
+  configuration: {
+    templates: [{ name: "manual", payload: { reason: "console" } }],
+  },
+};
+
 const NODE_ACTION: SuperplaneComponentsNode = {
   id: "node-2",
   name: "publish-artifact",
   type: "TYPE_ACTION",
+};
+
+const PANEL_NO_PARAMS: ConsolePanel = {
+  id: "key-nodes",
+  type: "nodes",
+  content: {
+    title: "Key nodes",
+    nodes: [{ node: "deploy-prod", showRun: true, triggerName: "manual" }],
+  },
+};
+
+const PANEL_NO_PARAMS_PROMPT: ConsolePanel = {
+  id: "key-nodes",
+  type: "nodes",
+  content: {
+    title: "Key nodes",
+    nodes: [{ node: "deploy-prod", showRun: true, triggerName: "manual", promptConfirmation: true }],
+  },
 };
 
 const PANEL: ConsolePanel = {
@@ -93,6 +120,51 @@ describe("NodesPanelCard run flow", () => {
       templateName: "manual",
       parameters: { template: "manual", branch: "release/v3" },
     });
+  });
+
+  it("triggers immediately for a parameter-less row when confirmation is not required", async () => {
+    const onTrigger = vi.fn();
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, nodes: [NODE_NO_PARAMS], panel: PANEL_NO_PARAMS });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("nodes-panel-row-run"));
+    });
+    await waitFor(() => expect(onTrigger).toHaveBeenCalledTimes(1));
+    expect(onTrigger).toHaveBeenCalledWith("node-1", {
+      hookName: "run",
+      templateName: "manual",
+      parameters: { template: "manual" },
+    });
+    expect(screen.queryByTestId("nodes-panel-row-run-dialog-submit")).toBeNull();
+  });
+
+  it("locks the Run button with a loading state while the direct trigger is in flight", async () => {
+    let resolveTrigger: (() => void) | undefined;
+    const onTrigger = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveTrigger = resolve;
+        }),
+    );
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, nodes: [NODE_NO_PARAMS], panel: PANEL_NO_PARAMS });
+    fireEvent.click(screen.getByTestId("nodes-panel-row-run"));
+    await waitFor(() => expect(screen.getByTestId("nodes-panel-row-run")).toBeDisabled());
+    await act(async () => {
+      resolveTrigger?.();
+    });
+    await waitFor(() => expect(screen.getByTestId("nodes-panel-row-run")).not.toBeDisabled());
+  });
+
+  it("opens the confirm dialog for a parameter-less row when promptConfirmation is enabled", () => {
+    const onTrigger = vi.fn();
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: onTrigger,
+      nodes: [NODE_NO_PARAMS],
+      panel: PANEL_NO_PARAMS_PROMPT,
+    });
+    fireEvent.click(screen.getByTestId("nodes-panel-row-run"));
+    expect(onTrigger).not.toHaveBeenCalled();
+    expect(screen.getByTestId("nodes-panel-row-run-dialog-submit")).toBeTruthy();
   });
 
   it("disables the Run button when the viewer cannot run nodes", () => {
