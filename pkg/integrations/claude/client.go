@@ -5,7 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
+	"net/url"
+	"path/filepath"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -13,6 +18,9 @@ import (
 const (
 	defaultBaseURL        = "https://api.anthropic.com/v1"
 	anthropicVersionValue = "2023-06-01"
+	// anthropicFilesBeta is required to upload files and to reference a file_id
+	// from a content block on the Messages API.
+	anthropicFilesBeta = "files-api-2025-04-14"
 )
 
 type Client struct {
@@ -23,25 +31,28 @@ type Client struct {
 
 // Message represents a Claude API message.
 // Content can be a plain string (for simple text) or []ContentBlock
-// (for multi-part content with documents and text).
+// (for multi-part content with documents, images and text).
 type Message struct {
 	Role    string `json:"role"`
 	Content any    `json:"content"`
 }
 
 // ContentBlock represents a content block in a Claude message.
-// Used for text, documents, and other structured content.
+// Used for text, images, and documents.
 type ContentBlock struct {
 	Type   string              `json:"type"`
 	Text   string              `json:"text,omitempty"`
 	Source *ContentBlockSource `json:"source,omitempty"`
 }
 
-// ContentBlockSource describes the source of a document content block.
+// ContentBlockSource describes the source of an image/document content block.
+// Type "text"/"base64" carry MediaType+Data inline; type "file" references a
+// Files API file_id.
 type ContentBlockSource struct {
-	Type      string `json:"type"`       // "text" for inline content
-	MediaType string `json:"media_type"` // e.g. "text/plain", "text/markdown"
-	Data      string `json:"data"`       // the actual content
+	Type      string `json:"type"`
+	MediaType string `json:"media_type,omitempty"`
+	Data      string `json:"data,omitempty"`
+	FileID    string `json:"file_id,omitempty"`
 }
 
 type CreateMessageRequest struct {
@@ -143,7 +154,12 @@ func (c *Client) CreateMessage(req CreateMessageRequest) (*CreateMessageResponse
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, c.BaseURL+"/messages", bytes.NewBuffer(reqBody))
+	beta := ""
+	if requestReferencesFiles(req) {
+		beta = anthropicFilesBeta
+	}
+
+	responseBody, err := c.execRequestWithBeta(http.MethodPost, c.BaseURL+"/messages", bytes.NewBuffer(reqBody), beta)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +172,104 @@ func (c *Client) CreateMessage(req CreateMessageRequest) (*CreateMessageResponse
 	return &response, nil
 }
 
+// requestReferencesFiles reports whether any message content block references a
+// Files API file_id (which requires the files beta header).
+func requestReferencesFiles(req CreateMessageRequest) bool {
+	for _, m := range req.Messages {
+		blocks, ok := m.Content.([]ContentBlock)
+		if !ok {
+			continue
+		}
+		for _, b := range blocks {
+			if b.Source != nil && b.Source.FileID != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+// createFormFile is like multipart.Writer.CreateFormFile but lets the caller set
+// the part's Content-Type. The stdlib helper hardcodes application/octet-stream,
+// which causes the provider to store (and later reject) the file with the wrong
+// media type instead of the detected one.
+func createFormFile(w *multipart.Writer, fieldname, filename, contentType string) (io.Writer, error) {
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+		quoteEscaper.Replace(fieldname), quoteEscaper.Replace(filename)))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	h.Set("Content-Type", contentType)
+	return w.CreatePart(h)
+}
+
+// UploadFile uploads a file to the Anthropic Files API and returns its file_id.
+func (c *Client) UploadFile(content io.Reader, filename, contentType string) (string, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := createFormFile(writer, "file", filepath.Base(filename), contentType)
+	if err != nil {
+		return "", fmt.Errorf("create multipart file: %w", err)
+	}
+	if _, err := io.Copy(part, content); err != nil {
+		return "", fmt.Errorf("copy file content: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, c.BaseURL+"/files", &body)
+	if err != nil {
+		return "", fmt.Errorf("build upload request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("x-api-key", c.APIKey)
+	req.Header.Set("anthropic-version", anthropicVersionValue)
+	req.Header.Set("anthropic-beta", anthropicFilesBeta)
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("upload file: %w", err)
+	}
+	defer res.Body.Close()
+
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("read upload response: %w", err)
+	}
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
+		return "", fmt.Errorf("upload file failed (%d): %s", res.StatusCode, string(resBody))
+	}
+
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(resBody, &result); err != nil {
+		return "", fmt.Errorf("decode upload response: %w", err)
+	}
+	if result.ID == "" {
+		return "", fmt.Errorf("upload returned empty file ID")
+	}
+	return result.ID, nil
+}
+
+// DeleteFile removes an uploaded file. Best-effort cleanup; no-op for empty IDs.
+func (c *Client) DeleteFile(fileID string) error {
+	if fileID == "" {
+		return nil
+	}
+	_, err := c.execRequestWithBeta(http.MethodDelete, c.BaseURL+"/files/"+url.PathEscape(fileID), nil, anthropicFilesBeta)
+	return err
+}
+
 func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error) {
+	return c.execRequestWithBeta(method, URL, body, "")
+}
+
+func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta string) ([]byte, error) {
 	req, err := http.NewRequest(method, URL, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
@@ -166,6 +279,9 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 	}
 	req.Header.Set("x-api-key", c.APIKey)
 	req.Header.Set("anthropic-version", anthropicVersionValue)
+	if beta != "" {
+		req.Header.Set("anthropic-beta", beta)
+	}
 
 	res, err := c.http.Do(req)
 	if err != nil {
