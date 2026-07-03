@@ -17,7 +17,10 @@ apt-get install -qy \
   unzip \
   build-essential \
   gnupg \
-  lsb-release
+  lsb-release \
+  python3 \
+  python3-pip \
+  python3-venv
 
 # Docker
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
