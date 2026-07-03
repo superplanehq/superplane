@@ -7,7 +7,7 @@ import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
-const { sendMutation, chatState, chatRefetch } = vi.hoisted(() => {
+const { sendMutation, resetMutation, chatState, chatRefetch } = vi.hoisted(() => {
   const state = {
     status: "idle",
     refetchStatus: "idle",
@@ -15,6 +15,10 @@ const { sendMutation, chatState, chatRefetch } = vi.hoisted(() => {
 
   return {
     sendMutation: {
+      isPending: false,
+      mutateAsync: vi.fn(),
+    },
+    resetMutation: {
       isPending: false,
       mutateAsync: vi.fn(),
     },
@@ -62,6 +66,7 @@ vi.mock("@/hooks/useAgentChats", () => ({
     fetchNextPage: vi.fn(async () => undefined),
   }),
   useSendAgentChatMessage: () => sendMutation,
+  useResetCanvasAgentChat: () => resetMutation,
   useInterruptAgentChat: () => ({ isPending: false, mutate: vi.fn() }),
   useDefineAgentOutcome: () => ({ mutateAsync: vi.fn() }),
 }));
@@ -104,6 +109,9 @@ describe("CanvasToolSidebar", () => {
     sendMutation.isPending = false;
     sendMutation.mutateAsync.mockReset();
     sendMutation.mutateAsync.mockResolvedValue(null);
+    resetMutation.isPending = false;
+    resetMutation.mutateAsync.mockReset();
+    resetMutation.mutateAsync.mockResolvedValue(null);
     sessionStorage.clear();
   });
 
