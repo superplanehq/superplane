@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasToolSidebar } from ".";
@@ -88,6 +88,7 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
     isAgentEnabled: true,
     agentUnavailable: false,
     markAgentUnavailable: vi.fn(),
+    markAgentAvailable: vi.fn(),
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
@@ -114,9 +115,12 @@ describe("CanvasToolSidebar", () => {
   });
 
   it("renders the agent panel when the sidebar is open", async () => {
-    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+    const markAgentAvailable = vi.fn();
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentAvailable })} />);
 
     expect(await screen.findByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+    await waitFor(() => expect(markAgentAvailable).toHaveBeenCalledTimes(1));
   });
 
   it("allows retrying a failed session", async () => {

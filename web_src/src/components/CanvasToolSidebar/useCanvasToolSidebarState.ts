@@ -76,6 +76,7 @@ export function useCanvasToolSidebarState({
     if (previousCanvasIdRef.current === canvasId) return;
     previousCanvasIdRef.current = canvasId;
     setIsToolSidebarOpen(readInitialToolSidebarOpen(canvasId));
+    setAgentUnavailableCanvasId(undefined);
   }, [canvasId]);
 
   const persistOpen = useCallback(
@@ -114,6 +115,10 @@ export function useCanvasToolSidebarState({
   // the panel avoids advertising a chat that can never work (issue #5803).
   const markAgentUnavailable = useCallback(() => {
     setAgentUnavailableCanvasId(canvasId);
+  }, [canvasId]);
+
+  const markAgentAvailable = useCallback(() => {
+    setAgentUnavailableCanvasId((currentCanvasId) => (currentCanvasId === canvasId ? undefined : currentCanvasId));
   }, [canvasId]);
 
   useEffect(() => {
@@ -160,6 +165,7 @@ export function useCanvasToolSidebarState({
     isAgentEnabled: featureEnabled,
     agentUnavailable,
     markAgentUnavailable,
+    markAgentAvailable,
     handleToolSidebarToggle,
     openToolSidebar,
     closeToolSidebar,

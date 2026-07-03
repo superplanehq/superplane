@@ -85,10 +85,11 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
   // the agent as unavailable so the sidebar hides the panel and its toggle
   // instead of spinning on "Setting up..." forever (issue #5803).
   const chatFailed = chatQuery.isError;
-  const { markAgentUnavailable } = toolSidebarState;
+  const { markAgentAvailable, markAgentUnavailable } = toolSidebarState;
   useEffect(() => {
     if (chatFailed) markAgentUnavailable();
-  }, [chatFailed, markAgentUnavailable]);
+    if (!chatFailed && chatId) markAgentAvailable();
+  }, [chatFailed, chatId, markAgentAvailable, markAgentUnavailable]);
 
   if (chatFailed) {
     return (

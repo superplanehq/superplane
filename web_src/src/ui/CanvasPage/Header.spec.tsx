@@ -36,6 +36,7 @@ const toolSidebarState = {
   isAgentEnabled: false,
   agentUnavailable: false,
   markAgentUnavailable: vi.fn(),
+  markAgentAvailable: vi.fn(),
   handleToolSidebarToggle: vi.fn(),
   openToolSidebar: vi.fn(),
   closeToolSidebar: vi.fn(),
