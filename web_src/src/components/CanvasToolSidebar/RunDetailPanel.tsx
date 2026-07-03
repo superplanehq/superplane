@@ -1,7 +1,7 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Link as LinkIcon } from "lucide-react";
 import { useMemo } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEventExecutions } from "@/hooks/useCanvasData";
@@ -132,7 +132,7 @@ export function RunDetailPanel({
         {run.createdAt ? (
           <div className="mt-1 flex items-center gap-1">
             <span className="text-xs text-gray-500">
-              <TimeAgo date={run.createdAt} />
+              <Timestamp date={run.createdAt} display="relative" relativeStyle="abbreviated" />
             </span>
             <button
               type="button"
