@@ -286,6 +286,37 @@ func Test__Client__CreateResponse(t *testing.T) {
 		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
 		assert.Contains(t, string(body), `"model":"gpt-4o"`)
 		assert.Contains(t, string(body), `"input":"Hi"`)
+		// No schema configured -> the structured-output field is omitted.
+		assert.NotContains(t, string(body), `"text"`)
+	})
+
+	t.Run("sends text.format when schema is set", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"r","model":"gpt-4o","output_text":"{}"}`)),
+				},
+			},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+
+		_, err := client.CreateResponse(CreateResponseRequest{
+			Model: "gpt-4o",
+			Input: "Hi",
+			Text: &ResponseTextConfig{Format: &ResponseFormat{
+				Type:   "json_schema",
+				Name:   "structured_output",
+				Schema: map[string]any{"type": "object"},
+				Strict: true,
+			}},
+		})
+		require.NoError(t, err)
+
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		assert.Contains(t, string(body), `"text":{"format":{"type":"json_schema"`)
+		assert.Contains(t, string(body), `"name":"structured_output"`)
+		assert.Contains(t, string(body), `"strict":true`)
 	})
 
 	t.Run("API error -> error", func(t *testing.T) {

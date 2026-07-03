@@ -48,8 +48,9 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 // CreateResponseRequest is the Responses API request. Input is a plain string
 // for text-only prompts, or []InputMessage when attaching files/images.
 type CreateResponseRequest struct {
-	Model string `json:"model"`
-	Input any    `json:"input"`
+	Model string              `json:"model"`
+	Input any                 `json:"input"`
+	Text  *ResponseTextConfig `json:"text,omitempty"`
 }
 
 // InputMessage is a role + content-parts entry in the Responses API input array.
@@ -66,9 +67,23 @@ type InputPart struct {
 	FileID   string `json:"file_id,omitempty"`
 }
 
+// ResponseTextConfig carries the structured-output format for the Responses API.
+type ResponseTextConfig struct {
+	Format *ResponseFormat `json:"format,omitempty"`
+}
+
+// ResponseFormat constrains the response to a JSON schema (Responses API: text.format).
+type ResponseFormat struct {
+	Type   string `json:"type"`             // "json_schema"
+	Name   string `json:"name"`             // required by the Responses API
+	Schema any    `json:"schema"`           // the JSON Schema object
+	Strict bool   `json:"strict,omitempty"` // enforce exact schema conformance
+}
+
 type ResponseContent struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type    string `json:"type"`
+	Text    string `json:"text"`
+	Refusal string `json:"refusal,omitempty"`
 }
 
 type ResponseOutput struct {
