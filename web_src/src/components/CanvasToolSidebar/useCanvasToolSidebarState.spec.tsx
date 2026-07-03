@@ -98,6 +98,7 @@ describe("useCanvasToolSidebarState", () => {
 
     expect(screen.getByTestId("toggle-state")).toHaveTextContent("hidden");
     expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+    expect(window.localStorage.getItem("canvasAgentSidebarOpen:canvas-x")).toBe("true");
   });
 
   it("shows the toggle again when agent provisioning later succeeds", () => {

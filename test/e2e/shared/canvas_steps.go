@@ -79,10 +79,9 @@ func (s *CanvasSteps) ExitEditMode() {
 	s.session.Sleep(500)
 }
 
-// OpenVersionsSidebar reveals the versions sidebar, which is shown while an edit
-// session is active (unless the agent panel is the active side panel). If no
-// edit session is active yet, it enters edit mode (selecting the latest draft or
-// creating one) to reveal the sidebar.
+// OpenVersionsSidebar reveals the versions sidebar. If no edit session is active
+// yet, it enters edit mode (selecting the latest draft or creating one) before
+// opening the sidebar from the header toggle.
 func (s *CanvasSteps) OpenVersionsSidebar() {
 	sidebar := q.TestID("canvas-versions-sidebar").Run(s.session)
 	if visible, _ := sidebar.IsVisible(); visible {
@@ -91,6 +90,7 @@ func (s *CanvasSteps) OpenVersionsSidebar() {
 	}
 
 	s.EnterEditMode()
+	s.session.Click(q.TestID("canvas-versions-sidebar-toggle"))
 	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
 	s.session.Sleep(300)
 }

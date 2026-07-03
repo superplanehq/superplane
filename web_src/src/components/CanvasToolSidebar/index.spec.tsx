@@ -9,6 +9,10 @@ const richMessageRenderSpy = vi.fn();
 
 const { sendMutation, chatState, chatRefetch } = vi.hoisted(() => {
   const state = {
+    hasChat: true,
+    isError: false,
+    isFetching: false,
+    isLoading: false,
     status: "idle",
     refetchStatus: "idle",
   };
@@ -32,8 +36,10 @@ vi.mock("@/hooks/useCanvasData", () => ({
 
 vi.mock("@/hooks/useAgentChats", () => ({
   useCanvasAgentChat: () => ({
-    data: { id: "chat-1", status: chatState.status },
-    isLoading: false,
+    data: chatState.hasChat ? { id: "chat-1", status: chatState.status } : undefined,
+    isError: chatState.isError,
+    isFetching: chatState.isFetching,
+    isLoading: chatState.isLoading,
     refetch: chatRefetch,
   }),
   useAgentChatMessages: () => ({
@@ -101,6 +107,10 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
 describe("CanvasToolSidebar", () => {
   beforeEach(() => {
     richMessageRenderSpy.mockClear();
+    chatState.hasChat = true;
+    chatState.isError = false;
+    chatState.isFetching = false;
+    chatState.isLoading = false;
     chatState.status = "idle";
     chatState.refetchStatus = "idle";
     chatRefetch.mockClear();
@@ -121,6 +131,30 @@ describe("CanvasToolSidebar", () => {
 
     expect(await screen.findByPlaceholderText("Ask the agent…")).toBeInTheDocument();
     await waitFor(() => expect(markAgentAvailable).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps the agent visible while a cached chat error is refetching", async () => {
+    const markAgentUnavailable = vi.fn();
+    chatState.hasChat = false;
+    chatState.isError = true;
+    chatState.isFetching = true;
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentUnavailable })} />);
+
+    expect(await screen.findByText(/Setting up/)).toBeInTheDocument();
+    expect(markAgentUnavailable).not.toHaveBeenCalled();
+  });
+
+  it("marks the agent unavailable after a settled chat setup failure", async () => {
+    const markAgentUnavailable = vi.fn();
+    chatState.hasChat = false;
+    chatState.isError = true;
+    chatState.isFetching = false;
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentUnavailable })} />);
+
+    expect(await screen.findByText("The SuperPlane agent isn't available on this instance.")).toBeInTheDocument();
+    await waitFor(() => expect(markAgentUnavailable).toHaveBeenCalledTimes(1));
   });
 
   it("allows retrying a failed session", async () => {

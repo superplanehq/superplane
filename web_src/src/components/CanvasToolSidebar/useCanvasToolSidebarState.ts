@@ -122,8 +122,10 @@ export function useCanvasToolSidebarState({
   }, [canvasId]);
 
   useEffect(() => {
-    if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar || agentUnavailable) closeToolSidebar();
-  }, [featureEnabled, forceEnable, hideCanvasToolSidebar, agentUnavailable, closeToolSidebar]);
+    if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar || agentUnavailable) {
+      setIsToolSidebarOpen(false);
+    }
+  }, [featureEnabled, forceEnable, hideCanvasToolSidebar, agentUnavailable]);
 
   const showToolSidebarToggle = (featureEnabled || forceEnable) && !hideCanvasToolSidebar && !agentUnavailable;
 
