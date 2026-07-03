@@ -126,10 +126,8 @@ export function abandonPendingPlaceholderBoot(canvasId: string) {
   window.dispatchEvent(new CustomEvent(AGENT_BOOT_CONTEXT_READY_EVENT, { detail: { canvasId } }));
 }
 
-// Clear every trace of boot state for a single canvas: the (shared) boot
-// context entry if it belongs to this canvas, plus the persisted template
-// intro. Used by /clear so a reset session doesn't auto-boot or keep showing
-// the old template introduction, while leaving other canvases untouched.
+// Clear all boot state for a single canvas (scoped context + stored template
+// intro), leaving other canvases untouched.
 export function clearAgentBootContextForCanvas(canvasId: string) {
   if (typeof window === "undefined") return;
 

@@ -135,9 +135,7 @@ function ChatConversation({
   const rawMessages = useConversationMessages(messagesQuery.data);
   const messages = useGreetedMessages(rawMessages, canvasId);
 
-  // Reset on chatId too: after /clear the parent swaps in a fresh session whose
-  // initialStatus may coincide with the old value, so depending on initialStatus
-  // alone would leave a stale "streaming" status (and its thinking indicator) up.
+  // chatId is a dep so a /clear session swap resets a stale "streaming" status.
   useEffect(() => {
     setStatus(initialStatus || "idle");
   }, [initialStatus, chatId]);
@@ -221,12 +219,10 @@ function ChatConversation({
 }
 
 // Prepend a synthetic greeting (and optional template intro) so it never disappears.
-// The boot intro is read fresh each render (a cheap sessionStorage lookup) so a
-// same-canvas session swap (e.g. /clear) immediately drops it once it has been
-// cleared for this canvas; the value-compared string keeps the memo below stable.
 function useGreetedMessages(rawMessages: AgentMessage[], canvasId: string): AgentMessage[] {
   const { account } = useContext(AccountContext);
   const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
+  // Read fresh each render so a /clear drops the intro once cleared for this canvas.
   const bootInitialMessage = getAgentBootInitialMessage(canvasId);
 
   return useMemo(() => {
@@ -396,8 +392,7 @@ function useConversationHandlers({
 }): ConversationHandlers {
   // React Query mutation objects are new on every render; keep latest refs in
   // a ref so the handler callbacks stay stable across parent re-renders
-  // (canvas zoom/pan ticks the parent often). isStreaming rides along so /clear
-  // can refuse mid-turn without re-creating the callbacks each status tick.
+  // (canvas zoom/pan ticks the parent often). isStreaming rides along too.
   const mutationsRef = useRef({ sendMutation, interruptMutation, outcomeMutation, resetMutation });
   mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation, resetMutation };
   const isStreamingRef = useRef(isStreaming);
@@ -412,16 +407,12 @@ function useConversationHandlers({
       setNotice(null);
 
       if (trimmed === "/clear") {
-        // Don't delete the session out from under an in-flight turn; make the
-        // user stop it first so we never reset while work is still streaming.
+        // Don't delete the session out from under an in-flight turn.
         if (isStreamingRef.current) {
           setNotice("Stop the current response before clearing the chat.");
           return;
         }
-        // Drop this canvas's boot context (scoped, incl. the stored template
-        // intro) so the kickoff effect can't auto-boot the fresh, empty session
-        // and the sidebar stops showing the old intro. Other canvases are left
-        // untouched.
+        // Scoped so a reset can't auto-boot or keep showing this canvas's intro.
         clearAgentBootContextForCanvas(canvasId);
         await reset.mutateAsync().catch((error) => {
           setError(error instanceof Error ? error.message : "failed to clear chat");
