@@ -125,12 +125,12 @@ export function useCanvasToolSidebarState({
   }, [agentUnavailable, canvasId]);
 
   useEffect(() => {
-    if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar || agentUnavailable) {
+    if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar) {
       setIsToolSidebarOpen(false);
     }
-  }, [featureEnabled, forceEnable, hideCanvasToolSidebar, agentUnavailable]);
+  }, [featureEnabled, forceEnable, hideCanvasToolSidebar]);
 
-  const showToolSidebarToggle = (featureEnabled || forceEnable) && !hideCanvasToolSidebar && !agentUnavailable;
+  const showToolSidebarToggle = (featureEnabled || forceEnable) && !hideCanvasToolSidebar;
 
   useEffect(() => {
     if (!showToolSidebarToggle) return;
