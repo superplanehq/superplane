@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import { AccountContext } from "@/contexts/accountContextState";
@@ -39,6 +38,8 @@ import {
 import type { AgentMessage, AgentOutgoingImage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
+import { AgentSetupNotice } from "./AgentSetupState";
+import { getAgentSetupState } from "./agentSetupStateModel";
 
 const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 15000;
 
@@ -82,26 +83,28 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
     return result.data?.status;
   }, [refetchChat]);
 
-  if (chatQuery.isLoading || !chatId) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="flex flex-col items-start">
-            <div className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900">
-              Hi {firstName}! I'm your SuperPlane agent. Give me a moment to set up and I'll help you build.
-              <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
-                <Loader2 className="size-3 animate-spin" /> Setting up...
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const setupState = getAgentSetupState({
+    chatId,
+    error: chatQuery.error,
+    isError: chatQuery.isError,
+    isFetching: chatQuery.isFetching,
+    isLoading: chatQuery.isLoading,
+  });
+  const agentUnavailable = setupState === "unavailable";
+  const { markAgentAvailable, markAgentUnavailable } = toolSidebarState;
+  useEffect(() => {
+    if (agentUnavailable) markAgentUnavailable();
+    if (!agentUnavailable && chatId) markAgentAvailable();
+  }, [agentUnavailable, chatId, markAgentAvailable, markAgentUnavailable]);
+
+  if (setupState) {
+    return <AgentSetupNotice firstName={firstName} onRetry={() => void chatQuery.refetch()} state={setupState} />;
   }
 
+  const readyChatId = chatId as string;
   return (
     <ChatConversation
-      chatId={chatId}
+      chatId={readyChatId}
       canvasId={canvasId}
       organizationId={organizationId}
       initialStatus={chatQuery.data?.status ?? "idle"}
