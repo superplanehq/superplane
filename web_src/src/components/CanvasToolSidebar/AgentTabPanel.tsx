@@ -1,7 +1,5 @@
-import { Loader2 } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
-import { Button } from "@/components/ui/button";
 import { AccountContext } from "@/contexts/accountContextState";
 import { createSystemMessage } from "@/components/AgentSidebar/systemMessages";
 import { ChatComposer } from "@/components/AgentSidebar/ChatComposer";
@@ -38,10 +36,10 @@ import {
 import type { AgentMessage, AgentOutgoingImage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
+import { AgentSetupNotice } from "./AgentSetupState";
+import { getAgentSetupState } from "./agentSetupStateModel";
 
 const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 15000;
-const AGENTS_DISABLED_CODE = 14;
-const AGENTS_DISABLED_MESSAGE = "agents are not enabled on this installation";
 
 type ChatConversationProps = {
   chatId: string;
@@ -83,68 +81,28 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
     return result.data?.status;
   }, [refetchChat]);
 
-  const chatFailed = chatQuery.isError && !chatQuery.isFetching && !chatId;
-  const agentUnavailable = chatFailed && isAgentsDisabledError(chatQuery.error);
-  const setupFailed = chatFailed && !agentUnavailable;
+  const setupState = getAgentSetupState({
+    chatId,
+    error: chatQuery.error,
+    isError: chatQuery.isError,
+    isFetching: chatQuery.isFetching,
+    isLoading: chatQuery.isLoading,
+  });
+  const agentUnavailable = setupState === "unavailable";
   const { markAgentAvailable, markAgentUnavailable } = toolSidebarState;
   useEffect(() => {
     if (agentUnavailable) markAgentUnavailable();
     if (!agentUnavailable && chatId) markAgentAvailable();
   }, [agentUnavailable, chatId, markAgentAvailable, markAgentUnavailable]);
 
-  if (agentUnavailable) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="flex flex-col items-start">
-            <div className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900">
-              The SuperPlane agent isn't available on this instance.
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  if (setupState) {
+    return <AgentSetupNotice firstName={firstName} onRetry={() => void chatQuery.refetch()} state={setupState} />;
   }
 
-  if (setupFailed) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="flex flex-col items-start">
-            <div className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900">
-              I couldn't set up the SuperPlane agent. Try again in a moment.
-              <div className="mt-3">
-                <Button size="sm" variant="outline" onClick={() => void chatQuery.refetch()}>
-                  Try again
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (chatQuery.isLoading || !chatId) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="flex flex-col items-start">
-            <div className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900">
-              Hi {firstName}! I'm your SuperPlane agent. Give me a moment to set up and I'll help you build.
-              <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
-                <Loader2 className="size-3 animate-spin" /> Setting up...
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  const readyChatId = chatId as string;
   return (
     <ChatConversation
-      chatId={chatId}
+      chatId={readyChatId}
       canvasId={canvasId}
       organizationId={organizationId}
       initialStatus={chatQuery.data?.status ?? "idle"}
@@ -154,34 +112,6 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
       isEditing={toolSidebarState.isEditing}
     />
   );
-}
-
-function isAgentsDisabledError(error: unknown): boolean {
-  return getErrorStatusCandidates(error).some((status) => {
-    if (!status || typeof status !== "object") return false;
-
-    const maybeStatus = status as { code?: unknown; message?: unknown };
-    return maybeStatus.code === AGENTS_DISABLED_CODE && maybeStatus.message === AGENTS_DISABLED_MESSAGE;
-  });
-}
-
-function getErrorStatusCandidates(error: unknown, seen = new Set<object>()): unknown[] {
-  if (!error || typeof error !== "object" || seen.has(error)) return [];
-  seen.add(error);
-
-  const record = error as Record<string, unknown>;
-  return [
-    error,
-    ...getNestedErrorStatusCandidates(record.response, seen),
-    ...getNestedErrorStatusCandidates(record.error, seen),
-  ];
-}
-
-function getNestedErrorStatusCandidates(error: unknown, seen: Set<object>): unknown[] {
-  if (!error || typeof error !== "object") return [];
-
-  const record = error as Record<string, unknown>;
-  return [error, ...getErrorStatusCandidates(record.data, seen), ...getErrorStatusCandidates(record.error, seen)];
 }
 
 function ChatConversation({
