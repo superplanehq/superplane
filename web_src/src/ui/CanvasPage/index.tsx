@@ -815,19 +815,6 @@ function CanvasPage(props: CanvasPageProps) {
   };
   const isVersionsSidebarOpen = versionsContentAvailable && versionsSidebarBaseState.isVersionsSidebarOpen;
 
-  // The collapse state is intentionally not persisted: the versions sidebar
-  // expands whenever the user (re)enters an edit session — except when the agent
-  // panel is the active side panel (e.g. a new app), where canvas history is a
-  // noisy starting point and the agent should take precedence (issue #5803).
-  const isEditSessionActive = props.isEditSessionActive;
-  const isToolSidebarOpen = toolSidebarState.isToolSidebarOpen;
-  const { openVersionsSidebar } = versionsSidebarBaseState;
-  useEffect(() => {
-    if (isEditSessionActive && !isToolSidebarOpen) {
-      openVersionsSidebar();
-    }
-  }, [isEditSessionActive, isToolSidebarOpen, openVersionsSidebar]);
-
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [canvasModalRequest, setCanvasModalRequest] = useState<CanvasModalRequest | null>(null);
