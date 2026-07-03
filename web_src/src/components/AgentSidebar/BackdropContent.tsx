@@ -1,3 +1,6 @@
+// Slash commands the composer intercepts instead of sending to the agent.
+const SLASH_COMMANDS = ["/clear"];
+
 /**
  * Renders the text with @mentions highlighted behind a transparent textarea.
  */
@@ -8,6 +11,20 @@ export function BackdropContent({
   text: string;
   mentions: { label: string; startIndex: number }[];
 }) {
+  // A slash command only acts as one when it's the whole input; highlight it like
+  // a mention (no padding/font-weight so backdrop metrics stay aligned).
+  const command = SLASH_COMMANDS.find((c) => text.trim() === c);
+  if (command) {
+    const start = text.indexOf(command);
+    return (
+      <span className="whitespace-pre-wrap break-words text-[rgba(10,10,10,1)]">
+        {text.slice(0, start)}
+        <span className="rounded bg-blue-100 text-blue-700">{command}</span>
+        {text.slice(start + command.length)}
+      </span>
+    );
+  }
+
   if (mentions.length === 0) {
     // No mentions — render the text normally to maintain layout
     return <span className="whitespace-pre-wrap break-words text-[rgba(10,10,10,1)]">{text || "\u00A0"}</span>;
