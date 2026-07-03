@@ -276,11 +276,6 @@ func (c *GetUsage) Execute(ctx core.ExecutionContext) error {
 		0, 0, 0, 0, time.UTC,
 	)
 
-	endOfDay := time.Date(
-		now.Year(), now.Month(), now.Day(),
-		23, 59, 59, 0, time.UTC,
-	)
-
 	// Default: 7 days ago at 00:00:00 UTC
 	startOfWeek := startOfToday.AddDate(0, 0, -7)
 
@@ -301,14 +296,17 @@ func (c *GetUsage) Execute(ctx core.ExecutionContext) error {
 		if err != nil {
 			return fmt.Errorf("invalid end date format (expected YYYY-MM-DD): %w", err)
 		}
-		endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 0, time.UTC)
 	} else {
-		endDate = endOfDay
+		endDate = startOfToday
 	}
 
 	if startDate.After(endDate) {
 		return fmt.Errorf("start date must be before end date")
 	}
+
+	// The Usage API treats end_time as an exclusive bound, so use midnight after
+	// the end date to fully include the last day's bucket.
+	endExclusive := endDate.AddDate(0, 0, 1)
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
@@ -321,9 +319,9 @@ func (c *GetUsage) Execute(ctx core.ExecutionContext) error {
 
 	params := url.Values{}
 	params.Set("start_time", strconv.FormatInt(startDate.Unix(), 10))
-	params.Set("end_time", strconv.FormatInt(endDate.Unix(), 10))
+	params.Set("end_time", strconv.FormatInt(endExclusive.Unix(), 10))
 	params.Set("bucket_width", "1d")
-	params.Set("limit", strconv.Itoa(bucketLimit(usageType, startDate, endDate)))
+	params.Set("limit", strconv.Itoa(bucketLimit(usageType, startDate, endExclusive)))
 	if spec.GroupBy != "" && spec.GroupBy != "none" {
 		params.Set("group_by", spec.GroupBy)
 	}
@@ -359,9 +357,10 @@ func (c *GetUsage) Execute(ctx core.ExecutionContext) error {
 }
 
 // bucketLimit returns the number of daily buckets to request per page, capped
-// at the API maximum for the usage type.
-func bucketLimit(usageType string, startDate, endDate time.Time) int {
-	days := int(endDate.Sub(startDate).Hours()/24) + 1
+// at the API maximum for the usage type. Both bounds are midnight-aligned, with
+// endExclusive one day past the last included day.
+func bucketLimit(usageType string, startDate, endExclusive time.Time) int {
+	days := int(endExclusive.Sub(startDate).Hours() / 24)
 
 	limit := maxUsageBucketsPerPage
 	if usageType == usageTypeCosts {

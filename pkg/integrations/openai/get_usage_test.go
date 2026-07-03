@@ -3,8 +3,10 @@ package openai
 import (
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -125,6 +127,11 @@ func Test__GetUsage__Execute(t *testing.T) {
 		require.Len(t, httpContext.Requests, 1)
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/organization/costs")
 		assert.Equal(t, "3", httpContext.Requests[0].URL.Query().Get("limit"))
+
+		// end_time is exclusive, so it must be midnight after the end date to
+		// include the last day's bucket.
+		endExclusive := time.Date(2026, 6, 21, 0, 0, 0, 0, time.UTC).Unix()
+		assert.Equal(t, strconv.FormatInt(endExclusive, 10), httpContext.Requests[0].URL.Query().Get("end_time"))
 	})
 
 	t.Run("group by none is not sent", func(t *testing.T) {
