@@ -72,6 +72,7 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import type { CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
+import { resolveFitViewVersionId } from "@/ui/CanvasPage/fitView";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -618,6 +619,8 @@ export function AppPage() {
    */
   const hasFitToViewRef = useRef(false);
   const runsHasFitToViewRef = useRef(false);
+  // Canvas/version the persisted viewport was fitted for; switching content re-fits the graph.
+  const lastFittedContentKeyRef = useRef<string | null>(null);
   const hasSyncedVersionFromURLRef = useRef(false);
 
   /**
@@ -4235,12 +4238,7 @@ export function AppPage() {
       </div>
     ) : null;
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
-  const canvasRenderKey = [
-    canvasViewKey,
-    isDraftCanvasLoading ? "draft-loading" : "draft-ready",
-    isRunInspectionMode ? "runs" : "canvas",
-    `reset-${stagingResetNonce}`,
-  ].join(":");
+  const canvasRenderKey = `${canvasViewKey}:${isDraftCanvasLoading ? "draft-loading" : "draft-ready"}:${isRunInspectionMode ? "runs" : "canvas"}:reset-${stagingResetNonce}`;
   const headerBanners = [appBanner, remoteUpdateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const enterEditModeDisabled = !canUpdateCanvas || canvasDeletedRemotely;
@@ -4486,6 +4484,8 @@ export function AppPage() {
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunInspectionMode ? runsViewportRef : viewportRef}
+          fitViewContentKey={`${canvasId}:${resolveFitViewVersionId({ liveCanvasVersionId, activeCanvasVersionId, isViewingDraftVersion, draftSpec: draftSpecToRender, selectedVersion: selectedCanvasVersion })}`}
+          lastFittedContentKeyRef={lastFittedContentKeyRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           fitAllFocusNodeIds={
             isRunInspectionMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
