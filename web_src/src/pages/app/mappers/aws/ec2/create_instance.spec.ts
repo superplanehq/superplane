@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createInstanceMapper, createInstanceStateFunction } from "./create_instance";
+import { createInstanceMapper, CREATE_INSTANCE_STATE_REGISTRY } from "./create_instance";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../../types";
 
 function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
@@ -198,13 +198,13 @@ describe("createInstanceMapper.getExecutionDetails", () => {
   });
 });
 
-describe("createInstanceStateFunction", () => {
+describe("CREATE_INSTANCE_STATE_REGISTRY", () => {
   it("returns created for a passed execution that emitted to the created channel", () => {
     const execution = buildExecution({
       outputs: { created: [buildOutput({ instanceId: "i-abc123", state: "running" })] },
     });
 
-    expect(createInstanceStateFunction(execution)).toBe("created");
+    expect(CREATE_INSTANCE_STATE_REGISTRY.getState(execution)).toBe("created");
   });
 
   it("returns failed when the run emitted to the failed channel even though the execution passed", () => {
@@ -212,12 +212,17 @@ describe("createInstanceStateFunction", () => {
       outputs: { failed: [buildOutput({ error: "boom", awsErrorCode: "InsufficientInstanceCapacity" })] },
     });
 
-    expect(createInstanceStateFunction(execution)).toBe("failed");
+    expect(CREATE_INSTANCE_STATE_REGISTRY.getState(execution)).toBe("failed");
   });
 
   it("returns running while the execution is still in progress", () => {
-    const execution = buildExecution({ state: "STATE_STARTED", outputs: undefined });
+    const execution = buildExecution({
+      state: "STATE_STARTED",
+      result: "RESULT_UNSPECIFIED" as ExecutionInfo["result"],
+      resultReason: "RESULT_REASON_UNSPECIFIED" as ExecutionInfo["resultReason"],
+      outputs: undefined,
+    });
 
-    expect(createInstanceStateFunction(execution)).toBe("running");
+    expect(CREATE_INSTANCE_STATE_REGISTRY.getState(execution)).toBe("running");
   });
 });
