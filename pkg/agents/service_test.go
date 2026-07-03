@@ -279,6 +279,30 @@ func TestService_ResetSession_ReplacesSessionAndClearsMessages(t *testing.T) {
 	assert.Equal(t, 2, provider.createCalled, "ensure after reset must not provision again")
 }
 
+func TestService_ResetSession_RefusesWhileStreaming(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	original, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.UpdateAgentSessionStatus(original.ID, models.AgentSessionStatusStreaming))
+
+	_, err = svc.ResetSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, agents.ErrSessionBusy), "reset must refuse a streaming session")
+
+	// The streaming session must be left intact and no replacement provisioned.
+	after, err := models.FindAgentSessionForUser(r.Organization.ID, r.User, original.ID)
+	require.NoError(t, err)
+	assert.Equal(t, original.ID, after.ID)
+	assert.Equal(t, models.AgentSessionStatusStreaming, after.Status)
+	assert.Equal(t, 1, provider.createCalled, "busy reset must not provision a replacement provider session")
+}
+
 func TestService_EnsureSession_ReplacesIdleSessionWhenToolSchemaRevisionChanges(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

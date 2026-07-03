@@ -65,6 +65,17 @@ func (s *Service) ResetSession(ctx context.Context, organizationID, userID, canv
 		return nil, err
 	}
 
+	// Cheap pre-check so we don't create a provider session just to throw it
+	// away when the current turn is still streaming. The advisory-locked check
+	// inside the transaction below is the authoritative one that closes the race.
+	existing, err := findCanvasSession(database.Conn(), organizationID, userID, canvasID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil && existing.Status == models.AgentSessionStatusStreaming {
+		return nil, ErrSessionBusy
+	}
+
 	upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{
 		Title: sessionTitle(organizationID, canvasID),
 	})
@@ -81,12 +92,17 @@ func (s *Service) ResetSession(ctx context.Context, organizationID, userID, canv
 			return err
 		}
 
-		existing, err := findCanvasSession(tx, organizationID, userID, canvasID)
+		locked, err := findCanvasSession(tx, organizationID, userID, canvasID)
 		if err != nil {
 			return err
 		}
-		if existing != nil {
-			oldProviderSession = existing.ProviderSessionID
+		if locked != nil {
+			// Authoritative streaming guard under the advisory lock: never delete
+			// a session whose turn is still streaming out from under the worker.
+			if locked.Status == models.AgentSessionStatusStreaming {
+				return ErrSessionBusy
+			}
+			oldProviderSession = locked.ProviderSessionID
 			if err := models.DeleteAgentSessionForUserCanvas(tx, organizationID, userID, canvasID); err != nil {
 				return err
 			}

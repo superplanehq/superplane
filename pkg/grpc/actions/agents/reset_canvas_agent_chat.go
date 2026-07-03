@@ -34,6 +34,9 @@ func ResetCanvasAgentChat(
 		if errors.Is(err, agents.ErrSessionForbidden) {
 			return nil, grpcerrors.PermissionDenied(nil, "agent chat is not allowed")
 		}
+		if errors.Is(err, agents.ErrSessionBusy) {
+			return nil, grpcerrors.FailedPrecondition(nil, "agent is still processing the current turn")
+		}
 		log.WithError(err).WithField("canvas_id", canvas).Error("failed to reset agent chat")
 		return nil, grpcerrors.Internal(err, "failed to reset agent chat")
 	}
