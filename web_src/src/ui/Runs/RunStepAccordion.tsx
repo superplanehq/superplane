@@ -9,13 +9,14 @@ import type {
 import Editor from "@monaco-editor/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useEventExecutions } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RUN_NODE_ICON_SIZE, RunNodeIcon } from "./RunNodeIcon";
 import { RunStepTimeline } from "./RunStepTimeline";
 import { buildExecutionChain, eventBadgeForExecution, eventBadgeForTriggeredTrigger } from "./runNodeDetailModel";
-import { formatEventTimestamp, formatStepDuration } from "./runSummary";
+import { formatEventTimestamp, formatStepDuration, getStepActivity } from "./runSummary";
 
 export function StatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
   return (
@@ -257,6 +258,54 @@ export function AccordionNodeDetail({
   );
 }
 
+/**
+ * Per-step action affordance shown only on in-flight (running / waiting) steps: a
+ * single "Action" button whose hover card lists the contextual actions — an
+ * approval step offers Approve / Reject / Cancel, any other in-flight step offers Stop.
+ */
+function StepActionMenu({ isApproval }: { isApproval: boolean }) {
+  const actions: { label: string; tone: "approve" | "danger" | "default" }[] = isApproval
+    ? [
+        { label: "Approve", tone: "approve" },
+        { label: "Reject", tone: "danger" },
+        { label: "Cancel", tone: "default" },
+      ]
+    : [{ label: "Stop", tone: "danger" }];
+
+  return (
+    <HoverCard openDelay={80} closeDelay={100}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          onClick={(event) => event.stopPropagation()}
+          className="shrink-0 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-800 data-[state=open]:bg-slate-100 data-[state=open]:text-slate-800"
+        >
+          Action
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent align="end" side="bottom" sideOffset={4} className="w-40 p-1">
+        <div className="flex flex-col">
+          {actions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              onClick={(event) => event.stopPropagation()}
+              className={cn(
+                "rounded px-2 py-1.5 text-left text-[13px] transition-colors",
+                action.tone === "approve" && "text-emerald-700 hover:bg-emerald-50",
+                action.tone === "danger" && "text-red-600 hover:bg-red-50",
+                action.tone === "default" && "text-slate-600 hover:bg-slate-50",
+              )}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
 export function AccordionRow({
   nodeId,
   workflowNode,
@@ -292,6 +341,12 @@ export function AccordionRow({
   // Triggers have no duration; instead show when their event was received.
   const meta = isTrigger ? formatEventTimestamp(triggerTimestamp) : execution ? formatStepDuration(execution) : null;
 
+  // Only in-flight steps (running / waiting) expose an inline action; the run as a
+  // whole is stopped/rerun from the run header, not per step.
+  const activity = !isTrigger && execution ? getStepActivity(workflowNode, execution) : "done";
+  const showStepAction = activity === "running" || activity === "waiting";
+  const isApproval = workflowNode?.component === "approval";
+
   return (
     <div
       role="button"
@@ -322,6 +377,8 @@ export function AccordionRow({
         className={cn("h-3.5 w-3.5 shrink-0", isExpanded ? "text-gray-800" : "text-gray-500")}
       />
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800">{nodeName}</span>
+      {showStepAction ? <StepActionMenu isApproval={isApproval} /> : null}
+      <HeaderIconButton label="Send to agent" icon={<Sparkles className="h-3.5 w-3.5" />} />
       {meta ? <span className="shrink-0 text-[11px] tabular-nums text-gray-400">{meta}</span> : null}
       {badge ? <StatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}
     </div>

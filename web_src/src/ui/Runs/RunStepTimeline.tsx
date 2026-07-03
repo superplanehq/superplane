@@ -284,7 +284,6 @@ function InputItem({
               onClick={toggleOpen}
             />
           ) : null}
-          <HeaderIconButton label="Send to agent" icon={<Sparkles className="h-3.5 w-3.5" />} />
         </>
       }
     >
@@ -338,7 +337,7 @@ function ActionItem({
   timestamp: string | null;
   nodeName: string;
 }) {
-  const [showSummary, toggleSummary] = useTimelineToggle("summary", false);
+  const [showSummary, toggleSummary] = useTimelineToggle("summary", true);
   const [showConfig, toggleConfig] = useTimelineToggle("config", false);
   const [showStatusTimeline, toggleStatusTimeline] = useTimelineToggle("statusTimeline", true);
   const hasSummary = Object.keys(summaryDetails).length > 0;
@@ -380,7 +379,6 @@ function ActionItem({
               onClick={toggleConfig}
             />
           ) : null}
-          <HeaderIconButton label="Send to agent" icon={<Sparkles className="h-3.5 w-3.5" />} />
         </>
       }
     >
@@ -447,7 +445,6 @@ function OutputItem({
               onClick={toggleOpen}
             />
           ) : null}
-          <HeaderIconButton label="Send to agent" icon={<Sparkles className="h-3.5 w-3.5" />} />
         </>
       }
     >

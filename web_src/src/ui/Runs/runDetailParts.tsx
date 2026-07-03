@@ -6,6 +6,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { RUN_STATUS_META, type RunStatusKey } from "./runPresentation";
 import { formatRunDuration, RUN_STEP_FILTERS, type RunStepFilter, type RunStepSummary } from "./runSummary";
@@ -32,6 +33,37 @@ function RunStatusPill({ status }: { status: RunStatusKey }) {
       <Icon className="h-3.5 w-3.5" />
       {meta.label}
     </span>
+  );
+}
+
+/**
+ * Run-level primary action shown beside the summary meta line: "Stop" while the
+ * run is still going, otherwise "Rerun" to restart the whole run.
+ */
+function RunLevelActionButton({ status }: { status: RunStatusKey }) {
+  const isRunning = status === "running";
+  const label = isRunning ? "Stop" : "Rerun";
+  const tooltip = isRunning
+    ? "Stop all running steps and cancel queued ones"
+    : "Restart this whole run from trigger event";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "shrink-0 rounded border px-2 py-0.5 text-xs font-medium transition-colors",
+            isRunning
+              ? "border-red-200 bg-white text-red-600 hover:bg-red-50"
+              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900",
+          )}
+        >
+          {label}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -94,13 +126,16 @@ export function IdentityHeader({
           {title}
         </h1>
       </div>
-      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-gray-500">
-        {metaItems.map((item, index) => (
-          <span key={item.key} className="inline-flex items-center gap-x-1.5">
-            {index > 0 ? <span className="text-gray-300">&middot;</span> : null}
-            {item.content}
-          </span>
-        ))}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-gray-500">
+          {metaItems.map((item, index) => (
+            <span key={item.key} className="inline-flex items-center gap-x-1.5">
+              {index > 0 ? <span className="text-gray-300">&middot;</span> : null}
+              {item.content}
+            </span>
+          ))}
+        </div>
+        <RunLevelActionButton status={status} />
       </div>
     </div>
   );
