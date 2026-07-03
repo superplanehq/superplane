@@ -519,12 +519,11 @@ func TestCanvasVersionToConsoleYML_RoundTripsEmptyDashboard(t *testing.T) {
 	canvasID := uuid.New()
 	canvasVersion := &CanvasVersion{
 		WorkflowID:    canvasID,
-		Name:          "Canvas Name",
 		ConsolePanels: datatypes.NewJSONType([]ConsolePanel{}),
 		ConsoleLayout: datatypes.NewJSONType([]ConsoleLayoutItem{}),
 	}
 
-	out, err := CanvasVersionToConsoleYML(canvasVersion)
+	out, err := CanvasVersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "apiVersion: v1")
 	assert.Contains(t, string(out), "kind: Console")
@@ -543,7 +542,6 @@ func TestCanvasVersionToConsoleYML_RoundTripsPanelsAndLayout(t *testing.T) {
 	minW, minH := 2, 1
 	canvasVersion := &CanvasVersion{
 		WorkflowID: canvasID,
-		Name:       "Canvas Name",
 		ConsolePanels: datatypes.NewJSONType([]ConsolePanel{
 			{ID: "p1", Type: "markdown", Content: map[string]any{"body": "hello"}},
 		}),
@@ -552,7 +550,7 @@ func TestCanvasVersionToConsoleYML_RoundTripsPanelsAndLayout(t *testing.T) {
 		}),
 	}
 
-	out, err := CanvasVersionToConsoleYML(canvasVersion)
+	out, err := CanvasVersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
 
 	parsed, err := ConsoleFromYML(out)
@@ -571,7 +569,6 @@ func TestCanvasVersionToConsoleYML_IsDeterministic(t *testing.T) {
 	canvasID := uuid.New()
 	canvasVersion := &CanvasVersion{
 		WorkflowID: canvasID,
-		Name:       "Canvas Name",
 		ConsolePanels: datatypes.NewJSONType([]ConsolePanel{
 			{ID: "a", Type: "markdown", Content: map[string]any{"body": "hi"}},
 			{ID: "b", Type: "markdown", Content: map[string]any{"body": "hey"}},
@@ -582,9 +579,9 @@ func TestCanvasVersionToConsoleYML_IsDeterministic(t *testing.T) {
 		}),
 	}
 
-	first, err := CanvasVersionToConsoleYML(canvasVersion)
+	first, err := CanvasVersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
-	second, err := CanvasVersionToConsoleYML(canvasVersion)
+	second, err := CanvasVersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
 	assert.Equal(t, string(first), string(second))
 }

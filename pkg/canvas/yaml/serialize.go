@@ -11,9 +11,9 @@ import (
 )
 
 // CanvasResourceYAML serializes a canvas version into the canonical canvas.yaml
-// representation. The caller passes the already-serialized proto version so this
-// package stays free of model/database dependencies.
-func CanvasResourceYAML(version *pb.CanvasVersion, canvasID string) (string, error) {
+// representation. Canvas name and description come from the workflow row, not
+// version metadata.
+func CanvasResourceYAML(version *pb.CanvasVersion, canvasID, name, description string) (string, error) {
 	// Use protojson (not encoding/json) so proto enums such as node.type are
 	// emitted as their canonical names (e.g. "TYPE_TRIGGER") instead of their
 	// numeric values. ParseCanvasResource reads canvas.yaml back with protojson,
@@ -42,8 +42,8 @@ func CanvasResourceYAML(version *pb.CanvasVersion, canvasID string) (string, err
 		"kind":       CanvasKind,
 		"metadata": map[string]any{
 			"id":          canvasID,
-			"name":        version.GetMetadata().GetName(),
-			"description": version.GetMetadata().GetDescription(),
+			"name":        name,
+			"description": description,
 		},
 		"spec": spec,
 	}

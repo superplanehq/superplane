@@ -1,7 +1,7 @@
 import { canvasesDescribeCanvasVersion, type CanvasesCanvasVersion, type CanvasesStagingSummary } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-import { dematerializeCanvasMetadata, dematerializeCanvasSpec, dematerializeConsoleSpec } from "./workflow-spec-files";
+import { dematerializeCanvasSpec, dematerializeConsoleSpec } from "./workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
 import { isNotFoundError } from "../workflowPageHelpers";
 
@@ -79,19 +79,7 @@ export function canvasVersionWithSpecFromYaml(
     return version;
   }
 
-  // Carry the canvas-level name/description from canvas.yaml onto the version
-  // metadata so edit mode can render the canvas without the DescribeCanvas
-  // response. Only override when the file actually provides a value.
-  const yamlMetadata = dematerializeCanvasMetadata(canvasYaml);
-  const metadata = version.metadata
-    ? {
-        ...version.metadata,
-        ...(yamlMetadata?.name ? { name: yamlMetadata.name } : {}),
-        ...(yamlMetadata?.description !== undefined ? { description: yamlMetadata.description } : {}),
-      }
-    : version.metadata;
-
-  return { ...version, metadata, spec };
+  return { ...version, spec };
 }
 
 export async function fetchCanvasVersionWithSpec(
