@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import {
   Dialog,
@@ -20,7 +21,7 @@ import {
   parameterDisplayLabel,
   type StartTemplateParameter,
 } from "../mappers/start/templatePayload";
-import { ConfirmFact, ConfirmParametersPreview } from "./confirmDialogPreview";
+import { ConfirmParametersPreview } from "./confirmDialogPreview";
 import { formatParameters } from "./formatConfirmDialogParameters";
 import { resolveStartTemplate } from "./consoleTriggerParameters";
 
@@ -74,6 +75,7 @@ export function NodeRunConfirmDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | undefined>();
+  const [payloadOpen, setPayloadOpen] = useState(false);
 
   // Re-seed parameter values whenever the dialog opens on a different
   // template — keeps stale inputs from leaking across templates when a
@@ -82,6 +84,7 @@ export function NodeRunConfirmDialog({
     if (open) {
       setParameterValues(seedParameterValues(parameters));
       setSubmitError(undefined);
+      setPayloadOpen(false);
     }
   }, [open, parameters]);
 
@@ -120,25 +123,11 @@ export function NodeRunConfirmDialog({
       <DialogContent className="min-w-0 overflow-hidden pb-6">
         <DialogHeader className="min-w-0">
           <DialogTitle>{dialogTitle}</DialogTitle>
-          <DialogDescription className="min-w-0">
-            {resolved ? (
-              <>
-                Manually run <span className="font-medium text-slate-700">{resolved.label}</span>
-                {template ? (
-                  <>
-                    {" "}
-                    using template{" "}
-                    <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-700">
-                      {template.name}
-                    </code>
-                  </>
-                ) : null}
-                .
-              </>
-            ) : (
-              "Resolve the node to display its run options."
-            )}
-          </DialogDescription>
+          {resolved ? (
+            <DialogDescription className="sr-only">{dialogTitle}</DialogDescription>
+          ) : (
+            <DialogDescription className="min-w-0">Resolve the node to display its run options.</DialogDescription>
+          )}
         </DialogHeader>
         <div className="min-w-0 space-y-3 text-[13px]" data-testid={`${testId}-body`}>
           {!template ? (
@@ -147,7 +136,6 @@ export function NodeRunConfirmDialog({
             <>
               {hasParameters ? (
                 <div className="min-w-0 space-y-1.5" data-testid={`${testId}-fields`}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Parameters</p>
                   <StartRunParameterFields
                     parameters={parameters}
                     parameterValues={parameterValues}
@@ -155,11 +143,23 @@ export function NodeRunConfirmDialog({
                   />
                 </div>
               ) : null}
-              <ConfirmFact label="Will submit">
-                <ConfirmParametersPreview testId={`${testId}-parameters`}>
-                  {formatParameters(previewParameters)}
-                </ConfirmParametersPreview>
-              </ConfirmFact>
+              <div className="min-w-0 space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => setPayloadOpen((prev) => !prev)}
+                  aria-expanded={payloadOpen}
+                  className="flex items-center gap-1 rounded px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 hover:bg-slate-100"
+                  data-testid={`${testId}-payload-toggle`}
+                >
+                  {payloadOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                  Payload
+                </button>
+                {payloadOpen ? (
+                  <ConfirmParametersPreview testId={`${testId}-parameters`}>
+                    {formatParameters(previewParameters)}
+                  </ConfirmParametersPreview>
+                ) : null}
+              </div>
             </>
           )}
           <SubmitErrorMessage error={submitError} testId={testId} />

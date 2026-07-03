@@ -48,6 +48,9 @@ describe("NodeRunConfirmDialog", () => {
       />,
     );
     expect(screen.queryByTestId("node-run-confirm-fields")).toBeNull();
+    // The payload preview is collapsed by default; expand it before asserting.
+    expect(screen.queryByTestId("node-run-confirm-parameters")).toBeNull();
+    fireEvent.click(screen.getByTestId("node-run-confirm-payload-toggle"));
     const preview = screen.getByTestId("node-run-confirm-parameters");
     expect(preview.textContent).toContain('"template": "manual"');
   });
@@ -68,6 +71,7 @@ describe("NodeRunConfirmDialog", () => {
       />,
     );
 
+    fireEvent.click(screen.getByTestId("node-run-confirm-payload-toggle"));
     const preview = screen.getByTestId("node-run-confirm-parameters");
     expect(preview.getAttribute("class")).toContain("overflow-x-auto");
     expect(preview.getAttribute("class")).toContain("whitespace-pre");
