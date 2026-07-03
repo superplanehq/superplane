@@ -1,5 +1,6 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
+import type { MouseEvent } from "react";
+import { Timestamp } from "@/components/Timestamp";
 import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
@@ -36,6 +37,24 @@ export function RunRow({
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
   const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?run=${run.id}`) : "#";
+  const selectRun = () => {
+    if (run.id) onSelectRun(run.id);
+  };
+  const openRunInNewTab = () => {
+    if (runHref === "#") return;
+    window.open(runHref, "_blank", "noopener,noreferrer");
+  };
+  const handleTimestampClick = (event: MouseEvent<HTMLSpanElement>) => {
+    if (isNormalClick(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      selectRun();
+      return;
+    }
+
+    event.stopPropagation();
+    openRunInNewTab();
+  };
 
   return (
     <div
@@ -51,7 +70,7 @@ export function RunRow({
         onClick={(e) => {
           if (isNormalClick(e)) {
             e.preventDefault();
-            if (run.id) onSelectRun(run.id);
+            selectRun();
           }
         }}
         className="absolute inset-0 z-0"
@@ -107,8 +126,12 @@ export function RunRow({
         <LinkIcon className="h-3 w-3" />
       </button>
       {run.createdAt ? (
-        <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-500">
-          <TimeAgo date={run.createdAt} includeAgo={false} />
+        <span
+          className="relative z-10 shrink-0 text-xs tabular-nums text-gray-500"
+          onClick={handleTimestampClick}
+          onAuxClick={handleTimestampClick}
+        >
+          <Timestamp date={run.createdAt} display="relative" relativeStyle="abbreviated" includeAgo={false} />
         </span>
       ) : null}
     </div>
