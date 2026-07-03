@@ -24,9 +24,10 @@ const (
 )
 
 type Client struct {
-	APIKey  string
-	BaseURL string
-	http    core.HTTPContext
+	APIKey   string
+	AdminKey string
+	BaseURL  string
+	http     core.HTTPContext
 }
 
 // Message represents a Claude API message.
@@ -122,10 +123,13 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		return nil, err
 	}
 
+	adminKey, _ := ctx.GetConfig("adminKey")
+
 	return &Client{
-		APIKey:  string(apiKey),
-		BaseURL: defaultBaseURL,
-		http:    httpClient,
+		APIKey:   string(apiKey),
+		AdminKey: string(adminKey),
+		BaseURL:  defaultBaseURL,
+		http:     httpClient,
 	}, nil
 }
 
@@ -270,6 +274,14 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 }
 
 func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta string) ([]byte, error) {
+	return c.doRequest(method, URL, body, c.APIKey, beta)
+}
+
+func (c *Client) execAdminRequest(method, URL string, body io.Reader) ([]byte, error) {
+	return c.doRequest(method, URL, body, c.AdminKey, "")
+}
+
+func (c *Client) doRequest(method, URL string, body io.Reader, apiKey, beta string) ([]byte, error) {
 	req, err := http.NewRequest(method, URL, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
@@ -277,7 +289,7 @@ func (c *Client) execRequestWithBeta(method, URL string, body io.Reader, beta st
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("x-api-key", c.APIKey)
+	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("anthropic-version", anthropicVersionValue)
 	if beta != "" {
 		req.Header.Set("anthropic-beta", beta)
