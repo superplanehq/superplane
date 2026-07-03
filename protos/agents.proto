@@ -36,6 +36,17 @@ service Agents {
     };
   }
 
+  rpc ResetCanvasAgentChat(ResetCanvasAgentChatRequest) returns (ResetCanvasAgentChatResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agents/canvases/{canvas_id}/chat/reset"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reset the user's chat for a canvas";
+      description: "Deletes the current chat session and messages, then provisions a brand-new session. Used by the `/clear` command.";
+      tags: "Agent";
+    };
+  }
+
   rpc ListAgentChatMessages(ListAgentChatMessagesRequest) returns (ListAgentChatMessagesResponse) {
     option (google.api.http) = {
       get: "/api/v1/agents/chats/{chat_id}/messages"
@@ -95,6 +106,14 @@ message GetCanvasAgentChatRequest {
 }
 
 message GetCanvasAgentChatResponse {
+  AgentChatInfo chat = 1;
+}
+
+message ResetCanvasAgentChatRequest {
+  string canvas_id = 1;
+}
+
+message ResetCanvasAgentChatResponse {
   AgentChatInfo chat = 1;
 }
 
