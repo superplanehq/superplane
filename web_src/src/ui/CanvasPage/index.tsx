@@ -796,7 +796,7 @@ function CanvasPage(props: CanvasPageProps) {
     canvasId: props.canvasId,
     organizationId: props.organizationId,
   });
-  const runsSidebarBaseState = useCanvasRunsSidebarState();
+  const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
   const showRunsSidebar = isCanvasWorkflowTab(props.headerMode) && props.toolSidebarRunsContent != null;
   const runsSidebarState = {
     ...runsSidebarBaseState,
@@ -804,7 +804,7 @@ function CanvasPage(props: CanvasPageProps) {
   };
   const isRunsSidebarOpen = showRunsSidebar && runsSidebarBaseState.isRunsSidebarOpen;
 
-  const versionsSidebarBaseState = useCanvasVersionsSidebarState();
+  const versionsSidebarBaseState = useCanvasVersionsSidebarState(props.canvasId);
   // Versions content is only produced during an edit session; within that session
   // the sidebar can be shown/hidden with the header toggle.
   const versionsContentAvailable = props.toolSidebarVersionsContent != null;
@@ -814,16 +814,6 @@ function CanvasPage(props: CanvasPageProps) {
     showVersionsSidebarToggle,
   };
   const isVersionsSidebarOpen = versionsContentAvailable && versionsSidebarBaseState.isVersionsSidebarOpen;
-
-  // The collapse state is intentionally not persisted: the versions sidebar always
-  // starts expanded whenever the user (re)enters an edit session.
-  const isEditSessionActive = props.isEditSessionActive;
-  const { openVersionsSidebar } = versionsSidebarBaseState;
-  useEffect(() => {
-    if (isEditSessionActive) {
-      openVersionsSidebar();
-    }
-  }, [isEditSessionActive, openVersionsSidebar]);
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);

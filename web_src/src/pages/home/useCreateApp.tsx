@@ -5,6 +5,8 @@ import { useCreateCanvas } from "@/hooks/useCanvasData";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast } from "@/lib/toast";
 import { PLACEHOLDER_NODE_CONTEXT_KEY, setAgentBootContext } from "@/lib/agentBootContext";
+import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { appPath } from "@/lib/appPaths";
 
 interface UseCreateAppOptions {
@@ -34,7 +36,9 @@ export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
         const canvasId = result?.data?.canvas?.metadata?.id;
         if (canvasId) {
           onCreated?.();
-          localStorage.setItem("canvasAgentSidebarOpen", "true");
+          // A new app always starts with the agent panel open (stored per canvas).
+          writeCanvasAgentSidebarOpen(canvasId, true);
+          writeCanvasRunsSidebarOpen(canvasId, false);
           localStorage.setItem("canvasSidebarOpen", "false");
           setAgentBootContext(canvasId, "blank");
           sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
