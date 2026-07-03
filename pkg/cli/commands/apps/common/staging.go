@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/base64"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -61,6 +62,25 @@ func GetCanvasStaging(ctx core.CommandContext, appID string) (openapi_client.Can
 	return response.GetStagingSummary(), nil
 }
 
+// NormalizeRepositoryPath returns a repository-relative path.
+func NormalizeRepositoryPath(path string) string {
+	return strings.TrimLeft(strings.TrimSpace(strings.ReplaceAll(path, "\\", "/")), "/")
+}
+
+// RepositoryPathFromLocalFile maps a local file path to its repository path.
+func RepositoryPathFromLocalFile(localPath string) string {
+	return NormalizeRepositoryPath(filepath.Base(localPath))
+}
+
+// RequireCommitMessage validates a commit message flag value.
+func RequireCommitMessage(message string) (string, error) {
+	trimmed := strings.TrimSpace(message)
+	if trimmed == "" {
+		return "", fmt.Errorf("--message is required")
+	}
+	return trimmed, nil
+}
+
 // StageRepositorySpecFile writes a repository spec file into per-user staging.
 func StageRepositorySpecFile(
 	ctx core.CommandContext,
@@ -68,12 +88,38 @@ func StageRepositorySpecFile(
 	path string,
 	content []byte,
 ) error {
-	operation := openapi_client.NewCanvasesCanvasRepositoryFileOperation()
-	operation.SetPath(path)
-	operation.SetContent(base64.StdEncoding.EncodeToString(content))
+	return StageRepositoryFiles(ctx, canvasID, []RepositoryFileStaging{{
+		Path:    path,
+		Content: content,
+	}})
+}
+
+type RepositoryFileStaging struct {
+	Path    string
+	Content []byte
+}
+
+// StageRepositoryFiles writes one or more repository files into per-user staging.
+func StageRepositoryFiles(ctx core.CommandContext, canvasID string, files []RepositoryFileStaging) error {
+	if len(files) == 0 {
+		return fmt.Errorf("at least one file is required")
+	}
+
+	operations := make([]openapi_client.CanvasesCanvasRepositoryFileOperation, 0, len(files))
+	for _, file := range files {
+		path := NormalizeRepositoryPath(file.Path)
+		if path == "" {
+			return fmt.Errorf("repository path is required")
+		}
+
+		operation := openapi_client.NewCanvasesCanvasRepositoryFileOperation()
+		operation.SetPath(path)
+		operation.SetContent(base64.StdEncoding.EncodeToString(file.Content))
+		operations = append(operations, *operation)
+	}
 
 	body := openapi_client.NewCanvasesPutCanvasStagingBody()
-	body.SetOperations([]openapi_client.CanvasesCanvasRepositoryFileOperation{*operation})
+	body.SetOperations(operations)
 
 	_, _, err := ctx.API.CanvasStagingAPI.
 		CanvasesPutCanvasStaging(ctx.Context, canvasID).
@@ -100,23 +146,4 @@ func DiscardCanvasStaging(ctx core.CommandContext, canvasID string) error {
 		CanvasesDeleteCanvasStaging(ctx.Context, canvasID).
 		Execute()
 	return err
-}
-
-// FindCurrentUserDraftVersionID returns the live version id for an app.
-func FindCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	return EnsureLiveVersionID(ctx, appID)
-}
-
-// EnsureCurrentUserDraftVersionID is kept for CLI compatibility and resolves the live version id.
-func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	return EnsureLiveVersionID(ctx, appID)
-}
-
-// ResolveDraftVersionID is kept for CLI compatibility and validates an explicit version id.
-func ResolveDraftVersionID(ctx core.CommandContext, appID, draftID string) (string, error) {
-	trimmedDraftID := strings.TrimSpace(draftID)
-	if trimmedDraftID == "" {
-		return "", fmt.Errorf("version id is required")
-	}
-	return ResolveLiveVersionID(ctx, appID, trimmedDraftID)
 }

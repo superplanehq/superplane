@@ -11,8 +11,6 @@ const (
 	testCanvasID       = "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 	testCanvasName     = "my-canvas"
 	testDescribeCanvas = "/api/v1/canvases/" + testCanvasID
-	testMePath         = "/api/v1/me"
-	cliTestUserID      = "user-1"
 )
 
 func repositoryConsoleFilePath(canvasID string) string {
@@ -20,68 +18,6 @@ func repositoryConsoleFilePath(canvasID string) string {
 }
 
 const sampleConsoleYAMLBody = "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: " + testCanvasID + "\n  name: " + testCanvasName + "\nspec:\n  panels:\n    - id: notes\n      type: markdown\n      content:\n        body: Hello\n  layout:\n    - i: notes\n      x: 0\n      y: 0\n      w: 4\n      h: 2\n"
-
-func draftVersionsPath(canvasID string) string {
-	return "/api/v1/canvases/" + canvasID + "/versions"
-}
-
-func expectMe() requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   testMePath,
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"user":{"id":"` + cliTestUserID + `"}}`))
-		},
-	}
-}
-
-func expectListUserDraftBranch(canvasID, versionID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   draftVersionsPath(canvasID),
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"` + versionID + `","owner":{"id":"` + cliTestUserID + `"}}}]}`))
-		},
-	}
-}
-
-func expectListDraftBranchesEmpty(canvasID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   draftVersionsPath(canvasID),
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[]}`))
-		},
-	}
-}
-
-// expectValidateDraftVersion mocks the describe-version call used by
-// common.ResolveDraftVersionID to validate an explicit --draft-id. It
-// returns a draft version owned by the test user.
-func expectValidateDraftVersion(canvasID, versionID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   "/api/v1/canvases/" + canvasID + "/versions/" + versionID,
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `","canvasId":"` + canvasID + `"}}}`))
-		},
-	}
-}
-
-func expectCreateDraftBranch(canvasID, versionID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodPost,
-		path:   draftVersionsPath(canvasID),
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `"}}}`))
-		},
-	}
-}
 
 func describeCanvasResponse(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 	t.Helper()
@@ -155,7 +91,6 @@ func TestGetTextOutputSummary(t *testing.T) {
 	out := stdout.String()
 	require.Contains(t, out, "App: "+testCanvasName)
 	require.Contains(t, out, "App ID: "+testCanvasID)
-	require.Contains(t, out, "Source: live")
 	require.Contains(t, out, "Panels: 1")
 	require.Contains(t, out, "Layout items: 1")
 }
@@ -198,33 +133,4 @@ func TestGetErrorsWhenNoCanvasAndNoActive(t *testing.T) {
 	err := (&getCommand{}).Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "app-name-or-id")
-}
-
-func TestGetDraftIDSelectsExplicitVersion(t *testing.T) {
-	server := newAPITestServer(
-		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasResponse,
-		},
-		expectValidateDraftVersion(testCanvasID, "version-2"),
-		requestExpectation{
-			method: http.MethodGet,
-			path:   repositoryConsoleFilePath(testCanvasID),
-			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-				require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
-				require.Equal(t, "version-2", r.URL.Query().Get("version_id"))
-				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-				_, _ = w.Write([]byte(sampleConsoleYAMLBody))
-			},
-		},
-	)
-
-	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
-	ctx.Args = []string{testCanvasID}
-
-	draftID := "version-2"
-	require.NoError(t, (&getCommand{draftID: &draftID}).Execute(ctx))
-	require.Contains(t, stdout.String(), "Version ID: version-2")
 }

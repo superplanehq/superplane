@@ -11,7 +11,7 @@ import (
 
 type setCommand struct {
 	file    *string
-	draftID *string
+	message *string
 }
 
 func (c *setCommand) Execute(ctx core.CommandContext) error {
@@ -32,11 +32,11 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	if c.file != nil {
 		flagValue = strings.TrimSpace(*c.file)
 	}
-	draftID := ""
-	if c.draftID != nil {
-		draftID = strings.TrimSpace(*c.draftID)
+
+	commitMessage, err := common.RequireCommitMessage(messageValue(c.message))
+	if err != nil {
+		return fmt.Errorf("%w; use \"superplane apps staging update\" and \"superplane apps staging commit\" to stage changes first", err)
 	}
-	stageOnly := draftID != ""
 
 	yamlBytes, source, err := resolveYAMLSource(ctx.Cmd.InOrStdin(), flagValue, positional)
 	if err != nil {
@@ -52,14 +52,6 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	if stageOnly {
-		if _, err := common.ResolveLiveVersionID(ctx, canvasID, draftID); err != nil {
-			return err
-		}
-	} else if _, err := common.EnsureLiveVersionID(ctx, canvasID); err != nil {
-		return err
-	}
-
 	if err := common.StageRepositorySpecFile(
 		ctx,
 		canvasID,
@@ -69,20 +61,7 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	if stageOnly {
-		if !ctx.Renderer.IsText() {
-			return ctx.Renderer.Render(map[string]string{
-				"appId":  canvasID,
-				"staged": "true",
-			})
-		}
-		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, err := fmt.Fprintf(stdout, "Console changes staged for app %s\n", canvasID)
-			return err
-		})
-	}
-
-	commitResponse, err := common.CommitCanvasStaging(ctx, canvasID, "Update console.yaml")
+	commitResponse, err := common.CommitCanvasStaging(ctx, canvasID, commitMessage)
 	if err != nil {
 		return fmt.Errorf("console was staged but commit failed: %w", err)
 	}
@@ -114,4 +93,11 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(updatedResource.Spec.Layout))
 		return err
 	})
+}
+
+func messageValue(message *string) string {
+	if message == nil {
+		return ""
+	}
+	return *message
 }

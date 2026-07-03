@@ -166,35 +166,3 @@ func TestGetLiveYAMLOutput(t *testing.T) {
 	require.Contains(t, out, "id: "+testGetCanvasID)
 	require.Contains(t, out, "name: "+testGetCanvasName)
 }
-
-func TestGetDraftIDSelectsExplicitVersion(t *testing.T) {
-	server := newAPITestServer(
-		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasMetadataResponse,
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testGetCanvasID + "/versions/version-2",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"version-2"}}}`))
-			},
-		},
-		expectFetchCanvasYAML(
-			testGetCanvasID,
-			"version-2",
-			sampleCanvasYAMLBody,
-		),
-	)
-
-	ctx, stdout := cli.NewCommandContext(t, server.server, "text")
-	ctx.Args = []string{testGetCanvasID}
-
-	draftID := "version-2"
-	require.NoError(t, (&getCommand{draftID: &draftID}).Execute(ctx))
-	require.Contains(t, stdout.String(), "Source: draft")
-	require.Contains(t, stdout.String(), "Version ID: version-2")
-}

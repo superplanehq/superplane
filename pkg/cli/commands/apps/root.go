@@ -4,9 +4,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/console"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/drafts"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/files"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/memory"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/staging"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -42,7 +42,7 @@ App URL pattern: {baseURL}/{organizationId}/apps/{appId}
 	root.AddCommand(activeCmd)
 	root.AddCommand(NewCreateCommand(options))
 	root.AddCommand(NewDeleteCommand(options))
-	root.AddCommand(drafts.NewCommand(options))
+	root.AddCommand(staging.NewCommand(options))
 	root.AddCommand(canvas.NewCommand(options))
 	root.AddCommand(console.NewCommand(options))
 	root.AddCommand(files.NewRootCommand(options))

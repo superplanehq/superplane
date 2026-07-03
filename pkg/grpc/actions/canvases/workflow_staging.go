@@ -9,9 +9,10 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"gorm.io/gorm"
@@ -37,6 +38,7 @@ func loadCanvasStagingContext(
 	organizationID string,
 	canvasID string,
 ) (*canvasStagingContext, error) {
+	db := database.DB(ctx)
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -52,7 +54,7 @@ func loadCanvasStagingContext(
 		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
-	canvas, err := models.FindCanvas(organizationUUID, canvasUUID)
+	canvas, err := models.FindCanvasInTransaction(db, organizationUUID, canvasUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "canvas not found")
@@ -60,13 +62,13 @@ func loadCanvasStagingContext(
 		return nil, grpcerrors.Internal(err, "failed to load canvas")
 	}
 
-	liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load live version")
 	}
 
 	userUUID := uuid.MustParse(userID)
-	rows, err := models.ListWorkflowStagingForUser(nil, canvas.ID, userUUID)
+	rows, err := models.ListWorkflowStagingForUserInTransaction(db, canvas.ID, userUUID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}

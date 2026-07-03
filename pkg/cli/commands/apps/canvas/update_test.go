@@ -1,9 +1,6 @@
 package canvas
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -63,70 +60,12 @@ func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
 	require.Len(t, s.expectations, 0, "unused request expectations")
 }
 
-const cliTestUserID = "user-1"
-
-func draftVersionsPath(canvasID string) string {
-	return "/api/v1/canvases/" + canvasID + "/versions"
-}
-
-func expectMe() requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   "/api/v1/me",
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"user":{"id":"` + cliTestUserID + `"}}`))
-		},
-	}
-}
-
-func expectListDraftBranchesEmpty(canvasID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   draftVersionsPath(canvasID),
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[]}`))
-		},
-	}
-}
-
-func expectCreateDraftBranch(canvasID, versionID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodPost,
-		path:   draftVersionsPath(canvasID),
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `"}}}`))
-		},
-	}
-}
-
 func repositoryCanvasFilePath(canvasID string) string {
 	return "/api/v1/canvases/" + canvasID + "/repository/file"
 }
 
-func repositoryCommitsPath(canvasID string) string {
-	return "/api/v1/canvases/" + canvasID + "/repository/commits"
-}
-
-func describeVersionPath(canvasID, versionID string) string {
-	return "/api/v1/canvases/" + canvasID + "/versions/" + versionID
-}
-
 func stagingPath(canvasID string) string {
 	return "/api/v1/canvases/" + canvasID + "/staging"
-}
-
-func expectListLiveVersion(canvasID, versionID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   draftVersionsPath(canvasID),
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"` + versionID + `"}}]}`))
-		},
-	}
 }
 
 func expectStageCanvasYAML(canvasID string) requestExpectation {
@@ -151,59 +90,6 @@ func expectCommitStaging(canvasID, versionID string) requestExpectation {
 	}
 }
 
-func expectCommitCanvasYAML(canvasID, versionID string, assertYAML func(t *testing.T, yaml string)) requestExpectation {
-	return requestExpectation{
-		method: http.MethodPost,
-		path:   repositoryCommitsPath(canvasID),
-		handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-			rawBody, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			var payload map[string]any
-			require.NoError(t, json.Unmarshal(rawBody, &payload))
-			require.Equal(t, versionID, payload["versionId"])
-			if assertYAML != nil {
-				operations, ok := payload["operations"].([]any)
-				require.True(t, ok)
-				require.NotEmpty(t, operations)
-				first, ok := operations[0].(map[string]any)
-				require.True(t, ok)
-				encoded, ok := first["content"].(string)
-				require.True(t, ok)
-				decoded, err := base64.StdEncoding.DecodeString(encoded)
-				require.NoError(t, err)
-				assertYAML(t, string(decoded))
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{}`))
-		},
-	}
-}
-
-func expectDescribeCanvasVersion(canvasID, versionID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   describeVersionPath(canvasID, versionID),
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `","canvasId":"` + canvasID + `"}}}`))
-		},
-	}
-}
-
-// expectValidateDraftVersion mocks the describe-version call used by
-// common.ResolveDraftVersionID to validate an explicit --draft-id. It
-// returns a draft version owned by the test user.
-func expectValidateDraftVersion(canvasID, versionID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodGet,
-		path:   describeVersionPath(canvasID, versionID),
-		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `","canvasId":"` + canvasID + `"}}}`))
-		},
-	}
-}
-
 func expectFetchCanvasYAML(canvasID, versionID, yamlBody string) requestExpectation {
 	return requestExpectation{
 		method: http.MethodGet,
@@ -217,12 +103,23 @@ func expectFetchCanvasYAML(canvasID, versionID, yamlBody string) requestExpectat
 	}
 }
 
+func TestUpdateWithoutMessageReturnsError(t *testing.T) {
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	filePath := writeTestCanvasFileWithMetadataID(t, "needs-message", canvasID)
+	file := filePath
+	ctx, _ := cli.NewCommandContext(t, newAPITestServer(t).server, "text")
+
+	err := (&updateCommand{file: &file}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--message is required")
+}
+
 func TestUpdateWithoutFileReturnsError(t *testing.T) {
 	server := newAPITestServer(t)
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
-	err := (&updateCommand{}).Execute(ctx)
+	message := "Update canvas"
+	err := (&updateCommand{message: &message}).Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "file")
 }
 
 func writeTestCanvasFileWithoutMetadataID(t *testing.T, name string) string {
@@ -278,38 +175,12 @@ func TestResolveCanvasForFileUpdateWhitespaceIDReturnsError(t *testing.T) {
 	require.Contains(t, err.Error(), "metadata.id is required")
 }
 
-func TestUpdateFromFileJSONOutputWhenDraft(t *testing.T) {
-	t.Helper()
-	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
-
-	server := newAPITestServer(
-		t,
-		expectValidateDraftVersion(canvasID, "version-1"),
-		expectStageCanvasYAML(canvasID),
-	)
-
-	filePath := writeTestCanvasFileWithMetadataID(t, "json-out", canvasID)
-	file := filePath
-	draftID := "version-1"
-	ctx, stdout := cli.NewCommandContext(t, server.server, "json")
-
-	err := (&updateCommand{file: &file, draftID: &draftID}).Execute(ctx)
-	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `"staged": "true"`)
-
-	server.AssertCalls(t, []string{
-		http.MethodGet + " " + describeVersionPath(canvasID, "version-1"),
-		http.MethodPut + " " + stagingPath(canvasID),
-	})
-}
-
 func TestUpdateFromFileWhenCommitFailsReturnsWrappedError(t *testing.T) {
 	t.Helper()
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 
 	server := newAPITestServer(
 		t,
-		expectListLiveVersion(canvasID, "ver-1"),
 		expectStageCanvasYAML(canvasID),
 		requestExpectation{
 			method: http.MethodPost,
@@ -323,14 +194,14 @@ func TestUpdateFromFileWhenCommitFailsReturnsWrappedError(t *testing.T) {
 
 	filePath := writeTestCanvasFileWithMetadataID(t, "pub-fail", canvasID)
 	file := filePath
+	message := "Update canvas"
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file}).Execute(ctx)
+	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "canvas was staged but commit failed"), err.Error())
 
 	server.AssertCalls(t, []string{
-		http.MethodGet + " " + draftVersionsPath(canvasID),
 		http.MethodPut + " " + stagingPath(canvasID),
 		http.MethodPost + " " + stagingPath(canvasID) + "/commit",
 	})
@@ -342,7 +213,6 @@ func TestUpdateFromFileWhenStageFailsReturnsError(t *testing.T) {
 
 	server := newAPITestServer(
 		t,
-		expectValidateDraftVersion(canvasID, "version-1"),
 		requestExpectation{
 			method: http.MethodPut,
 			path:   stagingPath(canvasID),
@@ -355,14 +225,13 @@ func TestUpdateFromFileWhenStageFailsReturnsError(t *testing.T) {
 
 	filePath := writeTestCanvasFileWithMetadataID(t, "put-fail", canvasID)
 	file := filePath
-	draftID := "version-1"
+	message := "Update canvas"
 	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file, draftID: &draftID}).Execute(ctx)
+	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
 	require.Error(t, err)
 
 	server.AssertCalls(t, []string{
-		http.MethodGet + " " + describeVersionPath(canvasID, "version-1"),
 		http.MethodPut + " " + stagingPath(canvasID),
 	})
 }
@@ -373,7 +242,6 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 
 	server := newAPITestServer(
 		t,
-		expectListLiveVersion(canvasID, "version-1"),
 		expectStageCanvasYAML(canvasID),
 		expectCommitStaging(canvasID, "version-1"),
 		expectFetchCanvasYAML(
@@ -390,14 +258,14 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 	require.NoError(t, os.WriteFile(filePath, []byte(yaml), 0o644))
 
 	file := filePath
+	message := "Update canvas"
 	ctx, stdout := cli.NewCommandContext(t, server.server, "text")
 
-	err := (&updateCommand{file: &file}).Execute(ctx)
+	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "Integrations: 1")
 
 	server.AssertCalls(t, []string{
-		http.MethodGet + " " + draftVersionsPath(canvasID),
 		http.MethodPut + " " + stagingPath(canvasID),
 		http.MethodPost + " " + stagingPath(canvasID) + "/commit",
 		http.MethodGet + " " + repositoryCanvasFilePath(canvasID),
