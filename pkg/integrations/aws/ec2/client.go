@@ -2691,11 +2691,14 @@ func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
 		params.Set("TreatMissingData", treatMissing)
 	}
 
-	for i, arn := range input.AlarmActions {
+	actionIndex := 0
+	for _, arn := range input.AlarmActions {
 		arn = strings.TrimSpace(arn)
-		if arn != "" {
-			params.Set(fmt.Sprintf("AlarmActions.member.%d", i+1), arn)
+		if arn == "" {
+			continue
 		}
+		actionIndex++
+		params.Set(fmt.Sprintf("AlarmActions.member.%d", actionIndex), arn)
 	}
 
 	return c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "PutMetricAlarm", params, nil)
@@ -2703,12 +2706,14 @@ func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
 
 func (c *Client) DeleteAlarms(alarmNames ...string) error {
 	params := url.Values{}
-	for i, name := range alarmNames {
+	index := 0
+	for _, name := range alarmNames {
 		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
-		params.Set(fmt.Sprintf("AlarmNames.member.%d", i+1), name)
+		index++
+		params.Set(fmt.Sprintf("AlarmNames.member.%d", index), name)
 	}
 
 	if len(params) == 0 {
