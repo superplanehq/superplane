@@ -28,7 +28,6 @@ import {
   isAgentBootReady,
 } from "@/lib/agentBootContext";
 import { ConversationTranscript } from "./AgentConversationTranscript";
-import { ClearChatButton } from "./ClearChatButton";
 import {
   createWebsocketCallbacks,
   isOutcomeActive,
@@ -170,9 +169,7 @@ function ChatConversation({
   const agentBusy = status === "streaming" || outcomeMutation.isPending || resetMutation.isPending || outcomeActive;
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <ClearChatButton onClearChat={() => void handlers.handleSend("/clear")} clearing={resetMutation.isPending} />
-
+    <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTranscript
         error={error}
         notice={notice}
@@ -209,6 +206,8 @@ function ChatConversation({
         organizationId={organizationId}
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
+        onClearChat={() => void handlers.handleSend("/clear")}
+        clearing={resetMutation.isPending}
         sending={agentBusy}
         sendPending={sendMutation.isPending || resetMutation.isPending}
         stopping={interruptMutation.isPending}
@@ -538,6 +537,8 @@ function ComposerWithCanvasData({
   organizationId: string;
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   onStop: () => void;
+  onClearChat: () => void;
+  clearing: boolean;
   sending: boolean;
   sendPending: boolean;
   stopping?: boolean;
