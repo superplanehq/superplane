@@ -14,9 +14,13 @@ import { useEventExecutions } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RUN_NODE_ICON_SIZE, RunNodeIcon } from "./RunNodeIcon";
+import { RunStepConfigView } from "./RunStepConfigView";
 import { RunStepTimeline } from "./RunStepTimeline";
 import { buildExecutionChain, eventBadgeForExecution, eventBadgeForTriggeredTrigger } from "./runNodeDetailModel";
 import { formatEventTimestamp, formatStepDuration, getStepActivity } from "./runSummary";
+
+/** Controls what expanded steps render: the run-detail timeline or the read-only step configuration. */
+export type StepDetailMode = "run-details" | "step-config";
 
 export function StatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
   return (
@@ -240,13 +244,19 @@ export function AccordionNodeDetail({
   workflowNodes,
   componentIconMap = {},
   executions,
+  stepDetailMode = "run-details",
 }: {
   run: CanvasesCanvasRun;
   nodeId: string;
   workflowNodes: ComponentsNode[];
   componentIconMap?: Record<string, string>;
   executions: CanvasesCanvasNodeExecution[];
+  stepDetailMode?: StepDetailMode;
 }) {
+  if (stepDetailMode === "step-config") {
+    return <RunStepConfigView nodeId={nodeId} workflowNodes={workflowNodes} componentIconMap={componentIconMap} />;
+  }
+
   return (
     <RunStepTimeline
       run={run}

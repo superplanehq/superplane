@@ -21,7 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useEventExecutions } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
-import { AccordionNodeDetail, AccordionRow } from "./RunStepAccordion";
+import { AccordionNodeDetail, AccordionRow, type StepDetailMode } from "./RunStepAccordion";
 import { buildExecutionChain } from "./runNodeDetailModel";
 import { ErrorBanner, IdentityHeader, StepToolbar } from "./runDetailParts";
 import { buildNodeMap, buildRunPresentation } from "./runPresentation";
@@ -29,6 +29,31 @@ import { findErrorExecutions, getRunStepSummary, getStepActivity, type RunStepFi
 
 export type RunDetailContext = "live" | "inspection";
 export type RunDisplayMode = "full" | "split" | "min";
+export type { StepDetailMode };
+
+const STEP_DETAIL_MODE_STORAGE_KEY = "superplane.run-panel.step-detail-mode";
+
+/** Persisted step-content mode (run details vs read-only step configuration), shared across runs. */
+function useStepDetailMode(): [StepDetailMode, (mode: StepDetailMode) => void] {
+  const [mode, setMode] = useState<StepDetailMode>(() => {
+    try {
+      return window.localStorage.getItem(STEP_DETAIL_MODE_STORAGE_KEY) === "step-config"
+        ? "step-config"
+        : "run-details";
+    } catch {
+      return "run-details";
+    }
+  });
+  const update = useCallback((next: StepDetailMode) => {
+    setMode(next);
+    try {
+      window.localStorage.setItem(STEP_DETAIL_MODE_STORAGE_KEY, next);
+    } catch {
+      // Persisting is best-effort; ignore quota/availability errors.
+    }
+  }, []);
+  return [mode, update];
+}
 
 /**
  * Tracks an element's rendered height via a callback ref + ResizeObserver, so
@@ -284,6 +309,7 @@ function StepList({
   onToggleNode,
   stickyOffset,
   isLoading,
+  stepDetailMode,
 }: {
   run: CanvasesCanvasRun;
   executions: CanvasesCanvasNodeExecution[];
@@ -294,6 +320,7 @@ function StepList({
   onToggleNode: (nodeId: string) => void;
   stickyOffset: number;
   isLoading: boolean;
+  stepDetailMode: StepDetailMode;
 }) {
   const triggerNodeId = run.rootEvent?.nodeId;
   const chain = useMemo(() => buildExecutionChain(executions, triggerNodeId), [executions, triggerNodeId]);
@@ -350,6 +377,7 @@ function StepList({
                 workflowNodes={workflowNodes}
                 componentIconMap={componentIconMap}
                 executions={executions}
+                stepDetailMode={stepDetailMode}
               />
             ) : null}
           </div>
@@ -384,6 +412,7 @@ function RunPanelBody({
   isLoading: boolean;
 }) {
   const [statusFilter, setStatusFilter] = useState<RunStepFilter[]>([]);
+  const [stepDetailMode, setStepDetailMode] = useStepDetailMode();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [headerRef, headerHeight] = useElementHeight<HTMLDivElement>();
   const [toolbarRef, toolbarHeight] = useElementHeight<HTMLDivElement>();
@@ -391,11 +420,10 @@ function RunPanelBody({
   const summary = useMemo(() => getRunStepSummary(executions, workflowNodes), [executions, workflowNodes]);
   const errorExecutions = useMemo(() => findErrorExecutions(executions), [executions]);
   const stepCount = summary.total;
-  const hasFilters = summary.errors + summary.running + summary.waiting > 0;
   const contentClass = isFull ? "px-8" : "px-4";
-  // Steps must clear the sticky header (and sticky filter toolbar, when shown)
+  // Steps must clear the sticky header and the always-present filter/mode toolbar
   // when scrolled to the top.
-  const stickyOffset = headerHeight + (hasFilters ? toolbarHeight : 0);
+  const stickyOffset = headerHeight + toolbarHeight;
 
   const lastScrolledNodeId = useRef<string | null>(null);
 
@@ -467,16 +495,16 @@ function RunPanelBody({
             contentClass={contentClass}
           />
         ) : null}
-        {hasFilters ? (
-          <StepToolbar
-            summary={summary}
-            statusFilter={statusFilter}
-            onToggleStatus={toggleStatus}
-            contentClass={contentClass}
-            stickyTop={headerHeight}
-            rootRef={toolbarRef}
-          />
-        ) : null}
+        <StepToolbar
+          summary={summary}
+          statusFilter={statusFilter}
+          onToggleStatus={toggleStatus}
+          contentClass={contentClass}
+          stickyTop={headerHeight}
+          rootRef={toolbarRef}
+          stepDetailMode={stepDetailMode}
+          onSetStepDetailMode={setStepDetailMode}
+        />
         <StepList
           run={run}
           executions={executions}
@@ -487,6 +515,7 @@ function RunPanelBody({
           onToggleNode={onToggleNode}
           stickyOffset={stickyOffset}
           isLoading={isLoading}
+          stepDetailMode={stepDetailMode}
         />
       </div>
     </div>

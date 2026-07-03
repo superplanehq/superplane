@@ -1,4 +1,4 @@
-import { AlertTriangle, type LucideIcon } from "lucide-react";
+import { AlertTriangle, type LucideIcon, Rows3, SlidersHorizontal } from "lucide-react";
 import type { ReactNode, Ref } from "react";
 import type {
   CanvasesCanvasNodeExecution,
@@ -8,6 +8,7 @@ import type {
 import { TimeAgo } from "@/components/TimeAgo";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { StepDetailMode } from "./RunStepAccordion";
 import { RUN_STATUS_META, type RunStatusKey } from "./runPresentation";
 import { formatRunDuration, RUN_STEP_FILTERS, type RunStepFilter, type RunStepSummary } from "./runSummary";
 
@@ -207,7 +208,44 @@ export function ErrorBanner({
   );
 }
 
-/** Sticky, state-based step filters (Errors / Running / Waiting). */
+const STEP_DETAIL_MODES: { mode: StepDetailMode; label: string; icon: LucideIcon }[] = [
+  { mode: "run-details", label: "Run details", icon: Rows3 },
+  { mode: "step-config", label: "Step config", icon: SlidersHorizontal },
+];
+
+/** Segmented control that switches expanded steps between run details and read-only step configuration. */
+function StepDetailModeToggle({
+  stepDetailMode,
+  onSetStepDetailMode,
+}: {
+  stepDetailMode: StepDetailMode;
+  onSetStepDetailMode: (mode: StepDetailMode) => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-50 p-0.5">
+      {STEP_DETAIL_MODES.map(({ mode, label, icon: Icon }) => {
+        const active = stepDetailMode === mode;
+        return (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => onSetStepDetailMode(mode)}
+            aria-pressed={active}
+            className={cn(
+              "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+              active ? "bg-white text-slate-800 shadow-sm" : "text-gray-500 hover:text-gray-700",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Sticky toolbar: state-based step filters (Errors / Running / Waiting) and the step-content mode toggle. */
 export function StepToolbar({
   summary,
   statusFilter,
@@ -215,6 +253,8 @@ export function StepToolbar({
   contentClass,
   stickyTop = 0,
   rootRef,
+  stepDetailMode,
+  onSetStepDetailMode,
 }: {
   summary: RunStepSummary;
   statusFilter: RunStepFilter[];
@@ -223,6 +263,8 @@ export function StepToolbar({
   /** Offset from the top of the scroll container, so it stops below the sticky header. */
   stickyTop?: number;
   rootRef?: Ref<HTMLDivElement>;
+  stepDetailMode: StepDetailMode;
+  onSetStepDetailMode: (mode: StepDetailMode) => void;
 }) {
   const countFor = (id: RunStepFilter) =>
     id === "error" ? summary.errors : id === "running" ? summary.running : summary.waiting;
@@ -233,31 +275,34 @@ export function StepToolbar({
       ref={rootRef}
       style={{ top: stickyTop }}
       className={cn(
-        "sticky z-10 flex flex-wrap items-center gap-1 border-b border-slate-950/10 bg-white/95 py-2 backdrop-blur",
+        "sticky z-10 flex items-center justify-between gap-2 border-b border-slate-950/10 bg-white/95 py-2 backdrop-blur",
         contentClass,
       )}
     >
-      <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Steps</span>
-      {available.map((option) => {
-        const active = statusFilter.includes(option.id);
-        return (
-          <button
-            key={option.id}
-            type="button"
-            onClick={() => onToggleStatus(option.id)}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
-              active
-                ? "border-slate-300 bg-slate-100 text-slate-800"
-                : "border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700",
-            )}
-          >
-            <span className={cn("h-1.5 w-1.5 rounded-full", option.dotClassName)} />
-            {option.label}
-            <span className="tabular-nums text-gray-400">{countFor(option.id)}</span>
-          </button>
-        );
-      })}
+      <div className="flex min-w-0 flex-wrap items-center gap-1">
+        <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Steps</span>
+        {available.map((option) => {
+          const active = statusFilter.includes(option.id);
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onToggleStatus(option.id)}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                active
+                  ? "border-slate-300 bg-slate-100 text-slate-800"
+                  : "border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+              )}
+            >
+              <span className={cn("h-1.5 w-1.5 rounded-full", option.dotClassName)} />
+              {option.label}
+              <span className="tabular-nums text-gray-400">{countFor(option.id)}</span>
+            </button>
+          );
+        })}
+      </div>
+      <StepDetailModeToggle stepDetailMode={stepDetailMode} onSetStepDetailMode={onSetStepDetailMode} />
     </div>
   );
 }
