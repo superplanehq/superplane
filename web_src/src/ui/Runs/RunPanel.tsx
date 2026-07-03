@@ -7,6 +7,7 @@ import {
   Link as LinkIcon,
   type LucideIcon,
   PanelRight,
+  Rows3,
   Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -75,7 +76,8 @@ export interface RunPanelProps {
   onNextRun?: () => void;
   hasPrevRun?: boolean;
   hasNextRun?: boolean;
-  onViewOnCanvas?: () => void;
+  /** Opens this run in the dedicated run inspection view (as if picked from the runs sidebar). */
+  onOpenInRunView?: () => void;
   onAskAgent?: () => void;
 }
 
@@ -168,7 +170,15 @@ function DisplaySizeMenu({
   );
 }
 
-function RunActionsMenu({ run, onAskAgent }: { run: CanvasesCanvasRun; onAskAgent?: () => void }) {
+function RunActionsMenu({
+  run,
+  onOpenInRunView,
+  onAskAgent,
+}: {
+  run: CanvasesCanvasRun;
+  onOpenInRunView?: () => void;
+  onAskAgent?: () => void;
+}) {
   const copyRunLink = useCallback(async () => {
     const url = new URL(window.location.href);
     url.searchParams.delete("view");
@@ -191,6 +201,9 @@ function RunActionsMenu({ run, onAskAgent }: { run: CanvasesCanvasRun; onAskAgen
 
   return (
     <>
+      {onOpenInRunView ? (
+        <ChromeIconButton label="Open in run view" icon={<Rows3 className="h-4 w-4" />} onClick={onOpenInRunView} />
+      ) : null}
       <ChromeIconButton label="Copy link" icon={<LinkIcon className="h-4 w-4" />} onClick={copyRunLink} />
       <ChromeIconButton label="Send to agent" icon={<Sparkles className="h-4 w-4" />} onClick={sendToAgent} />
     </>
@@ -206,6 +219,7 @@ function ChromeRow({
   onNextRun,
   hasPrevRun,
   hasNextRun,
+  onOpenInRunView,
   onAskAgent,
   onClose,
   closeLabel,
@@ -218,6 +232,7 @@ function ChromeRow({
   onNextRun?: () => void;
   hasPrevRun?: boolean;
   hasNextRun?: boolean;
+  onOpenInRunView?: () => void;
   onAskAgent?: () => void;
   onClose: () => void;
   closeLabel: string;
@@ -253,7 +268,7 @@ function ChromeRow({
       </div>
 
       <div className="flex items-center gap-0.5">
-        {run ? <RunActionsMenu run={run} onAskAgent={onAskAgent} /> : null}
+        {run ? <RunActionsMenu run={run} onOpenInRunView={onOpenInRunView} onAskAgent={onAskAgent} /> : null}
       </div>
     </div>
   );
@@ -324,11 +339,18 @@ function StepList({
               componentIconMap={componentIconMap}
               execution={execution}
               isTrigger={isTrigger}
+              triggerTimestamp={run.rootEvent?.createdAt ?? run.createdAt}
               isExpanded={expandedNodeId === nodeId}
               onToggle={onToggleNode}
             />
             {expandedNodeId === nodeId ? (
-              <AccordionNodeDetail run={run} nodeId={nodeId} workflowNodes={workflowNodes} executions={executions} />
+              <AccordionNodeDetail
+                run={run}
+                nodeId={nodeId}
+                workflowNodes={workflowNodes}
+                componentIconMap={componentIconMap}
+                executions={executions}
+              />
             ) : null}
           </div>
         );
@@ -495,6 +517,7 @@ export function RunPanel({
   onNextRun,
   hasPrevRun,
   hasNextRun,
+  onOpenInRunView,
   onAskAgent,
 }: RunPanelProps) {
   const executionsQuery = useEventExecutions(canvasId, run?.rootEvent?.id || null);
@@ -516,6 +539,7 @@ export function RunPanel({
         onNextRun={onNextRun}
         hasPrevRun={hasPrevRun}
         hasNextRun={hasNextRun}
+        onOpenInRunView={onOpenInRunView}
         onAskAgent={onAskAgent}
         onClose={onClose}
         closeLabel={resolvedCloseLabel}

@@ -85,6 +85,61 @@ export function eventBadgeForExecution(
   return { badgeColor: style.badgeColor, label: style.label ?? String(eventState) };
 }
 
+export interface StepStatusEntry {
+  key: string;
+  label: string;
+  /** Tailwind background class for the timeline dot. */
+  dotClassName: string;
+  /** ISO timestamp for this status change. */
+  timestamp: string;
+}
+
+/** Event states that mean "blocked, waiting on time or input" (e.g. approval, timegate). */
+const WAITING_STATUS_STATES = new Set(["waiting", "queued", "pending"]);
+
+/**
+ * The canonical status changes a step goes through, for the Action sub-timeline:
+ * Triggered -> Queued -> Running|Waiting -> terminal. The backend only records a
+ * single state/result plus created/updated timestamps, so the intermediate
+ * timestamps are interpolated between the step's start and finish. The terminal
+ * entry's label/color comes from the component's own state map.
+ */
+export function buildStepStatusTimeline(
+  execution: CanvasesCanvasNodeExecution,
+  node: ComponentsNode | undefined,
+  now: number = Date.now(),
+): StepStatusEntry[] {
+  const start = execution.createdAt ? new Date(execution.createdAt).getTime() : now;
+  const finished = execution.state === "STATE_FINISHED";
+  const end = finished && execution.updatedAt ? new Date(execution.updatedAt).getTime() : now;
+  const duration = Math.max(0, end - start);
+  const at = (fraction: number) => new Date(start + Math.round(duration * fraction)).toISOString();
+
+  const entries: StepStatusEntry[] = [
+    { key: "triggered", label: "Triggered", dotClassName: "bg-violet-400", timestamp: new Date(start).toISOString() },
+    { key: "queued", label: "Queued", dotClassName: "bg-slate-400", timestamp: at(0.1) },
+  ];
+
+  const isWaiting = WAITING_STATUS_STATES.has(getExecutionEventState(node, execution));
+  entries.push(
+    isWaiting
+      ? { key: "waiting", label: "Waiting", dotClassName: "bg-amber-500", timestamp: at(0.25) }
+      : { key: "running", label: "Running", dotClassName: "bg-blue-500", timestamp: at(0.25) },
+  );
+
+  if (finished) {
+    const badge = eventBadgeForExecution(node, execution);
+    entries.push({
+      key: "terminal",
+      label: badge.label,
+      dotClassName: badge.badgeColor,
+      timestamp: new Date(end).toISOString(),
+    });
+  }
+
+  return entries;
+}
+
 export function buildExecutionChain(executions: CanvasesCanvasNodeExecution[], triggerNodeId?: string | null) {
   const chain: string[] = [];
   const visited = new Set<string>();

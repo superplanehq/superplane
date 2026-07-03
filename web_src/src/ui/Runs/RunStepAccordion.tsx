@@ -11,17 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useEventExecutions } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
 import { RUN_NODE_ICON_SIZE, RunNodeIcon } from "./RunNodeIcon";
-import {
-  buildExecutionChain,
-  eventBadgeForExecution,
-  eventBadgeForTriggeredTrigger,
-  hasObjectValue,
-  isErrorValue,
-} from "./runNodeDetailModel";
-import { formatStepDuration } from "./runSummary";
-import { useRunNodeDetailPresentation } from "./useRunNodeDetailPresentation";
+import { RunStepTimeline } from "./RunStepTimeline";
+import { buildExecutionChain, eventBadgeForExecution, eventBadgeForTriggeredTrigger } from "./runNodeDetailModel";
+import { formatEventTimestamp, formatStepDuration } from "./runSummary";
 
 export function StatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
   return (
@@ -48,14 +41,17 @@ export function DetailBox({ title, children, actions }: { title: string; childre
   );
 }
 
-function HeaderIconButton({
+export function HeaderIconButton({
   label,
   icon,
   onClick,
+  active,
 }: {
   label: string;
   icon: ReactNode;
   onClick?: (event: React.MouseEvent) => void;
+  /** When defined, renders as a toggle: reflects pressed state and shows a filled background when on. */
+  active?: boolean;
 }) {
   return (
     <Tooltip>
@@ -63,11 +59,17 @@ function HeaderIconButton({
         <button
           type="button"
           aria-label={label}
+          aria-pressed={active}
           onClick={(event) => {
             event.stopPropagation();
             onClick?.(event);
           }}
-          className="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
+          className={cn(
+            "flex h-6 w-6 items-center justify-center rounded transition-colors",
+            active
+              ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+              : "text-slate-400 hover:bg-slate-200 hover:text-slate-700",
+          )}
         >
           {icon}
         </button>
@@ -128,7 +130,7 @@ function humanizeReason(reason?: string) {
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
-function ErrorDetailBox({
+export function ErrorDetailBox({
   message,
   reason,
   metadata,
@@ -169,74 +171,27 @@ function ErrorDetailBox({
   );
 }
 
-function buildSummaryDetails(rawDetails: Record<string, unknown>, metadata: Record<string, unknown> | undefined) {
-  if (!isErrorValue(rawDetails.Error)) return rawDetails;
-  return Object.fromEntries(
-    Object.entries(rawDetails).filter(([key]) => key !== "Error" && !(key in (metadata ?? {}))),
-  );
-}
-
-function NodeOutcomeBox({
-  presentation,
-  execution,
-}: {
-  presentation: ReturnType<typeof useRunNodeDetailPresentation>;
-  execution: CanvasesCanvasNodeExecution | undefined;
-}) {
-  const errorValue = presentation.tabData?.details?.Error;
-  if (isErrorValue(errorValue)) {
-    return (
-      <ErrorDetailBox message={errorValue.message} reason={execution?.resultReason} metadata={execution?.metadata} />
-    );
-  }
-  if (presentation.hasPayload) {
-    return <JsonDetailBox title="Output" value={presentation.tabData?.payload} />;
-  }
-  return null;
-}
-
 export function AccordionNodeDetail({
   run,
   nodeId,
   workflowNodes,
+  componentIconMap = {},
   executions,
 }: {
   run: CanvasesCanvasRun;
   nodeId: string;
   workflowNodes: ComponentsNode[];
+  componentIconMap?: Record<string, string>;
   executions: CanvasesCanvasNodeExecution[];
 }) {
-  const presentation = useRunNodeDetailPresentation({ run, nodeId, workflowNodes, executions });
-
-  const execution = executions.find((item) => item.nodeId === nodeId);
-  const inputData = presentation.isTriggerNode ? undefined : execution?.rootEvent?.data;
-  const hasInput = hasObjectValue(inputData);
-  const summaryDetails = buildSummaryDetails(presentation.tabData?.details ?? {}, execution?.metadata);
-
-  if (!presentation.hasAnyTab && !hasInput) {
-    return <div className="px-3 py-3 text-xs text-gray-400">No execution data for this node in this run.</div>;
-  }
-
   return (
-    <div className="flex flex-col gap-2 bg-slate-50 px-3 py-3">
-      {presentation.hasDetailsSection ? (
-        <DetailBox
-          title="Summary"
-          actions={<HeaderIconButton label="Ask agent" icon={<Sparkles className="h-3.5 w-3.5" />} />}
-        >
-          <RunNodeDetailDetailsView
-            details={summaryDetails}
-            statusBadge={presentation.headerEventBadge}
-            relativeTime={presentation.createdAt}
-          />
-        </DetailBox>
-      ) : null}
-      {hasInput ? <JsonDetailBox title="Input" value={inputData} /> : null}
-      {presentation.hasConfig ? (
-        <JsonDetailBox title="Runtime Config" value={presentation.tabData?.configuration} />
-      ) : null}
-      <NodeOutcomeBox presentation={presentation} execution={execution} />
-    </div>
+    <RunStepTimeline
+      run={run}
+      nodeId={nodeId}
+      workflowNodes={workflowNodes}
+      componentIconMap={componentIconMap}
+      executions={executions}
+    />
   );
 }
 
@@ -246,6 +201,7 @@ export function AccordionRow({
   componentIconMap,
   execution,
   isTrigger,
+  triggerTimestamp,
   isExpanded,
   onToggle,
   className,
@@ -255,6 +211,8 @@ export function AccordionRow({
   componentIconMap: Record<string, string>;
   execution?: CanvasesCanvasNodeExecution;
   isTrigger: boolean;
+  /** When the triggering event was received (run start); shown in place of a duration for the trigger row. */
+  triggerTimestamp?: string;
   isExpanded: boolean;
   onToggle: (nodeId: string) => void;
   className?: string;
@@ -269,7 +227,8 @@ export function AccordionRow({
       ? eventBadgeForExecution(workflowNode, execution)
       : null;
 
-  const duration = !isTrigger && execution ? formatStepDuration(execution) : null;
+  // Triggers have no duration; instead show when their event was received.
+  const meta = isTrigger ? formatEventTimestamp(triggerTimestamp) : execution ? formatStepDuration(execution) : null;
 
   return (
     <div
@@ -301,7 +260,7 @@ export function AccordionRow({
         className={cn("h-3.5 w-3.5 shrink-0", isExpanded ? "text-gray-800" : "text-gray-500")}
       />
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800">{nodeName}</span>
-      {duration ? <span className="shrink-0 text-[11px] tabular-nums text-gray-400">{duration}</span> : null}
+      {meta ? <span className="shrink-0 text-[11px] tabular-nums text-gray-400">{meta}</span> : null}
       {badge ? <StatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}
     </div>
   );
@@ -352,12 +311,19 @@ export function AccordionNodeList({
               componentIconMap={componentIconMap}
               execution={execution}
               isTrigger={isTrigger}
+              triggerTimestamp={run.rootEvent?.createdAt ?? run.createdAt}
               isExpanded={expandedNodeId === nodeId}
               onToggle={onToggleNode}
               className={rowClassName}
             />
             {expandedNodeId === nodeId ? (
-              <AccordionNodeDetail run={run} nodeId={nodeId} workflowNodes={workflowNodes} executions={executions} />
+              <AccordionNodeDetail
+                run={run}
+                nodeId={nodeId}
+                workflowNodes={workflowNodes}
+                componentIconMap={componentIconMap}
+                executions={executions}
+              />
             ) : null}
           </div>
         );

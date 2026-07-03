@@ -1602,6 +1602,16 @@ function CanvasPage(props: CanvasPageProps) {
               onClose={handleSidebarClose}
               displayMode={runPanelSize}
               onSetDisplayMode={setRunPanelSize}
+              onOpenInRunView={
+                props.onSelectRunFromSidebarEvent && props.liveSelectedNodeRun?.id
+                  ? () => {
+                      const runId = props.liveSelectedNodeRun?.id;
+                      if (!runId) return;
+                      const nodeId = liveExpandedNodeId ?? liveSelectedNodeId ?? undefined;
+                      props.onSelectRunFromSidebarEvent?.(runId, nodeId ? { nodeId } : undefined);
+                    }
+                  : undefined
+              }
             />
           </div>
         </div>

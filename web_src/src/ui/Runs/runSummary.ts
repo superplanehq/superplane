@@ -114,6 +114,44 @@ export function formatStepDuration(execution: CanvasesCanvasNodeExecution): stri
   return formatCompactDuration(elapsed);
 }
 
+/**
+ * Timestamp shown on the trigger step: when the triggering event was received
+ * (i.e. when the run started). Formatted as `HH:mm - dd:MM` (24h time, then
+ * day:month), since triggers have no duration to report.
+ */
+export function formatEventTimestamp(timestamp?: string): string | null {
+  if (!timestamp) return null;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const dayMonth = `${date.getDate()}.${months[date.getMonth()]}`;
+  return `${time} - ${dayMonth}`;
+}
+
+/** Elapsed offset from a reference start (e.g. `+0s`, `+3s`, `+7m 39s`), used for the step status sub-timeline rows. */
+export function formatRelativeOffset(fromMs: number, toMs: number): string {
+  const totalSeconds = Math.max(0, Math.round((toMs - fromMs) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `+${seconds}s`;
+  if (seconds === 0) return `+${minutes}m`;
+  return `+${minutes}m ${seconds}s`;
+}
+
+/**
+ * A step's elapsed time. Like {@link formatStepDuration} but also reports the
+ * in-flight elapsed (createdAt -> now) for steps that are still running/waiting.
+ */
+export function formatStepElapsed(execution: CanvasesCanvasNodeExecution, now: number = Date.now()): string | null {
+  if (!execution.createdAt) return null;
+  const start = new Date(execution.createdAt).getTime();
+  const end =
+    execution.state === "STATE_FINISHED" && execution.updatedAt ? new Date(execution.updatedAt).getTime() : now;
+  return formatCompactDuration(Math.max(0, end - start));
+}
+
 export function isRunFinished(run: CanvasesCanvasRun): boolean {
   return Boolean(run.finishedAt) || run.state === "STATE_FINISHED";
 }
