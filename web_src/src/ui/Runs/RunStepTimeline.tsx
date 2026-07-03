@@ -217,7 +217,7 @@ function TimelineItem({
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
-        <div className="z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200">
           {marker}
         </div>
         {!isLast ? <div className="min-h-4 w-px flex-1 bg-slate-200" /> : null}

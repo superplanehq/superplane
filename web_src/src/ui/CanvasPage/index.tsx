@@ -1266,7 +1266,7 @@ function CanvasPage(props: CanvasPageProps) {
   const anyRunPanelOpen = liveBottomInspectorOpen || runInspectionPanelOpen;
   const [runPanelSize, setRunPanelSize] = useState<RunDisplayMode>(loadRunPanelSize);
   const isRunPanelFull = runPanelSize === "full" && anyRunPanelOpen;
-  const runPanelWidthClass = runPanelSize === "full" ? "w-full" : runPanelSize === "min" ? "w-1/4" : "w-1/2";
+  const runPanelWidthClass = runPanelSize === "full" ? "w-full" : runPanelSize === "min" ? "w-1/3" : "w-1/2";
   useEffect(() => {
     saveRunPanelSize(runPanelSize);
   }, [runPanelSize]);

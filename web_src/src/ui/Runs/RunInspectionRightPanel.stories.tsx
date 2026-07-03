@@ -124,7 +124,7 @@ function RunInspectionRightPanelPlayground({
   }, []);
 
   const isFull = displayMode === "full" && Boolean(selectedRun);
-  const panelWidthClass = displayMode === "full" ? "w-full" : displayMode === "min" ? "w-1/4" : "w-1/2";
+  const panelWidthClass = displayMode === "full" ? "w-full" : displayMode === "min" ? "w-1/3" : "w-1/2";
 
   return (
     <div className="flex h-screen min-h-0 bg-white">
