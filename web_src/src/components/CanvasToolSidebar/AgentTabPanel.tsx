@@ -402,14 +402,19 @@ function useConversationHandlers({
     async (content: string, images?: AgentOutgoingImage[]) => {
       const trimmed = content.trim();
       const { sendMutation: send, resetMutation: reset } = mutationsRef.current;
-      if ((!trimmed && (images?.length ?? 0) === 0) || send.isPending || reset.isPending) return;
-      setError(null);
-      setNotice(null);
 
+      // Handle /clear before the generic send guard below so it isn't silently
+      // swallowed while a send is pending; surface a notice instead.
       if (trimmed === "/clear") {
-        // Don't delete the session out from under an in-flight turn.
+        if (reset.isPending) return;
+        setError(null);
+        setNotice(null);
         if (isStreamingRef.current) {
           setNotice("Stop the current response before clearing the chat.");
+          return;
+        }
+        if (send.isPending) {
+          setNotice("Wait for the message to send before clearing the chat.");
           return;
         }
         await reset.mutateAsync().catch((error) => {
@@ -424,6 +429,10 @@ function useConversationHandlers({
         setNotice("Chat cleared. You’re in a fresh session.");
         return;
       }
+
+      if ((!trimmed && (images?.length ?? 0) === 0) || send.isPending || reset.isPending) return;
+      setError(null);
+      setNotice(null);
 
       await send.mutateAsync({ chatId, content, mode: agentMode, images }).catch((error) => {
         setError(error instanceof Error ? error.message : "failed to send message");
