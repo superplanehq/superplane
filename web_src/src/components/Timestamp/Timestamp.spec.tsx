@@ -30,6 +30,24 @@ describe("Timestamp", () => {
     expect(screen.getByText(/^in /)).toBeInTheDocument();
   });
 
+  it("renders a compact abbreviated relative label without a suffix", () => {
+    render(
+      <Timestamp
+        date={new Date(Date.now() - 5 * 60 * 1000)}
+        display="relative"
+        relativeStyle="abbreviated"
+        includeAgo={false}
+      />,
+    );
+    const time = screen.getByText("5m");
+    expect(time.tagName).toBe("TIME");
+  });
+
+  it("renders a compact abbreviated relative label with an 'ago' suffix", () => {
+    render(<Timestamp date={new Date(Date.now() - 5 * 60 * 1000)} display="relative" relativeStyle="abbreviated" />);
+    expect(screen.getByText("5m ago")).toBeInTheDocument();
+  });
+
   it("renders the fallback for missing or invalid dates", () => {
     const { rerender } = render(<Timestamp date={null} fallback={<span>—</span>} />);
     expect(screen.getByText("—")).toBeInTheDocument();

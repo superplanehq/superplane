@@ -2,6 +2,7 @@ import React, { useEffect, useReducer } from "react";
 import { twMerge } from "tailwind-merge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { CopyButton } from "@/ui/CopyButton";
+import { formatTimeAgo } from "@/lib/date";
 import { formatAbsolute, formatISO, formatRelative, formatUTC, toDate, type TimestampInput } from "@/lib/datetime";
 
 // A single shared 1s ticker drives every relative label so a page with many
@@ -26,13 +27,28 @@ function subscribeRelativeTick(listener: () => void): () => void {
 }
 
 /**
- * Live-updating relative label. Uses `formatRelative` (not `TimeAgo`) so future
- * timestamps render as "in …" instead of being clamped to "0s ago".
+ * Live-updating relative label driven by the shared 1s ticker.
+ *
+ * - `"full"` uses `formatRelative` so future timestamps render as "in …"
+ *   instead of being clamped ("in 3 hours", "5 minutes ago").
+ * - `"abbreviated"` reuses `formatTimeAgo` (the helper `TimeAgo` uses) so dense
+ *   rows keep their compact "5m" / "5m ago" text byte-for-byte.
  */
-function RelativeLabel({ date, iso }: { date: Date; iso: string }) {
+function RelativeLabel({
+  date,
+  iso,
+  relativeStyle,
+  includeAgo,
+}: {
+  date: Date;
+  iso: string;
+  relativeStyle: "full" | "abbreviated";
+  includeAgo: boolean;
+}) {
   const [, tick] = useReducer((n: number) => n + 1, 0);
   useEffect(() => subscribeRelativeTick(tick), []);
-  return <time dateTime={iso}>{formatRelative(date)}</time>;
+  const label = relativeStyle === "abbreviated" ? formatTimeAgo(date, includeAgo) : formatRelative(date);
+  return <time dateTime={iso}>{label}</time>;
 }
 
 interface TimestampProps {
@@ -44,6 +60,18 @@ interface TimestampProps {
    * - `"relative"`: live-updating "5m ago" style text.
    */
   display?: "absolute" | "relative";
+  /**
+   * Style of the relative label (only applies when `display="relative"`):
+   * - `"full"` (default): verbose Intl text, e.g. "5 minutes ago" / "in 3 hours".
+   * - `"abbreviated"`: compact text for dense rows, e.g. "5m" / "5m ago".
+   */
+  relativeStyle?: "full" | "abbreviated";
+  /**
+   * Whether the abbreviated relative label includes the "ago" suffix, e.g. "5m ago"
+   * vs "5m". Only applies when `display="relative"` and `relativeStyle="abbreviated"`.
+   * Default `true`.
+   */
+  includeAgo?: boolean;
   /** Render the dashed underline affordance that hints at the hover details. Default `true`. */
   withHint?: boolean;
   className?: string;
@@ -70,6 +98,8 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 export const Timestamp = React.memo(function Timestamp({
   date,
   display = "absolute",
+  relativeStyle = "full",
+  includeAgo = true,
   withHint = true,
   className,
   align = "start",
@@ -88,7 +118,7 @@ export const Timestamp = React.memo(function Timestamp({
       <HoverCardTrigger asChild>
         <span className={twMerge(hintClasses, className)}>
           {display === "relative" ? (
-            <RelativeLabel date={resolved} iso={iso} />
+            <RelativeLabel date={resolved} iso={iso} relativeStyle={relativeStyle} includeAgo={includeAgo} />
           ) : (
             <time dateTime={iso}>{formatAbsolute(resolved)}</time>
           )}

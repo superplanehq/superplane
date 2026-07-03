@@ -1,4 +1,4 @@
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 import { cn, isUrl } from "@/lib/utils";
 import { isErrorValue } from "./runNodeDetailModel";
 
@@ -37,7 +37,7 @@ export function RunNodeDetailDetailsView({
         <div className="flex items-start gap-2">
           <span className="w-[120px] shrink-0 truncate text-right text-gray-500">Relative time:</span>
           <span className="min-w-0 break-all text-gray-800">
-            <TimeAgo date={relativeTime} />
+            <Timestamp date={relativeTime} display="relative" relativeStyle="abbreviated" />
           </span>
         </div>
       ) : null}

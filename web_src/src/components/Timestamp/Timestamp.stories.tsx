@@ -13,6 +13,13 @@ const meta: Meta<typeof Timestamp> = {
       control: "radio",
       options: ["absolute", "relative"],
     },
+    relativeStyle: {
+      control: "radio",
+      options: ["full", "abbreviated"],
+    },
+    includeAgo: {
+      control: "boolean",
+    },
     withHint: {
       control: "boolean",
     },
@@ -35,6 +42,25 @@ export const Relative: Story = {
   args: {
     date: oneDayAgo,
     display: "relative",
+  },
+};
+
+const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+export const RelativeAbbreviated: Story = {
+  args: {
+    date: fiveMinutesAgo,
+    display: "relative",
+    relativeStyle: "abbreviated",
+  },
+};
+
+export const RelativeAbbreviatedNoAgo: Story = {
+  args: {
+    date: fiveMinutesAgo,
+    display: "relative",
+    relativeStyle: "abbreviated",
+    includeAgo: false,
   },
 };
 
