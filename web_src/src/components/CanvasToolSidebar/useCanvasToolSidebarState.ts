@@ -118,8 +118,11 @@ export function useCanvasToolSidebarState({
   }, [canvasId]);
 
   const markAgentAvailable = useCallback(() => {
+    if (agentUnavailable) {
+      setIsToolSidebarOpen(readInitialToolSidebarOpen(canvasId));
+    }
     setAgentUnavailableCanvasId((currentCanvasId) => (currentCanvasId === canvasId ? undefined : currentCanvasId));
-  }, [canvasId]);
+  }, [agentUnavailable, canvasId]);
 
   useEffect(() => {
     if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar || agentUnavailable) {

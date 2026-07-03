@@ -1,14 +1,22 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { useCanvasRunsSidebarState } from "./useCanvasRunsSidebarState";
+import { useCanvasRunsSidebarState, writeCanvasRunsSidebarOpen } from "./useCanvasRunsSidebarState";
 
 describe("useCanvasRunsSidebarState", () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it("keeps the runs sidebar closed by default", () => {
+  it("opens the runs sidebar by default", () => {
     const { result } = renderHook(() => useCanvasRunsSidebarState());
+
+    expect(result.current.isRunsSidebarOpen).toBe(true);
+  });
+
+  it("falls back to the legacy global preference when a canvas does not have one", () => {
+    localStorage.setItem("canvasRunsSidebarOpen", "false");
+
+    const { result } = renderHook(() => useCanvasRunsSidebarState("canvas-a"));
 
     expect(result.current.isRunsSidebarOpen).toBe(false);
   });
@@ -28,8 +36,8 @@ describe("useCanvasRunsSidebarState", () => {
       result.current.handleRunsSidebarToggle();
     });
 
-    expect(result.current.isRunsSidebarOpen).toBe(true);
-    expect(localStorage.getItem("canvasRunsSidebarOpen:canvas-a")).toBe("true");
+    expect(result.current.isRunsSidebarOpen).toBe(false);
+    expect(localStorage.getItem("canvasRunsSidebarOpen:canvas-a")).toBe("false");
     expect(localStorage.getItem("canvasRunsSidebarOpen")).toBeNull();
   });
 
@@ -50,6 +58,15 @@ describe("useCanvasRunsSidebarState", () => {
     expect(result.current.isRunsSidebarOpen).toBe(false);
 
     rerender({ canvasId: "canvas-c" });
+    expect(result.current.isRunsSidebarOpen).toBe(true);
+  });
+
+  it("keeps a new canvas closed when it has an explicit per-canvas preference", () => {
+    localStorage.setItem("canvasRunsSidebarOpen", "true");
+    writeCanvasRunsSidebarOpen("new-canvas", false);
+
+    const { result } = renderHook(() => useCanvasRunsSidebarState("new-canvas"));
+
     expect(result.current.isRunsSidebarOpen).toBe(false);
   });
 });

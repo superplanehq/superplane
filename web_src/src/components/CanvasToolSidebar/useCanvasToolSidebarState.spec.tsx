@@ -101,15 +101,18 @@ describe("useCanvasToolSidebarState", () => {
     expect(window.localStorage.getItem("canvasAgentSidebarOpen:canvas-x")).toBe("true");
   });
 
-  it("shows the toggle again when agent provisioning later succeeds", () => {
+  it("shows the toggle again and restores the stored preference when agent provisioning later succeeds", () => {
+    window.localStorage.setItem("canvasAgentSidebarOpen:canvas-x", "true");
     render(<Harness onBeforeClose={vi.fn()} canvasId="canvas-x" />);
 
     fireEvent.click(screen.getByRole("button", { name: "mark-unavailable" }));
     expect(screen.getByTestId("toggle-state")).toHaveTextContent("hidden");
+    expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
 
     fireEvent.click(screen.getByRole("button", { name: "mark-available" }));
 
     expect(screen.getByTestId("toggle-state")).toHaveTextContent("shown");
+    expect(screen.getByTestId("open-state")).toHaveTextContent("open");
   });
 
   it("rechecks agent availability when navigating back to a canvas", () => {

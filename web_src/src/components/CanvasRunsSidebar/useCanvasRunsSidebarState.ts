@@ -6,14 +6,29 @@ function canvasRunsSidebarOpenStorageKey(canvasId?: string): string {
   return canvasId ? `${CANVAS_RUNS_SIDEBAR_OPEN_STORAGE_KEY}:${canvasId}` : CANVAS_RUNS_SIDEBAR_OPEN_STORAGE_KEY;
 }
 
+export function writeCanvasRunsSidebarOpen(canvasId: string, open: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(canvasRunsSidebarOpenStorageKey(canvasId), open ? "true" : "false");
+  } catch {
+    // Preference persistence is best-effort.
+  }
+}
+
 function readInitialRunsSidebarOpen(canvasId?: string): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return true;
   try {
     const saved = window.localStorage.getItem(canvasRunsSidebarOpenStorageKey(canvasId));
-    if (saved === null) return false;
+    if (saved === null && canvasId) {
+      const legacySaved = window.localStorage.getItem(CANVAS_RUNS_SIDEBAR_OPEN_STORAGE_KEY);
+      if (legacySaved === null) return true;
+      return legacySaved === "true";
+    }
+
+    if (saved === null) return true;
     return saved === "true";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -29,8 +44,17 @@ export function useCanvasRunsSidebarState(canvasId?: string) {
 
   const persistOpen = useCallback(
     (open: boolean) => {
+      if (canvasId) {
+        writeCanvasRunsSidebarOpen(canvasId, open);
+        return;
+      }
+
       if (typeof window === "undefined") return;
-      window.localStorage.setItem(canvasRunsSidebarOpenStorageKey(canvasId), open ? "true" : "false");
+      try {
+        window.localStorage.setItem(canvasRunsSidebarOpenStorageKey(canvasId), open ? "true" : "false");
+      } catch {
+        // Preference persistence is best-effort.
+      }
     },
     [canvasId],
   );
