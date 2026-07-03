@@ -12,16 +12,24 @@ import type {
 } from "../types";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
 
 type GetDailyUsageDataPayload = {
   period?: { startDate?: string; endDate?: string };
+  messages?: {
+    inputTokens?: number;
+    outputTokens?: number;
+  };
   claudeCode?: {
     sessions?: number;
-    linesAdded?: number;
-    linesRemoved?: number;
     pullRequests?: number;
     estimatedCostUsd?: number;
   };
+};
+
+type GetDailyUsageDataConfiguration = {
+  startDate?: string;
+  endDate?: string;
 };
 
 function formatPeriod(period: GetDailyUsageDataPayload["period"]): string | undefined {
@@ -29,9 +37,31 @@ function formatPeriod(period: GetDailyUsageDataPayload["period"]): string | unde
   return `${period?.startDate ?? "?"} – ${period?.endDate ?? "?"}`;
 }
 
-function formatLinesChanged(added?: number, removed?: number): string | undefined {
-  if (added == null && removed == null) return undefined;
-  return `+${added ?? 0} / -${removed ?? 0}`;
+function formatMessageTokens(inputTokens?: number, outputTokens?: number): string | undefined {
+  if (inputTokens == null && outputTokens == null) return undefined;
+  return `${(inputTokens ?? 0).toLocaleString()} in / ${(outputTokens ?? 0).toLocaleString()} out`;
+}
+
+// Mirrors the backend default in resolveDateRange (get_daily_usage_data.go):
+// the last 7 days, ending today, in UTC.
+function defaultDateRange(): { startDate: string; endDate: string } {
+  const endDate = new Date();
+  const startDate = new Date(endDate);
+  startDate.setUTCDate(startDate.getUTCDate() - 7);
+
+  return {
+    startDate: startDate.toISOString().slice(0, 10),
+    endDate: endDate.toISOString().slice(0, 10),
+  };
+}
+
+function dateRangeMetadata(node: NodeInfo): MetadataItem[] {
+  const config = node.configuration as GetDailyUsageDataConfiguration | undefined;
+  const defaults = defaultDateRange();
+  const startDate = config?.startDate || defaults.startDate;
+  const endDate = config?.endDate || defaults.endDate;
+
+  return [{ icon: "calendar", label: `${startDate} → ${endDate}` }];
 }
 
 function formatCostUsd(amount?: number): string | undefined {
@@ -53,13 +83,13 @@ function detailEntry(label: string, value: string | undefined): [string, string]
 }
 
 // The five metrics most relevant to a usage/cost review at a glance: the
-// covered period, Claude Code sessions, lines changed, pull requests opened,
-// and estimated spend.
+// covered period, Claude Code sessions, Messages API token usage, pull
+// requests opened, and estimated spend.
 function usageDetailFields(data: GetDailyUsageDataPayload | undefined): Record<string, string> {
   const entries = [
     detailEntry("Period", formatPeriod(data?.period)),
     detailEntry("Sessions", formatCount(data?.claudeCode?.sessions)),
-    detailEntry("Lines Changed", formatLinesChanged(data?.claudeCode?.linesAdded, data?.claudeCode?.linesRemoved)),
+    detailEntry("Message Tokens", formatMessageTokens(data?.messages?.inputTokens, data?.messages?.outputTokens)),
     detailEntry("Pull Requests", formatCount(data?.claudeCode?.pullRequests)),
     detailEntry("Estimated Cost", formatCostUsd(data?.claudeCode?.estimatedCostUsd)),
   ];
@@ -85,6 +115,7 @@ export const getDailyUsageDataMapper: ComponentBaseMapper = {
       eventSections: lastExecution
         ? getDailyUsageDataEventSections(context.nodes, lastExecution, componentName)
         : undefined,
+      metadata: dateRangeMetadata(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
