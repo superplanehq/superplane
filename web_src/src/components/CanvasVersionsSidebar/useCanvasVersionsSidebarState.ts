@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 export function useCanvasVersionsSidebarState() {
-  const [isVersionsSidebarOpen, setIsVersionsSidebarOpen] = useState(true);
+  const [isVersionsSidebarOpen, setIsVersionsSidebarOpen] = useState(false);
 
   const handleVersionsSidebarToggle = useCallback(() => {
     setIsVersionsSidebarOpen((current) => !current);
