@@ -232,6 +232,15 @@ func DeleteAgentSessionsForCanvasInTransaction(tx *gorm.DB, organizationID, canv
 		Error
 }
 
+func DeleteAgentSessionForUserCanvasInTransaction(tx *gorm.DB, organizationID, userID, canvasID uuid.UUID) error {
+	return tx.
+		Where("organization_id = ?", organizationID).
+		Where("user_id = ?", userID).
+		Where("canvas_id = ?", canvasID).
+		Delete(&AgentSession{}).
+		Error
+}
+
 func DeleteAgentSessionsForOrganizationInTransaction(tx *gorm.DB, organizationID uuid.UUID) error {
 	return tx.
 		Where("organization_id = ?", organizationID).
