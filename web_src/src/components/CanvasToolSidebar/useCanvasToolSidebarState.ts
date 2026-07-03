@@ -63,6 +63,12 @@ export function useCanvasToolSidebarState({
   const [isToolSidebarOpen, setIsToolSidebarOpen] = useState(() => readInitialToolSidebarOpen(canvasId));
   const [agentMode, setAgentMode] = useState<AgentMode>(readInitialAgentMode);
 
+  // Tracks the canvas whose managed-agent provider failed to provision a
+  // session (e.g. the instance has no agent credentials configured). Keyed by
+  // canvas id so navigating to another canvas re-evaluates availability.
+  const [agentUnavailableCanvasId, setAgentUnavailableCanvasId] = useState<string | undefined>(undefined);
+  const agentUnavailable = Boolean(canvasId) && agentUnavailableCanvasId === canvasId;
+
   // Re-read the preference when navigating between canvases (the open/closed
   // state is stored per canvas) so each app keeps its own sidebar state.
   const previousCanvasIdRef = useRef(canvasId);
@@ -103,11 +109,18 @@ export function useCanvasToolSidebarState({
     persistAgentMode(mode);
   }, []);
 
-  useEffect(() => {
-    if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar) closeToolSidebar();
-  }, [featureEnabled, forceEnable, hideCanvasToolSidebar, closeToolSidebar]);
+  // Called by the agent panel when it cannot set up a chat because the agent
+  // provider isn't configured on this instance. Hiding the toggle and closing
+  // the panel avoids advertising a chat that can never work (issue #5803).
+  const markAgentUnavailable = useCallback(() => {
+    setAgentUnavailableCanvasId(canvasId);
+  }, [canvasId]);
 
-  const showToolSidebarToggle = (featureEnabled || forceEnable) && !hideCanvasToolSidebar;
+  useEffect(() => {
+    if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar || agentUnavailable) closeToolSidebar();
+  }, [featureEnabled, forceEnable, hideCanvasToolSidebar, agentUnavailable, closeToolSidebar]);
+
+  const showToolSidebarToggle = (featureEnabled || forceEnable) && !hideCanvasToolSidebar && !agentUnavailable;
 
   useEffect(() => {
     if (!showToolSidebarToggle) return;
@@ -145,6 +158,8 @@ export function useCanvasToolSidebarState({
     isToolSidebarOpen,
     showToolSidebarToggle,
     isAgentEnabled: featureEnabled,
+    agentUnavailable,
+    markAgentUnavailable,
     handleToolSidebarToggle,
     openToolSidebar,
     closeToolSidebar,

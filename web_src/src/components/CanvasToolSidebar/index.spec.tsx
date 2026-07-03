@@ -86,6 +86,8 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
     isToolSidebarOpen: true,
     showToolSidebarToggle: true,
     isAgentEnabled: true,
+    agentUnavailable: false,
+    markAgentUnavailable: vi.fn(),
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),

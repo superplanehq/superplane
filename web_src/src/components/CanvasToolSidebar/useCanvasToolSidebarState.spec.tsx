@@ -19,8 +19,12 @@ function Harness({ onBeforeClose, canvasId }: { onBeforeClose: () => void; canva
     <div>
       <div data-testid="open-state">{state.isToolSidebarOpen ? "open" : "closed"}</div>
       <div data-testid="agent-state">{state.isAgentEnabled ? "enabled" : "disabled"}</div>
+      <div data-testid="toggle-state">{state.showToolSidebarToggle ? "shown" : "hidden"}</div>
       <button type="button" onClick={state.handleToolSidebarToggle}>
         toggle
+      </button>
+      <button type="button" onClick={state.markAgentUnavailable}>
+        mark-unavailable
       </button>
     </div>
   );
@@ -77,6 +81,20 @@ describe("useCanvasToolSidebarState", () => {
     expect(window.localStorage.getItem("canvasAgentSidebarOpen:canvas-b")).toBe("true");
     // The other canvas preference is untouched.
     expect(window.localStorage.getItem("canvasAgentSidebarOpen:canvas-a")).toBe("true");
+  });
+
+  it("hides the toggle and closes the sidebar when the agent is unavailable", () => {
+    window.localStorage.setItem("canvasAgentSidebarOpen:canvas-x", "true");
+
+    render(<Harness onBeforeClose={vi.fn()} canvasId="canvas-x" />);
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+    expect(screen.getByTestId("toggle-state")).toHaveTextContent("shown");
+
+    fireEvent.click(screen.getByRole("button", { name: "mark-unavailable" }));
+
+    expect(screen.getByTestId("toggle-state")).toHaveTextContent("hidden");
+    expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
   });
 
   it("ignores Cmd/Ctrl+B while typing in an input", () => {
