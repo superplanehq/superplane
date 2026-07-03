@@ -80,6 +80,30 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
     return result.data?.status;
   }, [refetchChat]);
 
+  // The chat can only be provisioned when the managed-agent provider is
+  // configured on this instance. When it isn't, GetCanvasAgentChat fails; treat
+  // the agent as unavailable so the sidebar hides the panel and its toggle
+  // instead of spinning on "Setting up..." forever (issue #5803).
+  const chatFailed = chatQuery.isError;
+  const { markAgentUnavailable } = toolSidebarState;
+  useEffect(() => {
+    if (chatFailed) markAgentUnavailable();
+  }, [chatFailed, markAgentUnavailable]);
+
+  if (chatFailed) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex flex-col items-start">
+            <div className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900">
+              The SuperPlane agent isn't available on this instance.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (chatQuery.isLoading || !chatId) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
