@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createInstanceMapper } from "./create_instance";
+import { createInstanceMapper, createInstanceStateFunction } from "./create_instance";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../../types";
 
 function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
@@ -167,5 +167,57 @@ describe("createInstanceMapper.getExecutionDetails", () => {
     expect(details["State"]).toBe("running");
     expect(details["Public IP"]).toBe("54.1.2.3");
     expect(details["Private IP"]).toBeUndefined();
+  });
+
+  it("surfaces the failure output when the run emitted to the failed channel", () => {
+    const ctx = buildDetailsCtx({
+      node: {
+        configuration: {
+          name: "builder",
+          region: "us-east-1",
+          instanceType: "t3.micro",
+        },
+      },
+      execution: {
+        outputs: {
+          failed: [
+            buildOutput({
+              error: "not enough capacity",
+              awsErrorCode: "InsufficientInstanceCapacity",
+              lastObservedState: "",
+            }),
+          ],
+        },
+      },
+    });
+
+    const details = createInstanceMapper.getExecutionDetails(ctx);
+    expect(details["State"]).toBe("Failed");
+    expect(details["Error"]).toBe("InsufficientInstanceCapacity: not enough capacity");
+    expect(details["Public IP"]).toBeUndefined();
+  });
+});
+
+describe("createInstanceStateFunction", () => {
+  it("returns created for a passed execution that emitted to the created channel", () => {
+    const execution = buildExecution({
+      outputs: { created: [buildOutput({ instanceId: "i-abc123", state: "running" })] },
+    });
+
+    expect(createInstanceStateFunction(execution)).toBe("created");
+  });
+
+  it("returns failed when the run emitted to the failed channel even though the execution passed", () => {
+    const execution = buildExecution({
+      outputs: { failed: [buildOutput({ error: "boom", awsErrorCode: "InsufficientInstanceCapacity" })] },
+    });
+
+    expect(createInstanceStateFunction(execution)).toBe("failed");
+  });
+
+  it("returns running while the execution is still in progress", () => {
+    const execution = buildExecution({ state: "STATE_STARTED", outputs: undefined });
+
+    expect(createInstanceStateFunction(execution)).toBe("running");
   });
 });
