@@ -4,7 +4,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { agentsListAgentChatMessages, agentsSendAgentChatMessage } from "@/api-client/sdk.gen";
 import type { AgentMessagesPage } from "./useAgentChats";
-import { agentChatKeys, useAgentChatMessages, useSendAgentChatMessage } from "./useAgentChats";
+import { agentChatKeys, useAgentChatMessages, useResetCanvasAgentChat, useSendAgentChatMessage } from "./useAgentChats";
 
 vi.mock("@/api-client/sdk.gen", () => ({
   agentsListAgentChatMessages: vi.fn(),
@@ -351,5 +351,58 @@ describe("useAgentChatMessages", () => {
         "optimistic-message-2",
       ]);
     });
+  });
+});
+
+describe("useResetCanvasAgentChat", () => {
+  it("replaces the canvas chat and clears message caches", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(agentChatKeys.forCanvas("canvas-1"), {
+      id: "chat-old",
+      canvasId: "canvas-1",
+      provider: "anthropic",
+      status: "idle",
+      createdAt: null,
+      updatedAt: null,
+    });
+
+    queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-old"), {
+      pages: [
+        {
+          messages: [
+            { id: "m1", role: "user", content: "hi", toolName: "", toolCallId: "", toolStatus: "", createdAt: null },
+          ],
+          hasMore: false,
+        },
+      ],
+      pageParams: [""],
+    });
+
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        chat: {
+          id: "chat-new",
+          canvasId: "canvas-1",
+          provider: "anthropic",
+          status: "idle",
+          createdAt: null,
+          updatedAt: null,
+        },
+      }),
+    })) as unknown as typeof fetch;
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useResetCanvasAgentChat("org-1", "canvas-1"), {
+      wrapper: wrapper(queryClient),
+    });
+    await result.current.mutateAsync();
+
+    const nextChat = queryClient.getQueryData(agentChatKeys.forCanvas("canvas-1")) as any;
+    expect(nextChat?.id).toBe("chat-new");
+    expect(queryClient.getQueryData(agentChatKeys.messages("chat-old"))).toBeUndefined();
+
+    vi.unstubAllGlobals();
   });
 });

@@ -12,6 +12,7 @@ import {
   agentsListAgentChatMessages,
   agentsSendAgentChatMessage,
 } from "@/api-client/sdk.gen";
+import type { AgentsAgentChatInfo } from "@/api-client";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import {
   fromApiChat,
@@ -228,6 +229,39 @@ export function useInterruptAgentChat(organizationId: string | undefined) {
         credentials: "include",
       });
       if (!res.ok) throw new Error(`Interrupt failed: ${res.status}`);
+    },
+  });
+}
+
+export function useResetCanvasAgentChat(organizationId: string | undefined, canvasId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!canvasId) throw new Error("Canvas is required");
+      const res = await fetch(`/api/v1/agents/canvases/${canvasId}/chat/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": organizationId ?? "" },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Reset failed: ${res.status}`);
+      const body = (await res.json()) as { chat?: AgentsAgentChatInfo };
+      return body.chat;
+    },
+    onMutate: async () => {
+      if (!canvasId) return { previousChatId: null as string | null };
+      const previousChat = queryClient.getQueryData<AgentChat | null>(agentChatKeys.forCanvas(canvasId));
+      return { previousChatId: previousChat?.id ?? null };
+    },
+    onSuccess: (chatInfo, _variables, context) => {
+      if (!canvasId) return;
+      const nextChat = fromApiChat(chatInfo);
+      queryClient.setQueryData(agentChatKeys.forCanvas(canvasId), nextChat);
+      if (context?.previousChatId) {
+        queryClient.removeQueries({ queryKey: agentChatKeys.messages(context.previousChatId) });
+      }
+      if (nextChat?.id) {
+        queryClient.removeQueries({ queryKey: agentChatKeys.messages(nextChat.id) });
+      }
     },
   });
 }
