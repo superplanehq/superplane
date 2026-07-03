@@ -450,8 +450,8 @@ function useConversationHandlers({
 
   const handleQuickAction = useCallback(
     async (action: string) => {
-      const { sendMutation: send } = mutationsRef.current;
-      if (send.isPending) return;
+      const { sendMutation: send, resetMutation: reset } = mutationsRef.current;
+      if (send.isPending || reset.isPending) return;
       try {
         await send.mutateAsync({ chatId, content: action, mode: agentMode });
       } catch {
@@ -463,7 +463,10 @@ function useConversationHandlers({
 
   const handleStartBuilding = useCallback(
     async (_rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
-      const { sendMutation: send } = mutationsRef.current;
+      const { sendMutation: send, resetMutation: reset } = mutationsRef.current;
+      // Only guard against an in-flight reset here; unlike quick actions this path
+      // intentionally doesn't gate on send.isPending (it fires right after a send).
+      if (reset.isPending) return;
 
       // Rubric is a spec confirmation — tell the agent to start building.
       // Always use builder mode regardless of current agentMode.
