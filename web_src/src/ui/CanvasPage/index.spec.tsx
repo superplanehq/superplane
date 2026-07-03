@@ -687,6 +687,45 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
     expect(lastFittedContentKeyRef.current).toBe("canvas-1:v2");
   });
 
+  it("honors the URL node focus only on the first fit, not on later switches", () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    const canvas = (fitViewContentKey: string) => (
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={singleNode}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="v1"
+          initialFocusNodeId="node-1"
+          fitViewContentKey={fitViewContentKey}
+          hasFitToViewRef={hasFitToViewRef}
+          lastFittedContentKeyRef={lastFittedContentKeyRef}
+        />
+      </MemoryRouter>
+    );
+
+    const { rerender } = render(canvas("canvas-1:v1"));
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+    // First fit frames the deep-linked node.
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+    expect(fitViewMock.mock.calls[0][0]?.nodes).toBeDefined();
+
+    // Switching version must frame the whole graph, not re-zoom onto the URL node.
+    rerender(canvas("canvas-1:v2"));
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+    expect(fitViewMock).toHaveBeenCalledTimes(2);
+    expect(fitViewMock.mock.calls[1][0]?.nodes).toBeUndefined();
+  });
+
   it("re-fits without a remount once the previewed version's nodes arrive", () => {
     vi.useFakeTimers();
     try {

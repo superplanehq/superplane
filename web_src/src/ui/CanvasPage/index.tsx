@@ -2625,8 +2625,14 @@ function CanvasContent({
       if (needsInitialFit) {
         const hasNodes = (stateRef.current.nodes?.length ?? 0) > 0;
 
-        const focusNodeId = initialFocusNodeId;
-        const focusNode = focusNodeId ? stateRef.current.nodes?.find((node) => node.id === focusNodeId) : null;
+        // The URL deep-link focus (?node=) must only zoom once, on the very first
+        // fit. Later canvas/version switches also enter this branch, but they should
+        // frame the whole graph rather than re-zoom onto that node.
+        const isFirstFit = !hasFitToViewRef.current;
+        const focusNode =
+          isFirstFit && initialFocusNodeId
+            ? stateRef.current.nodes?.find((node) => node.id === initialFocusNodeId)
+            : null;
 
         if (focusNode) {
           fitView({ nodes: [focusNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
