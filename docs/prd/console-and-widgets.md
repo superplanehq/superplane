@@ -685,6 +685,8 @@ Node panels resolve the configured `node` by id or name. They display the node's
 
 `promptConfirmation` (default `false`) controls whether a Run click pops the confirmation dialog. Templates that declare input fields (`parameters`) always open the dialog so the operator can fill them in. Templates with no input fields fire immediately on click unless `promptConfirmation` is `true`, in which case a bare "Run X?" confirmation is shown first.
 
+> **Behavior change:** dashboards created before `promptConfirmation` existed used to prompt on every Run click. After upgrading, parameter-less triggers fire immediately on the first click; set `promptConfirmation: true` on the panel (or the individual Key Nodes entry) to restore the confirm-first behavior.
+
 ## Multi-Node Panels
 
 The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow) instead of stamping out one `node` panel per row.

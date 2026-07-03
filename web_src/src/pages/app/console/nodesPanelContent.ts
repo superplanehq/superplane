@@ -9,6 +9,8 @@
  * `pkg/models/canvas_dashboard_yml.go`.
  */
 
+import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
+
 /**
  * One entry in a {@link NodesPanelContent} list. The minimum required field
  * is `node` (canvas node id or name); the optional `label` overrides the
@@ -80,25 +82,4 @@ function validateNodesEntry(raw: unknown, index: number): string | null {
     optionalStringError(`${prefix}.triggerName`, entry.triggerName) ??
     optionalBooleanError(`${prefix}.promptConfirmation`, entry.promptConfirmation)
   );
-}
-
-/** Error string for an optional field that, when present, must be a string. */
-function optionalStringError(field: string, value: unknown): string | null {
-  if (value !== undefined && value !== null && typeof value !== "string") {
-    return `${field} must be a string.`;
-  }
-  return null;
-}
-
-/** Error string for an optional field that, when present, must be a boolean. */
-function optionalBooleanError(field: string, value: unknown): string | null {
-  if (value !== undefined && typeof value !== "boolean") {
-    return `${field} must be a boolean.`;
-  }
-  return null;
-}
-
-function asObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
 }

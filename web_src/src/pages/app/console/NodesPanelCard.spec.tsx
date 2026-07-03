@@ -154,6 +154,52 @@ describe("NodesPanelCard run flow", () => {
     await waitFor(() => expect(screen.getByTestId("nodes-panel-row-run")).not.toBeDisabled());
   });
 
+  it("fires the trigger only once when the Run button is clicked twice before React re-renders", async () => {
+    let resolveTrigger: (() => void) | undefined;
+    const onTrigger = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveTrigger = resolve;
+        }),
+    );
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, nodes: [NODE_NO_PARAMS], panel: PANEL_NO_PARAMS });
+    const runButton = screen.getByTestId("nodes-panel-row-run");
+    fireEvent.click(runButton);
+    fireEvent.click(runButton);
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveTrigger?.();
+    });
+    await waitFor(() => expect(runButton).not.toBeDisabled());
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+  });
+
+  it("resets the Run button loading state after a confirmed run fails", async () => {
+    let rejectTrigger: ((error: Error) => void) | undefined;
+    const onTrigger = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectTrigger = reject;
+        }),
+    );
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: onTrigger,
+      nodes: [NODE_NO_PARAMS],
+      panel: PANEL_NO_PARAMS_PROMPT,
+    });
+    fireEvent.click(screen.getByTestId("nodes-panel-row-run"));
+    fireEvent.click(screen.getByTestId("nodes-panel-row-run-dialog-submit"));
+    await waitFor(() => expect(screen.queryByTestId("nodes-panel-row-run-dialog-submit")).toBeNull());
+    const runButton = screen.getByTestId("nodes-panel-row-run");
+    expect(runButton).toBeDisabled();
+    await act(async () => {
+      rejectTrigger?.(new Error("trigger failed"));
+    });
+    await waitFor(() => expect(runButton).not.toBeDisabled());
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the confirm dialog for a parameter-less row when promptConfirmation is enabled", () => {
     const onTrigger = vi.fn();
     renderPanel({

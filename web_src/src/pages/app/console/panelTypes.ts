@@ -28,9 +28,14 @@ import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent
 import { validateNumberDataSource } from "./numberDataSourceValidation";
 import { validateNumberMetrics } from "./numberMetricsValidation";
 import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
+import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
+
+// Re-export the shared object narrow so downstream validators
+// (e.g. `chartRenderValidation.ts`) keep their existing import path.
+export { asObject };
 
 /** All panel kinds the dashboard currently understands. */
 export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number"] as const;
@@ -317,27 +322,6 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
     case "number":
       return validateNumberContent(content);
   }
-}
-
-export function asObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
-}
-
-/** Error string for an optional field that, when present, must be a string. */
-function optionalStringError(field: string, value: unknown): string | null {
-  if (value !== undefined && value !== null && typeof value !== "string") {
-    return `${field} must be a string.`;
-  }
-  return null;
-}
-
-/** Error string for an optional field that, when present, must be a boolean. */
-function optionalBooleanError(field: string, value: unknown): string | null {
-  if (value !== undefined && typeof value !== "boolean") {
-    return `${field} must be a boolean.`;
-  }
-  return null;
 }
 
 function validateNodeContent(content: unknown): string | null {

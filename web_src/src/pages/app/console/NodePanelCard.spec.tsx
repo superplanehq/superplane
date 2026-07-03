@@ -118,6 +118,26 @@ describe("NodePanelCard run flow", () => {
     await waitFor(() => expect(screen.getByTestId("node-panel-run")).not.toBeDisabled());
   });
 
+  it("fires the trigger only once when the Run button is clicked twice before React re-renders", async () => {
+    let resolveTrigger: (() => void) | undefined;
+    const onTrigger = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveTrigger = resolve;
+        }),
+    );
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger });
+    const runButton = screen.getByTestId("node-panel-run");
+    fireEvent.click(runButton);
+    fireEvent.click(runButton);
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveTrigger?.();
+    });
+    await waitFor(() => expect(runButton).not.toBeDisabled());
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the confirm dialog for a parameter-less template when promptConfirmation is enabled", () => {
     const onTrigger = vi.fn();
     renderPanel({ canRunNodes: true, onTriggerNode: onTrigger, panel: PANEL_PROMPT });

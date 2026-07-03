@@ -14,9 +14,8 @@ import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { WidgetEmptyState } from "./WidgetEmptyState";
 import { useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
-import { confirmConsoleTriggerNode } from "./confirmConsoleTriggerNode";
-import { buildConsoleTriggerParameters, triggerHasParameters } from "./consoleTriggerParameters";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
+import { useConsoleRunTrigger } from "./useConsoleRunTrigger";
 import type { NodesPanelContent, NodesPanelNode } from "./nodesPanelContent";
 
 interface NodesPanelCardProps {
@@ -125,37 +124,11 @@ function NodesPanelRunControl({
   entry: NodesPanelNode;
   resolved: ReturnType<typeof resolveConsoleNode>;
 }) {
-  const ctx = useConsoleContext();
-  const [open, setOpen] = useState(false);
-  const [running, setRunning] = useState(false);
-  const canRun = (ctx?.canRunNodes ?? false) && Boolean(resolved);
-  const shouldPrompt = triggerHasParameters(resolved?.node, entry.triggerName) || Boolean(entry.promptConfirmation);
-
-  // Single run path for both the direct click and the confirm dialog: the
-  // Run button owns the loading state while the trigger executes.
-  // `confirmConsoleTriggerNode` already surfaces failures via a toast, so we
-  // swallow the rethrow to keep this fire-and-forget call free of unhandled
-  // rejections.
-  const runTrigger = async (parameters: Record<string, unknown>) => {
-    if (!resolved?.node?.id) return;
-    setRunning(true);
-    try {
-      await confirmConsoleTriggerNode(ctx, resolved.node.id, entry.triggerName, parameters);
-    } catch {
-      // Already reported to the user.
-    } finally {
-      setRunning(false);
-    }
-  };
-
-  const handleClick = () => {
-    if (shouldPrompt) {
-      setOpen(true);
-      return;
-    }
-    if (!resolved?.node) return;
-    void runTrigger(buildConsoleTriggerParameters(resolved.node, "run", entry.triggerName));
-  };
+  const { canRun, running, dialogOpen, setDialogOpen, handleClick, runTrigger } = useConsoleRunTrigger({
+    resolved,
+    triggerName: entry.triggerName,
+    promptConfirmation: entry.promptConfirmation,
+  });
 
   return (
     <>
@@ -175,11 +148,11 @@ function NodesPanelRunControl({
         Run
       </LoadingButton>
       <NodeRunConfirmDialog
-        open={open}
-        onOpenChange={setOpen}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
         resolved={resolved}
         templateName={entry.triggerName}
-        onConfirm={(parameters) => void runTrigger(parameters)}
+        onConfirm={runTrigger}
         testId="nodes-panel-row-run-dialog"
       />
     </>
