@@ -4,6 +4,8 @@ import type { QueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { setAgentBootContext } from "@/lib/agentBootContext";
+import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { showErrorToast } from "@/lib/toast";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
@@ -43,7 +45,9 @@ function prepareAgentSidebar(app: AppEntry, canvasId: string) {
       initialMessage: app.agentInitialMessage,
     });
   }
-  localStorage.setItem("canvasAgentSidebarOpen", "true");
+  // A newly installed app always starts with the agent panel open (stored per canvas).
+  writeCanvasAgentSidebarOpen(canvasId, true);
+  writeCanvasRunsSidebarOpen(canvasId, false);
   localStorage.setItem("canvasSidebarOpen", "false");
 }
 
