@@ -52,6 +52,7 @@ func (s *CanvasSteps) EnterEditMode() {
 // switch to the new draft so subsequent edits are staged onto it rather than the
 // draft that was being edited before.
 func (s *CanvasSteps) CreateNewDraftFromEditMenu() {
+	s.ensureEditMode()
 	s.OpenVersionsSidebar()
 	before := len(s.ListDraftVersions())
 
@@ -79,20 +80,42 @@ func (s *CanvasSteps) ExitEditMode() {
 	s.session.Sleep(500)
 }
 
-// OpenVersionsSidebar reveals the versions sidebar. If no edit session is active
-// yet, it enters edit mode (selecting the latest draft or creating one) before
-// opening the sidebar from the header toggle.
+// OpenVersionsSidebar reveals the versions sidebar from the current canvas mode.
+// If the header toggle is not available yet, it enters edit mode first.
 func (s *CanvasSteps) OpenVersionsSidebar() {
-	sidebar := q.TestID("canvas-versions-sidebar").Run(s.session)
-	if visible, _ := sidebar.IsVisible(); visible {
-		s.session.Sleep(300)
+	toggle := q.TestID("canvas-versions-sidebar-toggle").Run(s.session)
+	if visible, _ := toggle.IsVisible(); !visible {
+		s.EnterEditMode()
+	}
+
+	s.ensureVersionsSidebarOpen()
+	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
+	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) ensureEditMode() {
+	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
+	if visible, _ := exitEditButton.IsVisible(); visible {
 		return
 	}
 
 	s.EnterEditMode()
+}
+
+func (s *CanvasSteps) ensureVersionsSidebarOpen() {
+	toggle := q.TestID("canvas-versions-sidebar-toggle").Run(s.session)
+	require.NoError(s.t, toggle.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(15000),
+	}))
+
+	pressed, err := toggle.GetAttribute("aria-pressed", pw.LocatorGetAttributeOptions{Timeout: pw.Float(15000)})
+	require.NoError(s.t, err)
+	if pressed == "true" {
+		return
+	}
+
 	s.session.Click(q.TestID("canvas-versions-sidebar-toggle"))
-	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
-	s.session.Sleep(300)
 }
 
 // SelectRunInSidebar opens run inspection by selecting a run from the runs sidebar.
@@ -139,8 +162,10 @@ func (s *CanvasSteps) waitForToolSidebarOpen() {
 
 // OpenDraftBranchInSidebar selects a draft branch from the Versions sidebar by display name.
 func (s *CanvasSteps) OpenDraftBranchInSidebar(displayName string) {
+	s.ensureEditMode()
 	s.OpenVersionsSidebar()
 	selector := q.Locator(fmt.Sprintf(`[data-testid="canvas-draft-branch-row"]:has-text("%s") > button`, displayName))
+	s.waitForVisible(selector, 15*time.Second)
 	s.session.Click(selector)
 
 	chip := q.TestID("active-draft-branch-chip").Run(s.session)
@@ -150,6 +175,14 @@ func (s *CanvasSteps) OpenDraftBranchInSidebar(displayName string) {
 	}, 30*time.Second, 200*time.Millisecond, "editor did not switch to draft %q", displayName)
 
 	s.waitForEnabledExitEditButton()
+}
+
+func (s *CanvasSteps) waitForVisible(query q.Query, timeout time.Duration) {
+	locator := query.Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := locator.IsVisible()
+		return err == nil && visible
+	}, timeout, 200*time.Millisecond, "%s did not become visible", query.Describe())
 }
 
 // WaitForRunsSidebar waits until the runs sidebar is visible on the canvas tab.
@@ -188,6 +221,7 @@ func (s *CanvasSteps) AssertDraftCount(expected int) {
 
 // AssertDraftBranchesInSidebar verifies draft branch labels appear in the Versions sidebar.
 func (s *CanvasSteps) AssertDraftBranchesInSidebar(displayNames ...string) {
+	s.ensureEditMode()
 	s.OpenVersionsSidebar()
 	s.session.AssertVisible(q.TestID("canvas-drafts-section"))
 	for _, displayName := range displayNames {

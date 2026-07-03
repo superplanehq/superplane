@@ -804,7 +804,7 @@ function CanvasPage(props: CanvasPageProps) {
   };
   const isRunsSidebarOpen = showRunsSidebar && runsSidebarBaseState.isRunsSidebarOpen;
 
-  const versionsSidebarBaseState = useCanvasVersionsSidebarState();
+  const versionsSidebarBaseState = useCanvasVersionsSidebarState(props.canvasId);
   // Versions content is only produced during an edit session; within that session
   // the sidebar can be shown/hidden with the header toggle.
   const versionsContentAvailable = props.toolSidebarVersionsContent != null;
