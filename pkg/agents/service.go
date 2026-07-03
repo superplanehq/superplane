@@ -66,14 +66,8 @@ func (s *Service) ResetSession(ctx context.Context, organizationID, userID, canv
 		return nil, err
 	}
 
-	upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{Title: sessionTitle(organizationID, canvasID)})
+	session, oldProviderSession, err := s.swapCanvasSession(ctx, organizationID, userID, canvasID)
 	if err != nil {
-		return nil, fmt.Errorf("create provider session: %w", err)
-	}
-
-	session, oldProviderSession, err := s.swapCanvasSession(organizationID, userID, canvasID, upstream.ProviderSessionID)
-	if err != nil {
-		s.cleanupProviderSession(ctx, upstream.ProviderSessionID)
 		return nil, fmt.Errorf("reset session: %w", err)
 	}
 
@@ -81,8 +75,8 @@ func (s *Service) ResetSession(ctx context.Context, organizationID, userID, canv
 	return session, nil
 }
 
-// ensureCanvasSessionNotStreaming is a cheap pre-check that avoids creating a
-// provider session we'd only discard; swapCanvasSession re-checks under the lock.
+// ensureCanvasSessionNotStreaming is a cheap pre-check so a busy session fails
+// fast; swapCanvasSession re-checks under the advisory lock.
 func (s *Service) ensureCanvasSessionNotStreaming(organizationID, userID, canvasID uuid.UUID) error {
 	existing, err := findCanvasSession(database.Conn(), organizationID, userID, canvasID)
 	if err != nil {
@@ -94,13 +88,16 @@ func (s *Service) ensureCanvasSessionNotStreaming(organizationID, userID, canvas
 	return nil
 }
 
-// swapCanvasSession atomically deletes the current session (if any) and inserts
-// the replacement under the advisory lock, returning the retired provider
-// session id. It refuses to delete a session whose turn is still streaming.
-func (s *Service) swapCanvasSession(organizationID, userID, canvasID uuid.UUID, providerSessionID string) (*models.AgentSession, string, error) {
+// swapCanvasSession atomically deletes the current session (if any) and inserts a
+// fresh replacement, returning the retired provider session id. The provider
+// session is created inside the advisory lock (like provisionSession) so a
+// concurrent EnsureSession can't return a session this reset then deletes. It
+// refuses to delete a session whose turn is still streaming.
+func (s *Service) swapCanvasSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, string, error) {
 	var (
 		session            *models.AgentSession
 		oldProviderSession string
+		newProviderSession string
 	)
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
@@ -121,10 +118,20 @@ func (s *Service) swapCanvasSession(organizationID, userID, canvasID uuid.UUID, 
 			}
 		}
 
-		session = s.newCanvasSession(organizationID, userID, canvasID, providerSessionID)
+		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{Title: sessionTitle(organizationID, canvasID)})
+		if err != nil {
+			return fmt.Errorf("create provider session: %w", err)
+		}
+		newProviderSession = upstream.ProviderSessionID
+
+		session = s.newCanvasSession(organizationID, userID, canvasID, upstream.ProviderSessionID)
 		return models.CreateAgentSessionInTransaction(tx, session)
 	})
 	if err != nil {
+		// The provider session outlives a rolled-back transaction; clean it up.
+		if newProviderSession != "" {
+			s.cleanupProviderSession(ctx, newProviderSession)
+		}
 		return nil, "", err
 	}
 	return session, oldProviderSession, nil

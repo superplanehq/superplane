@@ -412,12 +412,14 @@ function useConversationHandlers({
           setNotice("Stop the current response before clearing the chat.");
           return;
         }
-        // Scoped so a reset can't auto-boot or keep showing this canvas's intro.
-        clearAgentBootContextForCanvas(canvasId);
         await reset.mutateAsync().catch((error) => {
           setError(error instanceof Error ? error.message : "failed to clear chat");
           throw error;
         });
+        // Only after a successful reset: scoped so the fresh session can't auto-boot
+        // or keep showing this canvas's stale intro. Kept after the await so a failed
+        // clear doesn't drop the boot context while the old session is still intact.
+        clearAgentBootContextForCanvas(canvasId);
         _setOutcomeState(null);
         setNotice("Chat cleared. You’re in a fresh session.");
         return;
