@@ -149,7 +149,7 @@ func (c *Client) messagesUsageReportURL(startingAt, endingAt string, limit int, 
 	q.Set("starting_at", startingAt)
 	q.Set("ending_at", endingAt)
 	q.Set("bucket_width", "1d")
-	q.Add("group_by", "model")
+	q.Add("group_by[]", "model")
 	q.Set("limit", fmt.Sprintf("%d", limit))
 	if page != "" {
 		q.Set("page", page)
