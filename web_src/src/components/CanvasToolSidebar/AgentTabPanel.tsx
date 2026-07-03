@@ -22,6 +22,7 @@ import { useCanvas, useCanvasVersion, useCanvasVersions, useInfiniteCanvasRuns }
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
+  clearAgentBootContextForCanvas,
   getAgentBootInitialMessage,
   getAgentBootMessage,
   isAgentBootReady,
@@ -147,6 +148,8 @@ function ChatConversation({
   const handlers = useConversationHandlers({
     agentMode,
     chatId,
+    canvasId,
+    isStreaming: status === "streaming",
     outcomeMutation,
     interruptMutation,
     resetMutation,
@@ -218,10 +221,13 @@ function ChatConversation({
 }
 
 // Prepend a synthetic greeting (and optional template intro) so it never disappears.
+// The boot intro is read fresh each render (a cheap sessionStorage lookup) so a
+// same-canvas session swap (e.g. /clear) immediately drops it once it has been
+// cleared for this canvas; the value-compared string keeps the memo below stable.
 function useGreetedMessages(rawMessages: AgentMessage[], canvasId: string): AgentMessage[] {
   const { account } = useContext(AccountContext);
   const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
-  const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
+  const bootInitialMessage = getAgentBootInitialMessage(canvasId);
 
   return useMemo(() => {
     const greeting: AgentMessage = {
@@ -366,6 +372,8 @@ function useAgentBootKickoff({
 function useConversationHandlers({
   agentMode,
   chatId,
+  canvasId,
+  isStreaming,
   outcomeMutation,
   interruptMutation,
   resetMutation,
@@ -376,6 +384,8 @@ function useConversationHandlers({
 }: {
   agentMode: AgentMode;
   chatId: string;
+  canvasId: string;
+  isStreaming: boolean;
   outcomeMutation: ReturnType<typeof useDefineAgentOutcome>;
   interruptMutation: ReturnType<typeof useInterruptAgentChat>;
   resetMutation: ReturnType<typeof useResetCanvasAgentChat>;
@@ -386,9 +396,12 @@ function useConversationHandlers({
 }): ConversationHandlers {
   // React Query mutation objects are new on every render; keep latest refs in
   // a ref so the handler callbacks stay stable across parent re-renders
-  // (canvas zoom/pan ticks the parent often).
+  // (canvas zoom/pan ticks the parent often). isStreaming rides along so /clear
+  // can refuse mid-turn without re-creating the callbacks each status tick.
   const mutationsRef = useRef({ sendMutation, interruptMutation, outcomeMutation, resetMutation });
   mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation, resetMutation };
+  const isStreamingRef = useRef(isStreaming);
+  isStreamingRef.current = isStreaming;
 
   const handleSend = useCallback(
     async (content: string, images?: AgentOutgoingImage[]) => {
@@ -399,9 +412,17 @@ function useConversationHandlers({
       setNotice(null);
 
       if (trimmed === "/clear") {
-        // Drop any pending boot context first so the kickoff effect can't
-        // auto-send a boot message onto the fresh, intentionally-empty session.
-        clearAgentBootContext();
+        // Don't delete the session out from under an in-flight turn; make the
+        // user stop it first so we never reset while work is still streaming.
+        if (isStreamingRef.current) {
+          setNotice("Stop the current response before clearing the chat.");
+          return;
+        }
+        // Drop this canvas's boot context (scoped, incl. the stored template
+        // intro) so the kickoff effect can't auto-boot the fresh, empty session
+        // and the sidebar stops showing the old intro. Other canvases are left
+        // untouched.
+        clearAgentBootContextForCanvas(canvasId);
         await reset.mutateAsync().catch((error) => {
           setError(error instanceof Error ? error.message : "failed to clear chat");
           throw error;
@@ -416,7 +437,7 @@ function useConversationHandlers({
         throw error;
       });
     },
-    [agentMode, chatId, setError, setNotice, _setOutcomeState],
+    [agentMode, chatId, canvasId, setError, setNotice, _setOutcomeState],
   );
 
   const handleStop = useCallback(() => {
