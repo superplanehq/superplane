@@ -14,6 +14,8 @@ import type { CanvasesCanvasRun } from "@/api-client";
 type ChatComposerProps = {
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   onStop: () => void;
+  onClearChat: () => void;
+  clearing: boolean;
   sending: boolean;
   sendPending: boolean;
   stopping?: boolean;
@@ -33,6 +35,8 @@ const modePlaceholder = {
 export function ChatComposer({
   onSend,
   onStop,
+  onClearChat,
+  clearing,
   sending,
   sendPending,
   stopping,
@@ -67,6 +71,8 @@ export function ChatComposer({
           agentMode={agentMode}
           onModeSwitch={onModeSwitch}
           modeDisabled={modeDisabled}
+          onClearChat={onClearChat}
+          clearing={clearing}
           sending={sending}
           stopping={stopping}
           statusLabel={statusLabel}
