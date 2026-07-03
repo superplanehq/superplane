@@ -16,8 +16,9 @@ func init() {
 type OpenAI struct{}
 
 type Configuration struct {
-	APIKey  string `json:"apiKey"`
-	BaseURL string `json:"baseURL"`
+	APIKey   string `json:"apiKey"`
+	AdminKey string `json:"adminKey"`
+	BaseURL  string `json:"baseURL"`
 }
 
 func (o *OpenAI) Name() string {
@@ -47,6 +48,14 @@ func (o *OpenAI) Configuration() []configuration.Field {
 			Description: "OpenAI API key",
 		},
 		{
+			Name:        "adminKey",
+			Label:       "Admin API Key",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Organization admin API key (sk-admin-...). Required for fetching usage data.",
+		},
+		{
 			Name:        "baseURL",
 			Label:       "Base URL",
 			Type:        configuration.FieldTypeString,
@@ -60,6 +69,7 @@ func (o *OpenAI) Configuration() []configuration.Field {
 func (o *OpenAI) Actions() []core.Action {
 	return []core.Action{
 		&CreateResponse{},
+		&GetUsage{},
 	}
 }
 
@@ -92,6 +102,12 @@ func (o *OpenAI) Sync(ctx core.SyncContext) error {
 
 	if err := client.Verify(); err != nil {
 		return err
+	}
+
+	if config.AdminKey != "" {
+		if err := client.VerifyAdmin(); err != nil {
+			return fmt.Errorf("admin key verification failed: %w", err)
+		}
 	}
 
 	ctx.Integration.Ready()
