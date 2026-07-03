@@ -60,6 +60,13 @@ describe("datetime", () => {
       expect(formatRelative(now - 60 * 24 * 60 * 60 * 1000, "en", now)).toBe("2 months ago");
       expect(formatRelative(now - 400 * 24 * 60 * 60 * 1000, "en", now)).toBe("1 year ago");
     });
+
+    it("rounds across unit boundaries instead of returning maxed-out units", () => {
+      expect(formatRelative(now - 59_600, "en", now)).toBe("1 minute ago");
+      expect(formatRelative(now + 59_600, "en", now)).toBe("in 1 minute");
+      expect(formatRelative(now - 23.6 * 60 * 60 * 1000, "en", now)).toBe("1 day ago");
+      expect(formatRelative(now + 6.6 * 24 * 60 * 60 * 1000, "en", now)).toBe("in 1 week");
+    });
   });
 
   describe("formatISO", () => {

@@ -92,7 +92,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 
 /**
  * Standardized timestamp display: a locale-aware label with a dashed underline
- * hint that reveals absolute (UTC), relative, and raw ISO values on hover,
+ * hint that reveals local absolute, relative, UTC, and raw ISO values on hover,
  * with a copy button for the ISO value.
  */
 export const Timestamp = React.memo(function Timestamp({
@@ -126,6 +126,7 @@ export const Timestamp = React.memo(function Timestamp({
       </HoverCardTrigger>
       <HoverCardContent align={align} className="w-auto max-w-sm p-3">
         <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1.5 text-sm">
+          <DetailRow label="Local">{formatAbsolute(resolved)}</DetailRow>
           <DetailRow label="UTC">{formatUTC(resolved)}</DetailRow>
           <DetailRow label="Relative">{formatRelative(resolved)}</DetailRow>
           <DetailRow label="Timestamp">

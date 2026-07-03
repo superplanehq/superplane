@@ -53,6 +53,27 @@ const DAY = 24 * HOUR;
 const WEEK = 7 * DAY;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
+const DEFAULT_LOCALE_KEY = "__default__";
+const relativeTimeFormatters = new Map<string, Intl.RelativeTimeFormat>();
+
+function relativeFormatter(locale?: string): Intl.RelativeTimeFormat {
+  const key = locale ?? DEFAULT_LOCALE_KEY;
+  const cached = relativeTimeFormatters.get(key);
+  if (cached) return cached;
+
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "always" });
+  relativeTimeFormatters.set(key, formatter);
+  return formatter;
+}
+
+function formatRelativeUnit(
+  diff: number,
+  unitSize: number,
+  unit: Intl.RelativeTimeFormatUnit,
+  formatter: Intl.RelativeTimeFormat,
+): string {
+  return formatter.format(Math.round(diff / unitSize), unit);
+}
 
 /**
  * Locale-aware relative time from now, e.g. `"1 day ago"` or `"in 3 hours"`.
@@ -65,15 +86,15 @@ export function formatRelative(value: TimestampInput, locale?: string, now: numb
 
   const diff = date.getTime() - now;
   const abs = Math.abs(diff);
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "always" });
+  const rtf = relativeFormatter(locale);
 
-  if (abs < MINUTE) return rtf.format(Math.round(diff / SECOND), "second");
-  if (abs < HOUR) return rtf.format(Math.round(diff / MINUTE), "minute");
-  if (abs < DAY) return rtf.format(Math.round(diff / HOUR), "hour");
-  if (abs < WEEK) return rtf.format(Math.round(diff / DAY), "day");
-  if (abs < MONTH) return rtf.format(Math.round(diff / WEEK), "week");
-  if (abs < YEAR) return rtf.format(Math.round(diff / MONTH), "month");
-  return rtf.format(Math.round(diff / YEAR), "year");
+  if (Math.round(abs / SECOND) < 60) return formatRelativeUnit(diff, SECOND, "second", rtf);
+  if (Math.round(abs / MINUTE) < 60) return formatRelativeUnit(diff, MINUTE, "minute", rtf);
+  if (Math.round(abs / HOUR) < 24) return formatRelativeUnit(diff, HOUR, "hour", rtf);
+  if (Math.round(abs / DAY) < 7) return formatRelativeUnit(diff, DAY, "day", rtf);
+  if (Math.round(abs / WEEK) < 4) return formatRelativeUnit(diff, WEEK, "week", rtf);
+  if (Math.round(abs / MONTH) < 12) return formatRelativeUnit(diff, MONTH, "month", rtf);
+  return formatRelativeUnit(diff, YEAR, "year", rtf);
 }
 
 /**

@@ -5,19 +5,25 @@ import { Timestamp } from "./Timestamp";
 describe("Timestamp", () => {
   const iso = "2026-06-02T10:01:10.561Z";
 
+  function getTimeByDateTime(dateTime: string): HTMLElement {
+    const time = document.querySelector(`time[datetime="${dateTime}"]`);
+    expect(time).toBeInstanceOf(HTMLElement);
+    return time as HTMLElement;
+  }
+
   it("renders an absolute label with a machine-readable dateTime", () => {
     render(<Timestamp date={iso} />);
-    const time = screen.getByText(/2026/);
+    const time = getTimeByDateTime(iso);
     expect(time.tagName).toBe("TIME");
     expect(time).toHaveAttribute("dateTime", iso);
   });
 
   it("renders the dashed underline hint by default and omits it when disabled", () => {
     const { rerender } = render(<Timestamp date={iso} />);
-    expect(screen.getByText(/2026/).closest("span")).toHaveClass("decoration-dashed");
+    expect(getTimeByDateTime(iso).closest("span")).toHaveClass("decoration-dashed");
 
     rerender(<Timestamp date={iso} withHint={false} />);
-    expect(screen.getByText(/2026/).closest("span")).not.toHaveClass("decoration-dashed");
+    expect(getTimeByDateTime(iso).closest("span")).not.toHaveClass("decoration-dashed");
   });
 
   it("renders past times as '… ago' when display is relative", () => {

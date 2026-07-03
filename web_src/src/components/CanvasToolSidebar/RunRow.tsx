@@ -1,4 +1,5 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import type { MouseEvent } from "react";
 import { Timestamp } from "@/components/Timestamp";
 import { appPath } from "@/lib/appPaths";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,18 @@ export function RunRow({
   const iconSrc = getHeaderIconSrc(triggerNode?.component);
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
   const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?run=${run.id}`) : "#";
+  const selectRun = () => {
+    if (run.id) onSelectRun(run.id);
+  };
+  const handleTimestampClick = (event: MouseEvent<HTMLSpanElement>) => {
+    if (!isNormalClick(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    selectRun();
+  };
 
   return (
     <div
@@ -51,7 +64,7 @@ export function RunRow({
         onClick={(e) => {
           if (isNormalClick(e)) {
             e.preventDefault();
-            if (run.id) onSelectRun(run.id);
+            selectRun();
           }
         }}
         className="absolute inset-0 z-0"
@@ -107,7 +120,7 @@ export function RunRow({
         <LinkIcon className="h-3 w-3" />
       </button>
       {run.createdAt ? (
-        <span className="relative z-10 shrink-0 text-xs tabular-nums text-gray-500">
+        <span className="relative z-10 shrink-0 text-xs tabular-nums text-gray-500" onClick={handleTimestampClick}>
           <Timestamp date={run.createdAt} display="relative" relativeStyle="abbreviated" includeAgo={false} />
         </span>
       ) : null}
