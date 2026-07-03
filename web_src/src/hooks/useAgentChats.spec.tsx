@@ -369,8 +369,6 @@ describe("useResetCanvasAgentChat", () => {
           canvasId: "canvas-1",
           provider: "anthropic",
           status: "idle",
-          createdAt: null,
-          updatedAt: null,
         },
       },
       request: new Request("https://superplane.test"),
@@ -404,7 +402,7 @@ describe("useResetCanvasAgentChat", () => {
     });
     await result.current.mutateAsync();
 
-    const nextChat = queryClient.getQueryData(agentChatKeys.forCanvas("canvas-1")) as any;
+    const nextChat = queryClient.getQueryData<{ id?: string } | null>(agentChatKeys.forCanvas("canvas-1"));
     expect(nextChat?.id).toBe("chat-new");
     expect(queryClient.getQueryData(agentChatKeys.messages("chat-old"))).toBeUndefined();
   });

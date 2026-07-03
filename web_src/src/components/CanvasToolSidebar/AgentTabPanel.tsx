@@ -132,43 +132,15 @@ function ChatConversation({
   const [notice, setNotice] = useState<string | null>(null);
   const [outcomeState, setOutcomeState] = useStoredOutcomeState(chatId);
   const rawMessages = useConversationMessages(messagesQuery.data);
-  const { account } = useContext(AccountContext);
-  const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
-  const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
+  const messages = useGreetedMessages(rawMessages, canvasId);
 
+  // Reset on chatId too: after /clear the parent swaps in a fresh session whose
+  // initialStatus may coincide with the old value, so depending on initialStatus
+  // alone would leave a stale "streaming" status (and its thinking indicator) up.
   useEffect(() => {
     setStatus(initialStatus || "idle");
-  }, [initialStatus]);
+  }, [initialStatus, chatId]);
   useStreamingStatusReconciler(status, setStatus, refreshChatStatus);
-
-  // Prepend a synthetic greeting as the first message so it never disappears
-  const messages = useMemo(() => {
-    const greeting: AgentMessage = {
-      id: "__greeting__",
-      role: "assistant",
-      content: `Hi ${greetingFirstName}! I'm your SuperPlane agent. I'll help you build and modify this canvas.`,
-      createdAt: rawMessages[0]?.createdAt ?? null,
-      toolCallId: "",
-      toolName: "",
-      toolStatus: "",
-    };
-
-    if (!bootInitialMessage) {
-      return [greeting, ...rawMessages];
-    }
-
-    const templateIntro: AgentMessage = {
-      id: "__boot_initial_message__",
-      role: "assistant",
-      content: bootInitialMessage,
-      createdAt: rawMessages[0]?.createdAt ?? null,
-      toolCallId: "",
-      toolName: "",
-      toolStatus: "",
-    };
-
-    return [greeting, templateIntro, ...rawMessages];
-  }, [rawMessages, greetingFirstName, bootInitialMessage]);
 
   const showThinking = useThinkingIndicator(rawMessages, status);
   useAgentBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, agentMode });
@@ -236,19 +208,54 @@ function ChatConversation({
         sending={agentBusy}
         sendPending={sendMutation.isPending || resetMutation.isPending}
         stopping={interruptMutation.isPending}
-        statusLabel={
-          resetMutation.isPending
-            ? "Clearing chat..."
-            : sendMutation.isPending
-              ? "Starting agent..."
-              : statusLabel(status)
-        }
+        statusLabel={resolveComposerStatusLabel(resetMutation.isPending, sendMutation.isPending, status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
         modeDisabled={agentBusy}
       />
     </div>
   );
+}
+
+// Prepend a synthetic greeting (and optional template intro) so it never disappears.
+function useGreetedMessages(rawMessages: AgentMessage[], canvasId: string): AgentMessage[] {
+  const { account } = useContext(AccountContext);
+  const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
+  const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
+
+  return useMemo(() => {
+    const greeting: AgentMessage = {
+      id: "__greeting__",
+      role: "assistant",
+      content: `Hi ${greetingFirstName}! I'm your SuperPlane agent. I'll help you build and modify this canvas.`,
+      createdAt: rawMessages[0]?.createdAt ?? null,
+      toolCallId: "",
+      toolName: "",
+      toolStatus: "",
+    };
+
+    if (!bootInitialMessage) {
+      return [greeting, ...rawMessages];
+    }
+
+    const templateIntro: AgentMessage = {
+      id: "__boot_initial_message__",
+      role: "assistant",
+      content: bootInitialMessage,
+      createdAt: rawMessages[0]?.createdAt ?? null,
+      toolCallId: "",
+      toolName: "",
+      toolStatus: "",
+    };
+
+    return [greeting, templateIntro, ...rawMessages];
+  }, [rawMessages, greetingFirstName, bootInitialMessage]);
+}
+
+function resolveComposerStatusLabel(resetPending: boolean, sendPending: boolean, status: string): string {
+  if (resetPending) return "Clearing chat...";
+  if (sendPending) return "Starting agent...";
+  return statusLabel(status);
 }
 
 function useStreamingStatusReconciler(
@@ -392,6 +399,9 @@ function useConversationHandlers({
       setNotice(null);
 
       if (trimmed === "/clear") {
+        // Drop any pending boot context first so the kickoff effect can't
+        // auto-send a boot message onto the fresh, intentionally-empty session.
+        clearAgentBootContext();
         await reset.mutateAsync().catch((error) => {
           setError(error instanceof Error ? error.message : "failed to clear chat");
           throw error;
