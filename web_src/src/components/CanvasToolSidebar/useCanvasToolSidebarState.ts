@@ -82,7 +82,11 @@ export function useCanvasToolSidebarState({
     if (!showToolSidebarToggle) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "b" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+      // Some instrumentation SDKs dispatch synthetic keyboard events where `key` is unset.
+      const { key } = event as KeyboardEvent & { key?: unknown };
+      const lowerKey = typeof key === "string" ? key.toLowerCase() : "";
+
+      if (lowerKey !== "b" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
         return;
       }
 
