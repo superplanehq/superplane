@@ -51,6 +51,17 @@ export function resolveStartTemplate(
 }
 
 /**
+ * True when the resolved Start template declares at least one input
+ * parameter. Widget run controls use this to decide whether a Run click must
+ * open the confirm dialog (to collect field values) or can fire the trigger
+ * directly.
+ */
+export function triggerHasParameters(node: ComponentsNode | undefined, templateName?: string): boolean {
+  const template = resolveStartTemplate(node, templateName);
+  return (template?.parameters?.length ?? 0) > 0;
+}
+
+/**
  * Derive the `parameters` body the gRPC `InvokeNodeTriggerHook` endpoint
  * expects when the dashboard fires a quick Run on a referenced node.
  *
