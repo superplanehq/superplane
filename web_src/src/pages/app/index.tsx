@@ -4451,7 +4451,7 @@ export function AppPage() {
           getAutocompleteExampleObj={getAutocompleteExampleObj}
           getCustomField={getCustomField}
           onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
-          configurationSaveMode={isReadOnly ? "manual" : "auto"}
+          configurationSaveMode="auto"
           onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
           onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
           onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
