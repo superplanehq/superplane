@@ -3,7 +3,6 @@ package canvas
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
@@ -11,11 +10,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/cli/layout"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"gopkg.in/yaml.v3"
 )
 
 type updateCommand struct {
 	file            *string
-	draftID         *string
+	message         *string
 	autoLayout      *string
 	autoLayoutScope *string
 	autoLayoutNodes *[]string
@@ -49,6 +49,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if c.file != nil {
 		filePath = *c.file
 	}
+	if strings.TrimSpace(filePath) == "" {
+		return fmt.Errorf("canvas file is required")
+	}
 
 	autoLayoutValue := ""
 	if c.autoLayout != nil {
@@ -63,87 +66,75 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
 	}
 
-	draftID := ""
-	if c.draftID != nil {
-		draftID = strings.TrimSpace(*c.draftID)
+	commitMessage, err := common.RequireCommitMessage(messageValue(c.message))
+	if err != nil {
+		return fmt.Errorf("%w; use \"superplane apps staging update\" and \"superplane apps staging commit\" to stage changes first", err)
 	}
-	draftMode := draftID != ""
 
-	canvasID, _, err := resolveCanvasForFileUpdate(filePath)
+	resource, err := models.ParseCanvasResourceFromFile(filePath, "update")
 	if err != nil {
 		return err
 	}
-
-	yamlBytes, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to read canvas yaml: %w", err)
+	if resource.Metadata == nil || strings.TrimSpace(resource.Metadata.GetId()) == "" {
+		return fmt.Errorf("canvas metadata.id is required in the YAML file")
 	}
+	canvasID := strings.TrimSpace(resource.Metadata.GetId())
 
-	var targetVersionID string
-	if draftMode {
-		targetVersionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
-	} else {
-		targetVersionID, err = common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
-	}
+	autoLayout, err := layout.ResolveUpdateAutoLayout(
+		layout.HasFlags(ctx),
+		resource.AutoLayout,
+		autoLayoutValue,
+		autoLayoutScopeValue,
+		autoLayoutNodeIDs,
+	)
 	if err != nil {
 		return err
 	}
-
-	var autoLayout *openapi_client.CanvasesCanvasAutoLayout
-	if layout.HasFlags(ctx) {
-		parsed, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
-		if parseErr != nil {
-			return parseErr
+	if autoLayout != nil {
+		if resource.Spec == nil {
+			return fmt.Errorf("canvas spec is required when auto-layout is enabled")
 		}
-		autoLayout = parsed
-	} else {
-		defaultLayout := layout.DefaultAutoLayout()
-		autoLayout = &defaultLayout
+		if err := layout.ApplyToCanvasSpec(resource.Spec, autoLayout); err != nil {
+			return fmt.Errorf("apply auto-layout: %w", err)
+		}
 	}
 
-	if err := common.CommitRepositorySpecFile(
+	yamlBytes, err := yaml.Marshal(resource)
+	if err != nil {
+		return fmt.Errorf("marshal canvas yaml: %w", err)
+	}
+
+	if err := common.StageRepositorySpecFile(
 		ctx,
 		canvasID,
-		targetVersionID,
 		common.CanvasYAMLRepositoryPath,
 		yamlBytes,
-		"Update canvas.yaml",
-		autoLayout,
-		true,
 	); err != nil {
 		return err
 	}
 
-	versionResponse, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesDescribeCanvasVersion(ctx.Context, canvasID, targetVersionID).
-		Execute()
+	commitResponse, err := common.CommitCanvasStaging(ctx, canvasID, commitMessage)
 	if err != nil {
-		return err
+		return fmt.Errorf("canvas was staged but commit failed: %w", err)
 	}
-	version := versionResponse.GetVersion()
+
+	version := commitResponse.GetVersion()
 	if version.Metadata == nil {
+		return fmt.Errorf("committed version metadata is missing")
+	}
+	targetVersionID := strings.TrimSpace(version.Metadata.GetId())
+	if targetVersionID == "" {
 		return fmt.Errorf("updated version metadata is missing")
 	}
 
 	canvasYAML, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, targetVersionID)
 	if err != nil {
-		return fmt.Errorf("canvas draft updated but failed to read canvas.yaml: %w", err)
+		return fmt.Errorf("canvas updated but failed to read canvas.yaml: %w", err)
 	}
 
 	versionForValidation := versionWithSpecFromYAML(version, string(canvasYAML))
 	if errText := formatNodeSpecErrorsForCLI(versionForValidation); errText != "" {
 		return fmt.Errorf("%s", errText)
-	}
-
-	// When not in draft mode, auto-publish the updated draft version.
-	if !draftMode {
-		_, _, publishErr := ctx.API.CanvasVersionAPI.
-			CanvasesPublishCanvasVersion(ctx.Context, canvasID, targetVersionID).
-			Body(map[string]any{}).
-			Execute()
-		if publishErr != nil {
-			return fmt.Errorf("draft was updated but publish failed: %w", publishErr)
-		}
 	}
 
 	if !ctx.Renderer.IsText() {
@@ -185,6 +176,13 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 		return err
 	})
+}
+
+func messageValue(message *string) string {
+	if message == nil {
+		return ""
+	}
+	return *message
 }
 
 func versionWithSpecFromYAML(version openapi_client.CanvasesCanvasVersion, canvasYAML string) openapi_client.CanvasesCanvasVersion {
