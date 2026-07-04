@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
@@ -42,6 +43,32 @@ func loadLiveCanvasVersion(ctx context.Context, db *gorm.DB, canvas *models.Canv
 	defer done(&err)
 
 	return models.FindLiveCanvasVersionByCanvasInTransaction(db.WithContext(ctx), canvas)
+}
+
+func resolveLiveCanvasVersionID(tx *gorm.DB, canvas *models.Canvas, requestedVersionID string) (uuid.UUID, error) {
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uuid.Nil, grpcerrors.NotFound(err, "canvas live version not found")
+		}
+		return uuid.Nil, err
+	}
+
+	requestedVersionID = strings.TrimSpace(requestedVersionID)
+	if requestedVersionID == "" {
+		return liveVersion.ID, nil
+	}
+
+	requestedUUID, err := uuid.Parse(requestedVersionID)
+	if err != nil {
+		return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid version id")
+	}
+
+	if requestedUUID != liveVersion.ID {
+		return uuid.Nil, grpcerrors.InvalidArgument(nil, "version_id is not the current live version")
+	}
+
+	return liveVersion.ID, nil
 }
 
 func loadCanvasStatus(ctx context.Context, db *gorm.DB, canvasID uuid.UUID) (canvasStatus *pb.Canvas_Status, err error) {

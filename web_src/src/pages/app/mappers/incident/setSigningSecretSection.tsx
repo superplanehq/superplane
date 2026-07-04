@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   canvasesDescribeCanvas,
-  canvasesStageCanvasRepositoryFile,
+  canvasesPutCanvasStaging,
   canvasesCommitCanvasStaging,
   canvasesInvokeNodeTriggerHook,
   type CanvasesCanvas,
@@ -60,10 +60,10 @@ async function commitUpdatedCanvasVersionYaml(params: {
     spec: params.updatedVersion.spec,
   });
 
-  registerLocalStagingWrite(params.canvasId, params.versionId);
-  await canvasesStageCanvasRepositoryFile(
+  registerLocalStagingWrite(params.canvasId);
+  await canvasesPutCanvasStaging(
     withOrganizationHeader({
-      path: { canvasId: params.canvasId, versionId: params.versionId },
+      path: { canvasId: params.canvasId },
       body: {
         operations: [
           {
@@ -76,8 +76,8 @@ async function commitUpdatedCanvasVersionYaml(params: {
   );
   await canvasesCommitCanvasStaging(
     withOrganizationHeader({
-      path: { canvasId: params.canvasId, versionId: params.versionId },
-      body: {},
+      path: { canvasId: params.canvasId },
+      body: { commitMessage: "Update signing secret configuration" },
     }),
   );
   params.queryClient.setQueryData(canvasKeys.versionDetail(params.canvasId, params.versionId), params.updatedVersion);
