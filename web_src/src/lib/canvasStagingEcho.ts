@@ -8,13 +8,15 @@
 
 const PENDING_ECHO_TTL_MS = 5000;
 
-// Expiry timestamps per `${canvasId}:${versionId}`. Each entry represents one
+let stagingEchoUserId: string | undefined;
+
+// Expiry timestamps per `${canvasId}:${userId}`. Each entry represents one
 // in-flight local staging write awaiting its broadcast echo. A TTL guards
 // against writes that fail (or whose echo never arrives) leaking forever.
 const pendingEchoExpiries = new Map<string, number[]>();
 
-function echoKey(canvasId: string, versionId: string): string {
-  return `${canvasId}:${versionId}`;
+function echoKey(canvasId: string, userId: string): string {
+  return `${canvasId}:${userId}`;
 }
 
 function dropExpired(expiries: number[], now: number): void {
@@ -23,15 +25,19 @@ function dropExpired(expiries: number[], now: number): void {
   }
 }
 
+export function setCanvasStagingEchoUserId(userId: string | undefined): void {
+  stagingEchoUserId = userId;
+}
+
 // Registers a staging write issued by this tab so its broadcast echo can be
 // ignored. Call right before issuing the request, since the server may broadcast
 // before the request's HTTP response resolves.
-export function registerLocalStagingWrite(canvasId?: string, versionId?: string): void {
-  if (!canvasId || !versionId) {
+export function registerLocalStagingWrite(canvasId?: string): void {
+  if (!canvasId || !stagingEchoUserId) {
     return;
   }
 
-  const key = echoKey(canvasId, versionId);
+  const key = echoKey(canvasId, stagingEchoUserId);
   const now = Date.now();
   const expiries = pendingEchoExpiries.get(key) ?? [];
   dropExpired(expiries, now);
@@ -41,13 +47,13 @@ export function registerLocalStagingWrite(canvasId?: string, versionId?: string)
 
 // Reports whether the incoming staging_updated event matches a local write from
 // this tab, consuming the registration when it does so a later genuine remote
-// event for the same version is not suppressed.
-export function consumeLocalStagingWrite(canvasId?: string, versionId?: string): boolean {
-  if (!canvasId || !versionId) {
+// event for the same user is not suppressed.
+export function consumeLocalStagingWrite(canvasId?: string, userId?: string): boolean {
+  if (!canvasId || !userId) {
     return false;
   }
 
-  const key = echoKey(canvasId, versionId);
+  const key = echoKey(canvasId, userId);
   const expiries = pendingEchoExpiries.get(key);
   if (!expiries) {
     return false;

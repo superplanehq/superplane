@@ -112,7 +112,7 @@ describe("SecondaryHeaderActions", () => {
     expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
   });
 
-  it("keeps the publish button visible while publish is pending", () => {
+  it("hides staging controls when there is nothing to commit and no action is pending", () => {
     render(
       <SecondaryHeaderActions
         canvasName="Canvas"
@@ -120,20 +120,17 @@ describe("SecondaryHeaderActions", () => {
         isEditing
         hasStagingChanges={false}
         commitStagingPending={false}
-        publishVersionDisabled
-        publishVersionLabel="Publish"
         onCommitStaging={vi.fn()}
         onResetStaging={vi.fn()}
-        onPublishVersion={vi.fn()}
         toolSidebarState={{} as CanvasToolSidebarState}
         runsSidebarState={runsSidebarState}
         versionsSidebarState={versionsSidebarState}
       />,
     );
 
-    expect(screen.getByTestId("canvas-publish-version-button")).toBeDisabled();
-    expect(screen.getByTestId("canvas-publish-version-button")).toHaveTextContent("Publish");
     expect(screen.queryByTestId("canvas-commit-staging-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-reset-staging-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
   });
 
   it("keeps staging controls disabled while reset settles after staging clears", () => {

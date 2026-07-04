@@ -195,12 +195,13 @@ func (s *Server) tryWriteStagedRepositoryFile(
 	path string,
 	versionID string,
 ) (bool, error) {
+	db := database.DB(ctx)
 	authCtx := authentication.SetUserIdInMetadata(ctx, user.ID.String())
 	content, found, deleted, stagedErr := canvases.ReadStagedRepositoryFile(
 		authCtx,
+		db,
 		user.OrganizationID.String(),
 		canvas.ID.String(),
-		versionID,
 		path,
 	)
 	if stagedErr != nil {

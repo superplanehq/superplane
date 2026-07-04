@@ -50,6 +50,7 @@ func UpdateCanvasVersion(
 		webhookBaseURL,
 		authService,
 		false,
+		false,
 	)
 }
 
@@ -66,6 +67,7 @@ func UpdateCanvasVersionWithUsage(
 	webhookBaseURL string,
 	authService authorization.Authorization,
 	discardStaging bool,
+	commitTarget bool,
 ) (*models.CanvasVersion, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -131,7 +133,7 @@ func UpdateCanvasVersionWithUsage(
 
 		nodes := injectMetadataIntoNodes(version.Nodes, nodes)
 
-		if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
+		if err := ensureVersionIsEditable(userUUID, canvas, version, commitTarget); err != nil {
 			return err
 		}
 
@@ -145,7 +147,7 @@ func UpdateCanvasVersionWithUsage(
 		}
 
 		if discardStaging {
-			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+			return models.DiscardStagedFilesForUser(tx, canvas.ID, userUUID, nil)
 		}
 
 		return nil
@@ -158,31 +160,25 @@ func UpdateCanvasVersionWithUsage(
 		return nil, grpcerrors.Internal(err, "failed to update canvas version")
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
+	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), organizationID).PublishUpdated(); err != nil {
+		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
 
 	return version, nil
 }
 
-func ensureVersionIsOwnedRegisteredDraft(userID uuid.UUID, version *models.CanvasVersion) error {
-	if version.OwnerID == nil || *version.OwnerID != userID {
-		return grpcerrors.PermissionDenied(nil, "version owner mismatch")
+func ensureVersionIsEditable(userID uuid.UUID, canvas *models.Canvas, version *models.CanvasVersion, commitTarget bool) error {
+	if commitTarget {
+		if models.IsLiveCanvasVersion(nil, canvas, version) {
+			return grpcerrors.FailedPrecondition(nil, "live versions are immutable")
+		}
+		if version.OwnerID == nil || *version.OwnerID != userID {
+			return grpcerrors.PermissionDenied(nil, "version owner mismatch")
+		}
+		return nil
 	}
 
-	if version.State == models.CanvasVersionStatePublished {
-		return grpcerrors.FailedPrecondition(nil, "published versions are immutable")
-	}
-
-	if version.State != models.CanvasVersionStateDraft {
-		return grpcerrors.FailedPrecondition(nil, "version is not your editable draft")
-	}
-
-	if !models.IsRegisteredDraftVersion(version) {
-		return grpcerrors.FailedPrecondition(nil, "version is not a registered draft branch")
-	}
-
-	return nil
+	return grpcerrors.FailedPrecondition(nil, "direct version updates are not supported; stage changes instead")
 }
 
 func injectMetadataIntoNodes(versionNodes []models.Node, proposedNodes []models.Node) []models.Node {

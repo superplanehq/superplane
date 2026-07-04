@@ -9,35 +9,33 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "console",
 		Short: "Manage an app console",
-		Long: `Manage the per-app console: panels and grid layout configured for an
-app. The console is stored on app versions, so reads default to the
-live console and writes always target your draft version.`,
+		Long: `Manage the per-app console: panels and grid layout configured for an app.
+
+Reads return the live console. Writes commit immediately with --message, or you
+can stage changes with "superplane apps staging update" and "staging commit".`,
 	}
 
-	var getDraftID string
 	getCmd := &cobra.Command{
 		Use:   "get [app-name-or-id]",
 		Short: "Get the console for an app",
-		Long: `Print the console for an app. With -o yaml, prints the canonical
-Console YAML (apiVersion: v1, kind: Console). Defaults to the live console;
-pass --draft-id to read a specific draft.
+		Long: `Print the live console for an app. With -o yaml, prints the canonical
+Console YAML (apiVersion: v1, kind: Console).
 
 The app argument is optional. When omitted, the active app
 configured with "superplane apps active" is used.`,
 		Args: cobra.MaximumNArgs(1),
 	}
-	getCmd.Flags().StringVar(&getDraftID, "draft-id", "", "target a specific draft by id (see `superplane apps drafts list`)")
-	core.Bind(getCmd, &getCommand{draftID: &getDraftID}, options)
+	core.Bind(getCmd, &getCommand{}, options)
 
 	var setFile string
-	var setDraftID string
+	var setMessage string
 	setCmd := &cobra.Command{
 		Use:   "set [app-name-or-id] [file]",
-		Short: "Replace the console draft with YAML",
-		Long: `Replace the console panels and layout in the current user's draft
-version. The YAML must use apiVersion: v1 and kind: Console.
+		Short: "Replace the live console with YAML",
+		Long: `Replace the live console panels and layout from YAML and commit with --message.
 
-Pass --draft-id to target a specific draft and leave the edit as a draft only.
+The YAML must use apiVersion: v1 and kind: Console. To stage changes without
+committing, use "superplane apps staging update" and "staging commit".
 
 The app argument is optional. When omitted, the active app
 configured with "superplane apps active" is used.
@@ -49,8 +47,9 @@ YAML source resolution order:
 		Args: cobra.MaximumNArgs(2),
 	}
 	setCmd.Flags().StringVarP(&setFile, "file", "f", "", `console YAML file path, or "-" for stdin`)
-	setCmd.Flags().StringVar(&setDraftID, "draft-id", "", "target a specific draft by id instead of auto-publishing (see `superplane apps drafts list`)")
-	core.Bind(setCmd, &setCommand{file: &setFile, draftID: &setDraftID}, options)
+	setCmd.Flags().StringVarP(&setMessage, "message", "m", "", "commit message")
+	_ = setCmd.MarkFlagRequired("message")
+	core.Bind(setCmd, &setCommand{file: &setFile, message: &setMessage}, options)
 
 	root.AddCommand(getCmd)
 	root.AddCommand(setCmd)

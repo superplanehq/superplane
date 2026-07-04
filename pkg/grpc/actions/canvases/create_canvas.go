@@ -145,15 +145,13 @@ func CreateCanvasWithSeedFiles(
 		// Create new empty canvas version record
 		//
 		emptyVersion := models.CanvasVersion{
-			ID:          versionID,
-			WorkflowID:  canvasID,
-			OwnerID:     &createdBy,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
-			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:         versionID,
+			WorkflowID: canvasID,
+			OwnerID:    &createdBy,
+			Nodes:      datatypes.NewJSONSlice([]models.Node{}),
+			Edges:      datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
 		}
 
 		if err := tx.Create(&emptyVersion).Error; err != nil {
