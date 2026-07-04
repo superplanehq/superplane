@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,11 +19,10 @@ import (
 )
 
 const (
-	listFilesActionName   = "list_files"
-	readFileActionName    = "read_file"
-	writeFileActionName   = "write_file"
-	deleteFileActionName  = "delete_file"
-	commitFilesActionName = "commit_files"
+	listFilesActionName  = "list_files"
+	readFileActionName   = "read_file"
+	writeFileActionName  = "write_file"
+	deleteFileActionName = "delete_file"
 )
 
 type listFilesAction struct {
@@ -117,41 +117,33 @@ func (a readFileAction) Execute(ctx context.Context, session agents.AgentSession
 
 func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessionContext, versionID, path string) (fileReadEntry, error) {
 	if canvasRepository.IsRepositorySpecFilePath(path) {
-		source := "live"
-		readSpecFile := canvasRepository.ReadRepositorySpecFile
-		if versionID != "" {
-			source = "draft"
-			readSpecFile = canvasRepository.ReadRepositorySpecFileStaged
-		}
-
-		content, err := readSpecFile(ctx, session.OrganizationID, session.CanvasID, versionID, path)
+		content, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, session.OrganizationID, session.CanvasID, versionID, path)
 		if err != nil {
 			return fileReadEntry{}, err
 		}
 
-		return fileReadEntry{Path: path, Content: content, Source: source, VersionID: versionID}, nil
+		return fileReadEntry{Path: path, Content: content, Source: "staging", VersionID: versionID}, nil
 	}
 
-	if versionID != "" {
-		content, found, deleted, err := canvasRepository.ReadStagedRepositoryFile(
-			ctx,
-			session.OrganizationID,
-			session.CanvasID,
-			versionID,
-			path,
-		)
-		if err != nil {
-			return fileReadEntry{}, err
-		}
-		if deleted {
-			return fileReadEntry{}, status.Errorf(codes.NotFound, "file %q is staged for deletion", path)
-		}
-		if found {
-			return fileReadEntry{Path: path, Content: content, Source: "draft", VersionID: versionID}, nil
-		}
+	db := database.DB(ctx)
+	content, found, deleted, err := canvasRepository.ReadStagedRepositoryFile(
+		ctx,
+		db,
+		session.OrganizationID,
+		session.CanvasID,
+		path,
+	)
+	if err != nil {
+		return fileReadEntry{}, err
+	}
+	if deleted {
+		return fileReadEntry{}, status.Errorf(codes.NotFound, "file %q is staged for deletion", path)
+	}
+	if found {
+		return fileReadEntry{Path: path, Content: content, Source: "staging", VersionID: versionID}, nil
 	}
 
-	content, err := a.readCommittedGitFile(ctx, session, path)
+	content, err = a.readCommittedGitFile(ctx, session, path)
 	if err != nil {
 		return fileReadEntry{}, err
 	}
@@ -199,11 +191,10 @@ func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionC
 		return fileStageResult{}, err
 	}
 
-	state, err := canvasRepository.StageRepositorySpecFileOperations(
+	state, err := canvasRepository.PutCanvasStaging(
 		ctx,
 		session.OrganizationID,
 		session.CanvasID,
-		draft.ID.String(),
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Content: []byte(input.Content)}},
 	)
 	if err != nil {
@@ -236,11 +227,10 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 		return fileStageResult{}, err
 	}
 
-	state, err := canvasRepository.StageRepositorySpecFileOperations(
+	state, err := canvasRepository.PutCanvasStaging(
 		ctx,
 		session.OrganizationID,
 		session.CanvasID,
-		draft.ID.String(),
 		[]*pb.CanvasRepositoryFileOperation{{Path: path, Delete: true}},
 	)
 	if err != nil {
@@ -254,58 +244,6 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 		Path:           path,
 		Deleted:        true,
 		StagingSummary: serializeStagingSummary(state),
-	}, nil
-}
-
-type commitFilesAction struct {
-	deps Dependencies
-}
-
-func newCommitFilesAction(deps Dependencies) commitFilesAction {
-	return commitFilesAction{deps: deps}
-}
-
-func (commitFilesAction) Name() string {
-	return commitFilesActionName
-}
-
-func (a commitFilesAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	if a.deps.GitProvider == nil {
-		return fileCommitResult{}, fmt.Errorf("git provider is not configured")
-	}
-
-	draft, err := resolveFileDraftVersion(session, input)
-	if err != nil {
-		return fileCommitResult{}, err
-	}
-
-	response, err := canvasRepository.CommitCanvasStaging(
-		ctx,
-		a.deps.GitProvider,
-		a.deps.UsageService,
-		a.deps.Encryptor,
-		a.deps.Registry,
-		session.OrganizationID,
-		session.CanvasID,
-		draft.ID.String(),
-		a.deps.WebhookBaseURL,
-		a.deps.AuthService,
-		strings.TrimSpace(input.Message),
-	)
-	if err != nil {
-		return fileCommitResult{}, err
-	}
-
-	return fileCommitResult{
-		Action:    commitFilesActionName,
-		CanvasID:  session.CanvasID,
-		VersionID: draft.ID.String(),
-		Draft: draftResult{
-			VersionID:   draft.ID.String(),
-			DisplayName: draft.DisplayName,
-			BranchName:  draft.GitBranch,
-		},
-		StagingSummary: serializeStagingSummary(response.GetStagingSummary()),
 	}, nil
 }
 
@@ -340,16 +278,12 @@ func requestedWritableFilePath(rawPath string) (string, error) {
 		return "", fmt.Errorf("invalid file path %q: %w", rawPath, err)
 	}
 	if canvasRepository.IsRepositorySpecFilePath(path) {
-		return "", fmt.Errorf("use patch_draft for %s", path)
+		return "", fmt.Errorf("use patch_staging for %s", path)
 	}
 	return path, nil
 }
 
 func requestedReadableFileVersionID(session agents.AgentSessionContext, input Input) (string, error) {
-	if input.UseDraft != nil && !*input.UseDraft {
-		return "", nil
-	}
-
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
 		return "", err
@@ -359,14 +293,11 @@ func requestedReadableFileVersionID(session agents.AgentSessionContext, input In
 		return "", err
 	}
 
-	draft, err := resolveReadableDraftVersion(canvasID, userID, input)
+	liveVersion, err := resolveTargetDraftVersion(canvasID, userID, input)
 	if err != nil {
 		return "", err
 	}
-	if draft == nil {
-		return "", nil
-	}
-	return draft.ID.String(), nil
+	return liveVersion.ID.String(), nil
 }
 
 func resolveFileDraftVersion(session agents.AgentSessionContext, input Input) (*models.CanvasVersion, error) {

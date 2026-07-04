@@ -10,9 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-type getCommand struct {
-	draftID *string
-}
+type getCommand struct{}
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
 	if len(ctx.Args) > 1 {
@@ -41,21 +39,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	canvasName := strings.TrimSpace(described.Metadata.GetName())
 	organizationID := strings.TrimSpace(described.Metadata.GetOrganizationId())
 
-	draftID := ""
-	if c.draftID != nil {
-		draftID = strings.TrimSpace(*c.draftID)
-	}
-
-	useDraft := draftID != ""
-	versionID := ""
-	if useDraft {
-		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
-		if err != nil {
-			return err
-		}
-	}
-
-	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, versionID)
+	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.CanvasYAMLRepositoryPath, "")
 	if err != nil {
 		return err
 	}
@@ -88,18 +72,10 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		source := "live"
-		if useDraft {
-			source = "draft"
-		}
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())
 		if url := common.BuildAppURL(ctx, organizationID, canvasID); url != "" {
 			_, _ = fmt.Fprintf(stdout, "App URL: %s\n", url)
-		}
-		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
-		if versionID != "" {
-			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
 		}
 		nodeCount := 0
 		edgeCount := 0

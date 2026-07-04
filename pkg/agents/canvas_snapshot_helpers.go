@@ -16,24 +16,14 @@ type superPlaneCanvasNodeSummary struct {
 }
 
 func ownedDraftVersion(canvasID, userID uuid.UUID) (*models.CanvasVersion, error) {
-	drafts, err := models.ListDraftCanvasVersions(canvasID)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range drafts {
-		if models.IsUserOwnedDraftVersion(&drafts[i], userID) && models.IsRegisteredDraftVersion(&drafts[i]) {
-			return &drafts[i], nil
-		}
-	}
-
+	_ = canvasID
+	_ = userID
 	return nil, nil
 }
 
 func selectedVersion(canvas *models.Canvas, draft *models.CanvasVersion, source string) (*models.CanvasVersion, error) {
-	if source == "draft" {
-		return draft, nil
-	}
+	_ = draft
+	_ = source
 
 	if canvas == nil || canvas.LiveVersionID == nil {
 		return nil, nil
