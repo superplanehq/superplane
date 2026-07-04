@@ -8,7 +8,6 @@ import (
 )
 
 func GatewayAuthorizationMiddleware(
-	mux *runtime.ServeMux,
 	authorizer *authorization.GatewayAuthorizer,
 ) runtime.Middleware {
 	return func(next runtime.HandlerFunc) runtime.HandlerFunc {
@@ -21,8 +20,7 @@ func GatewayAuthorizationMiddleware(
 
 			ctx, err := authorizer.AuthorizeHTTP(r.Context(), r, route, pathParams)
 			if err != nil {
-				_, outboundMarshaler := runtime.MarshalerForRequest(mux, r)
-				runtime.HTTPError(r.Context(), mux, outboundMarshaler, w, r, err)
+				writeGatewayHTTPError(r.Context(), w, err)
 				return
 			}
 
