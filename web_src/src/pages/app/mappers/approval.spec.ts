@@ -7,8 +7,8 @@ const DEFAULT_NODE = { id: "n1", name: "Approval Node", componentName: "approval
 function makeExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
   return {
     id: "e1",
-    createdAt: undefined,
-    updatedAt: undefined,
+    createdAt: "",
+    updatedAt: "",
     state: "STATE_FINISHED",
     result: "RESULT_PASSED",
     resultReason: "RESULT_REASON_OK",
