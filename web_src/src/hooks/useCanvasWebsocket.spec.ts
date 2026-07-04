@@ -303,21 +303,37 @@ describe("useCanvasWebsocket", () => {
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
   });
 
-  it("invalidates version and console queries for canvas updates", () => {
+  it("invalidates live canvas queries for canvas updates when viewing live", () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+    const onCanvasLifecycleEvent = vi.fn().mockReturnValue(true);
 
-    renderCanvasWebsocketHook(queryClient);
+    renderHook(
+      () =>
+        useCanvasWebsocket(
+          testCanvasId,
+          testOrganizationId,
+          undefined,
+          undefined,
+          undefined,
+          onCanvasLifecycleEvent,
+          () => true,
+        ),
+      {
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(QueryClientProvider, { client: queryClient }, children),
+      },
+    );
+
     emitWebsocketMessage("canvas_updated", {
       canvasId: testCanvasId,
     });
 
+    expect(onCanvasLifecycleEvent).toHaveBeenCalledWith({ canvasId: testCanvasId }, "canvas_updated");
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.versionList(testCanvasId),
+      queryKey: canvasKeys.detail(testOrganizationId, testCanvasId),
     });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.consoleAll(testCanvasId),
-    });
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.consoleAll(testCanvasId))).toHaveLength(0);
   });
 
   it("skips lifecycle invalidation when canvas_updated echo is consumed", () => {

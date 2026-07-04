@@ -2,49 +2,48 @@ export type ProcessCanvasLifecycleEventInput = {
   payload: { canvasId: string };
   eventName: string;
   canvasId?: string;
-  activeCanvasVersionId: string;
   editSessionActive: boolean;
   hasLocalSaveActivity: boolean;
   consumeIgnoredCanvasUpdatedEcho: () => boolean;
-  invalidateCanvasVersionData: (targetCanvasId: string, targetVersionId?: string) => void;
-  resyncDraftToCommitted: (versionId: string) => void;
+  invalidateCanvasStaging: (targetCanvasId: string) => void;
+  invalidateLiveVersionData: (targetCanvasId: string) => void;
   setCanvasDeletedRemotely: (value: boolean) => void;
   setRemoteCanvasUpdatePending: (value: boolean) => void;
 };
 
 function handleCanvasUpdatedLifecycle({
   canvasId,
-  activeCanvasVersionId,
   editSessionActive,
   hasLocalSaveActivity,
-  invalidateCanvasVersionData,
-  resyncDraftToCommitted,
+  invalidateCanvasStaging,
+  invalidateLiveVersionData,
   setRemoteCanvasUpdatePending,
 }: Pick<
   ProcessCanvasLifecycleEventInput,
   | "canvasId"
-  | "activeCanvasVersionId"
   | "editSessionActive"
   | "hasLocalSaveActivity"
-  | "invalidateCanvasVersionData"
-  | "resyncDraftToCommitted"
+  | "invalidateCanvasStaging"
+  | "invalidateLiveVersionData"
   | "setRemoteCanvasUpdatePending"
 >): boolean {
   if (hasLocalSaveActivity) {
     setRemoteCanvasUpdatePending(true);
-    if (canvasId && activeCanvasVersionId) {
-      invalidateCanvasVersionData(canvasId, activeCanvasVersionId);
-    }
+  }
+
+  if (!canvasId) {
     return true;
   }
 
-  if (canvasId) {
-    invalidateCanvasVersionData(canvasId, activeCanvasVersionId || undefined);
-    if (editSessionActive && activeCanvasVersionId) {
-      resyncDraftToCommitted(activeCanvasVersionId);
-    }
+  if (editSessionActive) {
+    // While editing, only refresh staging metadata. Version-scoped repository
+    // and console queries may still reference a version id that is no longer live
+    // (e.g. immediately after a commit in this tab).
+    invalidateCanvasStaging(canvasId);
+    return true;
   }
 
+  invalidateLiveVersionData(canvasId);
   return true;
 }
 

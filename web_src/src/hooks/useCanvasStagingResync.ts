@@ -3,13 +3,12 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { fetchCanvasVersionWithSpec } from "@/pages/app/lib/repository-spec-files";
-import { syncCommittedCanvasDraftState } from "@/pages/app/lib/sync-committed-canvas-draft";
 
-import { canvasKeys } from "./useCanvasData";
+import { canvasKeys } from "@/hooks/useCanvasData";
 
 type CanvasSpec = CanvasesCanvas["spec"] | null;
 
-interface UseCanvasDraftResyncOptions {
+interface UseCanvasStagingResyncOptions {
   organizationId?: string;
   canvasId?: string;
   activeCanvasVersionIdRef: MutableRefObject<string>;
@@ -21,23 +20,15 @@ interface UseCanvasDraftResyncOptions {
   setStagingResetNonce: Dispatch<SetStateAction<number>>;
 }
 
-interface CanvasDraftResync {
-  resyncDraftToCommitted: (versionId: string) => Promise<void>;
-  resyncDraftToStaged: (versionId: string, options?: ResyncDraftOptions) => Promise<void>;
-}
-
-type ResyncDraftOptions = {
+type ResyncStagedOptions = {
   /** Bumps stagingResetNonce so file/console baselines reset. Avoid when entering edit from agent staging — it remounts CanvasPage and can loop auto-open. */
   bumpResetNonce?: boolean;
 };
 
-// Re-applies a draft version's effective spec (committed or staged) to the
-// active editor state after a remote change. The rendered graph reads React
-// state rather than a query cache, so only the actively-edited draft drives a
-// full re-apply; other branches just drop their cached spec so a later switch
-// refetches. Owned by a hook to keep this shared cross-tab sync logic out of
-// the AppPage component body.
-export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): CanvasDraftResync {
+// Re-applies the staged (uncommitted) spec into React editor state after a remote
+// staging_updated event. The graph reads local state, not React Query, so query
+// invalidation alone is not enough while the user is actively editing.
+export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
   const {
     organizationId,
     canvasId,
@@ -52,10 +43,7 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
   const queryClient = useQueryClient();
   const resyncStagedInFlightRef = useRef(new Map<string, Promise<void>>());
 
-  // Applies an already-loaded spec to the active draft and treats it as the
-  // saved baseline so it is not re-detected as a local edit (which would
-  // re-stage and echo back to the originating tab, creating a feedback loop).
-  const applyResyncedSpec = useCallback(
+  const applyStagedSpec = useCallback(
     (versionId: string, spec: CanvasSpec) => {
       if (!organizationId || !canvasId) {
         return;
@@ -87,53 +75,8 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
     ],
   );
 
-  // A remote `canvas_updated` (e.g. a CLI commit) updates the live canvas and
-  // clears staging. Refresh the committed/staged caches and clear the staging
-  // indicators so the UI does not keep showing stale "uncommitted changes".
-  const resyncDraftToCommitted = useCallback(
-    async (versionId: string) => {
-      if (!organizationId || !canvasId) {
-        return;
-      }
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
-
-      if (activeCanvasVersionIdRef.current !== versionId) {
-        draftCanvasSpecsRef.current.delete(versionId);
-        return;
-      }
-
-      consoleMutationGenerationRef.current += 1;
-      const committedVersion = await syncCommittedCanvasDraftState({
-        queryClient,
-        organizationId,
-        canvasId,
-        versionId,
-      });
-      applyResyncedSpec(versionId, committedVersion?.spec ?? null);
-
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
-      setStagingResetNonce((nonce) => nonce + 1);
-    },
-    [
-      organizationId,
-      canvasId,
-      queryClient,
-      activeCanvasVersionIdRef,
-      draftCanvasSpecsRef,
-      consoleMutationGenerationRef,
-      applyResyncedSpec,
-      setStagingResetNonce,
-    ],
-  );
-
-  // A remote `staging_updated` (another tab editing the same draft) changed the
-  // draft's staging layer without committing. The console/files caches and diff
-  // badge refresh through the websocket hook's invalidations, but the rendered
-  // graph reads React state, so the active draft needs its effective staged
-  // spec re-applied here.
-  const resyncDraftToStaged = useCallback(
-    async (versionId: string, options?: ResyncDraftOptions) => {
+  const resyncStagedEditorState = useCallback(
+    async (versionId: string, options?: ResyncStagedOptions) => {
       if (!organizationId || !canvasId) {
         return;
       }
@@ -167,7 +110,7 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
             (current) => (current ? { ...current, spec: { ...current.spec, ...stagedSpec } } : current),
           );
         }
-        applyResyncedSpec(versionId, stagedSpec);
+        applyStagedSpec(versionId, stagedSpec);
 
         await queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) });
         if (bumpResetNonce) {
@@ -189,10 +132,13 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
       activeCanvasVersionIdRef,
       draftCanvasSpecsRef,
       consoleMutationGenerationRef,
-      applyResyncedSpec,
+      applyStagedSpec,
       setStagingResetNonce,
     ],
   );
 
-  return { resyncDraftToCommitted, resyncDraftToStaged };
+  return { resyncStagedEditorState };
 }
+
+/** @deprecated Use useCanvasStagingResync */
+export const useCanvasDraftResync = useCanvasStagingResync;
