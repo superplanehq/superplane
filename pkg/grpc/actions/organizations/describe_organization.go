@@ -22,7 +22,7 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 		}
 
 		log.Errorf("Error describing organization %s: %v", orgID, err)
-		return nil, err
+		return nil, grpcerrors.Internal(err, "failed to describe organization")
 	}
 
 	response := &pb.DescribeOrganizationResponse{
