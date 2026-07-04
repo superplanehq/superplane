@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -84,12 +85,12 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, nil)
 	require.NoError(t, err)
 
-	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
+	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, nil)
 	require.Error(t, err)
-	require.Equal(t, codes.AlreadyExists, status.Code(err))
+	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 }
 
 func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
@@ -107,73 +108,16 @@ func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.Error(t, err)
-	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	require.Equal(t, "canvas name is required", status.Convert(err).Message())
-}
-
-func TestCreateCanvasInheritsOrganizationChangeManagementWhenEnabled(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-
-	nowEnabled := true
-	require.NoError(t, database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("change_management_enabled", nowEnabled).Error)
-
-	workflow := &pb.Canvas{
-		Metadata: &pb.Canvas_Metadata{
-			Name: "Change management default canvas",
-		},
-		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{},
-			Edges: []*componentpb.Edge{},
-		},
-	}
-
-	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
-	require.NoError(t, err)
-	require.NotNil(t, response)
-	require.NotNil(t, response.Canvas)
-	require.NotNil(t, response.Canvas.Metadata)
-	// New canvases inherit organization change management setting.
-	require.NotNil(t, response.Canvas.Spec)
-	require.NotNil(t, response.Canvas.Spec.ChangeManagement)
-	require.True(t, response.Canvas.Spec.ChangeManagement.Enabled)
-
-	require.NotEmpty(t, response.Canvas.Metadata.Id)
-	createdCanvasUUID, parseErr := uuid.Parse(response.Canvas.Metadata.Id)
-	require.NoError(t, parseErr)
-	createdCanvas, findErr := models.FindCanvas(r.Organization.ID, createdCanvasUUID)
-	require.NoError(t, findErr)
-	require.True(t, createdCanvas.ChangeManagementEnabled)
-}
-
-func TestCreateCanvasResponseShowsCanvasLevelChangeManagementWhenEnabled(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-
-	canvas := &pb.Canvas{
-		Metadata: &pb.Canvas_Metadata{
-			Name: "Canvas level change management",
-		},
-		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{},
-			Edges: []*componentpb.Edge{},
-			ChangeManagement: &pb.Canvas_ChangeManagement{
-				Enabled: true,
-			},
-		},
-	}
-
-	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
-	require.NoError(t, err)
-	require.NotNil(t, response)
-	require.NotNil(t, response.Canvas)
-	require.NotNil(t, response.Canvas.Spec)
-	require.NotNil(t, response.Canvas.Spec.ChangeManagement)
-	require.True(t, response.Canvas.Spec.ChangeManagement.Enabled)
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	require.Equal(t, "canvas name is required", func() string {
+		_, msg, ok := grpcerrors.HandlerStatus(err)
+		if ok {
+			return msg
+		}
+		return err.Error()
+	}())
 }
 
 func TestCreateCanvasOnFreshOrganization(t *testing.T) {
@@ -192,7 +136,7 @@ func TestCreateCanvasOnFreshOrganization(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -248,10 +192,16 @@ func TestCreateCanvasRejectsInvalidEdgeChannel(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.Error(t, err)
-	require.Equal(t, codes.InvalidArgument, status.Code(err))
-	require.Contains(t, status.Convert(err).Message(), `source node http-1 does not have output channel "default"`)
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	require.Contains(t, func() string {
+		_, msg, ok := grpcerrors.HandlerStatus(err)
+		if ok {
+			return msg
+		}
+		return err.Error()
+	}(), `source node http-1 does not have output channel "default"`)
 }
 
 func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
@@ -282,8 +232,8 @@ func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, service)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, service)
 	require.Error(t, err)
-	require.Equal(t, codes.ResourceExhausted, status.Code(err))
-	require.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())
+	require.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
+	assert.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())
 }

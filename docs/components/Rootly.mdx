@@ -26,6 +26,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Incident
 
+**Trigger key:** `rootly.onIncident`
+
 The On Incident trigger starts a workflow execution when Rootly incident events occur.
 
 ### Use Cases
@@ -75,6 +77,8 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
 <a id="on-incident-timeline-event"></a>
 
 ## On Incident Timeline Event
+
+**Trigger key:** `rootly.onIncidentTimelineEvent`
 
 The On Incident Timeline Event trigger starts a workflow execution when Rootly incident timeline events are created or updated.
 Only events with kind "event" are emitted.
@@ -157,6 +161,8 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
 
 ## Create Event
 
+**Component key:** `rootly.createEvent`
+
 The Create Event component adds a timeline event (note/annotation) to a Rootly incident.
 
 ### Use Cases
@@ -199,6 +205,8 @@ Returns the created incident event with:
 <a id="create-incident"></a>
 
 ## Create Incident
+
+**Component key:** `rootly.createIncident`
 
 The Create Incident component creates a new incident in Rootly.
 
@@ -246,6 +254,8 @@ Returns the created incident object including:
 <a id="get-incident"></a>
 
 ## Get Incident
+
+**Component key:** `rootly.getIncident`
 
 The Get Incident component retrieves a single incident from Rootly by ID, including related resources.
 
@@ -345,6 +355,8 @@ Returns the incident object including:
 <a id="update-incident"></a>
 
 ## Update Incident
+
+**Component key:** `rootly.updateIncident`
 
 The Update Incident component updates an existing incident in Rootly.
 

@@ -1,0 +1,26 @@
+{
+  "type": "coolify.applications.listed",
+  "data": {
+    "count": 2,
+    "applications": [
+      {
+        "uuid": "abc123def456",
+        "name": "frontend",
+        "status": "running",
+        "fqdn": "https://app.example.com",
+        "description": "Marketing site",
+        "gitRepository": "https://github.com/example/frontend",
+        "gitBranch": "main"
+      },
+      {
+        "uuid": "def456abc789",
+        "name": "api",
+        "status": "exited",
+        "fqdn": "https://api.example.com",
+        "gitRepository": "https://github.com/example/api",
+        "gitBranch": "main"
+      }
+    ]
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

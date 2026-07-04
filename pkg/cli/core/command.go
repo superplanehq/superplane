@@ -29,8 +29,9 @@ type CommandContext struct {
  * and update the current configuration context.
  */
 type ConfigContext interface {
-	GetActiveCanvas() string
-	SetActiveCanvas(canvasID string) error
+	GetActiveApp() string
+	SetActiveApp(appID string) error
+	GetURL() string
 }
 
 // IsInteractive returns true when stdin is a terminal,

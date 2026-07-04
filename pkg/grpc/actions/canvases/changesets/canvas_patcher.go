@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -59,17 +58,17 @@ func (p *CanvasPatcher) GetVersion() *models.CanvasVersion {
 
 func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*models.CanvasVersion, error) {
 	v := &models.CanvasVersion{
-		ID:                      p.originalVersion.ID,
-		WorkflowID:              p.originalVersion.WorkflowID,
-		OwnerID:                 p.originalVersion.OwnerID,
-		State:                   p.originalVersion.State,
-		Name:                    p.originalVersion.Name,
-		Description:             p.originalVersion.Description,
-		ChangeManagementEnabled: p.originalVersion.ChangeManagementEnabled,
-		ChangeRequestApprovers:  datatypes.NewJSONSlice(p.originalVersion.EffectiveChangeRequestApprovers()),
-		PublishedAt:             p.originalVersion.PublishedAt,
-		CreatedAt:               p.originalVersion.CreatedAt,
-		UpdatedAt:               p.originalVersion.UpdatedAt,
+		ID:            p.originalVersion.ID,
+		WorkflowID:    p.originalVersion.WorkflowID,
+		OwnerID:       p.originalVersion.OwnerID,
+		State:         p.originalVersion.State,
+		PublishedAt:   p.originalVersion.PublishedAt,
+		ConsolePanels: p.originalVersion.ConsolePanels,
+		ConsoleLayout: p.originalVersion.ConsoleLayout,
+		GitBranch:     p.originalVersion.GitBranch,
+		DisplayName:   p.originalVersion.DisplayName,
+		CreatedAt:     p.originalVersion.CreatedAt,
+		UpdatedAt:     p.originalVersion.UpdatedAt,
 	}
 
 	nodeIDs := make([]string, 0, len(p.nodes))
@@ -108,7 +107,7 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 	return v, nil
 }
 
-func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset, autoLayout *pb.CanvasAutoLayout) error {
+func (p *CanvasPatcher) ApplyChangeset(changeset *CanvasChangeset, autoLayout *pb.CanvasAutoLayout) error {
 	if changeset == nil || len(changeset.Changes) == 0 {
 		return fmt.Errorf("changeset is required")
 	}
@@ -128,43 +127,43 @@ func (p *CanvasPatcher) ApplyChangeset(changeset *pb.CanvasChangeset, autoLayout
 	return CheckForCycles(p.finalVersion.Nodes, p.finalVersion.Edges)
 }
 
-func (p *CanvasPatcher) handleChange(change *pb.CanvasChangeset_Change) error {
+func (p *CanvasPatcher) handleChange(change *Change) error {
 	if change == nil {
 		return fmt.Errorf("change is required")
 	}
 
 	switch change.Type {
-	case pb.CanvasChangeset_Change_ADD_NODE:
+	case ChangeTypeAddNode:
 		return p.addNode(change)
-	case pb.CanvasChangeset_Change_DELETE_NODE:
+	case ChangeTypeDeleteNode:
 		return p.deleteNode(change)
-	case pb.CanvasChangeset_Change_UPDATE_NODE:
+	case ChangeTypeUpdateNode:
 		return p.updateNode(change)
-	case pb.CanvasChangeset_Change_ADD_EDGE:
+	case ChangeTypeAddEdge:
 		return p.addEdge(change)
-	case pb.CanvasChangeset_Change_DELETE_EDGE:
+	case ChangeTypeDeleteEdge:
 		return p.deleteEdge(change)
 	}
 
 	return fmt.Errorf("unknown change type: %s", change.Type)
 }
 
-func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
+func (p *CanvasPatcher) addNode(change *Change) error {
 	//
 	// These initial checks are hard checks.
 	// If they fail, we should return an error immediately.
 	//
-	node := change.GetNode()
+	node := change.Node
 	if node == nil {
 		return fmt.Errorf("node is required for %s", change.Type)
 	}
 
-	nodeID := node.GetId()
+	nodeID := node.ID
 	if nodeID == "" {
 		return fmt.Errorf("target node id is required for %s", change.Type)
 	}
 
-	if node.GetName() == "" {
+	if node.Name == "" {
 		return fmt.Errorf("target node name is required for %s", change.Type)
 	}
 
@@ -173,9 +172,11 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	}
 
 	newNode := models.Node{
-		ID:          nodeID,
-		Name:        node.GetName(),
-		IsCollapsed: node.GetIsCollapsed(),
+		ID:   nodeID,
+		Name: node.Name,
+	}
+	if node.IsCollapsed != nil {
+		newNode.IsCollapsed = *node.IsCollapsed
 	}
 
 	nodeType, nodeRef, err := p.findBlock(node)
@@ -186,9 +187,9 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	newNode.Type = nodeType
 	newNode.Ref = *nodeRef
 
-	if node.GetPosition() != nil {
-		newNode.Position.X = int(node.GetPosition().GetX())
-		newNode.Position.Y = int(node.GetPosition().GetY())
+	if node.Position != nil {
+		newNode.Position.X = int(node.Position.X)
+		newNode.Position.Y = int(node.Position.Y)
 	}
 
 	//
@@ -216,8 +217,8 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	}
 
 	var nodeConfiguration map[string]any
-	if node.GetConfiguration() != nil {
-		nodeConfiguration = node.GetConfiguration().AsMap()
+	if node.Configuration != nil {
+		nodeConfiguration = node.Configuration.AsMap()
 	}
 
 	err = configuration.ValidateConfiguration(schema, nodeConfiguration)
@@ -234,16 +235,16 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	return nil
 }
 
-func (p *CanvasPatcher) validateIntegration(node *pb.CanvasChangeset_Change_Node) (*string, error) {
-	if p.registry.IsCoreBlock(node.GetBlock()) {
+func (p *CanvasPatcher) validateIntegration(node *ChangeNode) (*string, error) {
+	if p.registry.IsCoreBlock(node.Block) {
 		return nil, nil
 	}
 
-	if node.GetIntegrationId() == "" {
-		return nil, fmt.Errorf("integration is required for %s", node.GetBlock())
+	if node.IntegrationID == "" {
+		return nil, fmt.Errorf("integration is required for %s", node.Block)
 	}
 
-	id := node.GetIntegrationId()
+	id := node.IntegrationID
 	integrationID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid integration id: %v", err)
@@ -254,20 +255,20 @@ func (p *CanvasPatcher) validateIntegration(node *pb.CanvasChangeset_Change_Node
 		return nil, fmt.Errorf("integration %s not found", id)
 	}
 
-	if !integration.HasCapabilityEnabled(node.GetBlock()) {
-		return nil, fmt.Errorf("%s is not enabled for integration %s", node.GetBlock(), integration.InstallationName)
+	if !integration.HasCapabilityEnabled(node.Block) {
+		return nil, fmt.Errorf("%s is not enabled for integration %s", node.Block, integration.InstallationName)
 	}
 
 	return &id, nil
 }
 
-func (p *CanvasPatcher) deleteNode(change *pb.CanvasChangeset_Change) error {
-	node := change.GetNode()
+func (p *CanvasPatcher) deleteNode(change *Change) error {
+	node := change.Node
 	if node == nil {
 		return fmt.Errorf("target is required for %s", change.Type)
 	}
 
-	nodeID := node.GetId()
+	nodeID := node.ID
 	if nodeID == "" {
 		return fmt.Errorf("target node id is required for %s", change.Type)
 	}
@@ -288,18 +289,18 @@ func (p *CanvasPatcher) deleteNode(change *pb.CanvasChangeset_Change) error {
 	return nil
 }
 
-func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
+func (p *CanvasPatcher) updateNode(change *Change) error {
 
 	//
 	// These initial checks are hard checks.
 	// If they fail, we should return an error immediately.
 	//
-	node := change.GetNode()
+	node := change.Node
 	if node == nil {
 		return fmt.Errorf("node is required for %s", change.Type)
 	}
 
-	nodeID := node.GetId()
+	nodeID := node.ID
 	if nodeID == "" {
 		return fmt.Errorf("node id is required for %s", change.Type)
 	}
@@ -309,17 +310,17 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 		return fmt.Errorf("node %s not found", nodeID)
 	}
 
-	if node.GetName() != "" {
-		currentNode.Name = node.GetName()
+	if node.Name != "" {
+		currentNode.Name = node.Name
 	}
 
-	if node.GetPosition() != nil {
-		currentNode.Position.X = int(node.GetPosition().GetX())
-		currentNode.Position.Y = int(node.GetPosition().GetY())
+	if node.Position != nil {
+		currentNode.Position.X = int(node.Position.X)
+		currentNode.Position.Y = int(node.Position.Y)
 	}
 
 	if node.IsCollapsed != nil {
-		currentNode.IsCollapsed = node.GetIsCollapsed()
+		currentNode.IsCollapsed = *node.IsCollapsed
 	}
 
 	//
@@ -329,26 +330,26 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 	// node will be in an error state.
 	//
 
-	if node.GetConfiguration() != nil {
+	if node.Configuration != nil {
 		schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = node.GetConfiguration().AsMap()
+			currentNode.Configuration = node.Configuration.AsMap()
 			p.nodes[nodeID] = currentNode
 			return nil
 		}
 
-		err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
+		err = configuration.ValidateConfiguration(schema, node.Configuration.AsMap())
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = node.GetConfiguration().AsMap()
+			currentNode.Configuration = node.Configuration.AsMap()
 			p.nodes[nodeID] = currentNode
 			return nil
 		}
 
-		currentNode.Configuration = node.GetConfiguration().AsMap()
+		currentNode.Configuration = node.Configuration.AsMap()
 		currentNode.ErrorMessage = nil
 	}
 
@@ -387,77 +388,77 @@ func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef 
 	}
 }
 
-func (p *CanvasPatcher) addEdge(change *pb.CanvasChangeset_Change) error {
-	edge := change.GetEdge()
+func (p *CanvasPatcher) addEdge(change *Change) error {
+	edge := change.Edge
 	if edge == nil {
 		return fmt.Errorf("edge is required for %s", change.Type)
 	}
 
-	if edge.GetSourceId() == "" {
+	if edge.SourceID == "" {
 		return fmt.Errorf("source id is required for %s", change.Type)
 	}
 
-	if edge.GetTargetId() == "" {
+	if edge.TargetID == "" {
 		return fmt.Errorf("target id is required for %s", change.Type)
 	}
 
-	if edge.GetChannel() == "" {
+	if edge.Channel == "" {
 		return fmt.Errorf("channel is required for %s", change.Type)
 	}
 
-	if edge.GetSourceId() == edge.GetTargetId() {
+	if edge.SourceID == edge.TargetID {
 		return fmt.Errorf("self-loop edges are not allowed")
 	}
 
-	if _, exists := p.nodes[edge.GetSourceId()]; !exists {
-		return fmt.Errorf("source node %s not found", edge.GetSourceId())
+	if _, exists := p.nodes[edge.SourceID]; !exists {
+		return fmt.Errorf("source node %s not found", edge.SourceID)
 	}
 
-	if _, exists := p.nodes[edge.GetTargetId()]; !exists {
-		return fmt.Errorf("target node %s not found", edge.GetTargetId())
+	if _, exists := p.nodes[edge.TargetID]; !exists {
+		return fmt.Errorf("target node %s not found", edge.TargetID)
 	}
 
 	if err := ValidateSourceNodeOutputChannel(
 		p.registry,
-		p.nodes[edge.GetSourceId()],
-		edge.GetChannel(),
+		p.nodes[edge.SourceID],
+		edge.Channel,
 	); err != nil {
 		return err
 	}
 
-	edgeKey := p.edgeKey(edge.GetSourceId(), edge.GetTargetId(), edge.GetChannel())
+	edgeKey := p.edgeKey(edge.SourceID, edge.TargetID, edge.Channel)
 	if _, exists := p.edges[edgeKey]; exists {
 		return nil
 	}
 
 	p.edges[edgeKey] = models.Edge{
-		SourceID: edge.GetSourceId(),
-		TargetID: edge.GetTargetId(),
-		Channel:  edge.GetChannel(),
+		SourceID: edge.SourceID,
+		TargetID: edge.TargetID,
+		Channel:  edge.Channel,
 	}
 
 	return nil
 }
 
-func (p *CanvasPatcher) deleteEdge(change *pb.CanvasChangeset_Change) error {
-	edge := change.GetEdge()
+func (p *CanvasPatcher) deleteEdge(change *Change) error {
+	edge := change.Edge
 	if edge == nil {
 		return fmt.Errorf("edge is required for %s", change.Type)
 	}
 
-	if edge.GetSourceId() == "" {
+	if edge.SourceID == "" {
 		return fmt.Errorf("source id is required for %s", change.Type)
 	}
 
-	if edge.GetTargetId() == "" {
+	if edge.TargetID == "" {
 		return fmt.Errorf("target id is required for %s", change.Type)
 	}
 
-	if edge.GetChannel() == "" {
+	if edge.Channel == "" {
 		return fmt.Errorf("channel is required for %s", change.Type)
 	}
 
-	edgeKey := p.edgeKey(edge.GetSourceId(), edge.GetTargetId(), edge.GetChannel())
+	edgeKey := p.edgeKey(edge.SourceID, edge.TargetID, edge.Channel)
 	if _, exists := p.edges[edgeKey]; !exists {
 		return nil
 	}
@@ -466,43 +467,43 @@ func (p *CanvasPatcher) deleteEdge(change *pb.CanvasChangeset_Change) error {
 	return nil
 }
 
-func (p *CanvasPatcher) findBlock(node *pb.CanvasChangeset_Change_Node) (string, *models.NodeRef, error) {
-	if node.GetBlock() == "" {
+func (p *CanvasPatcher) findBlock(node *ChangeNode) (string, *models.NodeRef, error) {
+	if node.Block == "" {
 		return "", nil, fmt.Errorf("block is required")
 	}
 
 	//
 	// Check if the block is an action
 	//
-	_, err := p.registry.GetAction(node.GetBlock())
+	_, err := p.registry.GetAction(node.Block)
 	if err == nil {
 		return models.NodeTypeComponent, &models.NodeRef{
-			Component: &models.ComponentRef{Name: node.GetBlock()},
+			Component: &models.ComponentRef{Name: node.Block},
 		}, nil
 	}
 
 	//
 	// Otherwise, check if the block is a trigger
 	//
-	_, err = p.registry.GetTrigger(node.GetBlock())
+	_, err = p.registry.GetTrigger(node.Block)
 	if err == nil {
 		return models.NodeTypeTrigger, &models.NodeRef{
-			Trigger: &models.TriggerRef{Name: node.GetBlock()},
+			Trigger: &models.TriggerRef{Name: node.Block},
 		}, nil
 	}
 
 	//
 	// Otherwise, check if the block is a widget
 	//
-	_, err = p.registry.GetWidget(node.GetBlock())
+	_, err = p.registry.GetWidget(node.Block)
 	if err == nil {
 		return models.NodeTypeWidget, &models.NodeRef{
-			Widget: &models.WidgetRef{Name: node.GetBlock()},
+			Widget: &models.WidgetRef{Name: node.Block},
 		}, nil
 	}
 
 	//
 	// If the block is not any of the above, return an error
 	//
-	return "", nil, fmt.Errorf("block %s not found in registry", node.GetBlock())
+	return "", nil, fmt.Errorf("block %s not found in registry", node.Block)
 }

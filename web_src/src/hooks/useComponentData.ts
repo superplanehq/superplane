@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { actionsListActions, actionsDescribeAction } from "../api-client/sdk.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
+import { useExperimentalFeature } from "./useExperimentalFeature";
+import { useExperimentalFeaturesRegistry } from "./useExperimentalFeatures";
 
 export const componentKeys = {
   all: ["components"] as const,
@@ -11,11 +13,25 @@ export const componentKeys = {
 };
 
 export const useComponents = (organizationId: string) => {
+  const { enabledExperimentalFeatures } = useExperimentalFeature(organizationId);
+  const { data: expRegistry } = useExperimentalFeaturesRegistry();
+  const experimentalFeatures =
+    expRegistry?.features.filter((feature) => !feature.released).map((feature) => feature.id) || [];
+
   return useQuery({
     queryKey: componentKeys.list(organizationId),
     queryFn: async () => {
       const response = await actionsListActions(withOrganizationHeader({}));
       return response.data?.actions || [];
+    },
+    select: (data) => {
+      return (data || []).filter((action) => {
+        const featureID = action.name || "";
+        const isExperimental = experimentalFeatures.includes(featureID);
+        const isEnabled = enabledExperimentalFeatures.includes(featureID);
+
+        return !isExperimental || isEnabled;
+      });
     },
     enabled: !!organizationId,
   });

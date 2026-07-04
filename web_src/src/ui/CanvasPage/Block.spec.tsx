@@ -276,4 +276,87 @@ describe("Block fallback rendering", () => {
 
     expect(onAppendFromNode).toHaveBeenCalledWith("router-node", "failure");
   });
+
+  it("keeps node body content visible and fades opacity during edge-hover dimming", () => {
+    const { container } = render(
+      <Block
+        canvasMode="edit"
+        data={{
+          label: "Dimmed Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          _hasHighlightedNodes: true,
+          _isHighlighted: false,
+          component: {
+            title: "Dimmed Component",
+            iconSlug: "box",
+            collapsed: false,
+            includeEmptyState: true,
+            emptyStateProps: {
+              title: "Waiting for the first run",
+              purpose: "runtime",
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Ready to run...")).toBeInTheDocument();
+    expect(container.firstChild).toHaveClass("opacity-30");
+  });
+
+  it("blanks node body content only for runs-style participant dimming", () => {
+    const { container } = render(
+      <Block
+        canvasMode="edit"
+        data={{
+          label: "Run Context Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          _hasHighlightedNodes: true,
+          _isHighlighted: false,
+          _dimBodyBelowHeader: true,
+          component: {
+            title: "Run Context Component",
+            iconSlug: "box",
+            collapsed: false,
+            includeEmptyState: true,
+            emptyStateProps: {
+              title: "Waiting for the first run",
+              purpose: "runtime",
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("Ready to run...")).not.toBeInTheDocument();
+    expect(container.firstChild).not.toHaveClass("opacity-30");
+  });
+
+  it("keeps note content visible during runs-style participant dimming", () => {
+    const { container } = render(
+      <Block
+        canvasMode="live"
+        data={{
+          label: "Run Context Note",
+          state: "pending",
+          type: "annotation",
+          _hasHighlightedNodes: true,
+          _isHighlighted: false,
+          _dimBodyBelowHeader: true,
+          annotation: {
+            title: "Run Context Note",
+            annotationText: "Important context for this workflow",
+            annotationColor: "yellow",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Important context for this workflow")).toBeInTheDocument();
+    expect(container.firstChild).not.toHaveClass("opacity-30");
+  });
 });

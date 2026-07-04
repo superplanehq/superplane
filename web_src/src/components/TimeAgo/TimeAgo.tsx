@@ -21,21 +21,26 @@ function stopGlobalTimer() {
 interface TimeAgoProps {
   date: Date | string;
   className?: string;
+  includeAgo?: boolean;
 }
 
-export const TimeAgo = React.memo(function TimeAgo({ date, className }: TimeAgoProps) {
+/**
+ * @deprecated Use `Timestamp` from `@/components/Timestamp` so users get the
+ * standardized hover details and copy affordance from issue #5150.
+ */
+export const TimeAgo = React.memo(function TimeAgo({ date, className, includeAgo = true }: TimeAgoProps) {
   const d = typeof date === "string" ? new Date(date) : date;
   const dateMs = d.getTime();
-  const [text, setText] = useState(() => formatTimeAgo(new Date(dateMs)));
+  const [text, setText] = useState(() => formatTimeAgo(new Date(dateMs), includeAgo));
   const lastTextRef = useRef(text);
 
   const update = useCallback(() => {
-    const newText = formatTimeAgo(new Date(dateMs));
+    const newText = formatTimeAgo(new Date(dateMs), includeAgo);
     if (newText !== lastTextRef.current) {
       lastTextRef.current = newText;
       setText(newText);
     }
-  }, [dateMs]);
+  }, [dateMs, includeAgo]);
 
   useEffect(() => {
     update();

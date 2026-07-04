@@ -284,6 +284,24 @@ func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	return nil
 }
 
+func (c *ExecutionStateContext) EmitAndContinue(channel, payloadType string, payloads []any) error {
+	c.Finished = false
+	c.Passed = true
+	c.Channel = channel
+	c.Type = payloadType
+
+	wrappedPayloads := make([]any, 0, len(payloads))
+	for _, payload := range payloads {
+		wrappedPayloads = append(wrappedPayloads, map[string]any{
+			"type":      payloadType,
+			"timestamp": time.Now(),
+			"data":      payload,
+		})
+	}
+	c.Payloads = wrappedPayloads
+	return nil
+}
+
 func (c *ExecutionStateContext) Fail(reason, message string) error {
 	c.Finished = true
 	c.Passed = false
@@ -293,8 +311,22 @@ func (c *ExecutionStateContext) Fail(reason, message string) error {
 }
 
 func (c *ExecutionStateContext) SetKV(key, value string) error {
+	if c.KVs == nil {
+		c.KVs = map[string]string{}
+	}
 	c.KVs[key] = value
 	return nil
+}
+
+func (c *ExecutionStateContext) GetKV(key string) (string, error) {
+	if c.KVs == nil {
+		return "", core.ErrExecutionKVNotFound
+	}
+	v, ok := c.KVs[key]
+	if !ok {
+		return "", core.ErrExecutionKVNotFound
+	}
+	return v, nil
 }
 
 type AuthContext struct {
@@ -406,33 +438,26 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 }
 
 type ExpressionContext struct {
-	Output any
-	Error  error
+	Output                any
+	Error                 error
+	WithVariablesOutputs  map[string]any
+	WithVariablesOutputFn func(expression string, variables map[string]any) (any, error)
 }
 
 func (c *ExpressionContext) Run(expression string) (any, error) {
 	return c.Output, c.Error
 }
 
-type Notification struct {
-	Title     string
-	Body      string
-	URL       string
-	URLLabel  string
-	Receivers core.NotificationReceivers
-}
-
-type NotificationContext struct {
-	Messages []Notification
-}
-
-func (c *NotificationContext) IsAvailable() bool {
-	return true
-}
-
-func (c *NotificationContext) Send(title, body, url, urlLabel string, receivers core.NotificationReceivers) error {
-	c.Messages = append(c.Messages, Notification{Title: title, Body: body, URL: url, URLLabel: urlLabel, Receivers: receivers})
-	return nil
+func (c *ExpressionContext) RunWithExtraVariables(expression string, variables map[string]any) (any, error) {
+	if c.WithVariablesOutputFn != nil {
+		return c.WithVariablesOutputFn(expression, variables)
+	}
+	if c.WithVariablesOutputs != nil {
+		if v, ok := c.WithVariablesOutputs[expression]; ok {
+			return v, nil
+		}
+	}
+	return c.Output, c.Error
 }
 
 type IntegrationSecretStorage struct {

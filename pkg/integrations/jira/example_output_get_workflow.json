@@ -1,0 +1,46 @@
+{
+  "type": "jira.workflow",
+  "timestamp": "2026-01-19T12:00:00Z",
+  "data": {
+    "issueKey": "PROJ-123",
+    "issueType": "Task",
+    "projectKey": "PROJ",
+    "workflowName": "Software Simplified Workflow",
+    "workflowSchemeId": "101010",
+    "workflowSchemeName": "Default workflow scheme",
+    "currentStatus": "In Progress",
+    "currentStatusId": "10002",
+    "statuses": [
+      {
+        "id": "10001",
+        "name": "To Do",
+        "category": "TODO"
+      },
+      {
+        "id": "10002",
+        "name": "In Progress",
+        "category": "IN_PROGRESS",
+        "isCurrent": true
+      },
+      {
+        "id": "10003",
+        "name": "Done",
+        "category": "DONE"
+      }
+    ],
+    "availableTransitions": [
+      {
+        "id": "21",
+        "name": "Stop progress",
+        "toStatusId": "10001",
+        "toStatus": "To Do"
+      },
+      {
+        "id": "31",
+        "name": "Resolve",
+        "toStatusId": "10003",
+        "toStatus": "Done"
+      }
+    ]
+  }
+}

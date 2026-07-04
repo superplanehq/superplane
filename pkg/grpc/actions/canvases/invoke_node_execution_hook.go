@@ -12,13 +12,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func InvokeNodeExecutionHook(
@@ -34,7 +33,7 @@ func InvokeNodeExecutionHook(
 ) (*pb.InvokeNodeExecutionHookResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	canvas, err := models.FindCanvas(orgID, canvasID)
@@ -52,12 +51,8 @@ func InvokeNodeExecutionHook(
 		return nil, fmt.Errorf("node not found: %w", err)
 	}
 
-	//
-	// TODO
-	// Blueprint nodes don't expose actions for now.
-	//
-	if node.Ref.Data().Component == nil {
-		return nil, fmt.Errorf("node is not a component node")
+	if node.Type != models.NodeTypeComponent || node.Ref.Data().Component == nil {
+		return nil, grpcerrors.InvalidArgument(nil, "node is not a component node")
 	}
 
 	hookProvider, hookDef, err := registry.FindActionHook(node.Ref.Data().Component.Name, hookName)
@@ -84,7 +79,7 @@ func InvokeNodeExecutionHook(
 	}
 
 	tx := database.Conn()
-	logger := logging.ForExecution(execution, nil)
+	logger := logging.ForExecution(execution)
 	actionCtx := core.ActionHookContext{
 		Name:           hookName,
 		Parameters:     parameters,
@@ -94,14 +89,13 @@ func InvokeNodeExecutionHook(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Auth:           contexts.NewAuthReader(tx, orgID, authService, user),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Notifications:  contexts.NewNotificationContext(tx, orgID, canvas.ID),
 	}
 
 	if node.AppInstallationID != nil {
 		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
 			logger.Errorf("error finding app installation: %v", err)
-			return nil, status.Error(codes.Internal, "error building context")
+			return nil, grpcerrors.Internal(err, "error building context")
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
@@ -111,17 +105,17 @@ func InvokeNodeExecutionHook(
 	actionCtx.Logger = logger
 	err = hookProvider.HandleHook(actionCtx)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "action execution failed")
 	}
 
-	messages.NewCanvasExecutionMessage(
-		execution.WorkflowID.String(),
-		execution.ID.String(),
-		execution.NodeID,
-	).Publish()
+	if err := messages.PublishCanvasExecutionByID(execution.WorkflowID, execution.ID); err != nil {
+		logger.Errorf("failed to publish execution state RabbitMQ message: %v", err)
+	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			logger.Errorf("failed to publish canvas event created RabbitMQ message: %v", err)
+		}
 	}
 
 	return &pb.InvokeNodeExecutionHookResponse{}, nil

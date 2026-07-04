@@ -123,6 +123,46 @@ func Test__CapabilityMapper__NewPermissionSet(t *testing.T) {
 		ps := m.NewPermissionSet([]string{"github.doesNotExist"})
 		assert.True(t, ps.IsEmpty())
 	})
+
+	t.Run("deployment actions request deployments write permission", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.createDeployment", "github.createDeploymentStatus"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "write", got["deployments"])
+	})
+
+	t.Run("status trigger requests statuses read permission", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.onCommitStatus"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "read", got["statuses"])
+	})
+
+	t.Run("combined status action requests statuses read permission", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.getCombinedCommitStatus"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "read", got["statuses"])
+	})
+
+	t.Run("check run trigger requests checks read permission", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.onCheckRun", "github.listCheckRunsForRef"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "read", got["checks"])
+	})
+
+	t.Run("merge pull request action requests pull request write permission", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.mergePullRequest"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "write", got["pull_requests"])
+	})
 }
 
 func Test__PermissionSet__IsEmpty(t *testing.T) {
@@ -171,6 +211,7 @@ func Test__PermissionSet__ForAppManifest(t *testing.T) {
 			PermissionPullRequests:   1,
 			PermissionContents:       0,
 			PermissionActions:        1,
+			PermissionChecks:         0,
 			PermissionCommitStatuses: 0,
 			PermissionMetadata:       1,
 		},
@@ -185,6 +226,7 @@ func Test__PermissionSet__ForAppManifest(t *testing.T) {
 	assert.Equal(t, "write", got["pull_requests"])
 	assert.Equal(t, "read", got["contents"])
 	assert.Equal(t, "write", got["actions"])
+	assert.Equal(t, "read", got["checks"])
 	assert.Equal(t, "read", got["statuses"])
 	assert.Equal(t, "write", got["metadata"])
 	assert.Equal(t, "read", got["organization_administration"])

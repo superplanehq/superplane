@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
@@ -16,9 +18,8 @@ import (
 )
 
 func TestInvitations(t *testing.T) {
-	steps := &invitationSteps{t: t}
-
 	t.Run("accepting invite link assigns viewer role", func(t *testing.T) {
+		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
 		invitee := steps.createInviteeAccount()
@@ -28,6 +29,7 @@ func TestInvitations(t *testing.T) {
 	})
 
 	t.Run("following invite link and creating password account", func(t *testing.T) {
+		steps := &invitationSteps{t: t}
 		steps.startLoggedOut()
 		token := steps.createInviteLink()
 
@@ -46,6 +48,7 @@ func TestInvitations(t *testing.T) {
 	})
 
 	t.Run("disabled invite link no longer works", func(t *testing.T) {
+		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
 		steps.disableInviteLink(token)
@@ -54,6 +57,7 @@ func TestInvitations(t *testing.T) {
 	})
 
 	t.Run("viewer sees invite link access message", func(t *testing.T) {
+		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
 		invitee := steps.createInviteeAccount()
@@ -81,7 +85,7 @@ func (s *invitationSteps) startLoggedOut() {
 }
 
 func (s *invitationSteps) createInviteLink() string {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(s.session.OrgID.String())
+	inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(s.t.Context()), s.session.OrgID.String())
 	if err == nil {
 		return inviteLink.Token.String()
 	}
@@ -89,7 +93,7 @@ func (s *invitationSteps) createInviteLink() string {
 		require.NoError(s.t, err)
 	}
 
-	inviteLink, err = models.CreateInviteLink(s.session.OrgID)
+	inviteLink, err = models.CreateInviteLink(database.DB(s.t.Context()), s.session.OrgID)
 	require.NoError(s.t, err)
 	return inviteLink.Token.String()
 }
@@ -162,10 +166,11 @@ func (s *invitationSteps) submitSignup() {
 }
 
 func (s *invitationSteps) disableInviteLink(token string) {
-	inviteLink, err := models.FindInviteLinkByToken(token)
+	tx := database.DB(s.t.Context())
+	inviteLink, err := models.FindInviteLinkByToken(tx, token)
 	require.NoError(s.t, err)
 	inviteLink.Enabled = false
-	require.NoError(s.t, models.SaveInviteLink(inviteLink))
+	require.NoError(s.t, models.SaveInviteLink(tx, inviteLink))
 }
 
 func (s *invitationSteps) assertInviteLinkDisabled() {
@@ -188,7 +193,7 @@ func (s *invitationSteps) assertInviteeViewerRole(email string) {
 	authService, err := authorization.NewAuthService()
 	require.NoError(s.t, err)
 
-	roles, err := authService.GetUserRolesForOrg(user.ID.String(), s.session.OrgID.String())
+	roles, err := authService.GetUserRolesForOrg(context.Background(), user.ID.String(), s.session.OrgID.String())
 	require.NoError(s.t, err)
 	require.NotEmpty(s.t, roles)
 

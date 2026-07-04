@@ -20,7 +20,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/actions"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/admin"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/checks"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/contents"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/deployments"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/issues"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/metadata"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
@@ -56,6 +58,8 @@ var defaultGitHubAppEvents = []string{
 	"pull_request_review_comment",
 	"push",
 	"release",
+	"status",
+	"check_run",
 	"workflow_run",
 }
 
@@ -107,6 +111,7 @@ func (g *GitHub) Configuration() []configuration.Field {
 func (g *GitHub) Actions() []core.Action {
 	return []core.Action{
 		&admin.GetWorkflowUsage{},
+		&checks.ListCheckRunsForRef{},
 		&actions.RunWorkflow{},
 		&contents.CreateRelease{},
 		&contents.GetRelease{},
@@ -116,6 +121,7 @@ func (g *GitHub) Actions() []core.Action {
 		&issues.AddIssueLabel{},
 		&issues.CreateIssue{},
 		&issues.CreateIssueComment{},
+		&issues.UpdateIssueComment{},
 		&issues.GetIssue{},
 		&issues.RemoveIssueLabel{},
 		&issues.RemoveIssueAssignee{},
@@ -123,8 +129,13 @@ func (g *GitHub) Actions() []core.Action {
 		&metadata.GetRepositoryPermission{},
 		&pulls.CreateReview{},
 		&pulls.CreatePullRequest{},
+		&pulls.MergePullRequest{},
+		&pulls.AddPullRequestReviewers{},
 		&pulls.AddReaction{},
+		&statuses.GetCombinedCommitStatus{},
 		&statuses.PublishCommitStatus{},
+		&deployments.CreateDeployment{},
+		&deployments.CreateDeploymentStatus{},
 	}
 }
 
@@ -140,6 +151,8 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&pulls.OnPullRequest{},
 		&pulls.OnPRComment{},
 		&pulls.OnPRReviewComment{},
+		&checks.OnCheckRun{},
+		&statuses.OnCommitStatus{},
 	}
 }
 
@@ -874,10 +887,12 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",
+			"checks":                      "read",
 			"contents":                    "write",
 			"pull_requests":               "write",
 			"repository_hooks":            "write",
 			"statuses":                    "write",
+			"deployments":                 "write",
 			"organization_administration": "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),

@@ -438,6 +438,46 @@ func TestHTTP__Execute__GET(t *testing.T) {
 	assert.Equal(t, "world", body["hello"])
 }
 
+func TestHTTP__Execute__HEAD(t *testing.T) {
+	h := &HTTP{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "HEAD", r.Method)
+		assert.Equal(t, "/health", r.URL.Path)
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.Empty(t, body)
+
+		w.Header().Set("X-Custom", "ok")
+		w.Header().Set("Content-Length", "42")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ctx, stateCtx, _ := createExecutionContext(map[string]any{
+		"method": "HEAD",
+		"url":    server.URL + "/health",
+	})
+
+	err := h.Execute(ctx)
+	require.NoError(t, err)
+
+	assert.True(t, stateCtx.Passed)
+	assert.True(t, stateCtx.Finished)
+	assert.Equal(t, SuccessOutputChannel, stateCtx.Channel)
+	assert.Equal(t, "http.request.finished", stateCtx.Type)
+
+	response := responsePayload(t, stateCtx)
+	assert.Equal(t, http.StatusOK, response["status"])
+	assert.Nil(t, response["body"])
+
+	headers, ok := response["headers"].(http.Header)
+	require.True(t, ok)
+	assert.Equal(t, "ok", headers.Get("X-Custom"))
+	assert.Equal(t, "42", headers.Get("Content-Length"))
+}
+
 func TestHTTP__Execute__SetsAuthorizationFromSecret(t *testing.T) {
 	h := &HTTP{}
 	var gotAuth string

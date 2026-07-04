@@ -40,6 +40,20 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
 
+	t.Run("can skip SMTP after opening SMTP configuration", func(t *testing.T) {
+		steps := &ownerSetupSteps{t: t}
+		steps.start()
+		steps.visitRootPage()
+		steps.assertRedirectedToSetup()
+		steps.visitSetupPage()
+		steps.fillInOwnerDetails("smtp-skip@example.com", "SMTP", "Skip", "Password1")
+		steps.chooseSMTPSetup()
+		steps.finishOwnerSetupWithoutSMTPFromSMTPConfig()
+		steps.assertOwnerAndOrganizationCreated()
+		steps.assertRedirectedToOrganizationHome()
+		steps.assertOwnerSetupIsNoLongerRequired()
+	})
+
 	t.Run("can enable private network access during owner setup", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
@@ -147,6 +161,11 @@ func (s *ownerSetupSteps) chooseSMTPSetup() {
 	s.session.Click(q.Text("Set up SMTP"))
 }
 
+func (s *ownerSetupSteps) finishOwnerSetupWithoutSMTPFromSMTPConfig() {
+	s.session.Click(q.Text("Do this later"))
+	s.waitForSetupToComplete()
+}
+
 func (s *ownerSetupSteps) enablePrivateNetworkAccess() {
 	s.session.Click(q.TestID("owner-setup-private-network-switch"))
 }
@@ -166,7 +185,7 @@ func (s *ownerSetupSteps) fillInSMTPDetails(host, port, username, password, from
 	s.session.FillIn(q.Locator(`input[placeholder="noreply@example.com"]`), fromEmail)
 
 	if !useTLS {
-		s.session.Click(q.Locator(`input[type="checkbox"]`))
+		s.session.Click(q.Locator(`#owner-setup-smtp-use-tls`))
 	}
 }
 
@@ -225,7 +244,7 @@ func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {
 }
 
 func (s *ownerSetupSteps) assertPrivateNetworkAccessEnabled() {
-	metadata, err := models.GetInstallationMetadata()
+	metadata, err := models.GetInstallationMetadata(database.Conn())
 	assert.NoError(s.t, err, "load installation metadata")
 	assert.True(s.t, metadata.AllowPrivateNetworkAccess, "expected private network access to be enabled")
 }

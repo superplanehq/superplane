@@ -30,19 +30,10 @@ generate_proto_definition() {
 
 generate_proto_files() {
   rm -rf "$INTERNAL_OUT"
-  echo "$(bold "Generating proto files")"
   for MODULE in ${MODULES[@]};
   do
     generate_proto_definition $MODULE $PROTO_DIR/$MODULE.proto
   done
-
-  echo "Files generated in $INTERNAL_OUT"
-}
-
-bold() {
-  bold_text=$(tput bold)
-  normal_text=$(tput sgr0)
-  echo -n "${bold_text}$@${normal_text}"
 }
 
 generate_proto_files

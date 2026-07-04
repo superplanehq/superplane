@@ -1,15 +1,17 @@
 import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { Bot, Copy, ArrowLeft } from "lucide-react";
+import { Bot, ArrowLeft } from "lucide-react";
+import { CopyButton } from "@/ui/CopyButton";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -36,6 +38,8 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
   const updateMutation = useUpdateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
   const regenerateTokenMutation = useRegenerateServiceAccountToken(organizationId);
+
+  useReportPageReady(!isLoading && !permissionsLoading && !!id);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
@@ -94,16 +98,6 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
       }
     } catch (error) {
       showErrorToast(`Failed to regenerate token: ${getApiErrorMessage(error)}`);
-    }
-  };
-
-  const handleCopyToken = async () => {
-    if (!newToken) return;
-    try {
-      await navigator.clipboard.writeText(newToken);
-      showSuccessToast("Token copied to clipboard");
-    } catch {
-      showErrorToast("Failed to copy token");
     }
   };
 
@@ -302,9 +296,14 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                   className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-800"
                   data-testid="sa-token-display"
                 />
-                <Button variant="outline" onClick={handleCopyToken} data-testid="sa-token-copy">
-                  <Copy className="w-4 h-4" />
-                </Button>
+                <CopyButton
+                  variant="button"
+                  text={newToken}
+                  data-testid="sa-token-copy"
+                  onCopyError={() => showErrorToast("Failed to copy token")}
+                >
+                  Copy
+                </CopyButton>
               </div>
 
               <div className="flex justify-start mt-6">

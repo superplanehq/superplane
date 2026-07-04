@@ -59,7 +59,7 @@ func (s *settingsAutoSaveSteps) givenACanvasExists(canvasName string) {
 
 func (s *settingsAutoSaveSteps) addFilterNode(name string) {
 	s.canvas.AddFilter(name, models.Position{X: 500, Y: 250})
-	s.nodeID = s.waitForSingleNodeID()
+	s.nodeID = s.waitForNodeID(name)
 }
 
 func (s *settingsAutoSaveSteps) clearExpressionField() {
@@ -140,20 +140,17 @@ func (s *settingsAutoSaveSteps) assertExpressionInputEquals(expected string) {
 	require.Equal(s.t, expected, value)
 }
 
-func (s *settingsAutoSaveSteps) waitForSingleNodeID() string {
+func (s *settingsAutoSaveSteps) waitForNodeID(nodeName string) string {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		draft := s.canvas.FindCurrentDraft()
-		if draft != nil && len(draft.Nodes) == 1 {
-			return draft.Nodes[0].ID
+		if node, ok := s.canvas.DraftNodeByName(nodeName); ok {
+			return node.ID
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	draft := s.canvas.FindCurrentDraft()
-	require.NotNil(s.t, draft, "no draft version found")
-	require.Len(s.t, draft.Nodes, 1, "expected exactly one node in draft version after adding filter")
-	return draft.Nodes[0].ID
+	require.Failf(s.t, "node not found", "expected node %q in draft version after adding filter", nodeName)
+	return ""
 }
 
 func (s *settingsAutoSaveSteps) getExpressionField() (any, bool, bool) {
@@ -161,12 +158,8 @@ func (s *settingsAutoSaveSteps) getExpressionField() (any, bool, bool) {
 		return nil, false, false
 	}
 
-	draft := s.canvas.FindCurrentDraft()
-	if draft == nil {
-		return nil, false, false
-	}
-
-	for _, node := range draft.Nodes {
+	nodes, _ := s.canvas.DraftEffectiveSpec()
+	for _, node := range nodes {
 		if node.ID == s.nodeID {
 			val, exists := node.Configuration["expression"]
 			return val, exists, true

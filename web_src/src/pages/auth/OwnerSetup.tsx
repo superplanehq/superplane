@@ -1,12 +1,11 @@
 import React, { useState } from "react";
-import { Input, InputGroup } from "../../components/Input/input";
-import { Label } from "@/components/ui/label";
-import { Text } from "../../components/Text/text";
-import { Button } from "../../components/ui/button";
-import { Switch } from "@/ui/switch";
-import superplaneLogo from "../../assets/superplane.svg";
 import { posthog, isPostHogEnabled } from "@/posthog";
-import OwnerSetupSurvey, { type PostHogSurvey } from "./OwnerSetupSurvey";
+import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
+import { OwnerStep } from "./ownerSetup/OwnerStep";
+import { PrivateNetworkStep } from "./ownerSetup/PrivateNetworkStep";
+import { SmtpPromptStep } from "./ownerSetup/SmtpPromptStep";
+import { SmtpConfigStep } from "./ownerSetup/SmtpConfigStep";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
 
@@ -30,6 +29,8 @@ const OwnerSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useReportPageReady(true);
 
   const isEmailValid = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -191,12 +192,33 @@ const OwnerSetup: React.FC = () => {
     setStep("smtpPrompt");
   };
 
+  const handlePrivateNetworkBack = () => {
+    setError(null);
+    setFieldErrors({});
+    setStep("owner");
+  };
+
   const handleSkipSMTP = () => {
+    setFieldErrors({});
     submitSetup(false);
   };
 
   const handleEnableSMTP = () => {
+    setError(null);
+    setFieldErrors({});
     setStep("smtpConfig");
+  };
+
+  const handleSMTPPromptBack = () => {
+    setError(null);
+    setFieldErrors({});
+    setStep("privateNetwork");
+  };
+
+  const handleSMTPConfigBack = () => {
+    setError(null);
+    setFieldErrors({});
+    setStep("smtpPrompt");
   };
 
   const handleSubmitSMTP = (e: React.FormEvent) => {
@@ -212,311 +234,72 @@ const OwnerSetup: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4 py-8">
       <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-lg outline outline-gray-950/10 shadow-sm p-8">
         {step === "owner" && (
-          <div className="text-center mb-8">
-            <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
-            <h4 className="text-xl font-medium text-gray-800 dark:text-white mb-1">Set up owner account</h4>
-            <Text className="text-gray-800 dark:text-gray-300">Create an account for this SuperPlane instance.</Text>
-          </div>
-        )}
-
-        {step === "owner" && (
-          <form onSubmit={handleOwnerNext} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <Label className="block text-left mb-2">
-                  First Name <span className="text-gray-800">*</span>
-                </Label>
-                <InputGroup>
-                  <Input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="First name"
-                    className={fieldErrors.firstName ? "border-red-500" : ""}
-                  />
-                </InputGroup>
-                {fieldErrors.firstName && (
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.firstName}</p>
-                )}
-              </div>
-
-              <div>
-                <Label className="block text-left mb-2">
-                  Last Name <span className="text-gray-800">*</span>
-                </Label>
-                <InputGroup>
-                  <Input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Last name"
-                    className={fieldErrors.lastName ? "border-red-500" : ""}
-                  />
-                </InputGroup>
-                {fieldErrors.lastName && (
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.lastName}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <Label className="block text-left mb-2">
-                Email <span className="text-gray-800">*</span>
-              </Label>
-              <InputGroup>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className={fieldErrors.email ? "border-red-500" : ""}
-                />
-              </InputGroup>
-              {fieldErrors.email && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>}
-            </div>
-
-            <div>
-              <Label className="block text-left mb-2">
-                Password <span className="text-gray-800">*</span>
-              </Label>
-              <InputGroup>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                  className={fieldErrors.password ? "border-red-500 ph-no-capture" : "ph-no-capture"}
-                />
-              </InputGroup>
-              {fieldErrors.password ? (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>
-              ) : (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  8+ characters, at least 1 number and 1 capital letter
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label className="block text-left mb-2">
-                Confirm Password <span className="text-gray-800">*</span>
-              </Label>
-              <InputGroup>
-                <Input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm password"
-                  className={fieldErrors.confirmPassword ? "border-red-500 ph-no-capture" : "ph-no-capture"}
-                />
-              </InputGroup>
-              {fieldErrors.confirmPassword && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>
-              )}
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Saving..." : "Next"}
-            </Button>
-          </form>
+          <OwnerStep
+            email={email}
+            firstName={firstName}
+            lastName={lastName}
+            password={password}
+            confirmPassword={confirmPassword}
+            loading={loading}
+            error={error}
+            fieldErrors={fieldErrors}
+            onEmailChange={setEmail}
+            onFirstNameChange={setFirstName}
+            onLastNameChange={setLastName}
+            onPasswordChange={setPassword}
+            onConfirmPasswordChange={setConfirmPassword}
+            onNext={handleOwnerNext}
+          />
         )}
 
         {step === "privateNetwork" && (
-          <div className="space-y-6">
-            {error && (
-              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
-              </div>
-            )}
-
-            <div className="text-left">
-              <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Private network access</h4>
-              <Text className="text-gray-800 dark:text-gray-300">
-                Decide whether this SuperPlane instance should be allowed to reach internal services before continuing
-                to email setup.
-              </Text>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-left">
-              <div className="flex items-start justify-between gap-6">
-                <div className="max-w-xs">
-                  <Label className="mb-1 block text-sm font-medium text-gray-800">Allow private network targets</Label>
-                  <Text className="text-sm text-gray-600">
-                    Enable this if SuperPlane needs to reach tools inside your VPC, private Kubernetes cluster, or
-                    another closed network. This reduces SSRF protection for private addresses.
-                  </Text>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500">{allowPrivateNetworkAccess ? "Enabled" : "Disabled"}</span>
-                  <Switch
-                    data-testid="owner-setup-private-network-switch"
-                    checked={allowPrivateNetworkAccess}
-                    onCheckedChange={setAllowPrivateNetworkAccess}
-                    aria-label="Allow connections to private network tools"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Button type="button" className="w-full" disabled={loading} onClick={handlePrivateNetworkNext}>
-              Next
-            </Button>
-          </div>
+          <PrivateNetworkStep
+            allowPrivateNetworkAccess={allowPrivateNetworkAccess}
+            loading={loading}
+            error={error}
+            onAllowPrivateNetworkAccessChange={setAllowPrivateNetworkAccess}
+            onBack={handlePrivateNetworkBack}
+            onNext={handlePrivateNetworkNext}
+          />
         )}
 
         {step === "smtpPrompt" && (
-          <div className="space-y-6">
-            {error && (
-              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
-              </div>
-            )}
-
-            <div className="text-left">
-              <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Set up email delivery?</h4>
-              <Text className="text-gray-800 dark:text-gray-300">
-                Configure SMTP now to receive notifications. You can skip and set it up later.
-              </Text>
-            </div>
-
-            <div className="flex gap-3">
-              <Button type="button" disabled={loading} onClick={handleEnableSMTP}>
-                Set up SMTP
-              </Button>
-              <Button type="button" variant="outline" disabled={loading} onClick={handleSkipSMTP}>
-                Do this later
-              </Button>
-            </div>
-          </div>
+          <SmtpPromptStep
+            loading={loading}
+            error={error}
+            onBack={handleSMTPPromptBack}
+            onEnableSMTP={handleEnableSMTP}
+            onSkipSMTP={handleSkipSMTP}
+          />
         )}
 
         {step === "survey" && activeSurvey && pendingOrganizationId && (
-          <OwnerSetupSurvey survey={activeSurvey} organizationId={pendingOrganizationId} />
+          <PostHogSurveyForm survey={activeSurvey} redirectTo={`/${pendingOrganizationId}`} />
         )}
 
         {step === "smtpConfig" && (
-          <form onSubmit={handleSubmitSMTP} className="space-y-6">
-            {error && (
-              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
-              </div>
-            )}
-
-            <div className="text-left">
-              <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-2">SMTP configuration</h4>
-              <Text className="text-gray-800 dark:text-gray-300">Configure email delivery for this instance.</Text>
-            </div>
-
-            <div>
-              <Label className="block text-left mb-2">
-                SMTP Host <span className="text-gray-800">*</span>
-              </Label>
-              <InputGroup>
-                <Input
-                  type="text"
-                  value={smtpHost}
-                  onChange={(e) => setSmtpHost(e.target.value)}
-                  placeholder="smtp.example.com"
-                  className={fieldErrors.smtpHost ? "border-red-500" : ""}
-                />
-              </InputGroup>
-              {fieldErrors.smtpHost && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.smtpHost}</p>
-              )}
-            </div>
-
-            <div>
-              <Label className="block text-left mb-2">
-                SMTP Port <span className="text-gray-800">*</span>
-              </Label>
-              <InputGroup>
-                <Input
-                  type="text"
-                  value={smtpPort}
-                  onChange={(e) => setSmtpPort(e.target.value)}
-                  placeholder="587"
-                  className={fieldErrors.smtpPort ? "border-red-500" : ""}
-                />
-              </InputGroup>
-              {fieldErrors.smtpPort && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.smtpPort}</p>
-              )}
-            </div>
-
-            <div>
-              <Label className="block text-left mb-2">SMTP Username</Label>
-              <InputGroup>
-                <Input
-                  type="text"
-                  value={smtpUsername}
-                  onChange={(e) => setSmtpUsername(e.target.value)}
-                  placeholder="smtp-user"
-                />
-              </InputGroup>
-            </div>
-
-            <div>
-              <Label className="block text-left mb-2">SMTP Password</Label>
-              <InputGroup>
-                <Input
-                  type="password"
-                  value={smtpPassword}
-                  onChange={(e) => setSmtpPassword(e.target.value)}
-                  placeholder="SMTP password"
-                  className={fieldErrors.smtpPassword ? "border-red-500 ph-no-capture" : "ph-no-capture"}
-                />
-              </InputGroup>
-              {fieldErrors.smtpPassword && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.smtpPassword}</p>
-              )}
-            </div>
-
-            <div>
-              <Label className="block text-left mb-2">From Name</Label>
-              <InputGroup>
-                <Input
-                  type="text"
-                  value={smtpFromName}
-                  onChange={(e) => setSmtpFromName(e.target.value)}
-                  placeholder="SuperPlane"
-                />
-              </InputGroup>
-            </div>
-
-            <div>
-              <Label className="block text-left mb-2">
-                From Email <span className="text-gray-800">*</span>
-              </Label>
-              <InputGroup>
-                <Input
-                  type="email"
-                  value={smtpFromEmail}
-                  onChange={(e) => setSmtpFromEmail(e.target.value)}
-                  placeholder="noreply@example.com"
-                  className={fieldErrors.smtpFromEmail ? "border-red-500" : ""}
-                />
-              </InputGroup>
-              {fieldErrors.smtpFromEmail && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.smtpFromEmail}</p>
-              )}
-            </div>
-
-            <Label className="inline-flex items-center gap-2">
-              <input type="checkbox" checked={smtpUseTLS} onChange={(e) => setSmtpUseTLS(e.target.checked)} />
-              Use TLS (STARTTLS)
-            </Label>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Saving..." : "Finish setup"}
-            </Button>
-          </form>
+          <SmtpConfigStep
+            smtpHost={smtpHost}
+            smtpPort={smtpPort}
+            smtpUsername={smtpUsername}
+            smtpPassword={smtpPassword}
+            smtpFromName={smtpFromName}
+            smtpFromEmail={smtpFromEmail}
+            smtpUseTLS={smtpUseTLS}
+            loading={loading}
+            error={error}
+            fieldErrors={fieldErrors}
+            onSmtpHostChange={setSmtpHost}
+            onSmtpPortChange={setSmtpPort}
+            onSmtpUsernameChange={setSmtpUsername}
+            onSmtpPasswordChange={setSmtpPassword}
+            onSmtpFromNameChange={setSmtpFromName}
+            onSmtpFromEmailChange={setSmtpFromEmail}
+            onSmtpUseTLSChange={setSmtpUseTLS}
+            onBack={handleSMTPConfigBack}
+            onSkipSMTP={handleSkipSMTP}
+            onSubmit={handleSubmitSMTP}
+          />
         )}
       </div>
     </div>

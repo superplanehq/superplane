@@ -1,5 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Link } from "@/components/Link/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/Table/table";
@@ -8,11 +9,12 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Copy } from "lucide-react";
+import { Bot } from "lucide-react";
+import { CopyButton } from "@/ui/CopyButton";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceAccounts, useCreateServiceAccount, useDeleteServiceAccount } from "@/hooks/useServiceAccounts";
@@ -36,6 +38,8 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
   const { data: serviceAccounts = [], isLoading } = useServiceAccounts(organizationId);
   const createMutation = useCreateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
+
+  useReportPageReady(!isLoading && !permissionsLoading);
 
   const handleCreateClick = () => {
     if (!canCreate) return;
@@ -76,16 +80,6 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
       }
     } catch (error) {
       showErrorToast(`Failed to create service account: ${getApiErrorMessage(error)}`);
-    }
-  };
-
-  const handleCopyToken = async () => {
-    if (!newToken) return;
-    try {
-      await navigator.clipboard.writeText(newToken);
-      showSuccessToast("Token copied to clipboard");
-    } catch {
-      showErrorToast("Failed to copy token");
     }
   };
 
@@ -358,9 +352,14 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                   className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-800"
                   data-testid="sa-token-display"
                 />
-                <Button variant="outline" onClick={handleCopyToken} data-testid="sa-token-copy">
-                  <Copy className="w-4 h-4" />
-                </Button>
+                <CopyButton
+                  variant="button"
+                  text={newToken}
+                  data-testid="sa-token-copy"
+                  onCopyError={() => showErrorToast("Failed to copy token")}
+                >
+                  Copy
+                </CopyButton>
               </div>
 
               <div className="flex justify-start mt-6">

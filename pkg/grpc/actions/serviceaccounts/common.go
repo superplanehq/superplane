@@ -4,6 +4,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func serializeServiceAccount(sa *models.User, creator *models.User) *pb.ServiceAccount {
@@ -34,12 +35,12 @@ func serializeServiceAccount(sa *models.User, creator *models.User) *pb.ServiceA
 	return out
 }
 
-func creatorUserForServiceAccount(orgID string, sa *models.User) (*models.User, error) {
+func creatorUserForServiceAccount(db *gorm.DB, orgID string, sa *models.User) (*models.User, error) {
 	if sa.CreatedBy == nil {
 		return nil, nil
 	}
 
-	users, err := models.FindUsersByIDsInOrganization(orgID, []string{sa.CreatedBy.String()})
+	users, err := models.FindUsersByIDsInOrganization(db, orgID, []string{sa.CreatedBy.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +50,7 @@ func creatorUserForServiceAccount(orgID string, sa *models.User) (*models.User, 
 	return &users[0], nil
 }
 
-func creatorsByIDForServiceAccounts(orgID string, sas []models.User) (map[string]*models.User, error) {
+func creatorsByIDForServiceAccounts(db *gorm.DB, orgID string, sas []models.User) (map[string]*models.User, error) {
 	idSet := make(map[string]struct{})
 	for i := range sas {
 		if sas[i].CreatedBy != nil {
@@ -65,7 +66,7 @@ func creatorsByIDForServiceAccounts(orgID string, sas []models.User) (map[string
 		ids = append(ids, id)
 	}
 
-	users, err := models.FindUsersByIDsInOrganization(orgID, ids)
+	users, err := models.FindUsersByIDsInOrganization(db, orgID, ids)
 	if err != nil {
 		return nil, err
 	}

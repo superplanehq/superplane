@@ -1,0 +1,94 @@
+/* Dashboard grid styling — layered on top of react-grid-layout defaults. */
+
+.console-grid {
+  position: relative;
+  transition: none !important;
+}
+
+/* Panels snap immediately when the grid compacts or reflows after drag/resize. */
+.console-grid .react-grid-item {
+  transition: none !important;
+}
+
+.console-grid .react-grid-item.cssTransforms {
+  transition: none !important;
+}
+
+/*
+ * react-grid-layout applies a 200ms transition on `height` to the container
+ * and on `transform`, `width`, and `height` to every grid item. The first
+ * time the grid mounts (e.g. when the user opens the Console tab) the
+ * WidthProvider mounts with a hardcoded 1280px width and only learns the
+ * real width asynchronously via a ResizeObserver, after which the tiles
+ * re-lay-out and visibly stretch into their final spots. We suppress those
+ * transitions until the wrapper has been measured for real (see
+ * `transitionsArmed` in ConsoleView.tsx) so the Console tab opens with
+ * tiles already in place. Drag / resize transitions resume immediately
+ * after.
+ */
+.console-grid.console-grid--instant {
+  transition: none !important;
+}
+
+.console-grid.console-grid--instant .react-grid-item {
+  transition: none !important;
+}
+
+.console-grid .console-grid-item {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+
+.console-grid .console-grid-item > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.console-grid-removed-ghost > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Resize handle indicator in the bottom-right corner of each tile. */
+.console-grid .react-resizable-handle {
+  --dashboard-resize-handle-icon: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z' fill='black' fill-opacity='0.3'/%3E%3Cpath d='M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z' fill='black' fill-opacity='0.3'/%3E%3C/svg%3E");
+  background-image: var(--dashboard-resize-handle-icon);
+  background-repeat: no-repeat;
+  background-position: right 6px bottom 6px;
+  background-size: 12px 12px;
+  background-color: transparent;
+  width: 36px;
+  height: 36px;
+  bottom: 2px;
+  right: 2px;
+  opacity: 0;
+  cursor: nwse-resize;
+  transition: opacity 120ms ease-in-out;
+}
+
+.console-grid .react-grid-item:hover .react-resizable-handle,
+.console-grid .react-grid-item.resizing .react-resizable-handle {
+  opacity: 1;
+}
+
+.console-grid .react-resizable-handle::after {
+  content: none;
+}
+
+/* Drag preview / placeholder. */
+.console-grid .react-grid-placeholder {
+  background-color: rgb(186, 230, 253); /* sky-200 */
+  opacity: 0.5;
+  border-radius: 0.5rem;
+}
+
+/* Active drag/resize indicator. */
+.console-grid .react-grid-item.react-draggable-dragging,
+.console-grid .react-grid-item.resizing {
+  z-index: 30;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+}

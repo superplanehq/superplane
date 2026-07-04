@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
@@ -9,12 +10,28 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
+const (
+	EnvURL   = "SUPERPLANE_URL"
+	EnvToken = "SUPERPLANE_TOKEN"
+)
+
 type ConfigContext struct {
 	URL            string  `json:"url" yaml:"url"`
 	Organization   string  `json:"organization" yaml:"organization"`
 	OrganizationID string  `json:"organizationId,omitempty" yaml:"organizationId,omitempty"`
 	APIToken       string  `json:"apiToken" yaml:"apiToken"`
-	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"`
+	App            *string `json:"app,omitempty" yaml:"app,omitempty"`
+	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"` // deprecated: use app
+}
+
+func activeAppID(context ConfigContext) string {
+	if context.App != nil && strings.TrimSpace(*context.App) != "" {
+		return strings.TrimSpace(*context.App)
+	}
+	if context.Canvas != nil {
+		return strings.TrimSpace(*context.Canvas)
+	}
+	return ""
 }
 
 func normalizeBaseURL(raw string) string {
@@ -69,6 +86,40 @@ func GetContexts() []ConfigContext {
 	}
 
 	return normalized
+}
+
+func GetEnvironmentContext() (ConfigContext, bool) {
+	context, ok, err := environmentContext()
+	if err != nil {
+		return ConfigContext{}, false
+	}
+
+	return context, ok
+}
+
+func ValidateEnvironmentContext() error {
+	_, _, err := environmentContext()
+	return err
+}
+
+func environmentContext() (ConfigContext, bool, error) {
+	rawURL, urlSet := os.LookupEnv(EnvURL)
+	rawToken, tokenSet := os.LookupEnv(EnvToken)
+	if !urlSet && !tokenSet {
+		return ConfigContext{}, false, nil
+	}
+
+	url := normalizeBaseURL(rawURL)
+	token := strings.TrimSpace(rawToken)
+	if url == "" || token == "" {
+		return ConfigContext{}, false, fmt.Errorf("%s and %s must both be set to use environment CLI authentication", EnvURL, EnvToken)
+	}
+
+	return ConfigContext{
+		URL:          url,
+		Organization: "environment",
+		APIToken:     token,
+	}, true, nil
 }
 
 func GetCurrentContext() (ConfigContext, bool) {
@@ -287,23 +338,34 @@ func findMatchingContextIndex(contexts []ConfigContext, context ConfigContext) i
  * which uses the current context as the source for operations..
  */
 type CurrentContext struct {
-	context ConfigContext
+	context  ConfigContext
+	readOnly bool
 }
 
 func NewCurrentContext(context ConfigContext) core.ConfigContext {
 	return &CurrentContext{context: context}
 }
 
-func (c *CurrentContext) GetActiveCanvas() string {
-	if c.context.Canvas == nil {
-		return ""
-	}
-
-	return *c.context.Canvas
+func NewEnvironmentContext(context ConfigContext) core.ConfigContext {
+	return &CurrentContext{context: context, readOnly: true}
 }
 
-func (c *CurrentContext) SetActiveCanvas(canvasID string) error {
-	c.context.Canvas = &canvasID
+func (c *CurrentContext) GetActiveApp() string {
+	return activeAppID(c.context)
+}
+
+func (c *CurrentContext) SetActiveApp(appID string) error {
+	if c.readOnly {
+		return fmt.Errorf("cannot set active app when using %s and %s; pass --app-id instead", EnvURL, EnvToken)
+	}
+
+	appID = strings.TrimSpace(appID)
+	c.context.App = &appID
+	c.context.Canvas = nil
 	_, err := UpsertContext(c.context)
 	return err
+}
+
+func (c *CurrentContext) GetURL() string {
+	return c.context.URL
 }

@@ -282,3 +282,49 @@ func TestGetCurrentContextResolvesAfterUpgrade(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, upgraded.OrganizationID, current.OrganizationID)
 }
+
+func TestEnvironmentContextOverridesConfiguredContext(t *testing.T) {
+	setupViper(t)
+
+	_, err := UpsertContext(ConfigContext{
+		URL:            "https://app.superplane.com",
+		Organization:   "Saved",
+		OrganizationID: "aaaaaaaa-0000-0000-0000-000000000001",
+		APIToken:       "saved-token",
+	})
+	require.NoError(t, err)
+
+	t.Setenv(EnvURL, "https://agent.superplane.com/")
+	t.Setenv(EnvToken, "agent-token")
+
+	require.NoError(t, ValidateEnvironmentContext())
+	require.Equal(t, "https://agent.superplane.com", GetAPIURL())
+	require.Equal(t, "agent-token", GetAPIToken())
+
+	context, ok := GetEnvironmentContext()
+	require.True(t, ok)
+	require.Equal(t, "https://agent.superplane.com", context.URL)
+	require.Equal(t, "agent-token", context.APIToken)
+
+	config := NewEnvironmentContext(context)
+	err = config.SetActiveApp("canvas-from-env-run")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "pass --app-id")
+	require.Empty(t, config.GetActiveApp())
+
+	current, ok := GetCurrentContext()
+	require.True(t, ok)
+	require.Nil(t, current.Canvas)
+	require.Equal(t, "saved-token", current.APIToken)
+}
+
+func TestEnvironmentContextRequiresURLAndToken(t *testing.T) {
+	setupViper(t)
+
+	t.Setenv(EnvURL, "https://agent.superplane.com")
+
+	err := ValidateEnvironmentContext()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), EnvURL)
+	require.Contains(t, err.Error(), EnvToken)
+}

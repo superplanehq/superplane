@@ -38,6 +38,42 @@ func TestBuildPostgresDSN_sessionTimeouts(t *testing.T) {
 	}
 }
 
+func TestDSNConfigFromEnv(t *testing.T) {
+	t.Setenv("DB_HOST", "db.example")
+	t.Setenv("DB_PORT", "5432")
+	t.Setenv("DB_NAME", "superplane_test")
+	t.Setenv("DB_USERNAME", "postgres")
+	t.Setenv("DB_PASSWORD", "secret")
+	t.Setenv("POSTGRES_DB_SSL", "true")
+	t.Setenv("APPLICATION_NAME", "superplane-test")
+
+	cfg := dsnConfigFromEnv()
+
+	require.Equal(t, "db.example", cfg.Host)
+	require.Equal(t, "5432", cfg.Port)
+	require.Equal(t, "superplane_test", cfg.Name)
+	require.Equal(t, "postgres", cfg.User)
+	require.Equal(t, "secret", cfg.Pass)
+	require.Equal(t, "require", cfg.Ssl)
+	require.Equal(t, "superplane-test", cfg.ApplicationName)
+}
+
+func TestOpenDedicatedSQLDB_ConfiguresDedicatedPool(t *testing.T) {
+	if os.Getenv("DB_HOST") == "" {
+		t.Skip("DB_HOST not set (run with make test in Docker)")
+	}
+
+	db, err := OpenDedicatedSQLDB("agent-stream-lock-test", 0)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+	})
+
+	stats := db.Stats()
+	require.Equal(t, 1, stats.MaxOpenConnections)
+	require.NoError(t, db.Ping())
+}
+
 func TestClassifyPostgresSessionTimeout(t *testing.T) {
 	tests := []struct {
 		name string

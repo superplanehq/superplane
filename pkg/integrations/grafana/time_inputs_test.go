@@ -15,6 +15,10 @@ func (t testExpressionContext) Run(expression string) (any, error) {
 	return t.run(expression)
 }
 
+func (t testExpressionContext) RunWithExtraVariables(expression string, _ map[string]any) (any, error) {
+	return t.run(expression)
+}
+
 func Test__resolveGrafanaTimeInput(t *testing.T) {
 	t.Run("preserves grafana relative values", func(t *testing.T) {
 		value, err := resolveGrafanaTimeInput("now-24h", nil, nil)

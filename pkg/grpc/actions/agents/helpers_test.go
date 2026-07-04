@@ -1,89 +1,61 @@
-package agents
+package agents_test
 
 import (
 	"context"
-	"net"
-	"sync/atomic"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/require"
-	internalpb "github.com/superplanehq/superplane/pkg/protos/private/agents"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/stats"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/google/uuid"
+	agentservice "github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
 )
 
-// mockAgentsServer implements the internal AgentsServer interface for testing.
-type mockAgentsServer struct {
-	internalpb.UnimplementedAgentsServer
+type stubService struct {
+	ensureSession func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error)
+	resetSession  func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error)
+	getSession    func(uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error)
+	listMessages  func(uuid.UUID, uuid.UUID, int) ([]models.AgentSessionMessage, error)
+	sendMessage   func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, string) (*models.AgentSessionMessage, error)
+	interruptErr  error
+	defineErr     error
 }
 
-func (m *mockAgentsServer) ListAgentChats(ctx context.Context, req *internalpb.ListAgentChatsRequest) (*internalpb.ListAgentChatsResponse, error) {
-	return &internalpb.ListAgentChatsResponse{
-		Chats: []*internalpb.ChatInfo{
-			{Id: "chat-1", InitialMessage: "hello", CreatedAt: timestamppb.Now()},
-		},
-	}, nil
+func (s *stubService) EnsureSession(ctx context.Context, o, u, c uuid.UUID) (*models.AgentSession, error) {
+	return s.ensureSession(ctx, o, u, c)
 }
-
-func (m *mockAgentsServer) DescribeAgentChat(ctx context.Context, req *internalpb.DescribeAgentChatRequest) (*internalpb.DescribeAgentChatResponse, error) {
-	return &internalpb.DescribeAgentChatResponse{
-		Chat: &internalpb.ChatInfo{Id: req.ChatId, InitialMessage: "hello", CreatedAt: timestamppb.Now()},
-	}, nil
+func (s *stubService) ResetSession(ctx context.Context, o, u, c uuid.UUID) (*models.AgentSession, error) {
+	return s.resetSession(ctx, o, u, c)
 }
-
-func (m *mockAgentsServer) ListAgentChatMessages(ctx context.Context, req *internalpb.ListAgentChatMessagesRequest) (*internalpb.ListAgentChatMessagesResponse, error) {
-	return &internalpb.ListAgentChatMessagesResponse{
-		Messages: []*internalpb.AgentChatMessage{
-			{Id: "msg-1", Role: "user", Content: "hello"},
-		},
-	}, nil
+func (s *stubService) GetSession(o, u, id uuid.UUID) (*models.AgentSession, error) {
+	return s.getSession(o, u, id)
 }
-
-func (m *mockAgentsServer) DeleteAgentChat(ctx context.Context, req *internalpb.DeleteAgentChatRequest) (*internalpb.DeleteAgentChatResponse, error) {
-	if req.ChatId == "not-found" {
-		return nil, status.Error(codes.NotFound, "chat not found")
+func (s *stubService) ListMessages(id, before uuid.UUID, limit int) ([]models.AgentSessionMessage, error) {
+	return s.listMessages(id, before, limit)
+}
+func (s *stubService) SendMessage(ctx context.Context, o, u, id uuid.UUID, content string, images []agentservice.MessageImage, mode ...string) (*models.AgentSessionMessage, error) {
+	selectedMode := ""
+	if len(mode) > 0 {
+		selectedMode = mode[0]
 	}
-	return &internalpb.DeleteAgentChatResponse{}, nil
+	return s.sendMessage(ctx, o, u, id, content, images, selectedMode)
 }
 
-// connTracker is a gRPC stats handler that counts open connections.
-type connTracker struct {
-	stats.Handler
-	open atomic.Int64
+func (s *stubService) InterruptSession(ctx context.Context, o, u, id uuid.UUID) error {
+	return s.interruptErr
 }
 
-func (c *connTracker) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context {
-	return ctx
-}
-func (c *connTracker) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context { return ctx }
-func (c *connTracker) HandleRPC(ctx context.Context, s stats.RPCStats)                    {}
-
-func (c *connTracker) HandleConn(ctx context.Context, s stats.ConnStats) {
-	switch s.(type) {
-	case *stats.ConnBegin:
-		c.open.Add(1)
-	case *stats.ConnEnd:
-		c.open.Add(-1)
-	}
+func (s *stubService) DefineOutcome(ctx context.Context, o, u, id uuid.UUID, description, rubric string, maxIterations int) error {
+	return s.defineErr
 }
 
-// startMockAgentServer creates a gRPC server with the mock agent service
-// and returns the listener address and a connection tracker.
-func startMockAgentServer(t *testing.T) (string, *connTracker) {
+func now() *time.Time {
+	t := time.Now()
+	return &t
+}
+
+func setupCanvas(t *testing.T, r *support.ResourceRegistry) *models.Canvas {
 	t.Helper()
-
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	tracker := &connTracker{}
-	server := grpc.NewServer(grpc.StatsHandler(tracker))
-	internalpb.RegisterAgentsServer(server, &mockAgentsServer{})
-
-	go func() { _ = server.Serve(lis) }()
-	t.Cleanup(server.GracefulStop)
-
-	return lis.Addr().String(), tracker
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	return canvas
 }

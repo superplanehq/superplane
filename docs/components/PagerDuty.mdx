@@ -33,6 +33,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Incident
 
+**Trigger key:** `pagerduty.onIncident`
+
 The On Incident trigger starts a workflow execution when PagerDuty incident events occur.
 
 ### Use Cases
@@ -139,6 +141,8 @@ This trigger automatically sets up a PagerDuty webhook subscription when configu
 
 ## On Incident Annotated
 
+**Trigger key:** `pagerduty.onIncidentAnnotated`
+
 The On Incident Annotated trigger starts a workflow execution when a note is added to a PagerDuty incident.
 
 ### Use Cases
@@ -231,6 +235,8 @@ This trigger automatically sets up a PagerDuty webhook subscription when configu
 
 ## On Incident Status Update
 
+**Trigger key:** `pagerduty.onIncidentStatusUpdate`
+
 The On Incident Status Update trigger starts a workflow execution when PagerDuty incident status changes.
 
 ### Use Cases
@@ -297,6 +303,8 @@ This trigger automatically sets up a PagerDuty webhook subscription when configu
 <a id="acknowledge-incident"></a>
 
 ## Acknowledge Incident
+
+**Component key:** `pagerduty.acknowledgeIncident`
 
 The Acknowledge Incident component acknowledges an existing PagerDuty incident.
 
@@ -406,6 +414,8 @@ Returns the acknowledged incident object with all current information.
 
 ## Annotate Incident
 
+**Component key:** `pagerduty.annotateIncident`
+
 The Annotate Incident component adds a note to an existing PagerDuty incident.
 
 ### Use Cases
@@ -514,6 +524,8 @@ Returns the incident object with all current information.
 <a id="create-incident"></a>
 
 ## Create Incident
+
+**Component key:** `pagerduty.createIncident`
 
 The Create Incident component creates a new incident in PagerDuty.
 
@@ -631,6 +643,8 @@ Returns the created incident object including:
 <a id="escalate-incident"></a>
 
 ## Escalate Incident
+
+**Component key:** `pagerduty.escalateIncident`
 
 The Escalate Incident component escalates an existing PagerDuty incident to a specific escalation level within its current escalation policy.
 
@@ -750,6 +764,8 @@ Returns the escalated incident object with all current information.
 <a id="list-incidents"></a>
 
 ## List Incidents
+
+**Component key:** `pagerduty.listIncidents`
 
 The List Incidents component queries PagerDuty for open incidents and routes execution based on urgency levels.
 
@@ -889,6 +905,8 @@ Returns a list of open incidents with:
 
 ## List Log Entries
 
+**Component key:** `pagerduty.listLogEntries`
+
 The List Log Entries component retrieves all log entries (audit trail) for a PagerDuty incident.
 
 ### Use Cases
@@ -976,6 +994,8 @@ Returns a list of log entries with:
 
 ## List Notes
 
+**Component key:** `pagerduty.listNotes`
+
 The List Notes component retrieves all notes (timeline entries) for a PagerDuty incident.
 
 ### Use Cases
@@ -1057,6 +1077,8 @@ Returns a list of notes with:
 <a id="resolve-incident"></a>
 
 ## Resolve Incident
+
+**Component key:** `pagerduty.resolveIncident`
 
 The Resolve Incident component resolves an existing PagerDuty incident.
 
@@ -1155,6 +1177,8 @@ Returns the resolved incident object with all current information.
 <a id="snooze-incident"></a>
 
 ## Snooze Incident
+
+**Component key:** `pagerduty.snoozeIncident`
 
 The Snooze Incident component temporarily pauses notifications for an acknowledged PagerDuty incident.
 
@@ -1266,6 +1290,8 @@ Returns the snoozed incident object with all current information.
 <a id="update-incident"></a>
 
 ## Update Incident
+
+**Component key:** `pagerduty.updateIncident`
 
 The Update Incident component modifies an existing PagerDuty incident.
 

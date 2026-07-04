@@ -93,7 +93,7 @@ func (c *actionsCommand) getActionByName(ctx core.CommandContext, name string) e
 	})
 }
 
-func renderActionText(stdout io.Writer, action openapi_client.SuperplaneActionsAction) error {
+func renderActionText(stdout io.Writer, action openapi_client.ActionsAction) error {
 	_, err := fmt.Fprintf(stdout, "Name: %s\n", action.GetName())
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func renderActionText(stdout io.Writer, action openapi_client.SuperplaneActionsA
 	return renderExamplePayloadText(stdout, action.GetExampleOutput())
 }
 
-func renderActionOutputChannelsText(stdout io.Writer, channels []openapi_client.SuperplaneActionsOutputChannel) error {
+func renderActionOutputChannelsText(stdout io.Writer, channels []openapi_client.ActionsOutputChannel) error {
 	_, err := fmt.Fprintln(stdout, "Output Channels:")
 	if err != nil {
 		return err
@@ -229,7 +229,7 @@ func renderExamplePayloadText(stdout io.Writer, examplePayload map[string]interf
 	return nil
 }
 
-func (c *actionsCommand) listActions(ctx core.CommandContext, from string) ([]openapi_client.SuperplaneActionsAction, error) {
+func (c *actionsCommand) listActions(ctx core.CommandContext, from string) ([]openapi_client.ActionsAction, error) {
 	//
 	// if --from is used, we grab the actions from the integration
 	//
@@ -252,25 +252,25 @@ func (c *actionsCommand) listActions(ctx core.CommandContext, from string) ([]op
 	return response.GetActions(), nil
 }
 
-func (c *actionsCommand) findActionByName(ctx core.CommandContext, name string) (openapi_client.SuperplaneActionsAction, error) {
+func (c *actionsCommand) findActionByName(ctx core.CommandContext, name string) (openapi_client.ActionsAction, error) {
 	integrationName, componentName, scoped := core.ParseIntegrationScopedName(name)
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.SuperplaneActionsAction{}, fmt.Errorf("action %q not found: no integration named %q", name, integrationName)
+			return openapi_client.ActionsAction{}, fmt.Errorf("action %q not found: no integration named %q", name, integrationName)
 		}
 		return findIntegrationComponent(integration, componentName)
 	}
 
 	response, _, err := ctx.API.ActionAPI.ActionsDescribeAction(ctx.Context, name).Execute()
 	if err != nil {
-		return openapi_client.SuperplaneActionsAction{}, err
+		return openapi_client.ActionsAction{}, err
 	}
 
 	return response.GetAction(), nil
 }
 
-func findIntegrationComponent(integration openapi_client.IntegrationsIntegrationDefinition, name string) (openapi_client.SuperplaneActionsAction, error) {
+func findIntegrationComponent(integration openapi_client.IntegrationsIntegrationDefinition, name string) (openapi_client.ActionsAction, error) {
 	for _, action := range actionsFromCapabilities(integration.GetCapabilities()) {
 		actionName := action.GetName()
 		if actionName == name || actionName == fmt.Sprintf("%s.%s", integration.GetName(), name) {
@@ -278,21 +278,22 @@ func findIntegrationComponent(integration openapi_client.IntegrationsIntegration
 		}
 	}
 
-	return openapi_client.SuperplaneActionsAction{}, fmt.Errorf("action %q not found in integration %q", name, integration.GetName())
+	return openapi_client.ActionsAction{}, fmt.Errorf("action %q not found in integration %q", name, integration.GetName())
 }
 
-func actionsFromCapabilities(capabilities []openapi_client.IntegrationsCapabilityDefinition) []openapi_client.SuperplaneActionsAction {
-	actions := []openapi_client.SuperplaneActionsAction{}
+func actionsFromCapabilities(capabilities []openapi_client.IntegrationsCapabilityDefinition) []openapi_client.ActionsAction {
+	actions := []openapi_client.ActionsAction{}
 	for _, capability := range capabilities {
 		if capability.GetType() != openapi_client.INTEGRATIONSCAPABILITYDEFINITIONTYPE_TYPE_ACTION {
 			continue
 		}
-		actions = append(actions, openapi_client.SuperplaneActionsAction{
+		actions = append(actions, openapi_client.ActionsAction{
 			Name:           capability.Name,
 			Label:          capability.Label,
 			Description:    capability.Description,
 			Configuration:  capability.Configuration,
 			OutputChannels: capability.OutputChannels,
+			ExampleOutput:  capability.ExampleOutput,
 		})
 	}
 	return actions
