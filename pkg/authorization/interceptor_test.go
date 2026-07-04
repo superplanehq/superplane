@@ -35,21 +35,18 @@ func TestResourceIDsFromPathParams(t *testing.T) {
 	})
 }
 
-func TestCanvasAuthorizationRulesSeparateDraftAndLiveActions(t *testing.T) {
+func TestCanvasAuthorizationRulesSeparateStagingAndLiveActions(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 
 	tests := []struct {
 		route  HTTPRoute
 		action string
 	}{
-		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions"}, action: "update_version"},
 		{route: HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/canvases/{canvas_id}/versions"}, action: "read"},
-		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}"}, action: "update_version"},
-		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/repository/commits"}, action: "update_version"},
-		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/files"}, action: "update_version"},
-		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/discard"}, action: "update_version"},
-		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/commit"}, action: "update_version"},
-		{route: HTTPRoute{Method: http.MethodPatch, Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/publish"}, action: "publish"},
+		{route: HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/canvases/{canvas_id}/staging"}, action: "read"},
+		{route: HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{canvas_id}/staging"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{canvas_id}/staging"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/staging/commit"}, action: "update"},
 		{route: HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{id}"}, action: "update"},
 		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{id}"}, action: "delete"},
 	}

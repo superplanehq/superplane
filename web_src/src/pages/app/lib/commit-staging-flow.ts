@@ -6,13 +6,14 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 
 import { refreshCachesAfterCommit } from "./sync-committed-canvas-draft";
 
-type CommitMutation = { mutateAsync: () => Promise<unknown> };
+type CommitMutation = { mutateAsync: (commitMessage: string) => Promise<{ version?: { metadata?: { id?: string } } }> };
 type DraftSpec = CanvasesCanvas["spec"] | null;
 
 export async function executeCommitStaging({
   organizationId,
   canvasId,
   activeCanvasVersionId,
+  commitMessage,
   queryClient,
   commitCanvasStagingMutation,
   consoleMutationGenerationRef,
@@ -21,11 +22,13 @@ export async function executeCommitStaging({
   setStagingResetNonce,
   ensureVersionActionDraftReady,
   flushRepositoryFileStaging,
-  registerIgnoredCanvasVersionUpdatedEcho,
+  registerIgnoredCanvasUpdatedEcho,
+  onCommittedVersionId,
 }: {
   organizationId?: string;
   canvasId?: string;
   activeCanvasVersionId: string;
+  commitMessage: string;
   queryClient: QueryClient;
   commitCanvasStagingMutation: CommitMutation;
   consoleMutationGenerationRef: MutableRefObject<number>;
@@ -34,7 +37,8 @@ export async function executeCommitStaging({
   setStagingResetNonce: Dispatch<SetStateAction<number>>;
   ensureVersionActionDraftReady: (errorMessage: string) => Promise<boolean>;
   flushRepositoryFileStaging?: () => Promise<void>;
-  registerIgnoredCanvasVersionUpdatedEcho?: (versionId?: string) => () => void;
+  registerIgnoredCanvasUpdatedEcho?: () => () => void;
+  onCommittedVersionId?: (versionId: string) => void;
 }): Promise<boolean> {
   await flushRepositoryFileStaging?.();
   const isReady = await ensureVersionActionDraftReady("Unable to prepare staged changes for commit");
@@ -43,28 +47,34 @@ export async function executeCommitStaging({
   }
 
   consoleMutationGenerationRef.current += 1;
-  const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho?.(activeCanvasVersionId);
+  const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho?.();
+  let committedVersionId = activeCanvasVersionId;
   try {
-    await commitCanvasStagingMutation.mutateAsync();
+    const response = await commitCanvasStagingMutation.mutateAsync(commitMessage);
+    committedVersionId = response?.version?.metadata?.id || activeCanvasVersionId;
   } catch (error) {
-    releaseCanvasVersionUpdatedEcho?.();
+    releaseCanvasUpdatedEcho?.();
     throw error;
   }
 
-  // Commit already succeeded on the server; cache refresh and local cleanup must not fail the action.
-  if (organizationId && canvasId) {
+  if (organizationId && canvasId && committedVersionId) {
     await refreshCachesAfterCommit({
       queryClient,
       organizationId,
       canvasId,
-      versionId: activeCanvasVersionId,
+      versionId: committedVersionId,
     });
+    queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+    onCommittedVersionId?.(committedVersionId);
   }
 
   if (canvasId) {
     await queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
   }
   draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
+  if (committedVersionId !== activeCanvasVersionId) {
+    draftCanvasSpecsRef.current.delete(committedVersionId);
+  }
   setDraftCanvasSpec(null);
   setStagingResetNonce((nonce) => nonce + 1);
   return true;

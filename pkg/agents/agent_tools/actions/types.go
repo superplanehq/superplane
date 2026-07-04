@@ -6,8 +6,6 @@ type Input struct {
 	CanvasID            string            `json:"canvas_id,omitempty"`
 	VersionID           string            `json:"version_id,omitempty"`
 	DraftVersionID      string            `json:"draft_version_id,omitempty"`
-	DisplayName         string            `json:"display_name,omitempty"`
-	UseDraft            *bool             `json:"use_draft,omitempty"`
 	IncludeConsole      bool              `json:"include_console,omitempty"`
 	IncludeIntegrations bool              `json:"include_integrations,omitempty"`
 	IncludeCanvasYAML   bool              `json:"include_canvas_yaml,omitempty"`
@@ -30,11 +28,10 @@ type Input struct {
 	Path                string            `json:"path,omitempty"`
 	Paths               []string          `json:"paths,omitempty"`
 	Content             string            `json:"content,omitempty"`
-	Message             string            `json:"message,omitempty"`
 	Query               string            `json:"query,omitempty"`
 }
 
-// PatchOperation describes one small graph edit for patch_draft.
+// PatchOperation describes one small graph edit for patch_staging.
 type PatchOperation struct {
 	Op     string     `json:"op"`
 	NodeID string     `json:"node_id,omitempty"`
@@ -153,14 +150,6 @@ type fileStageResult struct {
 	VersionID      string         `json:"version_id"`
 	Path           string         `json:"path"`
 	Deleted        bool           `json:"deleted,omitempty"`
-	StagingSummary stagingSummary `json:"staging_summary"`
-}
-
-type fileCommitResult struct {
-	Action         string         `json:"action"`
-	CanvasID       string         `json:"canvas_id"`
-	VersionID      string         `json:"version_id"`
-	Draft          draftResult    `json:"draft"`
 	StagingSummary stagingSummary `json:"staging_summary"`
 }
 

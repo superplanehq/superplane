@@ -33,15 +33,14 @@ func TestCanvasYAMLFromVersionIncludesActionNodeType(t *testing.T) {
 		},
 	}, nil)
 
-	response, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String(), "")
+	liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 	require.NoError(t, err)
 
-	versionID := response.GetVersion().GetMetadata().GetId()
 	yamlText, err := ReadRepositorySpecFile(
 		ctx,
 		r.Organization.ID.String(),
 		canvas.ID.String(),
-		versionID,
+		liveVersion.ID.String(),
 		CanvasYAMLRepositoryPath,
 	)
 	require.NoError(t, err)

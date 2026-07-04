@@ -67,42 +67,6 @@ func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, 
 	return *matches[0].Id, nil
 }
 
-// FindCurrentUserDraftVersionID returns the version id of the current user's
-// first draft branch, or an empty string if none exists. It does not create a
-// draft. The API scopes drafts to the authenticated user, so listing already
-// returns only their drafts.
-func FindCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	versions, err := ListDraftVersions(ctx, appID)
-	if err != nil {
-		return "", err
-	}
-
-	for _, version := range versions {
-		if version.Metadata == nil {
-			continue
-		}
-		if versionID := strings.TrimSpace(version.Metadata.GetId()); versionID != "" {
-			return versionID, nil
-		}
-	}
-
-	return "", nil
-}
-
-// EnsureCurrentUserDraftVersionID returns the version id of a draft branch
-// owned by the current user, creating one if it does not yet exist.
-func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	versionID, err := FindCurrentUserDraftVersionID(ctx, appID)
-	if err != nil {
-		return "", err
-	}
-	if versionID != "" {
-		return versionID, nil
-	}
-
-	return createDraftVersion(ctx, appID, "")
-}
-
 // DescribeAppVersionByID loads a specific app version and errors when
 // the response does not include one.
 func DescribeAppVersionByID(

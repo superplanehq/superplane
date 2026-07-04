@@ -796,7 +796,7 @@ func TestStreamEvents_MapsCustomToolUseAndRequiresAction(t *testing.T) {
 func TestStreamEvents_ParsesCustomToolInputLargerThanDefaultScannerLimit(t *testing.T) {
 	consoleYAML := strings.Repeat("x", 70*1024)
 	input := map[string]any{
-		"action":       "patch_draft",
+		"action":       "patch_staging",
 		"version_id":   "draft-version",
 		"console_yaml": consoleYAML,
 	}

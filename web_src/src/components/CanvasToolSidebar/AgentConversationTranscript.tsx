@@ -309,14 +309,14 @@ function truncateQuestion(question: string): string {
   return question.length > 200 ? `${question.slice(0, 200)}…` : question;
 }
 
-// The `superplane_app` tool's `patch_draft` action edits the canvas — label it
+// The `superplane_app` tool's `patch_staging` action edits the canvas — label it
 // "Editing canvas" rather than a generic "Running command".
 function isCanvasEditMessage(message: AgentMessage): boolean {
   if (message.toolName !== "superplane_app") return false;
   try {
-    return (JSON.parse(message.content) as { action?: string })?.action === "patch_draft";
+    return (JSON.parse(message.content) as { action?: string })?.action === "patch_staging";
   } catch {
-    return message.content.includes("patch_draft");
+    return message.content.includes("patch_staging");
   }
 }
 
