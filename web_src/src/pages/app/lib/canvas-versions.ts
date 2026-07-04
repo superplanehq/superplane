@@ -1,27 +1,16 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
 
-export function isPublishedVersion(version: CanvasesCanvasVersion): boolean {
-  return version.metadata?.state === "STATE_PUBLISHED";
+export function sortVersionsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {
+  return [...versions].sort(
+    (a, b) =>
+      versionSortValue(b.metadata?.updatedAt || b.metadata?.createdAt) -
+      versionSortValue(a.metadata?.updatedAt || a.metadata?.createdAt),
+  );
 }
 
-export function isDraftVersion(version: CanvasesCanvasVersion): boolean {
-  return version.metadata?.state === "STATE_DRAFT";
-}
-
+/** @deprecated All versions are main-branch commits; use sortVersionsDesc. */
 export function sortPublishedVersionsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {
-  return versions
-    .filter(isPublishedVersion)
-    .sort((a, b) => versionSortValue(b.metadata?.publishedAt) - versionSortValue(a.metadata?.publishedAt));
-}
-
-export function sortDraftVersionsDesc(versions: CanvasesCanvasVersion[]): CanvasesCanvasVersion[] {
-  return versions
-    .filter(isDraftVersion)
-    .sort(
-      (a, b) =>
-        versionSortValue(b.metadata?.updatedAt || b.metadata?.createdAt) -
-        versionSortValue(a.metadata?.updatedAt || a.metadata?.createdAt),
-    );
+  return sortVersionsDesc(versions);
 }
 
 export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): string | undefined {
@@ -39,11 +28,12 @@ export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): 
 }
 
 export function formatVersionLabel(version?: CanvasesCanvasVersion | null): string {
-  if (version?.metadata?.state === "STATE_PUBLISHED") {
-    return "Published version";
+  const message = version?.metadata?.commitMessage?.trim();
+  if (message) {
+    return message;
   }
 
-  return "Draft version";
+  return "Commit";
 }
 
 export function formatVersionLabelWithTimestamp(version?: CanvasesCanvasVersion | null): string {

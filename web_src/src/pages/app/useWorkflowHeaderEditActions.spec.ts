@@ -65,6 +65,39 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
   });
 
+  it("auto edit mode waits for live version data before entering edit mode", async () => {
+    const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
+    const setSearchParams = vi.fn();
+    const searchParams = new URLSearchParams("edit=1");
+
+    const { rerender } = renderHook(
+      ({ liveVersionLoading }) =>
+        useWorkflowHeaderEditActions({
+          isRunInspectionMode: false,
+          handleClearRunInspection: vi.fn(),
+          handleToggleEditMode,
+          setRunDetailNodeId: vi.fn(),
+          setSearchParams: setSearchParams as unknown as SetURLSearchParams,
+          startup: {
+            hasEditableVersion: false,
+            canUpdateCanvas: true,
+            canvas: { metadata: { id: "canvas-1" }, spec: {} },
+            liveVersionLoading,
+            searchParams,
+          },
+        }),
+      { initialProps: { liveVersionLoading: true } },
+    );
+
+    expect(handleToggleEditMode).not.toHaveBeenCalled();
+
+    rerender({ liveVersionLoading: false });
+
+    await waitFor(() => {
+      expect(handleToggleEditMode).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("auto edit mode removes only the edit param from the current URL", async () => {
     const handleToggleEditMode = vi.fn().mockResolvedValue(undefined);
     const setSearchParams = vi.fn();

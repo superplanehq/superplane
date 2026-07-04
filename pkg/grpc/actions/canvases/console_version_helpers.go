@@ -3,8 +3,8 @@ package canvases
 import (
 	"context"
 	"errors"
+
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -36,19 +36,9 @@ func ensureConsoleVersionReadable(
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
 ) error {
-	if version.State == models.CanvasVersionStatePublished {
-		return nil
-	}
-
-	userID, ok := authentication.GetUserIdFromMetadata(ctx)
-	if !ok {
-		return grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-	userUUID := uuid.MustParse(userID)
-
-	if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
-		return nil
-	}
-
-	return grpcerrors.PermissionDenied(nil, "version is not visible in current flow")
+	_ = ctx
+	_ = tx
+	_ = canvas
+	_ = version
+	return nil
 }

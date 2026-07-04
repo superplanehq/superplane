@@ -4,19 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
-	"sort"
-	"strings"
 )
 
 const (
@@ -88,6 +89,7 @@ func readRepositorySpecFile(
 	path string,
 	stage bool,
 ) (string, error) {
+	db := database.DB(ctx)
 	canvas, version, err := loadRepositorySpecVersionForRead(ctx, organizationID, canvasID, versionID)
 	if err != nil {
 		return "", err
@@ -99,19 +101,7 @@ func readRepositorySpecFile(
 	}
 
 	if stage {
-		if version.State != models.CanvasVersionStateDraft {
-			stage = false
-		} else if err := ensureStagedReadAllowed(ctx, version); err != nil {
-			return "", err
-		}
-	}
-
-	if stage {
-		_, rows, stagingErr := stagingSummaryForVersion(version.ID)
-		if stagingErr != nil {
-			return "", stagingErr
-		}
-		return effectiveSpecYAML(canvas, version, organizationID, rows, normalized)
+		return ReadStagedRepositorySpecFile(ctx, db, organizationID, canvasID, version, normalized)
 	}
 
 	switch normalized {
@@ -198,6 +188,68 @@ func ApplyRepositorySpecFileOperations(
 	discardStaging bool,
 	operations []*pb.CanvasRepositoryFileOperation,
 ) error {
+	return applyRepositorySpecFileOperations(
+		ctx,
+		usageService,
+		encryptor,
+		registry,
+		organizationID,
+		canvasID,
+		versionID,
+		webhookBaseURL,
+		authService,
+		autoLayout,
+		discardStaging,
+		operations,
+		false,
+	)
+}
+
+func ApplyRepositorySpecFileOperationsToCommitTarget(
+	ctx context.Context,
+	usageService usage.Service,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	webhookBaseURL string,
+	authService authorization.Authorization,
+	autoLayout *pb.CanvasAutoLayout,
+	operations []*pb.CanvasRepositoryFileOperation,
+) error {
+	return applyRepositorySpecFileOperations(
+		ctx,
+		usageService,
+		encryptor,
+		registry,
+		organizationID,
+		canvasID,
+		versionID,
+		webhookBaseURL,
+		authService,
+		autoLayout,
+		false,
+		operations,
+		true,
+	)
+}
+
+func applyRepositorySpecFileOperations(
+	ctx context.Context,
+	usageService usage.Service,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	webhookBaseURL string,
+	authService authorization.Authorization,
+	autoLayout *pb.CanvasAutoLayout,
+	discardStaging bool,
+	operations []*pb.CanvasRepositoryFileOperation,
+	commitTarget bool,
+) error {
 	if strings.TrimSpace(versionID) == "" {
 		return grpcerrors.InvalidArgument(nil, "version_id is required for canvas.yaml and console.yaml updates")
 	}
@@ -233,6 +285,7 @@ func ApplyRepositorySpecFileOperations(
 				webhookBaseURL,
 				authService,
 				discardStaging,
+				commitTarget,
 			)
 			if err != nil {
 				return err
@@ -243,7 +296,7 @@ func ApplyRepositorySpecFileOperations(
 				return err
 			}
 
-			_, err = UpdateConsole(ctx, organizationID, canvasID, versionID, panels, layout, discardStaging)
+			_, err = UpdateConsole(ctx, organizationID, canvasID, versionID, panels, layout, discardStaging, commitTarget)
 			if err != nil {
 				return err
 			}
