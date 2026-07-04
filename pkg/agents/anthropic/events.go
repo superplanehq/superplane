@@ -9,13 +9,17 @@ import (
 )
 
 type anthropicEvent struct {
-	ID        string                  `json:"id"`
-	Type      string                  `json:"type"`
-	Name      string                  `json:"name"`
-	ToolUseID string                  `json:"tool_use_id,omitempty"`
-	Input     json.RawMessage         `json:"input,omitempty"`
-	Content   []anthropicContentBlock `json:"content"`
-	Error     *struct {
+	ID         string                  `json:"id"`
+	Type       string                  `json:"type"`
+	Model      string                  `json:"model,omitempty"`
+	Name       string                  `json:"name"`
+	ToolName   string                  `json:"tool_name,omitempty"`
+	ToolUseID  string                  `json:"tool_use_id,omitempty"`
+	Input      json.RawMessage         `json:"input,omitempty"`
+	Content    []anthropicContentBlock `json:"content"`
+	StopReason *anthropicStopReason    `json:"stop_reason,omitempty"`
+	Usage      *anthropicUsage         `json:"usage,omitempty"`
+	Error      *struct {
 		Message string `json:"message"`
 	} `json:"error"`
 	// Outcome evaluation fields (from Anthropic SSE stream)
@@ -39,6 +43,27 @@ type anthropicContentBlock struct {
 	Name string `json:"name"`
 }
 
+type anthropicStopReason struct {
+	Type     string   `json:"type"`
+	EventIDs []string `json:"event_ids"`
+}
+
+type anthropicUsage struct {
+	InputTokens              int64  `json:"input_tokens,omitempty"`
+	OutputTokens             int64  `json:"output_tokens,omitempty"`
+	TotalTokens              int64  `json:"total_tokens,omitempty"`
+	CacheReadTokens          int64  `json:"cache_read_tokens,omitempty"`
+	CacheWriteTokens         int64  `json:"cache_write_tokens,omitempty"`
+	CacheReadInputTokens     int64  `json:"cache_read_input_tokens,omitempty"`
+	CacheCreationInputTokens int64  `json:"cache_creation_input_tokens,omitempty"`
+	ServerToolUseInputTokens int64  `json:"server_tool_use_input_tokens,omitempty"`
+	ServiceTier              string `json:"service_tier,omitempty"`
+	CacheCreation            struct {
+		Ephemeral5mInputTokens int64 `json:"ephemeral_5m_input_tokens,omitempty"`
+		Ephemeral1hInputTokens int64 `json:"ephemeral_1h_input_tokens,omitempty"`
+	} `json:"cache_creation,omitempty"`
+}
+
 func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 	switch raw.Type {
 	case "agent.message":
@@ -47,14 +72,16 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 		return toolEvent(raw, agents.ProviderEventToolUseStarted), true
 	case "agent.tool_result":
 		return toolEvent(raw, agents.ProviderEventToolUseFinished), true
+	case "agent.custom_tool_use":
+		return customToolUseEvent(raw), true
 	case "session.status_idle":
-		return agents.ProviderEvent{Type: agents.ProviderEventTurnCompleted}, true
+		return idleEvent(raw)
 	case "session.status_terminated":
 		return sessionFailedEvent(raw), true
 	case "session.error":
-		// Managed Agents can emit recoverable internal errors and keep the
-		// session running; only status_terminated is terminal for us.
-		return agents.ProviderEvent{}, false
+		// Recoverable error: surface a notice but keep streaming. Only
+		// status_terminated is terminal.
+		return sessionNoticeEvent(raw), true
 	case "span.outcome_evaluation_start":
 		return outcomeEvaluationStartEvent(raw), true
 	case "agent.thread_message_sent":
@@ -80,10 +107,88 @@ func toolEvent(raw anthropicEvent, eventType agents.ProviderEventType) agents.Pr
 	return agents.ProviderEvent{
 		ProviderEventID: toolUseID(raw),
 		Type:            eventType,
-		ToolName:        raw.Name,
+		ToolName:        providerToolName(raw),
 		ToolCallID:      toolUseID(raw),
 		ToolInput:       redactSensitive(renderToolInput(raw.Input)),
 	}
+}
+
+func customToolUseEvent(raw anthropicEvent) agents.ProviderEvent {
+	id := customToolUseID(raw)
+	input := strings.TrimSpace(string(raw.Input))
+	return agents.ProviderEvent{
+		ProviderEventID: id,
+		Type:            agents.ProviderEventCustomToolUseStarted,
+		ToolName:        providerToolName(raw),
+		ToolCallID:      id,
+		ToolInput:       redactSensitive(input),
+		CustomToolUse: &agents.CustomToolUse{
+			ID:    id,
+			Name:  providerToolName(raw),
+			Input: input,
+		},
+	}
+}
+
+func idleEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
+	if raw.StopReason == nil || raw.StopReason.Type == "" || raw.StopReason.Type == "end_turn" {
+		return agents.ProviderEvent{
+			Type:  agents.ProviderEventTurnCompleted,
+			Model: raw.Model,
+			Usage: tokenUsage(raw.Usage),
+		}, true
+	}
+
+	if raw.StopReason.Type == "requires_action" {
+		return agents.ProviderEvent{
+			Type:               agents.ProviderEventCustomToolResultsRequired,
+			CustomToolEventIDs: append([]string(nil), raw.StopReason.EventIDs...),
+		}, true
+	}
+
+	return agents.ProviderEvent{
+		Type:  agents.ProviderEventTurnCompleted,
+		Model: raw.Model,
+		Usage: tokenUsage(raw.Usage),
+	}, true
+}
+
+func tokenUsage(raw *anthropicUsage) *agents.TokenUsage {
+	if raw == nil {
+		return nil
+	}
+
+	usage := &agents.TokenUsage{
+		InputTokens:      raw.InputTokens,
+		OutputTokens:     raw.OutputTokens,
+		TotalTokens:      raw.TotalTokens,
+		CacheReadTokens:  firstNonZero(raw.CacheReadTokens, raw.CacheReadInputTokens),
+		CacheWriteTokens: cacheCreationTokens(raw),
+	}
+	if usage.TotalTokens == 0 {
+		usage.TotalTokens = usage.InputTokens + usage.OutputTokens + usage.CacheReadTokens + usage.CacheWriteTokens + raw.ServerToolUseInputTokens
+	}
+	if usage.TotalTokens == 0 {
+		return nil
+	}
+	return usage
+}
+
+func cacheCreationTokens(raw *anthropicUsage) int64 {
+	return firstNonZero(
+		raw.CacheWriteTokens,
+		raw.CacheCreationInputTokens,
+		raw.CacheCreation.Ephemeral5mInputTokens+raw.CacheCreation.Ephemeral1hInputTokens,
+	)
+}
+
+func firstNonZero(values ...int64) int64 {
+	for _, value := range values {
+		if value != 0 {
+			return value
+		}
+	}
+	return 0
 }
 
 func sessionFailedEvent(raw anthropicEvent) agents.ProviderEvent {
@@ -94,6 +199,17 @@ func sessionFailedEvent(raw anthropicEvent) agents.ProviderEvent {
 	return agents.ProviderEvent{
 		Type:         agents.ProviderEventSessionFailed,
 		ErrorMessage: msg,
+	}
+}
+
+func sessionNoticeEvent(raw anthropicEvent) agents.ProviderEvent {
+	msg := "the agent hit a recoverable error and is retrying"
+	if raw.Error != nil && raw.Error.Message != "" {
+		msg = raw.Error.Message
+	}
+	return agents.ProviderEvent{
+		Type:         agents.ProviderEventSessionNotice,
+		ErrorMessage: redactSensitive(msg),
 	}
 }
 
@@ -139,6 +255,17 @@ func toolUseID(raw anthropicEvent) string {
 	return raw.ID
 }
 
+func customToolUseID(raw anthropicEvent) string {
+	return raw.ID
+}
+
+func providerToolName(raw anthropicEvent) string {
+	if raw.Name != "" {
+		return raw.Name
+	}
+	return raw.ToolName
+}
+
 // renderToolInput prefers the `command` field for shell-style tools and
 // falls back to compact JSON for anything else.
 func renderToolInput(input json.RawMessage) string {
@@ -164,8 +291,9 @@ func joinText(blocks []anthropicContentBlock) string {
 	return strings.Join(parts, "")
 }
 
-// JWTs are the only secret shape we inject into the preamble today; the
-// agent shouldn't be echoing them back through bash or assistant text.
+// Defense in depth: the agent is no longer handed any credential, but if a
+// JWT-shaped secret ever surfaces in tool output or assistant text we still
+// redact it rather than relay it to the user.
 var jwtPattern = regexp.MustCompile(`eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`)
 
 func redactSensitive(s string) string {

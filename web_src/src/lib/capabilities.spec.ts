@@ -1,6 +1,10 @@
 import type { IntegrationsCapabilityDefinition, IntegrationsIntegrationDefinition } from "@/api-client";
 import { describe, expect, it } from "vitest";
-import { buildIntegrationCapabilityGroupSections } from "@/lib/capabilities";
+import {
+  actionsFromCapabilities,
+  buildIntegrationCapabilityGroupSections,
+  triggersFromCapabilities,
+} from "@/lib/capabilities";
 
 function capability(name: string, label: string): IntegrationsCapabilityDefinition {
   return { name, label };
@@ -62,5 +66,51 @@ describe("buildIntegrationCapabilityGroupSections", () => {
       capabilityGroups: [{ capabilities: ["x"] }],
     };
     expect(buildIntegrationCapabilityGroupSections(definition, [capability("x", "X")])[0]?.label).toBe("Group 1");
+  });
+});
+
+describe("capability conversion", () => {
+  it("preserves action example output for expression autocomplete fallback", () => {
+    const actions = actionsFromCapabilities([
+      {
+        type: "TYPE_ACTION",
+        name: "custom.action",
+        label: "Custom Action",
+        exampleOutput: { data: { status: "passed" } },
+      },
+    ]);
+
+    expect(actions[0]).toMatchObject({
+      name: "custom.action",
+      exampleOutput: { data: { status: "passed" } },
+    });
+  });
+
+  it("preserves trigger example data for run title preview fallback", () => {
+    const triggers = triggersFromCapabilities([
+      {
+        type: "TYPE_TRIGGER",
+        name: "github.onCheckRun",
+        label: "Check Run",
+        exampleData: {
+          data: {
+            check_run: {
+              name: "DCO",
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(triggers[0]).toMatchObject({
+      name: "github.onCheckRun",
+      exampleData: {
+        data: {
+          check_run: {
+            name: "DCO",
+          },
+        },
+      },
+    });
   });
 });

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "loadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
+    "name": "my-load-balancer",
+    "dnsName": "my-load-balancer-123456789.us-east-1.elb.amazonaws.com",
+    "scheme": "internet-facing",
+    "type": "application",
+    "state": "active",
+    "vpcId": "vpc-0598c7d356eba48d7",
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-05-21T12:00:00Z",
+  "type": "aws.ec2.loadBalancer"
+}

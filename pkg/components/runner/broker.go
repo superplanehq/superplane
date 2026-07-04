@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -68,10 +69,11 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 //
 // Example request:
 // {
-//   "fleet_id": "aws-standard-1",
+//   "fleet_id": "e1-large-amd64",
 //   "commands": ["echo \"Hello, World!\""],
 //   "environment": [{"name": "APP_ENV", "value": "production"}],
 //   "webhook_url": "https://example.com/webhook",
+//   "webhook_payload_size_limit": 524288,
 //   "execution_mode": "host",
 //   "docker_image": "debian:bookworm-slim",
 //   "execution_timeout_seconds": 600
@@ -85,9 +87,14 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 type brokerCreateTaskRequest struct {
 	FleetID string `json:"fleet_id"`
 
-	Commands                []string                    `json:"commands"`
+	RunMode                 string                      `json:"run_mode,omitempty"`
+	Script                  string                      `json:"script,omitempty"`
+	MessageChain            json.RawMessage             `json:"message_chain,omitempty"`
+	Commands                []string                    `json:"commands,omitempty"`
+	SetupCommands           []string                    `json:"setup_commands,omitempty"`
 	Environment             []BrokerEnvironmentVariable `json:"environment,omitempty"`
 	WebhookURL              string                      `json:"webhook_url"`
+	WebhookPayloadSizeLimit int                         `json:"webhook_payload_size_limit"`
 	ExecutionMode           string                      `json:"execution_mode,omitempty"`
 	DockerImage             string                      `json:"docker_image,omitempty"`
 	ExecutionTimeoutSeconds *int                        `json:"execution_timeout_seconds,omitempty"`
@@ -99,15 +106,26 @@ type BrokerEnvironmentVariable struct {
 	Value string `json:"value"`
 }
 
+const (
+	RunModeJavaScript = "javascript_script"
+	RunModePython     = "python_script"
+	RunModeBash       = "bash_script"
+)
+
 // CreateTaskParams is forwarded to the task broker POST /v1/tasks.
 type CreateTaskParams struct {
-	MachineType    string
-	Commands       []string
-	WebhookURL     string
-	Environment    []BrokerEnvironmentVariable
-	ExecutionMode  string
-	DockerImage    string
-	TimeoutSeconds int // 0 = DefaultExecutionTimeoutSeconds
+	MachineType             string
+	RunMode                 string
+	Script                  string
+	MessageChain            json.RawMessage
+	Commands                []string
+	SetupCommands           []string
+	WebhookURL              string
+	WebhookPayloadSizeLimit int
+	Environment             []BrokerEnvironmentVariable
+	ExecutionMode           string
+	DockerImage             string
+	TimeoutSeconds          int // 0 = DefaultExecutionTimeoutSeconds
 }
 
 type brokerCreateTaskResponse struct {
@@ -120,18 +138,28 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		mode = ExecutionModeHost
 	}
 
+	webhookPayloadSizeLimit := p.WebhookPayloadSizeLimit
+	if webhookPayloadSizeLimit <= 0 {
+		webhookPayloadSizeLimit = config.MaxWebhookPayloadSize
+	}
+
 	fleetID, err := requireMachineType(p.MachineType)
 	if err != nil {
 		return "", err
 	}
 
 	req := brokerCreateTaskRequest{
-		FleetID:       fleetID,
-		Commands:      p.Commands,
-		Environment:   p.Environment,
-		WebhookURL:    p.WebhookURL,
-		ExecutionMode: mode,
-		DockerImage:   strings.TrimSpace(p.DockerImage),
+		FleetID:                 fleetID,
+		RunMode:                 strings.TrimSpace(p.RunMode),
+		Script:                  strings.TrimSpace(p.Script),
+		MessageChain:            p.MessageChain,
+		Commands:                p.Commands,
+		SetupCommands:           p.SetupCommands,
+		Environment:             p.Environment,
+		WebhookURL:              p.WebhookURL,
+		WebhookPayloadSizeLimit: webhookPayloadSizeLimit,
+		ExecutionMode:           mode,
+		DockerImage:             strings.TrimSpace(p.DockerImage),
 	}
 	timeout := p.TimeoutSeconds
 	if timeout <= 0 {

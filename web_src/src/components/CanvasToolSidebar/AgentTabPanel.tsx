@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import { AccountContext } from "@/contexts/accountContextState";
@@ -14,20 +13,20 @@ import {
   useCanvasAgentChat,
   useDefineAgentOutcome,
   useInterruptAgentChat,
+  useResetCanvasAgentChat,
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import { useCanvas, useCanvasVersion, useCanvasVersions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
-  getAgentBootInitialMessage,
+  clearAgentBootContextForCanvas,
   getAgentBootMessage,
   isAgentBootReady,
 } from "@/lib/agentBootContext";
 import { ConversationTranscript } from "./AgentConversationTranscript";
 import {
-  buildRubricText,
-  createInitialOutcomeState,
   createWebsocketCallbacks,
   isOutcomeActive,
   statusLabel,
@@ -35,14 +34,21 @@ import {
   useStoredOutcomeState,
   useThinkingIndicator,
 } from "./agentConversationState";
-import type { AgentMessage } from "./types";
+import type { AgentMessage, AgentOutgoingImage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
+import { useGreetedMessages } from "./useGreetedMessages";
+import { AgentSetupNotice } from "./AgentSetupState";
+import { getAgentSetupState, isSessionBusyError } from "./agentSetupStateModel";
+
+const STREAMING_STATUS_RECONCILE_INTERVAL_MS = 15000;
 
 type ChatConversationProps = {
   chatId: string;
   canvasId: string;
   organizationId: string;
+  initialStatus: string;
+  refreshChatStatus: () => Promise<string | undefined>;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
@@ -52,16 +58,13 @@ type DraftActionsBarProps = {
   messages: AgentMessage[];
   canvasId: string;
   organizationId: string;
-  chatId: string;
-  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
-  agentMode: AgentMode;
   isEditing: boolean;
   outcomePassed?: boolean;
   onVersionPublished?: () => void;
 };
 
 type ConversationHandlers = {
-  handleSend: (content: string) => Promise<void>;
+  handleSend: (content: string, images?: AgentOutgoingImage[]) => Promise<void>;
   handleStop: () => void;
   handleQuickAction: (action: string) => Promise<void>;
   handleStartBuilding: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => Promise<void>;
@@ -74,29 +77,38 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
   const chatId = chatQuery.data?.id ?? null;
   const { account } = useContext(AccountContext);
   const firstName = account?.name?.split(" ")[0] ?? "there";
+  const { refetch: refetchChat } = chatQuery;
+  const refreshChatStatus = useCallback(async () => {
+    const result = await refetchChat();
+    return result.data?.status;
+  }, [refetchChat]);
 
-  if (chatQuery.isLoading || !chatId) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="flex flex-col items-start">
-            <div className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900">
-              Hi {firstName}! I'm your SuperPlane agent. Give me a moment to set up and I'll help you build.
-              <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
-                <Loader2 className="size-3 animate-spin" /> Setting up...
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const setupState = getAgentSetupState({
+    chatId,
+    error: chatQuery.error,
+    isError: chatQuery.isError,
+    isFetching: chatQuery.isFetching,
+    isLoading: chatQuery.isLoading,
+  });
+  const agentUnavailable = setupState === "unavailable";
+  const { markAgentAvailable, markAgentUnavailable } = toolSidebarState;
+  useEffect(() => {
+    if (agentUnavailable) markAgentUnavailable();
+    if (!agentUnavailable && chatId) markAgentAvailable();
+  }, [agentUnavailable, chatId, markAgentAvailable, markAgentUnavailable]);
+
+  if (setupState) {
+    return <AgentSetupNotice firstName={firstName} onRetry={() => void chatQuery.refetch()} state={setupState} />;
   }
 
+  const readyChatId = chatId as string;
   return (
     <ChatConversation
-      chatId={chatId}
+      chatId={readyChatId}
       canvasId={canvasId}
       organizationId={organizationId}
+      initialStatus={chatQuery.data?.status ?? "idle"}
+      refreshChatStatus={refreshChatStatus}
       agentMode={toolSidebarState.agentMode}
       onModeSwitch={toolSidebarState.switchAgentMode}
       isEditing={toolSidebarState.isEditing}
@@ -108,6 +120,8 @@ function ChatConversation({
   chatId,
   canvasId,
   organizationId,
+  initialStatus,
+  refreshChatStatus,
   agentMode,
   onModeSwitch,
   isEditing,
@@ -116,68 +130,52 @@ function ChatConversation({
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
   const interruptMutation = useInterruptAgentChat(organizationId);
   const outcomeMutation = useDefineAgentOutcome(organizationId);
-  const [status, setStatus] = useState<string>("idle");
+  const resetMutation = useResetCanvasAgentChat(organizationId, canvasId);
+  const [status, setStatus] = useState<string>(initialStatus || "idle");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [outcomeState, setOutcomeState] = useStoredOutcomeState(chatId);
   const rawMessages = useConversationMessages(messagesQuery.data);
-  const { account } = useContext(AccountContext);
-  const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
-  const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
+  const messages = useGreetedMessages(rawMessages, canvasId);
 
-  // Prepend a synthetic greeting as the first message so it never disappears
-  const messages = useMemo(() => {
-    const greeting: AgentMessage = {
-      id: "__greeting__",
-      role: "assistant",
-      content: `Hi ${greetingFirstName}! I'm your SuperPlane agent. I'll help you build and modify this canvas.`,
-      createdAt: rawMessages[0]?.createdAt ?? null,
-      toolCallId: "",
-      toolName: "",
-      toolStatus: "",
-    };
-
-    if (!bootInitialMessage) {
-      return [greeting, ...rawMessages];
-    }
-
-    const templateIntro: AgentMessage = {
-      id: "__boot_initial_message__",
-      role: "assistant",
-      content: bootInitialMessage,
-      createdAt: rawMessages[0]?.createdAt ?? null,
-      toolCallId: "",
-      toolName: "",
-      toolStatus: "",
-    };
-
-    return [greeting, templateIntro, ...rawMessages];
-  }, [rawMessages, greetingFirstName, bootInitialMessage]);
+  // chatId is a dep so a /clear session swap resets a stale "streaming" status.
+  useEffect(() => {
+    setStatus(initialStatus || "idle");
+  }, [initialStatus, chatId]);
+  useStreamingStatusReconciler(status, setStatus, refreshChatStatus);
 
   const showThinking = useThinkingIndicator(rawMessages, status);
   useAgentBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, agentMode });
   const handlers = useConversationHandlers({
     agentMode,
     chatId,
+    canvasId,
+    isBusy: status === "streaming" || outcomeMutation.isPending || isOutcomeActive(outcomeState),
     outcomeMutation,
     interruptMutation,
+    resetMutation,
     sendMutation,
     setError,
+    setNotice,
     setOutcomeState,
   });
 
-  const wsCallbacks = useMemo(() => createWebsocketCallbacks(setStatus, setError, setOutcomeState), [setOutcomeState]);
+  const wsCallbacks = useMemo(
+    () => createWebsocketCallbacks(setStatus, setError, setOutcomeState, setNotice),
+    [setOutcomeState],
+  );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
   const outcomeActive = isOutcomeActive(outcomeState);
-  const agentBusy = status === "streaming" || outcomeMutation.isPending || outcomeActive;
-  const modeDisabled = agentBusy;
+  const agentBusy = status === "streaming" || outcomeMutation.isPending || resetMutation.isPending || outcomeActive;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTranscript
         error={error}
+        notice={notice}
         canvasId={canvasId}
         organizationId={organizationId}
         messageGroups={messageGroups}
@@ -201,27 +199,77 @@ function ChatConversation({
         messages={messages}
         canvasId={canvasId}
         organizationId={organizationId}
-        chatId={chatId}
-        sendMutation={sendMutation}
-        agentMode={agentMode}
         isEditing={isEditing}
         outcomePassed={outcomeState?.phase === "passed"}
         onVersionPublished={() => setOutcomeState(null)}
       />
 
-      <ChatComposer
+      <ComposerWithCanvasData
+        canvasId={canvasId}
+        organizationId={organizationId}
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
+        onClearChat={() => void handlers.handleSend("/clear")}
+        clearing={resetMutation.isPending}
         sending={agentBusy}
-        sendPending={sendMutation.isPending}
+        sendPending={sendMutation.isPending || resetMutation.isPending}
         stopping={interruptMutation.isPending}
-        statusLabel={statusLabel(status)}
+        statusLabel={resolveComposerStatusLabel(resetMutation.isPending, sendMutation.isPending, status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
-        modeDisabled={modeDisabled}
+        modeDisabled={agentBusy}
       />
     </div>
   );
+}
+
+function resolveComposerStatusLabel(resetPending: boolean, sendPending: boolean, status: string): string {
+  if (resetPending) return "Clearing chat...";
+  if (sendPending) return "Starting agent...";
+  return statusLabel(status);
+}
+
+function useStreamingStatusReconciler(
+  status: string,
+  setStatus: (value: string) => void,
+  refreshChatStatus: () => Promise<string | undefined>,
+) {
+  const activeRef = useRef(false);
+  const inFlightRef = useRef(false);
+  const reconcile = useCallback(async () => {
+    if (inFlightRef.current) {
+      return;
+    }
+
+    inFlightRef.current = true;
+    try {
+      const nextStatus = await refreshChatStatus();
+      if (activeRef.current && nextStatus && nextStatus !== "streaming") {
+        setStatus(nextStatus);
+      }
+    } catch {
+      // Websocket events remain the primary status path; refetch only repairs missed terminal events.
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [refreshChatStatus, setStatus]);
+
+  useEffect(() => {
+    if (status !== "streaming") {
+      return;
+    }
+
+    activeRef.current = true;
+    void reconcile();
+    const intervalId = window.setInterval(() => {
+      void reconcile();
+    }, STREAMING_STATUS_RECONCILE_INTERVAL_MS);
+
+    return () => {
+      activeRef.current = false;
+      window.clearInterval(intervalId);
+    };
+  }, [reconcile, status]);
 }
 
 function useAgentBootKickoff({
@@ -260,11 +308,20 @@ function useAgentBootKickoff({
     const allMessages = messagesQuery.data.pages?.flatMap((p) => p.messages) ?? [];
     if (allMessages.length > 0) return;
 
+    const bootMessage = getAgentBootMessage(canvasId);
+
+    // If no boot message (e.g. blank canvas), skip sending — static greeting only.
+    // Don't clear the boot context so refreshes still see the blank marker and skip again.
+    if (!bootMessage) {
+      bootState.current = "sent";
+      return;
+    }
+
     bootState.current = "sending";
     void sendMutation
       .mutateAsync({
         chatId,
-        content: createSystemMessage(getAgentBootMessage(canvasId)),
+        content: createSystemMessage(bootMessage),
         mode: agentMode,
       })
       .then(() => {
@@ -280,37 +337,84 @@ function useAgentBootKickoff({
 function useConversationHandlers({
   agentMode,
   chatId,
+  canvasId,
+  isBusy,
   outcomeMutation,
   interruptMutation,
+  resetMutation,
   sendMutation,
   setError,
-  setOutcomeState,
+  setNotice,
+  setOutcomeState: _setOutcomeState,
 }: {
   agentMode: AgentMode;
   chatId: string;
+  canvasId: string;
+  isBusy: boolean;
   outcomeMutation: ReturnType<typeof useDefineAgentOutcome>;
   interruptMutation: ReturnType<typeof useInterruptAgentChat>;
+  resetMutation: ReturnType<typeof useResetCanvasAgentChat>;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   setError: (value: string | null) => void;
+  setNotice: (value: string | null) => void;
   setOutcomeState: (update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => void;
 }): ConversationHandlers {
   // React Query mutation objects are new on every render; keep latest refs in
   // a ref so the handler callbacks stay stable across parent re-renders
-  // (canvas zoom/pan ticks the parent often).
-  const mutationsRef = useRef({ sendMutation, interruptMutation, outcomeMutation });
-  mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation };
+  // (canvas zoom/pan ticks the parent often). isBusy rides along too.
+  const mutationsRef = useRef({ sendMutation, interruptMutation, outcomeMutation, resetMutation });
+  mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation, resetMutation };
+  const isBusyRef = useRef(isBusy);
+  isBusyRef.current = isBusy;
 
   const handleSend = useCallback(
-    async (content: string) => {
-      const { sendMutation: send } = mutationsRef.current;
-      if (!content.trim() || send.isPending) return;
+    async (content: string, images?: AgentOutgoingImage[]) => {
+      const trimmed = content.trim();
+      const { sendMutation: send, resetMutation: reset } = mutationsRef.current;
+
+      // Handle /clear before the generic send guard below so it isn't silently
+      // swallowed while a send is pending; surface a notice instead.
+      if (trimmed === "/clear") {
+        if (reset.isPending) return;
+        setError(null);
+        setNotice(null);
+        if (isBusyRef.current) {
+          setNotice("Wait for the agent to finish before clearing the chat.");
+          return;
+        }
+        if (send.isPending) {
+          setNotice("Wait for the message to send before clearing the chat.");
+          return;
+        }
+        await reset.mutateAsync().catch((error) => {
+          // The backend also guards against a busy session; if local status hadn't
+          // caught up yet, show the intentional notice rather than a raw error.
+          if (isSessionBusyError(error)) {
+            setNotice("Wait for the agent to finish before clearing the chat.");
+          } else {
+            setError(error instanceof Error ? error.message : "failed to clear chat");
+          }
+          throw error;
+        });
+        // Only after a successful reset: scoped so the fresh session can't auto-boot
+        // or keep showing this canvas's stale intro. Kept after the await so a failed
+        // clear doesn't drop the boot context while the old session is still intact.
+        clearAgentBootContextForCanvas(canvasId);
+        _setOutcomeState(null);
+        setNotice("Chat cleared. You’re in a fresh session.");
+        return;
+      }
+
+      if ((!trimmed && (images?.length ?? 0) === 0) || send.isPending || reset.isPending) return;
       setError(null);
-      await send.mutateAsync({ chatId, content, mode: agentMode }).catch((error) => {
+      setNotice(null);
+
+      await send.mutateAsync({ chatId, content, mode: agentMode, images }).catch((error) => {
         setError(error instanceof Error ? error.message : "failed to send message");
         throw error;
       });
     },
-    [agentMode, chatId, setError],
+    [agentMode, chatId, canvasId, setError, setNotice, _setOutcomeState],
   );
 
   const handleStop = useCallback(() => {
@@ -319,8 +423,8 @@ function useConversationHandlers({
 
   const handleQuickAction = useCallback(
     async (action: string) => {
-      const { sendMutation: send } = mutationsRef.current;
-      if (send.isPending) return;
+      const { sendMutation: send, resetMutation: reset } = mutationsRef.current;
+      if (send.isPending || reset.isPending) return;
       try {
         await send.mutateAsync({ chatId, content: action, mode: agentMode });
       } catch {
@@ -331,41 +435,25 @@ function useConversationHandlers({
   );
 
   const handleStartBuilding = useCallback(
-    async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
-      const rubricText = buildRubricText(rubric);
-      const { sendMutation: send, outcomeMutation: outcome } = mutationsRef.current;
+    async (_rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
+      const { sendMutation: send, resetMutation: reset } = mutationsRef.current;
+      // Only guard against an in-flight reset here; unlike quick actions this path
+      // intentionally doesn't gate on send.isPending (it fires right after a send).
+      if (reset.isPending) return;
 
-      // In Build mode: rubric is a spec confirmation, not an outcome.
-      // Agent already has full context — just confirm.
-      if (agentMode === "builder") {
+      // Rubric is a spec confirmation — tell the agent to start building.
+      // Always use builder mode regardless of current agentMode.
+      try {
         await send.mutateAsync({
           chatId,
           content: "Specs approved. Start building.",
           mode: "builder",
         });
-        return;
-      }
-
-      // In Plan mode: kick off outcome with grading loop
-      setOutcomeState(createInitialOutcomeState(rubric));
-
-      try {
-        await outcome.mutateAsync({
-          chatId,
-          description: `Build a canvas based on this plan: ${rubric.title}`,
-          rubric: rubricText,
-          maxIterations: 3,
-        });
       } catch {
-        setOutcomeState(null);
-        await send.mutateAsync({
-          chatId,
-          content: `Start building based on this plan:\n\n${rubricText}`,
-          mode: "builder",
-        });
+        setError("Failed to start building. Please try again.");
       }
     },
-    [chatId, agentMode, setOutcomeState],
+    [chatId, setError],
   );
 
   return useMemo(
@@ -378,9 +466,6 @@ function DraftActionsBar({
   messages,
   canvasId,
   organizationId,
-  chatId,
-  sendMutation,
-  agentMode,
   isEditing,
   outcomePassed,
   onVersionPublished,
@@ -389,12 +474,17 @@ function DraftActionsBar({
     messages,
     canvasId,
     organizationId,
-    chatId,
-    sendMutation,
-    agentMode,
     outcomePassed,
     onVersionPublished,
   });
+
+  useEffect(() => {
+    if (!latestDraft) {
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("agent:draft-ready", { detail: { versionId: latestDraft.versionId } }));
+  }, [canvasId, latestDraft]);
 
   if (!latestDraft) return null;
 
@@ -412,4 +502,45 @@ function DraftActionsBar({
       </div>
     </div>
   );
+}
+
+function ComposerWithCanvasData({
+  canvasId,
+  organizationId,
+  ...composerProps
+}: {
+  canvasId: string;
+  organizationId: string;
+  onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
+  onStop: () => void;
+  onClearChat: () => void;
+  clearing: boolean;
+  sending: boolean;
+  sendPending: boolean;
+  stopping?: boolean;
+  statusLabel: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  modeDisabled?: boolean;
+}) {
+  const { data: canvas } = useCanvas(organizationId, canvasId, {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+  const { data: versions } = useCanvasVersions(organizationId, canvasId);
+  const latestVersion = versions?.[0];
+  const isDraft = latestVersion?.metadata?.state === "STATE_DRAFT";
+  const { data: draftVersion } = useCanvasVersion(organizationId, canvasId, latestVersion?.metadata?.id ?? "", isDraft);
+
+  // Use draft nodes if a draft exists, otherwise fall back to published
+  const nodes = useMemo(
+    () => (isDraft && draftVersion?.spec?.nodes ? draftVersion.spec.nodes : canvas?.spec?.nodes) ?? [],
+    [isDraft, draftVersion, canvas],
+  );
+
+  const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);
+  const runs = useMemo(() => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [], [runsQuery.data]);
+
+  return <ChatComposer {...composerProps} nodes={nodes} runs={runs} />;
 }

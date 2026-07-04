@@ -5,29 +5,28 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func ListGroups(ctx context.Context, domainType string, domainID string, authService authorization.Authorization) (*pb.ListGroupsResponse, error) {
-	groupNames, err := authService.GetGroups(domainID, domainType)
+	groupNames, err := authService.GetGroups(ctx, domainID, domainType)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get groups")
+		return nil, grpcerrors.Internal(err, "failed to get groups")
 	}
 
 	groups := make([]*pb.Group, len(groupNames))
 	for i, groupName := range groupNames {
-		role, err := authService.GetGroupRole(domainID, domainType, groupName)
+		role, err := authService.GetGroupRole(ctx, domainID, domainType, groupName)
 		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to get group roles")
+			return nil, grpcerrors.Internal(err, "failed to get group roles")
 		}
 
-		groupUsers, err := authService.GetGroupUsers(domainID, domainType, groupName)
+		groupUsers, err := authService.GetGroupUsers(ctx, domainID, domainType, groupName)
 		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to get group members count")
+			return nil, grpcerrors.Internal(err, "failed to get group members count")
 		}
 
 		groupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)

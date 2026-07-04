@@ -51,6 +51,10 @@ web_src/src/pages/workflowv2/
     TypedPanelShell.tsx
     PanelEditorDialog.tsx
     MarkdownPanelCard.tsx
+    HtmlPanelCard.tsx
+    HtmlPanelEditor.tsx
+    HtmlBody.tsx
+    htmlSanitize.ts
     NodePanelCard.tsx
     TablePanelCard.tsx
     ChartPanelCard.tsx
@@ -121,7 +125,8 @@ The panel `content` object is intentionally flexible, but every known panel type
 | Type | Purpose | Main content fields |
 | --- | --- | --- |
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
-| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `showRun?`, `triggerName?` |
+| `html` | Custom HTML with inline styles, scoped `<style>` blocks, and Tailwind classes (scripts and external resources blocked) | `title?`, `body?`, `variables?` |
+| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `label?`, `showRun?`, `triggerName?`, `promptConfirmation?` |
 | `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
@@ -142,8 +147,8 @@ Table, chart, and number panels share these data sources:
 | Source | Query | Result rows |
 | --- | --- | --- |
 | `memory` | `useCanvasMemoryEntries` | Canvas memory entries filtered by namespace. Optional `fieldPath` flattens a nested value or list. |
-| `executions` | `useInfiniteCanvasEvents` | Flattened `event.executions[]`, optionally filtered to one resolved node. Rows include `status`, `nodeName`, and `durationMs`. |
-| `runs` | `useInfiniteCanvasRuns` | Raw run objects. Number widgets can use API `totalCount` for count KPIs. |
+| `executions` | `useInfiniteCanvasEvents` | Flattened `event.executions[]`, optionally filtered to one resolved node. Rows include `status`, `nodeName`, `durationMs`, and `payload` (the data the node received from its root event). |
+| `runs` | `useInfiniteCanvasRuns` (+ `useEventExecutionsBatch` for `$`) | Raw run objects plus derived `status`, `nodeName` (the node that initiated the run, resolved from `rootEvent.nodeId`), `payload` (alias for `rootEvent.data`, the initial payload that triggered the run), `durationMs` (created-to-finished elapsed time in milliseconds — pair with `format: duration`), and `$` (a map keyed by node display name with each node's full execution including `outputs` — see [Addressing per-node outputs](#addressing-per-node-outputs)). Number widgets can use API `totalCount` for count KPIs. |
 
 Execution widgets eager-load more event pages until they have enough execution rows for the configured `limit`, or until a bounded page cap is reached. This avoids count widgets flashing an intermediate value when the first event page has few executions.
 
@@ -195,10 +200,29 @@ The table editor populates the column dropdown, the filter / sort field datalist
 | Data source | Field catalog |
 | --- | --- |
 | `memory` | Discovered live from canvas memory entries in the chosen namespace. |
-| `executions` | Static catalog mirroring the execution row shape (`status`, `nodeName`, `durationMs`, `state`, `result`, `resultReason`, `resultMessage`, `id`, `nodeId`, `canvasId`, `parentExecutionId`, `previousExecutionId`, `createdAt`, `updatedAt`). |
-| `runs` | Static catalog mirroring `CanvasesCanvasRun` (`state`, `result`, `id`, `canvasId`, `versionId`, `createdAt`, `updatedAt`, `finishedAt`). |
+| `executions` | Static catalog mirroring the execution row shape (`status`, `nodeName`, `durationMs`, `payload`, `state`, `result`, `resultReason`, `resultMessage`, `id`, `nodeId`, `canvasId`, `parentExecutionId`, `previousExecutionId`, `createdAt`, `updatedAt`). |
+| `runs` | Static catalog mirroring `CanvasesCanvasRun` plus the derived fields appended by `collectRunRows` (`state`, `result`, `status`, `nodeName`, `payload`, `durationMs`, `$`, `id`, `canvasId`, `versionId`, `createdAt`, `updatedAt`, `finishedAt`, `rootEvent.nodeId`, `rootEvent.customName`). |
 
-When suggestions are available, the column header bar also exposes an **Add all fields** button and quick-add chips that insert a column for each catalog field with `suggestColumnFormat`-derived formatting (e.g. `status` → `status`, `createdAt` → `relative`). Authors can still type a custom field (or `{{ CEL }}` template) — the dropdown switches to a free-text input via the `Custom…` option.
+When suggestions are available, the column header bar also exposes an **Add all fields** button and quick-add chips that insert a column for each catalog field with `suggestColumnFormat`-derived formatting (e.g. `status` → `status`, `createdAt` → `relative`).
+
+The column, filter, row-style, and sort field inputs are free-text — authors can type any **nested dot path** (e.g. `payload.user_id`, `rootEvent.customName`) or `{{ CEL }}` template. Catalog entries surface as `<datalist>` autocomplete suggestions. When the typed value matches a known catalog field, the column's `label` and `format` are auto-filled (only when the author hasn't already set them) so picking from the dropdown stays one-click.
+
+#### Addressing per-node outputs
+
+Run rows expose a `$` map keyed by **node display name** so authors can address the outputs of any node within that run. The shape mirrors the canvas-side expression syntax (`$['Node Name'].data`):
+
+| Path | Resolves to |
+| --- | --- |
+| `$["deploy-prod"].outputs` | The raw outputs map (`{ <channel>: [<event>, ...] }`) for the `deploy-prod` execution. |
+| `$["deploy-prod"].outputs.default[0]` | The first event emitted on the `default` channel. |
+| `$["deploy-prod"].data` | Convenience shortcut for the **last** event of the `default` channel (or the first available channel) with one `data` envelope unwrapped — matches what canvas-side `$['Node'].data` resolves to. |
+| `$["deploy-prod"].state`, `$["deploy-prod"].result` | Per-node state and result fields, useful for row styling. |
+
+The same syntax works in both literal field paths (e.g. a column `field: $["deploy-prod"].data.url`) and in `{{ }}` CEL templates (e.g. `format: link, label: "{{ $['deploy-prod'].data.url }}"`). Under the hood the CEL compiler rewrites `$` to a safe identifier (cel-js doesn't accept `$` as an identifier), but authors don't need to be aware of the rewrite — string literals are preserved verbatim, so a `$` inside `"..."` or `'...'` is left alone.
+
+**Missing nodes resolve to `undefined`** — when a given node didn't run for that run (e.g. the workflow forked and only one branch executed, or the execution hasn't reached that node yet), `$["other-node"].outputs` returns `undefined` and the widget cell renders as `-`. This is intentional and matches how missing dot paths behave elsewhere.
+
+**Performance:** Run-level outputs are not part of the `ListRuns` payload (executions are returned as lightweight refs). The widget side-loads them via `ListEventExecutions(rootEventId)` for each visible run, capped by the panel's `limit`. React Query caches the response keyed by `(canvasId, rootEventId)`, so opening the run detail modal and the widget share results. Authors with very large `limit` values should expect one extra request per run on first load.
 
 ### Columns
 
@@ -209,7 +233,7 @@ Each column needs a non-empty `field`. Optional fields:
 | `label` | Header text. Falls back to `field`. |
 | `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, or `link`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). |
 | `show` | Row expression controlling whether the cell is visible. |
-| `href` | Link template for `link` columns. |
+| `href` | Link template for `link` columns. Accepts `{{ cel }}` expressions and templates (e.g. `{{ prUrl }}` or `https://github.com/{{ org }}/pull/{{ prNumber }}`), legacy single-brace `{field}` placeholders, and bare static URLs. The column editor shows a dedicated href input with a field picker (values inserted as `{{ field }}`) when the format is `link`. |
 
 Column fields can be direct paths such as `status` or expression templates where supported by the widget helpers.
 
@@ -261,6 +285,39 @@ Console widgets support two related expression styles:
 - Legacy expressions such as `status == "running"` are supported in `show` and some filters.
 
 Use CEL templates for new payloads, confirmation text, and rich interpolation. Use structured `where` filters when the condition is simple and should be validated.
+
+### CEL builtins
+
+In addition to the standard CEL functions cel-js ships with, the dashboard exposes these helpers in every expression's environment:
+
+| Builtin | Description |
+| --- | --- |
+| `int(v)`, `float(v)`, `string(v)` | Type coercions, with sensible fallbacks for nullish input. |
+| `contains(s, sub)`, `startsWith(s, p)`, `endsWith(s, p)`, `matches(s, regex)` | String / regex predicates. |
+| `lower(s)`, `upper(s)` | Case conversions. |
+| `duration(seconds)` | Format a number of seconds as `5m 30s` / `1h 5m`. |
+| `timestamp(seconds)` | Format epoch seconds as an ISO-8601 string. |
+| `formatDate(value, pattern)` | Render any date-like value (ISO string, Date, epoch number) with tokens `yyyy yy MM M dd d HH H mm m ss s`. Renders in the viewer's local time. |
+| `epochMs(value)` | Convert any date-like value (ISO-8601 string, Date instance, epoch seconds, epoch ms) to **milliseconds since epoch**. Returns `0` for unparseable input so arithmetic stays defined. Pairs with `duration()` for human-friendly elapsed-time output. |
+| `parseJson(s)` | Parse a JSON-encoded string into a structured value (list, map, scalar). Non-string inputs pass through unchanged; invalid JSON or `null` input returns `null`. Useful as a wholesale value (`{{ parseJson(blob) }}`), wrapped in another function (`size(parseJson(tags))`), or for equality checks (`parseJson(value) == null`). |
+| `join(list, sep)` | Concatenate the elements of a list into a single string with an explicit separator. Non-array `list` returns `""`; non-string `sep` collapses to `""`; `null`/`undefined` elements render as `""`. Required to splice a mapped list into the output — a bare array value renders as JSON (`["a","b"]`) so it stays inspectable. Use `join(list, "")` for seamless fragment concatenation or any other separator for delimited output. Pairs with the `.map`/`.filter` macros on list-mode memory variables (`join(rows.map(r, "- " + r.name), "\n")`) — see [List mode](#list-mode). |
+| `firstLine(s)` | Text before the first line break in `s`. Treats `\r\n` and bare `\r` the same as `\n`. Returns `""` for `null`/`undefined`. Use it to keep multi-line run outputs from blowing up table cells: `{{ firstLine(payload.message) }}`. |
+| `substring(s, start, end?)` | Slice of `s` from `start` (inclusive) to `end` (exclusive). When `end` is omitted, returns everything from `start` onward. Negative `start` counts from the end (`-3` = last 3). Indices are clamped to the string length, and `end <= start` returns `""`. Non-string input is coerced via `String(value)`; `null`/`undefined` returns `""`. |
+| `truncate(s, n, suffix?)` | First `n` characters of `s`, with `suffix` appended only when truncation actually happened. Inputs shorter than `n`, non-numeric `n`, and negative `n` return `s` unchanged. Use it for "show first 80 chars with `…`" cells: `{{ truncate(payload.message, 80, "…") }}`. |
+| `splitIndex(s, sep, i)` | Nth segment of `split(s, sep)` returned as a scalar (cel-js can't index a function-call result inline). Negative `i` counts from the end (`-1` = last). Returns `""` for out-of-range / non-numeric `i`; an empty separator returns `s` unchanged. The separator is unescaped (`\n`, `\r`, `\t`, `\\`) because cel-js's lexer copies string literals verbatim, so `splitIndex(value, "\n", 0)` and `splitIndex(value, "|", 0)` both work as you'd expect. A `"\n"` separator also matches `\r\n` and bare `\r`, so it agrees with `firstLine` on Windows line endings. |
+| `trim(s, chars?)` | Strip leading / trailing whitespace, or — when `chars` is supplied — strip leading / trailing characters that appear in `chars`. |
+| `replace(s, old, new)` | Replace every occurrence of `old` in `s` with `new`. Empty `old` returns `s` unchanged. |
+| `indexOf(s, sub)` | First index of `sub` in `s`, or `-1` when missing. Useful inside `where` filters / boolean expressions. |
+
+`parseJson` has a real limitation: **cel-js does not support postfix `.field` / `[i]` / `.method(...)` after a function call result.** That means expressions like `parseJson(blob).items[0].id` or `parseJson(tags).map(t, t)` will fail to parse. To iterate or dot-access parsed data, either shape it as a real list/map upstream (canvas memory values are JSON-typed, so storing `{"tags": ["a","b"]}` lets you write `tags.map(t, t)` natively) or compose with macros that take the parsed value as an argument (`size`, `string`, etc.).
+
+The string-trimming helpers (`firstLine`, `substring`, `truncate`, `splitIndex`) all return scalars **for the same reason** — authors can't write `split(s, "\n")[0]` or `s.substring(0, 80)` against cel-js. The single-call form (`firstLine(s)`, `substring(s, 0, 80)`) sidesteps the parser limitation. They are the recommended way to trim long values that come straight from the `runs` data source (raw run outputs, error messages, etc.); equivalent expressions like `value[:80]` work in expr-lang at node-config / write time but **not** in widget cells.
+
+Note that `field: finishedAt - createdAt` does **not** work directly because both values are ISO-8601 strings and CEL doesn't subtract strings. Use one of:
+
+- `field: durationMs, format: duration` — easiest for the standard "how long did this take" cell on `runs` or `executions` rows (the derived field is already there).
+- `field: '{{ duration((epochMs(finishedAt) - epochMs(createdAt)) / 1000) }}'` — the explicit CEL form, useful when comparing arbitrary timestamp fields or subtracting the trigger time from the finish time.
+- `field: '{{ epochMs(finishedAt) - epochMs(createdAt) }}', format: duration` — gives you a numeric ms value the column formatter can render and downstream filters can compare against.
 
 Loose equality in legacy expressions is implemented explicitly by normalizing scalar strings, numbers, booleans, and `null`; do not add `eslint-disable-next-line` directives for equality checks.
 
@@ -326,6 +383,31 @@ Tooltips show the category in the header and one row per series with `label — 
 - `auto` (default) — visible for donut charts or when 2+ series are configured; hidden otherwise.
 - `show` — always visible (useful when you want consistent labels even for a single-series chart).
 - `hide` — never rendered.
+
+### Axis formatting
+
+Cartesian charts (`bar`, `stacked-bar`, `line`, `area`) expose three optional axis fields:
+
+- `xFormat` — display format applied to X-axis tick labels **and the hover tooltip header** (so the category in the tooltip matches the axis). Reuses the shared column-format vocabulary (`text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`). Useful when `xField` is a raw timestamp or numeric field — set `xFormat: date` instead of wrapping `xField` in a CEL expression like `{{ formatDate(createdAt, "MM/dd") }}`.
+- `yLabel` — Y-axis title rendered alongside the ticks (for example `USD`, `Errors / day`). Omitted by default.
+- `yFormat` — display format applied to Y-axis tick labels (`number`, `percent`, `duration`). Falls back to a locale-aware numeric default with thousands separators above 1k. The `format` declared on a series only affects tooltip values; configure `yFormat` to match it on the axis itself.
+
+```yaml
+render:
+  kind: chart
+  type: bar
+  xField: createdAt
+  xFormat: date
+  yLabel: USD
+  yFormat: number
+  series:
+    - field: cost
+      label: Cost
+      format: number
+      prefix: "$"
+```
+
+Donut charts ignore `xFormat`, `yLabel`, and `yFormat` (no axes are rendered).
 
 `WidgetChart` is implemented with Recharts via the shared shadcn `ChartContainer`. Category labels live in the tooltip rather than on the chart surface so densely-packed x-axes don't overlap.
 
@@ -455,15 +537,159 @@ Supported authoring features:
 
 - **Safe-by-default raw HTML.** `rehype-sanitize` strips `<script>`, inline event handlers (`onclick`, `onerror`, …), and any tag outside the allowlist. The only raw HTML tags explicitly added on top of the default allowlist are `<details>` and `<summary>` (plus the `open` attribute on `<details>`). If you need a new tag, extend `MARKDOWN_SANITIZE_SCHEMA` in `MarkdownPanelCard.tsx` rather than disabling sanitization.
 
+### Markdown variables
+
+Markdown panels can reference live data through named variables. Variables are declared on `content.variables` and consumed from the body (or title) with the same `{{ }}` CEL templates that table widgets use:
+
+```yaml
+- id: deploy-summary
+  type: markdown
+  content:
+    title: "Latest deploy of {{ release.service }}"
+    body: |
+      ## {{ release.service }}
+
+      - Status: **{{ lastRun.status }}**
+      - Triggered by: {{ lastRun.nodeName }}
+      - Output URL: {{ lastRun.$["Deploy"].data.url }}
+    variables:
+      - name: release
+        source:
+          kind: memory
+          namespace: releases
+          orderBy: createdAt
+          direction: desc
+          matches:
+            - field: env
+              value: production
+      - name: lastRun
+        source:
+          kind: run
+          select: latest_passed
+```
+
+Two source kinds are supported:
+
+- **`memory`** — picks the first row from a memory namespace (default), or the full sorted array when `mode: list` is set. Use `matches` (property-equality) to filter and `orderBy` + `direction` to choose which row counts as "first". `createdAt` is the default order; the namespace `id` is also queryable. The exposed object spreads the memory row's `values` together with `id`, `namespace`, `createdAt`, and `updatedAt`.
+- **`run`** — picks the most recent run with `select: latest`, `latest_passed`, or `latest_failed`. The exposed object spreads the run row and adds:
+  - `status` — normalized to `passed | failed | cancelled | running | unknown`.
+  - `nodeName`, `payload`, `durationMs` — convenience fields mirroring what the table widget exposes.
+  - `$` — a map of node-execution outputs keyed by node display name. Use it as `{{ run.$["Node Name"].data.field }}` for run-level output references.
+
+Variables resolve to `null` when no row matches (or `[]` in list mode); CEL access on `null` renders as an empty string, so a partial template never throws. The in-card editor surfaces a per-variable preview with one-click "insert" buttons, plus a live rendered preview that mirrors what the saved panel will display.
+
+#### List mode
+
+Add `mode: list` to a memory source to resolve the variable to every matching row instead of just the first. This unlocks CEL list macros (`map`, `filter`, `all`, `exists`, `size`) inside `{{ }}` so authors can render the rows as a Markdown / HTML list, count or filter them inline, etc. An optional `limit` (positive integer) caps the array; omit it to include every match.
+
+```yaml
+variables:
+  - name: deploys
+    source:
+      kind: memory
+      namespace: deployments
+      orderBy: createdAt
+      direction: desc
+      mode: list
+      limit: 20
+```
+
+cel-js doesn't allow `.method()` postfix after a function-call result, so chain macros directly off the bound variable (`deploys.filter(...).map(...)`).
+
+When an interpolated expression resolves to an array, the renderer falls back to JSON (e.g. `["a","b"]`) so a stray `{{ deploys }}` or `{{ rows }}` reference stays inspectable instead of silently flattening. To splice a mapped list of HTML/Markdown fragments into the output, wrap it in the `join(list, sep)` builtin — use `""` for seamless concatenation:
+
+```html
+<div>{{ join(deploys.map(d, "<p>" + d.name + "</p>"), "") }}</div>
+```
+
+renders `<div><p>web</p><p>api</p>…</div>`. When you want a separator between elements (newlines for a Markdown bullet list, commas for an inline summary), pass it as the second argument instead:
+
+```markdown
+- Total deploys: {{ size(deploys) }}
+- Passed: {{ size(deploys.filter(d, d.status == "passed")) }}
+
+{{ join(deploys.map(d, "- " + d.name + " @ " + d.createdAt), "\n") }}
+```
+
+A bare `{{ deploys }}` renders the array as JSON for inspection; reach for `map` to shape each element and `join(..., "")` (or any separator) to splice the fragments into the output. Run-source variables always resolve to a single row today; pick the rows you need with `mode: list` on a memory namespace instead.
+
+## HTML Panels
+
+HTML panels render `content.body` directly as HTML. They share the markdown panel's variable system (same `{{ name.field }}` syntax and the same `MarkdownVariablesPanel` editor), so anything you can do with markdown variables works inside an HTML body too.
+
+The editor is split code/preview: a monospace textarea for the HTML on the left, a live-rendered preview below it, and the shared variable manager on the right rail. Cmd/Ctrl+Enter saves, Escape cancels.
+
+### Safety policy
+
+The body is sanitized with DOMPurify at render time, before being injected via `dangerouslySetInnerHTML` into a scoped root element. The render pipeline is `interpolate variables -> DOMPurify allow-list -> scope <style> blocks -> render`, so variable values pulled from canvas memory or runs are sanitized the same way as hand-authored markup.
+
+Concretely:
+
+- **Allowed tags** — structural (`div`, `section`, `article`, `header`, `footer`, `main`, `aside`, `nav`, `p`, `h1`–`h6`, `blockquote`, `pre`, `hr`, `br`), inline (`span`, `strong`, `em`, `b`, `i`, `u`, `s`, `small`, `mark`, `sub`, `sup`, `code`, `kbd`, `samp`, `var`, `abbr`, `cite`, `dfn`, `q`, `time`, `data`), lists (`ul`, `ol`, `li`, `dl`, `dt`, `dd`), tables (`table`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td`, `caption`, `colgroup`, `col`), links and images (`a`, `img`, `figure`, `figcaption`), interactive (`details`, `summary`), and `style` (scoped — see below).
+- **Allowed attributes** — `class`, `style`, `id`, `href`, `src`, `srcset`, `title`, `alt`, `width`, `height`, `colspan`, `rowspan`, `open`, `lang`, `dir`, `role`, `tabindex`, `name`, plus ARIA. Everything else is stripped, including every `on*` event handler.
+- **Forbidden tags** — `script`, `noscript`, `iframe`, `frame`, `frameset`, `object`, `embed`, `applet`, `link`, `meta`, `base`, `head`, `html`, `body`, `title`, `template`, `form` and all form controls, `audio`, `video`, `source`, `track`, `canvas`, `math`, `svg`. These are removed even if they appear in the allow-list by accident.
+- **`<img>` may load external images.** `src`/`srcset` go through the same URL allow-list as `href` below, so authors can write `<img src="https://cdn.example.com/logo.png">`. Authors should be aware that cross-origin image fetches do leak the canvas URL via the `Referer` header and can act as tracking pixels — only embed images from sources you trust. Other resource hooks (`poster` on `<video>`, deprecated `background`, `<object data>`, `ping`, `formaction`, `xlink:href`) are still always stripped, and inline `style` values that contain `url(...)`, `expression(...)`, `@import`, `behavior:`, `javascript:`, or `vbscript:` are dropped wholesale.
+- **URL allow-list** — `href`, `src`, and `srcset` are restricted to `http(s)`, `mailto:`, `tel:`, fragments (`#…`), and relative paths. `javascript:` and `data:` URLs never survive on any attribute.
+- **`<style>` blocks are kept and scoped.** Each rule is rewritten so its selectors are prefixed with `[data-console-html-root="<id>"]`, where `<id>` is unique to that panel instance, so user CSS cannot leak outside the widget root. Rules referencing `url(...)` are dropped, `@import` is dropped, and unknown at-rules (`@keyframes`, `@font-face`, etc.) are dropped. `@media` and `@supports` are recursed into so the scoping still applies.
+
+### Tailwind classes
+
+Tailwind v4 compiles only classes it finds while scanning source files. To make a stable, predictable set of utilities available to HTML widget authors, `web_src/src/App.css` includes a curated `@source inline(...)` safelist covering display, flex/grid, spacing, sizing, typography, color (`text-*`, `bg-*`, `border-*` for every default palette/shade), borders, rounding, shadow, opacity, overflow, positioning, z-index, cursor, and transition utilities. Authors can rely on those utility families without having to safelist anything per-panel; classes outside the safelist that aren't already in the bundle will simply have no effect.
+
+Interactive variants (`hover:`, `focus:`) are safelisted for the families where they matter — color (`text-*`, `bg-*`, `border-*`), display, text decoration (`underline`, `line-through`, `no-underline`), `shadow*`, and `opacity-*`. So `hover:bg-blue-100`, `focus:shadow-lg`, `hover:underline`, and similar combinations all work. Hover/focus on sizing, spacing, and typography size families is **not** in the safelist (rare in practice, would multiply the bundle). The `dark:` variant is also not safelisted — dark mode in SuperPlane is opt-out via ancestors with `.dark-mode-disabled`, so widget authors should pick colors that work in both themes rather than relying on the variant.
+
+### Authoring example
+
+```yaml
+- id: release-card
+  type: html
+  content:
+    title: "{{ release.service }}"
+    body: |
+      <style>
+        .badge {
+          display: inline-block;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+        }
+        .badge-passed { background: #dcfce7; color: #166534; }
+        .badge-failed { background: #fee2e2; color: #991b1b; }
+      </style>
+      <div class="flex flex-col gap-2 text-sm">
+        <div class="flex items-center gap-2">
+          <strong>{{ release.service }}</strong>
+          <span class="badge badge-{{ lastRun.status }}">{{ lastRun.status }}</span>
+        </div>
+        <p class="text-slate-600">Triggered by {{ lastRun.nodeName }}.</p>
+      </div>
+    variables:
+      - name: release
+        source:
+          kind: memory
+          namespace: releases
+      - name: lastRun
+        source:
+          kind: run
+          select: latest
+```
+
+The example uses Tailwind classes for layout and color, a scoped `<style>` block for the status badge, and CEL templates to interpolate live values. The backend stores the body as-is; sanitization is purely client-side at render time, which matches the markdown panel's trust model.
+
 ## Node Panels
 
-Node panels resolve the configured `node` by id or name. They display the latest status from `deriveDashboardNodeStatuses` and can optionally show a manual Run button.
+Node panels resolve the configured `node` by id or name. They display the node's name and can optionally show a manual Run button. The optional `label` field overrides the displayed name (falling back to the resolved canvas node name), mirroring the per-entry `label` on the Key Nodes panel.
 
-`showRun` only exposes the button. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
+`showRun` only exposes the button, and only for **trigger nodes** (`type: TYPE_TRIGGER`). Non-trigger nodes can still be pinned for status, but the Run button is suppressed at render time and the editor hides the Show-Run / trigger-template controls when a non-trigger node is selected. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
+
+`promptConfirmation` (default `false`) controls whether a Run click pops the confirmation dialog. Templates that declare input fields (`parameters`) always open the dialog so the operator can fill them in. Templates with no input fields fire immediately on click unless `promptConfirmation` is `true`, in which case a bare "Run X?" confirmation is shown first.
+
+> **Behavior change:** dashboards created before `promptConfirmation` existed used to prompt on every Run click. After upgrading, parameter-less triggers fire immediately on the first click; set `promptConfirmation: true` on the panel (or the individual Key Nodes entry) to restore the confirm-first behavior.
 
 ## Multi-Node Panels
 
-The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with their live status and an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow) instead of stamping out one `node` panel per row.
+The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow) instead of stamping out one `node` panel per row.
 
 ```yaml
 type: nodes
@@ -489,8 +715,9 @@ Per-entry fields:
 | `node` | Required. Canvas node id or name. |
 | `label` | Optional override for the displayed row name. Falls back to the resolved canvas node name. |
 | `description` | Optional short purpose line shown under the row name. |
-| `showRun` | When true, surface a manual "Run" button. Still gated by `canRunNodes`. |
+| `showRun` | When true and the resolved node is a trigger (`TYPE_TRIGGER`), surface a manual "Run" button. Still gated by `canRunNodes`. |
 | `triggerName` | Optional start template name when the trigger exposes multiple templates. |
+| `promptConfirmation` | When true, always confirm before running (default `false`). Templates with input fields always prompt regardless. |
 
 `content.nodes` may be an empty array on a freshly added panel; the card renders a "configure me" hint until the author adds at least one entry through the form.
 

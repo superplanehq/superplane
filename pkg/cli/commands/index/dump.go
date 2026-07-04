@@ -29,7 +29,7 @@ func newDumpCommand(options core.BindOptions) *cobra.Command {
 
 type indexDump struct {
 	Integrations []openapi_client.IntegrationsIntegrationDefinition `json:"integrations"`
-	Actions      []openapi_client.SuperplaneActionsAction           `json:"actions"`
+	Actions      []openapi_client.ActionsAction                     `json:"actions"`
 	Triggers     []openapi_client.TriggersTrigger                   `json:"triggers"`
 }
 

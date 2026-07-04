@@ -30,6 +30,7 @@ const (
 	FieldTypeRole                = "role"
 	FieldTypeGroup               = "group"
 	FieldTypeIntegrationResource = "integration-resource"
+	FieldTypeRepositoryFile      = "repository-file"
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
 	FieldTypeSecretKey           = "secret-key"
@@ -159,6 +160,8 @@ type ExpressionTypeOptions struct {
 type TextTypeOptions struct {
 	MinLength *int `json:"minLength,omitempty"`
 	MaxLength *int `json:"maxLength,omitempty"`
+	// Language is the Monaco editor language id (e.g. "javascript", "python").
+	Language string `json:"language,omitempty"`
 }
 
 /*

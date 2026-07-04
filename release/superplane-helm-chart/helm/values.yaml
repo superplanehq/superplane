@@ -74,6 +74,14 @@ sentry:
   dsn: ""
   environment: ""
 
+dash0Web:
+  secretName: ""
+  enabled: false
+  otlpEndpoint: ""
+  authToken: ""
+  serviceName: "superplane-web"
+  environment: ""
+
 #
 # Secret used to sign JWT session tokens
 #

@@ -10,12 +10,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
 
@@ -52,10 +52,10 @@ func Test__UpdateIntegrationCapabilities(t *testing.T) {
 			{Name: "feat", State: pb.Integration_CapabilityState_STATE_ENABLED},
 		})
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid organization ID")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "invalid organization ID")
 	})
 
 	t.Run("invalid integration ID -> invalid argument", func(t *testing.T) {
@@ -63,10 +63,10 @@ func Test__UpdateIntegrationCapabilities(t *testing.T) {
 			{Name: "feat", State: pb.Integration_CapabilityState_STATE_ENABLED},
 		})
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid integration ID")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "invalid integration ID")
 	})
 
 	t.Run("integration not found -> record not found", func(t *testing.T) {
@@ -74,10 +74,10 @@ func Test__UpdateIntegrationCapabilities(t *testing.T) {
 			{Name: "feat", State: pb.Integration_CapabilityState_STATE_ENABLED},
 		})
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "integration not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "integration not found")
 	})
 
 	t.Run("no capability changes -> invalid argument", func(t *testing.T) {
@@ -117,10 +117,10 @@ func Test__UpdateIntegrationCapabilities(t *testing.T) {
 		)
 		require.Error(t, err)
 
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "no changes")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "no changes")
 	})
 
 	t.Run("enable unavailable capability -> success", func(t *testing.T) {

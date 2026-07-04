@@ -9,11 +9,12 @@
 - gRPC API implementation in in pkg/grpc/actions
 - Database models in pkg/models
 - Integration component implementations: pkg/integrations/<integration>/
-- Workflow v2 UI component mappers: web_src/src/pages/workflowv2/mappers/<integration>/
+- UI component mappers: web_src/src/pages/app/mappers/<integration>/
 
 ## Pull Request Guidelines
 
 - PR titles must follow Conventional Commits and include a release-type prefix: `feat:`, `fix:`, `chore:`, or `docs:` (CI enforces this).
+- All commits must include a DCO sign-off trailer (`Signed-off-by: Name <email>`). Use `git commit -s` or `git commit --amend -s` when creating or updating commits.
 
 ## Build, Test, and Development Commands
 
@@ -24,6 +25,7 @@
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
 - Targeted E2E tests: `make e2e E2E_TEST_PACKAGES=./test/e2e/workflows`
 - For E2E test authoring, see [docs/contributing/e2e-tests.md](docs/contributing/e2e-tests.md)
+- For performance profiling of the dev server, see [docs/contributing/profiling.md](docs/contributing/profiling.md)
 - After updating UI code, always run `make check.build.ui` to verify everything is correct
 - After editing JS code, always run `make format.js` to make sure that the files are consistently formatted
 - After editing Golang code, always run `make format.go` to make sure that files are consistently formatted
@@ -35,14 +37,11 @@
 - For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
 - For new components or triggers, see [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
 - For component design guidelines and quality standards, see [docs/contributing/component-design.md](docs/contributing/component-design.md)
-- After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI (requires a running `app` container from `make dev.up`):
-  - `make pb.gen` to regenerate protobuf files
-  - `make openapi.spec.gen` to generate OpenAPI spec for the API
-  - `make openapi.client.gen` to generate GoLang SDK for the API
-  - `make openapi.web.client.gen` to generate TypeScript SDK for the UI
+- After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI with `make pb.gen`(requires a running `app` container from `make dev.up`)
 
 ## Coding Style & Naming Conventions
 
+- Always write clean code: work test-first by default, then keep names clear, functions focused, side effects explicit, control flow shallow, and error handling useful.
 - Tests end with \_test.go
 - Always prefer early returns over else blocks when possible
 - GoLang: prefer `any` over `interface{}` types
@@ -54,28 +53,55 @@
 
 ## Database Transaction Guidelines
 
-When working with database transactions, follow these rules to ensure data consistency:
+We are moving away from `database.Conn()` inside `pkg/models` and from the `FindX` / `FindXInTransaction` dual API. CI tracks remaining legacy usage via `make check.models.tx.debt`; do not add new `*InTransaction` definitions or `database.Conn()` call sites in `pkg/models`.
 
-- **NEVER** call `database.Conn()` inside a function that receives a `tx *gorm.DB` parameter
+**Why:**
 
-  - ❌ Bad: `func process(tx *gorm.DB) { user, _ := models.FindUser(id) }` where FindUser calls `database.Conn()`
-  - ✅ Good: `func process(tx *gorm.DB) { user, _ := models.FindUserInTransaction(tx, id) }`
+- Calling `database.Conn()` inside model code breaks transaction isolation when the caller already holds a `tx`
+- Conn wrappers plus `*InTransaction` methods duplicate API surface without adding behavior
 
-- **Always propagate** the transaction context through the entire call chain
+**Preferred pattern:** pass an explicit `*gorm.DB` as the first parameter. Callers outside `pkg/models` obtain it with `database.DB(ctx)` (request-scoped, attaches OpenTelemetry trace context).
 
-  - Pass `tx` as the first parameter to all functions that need database access
-  - If a model method is used within a transaction, create an `*InTransaction()` variant that accepts `tx`
+```go
+func FindCanvas(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
+    var canvas Canvas
+    err := tx.Where("organization_id = ? AND id = ?", orgID, id).First(&canvas).Error
+    if err != nil {
+        return nil, err
+    }
+    return &canvas, nil
+}
 
-- **Context constructors** must accept `tx *gorm.DB` if they perform database queries
+// Handler (no surrounding transaction):
+canvas, err := models.FindCanvas(database.DB(ctx), orgID, canvasID)
 
-  - ❌ Bad: `NewAuthContext(orgID, service)` that internally calls `database.Conn()`
-  - ✅ Good: `NewAuthContext(tx, orgID, service)` that uses the passed transaction
+// Inside an existing transaction:
+err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+    canvas, err := models.FindCanvas(tx, orgID, canvasID)
+    return err
+})
+```
 
-- **When creating new model methods**:
-  - Create both variants: `FindUser()` and `FindUserInTransaction(tx *gorm.DB)`
-  - The non-transaction variant should call the transaction variant: `return FindUserInTransaction(database.Conn(), ...)`
+Rules:
 
-**Why this matters**: Using `database.Conn()` inside transaction contexts breaks isolation, causes data inconsistency on rollback, and can lead to race conditions.
+- **NEVER** call `database.Conn()` inside `pkg/models` — pass the `*gorm.DB` from the caller instead
+- **NEVER** call a model function that uses `database.Conn()` internally while you already hold a `tx`
+- **Always propagate** the `*gorm.DB` through the entire call chain — pass it as the first parameter to functions that need database access
+- **Do not add** new `FindX` + `FindXInTransaction` pairs or conn wrappers; use a single function with an explicit `*gorm.DB` parameter
+- **Context constructors** that perform database queries must accept `tx *gorm.DB` as their first parameter
+
+When touching legacy `*InTransaction` or conn-wrapper code, migrate to the explicit-parameter pattern when practical and update the debt baseline with `make check.models.tx.debt.baseline.update`.
+
+### Model file layout (`pkg/models`)
+
+Order declarations in each model file as follows:
+
+1. **Struct** — package constants used by the model, then the struct type
+2. **Constructors** — `New…` functions that build values for the model (including name/ID helpers)
+3. **Getters** — methods on the struct (e.g. `TableName()`, computed accessors)
+4. **Database access** — functions whose first parameter is `tx *gorm.DB` (or `db *gorm.DB`)
+
+Place private helpers after the public API in the file.
 
 ## Cursor Cloud specific instructions
 

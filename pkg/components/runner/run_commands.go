@@ -3,10 +3,7 @@ package runner
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,7 +37,7 @@ var dockerImageCustomOnly = []configuration.VisibilityCondition{
 }
 
 func (c *Runner) Name() string  { return "runner" }
-func (c *Runner) Label() string { return "Runner" }
+func (c *Runner) Label() string { return "Run Shell Commands" }
 func (c *Runner) Icon() string  { return "terminal" }
 func (c *Runner) Color() string { return "blue" }
 
@@ -174,6 +171,11 @@ func (c *Runner) Configuration() []configuration.Field {
 			Required:    true,
 			Placeholder: "echo \"Hello, World!\"",
 			Description: "One shell command per line.",
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "shell",
+				},
+			},
 		},
 		{
 			Name:        "environment",
@@ -316,18 +318,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	hookParams := map[string]any{"task_id": taskID}
-
-	err = ctx.ExecutionState.SetKV("task_id", taskID)
-	if err != nil {
-		return fmt.Errorf("set task id in kv: %w", err)
-	}
-
-	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
-		return fmt.Errorf("runner execution metadata: %w", err)
-	}
-
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, hookParams, pollInterval)
+	return afterRunnerTaskCreated(ctx, taskID)
 }
 
 func (c *Runner) Hooks() []core.Hook {
@@ -337,107 +328,18 @@ func (c *Runner) Hooks() []core.Hook {
 func (c *Runner) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case hookActionPoll:
-		return c.handlePoll(ctx)
+		return pollBrokerTask(ctx, RunnerFinishedEventType)
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (c *Runner) handlePoll(ctx core.ActionHookContext) error {
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
-
-	taskID, ok := ctx.Parameters["task_id"].(string)
-	if !ok {
-		return fmt.Errorf("task_id is missing from parameters")
-	}
-
-	broker, err := NewBrokerClient(ctx.HTTP)
-	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
-	}
-
-	task, err := broker.FetchTaskStatus(taskID)
-	if err != nil {
-		ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
-		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
-	}
-
-	sink := taskLogFromBrokerTask(task)
-	if err := mergeRunnerTaskLog(ctx.Metadata, taskID, sink); err != nil {
-		ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
-	}
-
-	if task.IsInTerminalState() {
-		return c.processTaskStatus(ctx.ExecutionState, task)
-	}
-
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
-}
-
 func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	broker, err := NewBrokerClient(ctx.HTTP)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("new broker client: %w", err)
-	}
-
-	var raw map[string]any
-	if err := json.Unmarshal(ctx.Body, &raw); err != nil {
-		raw = nil
-	}
-
-	task, err := broker.ProcessWebhook(ctx.Body)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("process webhook: %w", err)
-	}
-
-	if !task.IsInTerminalState() {
-		ctx.Logger.Warn("runner: broker webhook received non-terminal state")
-	}
-
-	executionCtx, err := ctx.FindExecutionByKV("task_id", task.TaskID)
-	if err != nil {
-		return http.StatusNotFound, nil, nil
-	}
-
-	sink := taskLogFromBrokerTask(task)
-	if sink == nil {
-		sink = taskLogFromRawWebhook(raw)
-	}
-	if executionCtx.Metadata != nil {
-		if err := mergeRunnerTaskLog(executionCtx.Metadata, task.TaskID, sink); err != nil {
-			ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
-		}
-	}
-
-	err = c.processTaskStatus(executionCtx.ExecutionState, task)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("process task status: %w", err)
-	}
-
-	return http.StatusOK, nil, nil
+	return handleBrokerWebhook(ctx, RunnerFinishedEventType)
 }
 
 func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task) error {
-	if state.IsFinished() {
-		return nil
-	}
-
-	if !task.IsInTerminalState() {
-		return fmt.Errorf("task is not in terminal state")
-	}
-
-	channel := FailedOutputChannel
-	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
-		channel = PassedOutputChannel
-	}
-
-	out := map[string]any{"status": task.Status, "exit_code": task.effectiveExitCode()}
-	if v := brokerResultAsAny(task.Result); v != nil {
-		out["result"] = v
-	}
-	return state.Emit(channel, RunnerFinishedEventType, []any{out})
+	return processBrokerTaskStatus(state, task, RunnerFinishedEventType)
 }
 
 func brokerResultAsAny(raw json.RawMessage) any {
@@ -453,27 +355,7 @@ func brokerResultAsAny(raw json.RawMessage) any {
 }
 
 func (c *Runner) Cancel(ctx core.ExecutionContext) error {
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
-
-	taskID, err := ctx.ExecutionState.GetKV("task_id")
-	if err != nil {
-		if errors.Is(err, core.ErrExecutionKVNotFound) {
-			return nil
-		}
-		return fmt.Errorf("get task_id kv: %w", err)
-	}
-
-	broker, err := NewBrokerClient(ctx.HTTP)
-	if err != nil {
-		return err
-	}
-
-	if err := broker.CancelTask(taskID); err != nil {
-		return fmt.Errorf("cancel task: %w", err)
-	}
-	return nil
+	return cancelBrokerTask(ctx)
 }
 
 func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }

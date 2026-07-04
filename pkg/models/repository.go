@@ -57,11 +57,11 @@ func FindRepositoryInTransaction(tx *gorm.DB, canvasID uuid.UUID) (*Repository, 
 	return &repository, nil
 }
 
-func (c *Canvas) CreatePendingRepository(provider, providerRepoID string) error {
+func (c *Canvas) CreatePendingRepository(provider, providerRepoID string) (*Repository, error) {
 	return c.CreatePendingRepositoryInTransaction(database.Conn(), provider, providerRepoID)
 }
 
-func (c *Canvas) CreatePendingRepositoryInTransaction(tx *gorm.DB, provider, providerRepoID string) error {
+func (c *Canvas) CreatePendingRepositoryInTransaction(tx *gorm.DB, provider, providerRepoID string) (*Repository, error) {
 	r := &Repository{
 		CanvasID:       c.ID,
 		OrganizationID: c.OrganizationID,
@@ -72,7 +72,11 @@ func (c *Canvas) CreatePendingRepositoryInTransaction(tx *gorm.DB, provider, pro
 		UpdatedAt:      time.Now(),
 	}
 
-	return tx.Create(r).Error
+	if err := tx.Clauses(clause.Returning{}).Create(r).Error; err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }
 
 func ListPendingRepositories(limit int) ([]Repository, error) {

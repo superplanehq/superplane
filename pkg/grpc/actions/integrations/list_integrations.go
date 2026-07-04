@@ -3,6 +3,7 @@ package integrations
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
@@ -88,7 +89,7 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 			capabilityDef.ExampleOutput = toStruct(capability.ExampleOutput)
 			capabilityDef.ExampleData = toStruct(capability.ExampleData)
 
-			for _, field := range capability.Configuration {
+			for _, field := range capabilityConfigurationFields(capability) {
 				capabilityDef.Configuration = append(capabilityDef.Configuration, actions.ConfigurationFieldToProto(field))
 			}
 
@@ -105,6 +106,14 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 	}
 
 	return out
+}
+
+func capabilityConfigurationFields(capability core.Capability) []configuration.Field {
+	if capability.Type == core.IntegrationCapabilityTypeTrigger {
+		return actions.AppendGlobalTriggerFields(capability.Name, capability.Configuration)
+	}
+
+	return capability.Configuration
 }
 
 func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityDefinition {
@@ -137,7 +146,7 @@ func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityD
 	}
 
 	for _, trigger := range integration.Triggers() {
-		configFields := trigger.Configuration()
+		configFields := actions.AppendGlobalTriggerFields(trigger.Name(), trigger.Configuration())
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = actions.ConfigurationFieldToProto(field)

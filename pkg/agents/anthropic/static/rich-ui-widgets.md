@@ -52,7 +52,7 @@ Categories with `##` headings. Criteria should be functional requirements, not i
 
 ## Draft Actions
 
-**When to use:** After successfully creating a canvas draft. Renders Publish/Discard/See in Editor buttons. Print in the chat response, not as a file.
+**When to use:** After successfully creating or updating a canvas/console draft. Renders Publish/Discard/See in Editor buttons. Print in the chat response, not as a file.
 
 ```
 :::draft-actions
@@ -61,6 +61,7 @@ message: Draft ready — added health check nodes
 :::
 ```
 
+`versionId` is the same value as the draft id (`version_id`) returned by `superplane_app` action `patch_draft` — a draft's id *is* a version id. Use it as the `versionId` in this block.
 ## Chart
 
 **When to use:** Showing run history, metrics, analytics, or any numerical data the user asks about.
@@ -80,7 +81,7 @@ Types: `bar`, `line`, `area`, `pie`.
 
 ## Collapse
 
-**When to use:** Any output longer than 20 lines — YAML, logs, CLI output, large JSON.
+**When to use:** Any output longer than 20 lines — YAML, logs, tool output, large JSON.
 
 ```
 :::collapse title="Canvas YAML"

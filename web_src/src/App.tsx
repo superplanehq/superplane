@@ -17,13 +17,13 @@ import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
-import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
-import { WorkflowPageV2 } from "./pages/workflowv2";
+import { AppPage } from "./pages/app";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
@@ -32,6 +32,7 @@ import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import { usePageObservability } from "./hooks/usePageObservability";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -74,6 +75,7 @@ function App() {
 function AppRouter() {
   return (
     <BrowserRouter>
+      <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
         <ImpersonationBanner />
         <div className="flex-1 overflow-auto">
@@ -82,6 +84,8 @@ function AppRouter() {
             <Routes>
               {/* public routes */}
               <Route path="login" element={<Login />} />
+              <Route path="signup" element={<Login mode="signup" />} />
+              <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="setup" element={<OwnerSetup />} />
 
@@ -112,12 +116,10 @@ function AppRouter() {
                     path=":appId/settings"
                     element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
                   />
-                  <Route path=":appId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+                  <Route path=":appId" element={withAuthAndPermission(AppPage, "canvases", "read")} />
                 </Route>
                 <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
                 <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
-                <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
-                <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
 
@@ -129,6 +131,11 @@ function AppRouter() {
       </div>
     </BrowserRouter>
   );
+}
+
+function PageObservabilityScope() {
+  usePageObservability();
+  return null;
 }
 
 function OrganizationScope() {

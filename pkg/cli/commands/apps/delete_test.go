@@ -15,7 +15,7 @@ func newCanvasDeleteServer(t *testing.T) *httptest.Server {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvases":[{"metadata":{"id":"abc-123","name":"my-canvas"}}]}`))
+			_, _ = w.Write([]byte(`{"canvases":[{"id":"abc-123","name":"my-canvas"}]}`))
 		case r.Method == http.MethodDelete && r.URL.Path == "/api/v1/canvases/abc-123":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{}`))
@@ -53,7 +53,7 @@ func TestDeleteCommandFailsOnServerError(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvases":[{"metadata":{"id":"abc-123","name":"my-canvas"}}]}`))
+			_, _ = w.Write([]byte(`{"canvases":[{"id":"abc-123","name":"my-canvas"}]}`))
 		default:
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)

@@ -72,12 +72,12 @@ func TestResolveHTTPPolicyInTransaction(t *testing.T) {
 
 	errRollback := errors.New("rollback")
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		metadata, err := models.GetInstallationMetadataInTransaction(tx)
+		metadata, err := models.GetInstallationMetadata(tx)
 		require.NoError(t, err)
 
 		metadata.AllowPrivateNetworkAccess = true
 		metadata.UpdatedAt = time.Now()
-		require.NoError(t, models.UpdateInstallationMetadataInTransaction(tx, metadata))
+		require.NoError(t, models.UpdateInstallationMetadata(tx, metadata))
 
 		policy, err := ResolveHTTPPolicyInTransaction(tx)
 		require.NoError(t, err)

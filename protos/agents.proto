@@ -36,6 +36,17 @@ service Agents {
     };
   }
 
+  rpc ResetCanvasAgentChat(ResetCanvasAgentChatRequest) returns (ResetCanvasAgentChatResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agents/canvases/{canvas_id}/chat/reset"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reset the user's chat for a canvas";
+      description: "Deletes the current chat session and messages, then provisions a brand-new session. Used by the `/clear` command.";
+      tags: "Agent";
+    };
+  }
+
   rpc ListAgentChatMessages(ListAgentChatMessagesRequest) returns (ListAgentChatMessagesResponse) {
     option (google.api.http) = {
       get: "/api/v1/agents/chats/{chat_id}/messages"
@@ -98,6 +109,14 @@ message GetCanvasAgentChatResponse {
   AgentChatInfo chat = 1;
 }
 
+message ResetCanvasAgentChatRequest {
+  string canvas_id = 1;
+}
+
+message ResetCanvasAgentChatResponse {
+  AgentChatInfo chat = 1;
+}
+
 message ListAgentChatMessagesRequest {
   string chat_id = 1;
   string before_id = 2;
@@ -112,8 +131,21 @@ message ListAgentChatMessagesResponse {
 message SendAgentChatMessageRequest {
   string chat_id = 1;
   string content = 2;
-  // Controls whether the agent should build, answer questions, or plan.
   AgentMode mode = 3;
+  repeated AgentChatImage images = 4;
+}
+
+enum AgentChatImageMediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_PNG = 1;
+  MEDIA_TYPE_JPEG = 2;
+  MEDIA_TYPE_GIF = 3;
+  MEDIA_TYPE_WEBP = 4;
+}
+
+message AgentChatImage {
+  AgentChatImageMediaType media_type = 1;
+  bytes data = 2;
 }
 
 message SendAgentChatMessageResponse {
@@ -152,4 +184,18 @@ message AgentChatMessage {
   string tool_name = 5;
   string tool_status = 6;
   google.protobuf.Timestamp created_at = 7;
+  repeated AgentChatImage images = 8;
+}
+
+message AgentRunFinishedMessage {
+  string organization_id = 1;
+  string chat_id = 2;
+  string model = 3;
+  int64 input_tokens = 4;
+  int64 output_tokens = 5;
+  int64 total_tokens = 6;
+  int64 cache_read_tokens = 7;
+  int64 cache_write_tokens = 8;
+  string idempotency_key = 9;
+  string session_id = 10;
 }

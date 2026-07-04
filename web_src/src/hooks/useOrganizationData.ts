@@ -25,7 +25,6 @@ import {
   organizationsDescribeUsage,
 } from "../api-client/sdk.gen";
 import type { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
-import { canvasKeys } from "./useCanvasData";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 
 // Query Keys
@@ -192,7 +191,18 @@ export const useOrganizationInviteLink = (organizationId: string, enabled = true
   });
 };
 
-export const useOrganizationUsage = (organizationId: string, enabled = true) => {
+type OrganizationUsageQueryOptions = {
+  staleTime?: number;
+  gcTime?: number;
+  refetchOnMount?: boolean | "always";
+  refetchOnWindowFocus?: boolean | "always";
+};
+
+export const useOrganizationUsage = (
+  organizationId: string,
+  enabled = true,
+  options: OrganizationUsageQueryOptions = {},
+) => {
   return useQuery({
     queryKey: organizationKeys.usage(organizationId),
     queryFn: async () => {
@@ -203,9 +213,10 @@ export const useOrganizationUsage = (organizationId: string, enabled = true) => 
       );
       return response.data || null;
     },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: options.staleTime ?? 30 * 1000,
+    gcTime: options.gcTime ?? 5 * 60 * 1000,
+    refetchOnMount: options.refetchOnMount,
+    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
     enabled: !!organizationId && enabled,
   });
 };
@@ -536,7 +547,7 @@ export const useUpdateOrganization = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name?: string; description?: string; changeManagementEnabled?: boolean }) => {
+    mutationFn: async (params: { name?: string; description?: string }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -546,20 +557,13 @@ export const useUpdateOrganization = (organizationId: string) => {
                 name: params.name,
                 description: params.description,
               },
-              spec:
-                typeof params.changeManagementEnabled === "boolean"
-                  ? { changeManagementEnabled: params.changeManagementEnabled }
-                  : undefined,
             },
           },
         }),
       );
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) });
-      if (typeof variables.changeManagementEnabled === "boolean") {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.all });
-      }
     },
   });
 };

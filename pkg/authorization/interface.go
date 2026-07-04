@@ -1,9 +1,13 @@
 package authorization
 
-import "gorm.io/gorm"
+import (
+	"context"
+
+	"gorm.io/gorm"
+)
 
 type PermissionChecker interface {
-	CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error)
+	CheckOrganizationPermission(ctx context.Context, userID, orgID, resource, action string) (bool, error)
 	IsValidPermission(domainType string, permission *Permission) bool
 }
 
@@ -14,17 +18,17 @@ type GroupManager interface {
 	UpdateGroup(domainID string, domainType string, groupName string, newRole string, displayName string, description string) error
 	AddUserToGroup(domainID string, domainType string, userID string, group string) error
 	RemoveUserFromGroup(domainID string, domainType string, userID string, group string) error
-	GetGroupUsers(domainID string, domainType string, group string) ([]string, error)
-	GetUserGroups(domainID string, domainType string, userID string) ([]string, error)
-	GetGroups(domainID string, domainType string) ([]string, error)
-	GetGroupRole(domainID string, domainType string, group string) (string, error)
+	GetGroupUsers(ctx context.Context, domainID string, domainType string, group string) ([]string, error)
+	GetUserGroups(ctx context.Context, domainID string, domainType string, userID string) ([]string, error)
+	GetGroups(ctx context.Context, domainID string, domainType string) ([]string, error)
+	GetGroupRole(ctx context.Context, domainID string, domainType string, group string) (string, error)
 }
 
 // Role management interface
 type RoleManager interface {
 	AssignRole(userID, role, domainID string, domainType string) error
 	RemoveRole(userID, role, domainID string, domainType string) error
-	GetOrgUsersForRole(role string, orgID string) ([]string, error)
+	GetOrgUsersForRole(ctx context.Context, role string, orgID string) ([]string, error)
 }
 
 // Setup and initialization interface
@@ -35,15 +39,15 @@ type AuthorizationSetup interface {
 
 // User access and role query interface
 type UserAccessQuery interface {
-	GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error)
+	GetUserRolesForOrg(ctx context.Context, userID string, orgID string) ([]*RoleDefinition, error)
 }
 
 // Role definition and hierarchy interface
 type RoleDefinitionQuery interface {
-	GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error)
-	GetAllRoleDefinitions(domainType string, domainID string) ([]*RoleDefinition, error)
-	GetRolePermissions(roleName string, domainType string, domainID string) ([]*Permission, error)
-	GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error)
+	GetRoleDefinition(ctx context.Context, roleName string, domainType string, domainID string) (*RoleDefinition, error)
+	GetAllRoleDefinitions(ctx context.Context, domainType string, domainID string) ([]*RoleDefinition, error)
+	GetRolePermissions(ctx context.Context, roleName string, domainType string, domainID string) ([]*Permission, error)
+	GetRoleHierarchy(ctx context.Context, roleName string, domainType string, domainID string) ([]string, error)
 }
 
 // Custom role management interface

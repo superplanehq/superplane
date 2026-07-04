@@ -31,6 +31,48 @@ var exampleOutputDeleteIncidentBytes []byte
 var exampleOutputDeleteIncidentOnce sync.Once
 var exampleOutputDeleteIncident map[string]any
 
+//go:embed example_output_transition_issue.json
+var exampleOutputTransitionIssueBytes []byte
+
+var exampleOutputTransitionIssueOnce sync.Once
+var exampleOutputTransitionIssue map[string]any
+
+//go:embed example_output_approve_workflow.json
+var exampleOutputApproveWorkflowBytes []byte
+
+var exampleOutputApproveWorkflowOnce sync.Once
+var exampleOutputApproveWorkflow map[string]any
+
+//go:embed example_output_get_workflow.json
+var exampleOutputGetWorkflowBytes []byte
+
+var exampleOutputGetWorkflowOnce sync.Once
+var exampleOutputGetWorkflow map[string]any
+
+//go:embed example_output_create_alert.json
+var exampleOutputCreateAlertBytes []byte
+
+var exampleOutputCreateAlertOnce sync.Once
+var exampleOutputCreateAlert map[string]any
+
+//go:embed example_output_get_alert.json
+var exampleOutputGetAlertBytes []byte
+
+var exampleOutputGetAlertOnce sync.Once
+var exampleOutputGetAlert map[string]any
+
+//go:embed example_output_delete_alert.json
+var exampleOutputDeleteAlertBytes []byte
+
+var exampleOutputDeleteAlertOnce sync.Once
+var exampleOutputDeleteAlert map[string]any
+
+//go:embed example_output_update_alert.json
+var exampleOutputUpdateAlertBytes []byte
+
+var exampleOutputUpdateAlertOnce sync.Once
+var exampleOutputUpdateAlert map[string]any
+
 func (c *CreateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
 }
@@ -77,6 +119,18 @@ func (c *DeleteIncident) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteIncidentOnce, exampleOutputDeleteIncidentBytes, &exampleOutputDeleteIncident)
 }
 
+func (c *TransitionIssue) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputTransitionIssueOnce, exampleOutputTransitionIssueBytes, &exampleOutputTransitionIssue)
+}
+
+func (c *ApproveWorkflow) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputApproveWorkflowOnce, exampleOutputApproveWorkflowBytes, &exampleOutputApproveWorkflow)
+}
+
+func (c *GetWorkflow) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetWorkflowOnce, exampleOutputGetWorkflowBytes, &exampleOutputGetWorkflow)
+}
+
 //go:embed example_output_create_heartbeat.json
 var exampleOutputCreateHeartbeatBytes []byte
 
@@ -115,4 +169,20 @@ func (c *UpdateHeartbeat) ExampleOutput() map[string]any {
 
 func (c *DeleteHeartbeat) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteHeartbeatOnce, exampleOutputDeleteHeartbeatBytes, &exampleOutputDeleteHeartbeat)
+}
+
+func (c *CreateAlert) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAlertOnce, exampleOutputCreateAlertBytes, &exampleOutputCreateAlert)
+}
+
+func (c *GetAlert) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAlertOnce, exampleOutputGetAlertBytes, &exampleOutputGetAlert)
+}
+
+func (c *DeleteAlert) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAlertOnce, exampleOutputDeleteAlertBytes, &exampleOutputDeleteAlert)
+}
+
+func (c *UpdateAlert) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAlertOnce, exampleOutputUpdateAlertBytes, &exampleOutputUpdateAlert)
 }

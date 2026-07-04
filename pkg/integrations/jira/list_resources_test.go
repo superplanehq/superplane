@@ -5,12 +5,22 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+const globalStatusesResponse = `{
+	"isLast": true,
+	"values": [
+		{"id":"1","name":"To Do","statusCategory":"TODO"},
+		{"id":"2","name":"In Progress","statusCategory":"IN_PROGRESS"},
+		{"id":"3","name":"Done","statusCategory":"DONE"}
+	]
+}`
 
 func Test__ListResources__Project(t *testing.T) {
 	j := &Jira{}
@@ -150,12 +160,100 @@ func Test__ListResources__Assignee(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "project=TEST")
 	})
 
-	t.Run("missing project -> empty list, no API call", func(t *testing.T) {
+	t.Run("missing project and metadata -> empty list, no API call", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{}
 		resources, err := j.ListResources("assignee", core.ListResourcesContext{
 			HTTP:        httpContext,
 			Integration: newAuthorizedIntegration(),
 		})
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("missing project uses first synced project from metadata", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`[
+						{"accountId":"acct-1","displayName":"Alice"}
+					]`)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("assignee", core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: newAuthorizedIntegrationWithMetadata(Metadata{
+				Projects: []Project{{Key: "SYNC", Name: "Synced"}},
+			}),
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "acct-1", resources[0].ID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "project=SYNC")
+	})
+}
+
+func Test__ListResources__JSMApproval(t *testing.T) {
+	j := &Jira{}
+
+	t.Run("returns only pending approvals for the issueKey parameter", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"values": [
+							{"id":"1","name":"Manager","finalDecision":"approved"},
+							{"id":"2","name":"Director","finalDecision":"PENDING"},
+							{"id":"3","finalDecision":"PENDING"}
+						],
+						"isLastPage": true
+					}`)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("jsmApproval", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Parameters:  map[string]string{"issueKey": "ITSM-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "jsmApproval", resources[0].Type)
+		assert.Equal(t, "2", resources[0].ID)
+		assert.Equal(t, "Director", resources[0].Name)
+		assert.Equal(t, "3", resources[1].ID)
+		assert.Equal(t, "Approval 3", resources[1].Name)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/servicedeskapi/request/ITSM-1/approval")
+	})
+
+	t.Run("missing issueKey -> empty list, no API call", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+
+		resources, err := j.ListResources("jsmApproval", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("unresolved expression issueKey -> empty list, no API call", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+
+		resources, err := j.ListResources("jsmApproval", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Parameters:  map[string]string{"issueKey": "{{ trigger.issueKey }}"},
+		})
+
 		require.NoError(t, err)
 		assert.Empty(t, resources)
 		assert.Empty(t, httpContext.Requests)
@@ -199,6 +297,82 @@ func Test__ListResources__Priority__MissingHTTPContext(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, resources)
+}
+
+func Test__ListResources__IssueStatus(t *testing.T) {
+	j := &Jira{}
+
+	t.Run("with project parameter -> uses project statuses endpoint", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`[
+						{"name":"Task","statuses":[
+							{"id":"1","name":"To Do","statusCategory":{"key":"new"}},
+							{"id":"2","name":"Done","statusCategory":{"key":"done"}}
+						]}
+					]`)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("issueStatus", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Parameters:  map[string]string{"project": "TEST"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "issueStatus", resources[0].Type)
+		assert.Equal(t, "To Do", resources[0].Name)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/project/TEST/statuses")
+	})
+
+	t.Run("without project parameter -> falls back to global statuses", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(globalStatusesResponse)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("issueStatus", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 3)
+		assert.Equal(t, "To Do", resources[0].Name)
+		assert.Equal(t, "In Progress", resources[1].Name)
+		assert.Equal(t, "Done", resources[2].Name)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/statuses/search")
+	})
+
+	t.Run("unresolved expression project parameter -> falls back to global statuses", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(globalStatusesResponse)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("issueStatus", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Parameters:  map[string]string{"project": "{{ trigger.project }}"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 3)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/statuses/search")
+	})
 }
 
 func Test__ListResources__Unknown(t *testing.T) {
@@ -611,4 +785,75 @@ func Test__ListResources__Heartbeat(t *testing.T) {
 	require.Len(t, resources, 1)
 	assert.Equal(t, "DNS Checker", resources[0].ID)
 	assert.Contains(t, resources[0].Name, "DNS Checker")
+}
+
+func Test__ListResources__Alert(t *testing.T) {
+	j := &Jira{}
+	alertID := "abc-123-def"
+
+	t.Run("returns alerts with name and id", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{"values":[
+						{"id":"` + alertID + `","message":"Disk usage high","tinyId":"7"},
+						{"id":"xyz-456","message":"","tinyId":"8"}
+					]}`)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("alert", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: jiraTestIntegration(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "alert", resources[0].Type)
+		assert.Equal(t, alertID, resources[0].ID)
+		assert.Equal(t, "Disk usage high #7", resources[0].Name)
+		assert.Equal(t, "xyz-456", resources[1].ID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/jsm/ops/api/")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/v1/alerts")
+	})
+
+	t.Run("skips rows with empty id", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{"values":[
+						{"id":"","message":"no id"},
+						{"id":"good-id","message":"has id","tinyId":"1"}
+					]}`)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("alert", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: jiraTestIntegration(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "good-id", resources[0].ID)
+	})
+}
+
+func Test__opsAlertIntegrationResourceLabel__truncatesByRune(t *testing.T) {
+	longCJK := strings.Repeat("あ", 100)
+	label := opsAlertIntegrationResourceLabel(map[string]any{
+		"message": longCJK,
+		"tinyId":  "42",
+	}, "alert-uuid")
+	assert.True(t, utf8.ValidString(label))
+	assert.LessOrEqual(t, utf8.RuneCountInString(label), opsAlertLabelMaxRunes+len(" #42"))
+	assert.Contains(t, label, "#42")
+	assert.True(t, strings.HasSuffix(label, "... #42"))
+
+	short := opsAlertIntegrationResourceLabel(map[string]any{"message": "ok", "tinyId": "1"}, "id")
+	assert.Equal(t, "ok #1", short)
 }

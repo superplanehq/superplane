@@ -13,6 +13,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Artifact Registry • On Artifact Push" href="#artifact-registry-•-on-artifact-push" description="Trigger a workflow when an artifact is pushed to GCP Artifact Registry" />
   <LinkCard title="Cloud Build • On Build Complete" href="#cloud-build-•-on-build-complete" description="Trigger a workflow when a GCP Cloud Build build reaches a terminal status" />
   <LinkCard title="Compute • On VM Instance" href="#compute-•-on-vm-instance" description="Listen to GCP Compute Engine VM instance lifecycle events" />
+  <LinkCard title="Monitoring • On Alert" href="#monitoring-•-on-alert" description="Trigger a workflow when a Cloud Monitoring alerting policy opens or closes an incident" />
   <LinkCard title="Pub/Sub • On Message" href="#pub/sub-•-on-message" description="Trigger a workflow when a message is published to a GCP Pub/Sub topic" />
 </CardGrid>
 
@@ -28,15 +29,45 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud DNS • Delete Record" href="#cloud-dns-•-delete-record" description="Delete a DNS record from a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
+  <LinkCard title="Cloud SQL • Create Database" href="#cloud-sql-•-create-database" description="Create a logical database inside a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Create Instance" href="#cloud-sql-•-create-instance" description="Provision a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Delete Database" href="#cloud-sql-•-delete-database" description="Delete a logical database from a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Delete Instance" href="#cloud-sql-•-delete-instance" description="Delete a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Get Database" href="#cloud-sql-•-get-database" description="Fetch a logical database from a Cloud SQL instance" />
+  <LinkCard title="Cloud SQL • Get Instance" href="#cloud-sql-•-get-instance" description="Fetch a Cloud SQL instance's configuration and status" />
+  <LinkCard title="Compute • Create Firewall Rule" href="#compute-•-create-firewall-rule" description="Create a VPC firewall rule that allows or denies traffic to or from your VM instances" />
+  <LinkCard title="Compute • Create Load Balancer" href="#compute-•-create-load-balancer" description="Create a regional external passthrough Network Load Balancer that forwards TCP/UDP traffic to a group of VM instances" />
+  <LinkCard title="Compute • Create Static IP" href="#compute-•-create-static-ip" description="Reserve a regional external static IP address in a Google Cloud project" />
+  <LinkCard title="Compute • Delete Firewall Rule" href="#compute-•-delete-firewall-rule" description="Permanently delete a VPC firewall rule" />
+  <LinkCard title="Compute • Delete Load Balancer" href="#compute-•-delete-load-balancer" description="Delete a regional external passthrough Network Load Balancer and its backend service and health check" />
+  <LinkCard title="Compute • Delete Static IP" href="#compute-•-delete-static-ip" description="Release a regional external static IP address from a Google Cloud project" />
+  <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
+  <LinkCard title="Compute • Update Firewall Rule" href="#compute-•-update-firewall-rule" description="Update a VPC firewall rule: its protocols and ports, ranges, priority, targets and source filters, description, or enabled state" />
+  <LinkCard title="Compute • Create Image" href="#compute-•-create-image" description="Create a Google Compute Engine custom image from a disk, snapshot, or another image" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+  <LinkCard title="Compute • Delete Image" href="#compute-•-delete-image" description="Permanently delete a Google Compute Engine custom image" />
   <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance" />
+  <LinkCard title="Compute • Get VM Instance" href="#compute-•-get-vm-instance" description="Fetch the current state of a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Get VM Metrics" href="#compute-•-get-vm-metrics" description="Fetch CPU and network metrics for a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Manage VM Power" href="#compute-•-manage-vm-power" description="Perform power operations on a Google Compute Engine VM instance" />
+  <LinkCard title="Monitoring • Create Alerting Policy" href="#monitoring-•-create-alerting-policy" description="Create a Cloud Monitoring alerting policy from an instance-metric threshold or a PromQL query (Managed Prometheus)" />
+  <LinkCard title="Monitoring • Create Snooze" href="#monitoring-•-create-snooze" description="Create a Cloud Monitoring snooze that suppresses alert notifications for selected policies over a time window" />
+  <LinkCard title="Monitoring • Delete Alerting Policy" href="#monitoring-•-delete-alerting-policy" description="Permanently delete a Cloud Monitoring alerting policy" />
+  <LinkCard title="Monitoring • Expire Snooze" href="#monitoring-•-expire-snooze" description="End an active Cloud Monitoring snooze now so the snoozed policies can notify again" />
+  <LinkCard title="Monitoring • Get Alerting Policy" href="#monitoring-•-get-alerting-policy" description="Read the configuration and state of a Cloud Monitoring alerting policy" />
+  <LinkCard title="Monitoring • Get Snooze" href="#monitoring-•-get-snooze" description="Read a Cloud Monitoring snooze, including the policies it covers and its time window" />
+  <LinkCard title="Monitoring • Update Alerting Policy" href="#monitoring-•-update-alerting-policy" description="Update an existing Cloud Monitoring alerting policy's conditions, combiner, severity, strategy, or notifications" />
+  <LinkCard title="Managed Prometheus • Query" href="#managed-prometheus-•-query" description="Run an instant PromQL query against Google Cloud Managed Service for Prometheus" />
+  <LinkCard title="Managed Prometheus • Query Range" href="#managed-prometheus-•-query-range" description="Run a PromQL range query against Google Cloud Managed Service for Prometheus" />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Delete Topic" href="#pub/sub-•-delete-topic" description="Delete a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Publish Message" href="#pub/sub-•-publish-message" description="Publish a message to a GCP Pub/Sub topic" />
+  <LinkCard title="Cloud Storage • Create Bucket" href="#cloud-storage-•-create-bucket" description="Create a Cloud Storage bucket" />
+  <LinkCard title="Cloud Storage • Delete Bucket" href="#cloud-storage-•-delete-bucket" description="Delete a Cloud Storage bucket" />
+  <LinkCard title="Cloud Storage • Get Bucket" href="#cloud-storage-•-get-bucket" description="Fetch a Cloud Storage bucket's configuration and metadata" />
+  <LinkCard title="Compute • Update Image" href="#compute-•-update-image" description="Update a Google Compute Engine image: deprecate or obsolete it, and update its labels" />
   <LinkCard title="Compute • Update VM Machine Type" href="#compute-•-update-vm-machine-type" description="Change the machine type of a Google Compute Engine VM instance" />
 </CardGrid>
 
@@ -62,7 +93,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 - `roles/logging.configWriter` — create logging sinks for event triggers
 - `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/monitoring.viewer` to read VM metrics)
+- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/compute.securityAdmin` to create, update, and delete firewall rules, `roles/iam.serviceAccountViewer` to populate the firewall service-account picker, `roles/monitoring.viewer` to read VM metrics, `roles/cloudsql.admin` to manage Cloud SQL databases and instances, `roles/storage.admin` to manage Cloud Storage buckets)
 
 <a id="artifact-registry-•-on-artifact-analysis"></a>
 
@@ -265,6 +296,58 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.vmInstance"
+}
+```
+
+<a id="monitoring-•-on-alert"></a>
+
+## Monitoring • On Alert
+
+**Trigger key:** `gcp.monitoring.onAlert`
+
+The On Alert trigger starts a workflow execution when a Cloud Monitoring alerting policy fires (opens) or resolves (closes) an incident.
+
+### Trigger behavior
+
+When this trigger is set up, SuperPlane automatically creates a **webhook notification channel** in Cloud Monitoring that points back at SuperPlane. Cloud Monitoring POSTs the incident to SuperPlane whenever a policy attached to that channel changes state.
+
+To route a policy's incidents here, attach this trigger's notification channel to the policy via the **Create Alerting Policy** or **Update Alerting Policy** component's *Notification Channels* field. The channel's resource name is shown on the node after setup.
+
+### Configuration
+
+- **States**: Which incident states to emit on — `open` (fired) and/or `closed` (resolved). Defaults to `open`.
+
+### Event Data
+
+Emits one `gcp.monitoring.alert` event per matching incident, including the incident id, state, policy and condition names, the affected resource and metric, the observed/threshold values, and the incident URL.
+
+### Important Notes
+
+- Requires the `roles/monitoring.notificationChannelEditor` (or `roles/monitoring.editor`) IAM role so SuperPlane can create the webhook channel.
+- Removing the trigger deletes the webhook notification channel it created.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "conditionName": "CPU utilization above threshold",
+    "incidentId": "0.abcdef1234567890",
+    "metricDisplayName": "CPU utilization",
+    "metricType": "compute.googleapis.com/instance/cpu/utilization",
+    "observedValue": "0.93",
+    "policyName": "projects/my-project/alertPolicies/1234567890123456789",
+    "resourceDisplayName": "my-vm",
+    "resourceName": "my-vm",
+    "scopingProjectId": "my-project",
+    "startedAt": 1767225600,
+    "state": "open",
+    "summary": "CPU utilization for gce_instance my-vm is above the threshold of 0.8 with a value of 0.93.",
+    "thresholdValue": "0.8",
+    "url": "https://console.cloud.google.com/monitoring/alerting/incidents/0.abcdef1234567890?project=my-project"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "gcp.monitoring.alert"
 }
 ```
 
@@ -747,6 +830,813 @@ The invocation result, including:
 }
 ```
 
+<a id="cloud-sql-•-create-database"></a>
+
+## Cloud SQL • Create Database
+
+**Component key:** `gcp.cloudsql.createDatabase`
+
+The Create Database component adds a new logical database to an existing Cloud SQL instance.
+
+### Use Cases
+
+- **Application bootstrap**: Create an application-specific database as part of environment setup
+- **Tenant provisioning**: Add a dedicated database for a new customer or workspace
+- **Migration workflows**: Prepare a destination database before importing data
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance that will contain the new database (required)
+- **Database Name**: The name of the database to create (required, supports expressions)
+
+### Output
+
+Emits a `gcp.cloudsql.database` payload with the created database's `name`, `instance`, `project`, `charset`, `collation`, and `selfLink`.
+
+### Important Notes
+
+- Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role on the integration's service account, and the **Cloud SQL Admin API** enabled
+- Cloud SQL database creation is asynchronous; this component waits for the operation to finish before emitting
+
+### Example Output
+
+```json
+{
+  "data": {
+    "charset": "UTF8",
+    "collation": "en_US.UTF8",
+    "instance": "my-instance",
+    "name": "app_db",
+    "project": "my-project",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance/databases/app_db"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.database"
+}
+```
+
+<a id="cloud-sql-•-create-instance"></a>
+
+## Cloud SQL • Create Instance
+
+**Component key:** `gcp.cloudsql.createInstance`
+
+The Create Instance component provisions a new Cloud SQL instance.
+
+### Use Cases
+
+- **Environment setup**: Stand up a database server as part of provisioning an environment
+- **Ephemeral environments**: Create a dedicated instance for a preview or test run
+- **Infrastructure automation**: Provision databases as part of a broader workflow
+
+### Configuration
+
+- **Name**: The instance ID (required)
+- **Database Version**: The database engine and version (required)
+- **Region**: The region to create the instance in, chosen from the regions where Cloud SQL is available
+- **Tier**: The machine tier (size), chosen from the predefined tiers available in the selected region. Custom machine types (`db-custom-*`) are not listed.
+- **Disk Size (GB)**: The data disk size (minimum 10)
+- **Disk Type**: SSD (default) or HDD
+- **Edition**: Enterprise or Enterprise Plus
+- **Availability**: Zonal (single zone, default) or Regional (adds a standby in another zone for high availability)
+- **Root Password**: Initial password for the default admin user (optional, stored as a secret)
+- **Assign Public IP**: Whether to give the instance a public IPv4 address (default yes)
+- **SSL Mode**: How the instance enforces SSL/TLS on incoming connections (optional)
+- **Authorized Networks**: CIDR ranges allowed to connect over the public IP (optional)
+- **Automated Backups**: Enable daily automated backups (optional)
+- **Deletion Protection**: Prevent the instance from being deleted until protection is removed (optional)
+- **Labels**: Key-value labels applied to the instance (optional)
+
+### Output
+
+Emits a `gcp.cloudsql.instance` payload with the ready instance's `name`, `state`, `databaseVersion`, `region`, `tier`, `connectionName`, `ipAddress`, and `selfLink`.
+
+### Important Notes
+
+- **Instance creation is asynchronous and takes several minutes.** This component polls the instance until it reaches `RUNNABLE` (or times out) before emitting, so downstream steps run only once the instance is ready.
+- A public IP with no **Authorized Networks** is reachable only through the Cloud SQL Auth Proxy or private access; add CIDR ranges to allow direct external clients.
+- With **Deletion Protection** enabled, the Delete Instance component will fail until protection is removed.
+- Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role, and the **Cloud SQL Admin API** enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "connectionName": "my-project:us-central1:my-instance",
+    "databaseVersion": "POSTGRES_16",
+    "diskSizeGb": "10",
+    "edition": "ENTERPRISE",
+    "ipAddress": "34.41.10.20",
+    "name": "my-instance",
+    "region": "us-central1",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance",
+    "state": "RUNNABLE",
+    "tier": "db-f1-micro"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.instance"
+}
+```
+
+<a id="cloud-sql-•-delete-database"></a>
+
+## Cloud SQL • Delete Database
+
+**Component key:** `gcp.cloudsql.deleteDatabase`
+
+The Delete Database component permanently deletes a logical database from a Cloud SQL instance.
+
+### Use Cases
+
+- **Teardown**: Remove a database as part of decommissioning an environment
+- **Tenant offboarding**: Delete a customer's dedicated database
+- **Cleanup**: Drop temporary databases created during a workflow
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance that contains the database (required)
+- **Database**: The database to delete (required)
+
+### Output
+
+Emits a `gcp.cloudsql.database` payload with the deleted database's `name` and `instance`, and `deleted: true`.
+
+### Important Notes
+
+- **This permanently deletes the database and all its data — it is irreversible.**
+- Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role on the integration's service account, and the **Cloud SQL Admin API** enabled
+- Cloud SQL database deletion is asynchronous; this component waits for the operation to finish before emitting
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "instance": "my-instance",
+    "name": "app_db"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.database"
+}
+```
+
+<a id="cloud-sql-•-delete-instance"></a>
+
+## Cloud SQL • Delete Instance
+
+**Component key:** `gcp.cloudsql.deleteInstance`
+
+The Delete Instance component permanently deletes a Cloud SQL instance.
+
+### Use Cases
+
+- **Teardown**: Remove an instance when decommissioning an environment
+- **Ephemeral cleanup**: Delete a preview/test instance when it is no longer needed
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance to delete (required)
+
+### Output
+
+Emits a `gcp.cloudsql.instance` payload with the instance `name` and `deleted: true`.
+
+### Important Notes
+
+- **This permanently deletes the instance and all its databases and data — it is irreversible.**
+- Instance deletion is asynchronous and takes several minutes; this component polls until the instance is fully deleted (or times out) before emitting.
+- Requires the `roles/cloudsql.admin` (or `roles/cloudsql.editor`) IAM role, and the **Cloud SQL Admin API** enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "name": "my-instance"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.instance"
+}
+```
+
+<a id="cloud-sql-•-get-database"></a>
+
+## Cloud SQL • Get Database
+
+**Component key:** `gcp.cloudsql.getDatabase`
+
+The Get Database component retrieves a logical database from a Cloud SQL instance.
+
+### Use Cases
+
+- **Existence checks**: Confirm a database is present before acting on it
+- **Enrichment**: Read a database's charset/collation to feed a downstream step
+- **Auditing**: Capture database details as part of a workflow
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance that contains the database (required)
+- **Database**: The database to fetch (required)
+
+### Output
+
+Emits a `gcp.cloudsql.database` payload with the database's `name`, `instance`, `project`, `charset`, `collation`, and `selfLink`.
+
+### Important Notes
+
+- Requires the `roles/cloudsql.viewer` (or `roles/cloudsql.admin`) IAM role on the integration's service account, and the **Cloud SQL Admin API** enabled
+
+### Example Output
+
+```json
+{
+  "data": {
+    "charset": "UTF8",
+    "collation": "en_US.UTF8",
+    "instance": "my-instance",
+    "name": "app_db",
+    "project": "my-project",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance/databases/app_db"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.database"
+}
+```
+
+<a id="cloud-sql-•-get-instance"></a>
+
+## Cloud SQL • Get Instance
+
+**Component key:** `gcp.cloudsql.getInstance`
+
+The Get Instance component retrieves a Cloud SQL instance's configuration and current status.
+
+### Use Cases
+
+- **Readiness polling**: After Create Instance, poll until the instance reaches `RUNNABLE`
+- **Enrichment**: Read the connection name or IP address to feed a downstream step
+- **Auditing**: Capture instance details as part of a workflow
+
+### Configuration
+
+- **Instance**: The Cloud SQL instance to fetch (required)
+
+### Output
+
+Emits a `gcp.cloudsql.instance` payload with the instance `name`, `state`, `databaseVersion`, `region`, `tier`, `connectionName`, `ipAddress`, and `selfLink`.
+
+### Important Notes
+
+- Requires the `roles/cloudsql.viewer` (or `roles/cloudsql.admin`) IAM role, and the **Cloud SQL Admin API** enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "connectionName": "my-project:us-central1:my-instance",
+    "databaseVersion": "POSTGRES_16",
+    "diskSizeGb": "10",
+    "edition": "ENTERPRISE",
+    "ipAddress": "34.41.10.20",
+    "name": "my-instance",
+    "region": "us-central1",
+    "selfLink": "https://sqladmin.googleapis.com/v1/projects/my-project/instances/my-instance",
+    "state": "RUNNABLE",
+    "tier": "db-f1-micro"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.cloudsql.instance"
+}
+```
+
+<a id="compute-•-create-firewall-rule"></a>
+
+## Compute • Create Firewall Rule
+
+**Component key:** `gcp.compute.createFirewallRule`
+
+The Create Firewall Rule component creates a VPC firewall rule that controls traffic to and from the VM instances in a network.
+
+### Use Cases
+
+- **Open a port**: Allow inbound traffic on specific ports (e.g. 80, 443) to your VMs
+- **Lock down access**: Deny traffic from specific source ranges
+- **Targeted rules**: Apply a rule only to VMs carrying specific network tags
+
+### Configuration
+
+- **Name**: Name for the new firewall rule (lowercase letters, numbers and hyphens; 1–63 chars) (required)
+- **Network**: The VPC network the rule applies to (required)
+- **Direction**: `INGRESS` (incoming, default) or `EGRESS` (outgoing)
+- **Action**: `allow` (default) or `deny` the matched traffic
+- **Priority**: 0–65535; lower numbers win (default 1000)
+- **Protocols and ports**: *Specified protocols and ports* (default) lists protocol/ports entries (e.g. `tcp` with ports `80, 443`; leave ports empty to match all ports of that protocol). *All protocols and ports* matches every protocol/port and hides the list
+- **Targets**: Which instances the rule applies to — *All instances in the network* (default), *Specified target tags*, or *Specified service accounts*. Choosing tags or service accounts reveals the matching input (the service-account picker has a custom field for cross-project emails)
+- **Source filter** (INGRESS): How incoming traffic is matched — *IP ranges* (default, `0.0.0.0/0`), *Source tags*, or *Service accounts*. Choosing one reveals its input. With *IP ranges*, at least one CIDR is required (use `0.0.0.0/0` to match all) — an empty list is rejected because GCP would otherwise silently widen the rule to `0.0.0.0/0`.
+- **Destination ranges** (EGRESS): CIDR ranges the rule applies to (default `0.0.0.0/0`); at least one is required for the same reason.
+- **Description**: Optional human-readable description
+- **Disabled**: Create the rule in a disabled state
+- **Logs**: Turn on Firewall Rules Logging (optionally choosing whether to include metadata)
+
+> The Targets and Source filter dropdowns make tags and service accounts mutually exclusive within each, mirroring the GCP Console. A rule still can't mix tags on one side with service accounts on the other (e.g. target tags + source service accounts) — the component rejects that.
+
+### Output
+
+Emits the created firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target/source tags, target/source service accounts, disabled, logging state, creationTimestamp, and a console link.
+
+### Important Notes
+
+- Firewall rules are **global** resources; the network and rule live at the project level.
+- Requires the `roles/compute.securityAdmin` IAM role (or `roles/compute.admin`).
+- The **service-account dropdowns** additionally require `iam.serviceAccounts.list` (e.g. `roles/iam.serviceAccountViewer`) on the project; without it the dropdown can't list accounts — use the custom field to enter emails directly.
+- GCP does **not** verify that a service account exists when creating the rule, so a wrong or non-existent email produces a rule that silently matches nothing. The dropdown avoids this; the custom field is format-checked.
+- The component waits for the underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "action": "ALLOW",
+    "allowed": [
+      {
+        "IPProtocol": "tcp",
+        "ports": [
+          "80",
+          "443"
+        ]
+      }
+    ],
+    "creationTimestamp": "2026-06-23T12:00:00.000-07:00",
+    "direction": "INGRESS",
+    "disabled": false,
+    "link": "https://console.cloud.google.com/networking/firewalls/details/allow-http?project=my-project",
+    "loggingEnabled": false,
+    "name": "allow-http",
+    "network": "default",
+    "priority": 1000,
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/firewalls/allow-http",
+    "sourceRanges": [
+      "0.0.0.0/0"
+    ],
+    "targetTags": [
+      "web"
+    ]
+  },
+  "timestamp": "2026-06-23T12:00:00Z",
+  "type": "gcp.compute.firewallRule.created"
+}
+```
+
+<a id="compute-•-create-load-balancer"></a>
+
+## Compute • Create Load Balancer
+
+**Component key:** `gcp.compute.createLoadBalancer`
+
+The Create Load Balancer component builds a regional external passthrough Network Load Balancer (Layer 4). It gives you one public IP that spreads incoming TCP/UDP traffic across the VMs in an instance group, and routes around unhealthy VMs using a health check.
+
+Google Cloud has no single "load balancer" resource — a load balancer is a collection of resources. This component creates them for you, in order:
+
+1. **Health check** — how the LB decides a VM is healthy
+2. **Backend service** — references your instance group and the health check
+3. **Forwarding rule** — the public IP + ports that send traffic to the backend service
+
+If any step fails, the resources already created are rolled back.
+
+### Use Cases
+
+- **Distribute traffic**: Spread requests across several VMs running the same service
+- **Resilience**: Stop sending traffic to VMs that fail their health check
+- **Non-HTTP services**: Balance any TCP/UDP protocol (this is an L4 balancer; it does not terminate HTTPS or route by URL — use an Application Load Balancer for that)
+
+### Configuration
+
+- **Name**: Base name for the load balancer; the pieces are named `<name>-hc`, `<name>-backend`, `<name>-fr` (required)
+- **Region**: The region to create it in (required)
+- **Protocol**: `TCP` or `UDP` (default TCP)
+- **Ports**: One or more ports to forward, e.g. 80, 443 (required)
+- **Instance group**: The existing instance group whose VMs receive traffic (required)
+- **Health check protocol / port**: `TCP` (default), `HTTP`, or `HTTPS`; port defaults to the first forwarded port
+- **Reserved IP**: Optionally use a reserved static IP; leave blank for an ephemeral IP
+
+### Output
+
+Returns the assembled load balancer: **name**, **region**, **ipAddress**, **protocol**, **ports**, and the underlying **forwardingRule**, **backendService**, **healthCheck**, plus **resources** (selfLinks of everything created).
+
+### Important Notes
+
+- Targets an **existing** instance group; the group's VMs must be in the chosen region
+- Requires the `roles/compute.loadBalancerAdmin` IAM role
+- This is an L4 passthrough LB: it forwards ports and preserves the client IP; it does not terminate TLS
+
+### Example Output
+
+```json
+{
+  "data": {
+    "backendService": "web-lb-backend",
+    "forwardingRule": "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/forwardingRules/web-lb-fr",
+    "healthCheck": "web-lb-hc",
+    "instanceGroup": "web-servers",
+    "ipAddress": "34.1.2.3",
+    "name": "web-lb",
+    "ports": [
+      "80",
+      "443"
+    ],
+    "protocol": "TCP",
+    "region": "us-central1",
+    "resources": [
+      "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/healthChecks/web-lb-hc",
+      "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/backendServices/web-lb-backend",
+      "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/forwardingRules/web-lb-fr"
+    ]
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.loadBalancer.created"
+}
+```
+
+<a id="compute-•-create-static-ip"></a>
+
+## Compute • Create Static IP
+
+**Component key:** `gcp.compute.createStaticIP`
+
+The Create Static IP component reserves a regional external static (reserved) IP address in Compute Engine.
+
+A static IP keeps the same address across VM restarts and re-creations, unlike an ephemeral IP. Once reserved it can be attached to a VM instance with the **Manage Static IP** component.
+
+### Use Cases
+
+- **Stable endpoints**: Give a service a fixed public address that survives VM replacement
+- **Blue/green deployments**: Reserve the address ahead of time, then attach it to whichever VM is live
+- **DNS**: Point an A record at a reserved address you control
+
+### Configuration
+
+- **Name**: The name for the new address resource (required, lowercase RFC1035 — e.g. `web-prod-ip`)
+- **Region**: The region to reserve the address in (required). Regional external IPs can only be attached to VMs in the same region.
+- **Network Tier**: `PREMIUM` (default) or `STANDARD`
+- **Description**: Optional human-readable description
+
+### Output
+
+Returns the reserved address:
+- **name**, **address** (the reserved IP), **region**, **status**, **addressType**, **networkTier**, **selfLink**
+
+### Important Notes
+
+- Reserving and holding a static IP that is not attached to a running resource incurs charges
+- The component waits for the underlying regional operation to complete before reading the address back
+
+### Example Output
+
+```json
+{
+  "data": {
+    "address": "34.1.2.3",
+    "addressType": "EXTERNAL",
+    "name": "web-prod-ip",
+    "networkTier": "PREMIUM",
+    "region": "us-central1",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/addresses/web-prod-ip",
+    "status": "RESERVED"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.staticIP.created"
+}
+```
+
+<a id="compute-•-delete-firewall-rule"></a>
+
+## Compute • Delete Firewall Rule
+
+**Component key:** `gcp.compute.deleteFirewallRule`
+
+The Delete Firewall Rule component permanently deletes a VPC firewall rule.
+
+### Use Cases
+
+- **Cleanup**: Remove a firewall rule created by **Create Firewall Rule**
+- **Tighten security**: Remove an overly permissive rule as part of a workflow
+- **Lifecycle automation**: Remove temporary access rules once they are no longer needed
+
+### Configuration
+
+- **Firewall rule**: The firewall rule to delete. Pick from the list of rules in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.compute.createFirewallRule`) (required)
+
+### Output
+
+Returns the name of the deleted firewall rule.
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone.
+- If the firewall rule is not found, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup.
+- Requires the `roles/compute.securityAdmin` IAM role (or `roles/compute.admin`).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "allow-http"
+  },
+  "timestamp": "2026-06-23T12:00:00Z",
+  "type": "gcp.compute.firewallRule.deleted"
+}
+```
+
+<a id="compute-•-delete-load-balancer"></a>
+
+## Compute • Delete Load Balancer
+
+**Component key:** `gcp.compute.deleteLoadBalancer`
+
+The Delete Load Balancer component tears down a regional external passthrough Network Load Balancer. You select its **forwarding rule** (the load balancer's entry point), and the component follows the references and deletes the pieces in reverse order:
+
+1. **Forwarding rule** (the public IP + ports)
+2. **Backend service** it pointed at
+3. **Health check** the backend service used
+
+### Use Cases
+
+- **Cleanup**: Remove a load balancer created by **Create Load Balancer**
+- **Teardown**: Decommission a service's front end as part of a workflow
+
+### Configuration
+
+- **Load Balancer**: The regional external forwarding rule that anchors the load balancer (required)
+
+### Output
+
+Returns what was removed: **forwardingRule**, **backendService**, **healthCheck**, **region**.
+
+### Important Notes
+
+- The instance group the backend service referenced is **not** deleted — only the load balancer's own resources
+- The health check is removed on a best-effort basis; if it is shared by another load balancer the API keeps it and a note is returned
+- Requires the `roles/compute.loadBalancerAdmin` IAM role
+
+### Example Output
+
+```json
+{
+  "data": {
+    "backendService": "web-lb-backend",
+    "forwardingRule": "web-lb-fr",
+    "healthCheck": "web-lb-hc",
+    "region": "us-central1"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.loadBalancer.deleted"
+}
+```
+
+<a id="compute-•-delete-static-ip"></a>
+
+## Compute • Delete Static IP
+
+**Component key:** `gcp.compute.deleteStaticIP`
+
+The Delete Static IP component releases (deletes) a regional external static IP reservation.
+
+### Use Cases
+
+- **Cost optimization**: Release reserved IPs that are no longer needed (idle reserved IPs are billed)
+- **Cleanup**: Tear down addresses as part of environment teardown
+
+### Configuration
+
+- **Static IP**: Pick from the reserved external IPs across all regions, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.compute.createStaticIP`). The selection encodes both the region and the address name.
+
+### Output
+
+Returns the released address:
+- **name**: The name of the address that was released
+- **region**: The region it was in
+
+### Important Notes
+
+- A static IP that is still **attached** to a VM cannot be deleted — detach it first with **Manage Static IP**
+- If the address is not found at the resolved region/name, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "web-prod-ip",
+    "region": "us-central1"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.staticIP.deleted"
+}
+```
+
+<a id="compute-•-manage-static-ip"></a>
+
+## Compute • Manage Static IP
+
+**Component key:** `gcp.compute.manageStaticIP`
+
+The Manage Static IP component attaches a reserved external static IP to a VM instance, or detaches the instance's current external IP.
+
+Attaching works by managing the network interface's external access config: any existing external IP on the interface is removed first, then the static IP is assigned. Detaching removes the external access config entirely (the instance keeps its internal IP but loses external connectivity unless another address is attached).
+
+### Use Cases
+
+- **Blue/green deployments**: Move a stable public IP from the old VM to the new one with zero DNS changes
+- **Failover**: Reassign a reserved IP from a failed VM to a healthy replacement
+- **Maintenance**: Temporarily detach a public IP while a VM is serviced
+
+### Configuration
+
+- **Action**: `attach` or `detach` (required)
+- **VM Instance**: The target VM. The selection encodes both the zone and the instance name.
+- **Static IP** *(attach only)*: The reserved external IP to attach. Only IPs in the selected VM's region are listed, since a regional IP can attach only to a VM in the same region.
+- **Network Interface**: The interface to modify (default `nic0`)
+
+### Output
+
+Returns the instance state after the operation:
+- **instanceId**, **name**, **zone**, **status**, **selfLink**, **machineType**, **internalIP**, **externalIP**
+- **action**: The action performed (attach or detach)
+
+### Important Notes
+
+- A regional static IP can only be attached to a VM in the **same region**
+- Attaching is idempotent: if the static IP is already the instance's external IP, the component succeeds without changes
+- Detaching is idempotent: if the interface already has no external IP, the component succeeds without changes
+- The component waits for each underlying zone operation to complete before emitting
+
+### Example Output
+
+```json
+{
+  "data": {
+    "action": "attach",
+    "externalIP": "34.1.2.3",
+    "instanceId": "1234567890123456789",
+    "internalIP": "10.0.0.2",
+    "machineType": "e2-medium",
+    "name": "my-vm",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+    "status": "RUNNING",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.staticIP.attached"
+}
+```
+
+<a id="compute-•-update-firewall-rule"></a>
+
+## Compute • Update Firewall Rule
+
+**Component key:** `gcp.compute.updateFirewallRule`
+
+The Update Firewall Rule component changes an existing VPC firewall rule. **Toggle on only the fields you want to change; everything left off is untouched.** Enabled state, protocols and ports, targets, source filter, and logs are dropdowns you toggle on and then pick a value.
+
+### Use Cases
+
+- **Adjust access**: Change the allowed/denied protocols and ports
+- **Widen or narrow scope**: Update the source/destination CIDR ranges or the targets
+- **Re-prioritize**: Change the rule's priority
+- **Pause a rule**: Disable a rule without deleting it, then re-enable it later
+
+### Configuration
+
+- **Firewall rule**: The firewall rule to update (required)
+- **Enabled state** (toggle): enable or disable the rule
+- **Priority** (toggle): new priority (0-65535); lower numbers take precedence
+- **Protocols and ports** (toggle): "Specified protocols and ports" (replace with a list) or "All protocols and ports" (match everything). The rule keeps its existing action (allow or deny)
+- **Ranges** (toggle): Replace the rule's CIDR ranges. Independent of the **Source filter**; applied as source ranges for INGRESS rules and destination ranges for EGRESS rules (the rule's direction is fixed). `sourceRanges` may legitimately coexist with source tags **or** source service accounts, and editing the source filter does **not** touch ranges.
+- **Targets** (toggle): "All instances in the network", "Specified target tags", or "Specified service accounts". Choosing tags or service accounts **clears the other automatically** — a rule cannot use both. A specified tags/service-accounts selection with an empty list is rejected (it would silently broaden the rule to all instances).
+- **Source filter (INGRESS only, toggle)**: "IP ranges only" (clears source tags/service accounts), "Source tags", or "Source service accounts". Toggling this on for an EGRESS rule is rejected.
+- **Logs** (toggle): turn Firewall Rules Logging on or off (with optional metadata)
+- **Description** (toggle): Replace the rule's description
+
+> A firewall rule filters by **network tags** or by **service accounts**, never both. Switching a rule from one to the other is a single dropdown choice — the component auto-clears the opposite side. The component still rejects an update whose **result** would mix tags and service accounts across the Targets and Source filter sides.
+
+### Output
+
+Emits the updated firewall rule: name, selfLink, network, direction, priority, action, the allowed/denied protocols, source/destination ranges, target/source tags, target/source service accounts, disabled, logging state, creationTimestamp, and a console link.
+
+### Important Notes
+
+- A rule's **network** and **direction** are fixed at creation and cannot be changed; this component cannot switch an allow rule to a deny rule.
+- You must change at least one field.
+- Requires the `roles/compute.securityAdmin` IAM role (or `roles/compute.admin`).
+- The **service-account dropdowns** additionally require `iam.serviceAccounts.list` (e.g. `roles/iam.serviceAccountViewer`); without it, use the custom field to enter emails directly. Cross-project and non-existent service accounts aren't validated by GCP, so prefer the dropdown.
+- The component waits for the underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "action": "ALLOW",
+    "allowed": [
+      {
+        "IPProtocol": "tcp",
+        "ports": [
+          "80",
+          "443",
+          "8080"
+        ]
+      }
+    ],
+    "creationTimestamp": "2026-06-23T12:00:00.000-07:00",
+    "direction": "INGRESS",
+    "disabled": true,
+    "link": "https://console.cloud.google.com/networking/firewalls/details/allow-http?project=my-project",
+    "logMetadata": "INCLUDE_ALL_METADATA",
+    "loggingEnabled": true,
+    "name": "allow-http",
+    "network": "default",
+    "priority": 900,
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/firewalls/allow-http",
+    "sourceRanges": [
+      "10.0.0.0/8"
+    ],
+    "targetTags": [
+      "web"
+    ]
+  },
+  "timestamp": "2026-06-23T12:00:00Z",
+  "type": "gcp.compute.firewallRule.updated"
+}
+```
+
+<a id="compute-•-create-image"></a>
+
+## Compute • Create Image
+
+**Component key:** `gcp.createImage`
+
+The Create Image component creates a custom Compute Engine image.
+
+### Use Cases
+
+- **Golden image pipelines**: Build immutable, reusable images from validated disks
+- **Backup workflows**: Capture disk state as a restorable image before changes
+- **Release automation**: Produce versioned images as part of CI/CD
+
+### Configuration
+
+- **Image Name**: Name for the new image (lowercase, numbers, hyphens; 1–63 chars).
+- **Source**: Where the image is created from:
+  - **Disk**: A persistent disk (pick the region, zone, then the disk).
+  - **Snapshot**: A disk snapshot.
+  - **Image**: Another custom image in the project.
+- **Image family**: Optional family to group related images (e.g. `my-app`).
+- **Description**: Optional human-readable description.
+- **Labels**: Optional key-value labels (billing, environment, team).
+- **Storage location**: Optional single region or multi-region to store the image (e.g. `us` or `europe-west1`). Defaults to the source's region.
+- **Force create**: When the source is a disk attached to a running instance, create the image anyway (may produce an inconsistent image).
+
+### Output
+
+Emits the created image: name, selfLink, family, status, diskSizeGb, sourceDisk, labels, deprecationState, creationTimestamp.
+
+### Important Notes
+
+- Creating an image from a disk attached to a running VM is not recommended unless **Force create** is enabled.
+- The component waits for the underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "creationTimestamp": "2026-06-02T12:00:00.000-07:00",
+    "deprecationState": "ACTIVE",
+    "diskSizeGb": 10,
+    "family": "my-app",
+    "imageId": "1234567890123456789",
+    "labels": {
+      "env": "production"
+    },
+    "name": "my-app-2026-06-02",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-2026-06-02",
+    "sourceDisk": "my-disk",
+    "status": "READY",
+    "storageLocations": [
+      "us"
+    ]
+  },
+  "timestamp": "2026-06-02T12:00:00Z",
+  "type": "gcp.compute.image.created"
+}
+```
+
 <a id="compute-•-create-virtual-machine"></a>
 
 ## Compute • Create Virtual Machine
@@ -785,6 +1675,46 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.createVM.completed"
+}
+```
+
+<a id="compute-•-delete-image"></a>
+
+## Compute • Delete Image
+
+**Component key:** `gcp.deleteImage`
+
+The Delete Image component permanently deletes a Compute Engine custom image.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary or test images after use
+- **Cost optimization**: Delete unused images to reduce storage costs
+- **Lifecycle automation**: Remove obsolete images as part of release pipelines
+
+### Configuration
+
+- **Image**: The custom image to delete. Pick from the list of images in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.createImage`).
+
+### Output
+
+Returns the name of the deleted image.
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone.
+- If the image is not found, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup.
+- Deleting an image does not affect VM instances or disks already created from it.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageName": "my-app-2026-06-02"
+  },
+  "timestamp": "2026-06-02T12:00:00Z",
+  "type": "gcp.compute.image.deleted"
 }
 ```
 
@@ -830,6 +1760,61 @@ Returns information about the deleted instance:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.vmInstance.deleted"
+}
+```
+
+<a id="compute-•-get-vm-instance"></a>
+
+## Compute • Get VM Instance
+
+**Component key:** `gcp.getVMInstance`
+
+The Get VM Instance component reads the current state of a Compute Engine VM
+instance and emits its details on the default output channel.
+
+### Use Cases
+
+- **Status checks**: Verify a VM is in the expected state (e.g. `RUNNING`) before
+  proceeding with downstream work.
+- **Detail lookup**: Fetch IPs, machine type, or selfLink for use in later workflow steps.
+- **Health gates**: Pair with a condition to branch a workflow based on instance status.
+
+### Configuration
+
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained
+  from an upstream node (e.g. `selfLink` from `gcp.createVM`). The
+  selection encodes both the zone and the instance name.
+
+### Output
+
+The emitted payload contains the full instance summary:
+
+- **instanceId**, **selfLink**, **status**, **zone**, **name**, **machineType**
+- **internalIP**, **externalIP** (when present)
+
+### Important Notes
+
+- If the instance is not found at the resolved zone/name, the action fails so that
+  misconfigured or stale expressions do not silently mask a missing resource.
+- The integration's bound project is authoritative; a chained `selfLink` pointing
+  at a different project is rejected rather than silently rewritten.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "externalIP": "34.1.2.3",
+    "instanceId": "1234567890123456789",
+    "internalIP": "10.0.0.2",
+    "machineType": "e2-medium",
+    "name": "my-vm",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+    "status": "RUNNING",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.vmInstance.fetched"
 }
 ```
 
@@ -946,6 +1931,505 @@ Returns the instance state after the operation completes:
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.compute.vmInstance.power.power_off"
+}
+```
+
+<a id="monitoring-•-create-alerting-policy"></a>
+
+## Monitoring • Create Alerting Policy
+
+**Component key:** `gcp.monitoring.createAlertingPolicy`
+
+The Create Alerting Policy component creates a Cloud Monitoring alerting policy with one or more threshold conditions on Compute Engine instance metrics.
+
+### Use Cases
+
+- **Capacity management**: Alert when CPU stays above a safe level
+- **Composite alerts**: Combine multiple conditions (e.g. high CPU AND high network) with a combiner
+- **Severity routing**: Tag policies Critical/Error/Warning and rate-limit or auto-close incidents
+
+### Configuration
+
+- **Display Name**: Human-readable name for the policy (required)
+- **Condition type**: **Metric threshold** (default) or **PromQL query** (Google Managed Prometheus)
+- **Conditions** (threshold type): One or more threshold conditions. Each has:
+  - **Metric**, **Comparison** (above `>` or below `<`), **Threshold**, **Duration**
+  - Optional **Aligner**, **Rolling window**, **Group reducer** + **Group by fields** (aggregation)
+  - Optional **Trigger** by count or percent of time series
+- **PromQL query** (PromQL type): a PromQL expression that fires while it returns results, plus an optional **For** duration and **Evaluation interval** — the Prometheus-style alerting rule
+- **Combiner**: How multiple conditions combine — OR / AND / AND-with-matching-resource (default OR)
+- **Severity**: Critical / Error / Warning (optional)
+- **Notification Channels**: Existing channels to alert (optional)
+- **User Labels**: Key/value labels on the policy (optional)
+- **Enabled**: Whether the policy is active (default: true)
+- **Auto-close** / **Notification rate limit**: Alert strategy (optional)
+- **Documentation** / **Documentation subject**: Markdown shown in notifications (optional)
+
+### Output
+
+Returns the created policy: **name**, **id**, **displayName**, **enabled**, **combiner**, **severity**, **conditionsCount**, and the first condition's **comparison**, **thresholdValue**, **duration**, **filter**.
+
+### Important Notes
+
+- Requires the `roles/monitoring.editor` IAM role on the integration's service account
+- Conditions monitor the metric across **all** Compute Engine instances in the project
+- Up to 6 conditions per policy
+
+### Example Output
+
+```json
+{
+  "data": {
+    "combiner": "OR",
+    "comparison": "COMPARISON_GT",
+    "conditionsCount": 1,
+    "displayName": "High CPU on production instances",
+    "duration": "300s",
+    "enabled": true,
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "notificationChannels": [
+      "projects/my-project/notificationChannels/9876543210"
+    ],
+    "thresholdValue": 0.8
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.created"
+}
+```
+
+<a id="monitoring-•-create-snooze"></a>
+
+## Monitoring • Create Snooze
+
+**Component key:** `gcp.monitoring.createSnooze`
+
+The Create Snooze component creates a Cloud Monitoring **snooze** that prevents the selected alerting policies from sending notifications for a window of time, starting now. It is the GCP equivalent of an Alertmanager silence.
+
+### Use Cases
+
+- **Maintenance windows**: Mute alerts on policies while you deploy or patch
+- **Noise control**: Temporarily quiet a flapping policy while you fix the root cause
+- **Planned work**: Suppress notifications for a known, expected disruption
+
+### Configuration
+
+- **Display Name**: Human-readable name for the snooze (required)
+- **Alerting Policies**: One or more policies to snooze (required, up to 16)
+- **Duration**: How long to snooze, starting now (required)
+
+### Output
+
+Returns the created snooze: **name**, **id**, **displayName**, **policies**, **policiesCount**, **startTime**, **endTime**.
+
+### Important Notes
+
+- The snooze starts immediately and ends after the chosen duration
+- A snooze suppresses notifications but does not stop incidents from opening
+- Requires the `roles/monitoring.editor` (or `roles/monitoring.snoozeEditor`) IAM role
+
+### Example Output
+
+```json
+{
+  "data": {
+    "displayName": "Deploy maintenance window",
+    "endTime": "2025-02-14T13:00:00Z",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/snoozes/1234567890123456789",
+    "policies": [
+      "projects/my-project/alertPolicies/1111111111111111111"
+    ],
+    "policiesCount": 1,
+    "startTime": "2025-02-14T12:00:00Z"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.snooze.created"
+}
+```
+
+<a id="monitoring-•-delete-alerting-policy"></a>
+
+## Monitoring • Delete Alerting Policy
+
+**Component key:** `gcp.monitoring.deleteAlertingPolicy`
+
+The Delete Alerting Policy component permanently deletes a Cloud Monitoring alerting policy.
+
+### Use Cases
+
+- **Cleanup**: Remove policies for decommissioned services
+- **Environment teardown**: Delete alerting as part of tearing down ephemeral environments
+
+### Configuration
+
+- **Alerting Policy**: Pick from the policies in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createAlertingPolicy`).
+
+### Output
+
+Returns the deleted policy reference:
+- **name**: The resource name that was deleted
+- **id**: The policy ID
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- Requires the `roles/monitoring.editor` IAM role on the integration's service account
+- If the policy is not found, the action fails so stale expressions don't silently mask incomplete cleanup
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.deleted"
+}
+```
+
+<a id="monitoring-•-expire-snooze"></a>
+
+## Monitoring • Expire Snooze
+
+**Component key:** `gcp.monitoring.expireSnooze`
+
+The Expire Snooze component ends an active snooze immediately, so the policies it covers resume sending notifications. It is the GCP equivalent of expiring an Alertmanager silence.
+
+It moves the snooze's end time to now. Cloud Monitoring requires a snooze window to be at least a minute long, so a snooze that started less than a minute ago is instead cancelled outright (collapsed to a zero-length window) — either way alerting resumes right away.
+
+### Use Cases
+
+- **Early exit**: Maintenance finished ahead of schedule — re-enable alerting now
+- **Cleanup**: End a snooze created upstream once a workflow completes
+
+### Configuration
+
+- **Snooze**: Pick from the snoozes in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createSnooze`).
+
+### Output
+
+Returns the updated snooze: **name**, **id**, **displayName**, **policies**, **startTime**, **endTime** (now).
+
+### Important Notes
+
+- Cloud Monitoring has no delete-snooze operation; ending a snooze means setting its end time to the current time
+- Requires the `roles/monitoring.editor` (or `roles/monitoring.snoozeEditor`) IAM role
+
+### Example Output
+
+```json
+{
+  "data": {
+    "displayName": "Deploy maintenance window",
+    "endTime": "2025-02-14T12:30:00Z",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/snoozes/1234567890123456789",
+    "policies": [
+      "projects/my-project/alertPolicies/1111111111111111111"
+    ],
+    "policiesCount": 1,
+    "startTime": "2025-02-14T12:00:00Z"
+  },
+  "timestamp": "2025-02-14T12:30:00Z",
+  "type": "gcp.monitoring.snooze.expired"
+}
+```
+
+<a id="monitoring-•-get-alerting-policy"></a>
+
+## Monitoring • Get Alerting Policy
+
+**Component key:** `gcp.monitoring.getAlertingPolicy`
+
+The Get Alerting Policy component reads the configuration and state of a Cloud Monitoring alerting policy.
+
+### Use Cases
+
+- **Auditing**: Inspect a policy's threshold, comparison, and enabled state
+- **Conditional workflows**: Branch on whether a policy is enabled or how it's configured
+- **Chaining**: Read a policy created upstream before updating or deleting it
+
+### Configuration
+
+- **Alerting Policy**: Pick from the policies in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createAlertingPolicy`).
+
+### Output
+
+Returns the policy:
+- **name**, **id**, **displayName**, **enabled**, **combiner**, **conditionsCount**
+- **comparison**, **thresholdValue**, **duration**, **filter**: the first condition's threshold
+- **notificationChannels**: attached channels (when any)
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+- If the policy is not found, the action fails so stale expressions don't silently mask a problem
+
+### Example Output
+
+```json
+{
+  "data": {
+    "combiner": "OR",
+    "comparison": "COMPARISON_GT",
+    "conditionsCount": 1,
+    "displayName": "High CPU on production instances",
+    "duration": "300s",
+    "enabled": true,
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "notificationChannels": [
+      "projects/my-project/notificationChannels/9876543210"
+    ],
+    "thresholdValue": 0.8
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.fetched"
+}
+```
+
+<a id="monitoring-•-get-snooze"></a>
+
+## Monitoring • Get Snooze
+
+**Component key:** `gcp.monitoring.getSnooze`
+
+The Get Snooze component reads a Cloud Monitoring snooze.
+
+### Use Cases
+
+- **Auditing**: Inspect which policies are snoozed and until when
+- **Chaining**: Read a snooze created upstream before expiring it
+
+### Configuration
+
+- **Snooze**: Pick from the snoozes in your project, or pass an expression chained from an upstream node (e.g. the `name` emitted by `gcp.monitoring.createSnooze`).
+
+### Output
+
+Returns the snooze: **name**, **id**, **displayName**, **policies**, **policiesCount**, **startTime**, **endTime**.
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+
+### Example Output
+
+```json
+{
+  "data": {
+    "displayName": "Deploy maintenance window",
+    "endTime": "2025-02-14T13:00:00Z",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/snoozes/1234567890123456789",
+    "policies": [
+      "projects/my-project/alertPolicies/1111111111111111111"
+    ],
+    "policiesCount": 1,
+    "startTime": "2025-02-14T12:00:00Z"
+  },
+  "timestamp": "2025-02-14T12:30:00Z",
+  "type": "gcp.monitoring.snooze.fetched"
+}
+```
+
+<a id="monitoring-•-update-alerting-policy"></a>
+
+## Monitoring • Update Alerting Policy
+
+**Component key:** `gcp.monitoring.updateAlertingPolicy`
+
+The Update Alerting Policy component modifies an existing Cloud Monitoring alerting policy in place. Only the fields you set are changed (sent as an update mask).
+
+### Use Cases
+
+- **Threshold tuning**: Adjust a condition's threshold as baselines change
+- **Enable/disable**: Toggle a policy during maintenance windows
+- **Re-route**: Change notification channels, severity, or alert strategy
+
+### Configuration
+
+- **Alerting Policy**: The policy to update (required, supports expressions)
+- **Condition type**: Toggle to **replace** the policy's conditions with a metric threshold or a PromQL query (leave off to keep current conditions)
+- **Conditions** (threshold type): Provide to replace with threshold conditions (each: metric, comparison, threshold, duration, optional aggregation/trigger)
+- **PromQL query** (PromQL type): Provide to replace with a single PromQL condition (with optional For duration and evaluation interval)
+- **Combiner**: OR / AND / AND-with-matching-resource
+- **Severity**: Critical / Error / Warning
+- **Enabled**: Enable, disable, or leave unchanged
+- **Notification Channels**: Replace channels (provide empty to clear)
+- **User Labels**: Replace user labels
+- **Auto-close / Notification rate limit**: Replace the alert strategy
+- **Documentation / subject**: Replace the documentation
+
+### Output
+
+Returns the updated policy: **name**, **id**, **displayName**, **enabled**, **combiner**, **severity**, **conditionsCount**, and the first condition summary.
+
+### Important Notes
+
+- At least one field must be provided
+- Providing **Conditions** replaces all existing conditions
+- **Auto-close**, **rate limit**, **documentation content**, and **documentation subject** are each updated independently — changing one leaves the others untouched
+- Requires the `roles/monitoring.editor` IAM role
+
+### Example Output
+
+```json
+{
+  "data": {
+    "combiner": "OR",
+    "comparison": "COMPARISON_GT",
+    "conditionsCount": 1,
+    "displayName": "High CPU on production instances",
+    "duration": "300s",
+    "enabled": false,
+    "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+    "id": "1234567890123456789",
+    "name": "projects/my-project/alertPolicies/1234567890123456789",
+    "thresholdValue": 0.9
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.monitoring.alertingPolicy.updated"
+}
+```
+
+<a id="managed-prometheus-•-query"></a>
+
+## Managed Prometheus • Query
+
+**Component key:** `gcp.prometheus.query`
+
+The Query component runs an instant PromQL query against Google Cloud Managed Service for Prometheus (GMP).
+
+GMP stores Prometheus metrics in Cloud Monitoring (Monarch) and exposes a Prometheus-compatible HTTP frontend. This component calls `GET /v1/projects/<project>/location/global/prometheus/api/v1/query` and returns the result at a single point in time.
+
+### Use Cases
+
+- **Threshold checks**: Evaluate an expression (e.g. `up` or `rate(...)`) and branch on the value
+- **Spot readings**: Read the current value of a metric to enrich a workflow
+- **Chaining**: Feed a metric value into a downstream notification or decision node
+
+### Configuration
+
+- **Query**: Required PromQL expression to evaluate (supports expressions). Example: `up`
+
+The expression is evaluated at execution time ("now").
+
+### Output
+
+Emits one `gcp.prometheus.query` payload:
+- **resultType**: `vector`, `scalar`, etc.
+- **result**: the Prometheus result (series with their labels and value)
+- **seriesCount**: number of series returned
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+- An invalid PromQL expression fails the action with the Prometheus error message
+
+### Example Output
+
+```json
+{
+  "data": {
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "10.0.0.5:9090",
+          "job": "prometheus"
+        },
+        "value": [
+          1767225600,
+          "1"
+        ]
+      }
+    ],
+    "resultType": "vector",
+    "seriesCount": 1
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "gcp.prometheus.query"
+}
+```
+
+<a id="managed-prometheus-•-query-range"></a>
+
+## Managed Prometheus • Query Range
+
+**Component key:** `gcp.prometheus.queryRange`
+
+The Query Range component runs a PromQL range query against Google Cloud Managed Service for Prometheus (GMP) over an explicit time range.
+
+GMP stores Prometheus metrics in Cloud Monitoring (Monarch) and exposes a Prometheus-compatible HTTP frontend. This component calls `GET /v1/projects/<project>/location/global/prometheus/api/v1/query_range` and returns a matrix of samples between `start` and `end` at the given `step` resolution.
+
+### Use Cases
+
+- **Trend analysis**: Pull a metric over a window to summarise or chart it downstream
+- **Incident investigation**: Fetch samples for a specific time range when responding to an alert
+- **Anomaly checks**: Evaluate an expression across time before acting
+
+### Configuration
+
+- **Query**: Required PromQL expression to evaluate (supports expressions). Example: `rate(prometheus_http_requests_total[5m])`
+- **Start**: Required start timestamp in RFC3339 or Unix format (supports expressions). Example: `2026-01-01T00:00:00Z`
+- **End**: Required end timestamp in RFC3339 or Unix format (supports expressions). Example: `2026-01-02T00:00:00Z`
+- **Step**: Required query resolution step (e.g. `15s`, `1m`)
+
+### Output
+
+Emits one `gcp.prometheus.queryRange` payload:
+- **resultType**: typically `matrix`
+- **result**: the Prometheus result (series with their labels and `values` over time)
+- **seriesCount**: number of series returned
+- **start**, **end**, **step**: the query window
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account
+- An invalid PromQL expression fails the action with the Prometheus error message
+
+### Example Output
+
+```json
+{
+  "data": {
+    "end": "2026-01-01T01:00:00Z",
+    "result": [
+      {
+        "metric": {
+          "__name__": "up",
+          "instance": "10.0.0.5:9090",
+          "job": "prometheus"
+        },
+        "values": [
+          [
+            1767225600,
+            "1"
+          ],
+          [
+            1767225660,
+            "1"
+          ],
+          [
+            1767225720,
+            "0"
+          ]
+        ]
+      }
+    ],
+    "resultType": "matrix",
+    "seriesCount": 1,
+    "start": "2026-01-01T00:00:00Z",
+    "step": "60s"
+  },
+  "timestamp": "2026-01-01T01:00:00Z",
+  "type": "gcp.prometheus.queryRange"
 }
 ```
 
@@ -1083,6 +2567,212 @@ The Publish Message component sends a message to a GCP Pub/Sub topic.
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.message.published"
+}
+```
+
+<a id="cloud-storage-•-create-bucket"></a>
+
+## Cloud Storage • Create Bucket
+
+**Component key:** `gcp.storage.createBucket`
+
+The Create Bucket component creates a new Cloud Storage bucket.
+
+### Use Cases
+
+- **Environment setup**: Provision a bucket for artifacts, backups, or static assets as part of an environment
+- **Ephemeral environments**: Create a dedicated bucket for a preview or test run
+- **Infrastructure automation**: Provision storage as part of a broader workflow
+
+### Configuration
+
+- **Name**: The globally unique bucket name (required)
+- **Location**: The location to create the bucket in — a multi-region (`US`, `EU`, `ASIA`) or a specific region (required)
+- **Storage Class**: The default storage class for objects (Standard, Nearline, Coldline, Archive)
+- **Uniform Bucket-Level Access**: Use IAM-only access control instead of per-object ACLs (recommended, default on)
+- **Object Versioning**: Keep noncurrent versions of objects when they are overwritten or deleted (optional)
+- **Labels**: Key-value labels applied to the bucket (optional)
+
+### Output
+
+Emits a `gcp.storage.bucket` payload with the bucket's `name`, `location`, `locationType`, `storageClass`, `timeCreated`, `selfLink`, and a `consoleUrl` for opening the bucket in the Cloud Console.
+
+### Important Notes
+
+- **Bucket names are globally unique across all of Cloud Storage** and must follow the [naming guidelines](https://cloud.google.com/storage/docs/buckets#naming) (3–63 characters, lowercase letters, numbers, hyphens, underscores, and dots).
+- A bucket's location is permanent and cannot be changed after creation.
+- Requires the `roles/storage.admin` IAM role, and the **Cloud Storage API** (`storage.googleapis.com`) enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "consoleUrl": "https://console.cloud.google.com/storage/browser/my-bucket",
+    "id": "my-bucket",
+    "location": "US",
+    "locationType": "multi-region",
+    "name": "my-bucket",
+    "projectNumber": "123456789012",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket",
+    "storageClass": "STANDARD",
+    "timeCreated": "2025-01-01T00:00:00.000Z",
+    "uniformBucketLevelAccess": true,
+    "updated": "2025-01-01T00:00:00.000Z",
+    "versioning": false
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.storage.bucket"
+}
+```
+
+<a id="cloud-storage-•-delete-bucket"></a>
+
+## Cloud Storage • Delete Bucket
+
+**Component key:** `gcp.storage.deleteBucket`
+
+The Delete Bucket component permanently deletes a Cloud Storage bucket.
+
+### Use Cases
+
+- **Teardown**: Remove a bucket when decommissioning an environment
+- **Ephemeral cleanup**: Delete a preview/test bucket when it is no longer needed
+
+### Configuration
+
+- **Bucket**: The Cloud Storage bucket to delete (required)
+
+### Output
+
+Emits a `gcp.storage.bucket` payload with the bucket `name` and `deleted: true`.
+
+### Important Notes
+
+- **The bucket must be empty before it can be deleted.** Cloud Storage rejects the request if it still contains objects (including noncurrent object versions).
+- **This permanently deletes the bucket — it is irreversible.** Deleting a bucket frees its globally unique name for reuse by anyone.
+- If the bucket does not exist, the component treats the deletion as already complete (idempotent).
+- Requires the `roles/storage.admin` IAM role, and the **Cloud Storage API** (`storage.googleapis.com`) enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "name": "my-bucket"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.storage.bucket"
+}
+```
+
+<a id="cloud-storage-•-get-bucket"></a>
+
+## Cloud Storage • Get Bucket
+
+**Component key:** `gcp.storage.getBucket`
+
+The Get Bucket component retrieves a Cloud Storage bucket's configuration and metadata.
+
+### Use Cases
+
+- **Enrichment**: Read a bucket's location or storage class to feed a downstream step
+- **Existence check**: Confirm a bucket exists before writing to it
+- **Auditing**: Capture bucket details as part of a workflow
+
+### Configuration
+
+- **Bucket**: The Cloud Storage bucket to fetch (required)
+
+### Output
+
+Emits a `gcp.storage.bucket` payload with the bucket's `name`, `location`, `locationType`, `storageClass`, `timeCreated`, `selfLink`, and a `consoleUrl` for opening the bucket in the Cloud Console.
+
+### Important Notes
+
+- Requires the `roles/storage.admin` (or `roles/storage.legacyBucketReader`) IAM role, and the **Cloud Storage API** (`storage.googleapis.com`) enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "consoleUrl": "https://console.cloud.google.com/storage/browser/my-bucket",
+    "id": "my-bucket",
+    "location": "US",
+    "locationType": "multi-region",
+    "name": "my-bucket",
+    "projectNumber": "123456789012",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/my-bucket",
+    "storageClass": "STANDARD",
+    "timeCreated": "2025-01-01T00:00:00.000Z",
+    "uniformBucketLevelAccess": true,
+    "updated": "2025-01-02T00:00:00.000Z",
+    "versioning": false
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "gcp.storage.bucket"
+}
+```
+
+<a id="compute-•-update-image"></a>
+
+## Compute • Update Image
+
+**Component key:** `gcp.updateImage`
+
+The Update Image component updates an existing Compute Engine custom image. It can change the image's deprecation status (including marking it deprecated or obsolete) and update its labels.
+
+### Use Cases
+
+- **Release lifecycle**: Mark older images deprecated or obsolete as newer ones ship
+- **Pointing consumers forward**: Set a replacement image so users are guided to the current version
+- **Inventory hygiene**: Keep image labels accurate for billing, environment, and ownership
+
+### Configuration
+
+- **Image**: The custom image to update.
+- **Deprecation state**: Optionally change the image lifecycle state:
+  - **No change**: Leave the current deprecation state untouched.
+  - **Active**: Clear any deprecation (make the image fully usable again).
+  - **Deprecated**: Mark the image deprecated (still usable; warns on use).
+  - **Obsolete**: Mark the image obsolete (cannot be used to create new resources).
+  - **Deleted**: Mark the image as logically deleted.
+- **Replacement image**: Optional image to recommend in place of this one (name or URL). Applies when setting a deprecation state.
+- **Labels**: Optional key-value labels to add or update on the image. Labels you provide are merged with the image's existing labels; existing labels you don't list are left unchanged.
+
+### Output
+
+Emits the updated image: name, selfLink, family, status, diskSizeGb, labels, deprecationState, replacement, creationTimestamp.
+
+### Important Notes
+
+- Setting the deprecation state to **Active** clears an existing deprecation.
+- Updating labels merges with the image's existing labels; labels you don't list are preserved.
+- The component waits for each underlying global operation to complete before emitting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "creationTimestamp": "2026-06-02T12:00:00.000-07:00",
+    "deprecationState": "DEPRECATED",
+    "diskSizeGb": 10,
+    "family": "my-app",
+    "imageId": "1234567890123456789",
+    "labels": {
+      "env": "production",
+      "team": "platform"
+    },
+    "name": "my-app-2026-06-02",
+    "replacement": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-v2",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-2026-06-02",
+    "status": "READY"
+  },
+  "timestamp": "2026-06-02T12:00:00Z",
+  "type": "gcp.compute.image.updated"
 }
 ```
 

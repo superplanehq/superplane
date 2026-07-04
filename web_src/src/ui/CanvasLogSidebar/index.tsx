@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, CircleAlert, CircleX, Search, X } from "lucide-react";
 
-import type { CanvasesCanvasEventWithExecutions, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
-import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
-import { ErrorsConsoleContent } from "@/pages/workflowv2/ErrorsConsoleContent";
-import type { SidebarEvent } from "@/ui/componentSidebar/types";
+import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
+import { ErrorsConsoleContent } from "@/pages/app/ErrorsConsoleContent";
 
 export type ConsoleTab = "errors" | "warnings";
 export type LogEntryType = "success" | "error" | "warning" | "resolved-error";
@@ -44,16 +43,11 @@ export interface CanvasLogSidebarProps {
   counts: LogCounts;
   activeTab?: ConsoleTab;
   onTabChange?: (tab: ConsoleTab) => void;
-  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   onRunNodeSelect?: (nodeId: string) => void;
-  onRunExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
+  onRunExecutionSelect?: (options: { runId: string; nodeId: string }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
 }
 
@@ -90,7 +84,7 @@ export function CanvasLogSidebar({
   counts,
   activeTab: controlledTab,
   onTabChange,
-  runsEvents = [],
+  logRuns = [],
   runsNodes = [],
   runsComponentIconMap = {},
   onRunNodeSelect,
@@ -231,7 +225,7 @@ export function CanvasLogSidebar({
     [setSidebarHeight, sidebarHeight],
   );
 
-  const unacknowledgedCount = useMemo(() => countUnacknowledgedErrors(runsEvents), [runsEvents]);
+  const unacknowledgedCount = useMemo(() => countUnacknowledgedErrors(logRuns), [logRuns]);
 
   if (!isOpen) {
     return null;
@@ -258,7 +252,7 @@ export function CanvasLogSidebar({
             )}
           />
         </div>
-        <div className="flex items-center justify-between pl-4 pr-2 border-b border-gray-200 h-8">
+        <div className="flex items-center justify-between pl-4 border-b border-gray-200 h-8">
           <div className="flex items-center gap-4 -mb-2">
             <button
               type="button"
@@ -327,15 +321,12 @@ export function CanvasLogSidebar({
               </span>
             </button>
           </div>
-          <div className="flex h-full items-center justify-end">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onClose}
-              className="size-5 shrink-0 rounded hover:bg-gray-100"
-            >
-              <X className="h-3 w-3" />
-            </Button>
+          <div className="flex shrink-0 items-stretch">
+            <div className="flex items-center px-1">
+              <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
+                <X className="size-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
         <div className="px-2 border-b border-slate-200 h-8">
@@ -354,7 +345,7 @@ export function CanvasLogSidebar({
 
         {activeTab === "errors" ? (
           <ErrorsConsoleContent
-            events={runsEvents}
+            runs={logRuns}
             nodes={runsNodes}
             componentIconMap={runsComponentIconMap}
             searchQuery={searchValue}

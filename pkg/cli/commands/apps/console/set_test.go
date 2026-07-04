@@ -2,6 +2,7 @@ package console
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -39,45 +40,54 @@ func writeSampleConsoleYAML(t *testing.T) string {
 	return path
 }
 
-func listVersionsWithDraft(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-	t.Helper()
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","state":"STATE_DRAFT"}}],"hasNextPage":false}`))
+func repositoryCommitsPath(canvasID string) string {
+	return "/api/v1/canvases/" + canvasID + "/repository/commits"
 }
 
-// describeCanvasCMEnabledResponse returns a canvas whose spec advertises
-// change management enabled. Used by tests that exercise the auto change
-// request flow in `console set`.
-func describeCanvasCMEnabledResponse(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-	t.Helper()
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + testCanvasID + `","name":"` + testCanvasName + `"},"spec":{"changeManagement":{"enabled":true}}}}`))
+func expectCommitConsoleYAML(expectedVersionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodPost,
+		path:   repositoryCommitsPath(testCanvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			var parsed map[string]any
+			require.NoError(t, json.Unmarshal(body, &parsed))
+			require.Equal(t, expectedVersionID, parsed["versionId"])
+			operations, ok := parsed["operations"].([]any)
+			require.True(t, ok)
+			require.NotEmpty(t, operations)
+			first, ok := operations[0].(map[string]any)
+			require.True(t, ok)
+			encoded, ok := first["content"].(string)
+			require.True(t, ok)
+			decoded, err := base64.StdEncoding.DecodeString(encoded)
+			require.NoError(t, err)
+			require.Contains(t, string(decoded), "notes")
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{}`))
+		},
+	}
 }
 
-func handleUpdateDashboard(t *testing.T, expectedVersionID string) func(*testing.T, http.ResponseWriter, *http.Request) {
-	return func(_ *testing.T, w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		var parsed map[string]any
-		require.NoError(t, json.Unmarshal(body, &parsed))
-		require.Equal(t, expectedVersionID, parsed["versionId"])
+func expectFetchConsoleYAML(versionID string) requestExpectation {
+	return requestExpectation{
+		method: http.MethodGet,
+		path:   repositoryConsoleFilePath(testCanvasID),
+		handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "console.yaml", r.URL.Query().Get("path"))
+			require.Equal(t, versionID, r.URL.Query().Get("version_id"))
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = w.Write([]byte(sampleConsoleYAML))
+		},
+	}
+}
 
-		panels, ok := parsed["panels"].([]any)
-		require.True(t, ok)
-		require.Len(t, panels, 1)
-		firstPanel := panels[0].(map[string]any)
-		require.Equal(t, "notes", firstPanel["id"])
-		require.Equal(t, "markdown", firstPanel["type"])
-
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-            "dashboard": {
-                "canvasId": "` + testCanvasID + `",
-                "versionId": "` + expectedVersionID + `",
-                "panels": [{"id":"notes","type":"markdown","content":{"body":"Hello world"}}],
-                "layout": [{"i":"notes","x":0,"y":0,"w":4,"h":2}]
-            }
-        }`))
+func expectCommitAndFetchConsoleYAML(versionID string) []requestExpectation {
+	return []requestExpectation{
+		expectCommitConsoleYAML(versionID),
+		expectFetchConsoleYAML(versionID),
 	}
 }
 
@@ -86,21 +96,9 @@ func TestSetFromFileFlag(t *testing.T) {
 
 	server := newAPITestServer(
 		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasResponse,
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
-		requestExpectation{
-			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
-		},
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
+		expectCommitConsoleYAML("draft-1"),
+		expectFetchConsoleYAML("draft-1"),
 	)
 
 	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
@@ -117,21 +115,9 @@ func TestSetFromPositionalFile(t *testing.T) {
 
 	server := newAPITestServer(
 		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasResponse,
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
-		requestExpectation{
-			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
-		},
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
+		expectCommitConsoleYAML("draft-1"),
+		expectFetchConsoleYAML("draft-1"),
 	)
 
 	ctx, _ := newConsoleCommandContext(t, server.server, "text", nil)
@@ -143,21 +129,9 @@ func TestSetFromPositionalFile(t *testing.T) {
 func TestSetFromStdin(t *testing.T) {
 	server := newAPITestServer(
 		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasResponse,
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
-		requestExpectation{
-			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
-		},
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
+		expectCommitConsoleYAML("draft-1"),
+		expectFetchConsoleYAML("draft-1"),
 	)
 
 	ctx, _ := newConsoleCommandContext(t, server.server, "text", bytes.NewBufferString(sampleConsoleYAML))
@@ -171,32 +145,10 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 
 	server := newAPITestServer(
 		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasResponse,
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"versions":[],"hasNextPage":false}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodPost,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-1"}}}`))
-			},
-		},
-		requestExpectation{
-			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
-		},
+		expectListDraftBranchesEmpty(testCanvasID),
+		expectCreateDraftBranch(testCanvasID, "draft-1"),
+		expectCommitConsoleYAML("draft-1"),
+		expectFetchConsoleYAML("draft-1"),
 	)
 
 	ctx, _ := newConsoleCommandContext(t, server.server, "text", nil)
@@ -204,10 +156,10 @@ func TestSetCreatesDraftWhenMissing(t *testing.T) {
 
 	require.NoError(t, (&setCommand{file: strPtr(path)}).Execute(ctx))
 	server.AssertCalls(t, []string{
-		http.MethodGet + " " + testDescribeCanvas,
-		http.MethodGet + " /api/v1/canvases/" + testCanvasID + "/versions",
-		http.MethodPost + " /api/v1/canvases/" + testCanvasID + "/versions",
-		http.MethodPut + " " + testDashboardPath,
+		http.MethodGet + " " + draftVersionsPath(testCanvasID),
+		http.MethodPost + " " + draftVersionsPath(testCanvasID),
+		http.MethodPost + " " + repositoryCommitsPath(testCanvasID),
+		http.MethodGet + " " + repositoryConsoleFilePath(testCanvasID),
 	})
 }
 
@@ -218,21 +170,9 @@ func TestSetUsesActiveCanvasWhenNoArg(t *testing.T) {
 
 	server := newAPITestServer(
 		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasResponse,
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
-		requestExpectation{
-			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
-		},
+		expectListUserDraftBranch(testCanvasID, "draft-1"),
+		expectCommitConsoleYAML("draft-1"),
+		expectFetchConsoleYAML("draft-1"),
 	)
 
 	ctx, _ := newConsoleCommandContext(t, server.server, "text", nil)
@@ -256,86 +196,6 @@ func TestSetErrorsWhenNoCanvasAndNoActive(t *testing.T) {
 	err := (&setCommand{file: strPtr(path)}).Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "app-name-or-id")
-}
-
-// TestSetAutoCreatesChangeRequestWhenCMEnabled verifies that, with
-// change management enabled, `console set` opens a change request for
-// the updated draft so it is visible from the UI.
-func TestSetAutoCreatesChangeRequestWhenCMEnabled(t *testing.T) {
-	path := writeSampleConsoleYAML(t)
-
-	server := newAPITestServer(
-		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasCMEnabledResponse,
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
-		requestExpectation{
-			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
-		},
-		requestExpectation{
-			method: http.MethodPost,
-			path:   "/api/v1/canvases/" + testCanvasID + "/change-requests",
-			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-				body, err := io.ReadAll(r.Body)
-				require.NoError(t, err)
-				var parsed map[string]any
-				require.NoError(t, json.Unmarshal(body, &parsed))
-				require.Equal(t, "draft-1", parsed["versionId"])
-
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"changeRequest":{"metadata":{"id":"cr-42","status":"STATUS_OPEN"}}}`))
-			},
-		},
-	)
-
-	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
-	ctx.Args = []string{testCanvasID}
-
-	require.NoError(t, (&setCommand{file: strPtr(path), draftOnly: boolPtr(false)}).Execute(ctx))
-	out := stdout.String()
-	require.Contains(t, out, "Change request: cr-42")
-}
-
-// TestSetSkipsChangeRequestWithDraftFlag ensures `--draft` opts out of
-// the auto change-request creation even when change management is on.
-func TestSetSkipsChangeRequestWithDraftFlag(t *testing.T) {
-	path := writeSampleConsoleYAML(t)
-
-	server := newAPITestServer(
-		t,
-		requestExpectation{
-			method: http.MethodGet,
-			path:   testDescribeCanvas,
-			handle: describeCanvasCMEnabledResponse,
-		},
-		requestExpectation{
-			method: http.MethodGet,
-			path:   "/api/v1/canvases/" + testCanvasID + "/versions",
-			handle: listVersionsWithDraft,
-		},
-		requestExpectation{
-			method: http.MethodPut,
-			path:   testDashboardPath,
-			handle: handleUpdateDashboard(t, "draft-1"),
-		},
-	)
-
-	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
-	ctx.Args = []string{testCanvasID}
-
-	require.NoError(t, (&setCommand{file: strPtr(path), draftOnly: boolPtr(true)}).Execute(ctx))
-	out := stdout.String()
-	require.NotContains(t, out, "Change request:")
-	require.Contains(t, out, "superplane apps change-requests create")
 }
 
 func TestSetRejectsWrongKind(t *testing.T) {
@@ -386,4 +246,3 @@ func TestSetRequiresYAMLSource(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
-func boolPtr(b bool) *bool    { return &b }

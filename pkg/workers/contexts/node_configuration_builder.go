@@ -25,11 +25,11 @@ type NodeConfigurationBuilder struct {
 	workflowID          uuid.UUID
 	nodeID              string
 	previousExecutionID *uuid.UUID
+	incomingEventID     *uuid.UUID
 	rootEventID         *uuid.UUID
 	rootPayload         any
 	input               any
 	expressionVariables map[string]any
-	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
 }
 
@@ -38,11 +38,6 @@ func NewNodeConfigurationBuilder(tx *gorm.DB, workflowID uuid.UUID) *NodeConfigu
 		tx:         tx,
 		workflowID: workflowID,
 	}
-}
-
-func (b *NodeConfigurationBuilder) ForBlueprintNode(parentBlueprintNode *models.CanvasNode) *NodeConfigurationBuilder {
-	b.parentBlueprintNode = parentBlueprintNode
-	return b
 }
 
 func (b *NodeConfigurationBuilder) WithNodeID(nodeID string) *NodeConfigurationBuilder {
@@ -63,6 +58,11 @@ func (b *NodeConfigurationBuilder) WithRootPayload(payload any) *NodeConfigurati
 
 func (b *NodeConfigurationBuilder) WithPreviousExecution(previousExecutionID *uuid.UUID) *NodeConfigurationBuilder {
 	b.previousExecutionID = previousExecutionID
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithIncomingEventID(incomingEventID *uuid.UUID) *NodeConfigurationBuilder {
+	b.incomingEventID = incomingEventID
 	return b
 }
 
@@ -93,6 +93,22 @@ func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[stri
 	}
 
 	return resolved, nil
+}
+
+func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
+	if _, ok := configuration["customName"]; !ok {
+		return configuration
+	}
+
+	result := make(map[string]any, len(configuration)-1)
+	for key, value := range configuration {
+		if key == "customName" {
+			continue
+		}
+		result[key] = value
+	}
+
+	return result
 }
 
 func (b *NodeConfigurationBuilder) resolve(configuration map[string]any) (map[string]any, error) {
@@ -226,7 +242,8 @@ func asAnyMap(value any) (map[string]any, bool) {
 }
 
 func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string) (any, error) {
-	if !expressionRegex.MatchString(expression) {
+	matches := expressionRegex.FindAllStringIndex(expression, -1)
+	if len(matches) == 0 {
 		return expression, nil
 	}
 
@@ -276,10 +293,6 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 	env := map[string]any{
 		"$":      messageChain,
 		"memory": b.buildMemoryExpressionNamespace(),
-	}
-
-	if b.parentBlueprintNode != nil {
-		env["config"] = normalizeExpressionValue(b.parentBlueprintNode.Configuration.Data())
 	}
 
 	for key, value := range variables {
@@ -357,9 +370,38 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		if err != nil {
 			return nil, err
 		}
+
+		//
+		// listExecutionsInChain merges the current execution's linear lineage
+		// (walked via previous_execution_id) with every run-wide execution of
+		// upstream nodes. When the graph has a feedback cycle (e.g. a loop whose
+		// body points back at the loop), an upstream node has one execution per
+		// iteration, so the same name maps to many executions in the run. We must
+		// bind each name to the execution in the *current* lineage; otherwise
+		// expressions like a loop's until-condition would read a stale
+		// iteration's output. So a linear-chain execution always wins over a
+		// run-wide upstream match for the same node.
+		//
+		linearExecutions, err := b.listLinearExecutionsInChain()
+		if err != nil {
+			return nil, err
+		}
+		linearExecutionIDs := make(map[uuid.UUID]struct{}, len(linearExecutions))
+		for _, execution := range linearExecutions {
+			linearExecutionIDs[execution.ID] = struct{}{}
+		}
+
 		executionByNodeID = make(map[string]models.CanvasNodeExecution, len(executionsInChain))
 		for _, execution := range executionsInChain {
 			executionChainNodeIDs = append(executionChainNodeIDs, execution.NodeID)
+
+			if existing, ok := executionByNodeID[execution.NodeID]; ok {
+				_, existingIsLinear := linearExecutionIDs[existing.ID]
+				_, candidateIsLinear := linearExecutionIDs[execution.ID]
+				if existingIsLinear && !candidateIsLinear {
+					continue
+				}
+			}
 			executionByNodeID[execution.NodeID] = execution
 		}
 	}
@@ -369,20 +411,29 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		executionChainNodeIDs = append(executionChainNodeIDs, rootEvent.NodeID)
 	}
 
-	refToNodeID, err := b.resolveNodeRefs(referencedNodes, executionChainNodeIDs)
+	nodeRefs, err := b.resolveNodeRefs(referencedNodes, executionChainNodeIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	chainRefs := populateFromInputOrRoot(messageChain, inputMap, rootEvent, refToNodeID)
+	for _, nodeRef := range nodeRefs.unresolved {
+		messageChain[nodeRef] = nil
+	}
+
+	chainRefs := populateFromInputOrRoot(messageChain, inputMap, rootEvent, nodeRefs.byRef)
 
 	if len(chainRefs) == 0 {
-		b.injectConfigIntoMessageChain(messageChain, refToNodeID, executionByNodeID)
+		b.injectConfigIntoMessageChain(messageChain, nodeRefs.byRef, executionByNodeID)
 		return messageChain, nil
 	}
 
 	if b.previousExecutionID == nil {
-		return nil, fmt.Errorf("node name %s not found in execution chain", firstChainRef(chainRefs))
+		for nodeRef := range chainRefs {
+			messageChain[nodeRef] = nil
+		}
+
+		b.injectConfigIntoMessageChain(messageChain, nodeRefs.byRef, executionByNodeID)
+		return messageChain, nil
 	}
 
 	err = b.populateFromExecutions(messageChain, chainRefs, executionByNodeID)
@@ -390,8 +441,102 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		return nil, err
 	}
 
-	b.injectConfigIntoMessageChain(messageChain, refToNodeID, executionByNodeID)
+	b.injectConfigIntoMessageChain(messageChain, nodeRefs.byRef, executionByNodeID)
 	return messageChain, nil
+}
+
+// BuildExecutionMessageChain returns upstream node payloads keyed by canvas node name.
+// This is the $ object passed to runner JavaScript tasks.
+func (b *NodeConfigurationBuilder) BuildExecutionMessageChain() (map[string]any, error) {
+	nodeIDToName, err := b.nodeIDToNameMap()
+	if err != nil {
+		return nil, err
+	}
+
+	messageChain := map[string]any{}
+	inputMap := extractInputMap(b.input)
+
+	rootEvent, err := b.fetchRootEvent()
+	if err != nil {
+		return nil, err
+	}
+	if rootEvent != nil {
+		if name, ok := nodeIDToName[rootEvent.NodeID]; ok && name != "" {
+			payload := normalizeExpressionValue(rootEvent.Data.Data())
+			if rootEvent.ExecutionID != nil {
+				execution, execErr := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *rootEvent.ExecutionID)
+				if execErr == nil && execution != nil {
+					payload = injectConfig(payload, execution.Configuration.Data())
+				}
+			}
+			messageChain[name] = payload
+		}
+	}
+
+	executionsInChain, err := b.listExecutionsInChain()
+	if err != nil {
+		return nil, err
+	}
+	if len(executionsInChain) > 0 {
+		linearExecutions, err := b.listLinearExecutionsInChain()
+		if err != nil {
+			return nil, err
+		}
+
+		outputs, err := newExecutionOutputLookup(
+			b.tx,
+			linearExecutions,
+			executionIDsFromExecutions(executionsInChain),
+			b.incomingEventID,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		for i := len(executionsInChain) - 1; i >= 0; i-- {
+			execution := executionsInChain[i]
+			name, ok := nodeIDToName[execution.NodeID]
+			if !ok || name == "" {
+				continue
+			}
+
+			event, found, err := outputs.outputEvent(execution.ID)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
+				continue
+			}
+
+			messageChain[name] = injectConfig(normalizeExpressionValue(event.Data.Data()), execution.Configuration.Data())
+		}
+	}
+
+	for nodeID, value := range inputMap {
+		name, ok := nodeIDToName[nodeID]
+		if !ok || name == "" {
+			continue
+		}
+		messageChain[name] = value
+	}
+
+	return messageChain, nil
+}
+
+func (b *NodeConfigurationBuilder) nodeIDToNameMap() (map[string]string, error) {
+	nodes, err := models.FindCanvasNodesInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(map[string]string, len(nodes))
+	for _, node := range nodes {
+		if node.Name == "" {
+			continue
+		}
+		out[node.NodeID] = node.Name
+	}
+	return out, nil
 }
 
 func (b *NodeConfigurationBuilder) injectConfigIntoMessageChain(
@@ -416,13 +561,6 @@ func (b *NodeConfigurationBuilder) injectConfigIntoMessageChain(
 
 		messageChain[nodeRef] = injectConfig(payload, execution.Configuration.Data())
 	}
-}
-
-func firstChainRef(chainRefs map[string]string) string {
-	for nodeRef := range chainRefs {
-		return nodeRef
-	}
-	return ""
 }
 
 func extractInputMap(input any) map[string]any {
@@ -514,6 +652,8 @@ func normalizeJSONNumber(value json.Number) any {
 
 func formatTemplateValue(value any) string {
 	switch v := value.(type) {
+	case nil:
+		return "null"
 	case float32:
 		return strconv.FormatFloat(float64(v), 'f', -1, 32)
 	case float64:
@@ -523,10 +663,15 @@ func formatTemplateValue(value any) string {
 	}
 }
 
-func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionChainNodeIDs []string) (map[string]string, error) {
+type resolvedNodeRefs struct {
+	byRef      map[string]string
+	unresolved []string
+}
+
+func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionChainNodeIDs []string) (resolvedNodeRefs, error) {
 	nodes, err := models.FindCanvasNodesInTransaction(b.tx, b.workflowID)
 	if err != nil {
-		return nil, err
+		return resolvedNodeRefs{}, err
 	}
 
 	nameToNodeID := make(map[string]string, len(nodes))
@@ -558,10 +703,10 @@ func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionC
 		executionChainOrder[nodeID] = i
 	}
 
-	refToNodeID := make(map[string]string, len(nodeRefs))
+	resolved := resolvedNodeRefs{byRef: make(map[string]string, len(nodeRefs))}
 	for _, nodeRef := range nodeRefs {
 		if nodeID, ok := nameToNodeID[nodeRef]; ok {
-			refToNodeID[nodeRef] = nodeID
+			resolved.byRef[nodeRef] = nodeID
 			continue
 		}
 
@@ -579,17 +724,17 @@ func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionC
 			}
 
 			if closestNodeID != "" {
-				refToNodeID[nodeRef] = closestNodeID
+				resolved.byRef[nodeRef] = closestNodeID
 				continue
 			}
 
-			return nil, fmt.Errorf("node name %s is not unique and none of the matching nodes are in the execution chain", nodeRef)
+			return resolvedNodeRefs{}, fmt.Errorf("node name %s is not unique and none of the matching nodes are in the execution chain", nodeRef)
 		}
 
-		return nil, fmt.Errorf("node name %s not found in execution chain", nodeRef)
+		resolved.unresolved = append(resolved.unresolved, nodeRef)
 	}
 
-	return refToNodeID, nil
+	return resolved, nil
 }
 
 func (b *NodeConfigurationBuilder) fetchRootEvent() (*models.CanvasEvent, error) {
@@ -698,49 +843,47 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 	for nodeRef, nodeID := range chainRefs {
 		execution, ok := executionByNode[nodeID]
 		if !ok {
-			return fmt.Errorf("node %s not found in execution chain", nodeRef)
+			messageChain[nodeRef] = nil
+			continue
 		}
 		executionIDs = append(executionIDs, execution.ID)
 		executionIDByRef[nodeRef] = execution.ID
 	}
 
-	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+	chainExecutions, err := b.listLinearExecutionsInChain()
 	if err != nil {
 		return err
 	}
 
-	latestByExecution := latestEventByExecution(events, executionIDs)
+	referencedExecutionIDs := make([]uuid.UUID, 0, len(executionIDByRef))
+	for _, executionID := range executionIDByRef {
+		referencedExecutionIDs = append(referencedExecutionIDs, executionID)
+	}
+
+	outputs, err := newExecutionOutputLookup(
+		b.tx,
+		chainExecutions,
+		unionExecutionIDs(referencedExecutionIDs, executionIDsFromExecutions(chainExecutions)),
+		b.incomingEventID,
+	)
+	if err != nil {
+		return err
+	}
+
 	for nodeRef, executionID := range executionIDByRef {
-		event, ok := latestByExecution[executionID]
+		event, ok, err := outputs.outputEvent(executionID)
+		if err != nil {
+			return fmt.Errorf("node %s: %w", nodeRef, err)
+		}
 		if !ok {
-			return fmt.Errorf("node %s has no outputs", nodeRef)
+			messageChain[nodeRef] = nil
+			continue
 		}
 
 		messageChain[nodeRef] = normalizeExpressionValue(event.Data.Data())
 	}
 
 	return nil
-}
-
-func latestEventByExecution(events []models.CanvasEvent, executionIDs []uuid.UUID) map[uuid.UUID]models.CanvasEvent {
-	latestByExecution := make(map[uuid.UUID]models.CanvasEvent, len(executionIDs))
-	for _, event := range events {
-		if event.ExecutionID == nil {
-			continue
-		}
-
-		latest, ok := latestByExecution[*event.ExecutionID]
-		if !ok || event.CreatedAt == nil {
-			latestByExecution[*event.ExecutionID] = event
-			continue
-		}
-
-		if latest.CreatedAt == nil || event.CreatedAt.After(*latest.CreatedAt) {
-			latestByExecution[*event.ExecutionID] = event
-		}
-	}
-
-	return latestByExecution
 }
 
 var reservedExpressionIdentifiers = map[string]struct{}{
@@ -802,14 +945,44 @@ func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error
 		return nil, err
 	}
 	step := 0
+	var currentOutput currentOutputRef
 	if hasInput {
 		step++
+		currentOutput = b.currentInputOutputRef()
 		if step >= depth && inputPayload != nil {
 			return b.injectConfigFromPreviousExecution(inputPayload), nil
 		}
 	}
 
-	step, payload, err := b.resolveFromExecutions(depth, step, hasInput)
+	if !hasInput {
+		incomingPayload, ok, err := b.incomingEventPayload()
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			step++
+			currentOutput = currentOutputRef{eventID: b.incomingEventID}
+			if step >= depth {
+				return incomingPayload, nil
+			}
+		}
+	}
+
+	payloads, err := b.latestDirectUpstreamOutputPayloads()
+	if err != nil {
+		return nil, err
+	}
+	for _, payload := range payloads {
+		if currentOutput.matches(payload.event) {
+			continue
+		}
+		step++
+		if step >= depth {
+			return payload.data, nil
+		}
+	}
+
+	step, payload, err := b.resolveFromExecutions(depth, step, step > 0)
 	if err != nil {
 		return nil, err
 	}
@@ -818,6 +991,174 @@ func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error
 	}
 
 	return b.resolveFromRoot(depth, step)
+}
+
+func (b *NodeConfigurationBuilder) incomingEventPayload() (any, bool, error) {
+	if b.incomingEventID == nil {
+		return nil, false, nil
+	}
+
+	event, err := models.FindCanvasEventInTransaction(b.tx, *b.incomingEventID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return b.payloadFromEvent(*event), true, nil
+}
+
+type canvasEventPayload struct {
+	event models.CanvasEvent
+	data  any
+}
+
+type currentOutputRef struct {
+	eventID     *uuid.UUID
+	executionID *uuid.UUID
+}
+
+func (b *NodeConfigurationBuilder) currentInputOutputRef() currentOutputRef {
+	if b.incomingEventID != nil {
+		return currentOutputRef{eventID: b.incomingEventID}
+	}
+
+	return currentOutputRef{executionID: b.previousExecutionID}
+}
+
+func (r currentOutputRef) matches(event models.CanvasEvent) bool {
+	if r.eventID != nil {
+		return event.ID == *r.eventID
+	}
+
+	return r.executionID != nil && event.ExecutionID != nil && *event.ExecutionID == *r.executionID
+}
+
+func (b *NodeConfigurationBuilder) latestDirectUpstreamOutputPayloads() ([]canvasEventPayload, error) {
+	if b.nodeID == "" || b.rootEventID == nil {
+		return nil, nil
+	}
+
+	directExecutions, err := b.listDirectUpstreamExecutions()
+	if err != nil {
+		return nil, err
+	}
+	if len(directExecutions) == 0 {
+		return nil, nil
+	}
+
+	linearExecutions, err := b.listLinearExecutionsInChain()
+	if err != nil {
+		return nil, err
+	}
+	executions := selectCurrentExecutionsByNode(directExecutions, linearExecutions)
+
+	outputs, err := newExecutionOutputLookup(
+		b.tx,
+		linearExecutions,
+		executionIDsFromExecutions(executions),
+		b.incomingEventID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	payloads := make([]canvasEventPayload, 0, len(executions))
+	for _, execution := range executions {
+		event, ok, err := outputs.outputEvent(execution.ID)
+		if err != nil {
+			return nil, fmt.Errorf("node %s: %w", execution.NodeID, err)
+		}
+		if !ok {
+			continue
+		}
+
+		payloads = append(payloads, canvasEventPayload{
+			event: event,
+			data:  injectConfig(normalizeExpressionValue(event.Data.Data()), execution.Configuration.Data()),
+		})
+	}
+	sort.Slice(payloads, func(i, j int) bool {
+		return canvasEventAfter(payloads[i].event, payloads[j].event)
+	})
+
+	return payloads, nil
+}
+
+func selectCurrentExecutionsByNode(
+	executions []models.CanvasNodeExecution,
+	linearExecutions []models.CanvasNodeExecution,
+) []models.CanvasNodeExecution {
+	linearByNode := make(map[string]models.CanvasNodeExecution, len(linearExecutions))
+	for _, execution := range linearExecutions {
+		if _, exists := linearByNode[execution.NodeID]; exists {
+			continue
+		}
+		linearByNode[execution.NodeID] = execution
+	}
+
+	selectedByNode := make(map[string]models.CanvasNodeExecution, len(executions))
+	for _, execution := range executions {
+		if linear, ok := linearByNode[execution.NodeID]; ok {
+			selectedByNode[execution.NodeID] = linear
+			continue
+		}
+
+		selected, exists := selectedByNode[execution.NodeID]
+		if !exists || executionCreatedAfter(execution, selected) {
+			selectedByNode[execution.NodeID] = execution
+		}
+	}
+
+	selected := make([]models.CanvasNodeExecution, 0, len(selectedByNode))
+	for _, execution := range selectedByNode {
+		selected = append(selected, execution)
+	}
+	return selected
+}
+
+func executionCreatedAfter(left models.CanvasNodeExecution, right models.CanvasNodeExecution) bool {
+	if left.CreatedAt == nil && right.CreatedAt == nil {
+		return left.ID.String() > right.ID.String()
+	}
+	if left.CreatedAt == nil {
+		return false
+	}
+	if right.CreatedAt == nil {
+		return true
+	}
+	if left.CreatedAt.Equal(*right.CreatedAt) {
+		return left.ID.String() > right.ID.String()
+	}
+	return left.CreatedAt.After(*right.CreatedAt)
+}
+
+func canvasEventAfter(left models.CanvasEvent, right models.CanvasEvent) bool {
+	if left.CreatedAt == nil && right.CreatedAt == nil {
+		return left.ID.String() > right.ID.String()
+	}
+	if left.CreatedAt == nil {
+		return false
+	}
+	if right.CreatedAt == nil {
+		return true
+	}
+	if left.CreatedAt.Equal(*right.CreatedAt) {
+		return left.ID.String() > right.ID.String()
+	}
+	return left.CreatedAt.After(*right.CreatedAt)
+}
+
+func (b *NodeConfigurationBuilder) payloadFromEvent(event models.CanvasEvent) any {
+	payload := normalizeExpressionValue(event.Data.Data())
+	if event.ExecutionID == nil {
+		return payload
+	}
+
+	execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *event.ExecutionID)
+	if err != nil || execution == nil {
+		return payload
+	}
+
+	return injectConfig(payload, execution.Configuration.Data())
 }
 
 func (b *NodeConfigurationBuilder) injectConfigFromPreviousExecution(payload any) any {
@@ -833,7 +1174,7 @@ func (b *NodeConfigurationBuilder) injectConfigFromPreviousExecution(payload any
 	return injectConfig(payload, execution.Configuration.Data())
 }
 
-func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, hasInput bool) (int, any, error) {
+func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, hasCurrentPayload bool) (int, any, error) {
 	if b.previousExecutionID == nil {
 		return step, nil, nil
 	}
@@ -847,29 +1188,31 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 	}
 
 	startIndex := 0
-	if hasInput {
+	if hasCurrentPayload {
 		startIndex = 1
 	}
 
-	executionIDs := make([]uuid.UUID, 0, len(executionsInChain))
-	for _, execution := range executionsInChain {
-		executionIDs = append(executionIDs, execution.ID)
-	}
-
-	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+	outputs, err := newExecutionOutputLookup(
+		b.tx,
+		executionsInChain,
+		executionIDsFromExecutions(executionsInChain),
+		b.incomingEventID,
+	)
 	if err != nil {
 		return step, nil, err
 	}
 
-	latestByExecution := latestEventByExecution(events, executionIDs)
 	for _, execution := range executionsInChain[startIndex:] {
 		step++
 		if step < depth {
 			continue
 		}
 
-		event, exists := latestByExecution[execution.ID]
-		if !exists {
+		event, ok, err := outputs.outputEvent(execution.ID)
+		if err != nil {
+			return step, nil, err
+		}
+		if !ok {
 			continue
 		}
 
@@ -1068,7 +1411,6 @@ func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.Canva
 				root_event_id,
 				event_id,
 				previous_execution_id,
-				parent_execution_id,
 				state,
 				result,
 				result_reason,
@@ -1090,7 +1432,6 @@ func (b *NodeConfigurationBuilder) listLinearExecutionsInChain() ([]models.Canva
 				wne.root_event_id,
 				wne.event_id,
 				wne.previous_execution_id,
-				wne.parent_execution_id,
 				wne.state,
 				wne.result,
 				wne.result_reason,
@@ -1159,4 +1500,60 @@ func (b *NodeConfigurationBuilder) listUpstreamNodeIDs() ([]string, error) {
 	}
 	sort.Strings(ids)
 	return ids, nil
+}
+
+func (b *NodeConfigurationBuilder) listDirectSourceNodeIDs() ([]string, error) {
+	if b.nodeID == "" {
+		return nil, nil
+	}
+
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(b.tx, canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]struct{}{}
+	ids := []string{}
+	for _, edge := range liveEdges {
+		if edge.TargetID != b.nodeID {
+			continue
+		}
+		if _, exists := seen[edge.SourceID]; exists {
+			continue
+		}
+		seen[edge.SourceID] = struct{}{}
+		ids = append(ids, edge.SourceID)
+	}
+
+	return ids, nil
+}
+
+func (b *NodeConfigurationBuilder) listDirectUpstreamExecutions() ([]models.CanvasNodeExecution, error) {
+	if b.rootEventID == nil {
+		return nil, nil
+	}
+
+	sourceIDs, err := b.listDirectSourceNodeIDs()
+	if err != nil {
+		return nil, err
+	}
+	if len(sourceIDs) == 0 {
+		return nil, nil
+	}
+
+	var executions []models.CanvasNodeExecution
+	err = b.tx.
+		Where("workflow_id = ? AND root_event_id = ? AND node_id IN ?", b.workflowID, *b.rootEventID, sourceIDs).
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
 }

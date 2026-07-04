@@ -1,35 +1,20 @@
 import {
   ArrowRightLeft,
   BookOpen,
-  Boxes,
   CircleUser,
-  History,
-  Home,
   LogOut,
   MemoryStick,
   Palette,
   PanelTop,
   PlayCircle,
   Plus,
-  Search,
   Settings,
-  Shield,
   Sparkles,
 } from "lucide-react";
 import type { CanvasToolSidebarTab } from "@/components/CanvasToolSidebar/events";
 import { ADMIN_LINKS, DOCS_URL, ORGANIZATION_SETTINGS_LINKS } from "./constants";
 import { appSettingsPath } from "@/lib/appPaths";
-import type { CommandPage, PaletteAction, PalettePageAction } from "./types";
-
-type RootPageActionParams = {
-  accountInstallationAdmin: boolean;
-  canReadCanvas: boolean;
-  canUpdateCanvas: boolean;
-  canvasId: string | null;
-  currentCanvasName: string;
-  organizationId: string | null;
-  organizationName: string;
-};
+import type { PaletteAction } from "./types";
 
 type RootActionParams = {
   accountEmail: string;
@@ -50,64 +35,11 @@ type CurrentCanvasActionParams = {
   canvasId: string | null;
   currentCanvasName: string;
   goTo: (href: string) => void;
-  goToCurrentCanvasView: (view?: "dashboard" | "memory" | "runs") => void;
+  goToCurrentCanvasView: (view?: "console" | "memory") => void;
   openCurrentCanvasToolTab: (tab: CanvasToolSidebarTab) => void;
   organizationId: string | null;
   showToolTabCommands: boolean;
 };
-
-export function buildRootPageActions({
-  accountInstallationAdmin,
-  canReadCanvas,
-  canUpdateCanvas,
-  canvasId,
-  currentCanvasName,
-  organizationId,
-  organizationName,
-}: RootPageActionParams): PalettePageAction[] {
-  const actions: PalettePageAction[] = [
-    {
-      id: "open-canvas-page",
-      label: "Open Canvas",
-      description: organizationId ? "Search canvases in this organization" : "Choose an organization first",
-      icon: Search,
-      page: "open-canvas",
-      disabled: !organizationId || !canReadCanvas,
-      keywords: ["canvas", "project", "workflow", "search"],
-    },
-    {
-      id: "organization-settings-page",
-      label: "Organization Settings",
-      description: organizationId ? organizationName : "Choose an organization first",
-      icon: Settings,
-      page: "organization-settings",
-      disabled: !organizationId,
-      keywords: ["members", "groups", "roles", "integrations", "secrets", "service accounts", "billing"],
-    },
-    {
-      id: "canvas-settings-page",
-      label: "Canvas Settings",
-      description: canvasId ? currentCanvasName : "Pick a canvas to configure",
-      icon: Palette,
-      page: "canvas-settings",
-      disabled: !organizationId || !canReadCanvas || !canUpdateCanvas,
-      keywords: ["canvas", "settings", "configuration"],
-    },
-  ];
-
-  if (accountInstallationAdmin) {
-    actions.push({
-      id: "admin-page",
-      label: "Installation Admin",
-      description: "Organizations, accounts, settings, and runner tasks",
-      icon: Shield,
-      page: "admin",
-      keywords: ["admin", "installation", "accounts", "runner"],
-    });
-  }
-
-  return actions;
-}
 
 export function buildRootActions({
   accountEmail,
@@ -124,23 +56,15 @@ export function buildRootActions({
   return [
     {
       id: "new-canvas",
-      label: createCanvasPending ? "Creating canvas..." : "New Canvas",
-      description: organizationId ? `Create a blank canvas in ${organizationName}` : "Choose an organization first",
+      label: createCanvasPending ? "Creating app..." : "New App",
+      description: organizationId ? `Create a blank app in ${organizationName}` : "Choose an organization first",
       icon: Plus,
       shortcut: `${shortcutModifier}/`,
       disabled: !canCreateCanvas || createCanvasPending,
       onSelect: () => createCanvas(),
       keywords: ["new", "create", "canvas", "project", "workflow"],
     },
-    {
-      id: "new-organization",
-      label: "New Organization",
-      description: "Create another organization",
-      icon: Plus,
-      onSelect: () => goTo("/create"),
-      keywords: ["new", "create", "organization", "workspace"],
-    },
-    ...buildOrganizationRootActions(organizationId, organizationName, accountEmail, goTo),
+    ...buildOrganizationRootActions(organizationId, accountEmail, goTo),
     {
       id: "change-organization",
       label: "Change Organization",
@@ -184,7 +108,7 @@ export function buildCurrentCanvasActions({
   const actions: PaletteAction[] = [
     {
       id: "current-canvas",
-      label: "Canvas",
+      label: "App",
       description: currentCanvasName,
       icon: Palette,
       onSelect: () => goToCurrentCanvasView(),
@@ -195,15 +119,15 @@ export function buildCurrentCanvasActions({
       label: "Console",
       description: currentCanvasName,
       icon: PanelTop,
-      onSelect: () => goToCurrentCanvasView("dashboard"),
-      keywords: ["dashboard", "console"],
+      onSelect: () => goToCurrentCanvasView("console"),
+      keywords: ["console"],
     },
     {
       id: "current-canvas-runs",
       label: "Runs",
       description: currentCanvasName,
       icon: PlayCircle,
-      onSelect: () => goToCurrentCanvasView("runs"),
+      onSelect: () => goToCurrentCanvasView(),
       keywords: ["runs", "executions"],
     },
     {
@@ -216,7 +140,7 @@ export function buildCurrentCanvasActions({
     },
     {
       id: "current-canvas-settings",
-      label: "Canvas Settings",
+      label: "App Settings",
       description: currentCanvasName,
       icon: Settings,
       disabled: !canUpdateCanvas,
@@ -224,17 +148,6 @@ export function buildCurrentCanvasActions({
       keywords: ["canvas", "settings"],
     },
   ];
-
-  if (showToolTabCommands) {
-    actions.splice(4, 0, {
-      id: "current-canvas-versions",
-      label: "Versions",
-      description: currentCanvasName,
-      icon: History,
-      onSelect: () => openCurrentCanvasToolTab("versions"),
-      keywords: ["versions", "version history", "change requests"],
-    });
-  }
 
   if (agentEnabled && showToolTabCommands) {
     actions.splice(1, 0, {
@@ -283,29 +196,12 @@ export function buildAdminActions(goTo: (href: string) => void): PaletteAction[]
 
 function buildOrganizationRootActions(
   organizationId: string | null,
-  organizationName: string,
   accountEmail: string,
   goTo: (href: string) => void,
 ): PaletteAction[] {
   if (!organizationId) return [];
 
   return [
-    {
-      id: "go-home",
-      label: "Canvases",
-      description: organizationName,
-      icon: Home,
-      onSelect: () => goTo(`/${organizationId}`),
-      keywords: ["home", "dashboard", "canvases", "projects"],
-    },
-    {
-      id: "templates",
-      label: "Templates",
-      description: "Browse reusable canvases",
-      icon: Boxes,
-      onSelect: () => goTo(`/${organizationId}/templates`),
-      keywords: ["template", "canvas"],
-    },
     {
       id: "profile",
       label: "Profile",
@@ -315,8 +211,4 @@ function buildOrganizationRootActions(
       keywords: ["account", "profile", "user"],
     },
   ];
-}
-
-export function openPageAction(page: CommandPage, onOpenPage: (page: CommandPage) => void) {
-  return () => onOpenPage(page);
 }

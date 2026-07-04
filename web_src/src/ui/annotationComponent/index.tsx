@@ -4,6 +4,8 @@ import { Trash2 } from "lucide-react";
 import { NodeResizeControl, type ResizeParams } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
+import { extractCodeBlock } from "@/lib/markdownCode";
+import { CopyButton } from "@/ui/CopyButton";
 import { getDraftDiffOutlineClassName, type DraftDiffStatus } from "@/lib/draftDiff";
 import { SelectionWrapper } from "../selectionWrapper";
 import { setActiveNoteId } from "./noteFocus";
@@ -199,11 +201,10 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     [onAnnotationUpdate],
   );
 
-  // Enter edit mode on double-click
-  const handleDoubleClick = useCallback(() => {
-    setIsEditing(true);
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  }, []);
+  // Shared text styling for both modes
+  const textStyles = "text-sm leading-normal text-gray-800";
+  const showNoteActions = canvasMode === "edit" && !hideActionsButton;
+  const isNoteEditable = canvasMode === "edit";
 
   // Exit edit mode
   const exitEditMode = useCallback(() => {
@@ -224,9 +225,20 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
     [exitEditMode],
   );
 
-  // Shared text styling for both modes
-  const textStyles = "text-sm leading-normal text-gray-800";
-  const showNoteActions = canvasMode === "edit" && !hideActionsButton;
+  useEffect(() => {
+    if (!isNoteEditable && isEditing) {
+      exitEditMode();
+    }
+  }, [exitEditMode, isEditing, isNoteEditable]);
+
+  // Enter edit mode on double-click
+  const handleDoubleClick = useCallback(() => {
+    if (!isNoteEditable) {
+      return;
+    }
+    setIsEditing(true);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [isNoteEditable]);
 
   return (
     <SelectionWrapper selected={selected}>
@@ -353,8 +365,12 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                   </>
                 ) : (
                   <div
-                    className={cn("nodrag h-full w-full overflow-auto cursor-text text-left", textStyles)}
-                    onDoubleClick={handleDoubleClick}
+                    className={cn(
+                      "nodrag nowheel h-full w-full overflow-auto text-left select-text",
+                      isNoteEditable ? "cursor-text" : "cursor-default",
+                      textStyles,
+                    )}
+                    onDoubleClick={isNoteEditable ? handleDoubleClick : undefined}
                   >
                     {annotationText ? (
                       <ReactMarkdown
@@ -375,10 +391,31 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                           h4: ({ children }) => (
                             <h4 className="mt-2 first:mt-0 mb-1 text-xs font-medium leading-tight">{children}</h4>
                           ),
-                          code: ({ children }) => <code className="bg-black/10 px-1 rounded text-xs">{children}</code>,
-                          pre: ({ children }) => (
-                            <pre className="bg-black/10 p-2 rounded text-xs overflow-auto mb-2">{children}</pre>
-                          ),
+                          code: ({ children, className: codeClassName }) => {
+                            // Block-level code (inside our custom `pre`) is rendered plain so the
+                            // `pre` wrapper controls scrolling; only inline code gets the chip style.
+                            if (codeClassName?.includes("language-")) {
+                              return <code className={codeClassName}>{children}</code>;
+                            }
+                            return <code className="px-1 rounded text-xs font-mono">{children}</code>;
+                          },
+                          pre: ({ children }) => {
+                            const { code } = extractCodeBlock(children);
+                            return (
+                              <div
+                                className="relative mb-2 overflow-hidden rounded-md bg-slate-700 text-gray-100"
+                                onDoubleClick={(event) => event.stopPropagation()}
+                              >
+                                {/* Opaque chip so code scrolling underneath stays hidden behind the button. */}
+                                <div className="absolute right-1 top-1 z-10 rounded bg-slate-700">
+                                  <CopyButton text={code} dark data-testid="note-code-copy" />
+                                </div>
+                                <pre className="nodrag nowheel select-text overflow-x-auto whitespace-pre px-2.5 py-2 pr-9 text-xs leading-relaxed font-mono [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:cursor-pointer [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-thumb:hover]:bg-white/60">
+                                  {children}
+                                </pre>
+                              </div>
+                            );
+                          },
                           a: ({ children, href }) => (
                             <a
                               target="_blank"
@@ -396,36 +433,40 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                         {annotationText}
                       </ReactMarkdown>
                     ) : (
-                      <span className="text-black/50">Double click to add and edit notes...</span>
+                      <span className="text-black/50">
+                        {isNoteEditable ? "Double click to add and edit notes..." : "No notes"}
+                      </span>
                     )}
                   </div>
                 )}
               </div>
 
-              <NodeResizeControl
-                minWidth={MIN_WIDTH}
-                minHeight={MIN_HEIGHT}
-                onResize={handleResize}
-                onResizeEnd={handleResizeEnd}
-                autoScale={false}
-                position="bottom-right"
-                className="z-10 flex !h-9 !w-9 !min-h-9 !min-w-9 !translate-x-0 !translate-y-0 !items-end !justify-end !border-0 !bg-transparent !p-1.5 !shadow-none !left-auto !top-auto !right-0.5 !bottom-0.5 cursor-nwse-resize"
-              >
-                <span className="sr-only">Resize note</span>
-                <span className="pointer-events-none flex h-full w-full items-end justify-end" aria-hidden>
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="opacity-30"
-                  >
-                    <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
-                    <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />
-                  </svg>
-                </span>
-              </NodeResizeControl>
+              {isNoteEditable && (
+                <NodeResizeControl
+                  minWidth={MIN_WIDTH}
+                  minHeight={MIN_HEIGHT}
+                  onResize={handleResize}
+                  onResizeEnd={handleResizeEnd}
+                  autoScale={false}
+                  position="bottom-right"
+                  className="z-10 flex !h-9 !w-9 !min-h-9 !min-w-9 !translate-x-0 !translate-y-0 !items-end !justify-end !border-0 !bg-transparent !p-1.5 !shadow-none !left-auto !top-auto !right-0.5 !bottom-0.5 cursor-nwse-resize"
+                >
+                  <span className="sr-only">Resize note</span>
+                  <span className="pointer-events-none flex h-full w-full items-end justify-end" aria-hidden>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="opacity-30"
+                    >
+                      <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
+                      <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />
+                    </svg>
+                  </span>
+                </NodeResizeControl>
+              )}
             </>
           )}
         </div>

@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -29,7 +29,7 @@ func TestListAgentChatMessages_RequiresOwnership(t *testing.T) {
 		ChatId: uuid.NewString(),
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.NotFound, status.Code(err))
+	assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 }
 
 func TestListAgentChatMessages_ReturnsMessagesAndForwardsCursor(t *testing.T) {

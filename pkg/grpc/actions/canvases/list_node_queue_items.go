@@ -6,19 +6,20 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeQueueItemsResponse, error) {
 	wfID, err := uuid.Parse(workflowID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	limit = getLimit(limit)
@@ -37,7 +38,7 @@ func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workfl
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeQueueItems(queueItems)
+	serialized, err := SerializeNodeQueueItems(database.DB(ctx), queueItems)
 	if err != nil {
 		return nil, err
 	}
@@ -50,11 +51,11 @@ func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workfl
 	}, nil
 }
 
-func SerializeNodeQueueItems(queueItems []models.CanvasNodeQueueItem) ([]*pb.CanvasNodeQueueItem, error) {
+func SerializeNodeQueueItems(db *gorm.DB, queueItems []models.CanvasNodeQueueItem) ([]*pb.CanvasNodeQueueItem, error) {
 	//
 	// Fetch all input records
 	//
-	inputEvents, err := models.FindCanvasEvents(eventIDsFromQueueItems(queueItems))
+	inputEvents, err := models.FindCanvasEvents(db, eventIDsFromQueueItems(queueItems))
 	if err != nil {
 		return nil, fmt.Errorf("error find input events: %v", err)
 	}
@@ -81,7 +82,7 @@ func SerializeNodeQueueItems(queueItems []models.CanvasNodeQueueItem) ([]*pb.Can
 			serializedQueueItem.RootEvent, err = SerializeCanvasEvent(*queueItem.RootEvent)
 			if err != nil {
 				log.Errorf("Failed to serialize workflow event: %v", err)
-				return nil, status.Error(codes.Internal, "failed to list node queue items")
+				return nil, grpcerrors.Internal(err, "failed to list node queue items")
 			}
 		}
 

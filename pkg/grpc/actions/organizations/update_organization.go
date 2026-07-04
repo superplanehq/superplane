@@ -7,25 +7,24 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Organization) (*pb.UpdateOrganizationResponse, error) {
 	if pbOrganization == nil {
-		return nil, status.Error(codes.InvalidArgument, "organization is required")
+		return nil, grpcerrors.InvalidArgument(nil, "organization is required")
 	}
 
 	if pbOrganization.Metadata == nil {
-		return nil, status.Error(codes.InvalidArgument, "organization metadata is required")
+		return nil, grpcerrors.InvalidArgument(nil, "organization metadata is required")
 	}
 
 	organization, err := models.FindOrganizationByID(orgID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "organization not found")
+		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
 
 	if pbOrganization.Metadata.Name != "" {
@@ -36,16 +35,12 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 		organization.Description = pbOrganization.Metadata.Description
 	}
 
-	if pbOrganization.Spec != nil && pbOrganization.Spec.ChangeManagementEnabled != nil {
-		organization.ChangeManagementEnabled = *pbOrganization.Spec.ChangeManagementEnabled
-	}
-
 	now := time.Now()
 	organization.UpdatedAt = &now
 	err = database.Conn().Save(organization).Error
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, grpcerrors.InvalidArgument(err, "invalid organization update")
 		}
 
 		log.Errorf("Error updating organization %s: %v", orgID, err)
@@ -62,7 +57,6 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
 			},
 			Spec: &pb.Organization_Spec{
-				ChangeManagementEnabled:     &organization.ChangeManagementEnabled,
 				EnabledExperimentalFeatures: []string(organization.EnabledExperimentalFeatures),
 			},
 		},

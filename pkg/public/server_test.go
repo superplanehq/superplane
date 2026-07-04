@@ -17,6 +17,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -196,8 +197,7 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
 	require.NoError(t, err)
 
-	err = server.RegisterGRPCGateway("localhost:50051")
-	require.NoError(t, err)
+	registerTestGRPCGateway(t, server, authService, registry, &crypto.NoOpEncryptor{}, oidcProvider, gitProvider, nil)
 
 	response := execRequest(server, requestParams{
 		method: "GET",
@@ -429,7 +429,7 @@ func Test__CreateOrganization(t *testing.T) {
 		signer := jwt.NewSigner("test")
 		account, err := models.CreateAccount("test@example.com", "Test User")
 		require.NoError(t, err)
-		token, err := signer.Generate(account.ID.String(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		//
@@ -486,7 +486,7 @@ func Test__CreateOrganization(t *testing.T) {
 		account, err := models.CreateAccount("success@example.com", "Success User")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test")
-		token, err := signer.Generate(account.ID.String(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		//
@@ -535,7 +535,7 @@ func Test__CreateOrganization(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, account.Email, user.GetEmail())
 
-		roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
+		roles, err := authService.GetUserRolesForOrg(context.Background(), user.ID.String(), orgID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, roles)
 	})
@@ -546,7 +546,7 @@ func Test__CreateOrganization(t *testing.T) {
 		account, err := models.CreateAccount("duplicate@example.com", "Duplicate User")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test")
-		token, err := signer.Generate(account.ID.String(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		authService, err := authorization.NewAuthService()
@@ -588,7 +588,7 @@ func Test__CreateOrganization(t *testing.T) {
 		account, err := models.CreateAccount("limited@example.com", "Limited User")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test")
-		token, err := signer.Generate(account.ID.String(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		authService, err := authorization.NewAuthService()
@@ -652,7 +652,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 		account, err := models.CreateAccount("status-ok@example.com", "Status Ok")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test")
-		token, err := signer.Generate(account.ID.String(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		authService, err := authorization.NewAuthService()
@@ -711,7 +711,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 		account, err := models.CreateAccount("status-blocked@example.com", "Status Blocked")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test")
-		token, err := signer.Generate(account.ID.String(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		authService, err := authorization.NewAuthService()
@@ -776,7 +776,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 		account, err := models.CreateAccount("status-unavailable@example.com", "Status Unavailable")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test")
-		token, err := signer.Generate(account.ID.String(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
 		authService, err := authorization.NewAuthService()

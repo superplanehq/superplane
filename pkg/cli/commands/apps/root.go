@@ -3,9 +3,10 @@ package apps
 import (
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/changes"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/console"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/drafts"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/files"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/memory"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -17,8 +18,8 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 An app is a SuperPlane automation made up of a canvas, console, and files.
 
-App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
-(e.g. https://app.superplane.com/<organization-id>/canvases/<app-id>)`,
+App URL pattern: {baseURL}/{organizationId}/apps/{appId}
+(e.g. https://app.superplane.com/<organization-id>/apps/<app-id>)`,
 		Aliases: []string{"app"},
 	}
 
@@ -27,9 +28,7 @@ App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 		Short: "List apps",
 		Args:  cobra.NoArgs,
 	}
-	var listFull bool
-	listCmd.Flags().BoolVar(&listFull, "full", false, "show full output including all fields")
-	core.Bind(listCmd, &listCommand{full: &listFull}, options)
+	core.Bind(listCmd, &listCommand{}, options)
 
 	activeCmd := &cobra.Command{
 		Use:   "active [app-id]",
@@ -43,10 +42,11 @@ App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 	root.AddCommand(activeCmd)
 	root.AddCommand(NewCreateCommand(options))
 	root.AddCommand(NewDeleteCommand(options))
-	root.AddCommand(changes.NewCommand(options))
+	root.AddCommand(drafts.NewCommand(options))
 	root.AddCommand(canvas.NewCommand(options))
 	root.AddCommand(console.NewCommand(options))
 	root.AddCommand(files.NewRootCommand(options))
+	root.AddCommand(memory.NewCommand(options))
 
 	return root
 }

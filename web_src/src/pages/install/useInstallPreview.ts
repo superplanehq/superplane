@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { showErrorToast } from "@/lib/toast";
-import { INVALID_REPO_MESSAGE } from "./constants";
 import type { InstallPreview, OrganizationOption } from "./types";
+
+const INVALID_REPO_MESSAGE = "Invalid repository URL. Expected format: github.com/owner/repo";
 
 interface UseInstallPreviewOptions {
   repoParam: string | null;
@@ -26,6 +27,7 @@ export function useInstallPreview({
   useEffect(() => {
     if (!hasValidRepo || !repoParam) {
       setLoadError(INVALID_REPO_MESSAGE);
+
       setIsLoading(false);
       return;
     }

@@ -6,11 +6,10 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/usage"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
@@ -27,41 +26,41 @@ func AcceptInviteLinkWithUsage(
 	token string,
 ) (*structpb.Struct, error) {
 	if token == "" {
-		return nil, status.Error(codes.InvalidArgument, "invite link token is required")
+		return nil, grpcerrors.InvalidArgument(nil, "invite link token is required")
 	}
 
 	account, err := models.FindAccountByID(accountID)
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "account not found")
+		return nil, grpcerrors.Unauthenticated(nil, "account not found")
 	}
 
-	inviteLink, err := models.FindInviteLinkByToken(token)
+	inviteLink, err := models.FindInviteLinkByToken(database.DB(ctx), token)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "invite link not found")
+		return nil, grpcerrors.NotFound(err, "invite link not found")
 	}
 
 	if !inviteLink.Enabled {
-		return nil, status.Error(codes.PermissionDenied, "invite link disabled")
+		return nil, grpcerrors.PermissionDenied(nil, "invite link disabled")
 	}
 
 	org, err := models.FindOrganizationByID(inviteLink.OrganizationID.String())
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "organization not found")
+		return nil, grpcerrors.NotFound(err, "organization not found")
 	}
 
 	statusValue := "joined"
-	tx := database.Conn().Begin()
+	tx := database.DB(ctx).Begin()
 	user, err := models.FindMaybeDeletedUserByEmailInTransaction(tx, org.ID.String(), account.Email)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			tx.Rollback()
-			return nil, status.Error(codes.Internal, "failed to accept invite")
+			return nil, grpcerrors.Internal(err, "failed to accept invite")
 		}
 
 		userCount, countErr := models.CountActiveHumanUsersByOrganizationInTransaction(tx, org.ID.String())
 		if countErr != nil {
 			tx.Rollback()
-			return nil, status.Error(codes.Internal, "failed to accept invite")
+			return nil, grpcerrors.Internal(countErr, "failed to accept invite")
 		}
 
 		if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, org.ID.String(), &usagepb.OrganizationState{
@@ -74,7 +73,7 @@ func AcceptInviteLinkWithUsage(
 		user, err = models.CreateUserInTransaction(tx, org.ID, account.ID, account.Email, account.Name)
 		if err != nil {
 			tx.Rollback()
-			return nil, status.Error(codes.Internal, "failed to accept invite")
+			return nil, grpcerrors.Internal(err, "failed to accept invite")
 		}
 	} else if !user.DeletedAt.Valid {
 		tx.Rollback()
@@ -84,7 +83,7 @@ func AcceptInviteLinkWithUsage(
 		userCount, countErr := models.CountActiveHumanUsersByOrganizationInTransaction(tx, org.ID.String())
 		if countErr != nil {
 			tx.Rollback()
-			return nil, status.Error(codes.Internal, "failed to accept invite")
+			return nil, grpcerrors.Internal(countErr, "failed to accept invite")
 		}
 
 		if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, org.ID.String(), &usagepb.OrganizationState{
@@ -97,18 +96,18 @@ func AcceptInviteLinkWithUsage(
 		err = user.RestoreInTransaction(tx)
 		if err != nil {
 			tx.Rollback()
-			return nil, status.Error(codes.Internal, "failed to accept invite")
+			return nil, grpcerrors.Internal(err, "failed to accept invite")
 		}
 	}
 
 	err = authService.AssignRole(user.ID.String(), models.RoleOrgViewer, org.ID.String(), models.DomainTypeOrganization)
 	if err != nil {
 		tx.Rollback()
-		return nil, status.Error(codes.Internal, "failed to accept invite")
+		return nil, grpcerrors.Internal(err, "failed to accept invite")
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		return nil, status.Error(codes.Internal, "failed to accept invite")
+		return nil, grpcerrors.Internal(err, "failed to accept invite")
 	}
 
 	return inviteLinkAcceptResponse(org.ID.String(), org.Name, statusValue)

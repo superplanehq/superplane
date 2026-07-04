@@ -2,6 +2,7 @@ import { Heading } from "@/components/Heading/heading";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Description, Label } from "../../../components/Fieldset/fieldset";
@@ -170,7 +171,7 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
   },
   {
     category: "Canvases",
-    icon: "dashboard",
+    icon: "console",
     permissions: [
       {
         id: "canvas.read",
@@ -330,6 +331,10 @@ export function CreateRolePage() {
   const canUpdateRoles = canAct("roles", "update");
 
   usePageTitle([isReadOnly ? "View Role" : isEditMode ? "Edit Role" : "Create Role"]);
+
+  useReportPageReady((!isEditMode || !isLoading) && !permissionsLoading, {
+    failed: !!error,
+  });
 
   const handleCategoryToggle = (permissions: Permission[]) => {
     if (isReadOnly) return;

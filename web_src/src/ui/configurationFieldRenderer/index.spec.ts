@@ -1,5 +1,58 @@
-import { describe, expect, it } from "vitest";
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import type { ConfigurationField } from "@/api-client";
+import { describe, expect, it, vi } from "vitest";
+import { ConfigurationFieldRenderer } from "./index";
 import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
+
+const runTitleField: ConfigurationField = {
+  name: "customName",
+  type: "string",
+  label: "Run title",
+  description: "Give each run a dynamic title using expressions.",
+  togglable: true,
+  placeholder: "{{ root().data.context }}",
+};
+
+describe("ConfigurationFieldRenderer run title copy", () => {
+  it("explains disabled trigger run title customization", () => {
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        allowExpressions: true,
+        field: runTitleField,
+        value: null,
+        onChange: vi.fn(),
+        autocompleteExampleObj: { __root: { data: { context: "ci/build" } } },
+      }),
+    );
+
+    expect(screen.getByText("Customize run title")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This trigger starts a run when an event arrives. By default, SuperPlane names the run from the event payload.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("explains enabled trigger run title customization", () => {
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        allowExpressions: true,
+        field: runTitleField,
+        value: "{{ root().data.context }}",
+        onChange: vi.fn(),
+        autocompleteExampleObj: { __root: { data: { context: "ci/build" } } },
+      }),
+    );
+
+    expect(
+      screen.getByText(
+        "Set the title for runs started by this trigger. Use root().data to reference fields from the trigger event.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview title" })).toBeInTheDocument();
+  });
+});
 
 describe("buildTemplateParametersAutocompleteObject", () => {
   it("returns null when parameters are missing", () => {

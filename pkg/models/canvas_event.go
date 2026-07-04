@@ -51,7 +51,7 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 		return nil
 	}
 
-	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID)
+	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID, CanvasRunStateStarted, "")
 	if err != nil {
 		return err
 	}
@@ -60,9 +60,13 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-func FindCanvasEvents(ids []string) ([]CanvasEvent, error) {
+func FindCanvasEvents(tx *gorm.DB, ids []string) ([]CanvasEvent, error) {
+	if len(ids) == 0 {
+		return []CanvasEvent{}, nil
+	}
+
 	var events []CanvasEvent
-	err := database.Conn().
+	err := tx.
 		Where("id IN ?", ids).
 		Find(&events).
 		Error
@@ -74,9 +78,13 @@ func FindCanvasEvents(ids []string) ([]CanvasEvent, error) {
 	return events, nil
 }
 
-func FindCanvasEventsForExecutions(executionIDs []string) ([]CanvasEvent, error) {
+func FindCanvasEventsForExecutions(tx *gorm.DB, executionIDs []string) ([]CanvasEvent, error) {
+	if len(executionIDs) == 0 {
+		return []CanvasEvent{}, nil
+	}
+
 	var events []CanvasEvent
-	err := database.Conn().
+	err := tx.
 		Where("execution_id IN ?", executionIDs).
 		Find(&events).
 		Error
@@ -121,6 +129,20 @@ func FindCanvasEventInTransaction(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, erro
 	return &event, nil
 }
 
+func ListCanvasEventsByIDsInTransaction(tx *gorm.DB, ids []uuid.UUID) ([]CanvasEvent, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	var events []CanvasEvent
+	err := tx.Where("id IN ?", ids).Find(&events).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
 func ListCanvasEvents(canvasID uuid.UUID, nodeID string, limit int, before *time.Time) ([]CanvasEvent, error) {
 	var events []CanvasEvent
 	query := database.Conn().
@@ -161,8 +183,12 @@ func CountCanvasEvents(canvasID uuid.UUID, nodeID string) (int64, error) {
 }
 
 func ListRootCanvasEvents(canvasID uuid.UUID, limit int, before *time.Time) ([]CanvasEvent, error) {
+	return ListRootCanvasEventsInTransaction(database.Conn(), canvasID, limit, before)
+}
+
+func ListRootCanvasEventsInTransaction(tx *gorm.DB, canvasID uuid.UUID, limit int, before *time.Time) ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	query := database.Conn().
+	query := tx.
 		Where("workflow_id = ?", canvasID).
 		Where("execution_id IS NULL")
 
@@ -183,9 +209,13 @@ func ListRootCanvasEvents(canvasID uuid.UUID, limit int, before *time.Time) ([]C
 }
 
 func CountRootCanvasEvents(canvasID uuid.UUID) (int64, error) {
+	return CountRootCanvasEventsInTransaction(database.Conn(), canvasID)
+}
+
+func CountRootCanvasEventsInTransaction(tx *gorm.DB, canvasID uuid.UUID) (int64, error) {
 	var count int64
 
-	err := database.Conn().
+	err := tx.
 		Model(&CanvasEvent{}).
 		Where("workflow_id = ?", canvasID).
 		Where("execution_id IS NULL").
@@ -306,7 +336,7 @@ func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 		Table("workflow_events").
 		Select("workflow_events.*").
 		Clauses(clause.Locking{
-			Strength: "UPDATE",
+			Strength: lockingForUpdateNoKey,
 			Table:    clause.Table{Name: "workflow_events"},
 			Options:  "SKIP LOCKED",
 		}).
@@ -392,21 +422,24 @@ func (e *CanvasEvent) RoutedInTransaction(tx *gorm.DB) error {
 	return tx.Save(e).Error
 }
 
-// FindLastEventPerNode finds the most recent event for each node in a workflow
-// using DISTINCT ON to get one event per node_id, ordered by created_at DESC
-// Only returns events for nodes that have not been deleted
-func FindLastEventPerNode(canvasID uuid.UUID) ([]CanvasEvent, error) {
+// FindLastEventPerNode finds the most recent event for each node in a workflow.
+// Only returns events for nodes that have not been deleted.
+func FindLastEventPerNode(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	err := database.Conn().
+	err := tx.
 		Raw(`
-			SELECT DISTINCT ON (we.node_id) we.*
-			FROM workflow_events we
-			INNER JOIN workflow_nodes wn
-				ON we.workflow_id = wn.workflow_id
-				AND we.node_id = wn.node_id
-			WHERE we.workflow_id = ?
-			AND wn.deleted_at IS NULL
-			ORDER BY we.node_id, we.created_at DESC
+			SELECT we.*
+			FROM workflow_nodes wn
+			INNER JOIN LATERAL (
+				SELECT *
+				FROM workflow_events
+				WHERE workflow_id = wn.workflow_id
+				  AND node_id = wn.node_id
+				ORDER BY created_at DESC
+				LIMIT 1
+			) we ON true
+			WHERE wn.workflow_id = ?
+			  AND wn.deleted_at IS NULL
 		`, canvasID).
 		Scan(&events).
 		Error

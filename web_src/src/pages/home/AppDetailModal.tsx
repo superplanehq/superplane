@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
+import { resolveLucideIcon } from "@/lib/iconRegistry";
 import { ArrowLeft, ArrowRight, ExternalLink, Plus } from "lucide-react";
 
 export interface AppEntry {
@@ -115,8 +116,9 @@ export function LeadIcon({
   const cls = size === "lg" ? "h-8 w-8" : "h-5 w-5";
   if (!iconName) return <Plus className={`${cls} text-slate-400`} />;
   const iconSrc = getIntegrationIconSrc(iconName.toLowerCase());
-  if (!iconSrc) return <Plus className={`${cls} text-slate-400`} />;
-  return <img src={iconSrc} alt={iconName} className={cls} />;
+  if (iconSrc) return <img src={iconSrc} alt={iconName} className={cls} />;
+  const FallbackIcon = resolveLucideIcon(iconName);
+  return <FallbackIcon className={`${cls} text-slate-500`} />;
 }
 
 export function IntegrationIcons({ integrations }: { integrations: string[] }) {

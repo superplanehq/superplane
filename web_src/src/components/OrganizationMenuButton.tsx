@@ -11,6 +11,7 @@ import {
   Key,
   Lock,
   LogOut,
+  Mail,
   Menu,
   Plug,
   Settings,
@@ -23,6 +24,9 @@ import { Link } from "react-router-dom";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { posthog } from "@/posthog";
 
 interface OrganizationMenuButtonProps {
@@ -297,6 +301,44 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
           </TooltipTrigger>
           <TooltipContent>Homepage</TooltipContent>
         </Tooltip>
+        <HoverCard openDelay={100} closeDelay={150}>
+          <HoverCardTrigger asChild>
+            <Badge className="cursor-pointer rounded border-transparent bg-blue-500 px-1 py-0 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-blue-600">
+              Beta
+            </Badge>
+          </HoverCardTrigger>
+          <HoverCardContent align="start" className="w-72">
+            <p className="text-sm font-semibold text-gray-800">We're just getting started!</p>
+            <p className="mt-1 text-[13px] text-gray-500">SuperPlane is in beta. We'd love your feedback:</p>
+            <div className="mt-3 flex flex-col">
+              <a
+                href="https://github.com/superplanehq/superplane/issues/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+              >
+                <IntegrationIcon integrationName="github" />
+                <span>Log an issue</span>
+              </a>
+              <a
+                href="https://discord.superplane.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+              >
+                <IntegrationIcon integrationName="discord" />
+                <span>Chat on Discord</span>
+              </a>
+              <a
+                href="mailto:support@superplane.com"
+                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+              >
+                <Mail size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                <span>Send us an email</span>
+              </a>
+            </div>
+          </HoverCardContent>
+        </HoverCard>
       </div>
     </TooltipProvider>
   );

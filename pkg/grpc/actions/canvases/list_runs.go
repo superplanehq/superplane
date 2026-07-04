@@ -3,14 +3,17 @@ package canvases
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -22,12 +25,12 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		return nil, err
 	}
 
-	runs, err := models.ListCanvasRuns(canvasID, int(limit), beforeTime, filters)
+	runs, err := listCanvasRuns(ctx, canvasID, int(limit), beforeTime, filters)
 	if err != nil {
 		return nil, err
 	}
 
-	count, err := models.CountCanvasRuns(canvasID, filters)
+	count, err := countCanvasRuns(ctx, canvasID, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -37,12 +40,12 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		runIDs[i] = run.ID
 	}
 
-	rootEventsByRunID, err := listRootEventsForRuns(canvasID, runIDs)
+	rootEventsByRunID, err := loadRootEventsForRunsSpan(ctx, canvasID, runIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	executions, err := models.ListParentExecutionsForRunsInTransaction(database.Conn(), canvasID, runIDs)
+	executions, err := listExecutionsForRuns(ctx, canvasID, runIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +55,7 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		executionsByRunID[execution.RunID.String()] = append(executionsByRunID[execution.RunID.String()], execution)
 	}
 
-	serialized, err := SerializeCanvasRuns(runs, rootEventsByRunID, executionsByRunID)
+	serialized, err := serializeCanvasRuns(ctx, runs, rootEventsByRunID, executionsByRunID)
 	if err != nil {
 		return nil, err
 	}
@@ -92,14 +95,14 @@ func buildCanvasRunFilters(states []pb.CanvasRun_State, results []pb.CanvasRun_R
 	}, nil
 }
 
-func listRootEventsForRuns(canvasID uuid.UUID, runIDs []uuid.UUID) (map[string]models.CanvasEvent, error) {
+func listRootEventsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (map[string]models.CanvasEvent, error) {
 	eventsByRunID := map[string]models.CanvasEvent{}
 	if len(runIDs) == 0 {
 		return eventsByRunID, nil
 	}
 
 	var events []models.CanvasEvent
-	err := database.Conn().
+	err := database.DB(ctx).
 		Where("workflow_id = ?", canvasID).
 		Where("run_id IN ?", runIDs).
 		Where("execution_id IS NULL").
@@ -133,7 +136,7 @@ func SerializeCanvasRuns(runs []models.CanvasRun, rootEventsByRunID map[string]m
 
 func SerializeCanvasRun(run models.CanvasRun, rootEvent models.CanvasEvent, executions []models.CanvasNodeExecution) (*pb.CanvasRun, error) {
 	if rootEvent.ID == uuid.Nil {
-		return nil, status.Error(codes.NotFound, "root event not found")
+		return nil, grpcerrors.NotFound(nil, "root event not found")
 	}
 
 	serializedRootEvent, err := SerializeCanvasEvent(rootEvent)
@@ -172,7 +175,7 @@ func ProtoRunStateToModel(state pb.CanvasRun_State) (string, error) {
 	case pb.CanvasRun_STATE_FINISHED:
 		return models.CanvasRunStateFinished, nil
 	default:
-		return "", status.Error(codes.InvalidArgument, fmt.Sprintf("invalid run state filter: %s", state.String()))
+		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("invalid run state filter: %s", state.String()))
 	}
 }
 
@@ -185,7 +188,7 @@ func ProtoRunResultToModel(result pb.CanvasRun_Result) (string, error) {
 	case pb.CanvasRun_RESULT_CANCELLED:
 		return models.CanvasRunResultCancelled, nil
 	default:
-		return "", status.Error(codes.InvalidArgument, fmt.Sprintf("invalid run result filter: %s", result.String()))
+		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("invalid run result filter: %s", result.String()))
 	}
 }
 
@@ -219,4 +222,53 @@ func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {
 	}
 
 	return nil
+}
+
+func serializeCanvasRuns(
+	ctx context.Context,
+	runs []models.CanvasRun,
+	rootEventsByRunID map[string]models.CanvasEvent,
+	executionsByRunID map[string][]models.CanvasNodeExecution,
+) (serialized []*pb.CanvasRun, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.serialize")
+	defer done(&err)
+
+	serialized, err = SerializeCanvasRuns(runs, rootEventsByRunID, executionsByRunID)
+	if err != nil {
+		return nil, err
+	}
+
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(attribute.Int("runs.count", len(runs)))
+	}
+
+	return serialized, nil
+}
+
+func listCanvasRuns(ctx context.Context, canvasID uuid.UUID, limit int, beforeTime *time.Time, filters models.CanvasRunFilters) (runs []models.CanvasRun, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.list")
+	defer done(&err)
+
+	return models.ListCanvasRunsInTransaction(database.DB(ctx), canvasID, limit, beforeTime, filters)
+}
+
+func countCanvasRuns(ctx context.Context, canvasID uuid.UUID, filters models.CanvasRunFilters) (count int64, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.count")
+	defer done(&err)
+
+	return models.CountCanvasRunsInTransaction(database.DB(ctx), canvasID, filters)
+}
+
+func loadRootEventsForRunsSpan(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (events map[string]models.CanvasEvent, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.load_root_events")
+	defer done(&err)
+
+	return listRootEventsForRuns(ctx, canvasID, runIDs)
+}
+
+func listExecutionsForRuns(ctx context.Context, canvasID uuid.UUID, runIDs []uuid.UUID) (executions []models.CanvasNodeExecution, err error) {
+	ctx, done := telemetry.Span(ctx, "runs.load_executions")
+	defer done(&err)
+
+	return models.ListExecutionsForRunsInTransaction(database.DB(ctx), canvasID, runIDs)
 }

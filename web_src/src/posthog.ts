@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { initializeUtmAttribution } from "@/lib/utmAttribution";
 
 interface PostHogWindow extends Window {
   SUPERPLANE_POSTHOG_KEY?: string;
@@ -11,7 +12,9 @@ if (key) {
     api_host: "https://us.i.posthog.com",
     autocapture: false,
     capture_pageview: false,
+    person_profiles: "always",
   });
+  initializeUtmAttribution(posthog);
 }
 
 export { posthog };

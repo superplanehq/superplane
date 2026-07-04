@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -70,7 +71,12 @@ func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub) 
 		return fmt.Errorf("unknown execution state: %s", execution.State)
 	}
 
-	serializedExecutions, err := canvases.SerializeNodeExecutions([]models.CanvasNodeExecution{*execution}, []models.CanvasNodeExecution{})
+	resources, err := canvases.LoadNodeExecutionResources(database.Conn(), []models.CanvasNodeExecution{*execution})
+	if err != nil {
+		return fmt.Errorf("failed to load execution resources: %w", err)
+	}
+
+	serializedExecutions, err := canvases.SerializeNodeExecutions([]models.CanvasNodeExecution{*execution}, resources)
 	if err != nil {
 		return fmt.Errorf("failed to serialize execution: %w", err)
 	}

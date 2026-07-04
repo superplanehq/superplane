@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/useAccount";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 
 interface Organization {
   id: string;
@@ -98,6 +99,11 @@ const OrganizationSelect: React.FC = () => {
 
     fetchOrganizations();
   }, [account, accountLoading, location.pathname, location.search, navigate, fetchOrganizations]);
+
+  useReportPageReady(!loading && !accountLoading, {
+    organization_count: organizations.length,
+    failed: !!error,
+  });
 
   const createOrganizationDisabled = organizationCreationStatus?.allowed === false;
   const createOrganizationTooltip =

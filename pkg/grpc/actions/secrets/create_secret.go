@@ -10,49 +10,48 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"github.com/superplanehq/superplane/pkg/secrets"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID string, spec *pb.Secret) (*pb.CreateSecretResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
 	if spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "missing secret")
+		return nil, grpcerrors.InvalidArgument(nil, "missing secret")
 	}
 
 	if spec.Metadata == nil || spec.Metadata.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "empty secret name")
+		return nil, grpcerrors.InvalidArgument(nil, "empty secret name")
 	}
 
 	if spec.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "missing secret spec")
+		return nil, grpcerrors.InvalidArgument(nil, "missing secret spec")
 	}
 
 	provider := protoToSecretProvider(spec.Spec.Provider)
 	if provider == "" {
-		return nil, status.Error(codes.InvalidArgument, "invalid provider")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid provider")
 	}
 
 	data, err := prepareSecretData(ctx, encryptor, spec)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, grpcerrors.InvalidArgument(err, "invalid secret configuration")
 	}
 
 	secret, err := models.CreateSecret(spec.Metadata.Name, provider, userID, domainType, uuid.MustParse(domainID), data)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, grpcerrors.InvalidArgument(err, "name already used")
 		}
 
 		log.Errorf("failed to create secret %s: %v", spec.Metadata.Name, err)
-		return nil, status.Error(codes.Internal, "failed to create secret")
+		return nil, grpcerrors.Internal(err, "failed to create secret")
 	}
 
 	s, err := serializeSecret(ctx, encryptor, *secret)

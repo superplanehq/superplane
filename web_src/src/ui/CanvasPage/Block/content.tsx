@@ -10,7 +10,7 @@ import {
   getSafeCompositeProps,
   getSafeTriggerProps,
 } from "./data";
-import { isRecord } from "@/pages/workflowv2/mappers/safeMappers";
+import { isRecord } from "@/pages/app/mappers/safeMappers";
 
 function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isCompactView"]) {
   if (isCompactView !== undefined) {
@@ -29,14 +29,9 @@ function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isC
   }
 }
 
-function getActionProps(data: BlockProps["data"], compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
+function getActionProps(compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
   return {
-    runDisabled: props.runDisabled,
-    runDisabledTooltip: props.runDisabledTooltip,
-    onTogglePause: data.type === "trigger" ? undefined : props.onTogglePause,
-    onEdit: props.onEdit,
     onDuplicate: props.onDuplicate,
-    onDeactivate: props.onDeactivate,
     onToggleView: props.onToggleView,
     onDelete: props.onDelete,
     isCompactView: compactView,
@@ -183,7 +178,6 @@ function renderBlockByType(args: {
         <ComponentBase
           {...safeComponentProps}
           canvasMode={canvasMode}
-          paused={safeComponentProps.paused}
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
@@ -235,12 +229,7 @@ export function BlockContent({
   data,
   nodeId,
   selected = false,
-  runDisabled,
-  runDisabledTooltip,
-  onTogglePause,
-  onEdit,
   onDuplicate,
-  onDeactivate,
   onToggleView,
   onDelete,
   showHeader,
@@ -251,13 +240,8 @@ export function BlockContent({
   dimBodyBelowHeader,
 }: BlockProps) {
   const compactView = getCompactView(data, isCompactView);
-  const actionProps = getActionProps(data, compactView, {
-    runDisabled,
-    runDisabledTooltip,
-    onTogglePause,
-    onEdit,
+  const actionProps = getActionProps(compactView, {
     onDuplicate,
-    onDeactivate,
     onToggleView,
     onDelete,
   });

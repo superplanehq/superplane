@@ -11,12 +11,27 @@ import (
 )
 
 type CanvasMemoryContext struct {
-	tx       *gorm.DB
-	canvasID uuid.UUID
+	tx        *gorm.DB
+	canvasID  uuid.UUID
+	onChanged func()
 }
 
 func NewCanvasMemoryContext(tx *gorm.DB, canvasID uuid.UUID) *CanvasMemoryContext {
 	return &CanvasMemoryContext{tx: tx, canvasID: canvasID}
+}
+
+// WithChangeCallback registers a callback invoked whenever a mutating operation
+// (Add/Delete/Update/UpdateNamespace) succeeds. Used to signal callers that
+// memory was modified so they can publish a websocket event post-commit.
+func (c *CanvasMemoryContext) WithChangeCallback(onChanged func()) *CanvasMemoryContext {
+	c.onChanged = onChanged
+	return c
+}
+
+func (c *CanvasMemoryContext) notifyChanged() {
+	if c.onChanged != nil {
+		c.onChanged()
+	}
 }
 
 func (c *CanvasMemoryContext) Add(namespace string, values any) error {
@@ -39,6 +54,7 @@ func (c *CanvasMemoryContext) AddRecord(namespace string, values any) (core.Canv
 		return core.CanvasMemoryRecord{}, err
 	}
 
+	c.notifyChanged()
 	return canvasMemoryRecord(record), nil
 }
 
@@ -93,6 +109,10 @@ func (c *CanvasMemoryContext) Delete(namespace string, matches map[string]any) (
 		return nil, err
 	}
 
+	if len(records) > 0 {
+		c.notifyChanged()
+	}
+
 	deletedValues := make([]any, 0, len(records))
 	for _, record := range records {
 		deletedValues = append(deletedValues, record.Values.Data())
@@ -125,6 +145,10 @@ func (c *CanvasMemoryContext) UpdateRecords(namespace string, matches map[string
 		return nil, err
 	}
 
+	if len(records) > 0 {
+		c.notifyChanged()
+	}
+
 	return canvasMemoryRecords(records), nil
 }
 
@@ -150,6 +174,10 @@ func (c *CanvasMemoryContext) UpdateNamespaceRecords(namespace string, values ma
 	records, err := models.UpdateCanvasMemoriesByNamespaceInTransaction(c.tx, c.canvasID, namespace, values)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(records) > 0 {
+		c.notifyChanged()
 	}
 
 	return canvasMemoryRecords(records), nil

@@ -3,6 +3,7 @@ package contexts
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -299,7 +300,7 @@ func Test_NodeConfigurationBuilder_NodeNameNotUnique_UsesClosestInChain(t *testi
 	// Create executions for the chain
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
 
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
 	node1Data := map[string]any{"result": "first-filter"}
 	event1 := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-1", "default", &execution1.ID, node1Data)
 
@@ -320,6 +321,426 @@ func Test_NodeConfigurationBuilder_NodeNameNotUnique_UsesClosestInChain(t *testi
 	result, err := builder.Build(configuration)
 	require.NoError(t, err)
 	assert.Equal(t, "second-filter", result["field"])
+}
+
+// Test_NodeConfigurationBuilder_CyclicFeedback_UsesCurrentLineage guards against
+// a loop reading a stale iteration's body output. A loop body forms a feedback
+// cycle (loop -> body -> loop), so the body node is reachable "upstream" of the
+// loop and has one execution per iteration. When the loop evaluates an
+// expression (e.g. its until-condition) for the current feedback, $[body] must
+// resolve to the current iteration's output, not an older one.
+func Test_NodeConfigurationBuilder_CyclicFeedback_UsesCurrentLineage(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	// start -> loop -> body -> loop (feedback). The cycle makes "body" upstream
+	// of "loop", so all of body's per-iteration executions are in scope.
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{
+				NodeID: "loop",
+				Name:   "loop",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "loop"}}),
+			},
+			{
+				NodeID: "body",
+				Name:   "body",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "loop", Channel: "default"},
+			{SourceID: "loop", TargetID: "body", Channel: "next"},
+			{SourceID: "body", TargetID: "loop", Channel: "success"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+
+	// The long-lived loop session. Each body iteration branches off it (as in the
+	// real feedback-model loop), so the body executions are siblings.
+	loopExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "loop", rootEvent.ID, rootEvent.ID)
+
+	body1 := support.CreateNextNodeExecution(t, canvas.ID, "body", rootEvent.ID, rootEvent.ID, &loopExecution.ID)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, "body", "success", &body1.ID, map[string]any{"result": "tail"})
+
+	body2 := support.CreateNextNodeExecution(t, canvas.ID, "body", rootEvent.ID, rootEvent.ID, &loopExecution.ID)
+	support.EmitCanvasEventForNodeWithData(t, canvas.ID, "body", "success", &body2.ID, map[string]any{"result": "tail"})
+
+	// Current iteration: body flips "head". The feedback into the loop is this event.
+	body3 := support.CreateNextNodeExecution(t, canvas.ID, "body", rootEvent.ID, rootEvent.ID, &loopExecution.ID)
+	body3Event := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "body", "success", &body3.ID, map[string]any{"result": "head"})
+
+	// Evaluate from the loop's perspective for the current feedback (body3).
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("loop").
+		WithRootEvent(&rootEvent.ID).
+		WithPreviousExecution(&body3.ID).
+		WithIncomingEventID(&body3Event.ID)
+
+	// $[body] must be the current iteration (head), not the oldest (tail).
+	value, err := builder.ResolveExpression(`$["body"].result`)
+	require.NoError(t, err)
+	assert.Equal(t, "head", value)
+
+	done, err := builder.ResolveExpression(`$["body"].result == "head"`)
+	require.NoError(t, err)
+	assert.Equal(t, true, done)
+}
+
+func Test_NodeConfigurationBuilder_ReferencedUpstreamNodeWithNoOutputsResolvesToNil(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{NodeID: "build-a", Name: "Build A", Type: models.NodeTypeComponent},
+			{NodeID: "build-b", Name: "Build B", Type: models.NodeTypeComponent},
+			{NodeID: "merge", Name: "merge", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "build-a", Channel: "default"},
+			{SourceID: "start", TargetID: "build-b", Channel: "default"},
+			{SourceID: "build-a", TargetID: "merge", Channel: "passed"},
+			{SourceID: "build-b", TargetID: "merge", Channel: "passed"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	buildAExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-a", rootEvent.ID, rootEvent.ID)
+	buildAEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-a",
+		"passed",
+		&buildAExecution.ID,
+		map[string]any{"status": "succeeded"},
+	)
+
+	// The sibling execution exists in the same run but has not emitted an event yet.
+	support.CreateCanvasNodeExecution(t, canvas.ID, "build-b", rootEvent.ID, rootEvent.ID)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("merge").
+		WithPreviousExecution(&buildAExecution.ID).
+		WithIncomingEventID(&buildAEvent.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{"build-a": map[string]any{"status": "succeeded"}})
+
+	missing, err := builder.ResolveExpression(`$["Build B"] == nil`)
+	require.NoError(t, err)
+	assert.Equal(t, true, missing)
+}
+
+func setCanvasEventCreatedAt(t *testing.T, eventID uuid.UUID, createdAt time.Time) {
+	t.Helper()
+
+	err := database.Conn().
+		Model(&models.CanvasEvent{}).
+		Where("id = ?", eventID).
+		Update("created_at", createdAt).
+		Error
+	require.NoError(t, err)
+}
+
+func Test_NodeConfigurationBuilder_PreviousFallsBackToLatestUpstreamOutput(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{NodeID: "build-a", Name: "Build A", Type: models.NodeTypeComponent},
+			{NodeID: "build-b", Name: "Build B", Type: models.NodeTypeComponent},
+			{NodeID: "merge", Name: "merge", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "build-a", Channel: "default"},
+			{SourceID: "start", TargetID: "build-b", Channel: "default"},
+			{SourceID: "build-a", TargetID: "merge", Channel: "passed"},
+			{SourceID: "build-b", TargetID: "merge", Channel: "passed"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	buildAExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-a", rootEvent.ID, rootEvent.ID)
+	buildAEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-a",
+		"passed",
+		&buildAExecution.ID,
+		map[string]any{"status": "succeeded"},
+	)
+	buildBExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-b", rootEvent.ID, rootEvent.ID)
+	buildBEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-b",
+		"failed",
+		&buildBExecution.ID,
+		map[string]any{"status": "failed"},
+	)
+	createdAt := time.Now()
+	setCanvasEventCreatedAt(t, buildAEvent.ID, createdAt)
+	setCanvasEventCreatedAt(t, buildBEvent.ID, createdAt.Add(time.Second))
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("merge").
+		WithPreviousExecution(&buildAExecution.ID).
+		WithIncomingEventID(&buildBEvent.ID).
+		WithRootEvent(&rootEvent.ID)
+
+	status, err := builder.ResolveExpression(`previous().status`)
+	require.NoError(t, err)
+	assert.Equal(t, "failed", status)
+
+	status, err = builder.ResolveExpression(`previous(2).status`)
+	require.NoError(t, err)
+	assert.Equal(t, "succeeded", status)
+}
+
+func Test_NodeConfigurationBuilder_PreviousPrefersCurrentInputOverLatestUpstreamOutput(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{NodeID: "build-a", Name: "Build A", Type: models.NodeTypeComponent},
+			{NodeID: "build-b", Name: "Build B", Type: models.NodeTypeComponent},
+			{NodeID: "merge", Name: "merge", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "build-a", Channel: "default"},
+			{SourceID: "start", TargetID: "build-b", Channel: "default"},
+			{SourceID: "build-a", TargetID: "merge", Channel: "passed"},
+			{SourceID: "build-b", TargetID: "merge", Channel: "passed"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	buildAExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-a", rootEvent.ID, rootEvent.ID)
+	buildAEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-a",
+		"passed",
+		&buildAExecution.ID,
+		map[string]any{"status": "succeeded"},
+	)
+	buildBExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-b", rootEvent.ID, rootEvent.ID)
+	buildBEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-b",
+		"failed",
+		&buildBExecution.ID,
+		map[string]any{"status": "failed"},
+	)
+	createdAt := time.Now()
+	setCanvasEventCreatedAt(t, buildAEvent.ID, createdAt)
+	setCanvasEventCreatedAt(t, buildBEvent.ID, createdAt.Add(time.Second))
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("merge").
+		WithPreviousExecution(&buildAExecution.ID).
+		WithIncomingEventID(&buildAEvent.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{"build-a": map[string]any{"status": "succeeded"}})
+
+	status, err := builder.ResolveExpression(`previous().status`)
+	require.NoError(t, err)
+	assert.Equal(t, "succeeded", status)
+
+	nextStatus, err := builder.ResolveExpression(`previous(2).status`)
+	require.NoError(t, err)
+	assert.Equal(t, "failed", nextStatus)
+}
+
+func Test_NodeConfigurationBuilder_PreviousFallbackUsesDirectParentsOnly(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{NodeID: "prepare", Name: "Prepare", Type: models.NodeTypeComponent},
+			{NodeID: "build-a", Name: "Build A", Type: models.NodeTypeComponent},
+			{NodeID: "build-b", Name: "Build B", Type: models.NodeTypeComponent},
+			{NodeID: "merge", Name: "merge", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "prepare", Channel: "default"},
+			{SourceID: "prepare", TargetID: "build-a", Channel: "default"},
+			{SourceID: "prepare", TargetID: "build-b", Channel: "default"},
+			{SourceID: "build-a", TargetID: "merge", Channel: "passed"},
+			{SourceID: "build-b", TargetID: "merge", Channel: "passed"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	buildAExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-a", rootEvent.ID, rootEvent.ID)
+	buildAEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-a",
+		"passed",
+		&buildAExecution.ID,
+		map[string]any{"status": "build-a"},
+	)
+	buildBExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-b", rootEvent.ID, rootEvent.ID)
+	buildBEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-b",
+		"passed",
+		&buildBExecution.ID,
+		map[string]any{"status": "build-b"},
+	)
+	prepareExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "prepare", rootEvent.ID, rootEvent.ID)
+	prepareEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"prepare",
+		"passed",
+		&prepareExecution.ID,
+		map[string]any{"status": "prepare"},
+	)
+	createdAt := time.Now()
+	setCanvasEventCreatedAt(t, buildAEvent.ID, createdAt)
+	setCanvasEventCreatedAt(t, buildBEvent.ID, createdAt.Add(time.Second))
+	setCanvasEventCreatedAt(t, prepareEvent.ID, createdAt.Add(2*time.Second))
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("merge").
+		WithPreviousExecution(&buildAExecution.ID).
+		WithRootEvent(&rootEvent.ID)
+
+	status, err := builder.ResolveExpression(`previous().status`)
+	require.NoError(t, err)
+	assert.Equal(t, "build-b", status)
+
+	status, err = builder.ResolveExpression(`previous(2).status`)
+	require.NoError(t, err)
+	assert.Equal(t, "build-a", status)
+}
+
+func Test_NodeConfigurationBuilder_PreviousFallbackUsesOutputLookupAmbiguityRules(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "start", Name: "start", Type: models.NodeTypeTrigger},
+			{NodeID: "build-a", Name: "Build A", Type: models.NodeTypeComponent},
+			{NodeID: "merge", Name: "merge", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: "start", TargetID: "build-a", Channel: "default"},
+			{SourceID: "build-a", TargetID: "merge", Channel: "passed"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	buildAExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "build-a", rootEvent.ID, rootEvent.ID)
+	support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-a",
+		"passed",
+		&buildAExecution.ID,
+		map[string]any{"status": "first"},
+	)
+	support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		"build-a",
+		"passed",
+		&buildAExecution.ID,
+		map[string]any{"status": "second"},
+	)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithNodeID("merge").
+		WithPreviousExecution(&buildAExecution.ID).
+		WithRootEvent(&rootEvent.ID)
+
+	_, err := builder.ResolveExpression(`previous().status`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ambiguous outputs")
+
+	_, err = builder.ResolveExpression(`$["Build A"].status`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ambiguous outputs")
+}
+
+func Test_selectCurrentExecutionsByNode_PrefersLinearExecutionAndLatestFallback(t *testing.T) {
+	now := time.Now()
+	old := now.Add(-time.Minute)
+	newer := now.Add(time.Minute)
+
+	staleLoopExecution := models.CanvasNodeExecution{
+		ID:        uuid.New(),
+		NodeID:    "loop-body",
+		CreatedAt: &newer,
+	}
+	currentLoopExecution := models.CanvasNodeExecution{
+		ID:        uuid.New(),
+		NodeID:    "loop-body",
+		CreatedAt: &old,
+	}
+	oldBuildExecution := models.CanvasNodeExecution{
+		ID:        uuid.New(),
+		NodeID:    "build",
+		CreatedAt: &old,
+	}
+	newBuildExecution := models.CanvasNodeExecution{
+		ID:        uuid.New(),
+		NodeID:    "build",
+		CreatedAt: &newer,
+	}
+
+	selected := selectCurrentExecutionsByNode(
+		[]models.CanvasNodeExecution{
+			staleLoopExecution,
+			currentLoopExecution,
+			oldBuildExecution,
+			newBuildExecution,
+		},
+		[]models.CanvasNodeExecution{currentLoopExecution},
+	)
+
+	selectedByNode := map[string]uuid.UUID{}
+	for _, execution := range selected {
+		selectedByNode[execution.NodeID] = execution.ID
+	}
+
+	assert.Equal(t, currentLoopExecution.ID, selectedByNode["loop-body"])
+	assert.Equal(t, newBuildExecution.ID, selectedByNode["build"])
+	assert.Len(t, selectedByNode, 2)
 }
 
 func Test_NodeConfigurationBuilder_NodeNameNotUnique_NoneInChain(t *testing.T) {
@@ -388,7 +809,7 @@ func Test_NodeConfigurationBuilder_NodeIDNotAllowed(t *testing.T) {
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "node name node-1 not found in execution chain")
+	assert.Contains(t, err.Error(), "expression evaluation failed")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing.T) {
@@ -414,7 +835,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_NoRootEvent(t *testing
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found in execution chain")
+	assert.Contains(t, err.Error(), "expression evaluation failed")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
@@ -476,7 +897,6 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 		node1,
 		rootEvent.ID,
 		rootEvent.ID,
-		nil,
 	)
 	node1Data := map[string]any{
 		"step":   1,
@@ -579,15 +999,15 @@ func Test_NodeConfigurationBuilder_Chain_IncludesParallelUpstreamExecutions(t *t
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, startNode, "default", nil)
 
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, action1Node, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, action1Node, rootEvent.ID, rootEvent.ID)
 	action1Data := map[string]any{"value": "from-action-1"}
 	support.EmitCanvasEventForNodeWithData(t, canvas.ID, action1Node, "default", &execution1.ID, action1Data)
 
-	execution2 := support.CreateCanvasNodeExecution(t, canvas.ID, action2Node, rootEvent.ID, rootEvent.ID, nil)
+	execution2 := support.CreateCanvasNodeExecution(t, canvas.ID, action2Node, rootEvent.ID, rootEvent.ID)
 	action2Data := map[string]any{"value": "from-action-2"}
 	support.EmitCanvasEventForNodeWithData(t, canvas.ID, action2Node, "default", &execution2.ID, action2Data)
 
-	execution3 := support.CreateCanvasNodeExecution(t, canvas.ID, action3Node, rootEvent.ID, rootEvent.ID, nil)
+	execution3 := support.CreateCanvasNodeExecution(t, canvas.ID, action3Node, rootEvent.ID, rootEvent.ID)
 	action3Data := map[string]any{"value": "from-action-3"}
 	support.EmitCanvasEventForNodeWithData(t, canvas.ID, action3Node, "default", &execution3.ID, action3Data)
 
@@ -658,7 +1078,6 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Previous(t *testing.T) {
 		node1,
 		rootEvent.ID,
 		rootEvent.ID,
-		nil,
 	)
 	node1Data := map[string]any{
 		"step":   1,
@@ -747,7 +1166,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NoPreviousExecution(t
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found in execution chain")
+	assert.Contains(t, err.Error(), "expression evaluation failed")
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *testing.T) {
@@ -768,7 +1187,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *tes
 	)
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID)
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
 		WithPreviousExecution(&execution1.ID).
@@ -780,349 +1199,71 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_NodeNotInChain(t *tes
 
 	_, err := builder.Build(configuration)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found in execution chain")
+	assert.Contains(t, err.Error(), "expression evaluation failed")
 }
 
-func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
+func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_MissingReferenceResolvesNil(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	// Create a blueprint with a component node
-	blueprint := support.CreateBlueprint(
-		t,
-		r.Organization.ID,
-		[]models.Node{
-			{
-				ID:   "bp-node-1",
-				Name: "bp-node-1",
-				Type: models.NodeTypeComponent,
-				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
-			},
-		},
-		[]models.Edge{},
-		[]models.BlueprintOutputChannel{
-			{
-				Name:              "default",
-				NodeID:            "bp-node-1",
-				NodeOutputChannel: "default",
-			},
-		},
-	)
-
-	// Create a workflow with a trigger and a blueprint node
-	triggerNode := "trigger-1"
-	blueprintNode := "blueprint-1"
+	node1 := "node-1"
 	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
 		[]models.CanvasNode{
-			{
-				NodeID: triggerNode,
-				Name:   triggerNode,
-				Type:   models.NodeTypeTrigger,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
-			},
-			{
-				NodeID: blueprintNode,
-				Name:   blueprintNode,
-				Type:   models.NodeTypeBlueprint,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
-			},
+			{NodeID: node1, Name: node1, Type: models.NodeTypeComponent},
 		},
-		[]models.Edge{
-			{SourceID: triggerNode, TargetID: blueprintNode, Channel: "default"},
-		},
+		[]models.Edge{},
 	)
 
-	// Create a root event with test data
-	rootEventData := map[string]any{
-		"username": "alice",
-		"email":    "alice@example.com",
-		"age":      30,
-	}
-	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, rootEventData)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID)
 
-	// Create a blueprint execution
-	blueprintExecution := support.CreateCanvasNodeExecution(
-		t,
-		canvas.ID,
-		blueprintNode,
-		rootEvent.ID,
-		rootEvent.ID,
-		nil,
-	)
-
-	// Get the blueprint node for testing
-	blueprintCanvasNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, blueprintNode)
-	require.NoError(t, err)
-
-	// Build configuration for a node inside the blueprint
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
-		ForBlueprintNode(blueprintCanvasNode).
-		WithRootEvent(&rootEvent.ID).
-		WithPreviousExecution(&blueprintExecution.ID).
-		WithInput(map[string]any{triggerNode: rootEventData})
+		WithPreviousExecution(&execution1.ID).
+		WithInput(map[string]any{})
 
-	configuration := map[string]any{
-		"username": "{{ $[\"" + triggerNode + "\"].username }}",
-		"email":    "{{ $[\"" + triggerNode + "\"].email }}",
-		"age":      "{{ $[\"" + triggerNode + "\"].age }}",
-	}
+	result, err := builder.Build(map[string]any{
+		"field": "{{ $[\"token that does not exist\"] }}",
+	})
 
-	result, err := builder.Build(configuration)
 	require.NoError(t, err)
-	assert.Equal(t, "alice", result["username"])
-	assert.Equal(t, "alice@example.com", result["email"])
-	assert.Equal(t, "30", result["age"])
+	assert.Equal(t, "null", result["field"])
+
+	value, err := builder.ResolveExpression(`$["token that does not exist"]`)
+	require.NoError(t, err)
+	assert.Nil(t, value)
 }
 
-func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
+func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain_KnownNodeWithoutExecutionResolvesNil(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	// Create a blueprint with two sequential nodes
-	blueprint := support.CreateBlueprint(
-		t,
-		r.Organization.ID,
-		[]models.Node{
-			{
-				ID:   "bp-node-1",
-				Name: "bp-node-1",
-				Type: models.NodeTypeComponent,
-				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
-			},
-			{
-				ID:   "bp-node-2",
-				Name: "bp-node-2",
-				Type: models.NodeTypeComponent,
-				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
-			},
-		},
-		[]models.Edge{
-			{SourceID: "bp-node-1", TargetID: "bp-node-2", Channel: "default"},
-		},
-		[]models.BlueprintOutputChannel{
-			{
-				Name:              "default",
-				NodeID:            "bp-node-2",
-				NodeOutputChannel: "default",
-			},
-		},
-	)
-
-	// Create a workflow with a trigger and a blueprint node
-	triggerNode := "trigger-1"
-	blueprintNode := "blueprint-1"
+	node1 := "node-1"
+	node2 := "node-2"
 	canvas, _ := support.CreateCanvas(
 		t,
 		r.Organization.ID,
 		r.User,
 		[]models.CanvasNode{
-			{
-				NodeID: triggerNode,
-				Name:   triggerNode,
-				Type:   models.NodeTypeTrigger,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
-			},
-			{
-				NodeID: blueprintNode,
-				Name:   blueprintNode,
-				Type:   models.NodeTypeBlueprint,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
-			},
-		},
-		[]models.Edge{
-			{SourceID: triggerNode, TargetID: blueprintNode, Channel: "default"},
-		},
-	)
-
-	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
-
-	//
-	// Create parent blueprint execution
-	//
-	blueprintExecution := support.CreateCanvasNodeExecution(
-		t,
-		canvas.ID,
-		blueprintNode,
-		rootEvent.ID,
-		rootEvent.ID,
-		nil,
-	)
-
-	//
-	// Create first blueprint node child execution with outputs
-	//
-	bpNode1ID := blueprintNode + ":bp-node-1"
-	bpNode2ID := blueprintNode + ":bp-node-2"
-	bpNode1Execution := support.CreateCanvasNodeExecution(
-		t,
-		canvas.ID,
-		bpNode1ID,
-		rootEvent.ID,
-		rootEvent.ID,
-		&blueprintExecution.ID,
-	)
-
-	bpNode1Data := map[string]any{
-		"processed": true,
-		"value":     "from-first-node",
-	}
-	event1 := support.EmitCanvasEventForNodeWithData(t, canvas.ID, bpNode1ID, "default", &bpNode1Execution.ID, bpNode1Data)
-
-	//
-	// Create second blueprint node child execution
-	//
-	bpNode2Execution := support.CreateCanvasNodeExecution(
-		t,
-		canvas.ID,
-		bpNode2ID,
-		rootEvent.ID,
-		event1.ID,
-		&blueprintExecution.ID,
-	)
-	bpNode2Execution.PreviousExecutionID = &bpNode1Execution.ID
-	require.NoError(t, database.Conn().Save(&bpNode2Execution).Error)
-
-	//
-	// Test message chain access from bp-node-2 perspective
-	//
-	blueprintCanvasNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, blueprintNode)
-	require.NoError(t, err)
-
-	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
-		ForBlueprintNode(blueprintCanvasNode).
-		WithPreviousExecution(&bpNode2Execution.ID).
-		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{bpNode1ID: bpNode1Data})
-
-	configuration := map[string]any{
-		"processed": "{{ $[\"bp-node-1\"].processed }}",
-		"value":     "{{ $[\"bp-node-1\"].value }}",
-	}
-
-	result, err := builder.Build(configuration)
-	require.NoError(t, err)
-	assert.Equal(t, "true", result["processed"])
-	assert.Equal(t, "from-first-node", result["value"])
-}
-
-func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	// Create a blueprint
-	blueprint := support.CreateBlueprint(
-		t,
-		r.Organization.ID,
-		[]models.Node{
-			{
-				ID:   "bp-node-1",
-				Name: "bp-node-1",
-				Type: models.NodeTypeComponent,
-				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
-			},
-		},
-		[]models.Edge{},
-		[]models.BlueprintOutputChannel{
-			{
-				Name:              "default",
-				NodeID:            "bp-node-1",
-				NodeOutputChannel: "default",
-			},
-		},
-	)
-
-	// Create a canvas with a blueprint node that has configuration
-	blueprintNode := "blueprint-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: blueprintNode,
-				Name:   blueprintNode,
-				Type:   models.NodeTypeBlueprint,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
-				Configuration: datatypes.NewJSONType(map[string]any{
-					"api_key":     "secret-key-123",
-					"endpoint":    "https://api.example.com",
-					"timeout":     30,
-					"retry_count": 3,
-					"nested": map[string]any{
-						"value": "nested-data",
-					},
-				}),
-			},
+			{NodeID: node1, Name: node1, Type: models.NodeTypeComponent},
+			{NodeID: node2, Name: node2, Type: models.NodeTypeComponent},
 		},
 		[]models.Edge{},
 	)
 
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, blueprintNode, "default", nil)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, node1, "default", nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID)
 
-	// Get the blueprint node
-	blueprintCanvasNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, blueprintNode)
-	require.NoError(t, err)
-
-	// Build configuration accessing parent blueprint node config
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
-		ForBlueprintNode(blueprintCanvasNode).
-		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{blueprintNode: map[string]any{"input": "data"}})
+		WithPreviousExecution(&execution1.ID).
+		WithInput(map[string]any{})
 
-	configuration := map[string]any{
-		"key":      "{{ config.api_key }}",
-		"url":      "{{ config.endpoint }}",
-		"timeout":  "{{ config.timeout }}",
-		"retries":  "{{ config.retry_count }}",
-		"nested":   "{{ config.nested.value }}",
-		"combined": "API: {{ config.endpoint }}, Key: {{ config.api_key }}",
-	}
+	result, err := builder.ResolveExpression(`$["node-2"] == nil ? "missing" : "present"`)
 
-	result, err := builder.Build(configuration)
 	require.NoError(t, err)
-	assert.Equal(t, "secret-key-123", result["key"])
-	assert.Equal(t, "https://api.example.com", result["url"])
-	assert.Equal(t, "30", result["timeout"])
-	assert.Equal(t, "3", result["retries"])
-	assert.Equal(t, "nested-data", result["nested"])
-	assert.Equal(t, "API: https://api.example.com, Key: secret-key-123", result["combined"])
-}
-
-func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config_NotAvailableForWorkflowNodes(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: "node-1",
-				Name:   "node-1",
-				Type:   models.NodeTypeComponent,
-				Configuration: datatypes.NewJSONType(map[string]any{
-					"field": "value",
-				}),
-			},
-		},
-		[]models.Edge{},
-	)
-
-	//
-	// Build without ForBlueprintNode - this is a canvas-level node
-	//
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
-		WithRootEvent(&rootEvent.ID).
-		WithInput(map[string]any{"node-1": rootEvent.Data.Data()})
-
-	_, err := builder.Build(map[string]any{"field": "{{ config.field }}"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "error resolving field field: unknown name config")
+	assert.Equal(t, "missing", result)
 }
 
 func Test_NodeConfigurationBuilder_ComplexNesting(t *testing.T) {
@@ -1365,7 +1506,7 @@ func Test_NodeConfigurationBuilder_Config_ViaNodeReference(t *testing.T) {
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
 
 	componentConfig := map[string]any{"url": "https://example.com", "timeout": 30}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
 
 	outputData := map[string]any{"status": "ok"}
@@ -1424,7 +1565,7 @@ func Test_NodeConfigurationBuilder_Config_ViaPrevious(t *testing.T) {
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"root": "data"})
 
 	node1Config := map[string]any{"method": "POST", "endpoint": "/api/deploy"}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(node1Config)).Error)
 
 	node1Data := map[string]any{"result": "deployed"}
@@ -1486,7 +1627,7 @@ func Test_NodeConfigurationBuilder_Config_ExistingExpressionsStillWork(t *testin
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
 
 	componentConfig := map[string]any{"url": "https://example.com"}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
 
 	outputData := map[string]any{"status": "ok", "code": 200}
@@ -1547,7 +1688,7 @@ func Test_NodeConfigurationBuilder_Config_ViaPreviousDepthRootPath(t *testing.T)
 
 	rootEventData := map[string]any{"origin": "root"}
 	bootstrapRoot := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node1, "default", nil, map[string]any{"bootstrap": true})
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, bootstrapRoot.ID, bootstrapRoot.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, bootstrapRoot.ID, bootstrapRoot.ID)
 	node1Config := map[string]any{"region": "us-east-1"}
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(node1Config)).Error)
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node1, "default", &execution1.ID, rootEventData)
@@ -1611,7 +1752,7 @@ func Test_NodeConfigurationBuilder_Config_DoesNotMutateInputPayload(t *testing.T
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
 
 	componentConfig := map[string]any{"url": "https://example.com"}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
 
 	inputPayload := map[string]any{"status": "ok"}
@@ -1670,7 +1811,7 @@ func Test_NodeConfigurationBuilder_Config_DoesNotOverwriteExistingConfigKey(t *t
 	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
 
 	componentConfig := map[string]any{"url": "https://internal.example.com"}
-	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
 
 	outputWithConfig := map[string]any{
@@ -1695,4 +1836,96 @@ func Test_NodeConfigurationBuilder_Config_DoesNotOverwriteExistingConfigKey(t *t
 	assert.Equal(t, "https://api.example.com", result["api_url"])
 	assert.Equal(t, "https://api.example.com", result["prev_api_url"])
 	assert.Equal(t, "ok", result["output_status"])
+}
+
+func Test_NodeConfigurationBuilder_ForEachBranchPayload(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "start"
+	forEachNode := "forEach"
+	waitNode := "wait"
+	displayNode := "display"
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: forEachNode,
+				Name:   forEachNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "forEach"}}),
+			},
+			{
+				NodeID: waitNode,
+				Name:   waitNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "wait"}}),
+			},
+			{
+				NodeID: displayNode,
+				Name:   displayNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "display"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: forEachNode, Channel: "default"},
+			{SourceID: forEachNode, TargetID: waitNode, Channel: "item"},
+			{SourceID: waitNode, TargetID: displayNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		triggerNode,
+		"default",
+		nil,
+		map[string]any{"items": []any{"a", "b", "c"}},
+	)
+
+	forEachExecution := support.CreateCanvasNodeExecution(t, canvas.ID, forEachNode, rootEvent.ID, rootEvent.ID)
+
+	now := time.Now()
+	emitItem := func(item string, index int) *models.CanvasEvent {
+		return support.EmitCanvasEventForNodeWithData(
+			t,
+			canvas.ID,
+			forEachNode,
+			"item",
+			&forEachExecution.ID,
+			map[string]any{"item": item, "index": index, "totalCount": 3},
+		)
+	}
+
+	_ = emitItem("a", 0)
+	branchEvent := emitItem("b", 1)
+	_ = emitItem("c", 2)
+
+	require.NoError(t, database.Conn().Model(&models.CanvasEvent{}).
+		Where("execution_id = ?", forEachExecution.ID).
+		Update("created_at", now).Error)
+
+	waitInput := map[string]any{"item": "b", "index": 1, "totalCount": 3}
+	waitExecution := support.CreateNextNodeExecution(t, canvas.ID, waitNode, rootEvent.ID, branchEvent.ID, &forEachExecution.ID)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithPreviousExecution(&waitExecution.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{waitNode: waitInput})
+
+	result, err := builder.Build(map[string]any{
+		"item": "{{ $[\"" + forEachNode + "\"].item }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "b", result["item"])
 }

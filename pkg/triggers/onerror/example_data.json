@@ -1,0 +1,39 @@
+{
+  "type": "onError.triggered",
+  "data": {
+    "node": {
+      "id": "http-deploy-to-prod-a1b2c3",
+      "name": "Deploy to Prod",
+      "component": "http"
+    },
+    "error": {
+      "reason": "error",
+      "message": "request timeout after 30s"
+    },
+    "run": {
+      "id": "8f1c2d3e-4a5b-6c7d-8e9f-0a1b2c3d4e5f"
+    },
+    "root": {
+      "node": {
+        "id": "manual-run-9z8y7x",
+        "name": "Manual Run",
+        "component": "start"
+      },
+      "payload": {
+        "type": "manual.run",
+        "data": {
+          "version": "1.4.2"
+        }
+      }
+    },
+    "payloads": {
+      "Manual Run": {
+        "type": "manual.run",
+        "data": {
+          "version": "1.4.2"
+        }
+      }
+    }
+  },
+  "timestamp": "2024-01-01T09:00:00Z"
+}

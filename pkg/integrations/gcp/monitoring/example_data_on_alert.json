@@ -1,0 +1,20 @@
+{
+  "type": "gcp.monitoring.alert",
+  "data": {
+    "incidentId": "0.abcdef1234567890",
+    "state": "open",
+    "policyName": "projects/my-project/alertPolicies/1234567890123456789",
+    "conditionName": "CPU utilization above threshold",
+    "summary": "CPU utilization for gce_instance my-vm is above the threshold of 0.8 with a value of 0.93.",
+    "url": "https://console.cloud.google.com/monitoring/alerting/incidents/0.abcdef1234567890?project=my-project",
+    "resourceName": "my-vm",
+    "resourceDisplayName": "my-vm",
+    "observedValue": "0.93",
+    "thresholdValue": "0.8",
+    "scopingProjectId": "my-project",
+    "metricType": "compute.googleapis.com/instance/cpu/utilization",
+    "metricDisplayName": "CPU utilization",
+    "startedAt": 1767225600
+  },
+  "timestamp": "2026-01-01T00:00:00Z"
+}

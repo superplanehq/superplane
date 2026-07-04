@@ -47,6 +47,7 @@ export interface CanvasPageState {
     selectedNodeId: string | null;
     close: () => void;
     open: (nodeId: string) => void;
+    clearSelection: () => void;
   };
 }
 
@@ -274,27 +275,63 @@ function useComponentSidebarState(
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initial?.nodeId ?? null);
   const lastInitialRef = useRef<{ isOpen: boolean; nodeId: string | null } | null>(null);
 
+  // Keep the latest onChange in a ref so the callbacks and the sync effect below
+  // don't depend on its identity. `onChange` typically wraps react-router's
+  // `setSearchParams`, whose identity changes on every URL update — depending on
+  // it would otherwise re-run the sync effect on unrelated URL changes and
+  // re-push stale sidebar params back into the URL (e.g. after exiting edit
+  // mode, or clobbering the `branch` param when entering it).
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   const close = useCallback(() => {
     setIsOpen(false);
     setSelectedNodeId(null);
-    onChange?.(false, null);
-  }, [onChange]);
+    onChangeRef.current?.(false, null);
+  }, []);
 
-  const open = useCallback(
-    (nodeId: string) => {
-      setSelectedNodeId(nodeId);
-      setIsOpen(true);
-      onChange?.(true, nodeId);
-    },
-    [onChange],
-  );
+  const open = useCallback((nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setIsOpen(true);
+    onChangeRef.current?.(true, nodeId);
+  }, []);
 
-  // Keep external listener updated when selection changes while open
+  const clearSelection = useCallback(() => {
+    setSelectedNodeId(null);
+    onChangeRef.current?.(true, null);
+  }, []);
+
+  // Keep external listener updated when the selection genuinely changes while
+  // open. `open`/`close` already notify `onChange` for user-driven changes, so
+  // this effect only needs to cover internal selection changes that bypass them.
+  //
+  // It must NOT fire on mount or when echoing an externally-applied `initial`
+  // value. On mount the URL already reflects the sidebar state, and the
+  // component remounts whenever the selected version changes (its `key`
+  // includes the version id). Re-emitting here on remount would navigate from a
+  // stale location snapshot and clobber concurrent URL updates — e.g. switching
+  // drafts while a node is open would revert the freshly-set `branch` param.
+  const hasSyncedOnceRef = useRef(false);
   useEffect(() => {
-    if (isOpen) {
-      onChange?.(true, selectedNodeId);
+    if (!hasSyncedOnceRef.current) {
+      hasSyncedOnceRef.current = true;
+      return;
     }
-  }, [isOpen, selectedNodeId, onChange]);
+
+    if (!isOpen) {
+      return;
+    }
+
+    // Don't echo a selection that originated from an external (URL) sync.
+    const lastInitial = lastInitialRef.current;
+    if (lastInitial && lastInitial.isOpen === isOpen && lastInitial.nodeId === selectedNodeId) {
+      return;
+    }
+
+    onChangeRef.current?.(true, selectedNodeId);
+  }, [isOpen, selectedNodeId]);
 
   useEffect(() => {
     if (initial?.isOpen === undefined && initial?.nodeId === undefined) {
@@ -321,5 +358,6 @@ function useComponentSidebarState(
     selectedNodeId,
     close,
     open,
+    clearSelection,
   };
 }

@@ -24,7 +24,7 @@ func TestRunsView(t *testing.T) {
 		steps.start()
 		steps.givenACanvasWithManualTriggerAndNoop()
 		steps.whenTheManualTriggerRuns()
-		steps.whenIVisitRunsView()
+		steps.whenIVisitRunInspection()
 		steps.thenTheFinishedRunIsVisible()
 		steps.whenIOpenRunNodeDetails()
 		steps.thenRunNodeDetailsModalIsVisible()
@@ -84,7 +84,7 @@ func (s *runsViewSteps) givenACanvasWithManualTriggerAndNoop() {
 	s.canvas.AddNoop("Output", models.Position{X: 1000, Y: 200})
 	s.canvas.Connect("Start", "Output")
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *runsViewSteps) whenTheManualTriggerRuns() {
@@ -94,7 +94,33 @@ func (s *runsViewSteps) whenTheManualTriggerRuns() {
 }
 
 func (s *runsViewSteps) whenIVisitRunsView() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String() + "?view=runs")
+	s.canvas.Visit()
+	s.canvas.WaitForRunsSidebar()
+}
+
+func (s *runsViewSteps) whenIVisitRunInspection() {
+	require.NotNil(s.t, s.run, "expected run to be created before visiting run inspection")
+	s.whenIVisitRunsView()
+	s.canvas.SelectRunInSidebar(s.run.ID.String())
+	s.waitForRunInspectionReady()
+}
+
+func (s *runsViewSteps) waitForRunInspectionReady() {
+	deadline := time.Now().Add(30 * time.Second)
+	runID := s.run.ID.String()
+	for time.Now().Before(deadline) {
+		require.Contains(s.t, s.session.Page().URL(), "run="+runID)
+		startHeader := q.TestID("node-start-header").Run(s.session)
+		outputHeader := q.TestID("node-output-header").Run(s.session)
+		startVisible, startErr := startHeader.IsVisible()
+		outputVisible, outputErr := outputHeader.IsVisible()
+		if startErr == nil && outputErr == nil && startVisible && outputVisible {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	s.session.AssertVisible(q.TestID("node-start-header"))
+	s.session.AssertVisible(q.TestID("node-output-header"))
 }
 
 func (s *runsViewSteps) givenFinishedRuns(count int) {
@@ -141,19 +167,15 @@ func (s *runsViewSteps) givenOlderPublishedVersions(count int) {
 	for i := 0; i < count; i++ {
 		publishedAt := now.Add(-time.Duration(i) * time.Minute)
 		version := models.CanvasVersion{
-			ID:                      uuid.New(),
-			WorkflowID:              s.canvas.WorkflowID,
-			OwnerID:                 liveVersion.OwnerID,
-			State:                   models.CanvasVersionStatePublished,
-			Name:                    fmt.Sprintf("Seeded version %02d", i+1),
-			Description:             liveVersion.Description,
-			ChangeManagementEnabled: liveVersion.ChangeManagementEnabled,
-			ChangeRequestApprovers:  liveVersion.ChangeRequestApprovers,
-			PublishedAt:             &publishedAt,
-			Nodes:                   liveVersion.Nodes,
-			Edges:                   liveVersion.Edges,
-			CreatedAt:               &publishedAt,
-			UpdatedAt:               &publishedAt,
+			ID:          uuid.New(),
+			WorkflowID:  s.canvas.WorkflowID,
+			OwnerID:     liveVersion.OwnerID,
+			State:       models.CanvasVersionStatePublished,
+			PublishedAt: &publishedAt,
+			Nodes:       liveVersion.Nodes,
+			Edges:       liveVersion.Edges,
+			CreatedAt:   &publishedAt,
+			UpdatedAt:   &publishedAt,
 		}
 		require.NoError(s.t, database.Conn().Create(&version).Error)
 	}
@@ -161,12 +183,12 @@ func (s *runsViewSteps) givenOlderPublishedVersions(count int) {
 
 func (s *runsViewSteps) thenTheFinishedRunIsVisible() {
 	require.NotNil(s.t, s.run, "expected run to be created")
-	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Runs")`))
+	s.session.AssertVisible(q.TestID("canvas-runs-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-view-mode-live"][aria-current="page"]`))
 	s.session.AssertVisible(q.TestID("node-start-header"))
 	s.session.AssertVisible(q.TestID("node-output-header"))
-	s.session.AssertURLContains("view=runs")
 	s.session.AssertURLContains("run=" + s.run.ID.String())
+	require.NotContains(s.t, s.session.Page().URL(), "view=runs")
 	s.session.AssertText("Start")
 	s.session.AssertText("Output")
 	s.session.AssertText("success")
@@ -184,28 +206,41 @@ func (s *runsViewSteps) thenRunNodeDetailsModalIsVisible() {
 
 func (s *runsViewSteps) whenICloseRunNodeDetails() {
 	s.session.PressKey("Escape")
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		modal := q.TestID("run-node-detail-modal").Run(s.session)
+		visible, err := modal.IsVisible()
+		if err == nil && !visible {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 	s.session.AssertHidden(q.TestID("run-node-detail-modal"))
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
-	// The Agent tab is feature-flagged; switch back through another always-visible tool tab.
-	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Versions")`))
-	s.session.Click(q.TestID("canvas-edit-button"))
+	s.session.Click(q.TestID("runs-sidebar-live-canvas"))
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if !strings.Contains(s.session.Page().URL(), "run=") {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	require.NotContains(s.t, s.session.Page().URL(), "run=")
+	s.canvas.EnterEditMode()
 }
 
 func (s *runsViewSteps) whenIOpenVersionsSidebar() {
-	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Versions")`))
-	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
+	s.canvas.OpenVersionsSidebar()
 }
 
 func (s *runsViewSteps) thenRunsLoadMoreButtonIsHidden() {
-	s.session.AssertHidden(q.Locator(`[data-testid="canvas-tool-sidebar"] button:has-text("Load more")`))
+	s.session.AssertHidden(q.Locator(`[data-testid="canvas-runs-sidebar"] button:has-text("Load more")`))
 }
 
 func (s *runsViewSteps) thenVersionsLoadMoreButtonIsHidden() {
-	s.session.AssertHidden(q.Locator(`[data-testid="canvas-tool-sidebar"] button:has-text("Load older versions")`))
+	s.session.AssertHidden(q.Locator(`[data-testid="canvas-versions-sidebar"] button:has-text("Load older versions")`))
 }
 
 func (s *runsViewSteps) thenRunsSidebarRowCountIsAtLeast(expected int) {
@@ -292,19 +327,8 @@ func (s *runsViewSteps) waitForSidebarRowCountAtLeast(locator pw.Locator, expect
 }
 
 func (s *runsViewSteps) thenEditModeIsVisible() {
-	deadline := time.Now().Add(15 * time.Second)
-
-	for time.Now().Before(deadline) {
-		url := s.session.Page().URL()
-		if !strings.Contains(url, "view=runs") && !strings.Contains(url, "run="+s.run.ID.String()) {
-			return
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
+	s.canvas.WaitForEnabledExitEditButton()
 	url := s.session.Page().URL()
-	require.NotContains(s.t, url, "view=runs")
 	require.NotContains(s.t, url, "run="+s.run.ID.String())
 }
 

@@ -143,7 +143,7 @@ func validateAndPrintCreateResponse(
 		if _, err := fmt.Fprintf(stdout, "App %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId()); err != nil {
 			return err
 		}
-		if url := common.BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
+		if url := common.BuildAppURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
 			if _, err := fmt.Fprintf(stdout, "App URL: %s\n", url); err != nil {
 				return err
 			}

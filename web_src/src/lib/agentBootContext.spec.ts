@@ -16,6 +16,19 @@ describe("agent boot context", () => {
     sessionStorage.clear();
   });
 
+  it("sends no boot message by default so opening a canvas never invokes the agent", () => {
+    expect(getAgentBootMessage("canvas-1")).toBe("");
+  });
+
+  it("sends no boot message when the stored context is for a different canvas", () => {
+    setAgentBootContext("canvas-1", {
+      instructions: "This template deploys preview environments.",
+      initialMessage: "Here's what you've got on this canvas.",
+    });
+
+    expect(getAgentBootMessage("canvas-2")).toBe("");
+  });
+
   it("blocks boot while a placeholder node is pending for the canvas", () => {
     sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, "canvas-1");
 
@@ -47,9 +60,7 @@ describe("agent boot context", () => {
 
     expect(isAgentBootReady("canvas-1")).toBe(true);
     expect(sessionStorage.getItem(PLACEHOLDER_NODE_CONTEXT_KEY)).toBeNull();
-    expect(getAgentBootMessage("canvas-1")).toBe(
-      "Session ready. Read the current canvas state, check connected integrations, and greet the user.",
-    );
+    expect(getAgentBootMessage("canvas-1")).toBe("");
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: { canvasId: "canvas-1" } }));
 
     window.removeEventListener(AGENT_BOOT_CONTEXT_READY_EVENT, listener);
@@ -59,9 +70,9 @@ describe("agent boot context", () => {
     setAgentBootContext("canvas-1", "blank");
 
     expect(getAgentBootInitialMessage("canvas-1")).toBe(
-      "I can help design and modify this canvas. Describe the workflow you want, and I'll use the draft, console, and run panels to propose changes, apply approved updates, and explain each step.",
+      "You can describe the workflow you want to build, or click on the 'New Component' node on the canvas to get started. I'm here to help!",
     );
-    expect(getAgentBootMessage("canvas-1")).toContain("The user just created a new blank app");
+    expect(getAgentBootMessage("canvas-1")).toBe("");
   });
 
   it("stores template intro text separately from the constrained agent prompt", () => {
@@ -73,8 +84,9 @@ describe("agent boot context", () => {
     expect(getAgentBootInitialMessage("canvas-1")).toBe("Here's what you've got on this canvas.");
     expect(getAgentBootMessage("canvas-1")).not.toContain("This template deploys preview environments.");
     expect(getAgentBootMessage("canvas-1")).not.toContain("Read the current canvas state and connected integrations.");
+    expect(getAgentBootMessage("canvas-1")).not.toContain("Do not inspect the canvas");
     expect(getAgentBootMessage("canvas-1")).toContain(
-      "Do not inspect the canvas, integrations, files, or run any commands or tools.",
+      "Do not run commands or tools to inspect the canvas, integrations, or files.",
     );
     expect(getAgentBootMessage("canvas-1")).toContain(
       'Reply only with: "Tell me what you would like to do next in the canvas."',
@@ -90,8 +102,6 @@ describe("agent boot context", () => {
     clearAgentBootContext("canvas-1");
 
     expect(getAgentBootInitialMessage("canvas-1")).toBe("Here's what you've got on this canvas.");
-    expect(getAgentBootMessage("canvas-1")).toBe(
-      "Session ready. Read the current canvas state, check connected integrations, and greet the user.",
-    );
+    expect(getAgentBootMessage("canvas-1")).toBe("");
   });
 });

@@ -135,8 +135,33 @@ func (c *Client) PostURL(ctx context.Context, fullURL string, body any) ([]byte,
 	return c.ExecRequest(ctx, http.MethodPost, fullURL, bodyReader)
 }
 
+func (c *Client) Patch(ctx context.Context, path string, body any) ([]byte, error) {
+	path = strings.TrimPrefix(path, "/")
+	url := strings.TrimSuffix(c.baseURL, "/") + "/" + path
+	bodyReader, err := marshalRequestBody(body)
+	if err != nil {
+		return nil, err
+	}
+	return c.ExecRequest(ctx, http.MethodPatch, url, bodyReader)
+}
+
 func (c *Client) Delete(ctx context.Context, path string) ([]byte, error) {
 	path = strings.TrimPrefix(path, "/")
 	url := strings.TrimSuffix(c.baseURL, "/") + "/" + path
 	return c.ExecRequest(ctx, http.MethodDelete, url, nil)
+}
+
+// PatchURL issues a PATCH to a fully-qualified URL. APIs hosted on a different
+// base URL than Compute (e.g. Cloud Monitoring) use the *URL helpers.
+func (c *Client) PatchURL(ctx context.Context, fullURL string, body any) ([]byte, error) {
+	bodyReader, err := marshalRequestBody(body)
+	if err != nil {
+		return nil, err
+	}
+	return c.ExecRequest(ctx, http.MethodPatch, fullURL, bodyReader)
+}
+
+// DeleteURL issues a DELETE to a fully-qualified URL.
+func (c *Client) DeleteURL(ctx context.Context, fullURL string) ([]byte, error) {
+	return c.ExecRequest(ctx, http.MethodDelete, fullURL, nil)
 }

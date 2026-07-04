@@ -243,28 +243,6 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-// applyStatus moves an issue to the requested status. It looks up available
-// transitions from the issue's current state and executes the one whose target
-// status name matches. Returns an error if no such transition exists.
-func applyStatus(client *Client, issueKey, status string) error {
-	transitions, err := client.GetIssueTransitions(issueKey)
-	if err != nil {
-		return fmt.Errorf("failed to fetch transitions: %v", err)
-	}
-
-	for _, t := range transitions {
-		if strings.EqualFold(t.To.Name, status) {
-			return client.DoTransition(issueKey, t.ID)
-		}
-	}
-
-	available := make([]string, 0, len(transitions))
-	for _, t := range transitions {
-		available = append(available, t.To.Name)
-	}
-	return fmt.Errorf("no transition available to status %q (available: %v)", status, available)
-}
-
 func (c *CreateIssue) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }

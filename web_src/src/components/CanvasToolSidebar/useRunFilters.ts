@@ -13,7 +13,6 @@ interface UseRunFiltersParams {
 }
 
 export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange }: UseRunFiltersParams) {
-  const [search, setSearch] = useState("");
   const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(() => loadPersistedFilters().triggerIds);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<RunStatusFilter>>(() => loadPersistedFilters().statuses);
 
@@ -50,10 +49,7 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
   const decoratedRuns = useMemo(() => runs.map((run) => buildRunPresentation(run, nodeMap)), [runs, nodeMap]);
 
   const filteredRuns = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return decoratedRuns.filter(({ run, status, haystack }) => {
-      if (query && !haystack.includes(query)) return false;
+    return decoratedRuns.filter(({ run, status }) => {
       if (selectedStatuses.size > 0 && (status === "unknown" || !selectedStatuses.has(status))) return false;
 
       if (selectedTriggerIds.size > 0) {
@@ -63,7 +59,7 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
 
       return true;
     });
-  }, [decoratedRuns, search, selectedStatuses, selectedTriggerIds]);
+  }, [decoratedRuns, selectedStatuses, selectedTriggerIds]);
 
   const orderedRuns = useMemo(
     () => ({
@@ -73,10 +69,9 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
     [filteredRuns],
   );
 
-  const hasAnyFilter = search.trim().length > 0 || selectedTriggerIds.size > 0 || selectedStatuses.size > 0;
+  const hasAnyFilter = selectedTriggerIds.size > 0 || selectedStatuses.size > 0;
 
   const clearFilters = useCallback(() => {
-    setSearch("");
     setSelectedStatuses(new Set());
     setSelectedTriggerIds(new Set());
   }, []);
@@ -100,8 +95,6 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
   }, []);
 
   return {
-    search,
-    setSearch,
     selectedStatuses,
     selectedTriggerIds,
     triggerOptions,

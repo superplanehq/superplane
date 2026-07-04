@@ -47,7 +47,6 @@ func TestRegistry_FindActionHook(t *testing.T) {
 			Auth:           &supportcontexts.AuthContext{},
 			Requests:       &supportcontexts.RequestContext{},
 			Integration:    &supportcontexts.IntegrationContext{},
-			Notifications:  &supportcontexts.NotificationContext{},
 			Secrets:        &supportcontexts.SecretsContext{Values: map[string][]byte{}},
 		})
 		require.NoError(t, err)
@@ -91,7 +90,6 @@ func TestRegistry_FindActionHook(t *testing.T) {
 			Auth:           &supportcontexts.AuthContext{},
 			Requests:       &supportcontexts.RequestContext{},
 			Integration:    &supportcontexts.IntegrationContext{},
-			Notifications:  &supportcontexts.NotificationContext{},
 			Secrets:        &supportcontexts.SecretsContext{Values: map[string][]byte{}},
 		})
 		require.NoError(t, err)

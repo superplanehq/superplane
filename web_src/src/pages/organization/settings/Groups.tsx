@@ -1,7 +1,8 @@
-import { formatRelativeTime } from "@/lib/timezone";
+import { Timestamp } from "@/components/Timestamp";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Icon } from "../../../components/Icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "../../../components/Link/link";
@@ -46,6 +47,10 @@ export function Groups({ organizationId }: GroupsProps) {
   const canDeleteGroups = canAct("groups", "delete");
 
   const error = groupsError || rolesError;
+
+  useReportPageReady(!loadingGroups && !permissionsLoading, {
+    failed: !!error,
+  });
 
   const handleCreateGroup = () => {
     if (!canCreateGroups) return;
@@ -242,9 +247,12 @@ export function Groups({ organizationId }: GroupsProps) {
                     </TableCell>
 
                     <TableCell>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {formatRelativeTime(group.metadata?.createdAt)}
-                      </span>
+                      <Timestamp
+                        date={group.metadata?.createdAt}
+                        display="relative"
+                        className="text-sm text-gray-500 dark:text-gray-400"
+                        fallback={<span className="text-sm text-gray-500 dark:text-gray-400">N/A</span>}
+                      />
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">

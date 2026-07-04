@@ -121,6 +121,7 @@ func (g *GitHub) Actions() []core.Action {
 		&issues.AddIssueLabel{},
 		&issues.CreateIssue{},
 		&issues.CreateIssueComment{},
+		&issues.UpdateIssueComment{},
 		&issues.GetIssue{},
 		&issues.RemoveIssueLabel{},
 		&issues.RemoveIssueAssignee{},
@@ -129,6 +130,7 @@ func (g *GitHub) Actions() []core.Action {
 		&pulls.CreateReview{},
 		&pulls.CreatePullRequest{},
 		&pulls.MergePullRequest{},
+		&pulls.AddPullRequestReviewers{},
 		&pulls.AddReaction{},
 		&statuses.GetCombinedCommitStatus{},
 		&statuses.PublishCommitStatus{},
@@ -885,6 +887,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",
+			"checks":                      "read",
 			"contents":                    "write",
 			"pull_requests":               "write",
 			"repository_hooks":            "write",

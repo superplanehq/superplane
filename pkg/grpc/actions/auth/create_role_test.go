@@ -136,7 +136,7 @@ func Test_CreateRole(t *testing.T) {
 
 		_, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot create custom role with default role name")
+		assert.Equal(t, "failed to create role", err.Error())
 	})
 
 	t.Run("invalid request - nonexistent inherited role", func(t *testing.T) {

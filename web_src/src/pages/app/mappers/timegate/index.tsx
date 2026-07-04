@@ -1,0 +1,360 @@
+import React from "react";
+import type {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  StateFunction,
+  SubtitleContext,
+} from "../types";
+import type {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { getColorClass } from "@/lib/colors";
+import { getTriggerRenderer, getState, getStateMap } from "..";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import { PushThroughHandler } from "@/pages/app/components/PushThroughHandler";
+
+import { TimeGateCountdown } from "./countdown";
+
+interface Configuration {
+  days?: string[];
+  excludeDates?: string[];
+  timeRange?: string;
+  timezone?: string;
+}
+
+interface Metadata {
+  nextValidTime?: string;
+}
+
+export const timeGateMapper: ComponentBaseMapper = {
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const componentName = context.componentDefinition.name || "timegate";
+
+    return {
+      iconSlug: "clock",
+      iconColor: getColorClass("black"),
+      collapsed: context.node.isCollapsed,
+      collapsedBackground: "bg-white",
+      title:
+        context.node.name ||
+        context.componentDefinition.label ||
+        context.componentDefinition.name ||
+        "Unnamed component",
+      eventSections: context.lastExecutions[0]
+        ? getTimeGateEventSections(context.nodes, context.lastExecutions[0], componentName)
+        : undefined,
+      includeEmptyState: !context.lastExecutions[0],
+      specs: getTimeGateSpecs(context.node),
+      eventStateMap: getStateMap(componentName),
+      customField: getTimeGateCustomField(context),
+      customFieldVisibility: "live-only",
+    };
+  },
+  subtitle(context: SubtitleContext): React.ReactNode {
+    const subtitle = getTimeGateEventSubtitle(context.execution, "timegate");
+    return subtitle || "";
+  },
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const details: Record<string, string> = {};
+    const metadata = context.execution.metadata as
+      | { nextValidTime?: string; pushedThroughBy?: { name?: string; email?: string }; pushedThroughAt?: string }
+      | undefined;
+    const state = getState("timeGate")(context.execution);
+
+    if (state === "pushed through" && context.execution.updatedAt) {
+      details["Pushed Through At"] = new Date(context.execution.updatedAt!).toLocaleString();
+    }
+
+    if (state === "opened" && context.execution.updatedAt) {
+      details["Opened At"] = new Date(context.execution.updatedAt!).toLocaleString();
+    }
+
+    if (state === "cancelled" && context.execution.updatedAt) {
+      details["Cancelled At"] = new Date(context.execution.updatedAt!).toLocaleString();
+    }
+
+    if (metadata?.nextValidTime) {
+      details["Next Valid Time"] = new Date(metadata.nextValidTime).toLocaleString();
+    }
+
+    if (metadata?.pushedThroughBy) {
+      details["Pushed Through By"] = metadata.pushedThroughBy.name || metadata.pushedThroughBy.email || "";
+    }
+
+    return details;
+  },
+};
+
+function getTimeGateCustomField(context: ComponentBaseContext): React.ReactNode {
+  const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+  if (!lastExecution) {
+    return null;
+  }
+
+  if (lastExecution.state === "STATE_FINISHED") {
+    return null;
+  }
+
+  return React.createElement(PushThroughHandler, {
+    onPushThrough: async () => {
+      if (!lastExecution?.id) return;
+      return context.actions.invokeNodeExecutionHook(lastExecution.id, "pushThrough", null);
+    },
+  });
+}
+
+export const TIME_GATE_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  waiting: {
+    icon: "clock",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-orange-100",
+    badgeColor: "bg-yellow-600",
+  },
+  opened: {
+    icon: "circle-check",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
+  },
+  "pushed through": {
+    icon: "arrow-right",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-amber-100",
+    badgeColor: "bg-amber-500",
+  },
+};
+
+export const timeGateStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
+  if (!execution) return "neutral";
+
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" ||
+      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
+  ) {
+    return "error";
+  }
+
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
+    return "waiting";
+  }
+
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
+    if (isTimeGatePushedThrough(execution)) {
+      return "pushed through";
+    }
+
+    return "opened";
+  }
+
+  return "failed";
+};
+
+export const TIME_GATE_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: TIME_GATE_STATE_MAP,
+  getState: timeGateStateFunction,
+};
+
+function getTimezoneDisplay(timezoneOffset: string): string {
+  if (!timezoneOffset) {
+    return "Not configured";
+  }
+
+  if (timezoneOffset === "current") {
+    return "Current";
+  }
+
+  const offset = parseFloat(timezoneOffset);
+
+  if (isNaN(offset)) {
+    return "Invalid timezone";
+  }
+
+  if (offset === 0) return "GMT+0 (UTC)";
+  if (offset > 0) return `GMT+${offset}`;
+
+  return `GMT${offset}`;
+}
+
+const daysOfWeekOrder = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7 };
+const daysOfWeekLabels = {
+  monday: "Mon",
+  tuesday: "Tue",
+  wednesday: "Wed",
+  thursday: "Thu",
+  friday: "Fri",
+  saturday: "Sat",
+  sunday: "Sun",
+};
+const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function getTimeGateSpecs(node: NodeInfo): ComponentBaseSpec[] {
+  const configuration = node.configuration as Configuration;
+  const days = configuration?.days || [];
+  const excludeDates = configuration?.excludeDates || [];
+  const timeRange = configuration?.timeRange || "00:00-23:59";
+  const timeRangeLabel = formatTimeRangeLabel(timeRange);
+  const timezoneLabel = getTimezoneDisplay(configuration?.timezone || "0");
+
+  const formattedExcludeDates = excludeDates
+    .map((date) => formatDayInYearLabel(date))
+    .filter((date): date is string => Boolean(date));
+  const excludeLabel = formattedExcludeDates.length > 0 ? formattedExcludeDates.join(", ") : "None";
+
+  return [
+    {
+      title: "rule",
+      tooltipTitle: "Time gate rules",
+      iconSlug: "calendar",
+      values: [
+        {
+          badges: [
+            { label: "Allow:", bgColor: "bg-green-100", textColor: "text-green-800" },
+            {
+              label: days.length > 0 ? formatDaysLabel(days) : "Not configured",
+              bgColor: "bg-gray-100",
+              textColor: "text-gray-700",
+            },
+            { label: timeRangeLabel, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+          ],
+        },
+        ...(excludeDates.length > 0
+          ? [
+              {
+                badges: [
+                  { label: "Exclude:", bgColor: "bg-red-100", textColor: "text-red-800" },
+                  { label: excludeLabel, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                  { label: timeRangeLabel, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                ],
+              },
+            ]
+          : []),
+        {
+          badges: [
+            { label: "Timezone:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: timezoneLabel, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+          ],
+        },
+      ],
+    },
+  ];
+}
+
+function getTimeGateEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const executionState = getState(componentName)(execution);
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+
+  const subtitle = getTimeGateEventSubtitle(execution, componentName);
+
+  const eventSection: EventSection = {
+    receivedAt: new Date(execution.createdAt!),
+    eventTitle: title,
+    eventState: executionState,
+    eventId: execution.rootEvent!.id!,
+    eventSubtitle: subtitle,
+  };
+
+  return [eventSection];
+}
+
+function getTimeGateEventSubtitle(execution: ExecutionInfo, componentName: string): React.ReactNode | undefined {
+  const executionState = getState(componentName)(execution);
+  const timeAgo = execution.updatedAt
+    ? renderTimeAgo(new Date(execution.updatedAt))
+    : execution.createdAt
+      ? renderTimeAgo(new Date(execution.createdAt))
+      : "";
+
+  if (executionState === "waiting") {
+    const executionMetadata = execution.metadata as Metadata;
+    if (executionMetadata?.nextValidTime) {
+      return <TimeGateCountdown nextValidTime={executionMetadata.nextValidTime} timeAgo={timeAgo} />;
+    }
+  }
+
+  return timeAgo || undefined;
+}
+
+function isTimeGatePushedThrough(execution: ExecutionInfo): boolean {
+  if (!execution.updatedAt) {
+    return false;
+  }
+
+  const metadata = execution.metadata as Metadata | undefined;
+  if (!metadata?.nextValidTime) {
+    return false;
+  }
+
+  const nextValidTime = new Date(metadata.nextValidTime);
+  const finishedAt = new Date(execution.updatedAt);
+  if (Number.isNaN(nextValidTime.getTime()) || Number.isNaN(finishedAt.getTime())) {
+    return false;
+  }
+
+  return nextValidTime.getTime() - finishedAt.getTime() > 1000;
+}
+
+function formatDaysLabel(days: string[]): string {
+  return days
+    .slice()
+    .sort(
+      (a, b) =>
+        daysOfWeekOrder[a.trim() as keyof typeof daysOfWeekOrder] -
+        daysOfWeekOrder[b.trim() as keyof typeof daysOfWeekOrder],
+    )
+    .map((day) => daysOfWeekLabels[day.trim() as keyof typeof daysOfWeekLabels] || day.trim())
+    .join(", ");
+}
+
+function formatTimeRangeLabel(timeRange: string): string {
+  const { start, end } = parseTimeRange(timeRange);
+  if (start === "00:00" && end === "23:59") {
+    return "all day";
+  }
+
+  return `${start} - ${end}`;
+}
+
+function parseTimeRange(timeRange: string): { start: string; end: string } {
+  if (!timeRange) {
+    return { start: "00:00", end: "23:59" };
+  }
+
+  const parts = timeRange.split("-");
+  if (parts.length !== 2) {
+    return { start: "00:00", end: "23:59" };
+  }
+
+  const start = parts[0].trim() || "00:00";
+  const end = parts[1].trim() || "23:59";
+  return { start, end };
+}
+
+function formatDayInYearLabel(dayInYear: string): string | null {
+  const match = dayInYear.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (!match) return null;
+
+  const month = Number.parseInt(match[1], 10);
+  const day = Number.parseInt(match[2], 10);
+  if (Number.isNaN(month) || Number.isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  return `${monthLabels[month - 1]} ${day}`;
+}

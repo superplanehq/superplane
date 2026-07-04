@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func TestInterruptAgentChat_InvalidChatID(t *testing.T) {
@@ -23,7 +23,7 @@ func TestInterruptAgentChat_InvalidChatID(t *testing.T) {
 		ChatId: "not-a-uuid",
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }
 
 func TestInterruptAgentChat_NotFound(t *testing.T) {
@@ -36,7 +36,7 @@ func TestInterruptAgentChat_NotFound(t *testing.T) {
 		ChatId: uuid.NewString(),
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Equal(t, codes.Internal, grpcerrors.Code(err))
 }
 
 func TestInterruptAgentChat_Success(t *testing.T) {

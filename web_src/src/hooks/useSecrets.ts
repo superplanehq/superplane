@@ -20,12 +20,17 @@ export const secretKeys = {
     [...secretKeys.byDomain(domainId, domainType), "detail", secretId] as const,
 };
 
-export const useSecrets = (domainId: string, domainType: AuthorizationDomainType) => {
+// useSecrets returns the list of secrets in a domain. Pass `organizationId` to
+// override the org header (defaults to the org id parsed from the URL path),
+// which is required from pages outside the `/{orgId}/...` route shell such as
+// the install wizard.
+export const useSecrets = (domainId: string, domainType: AuthorizationDomainType, organizationId?: string) => {
   return useQuery({
     queryKey: secretKeys.byDomain(domainId, domainType),
     queryFn: async () => {
       const response = await secretsListSecrets(
         withOrganizationHeader({
+          organizationId,
           query: { domainId: domainId, domainType: domainType },
         }),
       );

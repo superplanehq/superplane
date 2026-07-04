@@ -8,11 +8,11 @@ import (
 
 func Test__Get(t *testing.T) {
 	t.Run("known id returns feature and true", func(t *testing.T) {
-		f, ok := Get("runner")
+		f, ok := Get(FeatureClaudeManagedAgents)
 		assert.True(t, ok)
-		assert.Equal(t, "runner", f.ID)
-		assert.Equal(t, "Runners", f.Label)
-		assert.Equal(t, "Sandboxed Runners", f.Description)
+		assert.Equal(t, FeatureClaudeManagedAgents, f.ID)
+		assert.Equal(t, "Claude Managed Agents", f.Label)
+		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
@@ -28,7 +28,7 @@ func Test__Get(t *testing.T) {
 }
 
 func Test__Exists(t *testing.T) {
-	assert.True(t, Exists("runner"))
+	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }
@@ -49,7 +49,11 @@ func Test__IsReleased(t *testing.T) {
 	})
 
 	t.Run("registered id with nil Released is not released", func(t *testing.T) {
-		assert.False(t, IsReleased("runner"))
+		original := registry
+		t.Cleanup(func() { registry = original })
+
+		registry = []Feature{{ID: "preview", Label: "Preview", Description: "Preview feature"}}
+		assert.False(t, IsReleased("preview"))
 	})
 
 	t.Run("registered id with Released=&true is released", func(t *testing.T) {

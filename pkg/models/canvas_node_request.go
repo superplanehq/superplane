@@ -46,17 +46,18 @@ type InvokeAction struct {
 func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 	var request CanvasNodeRequest
 
+	now := time.Now()
 	query := tx.
 		Table("workflow_node_requests").
 		Select("workflow_node_requests.*").
-		Joins("JOIN workflow_nodes ON workflow_node_requests.workflow_id = workflow_nodes.workflow_id AND workflow_node_requests.node_id = workflow_nodes.node_id").
 		Clauses(clause.Locking{
 			Strength: "UPDATE",
 			Table:    clause.Table{Name: "workflow_node_requests"},
 			Options:  "SKIP LOCKED",
 		}).
 		Where("workflow_node_requests.id = ?", id).
-		Where("workflow_nodes.deleted_at IS NULL")
+		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
+		Where("workflow_node_requests.run_at <= ?", now)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
 		First(&request).
@@ -76,10 +77,8 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 	query := database.Conn().
 		Table("workflow_node_requests").
 		Select("workflow_node_requests.*").
-		Joins("JOIN workflow_nodes ON workflow_node_requests.workflow_id = workflow_nodes.workflow_id AND workflow_node_requests.node_id = workflow_nodes.node_id").
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
-		Where("workflow_node_requests.run_at <= ?", now).
-		Where("workflow_nodes.deleted_at IS NULL")
+		Where("workflow_node_requests.run_at <= ?", now)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
 		Find(&requests).

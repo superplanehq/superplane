@@ -1,9 +1,9 @@
 import { Text } from "@/components/Text/text";
-import { formatRelativeTime } from "@/lib/timezone";
+import { Timestamp } from "@/components/Timestamp";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { showErrorToast } from "@/lib/toast";
 import { Terminal } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
-import { formatDateTime } from "./formatDate";
 
 type RunnerTask = {
   id: string;
@@ -58,17 +58,14 @@ const formatExecutionMode = (task: RunnerTask) => {
   return mode;
 };
 
-const RelativeTimestamp = ({ value }: { value?: string }) => {
-  if (!value) {
-    return <span className="text-gray-400">—</span>;
-  }
-
-  return (
-    <span className="text-gray-600 whitespace-nowrap" title={formatDateTime(value)}>
-      {formatRelativeTime(value)}
-    </span>
-  );
-};
+const RelativeTimestamp = ({ value }: { value?: string }) => (
+  <Timestamp
+    date={value}
+    display="relative"
+    className="text-gray-600 whitespace-nowrap"
+    fallback={<span className="text-gray-400">—</span>}
+  />
+);
 
 const RunnerTasksTable = ({ tasks }: { tasks: RunnerTask[] }) => (
   <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden">
@@ -154,6 +151,8 @@ const RunnerTasks: React.FC = () => {
 
     return () => window.clearInterval(interval);
   }, [loadTasks]);
+
+  useReportPageReady(!loading || configured !== null);
 
   if (loading && configured === null) {
     return (

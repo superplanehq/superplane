@@ -69,9 +69,10 @@ export const Block = React.memo(function Block(props: BlockProps) {
   const data = props.data;
   const isHighlighted = data._isHighlighted || false;
   const hasHighlightedNodes = data._hasHighlightedNodes || false;
-  const shouldFade = hasHighlightedNodes && !isHighlighted;
+  const isAnnotation = data.type === "annotation";
+  const shouldFade = !isAnnotation && hasHighlightedNodes && !isHighlighted;
   const isRemoved = data._draftDiffStatus === "removed";
-  const shouldBlankBody = data._dimBodyBelowHeader || isRemoved;
+  const shouldBlankBody = !isAnnotation && (data._dimBodyBelowHeader || isRemoved);
   const isConnectionInteractive = props.canvasMode !== "live" && !isRemoved;
 
   return (

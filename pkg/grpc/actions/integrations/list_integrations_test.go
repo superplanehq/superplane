@@ -110,6 +110,30 @@ func TestListIntegrationsIncludesExamplePayloadsForLegacyCapabilities(t *testing
 	require.Equal(t, "created", resp.Integrations[0].Capabilities[1].GetExampleData().GetFields()["event"].GetStringValue())
 }
 
+func TestListIntegrationsAddsGlobalFieldsToLegacyTriggerCapabilities(t *testing.T) {
+	r := &registry.Registry{
+		Integrations: map[string]core.Integration{
+			"dummy": impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+				Triggers: []core.Trigger{
+					&testTrigger{name: "github.onPush"},
+				},
+			}),
+		},
+		SetupProviders: map[string]core.IntegrationSetupProvider{},
+	}
+
+	resp, err := ListIntegrations(context.Background(), r)
+	require.NoError(t, err)
+	require.Len(t, resp.Integrations, 1)
+	require.Len(t, resp.Integrations[0].Capabilities, 1)
+
+	configuration := resp.Integrations[0].Capabilities[0].Configuration
+	require.Len(t, configuration, 1)
+	require.Equal(t, "customName", configuration[0].Name)
+	require.Equal(t, "Run title", configuration[0].Label)
+	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", configuration[0].GetDefaultValue())
+}
+
 func TestListIntegrationsIncludesExamplePayloadsForSetupProviderCapabilities(t *testing.T) {
 	r := &registry.Registry{
 		Integrations: map[string]core.Integration{
@@ -145,4 +169,47 @@ func TestListIntegrationsIncludesExamplePayloadsForSetupProviderCapabilities(t *
 
 	require.Equal(t, "ok", resp.Integrations[0].Capabilities[0].GetExampleOutput().GetFields()["status"].GetStringValue())
 	require.Equal(t, "push", resp.Integrations[0].Capabilities[1].GetExampleData().GetFields()["kind"].GetStringValue())
+}
+
+func TestListIntegrationsAddsGlobalFieldsToSetupProviderTriggerCapabilities(t *testing.T) {
+	r := &registry.Registry{
+		Integrations: map[string]core.Integration{
+			"dummy": impl.NewDummyIntegration(impl.DummyIntegrationOptions{}),
+		},
+		SetupProviders: map[string]core.IntegrationSetupProvider{
+			"dummy": &testSetupProvider{
+				groups: []core.CapabilityGroup{
+					{
+						Label: "Test",
+						Capabilities: []core.Capability{
+							{
+								Type: core.IntegrationCapabilityTypeTrigger,
+								Name: "github.onPush",
+								Configuration: []configuration.Field{
+									{
+										Name:     "repository",
+										Label:    "Repository",
+										Type:     configuration.FieldTypeString,
+										Required: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resp, err := ListIntegrations(context.Background(), r)
+	require.NoError(t, err)
+	require.Len(t, resp.Integrations, 1)
+	require.Len(t, resp.Integrations[0].Capabilities, 1)
+
+	configuration := resp.Integrations[0].Capabilities[0].Configuration
+	require.Len(t, configuration, 2)
+	require.Equal(t, "repository", configuration[0].Name)
+	require.Equal(t, "customName", configuration[1].Name)
+	require.Equal(t, "Run title", configuration[1].Label)
+	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", configuration[1].GetDefaultValue())
 }

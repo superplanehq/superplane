@@ -57,7 +57,7 @@ func TestSetupOwnerPersistsInstallationNetworkSettings(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, response.Code)
 
-	metadata, err := models.GetInstallationMetadata()
+	metadata, err := models.GetInstallationMetadata(database.Conn())
 	require.NoError(t, err)
 	assert.True(t, metadata.AllowPrivateNetworkAccess)
 }

@@ -3,7 +3,6 @@ package common
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -37,34 +36,18 @@ func ResolveAppNameOrIDArg(ctx core.CommandContext, arg string) (string, error) 
 	return FindAppID(ctx, ctx.API, trimmed)
 }
 
-// ChangeManagementEnabled reports whether change management is enabled on
-// the app identified by `appID`.
-func ChangeManagementEnabled(ctx core.CommandContext, appID string) (bool, error) {
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, appID).Execute()
-	if err != nil {
-		return false, err
-	}
-	if response.Canvas == nil {
-		return false, fmt.Errorf("app %q not found", appID)
-	}
-
-	spec := response.Canvas.GetSpec()
-	cm := spec.GetChangeManagement()
-	return cm.GetEnabled(), nil
-}
-
 func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, name string) (string, error) {
 	response, _, err := client.CanvasAPI.CanvasesListCanvases(ctx.Context).Execute()
 	if err != nil {
 		return "", err
 	}
 
-	var matches []openapi_client.CanvasesCanvas
+	var matches []openapi_client.CanvasesCanvasSummary
 	for _, canvas := range response.GetCanvases() {
-		if canvas.Metadata == nil || canvas.Metadata.Name == nil {
+		if canvas.Name == nil {
 			continue
 		}
-		if *canvas.Metadata.Name == name {
+		if *canvas.Name == name {
 			matches = append(matches, canvas)
 		}
 	}
@@ -77,41 +60,37 @@ func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, 
 		return "", fmt.Errorf("multiple apps named %q found", name)
 	}
 
-	if matches[0].Metadata == nil || matches[0].Metadata.Id == nil {
+	if matches[0].Id == nil {
 		return "", fmt.Errorf("app %q is missing an id", name)
 	}
 
-	return *matches[0].Metadata.Id, nil
+	return *matches[0].Id, nil
 }
 
-// FindCurrentUserDraftVersionID returns the id of the first non-published
-// app version visible to the current user, or an empty string if none
-// exists. It does not create a draft.
+// FindCurrentUserDraftVersionID returns the version id of the current user's
+// first draft branch, or an empty string if none exists. It does not create a
+// draft. The API scopes drafts to the authenticated user, so listing already
+// returns only their drafts.
 func FindCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	response, _, err := ctx.API.CanvasVersionAPI.CanvasesListCanvasVersions(ctx.Context, appID).Execute()
+	versions, err := ListDraftVersions(ctx, appID)
 	if err != nil {
 		return "", err
 	}
 
-	for _, version := range response.GetVersions() {
-		metadata := version.GetMetadata()
-		if metadata.GetState() == openapi_client.CANVASESCANVASVERSIONSTATE_STATE_PUBLISHED {
+	for _, version := range versions {
+		if version.Metadata == nil {
 			continue
 		}
-
-		versionID := strings.TrimSpace(metadata.GetId())
-		if versionID == "" {
-			continue
+		if versionID := strings.TrimSpace(version.Metadata.GetId()); versionID != "" {
+			return versionID, nil
 		}
-
-		return versionID, nil
 	}
 
 	return "", nil
 }
 
-// EnsureCurrentUserDraftVersionID returns the id of the current user's draft
-// version, creating one if it does not yet exist.
+// EnsureCurrentUserDraftVersionID returns the version id of a draft branch
+// owned by the current user, creating one if it does not yet exist.
 func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
 	versionID, err := FindCurrentUserDraftVersionID(ctx, appID)
 	if err != nil {
@@ -121,80 +100,7 @@ func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (str
 		return versionID, nil
 	}
 
-	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesCreateCanvasVersion(ctx.Context, appID).
-		Body(map[string]interface{}{}).
-		Execute()
-	if err != nil {
-		return "", err
-	}
-	if response.Version == nil || response.Version.Metadata == nil {
-		return "", fmt.Errorf("draft version was not returned by the API")
-	}
-
-	versionID = strings.TrimSpace(response.Version.Metadata.GetId())
-	if versionID == "" {
-		return "", fmt.Errorf("draft version id was not returned by the API")
-	}
-
-	return versionID, nil
-}
-
-// FindOwnedDraftVersionID walks the version history (paginated) and returns
-// the id of the latest non-published version whose owner matches `userID`,
-// or an empty string when none is found.
-func FindOwnedDraftVersionID(ctx core.CommandContext, appID string, userID string) (string, error) {
-	trimmedUserID := strings.TrimSpace(userID)
-	if trimmedUserID == "" {
-		return "", nil
-	}
-
-	var before *time.Time
-	for {
-		req := ctx.API.CanvasVersionAPI.
-			CanvasesListCanvasVersions(ctx.Context, appID).
-			Limit(50)
-		if before != nil {
-			req = req.Before(*before)
-		}
-
-		response, _, err := req.Execute()
-		if err != nil {
-			return "", err
-		}
-
-		for _, version := range response.GetVersions() {
-			metadata := version.GetMetadata()
-			if metadata.GetState() == openapi_client.CANVASESCANVASVERSIONSTATE_STATE_PUBLISHED {
-				continue
-			}
-
-			ownerID := ""
-			if metadata.Owner != nil {
-				ownerID = strings.TrimSpace(metadata.Owner.GetId())
-			}
-			if ownerID == "" || !strings.EqualFold(ownerID, trimmedUserID) {
-				continue
-			}
-
-			versionID := strings.TrimSpace(metadata.GetId())
-			if versionID == "" {
-				continue
-			}
-
-			return versionID, nil
-		}
-
-		if !response.GetHasNextPage() {
-			return "", nil
-		}
-
-		last, ok := response.GetLastTimestampOk()
-		if !ok || last == nil {
-			return "", nil
-		}
-		before = last
-	}
+	return createDraftVersion(ctx, appID, "")
 }
 
 // DescribeAppVersionByID loads a specific app version and errors when
@@ -215,14 +121,14 @@ func DescribeAppVersionByID(
 	return *response.Version, nil
 }
 
-// BuildCanvasURL composes the canonical web URL for a canvas. Returns "" when
-// the context, base URL, organization id, or canvas id is missing so callers
+// BuildCanvasURL composes the canonical web URL for an app. Returns "" when
+// the context, base URL, organization id, or app id is missing so callers
 // can omit the URL output without erroring.
 //
 // orgID and canvasID should come from the API response (canvas metadata)
 // rather than the local CLI context, so the URL stays correct even if the
 // active context drifts.
-func BuildCanvasURL(ctx core.CommandContext, orgID, canvasID string) string {
+func BuildAppURL(ctx core.CommandContext, orgID, canvasID string) string {
 	if ctx.Config == nil || orgID == "" || canvasID == "" {
 		return ""
 	}
@@ -232,5 +138,5 @@ func BuildCanvasURL(ctx core.CommandContext, orgID, canvasID string) string {
 		return ""
 	}
 
-	return fmt.Sprintf("%s/%s/canvases/%s", baseURL, orgID, canvasID)
+	return fmt.Sprintf("%s/%s/apps/%s", baseURL, orgID, canvasID)
 }

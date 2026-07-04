@@ -169,7 +169,7 @@ func Test__EventRetentionWorker_CleansExpiredCompletedRootEventChain(t *testing.
 		"created_at": time.Now().AddDate(0, 0, -31),
 	}).Error)
 
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", execution.ID).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultPassed,
@@ -438,7 +438,7 @@ func Test__EventRetentionWorker_SkipsRootEventWithPendingRequest(t *testing.T) {
 		"created_at": time.Now().AddDate(0, 0, -31),
 	}).Error)
 
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "component", rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", execution.ID).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultPassed,
@@ -481,7 +481,7 @@ func createCompletedRootEventChain(t *testing.T, canvasID uuid.UUID, daysAgo int
 	t.Helper()
 
 	rootEvent := createRootEventForWorker(t, canvasID, daysAgo)
-	execution := support.CreateCanvasNodeExecution(t, canvasID, "component", rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvasID, "component", rootEvent.ID, rootEvent.ID)
 	require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", execution.ID).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultPassed,
