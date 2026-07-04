@@ -197,10 +197,32 @@ function canvasVersionScopedQueryKeys(canvasId: string, versionId: string) {
   return [
     canvasKeys.versionDetail(canvasId, versionId),
     canvasKeys.versionStagedDetail(canvasId, versionId),
-    canvasKeys.canvasStaging(canvasId),
     canvasKeys.console(canvasId, versionId),
     canvasKeys.consoleStaged(canvasId, versionId),
   ];
+}
+
+function isVersionScopedRepositoryQuery(queryKey: readonly unknown[], canvasId: string, versionId: string): boolean {
+  if (!Array.isArray(queryKey) || !queryKey.includes(versionId)) {
+    return false;
+  }
+
+  const repositoryPrefix = canvasKeys.repository(canvasId);
+  if (queryKey.length < repositoryPrefix.length) {
+    return false;
+  }
+
+  return repositoryPrefix.every((part, index) => queryKey[index] === part);
+}
+
+export function removeCanvasVersionScopedQueries(queryClient: QueryClient, canvasId: string, versionId: string): void {
+  for (const queryKey of canvasVersionScopedQueryKeys(canvasId, versionId)) {
+    queryClient.removeQueries({ queryKey });
+  }
+
+  queryClient.removeQueries({
+    predicate: (query) => isVersionScopedRepositoryQuery(query.queryKey, canvasId, versionId),
+  });
 }
 
 export async function cancelCanvasVersionQueries(queryClient: QueryClient, canvasId: string, versionId: string) {
@@ -417,13 +439,6 @@ export const useCanvasVersionStaging = (canvasId: string, _versionId: string | u
 type CanvasGraphData = {
   nodes?: unknown[];
   edges?: unknown[];
-};
-
-const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
-  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
-  if (!raw) return 0;
-  const parsed = Date.parse(raw);
-  return Number.isNaN(parsed) ? 0 : parsed;
 };
 
 export const useCreateCanvas = (organizationId: string) => {
@@ -870,31 +885,9 @@ export const useUpdateCanvasVersion = (canvasId: string) => {
       if (variables.versionId) {
         // `version` carries the effective staged spec (fetched with stage=true),
         // so it belongs to the staged cache entry the editor reads — not the
-        // committed `versionDetail` used by the draft branch list.
+        // committed version list used when previewing historical versions.
         queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, variables.versionId), version);
       }
-
-      queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
-        if (!current) {
-          return current;
-        }
-
-        let found = false;
-        const next = current.map((item) => {
-          if (item?.metadata?.id === version.metadata?.id) {
-            found = true;
-            return version;
-          }
-          return item;
-        });
-
-        if (!found) {
-          next.unshift(version);
-        }
-
-        next.sort((left, right) => versionSortTimestamp(right) - versionSortTimestamp(left));
-        return next;
-      });
     },
   });
 };
@@ -1702,8 +1695,9 @@ export const useCommitCanvasStaging = (canvasId: string) => {
         canvasKeys.canvasStaging(canvasId),
         data?.stagingSummary ?? { hasStaging: false, stagedPaths: [] },
       );
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      // Version list/history invalidation is coordinated in executeCommitStaging
+      // after edit mode exits so effectiveLiveVersionId cannot race ahead of the
+      // active draft version during the commit transition.
     },
   });
 };
