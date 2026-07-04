@@ -1,6 +1,6 @@
 {
   "maxAllowedInTransactionDefinitions": 169,
-  "maxAllowedDatabaseConnCalls": 193,
+  "maxAllowedDatabaseConnCalls": 192,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -332,7 +332,6 @@
     "pkg/models/role_metadata.go:DeleteGroupMetadata:database.Conn()#1",
     "pkg/models/role_metadata.go:FindRoleMetadataByNames:database.Conn()#1",
     "pkg/models/secret.go:UpdateData:database.Conn()#1",
-    "pkg/models/secret.go:UpdateName:database.Conn()#1",
     "pkg/models/secret.go:Delete:database.Conn()#1",
     "pkg/models/secret.go:FindSecretByName:database.Conn()#1",
     "pkg/models/secret.go:FindSecretByID:database.Conn()#1",
@@ -367,5 +366,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-07-04T18:12:12Z"
+  "updatedAt": "2026-07-04T19:51:32Z"
 }
