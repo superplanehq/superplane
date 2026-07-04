@@ -9,9 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-type getCommand struct {
-	draftID *string
-}
+type getCommand struct{}
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
 	if len(ctx.Args) > 1 {
@@ -33,21 +31,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	draftID := ""
-	if c.draftID != nil {
-		draftID = strings.TrimSpace(*c.draftID)
-	}
-
-	useDraft := draftID != ""
-	versionID := ""
-	if useDraft {
-		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
-		if err != nil {
-			return err
-		}
-	}
-
-	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
+	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, "")
 	if err != nil {
 		return err
 	}
@@ -71,16 +55,8 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		source := "live"
-		if useDraft {
-			source = "draft"
-		}
 		_, _ = fmt.Fprintf(stdout, "App: %s\n", canvasName)
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
-		if versionID != "" {
-			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
-		}
 		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(resource.Spec.Panels))
 		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(resource.Spec.Layout))
 		return err

@@ -80,41 +80,12 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 
 func (s *CanvasService) ListCanvasVersions(ctx context.Context, req *pb.ListCanvasVersionsRequest) (*pb.ListCanvasVersionsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvasVersionsPaginated(ctx, organizationID, req.CanvasId, req.Limit, req.Before, req.State)
-}
-
-func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	displayName := ""
-	if req.DisplayName != nil {
-		displayName = *req.DisplayName
-	}
-	return canvases.CreateCanvasVersion(ctx, organizationID, req.CanvasId, displayName)
-}
-
-func (s *CanvasService) DeleteCanvasVersion(ctx context.Context, req *pb.DeleteCanvasVersionRequest) (*pb.DeleteCanvasVersionResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.DeleteCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
+	return canvases.ListCanvasVersionsPaginated(ctx, organizationID, req.CanvasId, req.Limit, req.Before)
 }
 
 func (s *CanvasService) DescribeCanvasVersion(ctx context.Context, req *pb.DescribeCanvasVersionRequest) (*pb.DescribeCanvasVersionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.DescribeCanvasVersion(ctx, organizationID, req.CanvasId, req.VersionId)
-}
-
-func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.PublishCanvasVersion(
-		ctx,
-		s.encryptor,
-		s.registry,
-		s.gitProvider,
-		organizationID,
-		req.CanvasId,
-		req.VersionId,
-		s.webhookBaseURL,
-		s.authService,
-	)
 }
 
 func (s *CanvasService) DeleteCanvas(ctx context.Context, req *pb.DeleteCanvasRequest) (*pb.DeleteCanvasResponse, error) {
@@ -315,44 +286,31 @@ func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.L
 	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId)
 }
 
-func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+func (s *CanvasService) PutCanvasStaging(ctx context.Context, req *pb.PutCanvasStagingRequest) (*pb.PutCanvasStagingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CommitCanvasRepositoryFiles(
-		ctx,
-		s.gitProvider,
-		s.usageService,
-		s.encryptor,
-		s.registry,
-		organizationID,
-		req.CanvasId,
-		req.GetVersionId(),
-		req.ExpectedHeadSha,
-		req.Message,
-		req.Operations,
-		req.AutoLayout,
-		s.webhookBaseURL,
-		s.authService,
-	)
-}
-
-func (s *CanvasService) StageCanvasRepositoryFile(ctx context.Context, req *pb.StageCanvasRepositoryFileRequest) (*pb.StageCanvasRepositoryFileResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	state, err := canvases.StageRepositorySpecFileOperations(
-		ctx,
-		organizationID,
-		req.CanvasId,
-		req.VersionId,
-		req.Operations,
-	)
+	state, err := canvases.PutCanvasStaging(ctx, organizationID, req.CanvasId, req.Operations)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.StageCanvasRepositoryFileResponse{StagingSummary: state}, nil
+	return &pb.PutCanvasStagingResponse{StagingSummary: state}, nil
 }
 
-func (s *CanvasService) DiscardCanvasStaging(ctx context.Context, req *pb.DiscardCanvasStagingRequest) (*pb.DiscardCanvasStagingResponse, error) {
+func (s *CanvasService) GetCanvasStaging(ctx context.Context, req *pb.GetCanvasStagingRequest) (*pb.GetCanvasStagingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.DiscardCanvasStaging(ctx, organizationID, req.CanvasId, req.VersionId, req.Paths)
+	state, err := canvases.GetCanvasStaging(ctx, organizationID, req.CanvasId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetCanvasStagingResponse{StagingSummary: state}, nil
+}
+
+func (s *CanvasService) DeleteCanvasStaging(ctx context.Context, req *pb.DeleteCanvasStagingRequest) (*pb.DeleteCanvasStagingResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	state, err := canvases.DeleteCanvasStaging(ctx, organizationID, req.CanvasId, req.Paths)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.DeleteCanvasStagingResponse{StagingSummary: state}, nil
 }
 
 func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitCanvasStagingRequest) (*pb.CommitCanvasStagingResponse, error) {
@@ -365,7 +323,7 @@ func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitC
 		s.registry,
 		organizationID,
 		req.CanvasId,
-		req.VersionId,
+		req.CommitMessage,
 		s.webhookBaseURL,
 		s.authService,
 	)

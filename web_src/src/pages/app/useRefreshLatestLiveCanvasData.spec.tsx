@@ -32,7 +32,7 @@ function expectInvalidation(
 }
 
 describe("useRefreshLatestLiveCanvasData", () => {
-  it("invalidates live canvas queries by default, including draft branches", async () => {
+  it("invalidates live canvas queries by default, including canvas staging", async () => {
     const { queryClient, invalidateQueries } = createInvalidateSpy();
 
     const { result } = renderHook(() => useRefreshLatestLiveCanvasData("org-1", "canvas-1", "live-version-1"), {
@@ -46,7 +46,7 @@ describe("useRefreshLatestLiveCanvasData", () => {
     expectInvalidation(invalidateQueries, canvasKeys.detail("org-1", "canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.versionList("canvas-1"), { exact: true });
     expectInvalidation(invalidateQueries, canvasKeys.versionHistory("canvas-1"));
-    expectInvalidation(invalidateQueries, canvasKeys.draftBranches("canvas-1"));
+    expectInvalidation(invalidateQueries, canvasKeys.canvasStaging("canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", "live-version-1"), { exact: true });
     expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", undefined), { exact: true });
   });
@@ -99,7 +99,7 @@ describe("useRefreshLatestLiveCanvasData", () => {
     expect(consoleInvalidations).toEqual([canvasKeys.console("canvas-1", undefined)]);
   });
 
-  it("invalidates publish console caches and skips draft branches when requested", async () => {
+  it("uses the provided live version id for console invalidation", async () => {
     const { queryClient, invalidateQueries } = createInvalidateSpy();
 
     const { result } = renderHook(() => useRefreshLatestLiveCanvasData("org-1", "canvas-1", "old-live-version"), {
@@ -107,18 +107,14 @@ describe("useRefreshLatestLiveCanvasData", () => {
     });
 
     await act(async () => {
-      await result.current({ liveVersionId: "published-version", skipDraftBranchRefetch: true });
+      await result.current({ liveVersionId: "published-version" });
     });
 
     expectInvalidation(invalidateQueries, canvasKeys.detail("org-1", "canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.versionList("canvas-1"), { exact: true });
     expectInvalidation(invalidateQueries, canvasKeys.versionHistory("canvas-1"));
+    expectInvalidation(invalidateQueries, canvasKeys.canvasStaging("canvas-1"));
     expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", "published-version"), { exact: true });
     expectInvalidation(invalidateQueries, canvasKeys.console("canvas-1", undefined), { exact: true });
-    expect(invalidateQueries).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        queryKey: canvasKeys.draftBranches("canvas-1"),
-      }),
-    );
   });
 });
