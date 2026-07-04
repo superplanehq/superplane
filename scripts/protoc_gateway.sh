@@ -20,8 +20,6 @@ PROTO_DIR="protos"
 generate_gateway_files() {
   MODULE=$1
   FILE=$2
-
-  echo "$(bold "Generating gRPC-Gateway files for $MODULE")"
   
   # Create output directories
   mkdir -p $GATEWAY_OUT/$MODULE
@@ -33,14 +31,6 @@ generate_gateway_files() {
          --grpc-gateway_opt=logtostderr=true \
          --grpc-gateway_opt=paths=source_relative \
          $FILE
-         
-  echo "Generated gRPC-Gateway files in $GATEWAY_OUT/$MODULE"
-}
-
-bold() {
-  bold_text=$(tput bold)
-  normal_text=$(tput sgr0)
-  echo -n "${bold_text}$@${normal_text}"
 }
 
 # Main execution
@@ -48,5 +38,3 @@ for MODULE in ${MODULES[@]};
 do
   generate_gateway_files $MODULE $PROTO_DIR/$MODULE.proto
 done
-
-echo "$(bold "Done generating gRPC-Gateway for: ${MODULES[@]}")"

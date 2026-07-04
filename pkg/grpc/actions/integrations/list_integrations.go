@@ -3,12 +3,14 @@ package integrations
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.ListIntegrationsResponse, error) {
@@ -84,7 +86,10 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 				OutputChannels: []*actionpb.OutputChannel{},
 			}
 
-			for _, field := range capability.Configuration {
+			capabilityDef.ExampleOutput = toStruct(capability.ExampleOutput)
+			capabilityDef.ExampleData = toStruct(capability.ExampleData)
+
+			for _, field := range capabilityConfigurationFields(capability) {
 				capabilityDef.Configuration = append(capabilityDef.Configuration, actions.ConfigurationFieldToProto(field))
 			}
 
@@ -101,6 +106,14 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 	}
 
 	return out
+}
+
+func capabilityConfigurationFields(capability core.Capability) []configuration.Field {
+	if capability.Type == core.IntegrationCapabilityTypeTrigger {
+		return actions.AppendGlobalTriggerFields(capability.Name, capability.Configuration)
+	}
+
+	return capability.Configuration
 }
 
 func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityDefinition {
@@ -128,11 +141,12 @@ func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityD
 			Description:    action.Description(),
 			Configuration:  configuration,
 			OutputChannels: outputChannels,
+			ExampleOutput:  toStruct(action.ExampleOutput()),
 		})
 	}
 
 	for _, trigger := range integration.Triggers() {
-		configFields := trigger.Configuration()
+		configFields := actions.AppendGlobalTriggerFields(trigger.Name(), trigger.Configuration())
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = actions.ConfigurationFieldToProto(field)
@@ -144,8 +158,18 @@ func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityD
 			Description:    trigger.Description(),
 			Configuration:  configuration,
 			OutputChannels: []*actionpb.OutputChannel{},
+			ExampleData:    toStruct(trigger.ExampleData()),
 		})
 	}
 
 	return capabilities
+}
+
+func toStruct(value map[string]any) *structpb.Struct {
+	if value == nil {
+		return nil
+	}
+
+	out, _ := structpb.NewStruct(value)
+	return out
 }

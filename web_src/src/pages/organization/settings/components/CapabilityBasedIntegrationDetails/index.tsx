@@ -1,5 +1,5 @@
 import type { IntegrationCapabilityState, OrganizationsIntegration } from "@/api-client";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useAvailableIntegrations, useIntegrationMutations } from "@/hooks/useIntegrations";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -75,6 +75,7 @@ export function CapabilityBasedIntegrationDetails({
       showSuccessToast("Property saved");
     } catch (_error) {
       showErrorToast(`Failed to save property: ${getApiErrorMessage(_error)}`);
+      throw _error;
     }
   };
 
@@ -86,6 +87,7 @@ export function CapabilityBasedIntegrationDetails({
       showSuccessToast("Secret saved");
     } catch (_error) {
       showErrorToast(`Failed to save secret: ${getApiErrorMessage(_error)}`);
+      throw _error;
     }
   };
 

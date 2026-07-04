@@ -1,0 +1,16 @@
+{
+  "data": {
+    "instanceId": "ocid1.instance.oc1.eu-frankfurt-1.aaaaExample1234567890",
+    "displayName": "test-instance-renamed",
+    "lifecycleState": "RUNNING",
+    "shape": "VM.Standard.E2.1.Micro",
+    "availabilityDomain": "XXXX:eu-frankfurt-1-AD-1",
+    "compartmentId": "ocid1.tenancy.oc1..aaaaaaaExample1234567890",
+    "region": "eu-frankfurt-1",
+    "timeCreated": "2026-04-22T20:31:25.145Z",
+    "publicIp": "192.0.2.1",
+    "privateIp": "10.0.0.17"
+  },
+  "timestamp": "2026-04-22T20:33:00.000Z",
+  "type": "oci.updateInstance"
+}

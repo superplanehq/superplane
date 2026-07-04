@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -39,6 +40,14 @@ func NewIntegrationRequestWorker(encryptor crypto.Encryptor, registry *registry.
 	}
 }
 
+// requestLeaseDuration is how far into the future a claimed request's run_at is
+// pushed while it is processed. It is simultaneously (a) the worst-case recovery
+// latency for a request whose worker died mid-process (it becomes due again once
+// the lease expires) and (b) a lower bound that must exceed the longest expected
+// Sync/HandleHook duration, so a request still legitimately in flight is never
+// re-leased by another worker.
+const requestLeaseDuration = 5 * time.Minute
+
 func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -71,31 +80,68 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 	}
 }
 
+// LockAndProcessRequest processes a request in 3 phases so the external
+// HTTP call (Sync/HandleHook) never holds a DB transaction open:
+//
+//   - Phase 1 (short tx): Lease the request by pushing run_at past the work window
+//   - Phase 2 (no tx): Run integration.Sync / HandleHook with a non-transactional context
+//   - Phase 3 (short tx): Persist instance state and mark the request completed
 func (w *IntegrationRequestWorker) LockAndProcessRequest(request models.IntegrationRequest) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		r, err := models.LockIntegrationRequest(tx, request.ID)
-		if err != nil {
-			w.log("Request %s already being processed - skipping", request.ID)
-			return nil
-		}
+	claimed, err := w.claimRequest(request)
+	if err != nil {
+		return err
+	}
+	if claimed == nil {
+		// Already claimed by another worker, or no longer due.
+		return nil
+	}
 
-		return w.processRequest(tx, r)
-	})
+	return w.processRequest(claimed)
 }
 
-func (w *IntegrationRequestWorker) processRequest(tx *gorm.DB, request *models.IntegrationRequest) error {
+// claimRequest leases the request in a short transaction by pushing its run_at
+// past the work window, so the poll loop (which only lists due pending requests)
+// will not pick it up again while the external work runs outside this transaction.
+// Returns nil if the request was already picked up by another worker.
+func (w *IntegrationRequestWorker) claimRequest(request models.IntegrationRequest) (*models.IntegrationRequest, error) {
+	var claimed *models.IntegrationRequest
+
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		r, err := models.LeaseIntegrationRequest(tx, request.ID, requestLeaseDuration)
+		if err != nil {
+			return err
+		}
+
+		claimed = r
+		return nil
+	})
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			w.log("Request %s already being processed - skipping", request.ID)
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to lease request %s: %w", request.ID, err)
+	}
+
+	return claimed, nil
+}
+
+func (w *IntegrationRequestWorker) processRequest(request *models.IntegrationRequest) error {
 	switch request.Type {
 	case models.IntegrationRequestTypeSync:
-		return w.syncIntegration(tx, request)
+		return w.syncIntegration(request)
 	case models.IntegrationRequestTypeInvokeAction:
-		return w.invokeIntegrationAction(tx, request)
+		return w.invokeIntegrationAction(request)
 	}
 
 	return fmt.Errorf("unsupported integration request type %s", request.Type)
 }
 
-func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.IntegrationRequest) error {
-	instance, err := models.FindUnscopedIntegrationInTransaction(tx, request.AppInstallationID)
+func (w *IntegrationRequestWorker) syncIntegration(request *models.IntegrationRequest) error {
+	db := database.Conn()
+
+	instance, err := models.FindUnscopedIntegrationInTransaction(db, request.AppInstallationID)
 	if err != nil {
 		return fmt.Errorf("failed to find integration: %v", err)
 	}
@@ -105,7 +151,13 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 		return fmt.Errorf("integration %s not found", instance.AppName)
 	}
 
-	integrationCtx := contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil)
+	//
+	// Phase 2: run Sync outside any transaction so the external HTTP call does
+	// not hold a DB connection/row lock. Secret and request writes during Sync
+	// go through a non-transactional context (database.Conn()).
+	//
+	integrationCtx := contexts.NewIntegrationContext(db, nil, instance, w.encryptor, w.registry, nil)
+	logging.ForIntegration(*instance).WithField("source", "sync").Info("Integration operation may write secrets")
 	syncErr := integration.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*instance),
 		HTTP:            w.registry.HTTPContext(),
@@ -124,15 +176,22 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 		instance.StateDescription = ""
 	}
 
-	if err := tx.Save(instance).Error; err != nil {
-		return fmt.Errorf("failed to save integration after sync: %v", err)
-	}
+	//
+	// Phase 3: persist instance state and complete the claimed request.
+	//
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(instance).Error; err != nil {
+			return fmt.Errorf("failed to save integration after sync: %v", err)
+		}
 
-	return request.Complete(tx)
+		return request.Complete(tx)
+	})
 }
 
-func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request *models.IntegrationRequest) error {
-	integration, err := models.FindUnscopedIntegrationInTransaction(tx, request.AppInstallationID)
+func (w *IntegrationRequestWorker) invokeIntegrationAction(request *models.IntegrationRequest) error {
+	db := database.Conn()
+
+	integration, err := models.FindUnscopedIntegrationInTransaction(db, request.AppInstallationID)
 	if err != nil {
 		return fmt.Errorf("failed to find app installation: %v", err)
 	}
@@ -143,8 +202,12 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 		return fmt.Errorf("failed to find hook: %v", err)
 	}
 
+	//
+	// Phase 2: run the action hook outside any transaction.
+	//
 	logger := logging.ForIntegration(*integration)
-	integrationCtx := contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil)
+	integrationCtx := contexts.NewIntegrationContext(db, nil, integration, w.encryptor, w.registry, nil)
+	logger.WithField("source", "integration_action").Info("Integration operation may write secrets")
 	hookCtx := core.IntegrationHookContext{
 		WebhooksBaseURL: w.webhooksBaseURL,
 		Name:            spec.InvokeAction.ActionName,
@@ -155,18 +218,21 @@ func (w *IntegrationRequestWorker) invokeIntegrationAction(tx *gorm.DB, request 
 		HTTP:            w.registry.HTTPContext(),
 	}
 
-	err = hookProvider.HandleHook(hookCtx)
-	if err != nil {
+	if err := hookProvider.HandleHook(hookCtx); err != nil {
 		logger.Errorf("error handling action: %v", err)
 	}
 
-	err = tx.Save(integration).Error
-	if err != nil {
-		logger.Errorf("failed to save integration %s: %v", integration.ID, err)
-		return fmt.Errorf("failed to save integration: %w", err)
-	}
+	//
+	// Phase 3: persist instance state and complete the claimed request.
+	//
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(integration).Error; err != nil {
+			logger.Errorf("failed to save integration %s: %v", integration.ID, err)
+			return fmt.Errorf("failed to save integration: %w", err)
+		}
 
-	return request.Complete(tx)
+		return request.Complete(tx)
+	})
 }
 
 func (w *IntegrationRequestWorker) log(format string, v ...any) {

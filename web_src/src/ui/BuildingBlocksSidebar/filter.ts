@@ -2,6 +2,15 @@ import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 export type TypeFilter = "all" | "trigger" | "component";
 
+/**
+ * Normalizes an integration name for comparison by lowercasing and stripping
+ * any non-alphanumeric characters, so that values like "GitHub" and "github"
+ * (or "google-cloud" and "googlecloud") are treated as the same integration.
+ */
+export function normalizeIntegrationName(value?: string): string {
+  return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 const TYPE_SORT_ORDER: Record<BuildingBlock["type"], number> = {
   trigger: 0,
   component: 1,

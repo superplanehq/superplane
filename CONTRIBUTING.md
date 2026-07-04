@@ -50,17 +50,18 @@ cd superplane
 
 ### Setting Up the Development Environment
 
-Once inside the cloned repository, set up your local environment and start
-the app with:
+Once inside the cloned repository, bring up Docker, install dependencies and
+migrations, then start the development server:
 
 ```sh
-make dev.setup     # Install dependencies, create the database, etc.
-make dev.start     # Start the development server (UI at http://localhost:8000)
+make dev.up        # Build images and start containers (Postgres, RabbitMQ, app shell, …)
+make dev.setup     # Codegen, Go + JS deps, database create/migrate (run inside the app container)
+make dev.server    # Start air + Vite (UI at http://localhost:8000)
 ```
 
-These commands will spin up all required services in Docker containers.
+After the first setup, run `make dev.up` when the stack is not running, then `make dev.server` to start air and Vite (use `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you need a fresh `npm install`, codegen, or migrations.
 
-When the process completes, you can access SuperPlane at [http://localhost:8000](http://localhost:8000).
+When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
 ## Additional Development Resources
 
@@ -76,11 +77,13 @@ When the process completes, you can access SuperPlane at [http://localhost:8000]
 - **[Pull Requests](docs/contributing/pull-requests.md)** - How to create pull-requests
 - **[Commit Sign-off](docs/contributing/commit_sign-off.md)** - Information about the Developer's Certificate of Origin and signing off commits
 - **[E2E Testing](docs/contributing/e2e-tests.md)** - Writing, running, and debugging end-to-end tests
+- **[Running Multiple Local Instances](docs/contributing/multi-instance-dev.md)** - Run two SuperPlane repos side by side with separate ports
 - **[Using AI Agents](docs/contributing/ai-agents.md)** - Guide for using AI agents to help with development tasks
 - **[Quality Standards](docs/contributing/quality.md)** - High-level principles for building maintainable, user-focused products
 
 ### Adding new integrations to SuperPlane
 
+- **[Building an Integration](docs/contributing/building-an-integration.md)** — High-level overview of the steps to add a new integration (claim a ticket, research, build, open a PR)
 - **[Opening PRs for integrations](docs/contributing/integration-prs.md)** — Checklist for opening and submitting integration PRs (title, description, video, frontend/backend/docs, CI, DCO)
 - **[Integrations](docs/contributing/integrations.md)** — Instructions for adding new third-party integrations to SuperPlane
 - **[Component Implementation](docs/contributing/component-implementations.md)** — Step-by-step instructions for creating new components or triggers

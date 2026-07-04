@@ -1,0 +1,2 @@
+- The "**Continue**" button/link will take you to GitHub so you can install `{{ .AppSlug }}` app into `{{ .Owner }}`
+- After installing the app, you will be redirected back here.

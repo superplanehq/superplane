@@ -4,16 +4,15 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func ListRoles(ctx context.Context, domainType string, domainID string, authService authorization.Authorization) (*pb.ListRolesResponse, error) {
-	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, domainID)
+	roleDefinitions, err := authService.GetAllRoleDefinitions(ctx, domainType, domainID)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to retrieve role definitions")
+		return nil, grpcerrors.Internal(err, "failed to retrieve role definitions")
 	}
 
 	roleNames := make([]string, len(roleDefinitions))
@@ -26,14 +25,14 @@ func ListRoles(ctx context.Context, domainType string, domainID string, authServ
 
 	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, "role not found")
+		return nil, grpcerrors.NotFound(err, "role not found")
 	}
 
 	roles := make([]*pb.Role, len(roleDefinitions))
 	for i, roleDef := range roleDefinitions {
 		role, err := convertRoleDefinitionToProto(roleDef, domainID, roleMetadataMap)
 		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to convert role definition")
+			return nil, grpcerrors.Internal(err, "failed to convert role definition")
 		}
 		roles[i] = role
 	}

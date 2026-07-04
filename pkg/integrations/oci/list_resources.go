@@ -2,6 +2,7 @@ package oci
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -10,10 +11,19 @@ const (
 	ResourceTypeCompartment         = "compartment"
 	ResourceTypeAvailabilityDomain  = "availabilityDomain"
 	ResourceTypeShape               = "shape"
+	ResourceTypeImageOS             = "imageOS"
 	ResourceTypeImage               = "image"
+	ResourceTypeCustomImage         = "customImage"
 	ResourceTypeVCN                 = "vcn"
 	ResourceTypeSubnet              = "subnet"
 	ResourceTypeBlockVolume         = "blockVolume"
+	ResourceTypeBootVolumeVPU       = "bootVolumeVPU"
+	ResourceTypeImageSource         = "imageSource"
+	ResourceTypeSourceImageType     = "sourceImageType"
+	ResourceTypeObjectNamespace     = "objectStorageNamespace"
+	ResourceTypeObjectBucket        = "objectStorageBucket"
+	ResourceTypeObject              = "objectStorageObject"
+	ResourceTypeInstance            = "instance"
 	ResourceTypeFunctionApplication = "functionApplication"
 	ResourceTypeFunction            = "function"
 	ResourceTypeContainerRepository = "containerRepository"
@@ -28,14 +38,45 @@ func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return listAvailabilityDomains(ctx)
 	case ResourceTypeShape:
 		return listShapes(ctx)
+	case ResourceTypeImageOS:
+		return listImageOperatingSystems(ctx)
 	case ResourceTypeImage:
 		return listImages(ctx)
+	case ResourceTypeCustomImage:
+		return listCustomImages(ctx)
 	case ResourceTypeVCN:
 		return listVCNs(ctx)
 	case ResourceTypeSubnet:
 		return listSubnets(ctx)
 	case ResourceTypeBlockVolume:
 		return listBlockVolumes(ctx)
+	case ResourceTypeBootVolumeVPU:
+		return staticResources(ResourceTypeBootVolumeVPU, []core.IntegrationResource{
+			{Type: ResourceTypeBootVolumeVPU, Name: "Lower Cost (0 VPUs/GB)", ID: "0"},
+			{Type: ResourceTypeBootVolumeVPU, Name: "Balanced (10 VPUs/GB)", ID: "10"},
+			{Type: ResourceTypeBootVolumeVPU, Name: "Higher Performance (20 VPUs/GB)", ID: "20"},
+			{Type: ResourceTypeBootVolumeVPU, Name: "Ultra High Performance (30 VPUs/GB)", ID: "30"},
+		}), nil
+	case ResourceTypeImageSource:
+		return staticResources(ResourceTypeImageSource, []core.IntegrationResource{
+			{Type: ResourceTypeImageSource, Name: "Instance", ID: createImageSourceInstance},
+			{Type: ResourceTypeImageSource, Name: "Object Storage URL", ID: createImageSourceObjectStorageURI},
+			{Type: ResourceTypeImageSource, Name: "Object Storage Object", ID: createImageSourceObjectStorageObject},
+		}), nil
+	case ResourceTypeSourceImageType:
+		return staticResources(ResourceTypeSourceImageType, []core.IntegrationResource{
+			{Type: ResourceTypeSourceImageType, Name: "QCOW2", ID: "QCOW2"},
+			{Type: ResourceTypeSourceImageType, Name: "VMDK", ID: "VMDK"},
+			{Type: ResourceTypeSourceImageType, Name: "OCI", ID: "OCI"},
+		}), nil
+	case ResourceTypeObjectNamespace:
+		return listObjectStorageNamespaces(ctx)
+	case ResourceTypeObjectBucket:
+		return listObjectStorageBuckets(ctx)
+	case ResourceTypeObject:
+		return listObjectStorageObjects(ctx)
+	case ResourceTypeInstance:
+		return listInstances(ctx)
 	case ResourceTypeFunctionApplication:
 		return listFunctionApplications(ctx)
 	case ResourceTypeFunction:
@@ -47,6 +88,13 @@ func (o *OCI) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	default:
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
+}
+
+func staticResources(resourceType string, resources []core.IntegrationResource) []core.IntegrationResource {
+	for i := range resources {
+		resources[i].Type = resourceType
+	}
+	return resources
 }
 
 func listCompartments(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -140,7 +188,52 @@ func listShapes(ctx core.ListResourcesContext) ([]core.IntegrationResource, erro
 	return resources, nil
 }
 
+func listImageOperatingSystems(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	images, err := client.ListImages(client.tenancyOCID, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list images: %w", err)
+	}
+
+	names := map[string]struct{}{}
+	for _, img := range images {
+		if img.LifecycleState != "AVAILABLE" || img.OperatingSystem == "" {
+			continue
+		}
+		names[img.OperatingSystem] = struct{}{}
+	}
+
+	sorted := make([]string, 0, len(names))
+	for name := range names {
+		sorted = append(sorted, name)
+	}
+	sort.Strings(sorted)
+
+	resources := make([]core.IntegrationResource, 0, len(sorted))
+	for _, name := range sorted {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeImageOS,
+			Name: name,
+			ID:   name,
+		})
+	}
+
+	return resources, nil
+}
+
 func listImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	return listImageResources(ctx, ResourceTypeImage, func(_ Image) bool { return true })
+}
+
+func listCustomImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	return listImageResources(ctx, ResourceTypeCustomImage, isCustomImage)
+}
+
+func listImageResources(ctx core.ListResourcesContext, resourceType string, include func(Image) bool) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OCI client: %w", err)
@@ -158,10 +251,151 @@ func listImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, erro
 		if img.LifecycleState != "AVAILABLE" {
 			continue
 		}
+		if !include(img) {
+			continue
+		}
 		resources = append(resources, core.IntegrationResource{
-			Type: ResourceTypeImage,
+			Type: resourceType,
 			Name: img.DisplayName,
 			ID:   img.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listObjectStorageNamespaces(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	namespaceName, err := client.GetObjectStorageNamespace()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object storage namespace: %w", err)
+	}
+	if namespaceName == "" {
+		return nil, nil
+	}
+
+	return []core.IntegrationResource{{
+		Type: ResourceTypeObjectNamespace,
+		Name: namespaceName,
+		ID:   namespaceName,
+	}}, nil
+}
+
+func listObjectStorageBuckets(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	namespaceName := ctx.Parameters["namespaceName"]
+	if namespaceName == "" {
+		namespaceName, err = client.GetObjectStorageNamespace()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get object storage namespace: %w", err)
+		}
+	}
+	if namespaceName == "" {
+		return nil, nil
+	}
+
+	compartmentID := ctx.Parameters["compartmentId"]
+	if compartmentID == "" {
+		compartmentID = client.tenancyOCID
+	}
+
+	buckets, err := client.ListBuckets(namespaceName, compartmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list buckets: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(buckets))
+	for _, bucket := range buckets {
+		if bucket.Name == "" {
+			continue
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeObjectBucket,
+			Name: bucket.Name,
+			ID:   bucket.Name,
+		})
+	}
+
+	return resources, nil
+}
+
+func listObjectStorageObjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	namespaceName := ctx.Parameters["namespaceName"]
+	if namespaceName == "" {
+		namespaceName, err = client.GetObjectStorageNamespace()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get object storage namespace: %w", err)
+		}
+	}
+	bucketName := ctx.Parameters["bucketName"]
+	if namespaceName == "" || bucketName == "" {
+		return nil, nil
+	}
+
+	objects, err := client.ListObjects(namespaceName, bucketName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list objects: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(objects))
+	for _, object := range objects {
+		if object.Name == "" {
+			continue
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeObject,
+			Name: object.Name,
+			ID:   object.Name,
+		})
+	}
+
+	return resources, nil
+}
+
+func listInstances(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OCI client: %w", err)
+	}
+
+	compartmentID := ctx.Parameters["compartmentId"]
+	if compartmentID == "" {
+		compartmentID = client.tenancyOCID
+	}
+
+	instances, err := client.ListInstances(compartmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list instances: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(instances))
+	for _, instance := range instances {
+		if instance.LifecycleState != "RUNNING" && instance.LifecycleState != "STOPPED" {
+			continue
+		}
+
+		name := instance.DisplayName
+		if name == "" {
+			name = instance.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeInstance,
+			Name: name,
+			ID:   instance.ID,
 		})
 	}
 

@@ -56,9 +56,10 @@ type IntegrationSetupProvider interface {
 type SetupStepType string
 
 const (
-	SetupStepTypeInputs         SetupStepType = "inputs"
-	SetupStepTypeRedirectPrompt SetupStepType = "redirectPrompt"
-	SetupStepTypeDone           SetupStepType = "done"
+	SetupStepTypeInputs              SetupStepType = "inputs"
+	SetupStepTypeCapabilitySelection SetupStepType = "capabilitySelection"
+	SetupStepTypeRedirectPrompt      SetupStepType = "redirectPrompt"
+	SetupStepTypeDone                SetupStepType = "done"
 )
 
 type SetupStep struct {
@@ -67,6 +68,7 @@ type SetupStep struct {
 	Label          string
 	Instructions   string
 	Inputs         []configuration.Field
+	Capabilities   []string
 	RedirectPrompt *RedirectPrompt
 }
 
@@ -106,8 +108,7 @@ type RedirectPrompt struct {
 }
 
 type SetupStepContext struct {
-	Step            string
-	Inputs          any
+	Step            StepInfo
 	IntegrationID   uuid.UUID
 	OrganizationID  string
 	BaseURL         string
@@ -117,6 +118,12 @@ type SetupStepContext struct {
 	Secrets         IntegrationSecretStorage
 	Properties      IntegrationPropertyStorage
 	Capabilities    CapabilityContext
+}
+
+type StepInfo struct {
+	Name         string
+	Inputs       any
+	Capabilities []string
 }
 
 /*
@@ -186,10 +193,11 @@ type IntegrationSecretDefinition struct {
  * They are typed so the different parts of the system can take only the ones they need.
  *
  * They can be in 4 states:
- * - Requested: the capability was requested, but the setup flow did not yet exposed it.
- * - Enabled: the capability is fully available for use.
- * - Disabled: the capability was made available during the setup flow, but has been manually disabled by the user.
- * - Unavailable: the integration itself has the capability available, but the capability was not requested as part of the setup flow.
+ * - Unavailable: capability exists, but was not requested as part of the setup flow, and the user cannot request it anymore.
+ * - Available: capability exists, setup did not expose it yet, but the user can still request it.
+ * - Requested: capability was requested, but setup did not enable it yet.
+ * - Enabled: capability is fully enabled and ready for use.
+ * - Disabled: capability was enabled during the setup flow, but has been manually disabled by the user.
  */
 type IntegrationCapabilityType string
 type IntegrationCapabilityState string
@@ -201,14 +209,20 @@ const (
 	IntegrationCapabilityStateRequested   IntegrationCapabilityState = "requested"
 	IntegrationCapabilityStateEnabled     IntegrationCapabilityState = "enabled"
 	IntegrationCapabilityStateDisabled    IntegrationCapabilityState = "disabled"
+	IntegrationCapabilityStateAvailable   IntegrationCapabilityState = "available"
 	IntegrationCapabilityStateUnavailable IntegrationCapabilityState = "unavailable"
 )
 
 type CapabilityContext interface {
-	Enable(capabilities ...string) error
-	Disable(capabilities ...string) error
-	IsRequested(capabilities ...string) (bool, error)
+	Request(capabilities ...string)
+	Available(capabilities ...string)
+	Unavailable(capabilities ...string)
+	Enable(capabilities ...string)
+	Disable(capabilities ...string)
+	Clear()
+	IsRequested(capabilities ...string) bool
 	Requested() []string
+	Enabled() []string
 }
 
 type CapabilityGroup struct {
@@ -223,4 +237,14 @@ type Capability struct {
 	Description    string                    `json:"description"`
 	Configuration  []configuration.Field     `json:"configuration"`
 	OutputChannels []OutputChannel           `json:"outputChannels"`
+	ExampleOutput  map[string]any            `json:"exampleOutput,omitempty"`
+	ExampleData    map[string]any            `json:"exampleData,omitempty"`
+}
+
+/*
+ * IntegrationSetupContext allows integrations to manage setup state
+ * from outside the setup flow (e.g. from an HTTP request handler).
+ */
+type IntegrationSetupContext interface {
+	SetStep(step SetupStep) error
 }

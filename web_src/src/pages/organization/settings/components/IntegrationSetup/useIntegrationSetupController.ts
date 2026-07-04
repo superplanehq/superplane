@@ -1,10 +1,10 @@
 import type {
-  IntegrationsCapabilityDefinition,
+  IntegrationSetupStepDefinition,
   IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
 } from "@/api-client";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
@@ -16,7 +16,6 @@ import {
   useNextIntegrationSetupStep,
   usePreviousIntegrationSetupStep,
 } from "@/hooks/useIntegrations";
-import { buildIntegrationCapabilityGroupSections } from "@/lib/capabilities";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { useIntegrationSetupActions } from "./useIntegrationSetupActions";
 import { applyResumeDescribeIfChanged, canRevertSetupStep, getCurrentSetupStep, getNextIntegrationName } from "./lib";
@@ -35,18 +34,17 @@ export function useIntegrationSetupController(organizationId: string) {
   });
   const state = useIntegrationSetupLocalState({
     integrationName: route.integrationName,
-    integrationCapabilities: metadata.integrationCapabilities,
     existingIntegrationNames: metadata.existingIntegrationNames,
     setupIntegrationId: route.setupIntegrationId,
     resumeIntegrationDescribe: queries.resumeIntegrationDescribe,
   });
   const progress = useIntegrationSetupProgress(state.createdIntegration, metadata.integrationLabel);
+  useSyncSelectedCapabilitiesForStep(progress.currentStep, state.setSelectedCapabilities);
   const mutations = useIntegrationSetupMutations(organizationId, state.createdIntegration);
   const actions = useIntegrationSetupActions({
     route,
     state,
     progress,
-    metadata,
     mutations,
   });
 
@@ -119,11 +117,6 @@ function useIntegrationSetupMetadata({
     () => getIntegrationCapabilities(integrationDefinition),
     [integrationDefinition],
   );
-  const capabilitySections = useMemo(
-    () => buildIntegrationCapabilityGroupSections(integrationDefinition, integrationCapabilities),
-    [integrationDefinition, integrationCapabilities],
-  );
-  const capabilityByName = useMemo(() => getCapabilityByName(integrationCapabilities), [integrationCapabilities]);
   const existingIntegrationNames = useMemo(
     () => getExistingIntegrationNames(connectedIntegrations),
     [connectedIntegrations],
@@ -133,15 +126,12 @@ function useIntegrationSetupMetadata({
     integrationDefinition,
     integrationLabel,
     integrationCapabilities,
-    capabilitySections,
-    capabilityByName,
     existingIntegrationNames,
   };
 }
 
 interface IntegrationSetupLocalStateParams {
   integrationName: string;
-  integrationCapabilities: IntegrationsCapabilityDefinition[];
   existingIntegrationNames: Set<string>;
   setupIntegrationId?: string;
   resumeIntegrationDescribe?: OrganizationsIntegration | null;
@@ -149,34 +139,44 @@ interface IntegrationSetupLocalStateParams {
 
 function useIntegrationSetupLocalState({
   integrationName,
-  integrationCapabilities,
   existingIntegrationNames,
   setupIntegrationId,
   resumeIntegrationDescribe,
 }: IntegrationSetupLocalStateParams) {
   const lastResumeDescribeKey = useRef<string | null>(null);
+  const hasEditedInstanceName = useRef(false);
   const [instanceName, setInstanceName] = useState("");
+  const handleInstanceNameChange = useCallback((value: string) => {
+    hasEditedInstanceName.current = true;
+    setInstanceName(value);
+  }, []);
   const [createdIntegration, setCreatedIntegration] = useState<OrganizationsIntegration | null>(null);
   const [stepInputs, setStepInputs] = useState<Record<string, unknown>>({});
   const [selectedCapabilities, setSelectedCapabilities] = useState<Set<string>>(new Set());
   const setters = useMemo(
     () => ({
       setCreatedIntegration,
+      hasEditedInstanceName,
       setInstanceName,
       setSelectedCapabilities,
       setStepInputs,
     }),
-    [],
+    [hasEditedInstanceName],
   );
 
   useResetSetupState(integrationName, lastResumeDescribeKey, setters);
-  useDefaultSelectedCapabilities(createdIntegration, integrationCapabilities, setSelectedCapabilities);
-  useDefaultInstanceName(instanceName, integrationName, existingIntegrationNames, setInstanceName);
+  useDefaultInstanceName(
+    instanceName,
+    integrationName,
+    existingIntegrationNames,
+    hasEditedInstanceName,
+    setInstanceName,
+  );
   useResumeIntegrationDescribe(setupIntegrationId, resumeIntegrationDescribe, lastResumeDescribeKey, setters);
 
   return {
     instanceName,
-    setInstanceName,
+    setInstanceName: handleInstanceNameChange,
     createdIntegration,
     setCreatedIntegration,
     stepInputs,
@@ -186,11 +186,40 @@ function useIntegrationSetupLocalState({
   };
 }
 
+function useSyncSelectedCapabilitiesForStep(
+  currentStep: IntegrationSetupStepDefinition | null,
+  setSelectedCapabilities: Dispatch<SetStateAction<Set<string>>>,
+) {
+  const offerKey = getCapabilitySelectionOfferKey(currentStep);
+
+  useEffect(() => {
+    if (!offerKey) {
+      return;
+    }
+    const names = getCapabilitiesFromOfferKey(offerKey);
+    setSelectedCapabilities(new Set(names));
+  }, [offerKey, setSelectedCapabilities]);
+}
+
+function getCapabilitySelectionOfferKey(currentStep: IntegrationSetupStepDefinition | null) {
+  if (currentStep?.type !== "CAPABILITY_SELECTION") {
+    return "";
+  }
+
+  return JSON.stringify({
+    name: currentStep.name ?? "",
+    capabilities: (currentStep.capabilities ?? []).filter((name): name is string => Boolean(name)),
+  });
+}
+
+function getCapabilitiesFromOfferKey(offerKey: string) {
+  return (JSON.parse(offerKey) as { capabilities: string[] }).capabilities;
+}
+
 function useIntegrationSetupProgress(createdIntegration: OrganizationsIntegration | null, integrationLabel: string) {
   const currentStep = getCurrentSetupStep(createdIntegration);
   const canRevertCurrentStep = canRevertSetupStep(createdIntegration);
   const integrationReady = createdIntegration?.status?.state === "ready";
-  const showSetupStepBack = Boolean(createdIntegration) && (!integrationReady || canRevertCurrentStep);
   const setupPageTitle = useMemo(
     () => getSetupPageTitle(createdIntegration, currentStep, integrationLabel),
     [createdIntegration, currentStep, integrationLabel],
@@ -200,7 +229,6 @@ function useIntegrationSetupProgress(createdIntegration: OrganizationsIntegratio
     currentStep,
     canRevertCurrentStep,
     integrationReady,
-    showSetupStepBack,
     setupPageTitle,
   };
 }
@@ -227,6 +255,7 @@ export type IntegrationSetupMutations = ReturnType<typeof useIntegrationSetupMut
 
 interface ResetStateSetters {
   setCreatedIntegration: Dispatch<SetStateAction<OrganizationsIntegration | null>>;
+  hasEditedInstanceName: MutableRefObject<boolean>;
   setInstanceName: Dispatch<SetStateAction<string>>;
   setSelectedCapabilities: Dispatch<SetStateAction<Set<string>>>;
   setStepInputs: Dispatch<SetStateAction<Record<string, unknown>>>;
@@ -239,6 +268,7 @@ function useResetSetupState(
 ) {
   useEffect(() => {
     lastResumeDescribeKey.current = null;
+    setters.hasEditedInstanceName.current = false;
     setters.setCreatedIntegration(null);
     setters.setStepInputs({});
     setters.setInstanceName("");
@@ -246,39 +276,20 @@ function useResetSetupState(
   }, [integrationName, lastResumeDescribeKey, setters]);
 }
 
-function useDefaultSelectedCapabilities(
-  createdIntegration: OrganizationsIntegration | null,
-  integrationCapabilities: IntegrationsCapabilityDefinition[],
-  setSelectedCapabilities: Dispatch<SetStateAction<Set<string>>>,
-) {
-  useEffect(() => {
-    if (createdIntegration) {
-      return;
-    }
-
-    setSelectedCapabilities((current) => {
-      if (current.size > 0) {
-        return current;
-      }
-
-      return new Set(integrationCapabilities.map((capability) => capability.name).filter(Boolean) as string[]);
-    });
-  }, [integrationCapabilities, createdIntegration, setSelectedCapabilities]);
-}
-
 function useDefaultInstanceName(
   instanceName: string,
   integrationName: string,
   existingIntegrationNames: Set<string>,
+  hasEditedInstanceName: MutableRefObject<boolean>,
   setInstanceName: Dispatch<SetStateAction<string>>,
 ) {
   useEffect(() => {
-    if (instanceName || !integrationName) {
+    if (instanceName || !integrationName || hasEditedInstanceName.current) {
       return;
     }
 
     setInstanceName(getNextIntegrationName(integrationName, existingIntegrationNames));
-  }, [instanceName, integrationName, existingIntegrationNames, setInstanceName]);
+  }, [instanceName, integrationName, existingIntegrationNames, hasEditedInstanceName, setInstanceName]);
 }
 
 function useResumeIntegrationDescribe(
@@ -292,6 +303,7 @@ function useResumeIntegrationDescribe(
       setters.setCreatedIntegration(describe);
       setters.setStepInputs({});
       setters.setSelectedCapabilities(new Set());
+      setters.hasEditedInstanceName.current = true;
       setters.setInstanceName(describe.metadata?.name || describe.metadata?.integrationName || "");
     });
   }, [setupIntegrationId, resumeIntegrationDescribe, lastResumeDescribeKey, setters]);
@@ -328,16 +340,6 @@ function getIntegrationCapabilities(integrationDefinition?: IntegrationsIntegrat
   return [...(integrationDefinition?.capabilities || [])]
     .filter((capability) => Boolean(capability.name))
     .sort((left, right) => left.label!.localeCompare(right.label!));
-}
-
-function getCapabilityByName(integrationCapabilities: IntegrationsCapabilityDefinition[]) {
-  const map = new Map<string, IntegrationsCapabilityDefinition>();
-  for (const capability of integrationCapabilities) {
-    if (capability.name) {
-      map.set(capability.name, capability);
-    }
-  }
-  return map;
 }
 
 function getExistingIntegrationNames(connectedIntegrations: OrganizationsIntegration[]) {

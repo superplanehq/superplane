@@ -42,8 +42,8 @@ func Test__ResolveExecutionErrors__ResolvesMultipleExecutions(t *testing.T) {
 	)
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	executionOne := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
-	executionTwo := support.CreateCanvasNodeExecution(t, canvas.ID, "node-2", rootEvent.ID, rootEvent.ID, nil)
+	executionOne := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
+	executionTwo := support.CreateCanvasNodeExecution(t, canvas.ID, "node-2", rootEvent.ID, rootEvent.ID)
 
 	require.NoError(t, executionOne.Fail(models.CanvasNodeExecutionResultReasonError, "boom"))
 	require.NoError(t, executionTwo.Fail(models.CanvasNodeExecutionResultReasonError, "boom"))
@@ -86,7 +86,7 @@ func Test__ResolveExecutionErrors__ReturnsErrorForNonErrorExecution(t *testing.T
 	)
 
 	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID, nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
 
 	_, err := ResolveExecutionErrors(context.Background(), canvas.ID, []uuid.UUID{execution.ID})
 	require.Error(t, err)

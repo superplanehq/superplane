@@ -1,8 +1,6 @@
 package contexts
 
 import (
-	"fmt"
-
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -18,7 +16,7 @@ func NewCapabilityContext(definitions []core.Capability, states []models.Capabil
 		definitionsMap[definition.Name] = definition
 	}
 
-	statesMap := make(map[string]models.CapabilityState)
+	statesMap := map[string]models.CapabilityState{}
 	for _, state := range states {
 		statesMap[state.Name] = state
 	}
@@ -37,45 +35,49 @@ func (c *CapabilityContext) States() []models.CapabilityState {
 	return states
 }
 
-func (c *CapabilityContext) Enable(capabilities ...string) error {
+func (c *CapabilityContext) updateState(newState core.IntegrationCapabilityState, capabilities ...string) {
 	for _, capability := range capabilities {
-		_, ok := c.definitions[capability]
-		if !ok {
-			return fmt.Errorf("capability %s not found", capability)
-		}
-
-		c.states[capability] = models.CapabilityState{Name: capability, State: core.IntegrationCapabilityStateEnabled}
+		c.states[capability] = models.CapabilityState{Name: capability, State: newState}
 	}
-
-	return nil
 }
 
-func (c *CapabilityContext) Disable(capabilities ...string) error {
-	for _, capability := range capabilities {
-		_, ok := c.definitions[capability]
-		if !ok {
-			return fmt.Errorf("capability %s not found", capability)
-		}
-
-		c.states[capability] = models.CapabilityState{Name: capability, State: core.IntegrationCapabilityStateDisabled}
-	}
-
-	return nil
+func (c *CapabilityContext) Request(capabilities ...string) {
+	c.updateState(core.IntegrationCapabilityStateRequested, capabilities...)
 }
 
-func (c *CapabilityContext) IsRequested(capabilities ...string) (bool, error) {
+func (c *CapabilityContext) Enable(capabilities ...string) {
+	c.updateState(core.IntegrationCapabilityStateEnabled, capabilities...)
+}
+
+func (c *CapabilityContext) Disable(capabilities ...string) {
+	c.updateState(core.IntegrationCapabilityStateDisabled, capabilities...)
+}
+
+func (c *CapabilityContext) Available(capabilities ...string) {
+	c.updateState(core.IntegrationCapabilityStateAvailable, capabilities...)
+}
+
+func (c *CapabilityContext) Unavailable(capabilities ...string) {
+	c.updateState(core.IntegrationCapabilityStateUnavailable, capabilities...)
+}
+
+func (c *CapabilityContext) Clear() {
+	c.states = map[string]models.CapabilityState{}
+}
+
+func (c *CapabilityContext) IsRequested(capabilities ...string) bool {
 	for _, capability := range capabilities {
 		v, ok := c.states[capability]
 		if !ok {
-			return false, fmt.Errorf("capability %s not found", capability)
+			return false
 		}
 
 		if v.State != core.IntegrationCapabilityStateRequested {
-			return false, nil
+			return false
 		}
 	}
 
-	return true, nil
+	return true
 }
 
 func (c *CapabilityContext) Requested() []string {
@@ -86,4 +88,14 @@ func (c *CapabilityContext) Requested() []string {
 		}
 	}
 	return requested
+}
+
+func (c *CapabilityContext) Enabled() []string {
+	enabled := []string{}
+	for _, capability := range c.states {
+		if capability.State == core.IntegrationCapabilityStateEnabled {
+			enabled = append(enabled, capability.Name)
+		}
+	}
+	return enabled
 }

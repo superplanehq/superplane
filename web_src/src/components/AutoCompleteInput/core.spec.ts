@@ -40,6 +40,37 @@ describe("getSuggestions", () => {
     expect(suggestions.some((item) => item.label === "trim")).toBe(true);
   });
 
+  it("suggests the memory namespace by prefix", () => {
+    const suggestions = getSuggestions("mem", "mem".length, {});
+    const memorySuggestion = suggestions.find((item) => item.label === "memory");
+    expect(memorySuggestion).toBeDefined();
+    expect(memorySuggestion?.kind).toBe("variable");
+    expect(memorySuggestion?.insertText).toBe("memory.");
+  });
+
+  it("suggests memory namespace methods after dot", () => {
+    const suggestions = getSuggestions("memory.", "memory.".length, {});
+    const findSuggestion = suggestions.find((item) => item.label === "find");
+    const findFirstSuggestion = suggestions.find((item) => item.label === "findFirst");
+
+    expect(findSuggestion).toBeDefined();
+    expect(findSuggestion?.kind).toBe("function");
+    expect(findSuggestion?.example).toBe('memory.find("machines", {"sandbox_id": "12121"})');
+    expect(findFirstSuggestion).toBeDefined();
+    expect(findFirstSuggestion?.kind).toBe("function");
+    expect(findFirstSuggestion?.example).toBe('memory.findFirst("machines", {"creator": "igor"}).sandbox_id');
+  });
+
+  it("does not suggest another memory method when the prefix exactly matches one", () => {
+    const suggestions = getSuggestions("memory.find", "memory.find".length, {});
+    expect(suggestions.map((item) => item.label)).not.toContain("findFirst");
+  });
+
+  it("suggests findFirst when the memory method prefix is partial", () => {
+    const suggestions = getSuggestions("memory.findF", "memory.findF".length, {});
+    expect(suggestions.map((item) => item.label)).toContain("findFirst");
+  });
+
   it("suggests root() payload fields after dot", () => {
     const suggestions = getSuggestions("root().", "root().".length, {
       __root: { github: { ref: "main" }, user: "alice" },
@@ -144,5 +175,21 @@ describe("getSuggestions config fields", () => {
     const labels = suggestions.map((item) => item.label);
     expect(labels).toContain("user");
     expect(labels).toContain("config");
+  });
+});
+
+describe("getSuggestions top-level globals", () => {
+  it("suggests top-level globals by name when enabled", () => {
+    const suggestions = getSuggestions(
+      "par",
+      "par".length,
+      { parameters: { message: "hello" } },
+      {
+        includeTopLevelGlobals: true,
+      },
+    );
+    const parametersSuggestion = suggestions.find((item) => item.label === "parameters");
+    expect(parametersSuggestion).toBeDefined();
+    expect(parametersSuggestion?.insertText).toBe("parameters.");
   });
 });

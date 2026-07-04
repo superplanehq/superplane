@@ -1,33 +1,38 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { appPath, appSettingsPath } from "./lib/appPaths";
 import { Toaster } from "sonner";
 import "./App.css";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
-import { AccountProvider } from "./contexts/AccountContext";
-import { useAccount } from "./contexts/AccountContext";
-import { PermissionsProvider } from "./contexts/PermissionsContext";
+import { GlobalCommandPalette } from "./components/GlobalCommandPalette";
+import { AccountProvider } from "./contexts/AccountProvider";
+import { useAccount } from "./contexts/useAccount";
+import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
 import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
-import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
+import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
-import { TemplatesPage } from "./pages/canvas/TemplatesPage";
-import HomePage from "./pages/home";
+import { HomePage } from "./pages/home";
+import { NewAppPage } from "./pages/home/NewAppPage";
+import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
-import { WorkflowPageV2 } from "./pages/workflowv2";
+import { AppPage } from "./pages/app";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
+import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import { usePageObservability } from "./hooks/usePageObservability";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -70,13 +75,17 @@ function App() {
 function AppRouter() {
   return (
     <BrowserRouter>
+      <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
         <ImpersonationBanner />
         <div className="flex-1 overflow-auto">
           <SetupGuard>
+            <GlobalCommandPalette />
             <Routes>
               {/* public routes */}
               <Route path="login" element={<Login />} />
+              <Route path="signup" element={<Login mode="signup" />} />
+              <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="setup" element={<OwnerSetup />} />
 
@@ -85,6 +94,7 @@ function AppRouter() {
                 <Route index element={<OrganizationsListAdmin />} />
                 <Route path="accounts" element={<AccountsListAdmin />} />
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
+                <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
               </Route>
 
@@ -94,17 +104,22 @@ function AppRouter() {
               {/* Invite link acceptance */}
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
 
+              {/* GitHub app installation */}
+              <Route path="install" element={withAuthOnly(InstallPage)} />
+
               {/* Organization-scoped protected routes */}
               <Route path=":organizationId" element={<OrganizationScope />}>
                 <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
-                <Route path="canvases/new" element={withAuthAndPermission(CreateCanvasPage, "canvases", "create")} />
-                <Route
-                  path="canvases/:canvasId/settings"
-                  element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
-                />
-                <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
-                <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
-                <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+                <Route path="apps">
+                  <Route path="new" element={withAuthAndPermission(NewAppPage, "canvases", "read")} />
+                  <Route
+                    path=":appId/settings"
+                    element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
+                  />
+                  <Route path=":appId" element={withAuthAndPermission(AppPage, "canvases", "read")} />
+                </Route>
+                <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
+                <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
               </Route>
 
@@ -118,12 +133,29 @@ function AppRouter() {
   );
 }
 
+function PageObservabilityScope() {
+  usePageObservability();
+  return null;
+}
+
 function OrganizationScope() {
   return (
     <PermissionsProvider>
       <Outlet />
     </PermissionsProvider>
   );
+}
+
+function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {
+  const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
+  const location = useLocation();
+
+  if (!organizationId || !canvasId) {
+    return <Navigate to="/" replace />;
+  }
+
+  const path = settings ? appSettingsPath(organizationId, canvasId) : appPath(organizationId, canvasId);
+  return <Navigate to={`${path}${location.search}`} replace />;
 }
 
 function SetupGuard({ children }: { children: React.ReactNode }) {

@@ -9,67 +9,78 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
-func DeleteCanvasVersion(ctx context.Context, organizationID string, canvasID string, versionID string) (*pb.DeleteCanvasVersionResponse, error) {
+func DeleteCanvasVersion(
+	ctx context.Context,
+	organizationID string,
+	canvasID string,
+	versionID string,
+) (*pb.DeleteCanvasVersionResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	orgUUID := uuid.MustParse(organizationID)
+	orgUUID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+	}
+
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
 	versionUUID, err := uuid.Parse(versionID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid version id")
 	}
 
 	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "canvas not found")
 	}
-
 	userUUID := uuid.MustParse(userID)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
 		if findErr != nil {
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {
-				return status.Error(codes.NotFound, "version not found")
+				return grpcerrors.NotFound(findErr, "version not found")
 			}
 			return findErr
 		}
 
 		if version.State != models.CanvasVersionStateDraft {
-			return status.Error(codes.FailedPrecondition, "only draft versions can be discarded")
+			return grpcerrors.FailedPrecondition(nil, "only draft versions can be discarded")
+		}
+
+		if !models.IsRegisteredDraftVersion(version) {
+			return grpcerrors.FailedPrecondition(nil, "version is not a registered draft branch")
 		}
 
 		if version.OwnerID == nil || *version.OwnerID != userUUID {
-			return status.Error(codes.PermissionDenied, "version owner mismatch")
+			return grpcerrors.PermissionDenied(nil, "version owner mismatch")
 		}
 
 		return tx.Delete(version).Error
 	})
-
 	if err != nil {
-		if status.Code(err) != codes.Unknown {
+		if grpcerrors.Code(err) != codes.Unknown {
 			return nil, err
 		}
 		log.WithError(err).Error("failed to delete canvas version")
-		return nil, status.Error(codes.Internal, "failed to delete canvas version")
+		return nil, grpcerrors.Internal(err, "failed to delete canvas version")
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), versionUUID.String()).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
+	if err := messages.PublishVersionDeleted(canvas.ID.String(), versionUUID.String()); err != nil {
+		log.Errorf("failed to publish canvas version deleted RabbitMQ message: %v", err)
 	}
 
 	return &pb.DeleteCanvasVersionResponse{}, nil

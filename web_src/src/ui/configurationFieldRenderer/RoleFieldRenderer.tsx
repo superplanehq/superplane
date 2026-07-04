@@ -45,7 +45,7 @@ export const RoleFieldRenderer = ({ value, onChange, domainId, allValues }: Role
   if (!roles || roles.length === 0) {
     return (
       <div className="space-y-2">
-        <Select disabled>
+        <Select value="" disabled>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="No roles available" />
           </SelectTrigger>

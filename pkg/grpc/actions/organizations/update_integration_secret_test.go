@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__UpdateIntegrationSecret(t *testing.T) {
@@ -30,7 +30,7 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 			return core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_one"}
 		},
 		OnStepSubmit: func(ctx core.SetupStepContext) (*core.SetupStep, error) {
-			switch ctx.Step {
+			switch ctx.Step.Name {
 			case "step_one":
 				return &core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_two"}, nil
 
@@ -46,9 +46,9 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 	t.Run("invalid organization ID -> invalid argument", func(t *testing.T) {
 		_, err := UpdateIntegrationSecret(ctx, r.Registry, "not-a-uuid", uuid.NewString(), "token", "x")
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("secret not found -> not found", func(t *testing.T) {
@@ -68,9 +68,9 @@ func Test__UpdateIntegrationSecret(t *testing.T) {
 
 		_, err = UpdateIntegrationSecret(ctx, r.Registry, r.Organization.ID.String(), resp.Integration.Metadata.Id, "missing_secret", "v")
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("existing secret -> success", func(t *testing.T) {

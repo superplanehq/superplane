@@ -22,14 +22,9 @@ import {
   organizationsUpdateInviteLink,
   organizationsResetInviteLink,
   organizationsDeleteOrganization,
-  organizationsGetAgentSettings,
   organizationsDescribeUsage,
-  organizationsUpdateAgentSettings,
-  organizationsSetAgentOpenAiKey,
-  organizationsDeleteAgentOpenAiKey,
 } from "../api-client/sdk.gen";
 import type { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
-import { canvasKeys } from "./useCanvasData";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 
 // Query Keys
@@ -44,7 +39,6 @@ export const organizationKeys = {
   role: (orgId: string, roleName: string) => [...organizationKeys.all, "role", orgId, roleName] as const,
   canvases: (orgId: string) => [...organizationKeys.all, "canvases", orgId] as const,
   inviteLink: (orgId: string) => [...organizationKeys.all, "inviteLink", orgId] as const,
-  agentSettings: (orgId: string) => [...organizationKeys.all, "agentSettings", orgId] as const,
   usage: (orgId: string) => [...organizationKeys.all, "usage", orgId] as const,
 };
 
@@ -55,6 +49,7 @@ export const useOrganization = (organizationId: string, enabled = true) => {
     queryFn: async () => {
       const response = await organizationsDescribeOrganization(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
         }),
       );
@@ -196,24 +191,18 @@ export const useOrganizationInviteLink = (organizationId: string, enabled = true
   });
 };
 
-export const useOrganizationAgentSettings = (organizationId: string, enabled = true) => {
-  return useQuery({
-    queryKey: organizationKeys.agentSettings(organizationId),
-    queryFn: async () => {
-      const response = await organizationsGetAgentSettings(
-        withOrganizationHeader({
-          path: { id: organizationId },
-        }),
-      );
-      return response.data?.agentSettings || null;
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!organizationId && enabled,
-  });
+type OrganizationUsageQueryOptions = {
+  staleTime?: number;
+  gcTime?: number;
+  refetchOnMount?: boolean | "always";
+  refetchOnWindowFocus?: boolean | "always";
 };
 
-export const useOrganizationUsage = (organizationId: string, enabled = true) => {
+export const useOrganizationUsage = (
+  organizationId: string,
+  enabled = true,
+  options: OrganizationUsageQueryOptions = {},
+) => {
   return useQuery({
     queryKey: organizationKeys.usage(organizationId),
     queryFn: async () => {
@@ -224,9 +213,10 @@ export const useOrganizationUsage = (organizationId: string, enabled = true) => 
       );
       return response.data || null;
     },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: options.staleTime ?? 30 * 1000,
+    gcTime: options.gcTime ?? 5 * 60 * 1000,
+    refetchOnMount: options.refetchOnMount,
+    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
     enabled: !!organizationId && enabled,
   });
 };
@@ -314,65 +304,6 @@ export const useUpdateOrganizationInviteLink = (organizationId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.inviteLink(organizationId) });
-    },
-  });
-};
-
-export const useUpdateOrganizationAgentSettings = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (agentModeEnabled: boolean) => {
-      const response = await organizationsUpdateAgentSettings(
-        withOrganizationHeader({
-          path: { id: organizationId },
-          body: { agentModeEnabled },
-        }),
-      );
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.agentSettings(organizationId) });
-    },
-  });
-};
-
-export const useSetOrganizationAgentOpenAIKey = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: { apiKey: string; validate?: boolean }) => {
-      const response = await organizationsSetAgentOpenAiKey(
-        withOrganizationHeader({
-          path: { id: organizationId },
-          body: {
-            apiKey: params.apiKey,
-            validate: params.validate ?? true,
-          },
-        }),
-      );
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.agentSettings(organizationId) });
-    },
-  });
-};
-
-export const useDeleteOrganizationAgentOpenAIKey = (organizationId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      const response = await organizationsDeleteAgentOpenAiKey(
-        withOrganizationHeader({
-          path: { id: organizationId },
-        }),
-      );
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.agentSettings(organizationId) });
     },
   });
 };
@@ -616,7 +547,7 @@ export const useUpdateOrganization = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name?: string; description?: string; changeManagementEnabled?: boolean }) => {
+    mutationFn: async (params: { name?: string; description?: string }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -626,20 +557,13 @@ export const useUpdateOrganization = (organizationId: string) => {
                 name: params.name,
                 description: params.description,
               },
-              spec:
-                typeof params.changeManagementEnabled === "boolean"
-                  ? { changeManagementEnabled: params.changeManagementEnabled }
-                  : undefined,
             },
           },
         }),
       );
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) });
-      if (typeof variables.changeManagementEnabled === "boolean") {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.all });
-      }
     },
   });
 };

@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -21,15 +22,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 func CreateIntegration(ctx context.Context, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhooksBaseURL string, orgID string, integrationName, name string, appConfig *structpb.Struct) (*pb.CreateIntegrationResponse, error) {
-	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig, nil)
+	return CreateIntegrationWithUsage(ctx, nil, registry, oidcProvider, baseURL, webhooksBaseURL, orgID, integrationName, name, appConfig)
 }
 
 func CreateIntegrationWithUsage(
@@ -42,16 +41,15 @@ func CreateIntegrationWithUsage(
 	orgID string,
 	integrationName, name string,
 	appConfig *structpb.Struct,
-	capabilities []string,
 ) (*pb.CreateIntegrationResponse, error) {
 	integration, err := registry.GetIntegration(integrationName)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationName)
+		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("integration %s not found", integrationName))
 	}
 
 	org, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid organization")
 	}
 
 	//
@@ -59,12 +57,12 @@ func CreateIntegrationWithUsage(
 	//
 	_, err = models.FindIntegrationByName(org, name)
 	if err == nil {
-		return nil, status.Errorf(codes.AlreadyExists, "an integration with the name %s already exists in this organization", name)
+		return nil, grpcerrors.AlreadyExists(nil, fmt.Sprintf("an integration with the name %s already exists in this organization", name))
 	}
 
 	integrationCount, err := models.CountIntegrationsByOrganization(orgID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to count integrations: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to count integrations")
 	}
 
 	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, orgID, &usagepb.OrganizationState{
@@ -89,15 +87,15 @@ func CreateIntegrationWithUsage(
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")
-			return nil, status.Error(codes.Internal, "failed to create integration")
+			return nil, grpcerrors.Internal(err, "failed to create integration")
 		}
 
 		setupProvider, err := registry.GetSetupProvider(integrationName)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get setup provider: %v", err)
+			return nil, grpcerrors.Internal(err, "failed to get setup provider")
 		}
 
-		return setupIntegration(registry, setupProvider, newIntegration, capabilities)
+		return setupIntegration(registry, setupProvider, newIntegration)
 	}
 
 	//
@@ -106,13 +104,13 @@ func CreateIntegrationWithUsage(
 	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), integrationID, nil)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to encrypt sensitive configuration")
-		return nil, status.Error(codes.Internal, "failed to encrypt sensitive configuration")
+		return nil, grpcerrors.Internal(err, "failed to encrypt sensitive configuration")
 	}
 
 	newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, configuration)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to create integration")
-		return nil, status.Error(codes.Internal, "failed to create integration")
+		return nil, grpcerrors.Internal(err, "failed to create integration")
 	}
 
 	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
@@ -126,21 +124,16 @@ func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capabil
 	return capabilities
 }
 
-func setupIntegration(registry *registry.Registry, setupProvider core.IntegrationSetupProvider, newIntegration *models.Integration, capabilities []string) (*pb.CreateIntegrationResponse, error) {
+func setupIntegration(registry *registry.Registry, setupProvider core.IntegrationSetupProvider, newIntegration *models.Integration) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("setting up integration %s", newIntegration.ID)
 
-	initialCapabilities, err := initialCapabilityStates(allCapabilities(setupProvider), capabilities)
-	if err != nil {
-		return nil, err
-	}
-
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		newIntegration.Capabilities = initialCapabilities
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), newIntegration.Capabilities)
+		logging.ForIntegration(*newIntegration).WithField("source", "integration_create_first_step").Info("Integration operation may write secrets")
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: newIntegration.OrganizationID.String(),
-			HTTP:           registry.HTTPContext(),
+			HTTP:           registry.HTTPContextInTransaction(tx),
 			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
 			Capabilities:   capabilityCtx,
 			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration),
@@ -157,45 +150,15 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 	})
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to setup integration next setup step: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to setup integration next setup step")
 	}
 
 	proto, err := serializeIntegration(registry, newIntegration, []models.CanvasNodeReference{})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to serialize integration: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to serialize integration")
 	}
 
 	return &pb.CreateIntegrationResponse{Integration: proto}, nil
-}
-
-func initialCapabilityStates(definitions []core.Capability, requestedCapabilities []string) ([]models.CapabilityState, error) {
-	definitionsByName := map[string]core.Capability{}
-	for _, definition := range definitions {
-		definitionsByName[definition.Name] = definition
-	}
-
-	requested := map[string]bool{}
-	for _, capability := range requestedCapabilities {
-		if _, ok := definitionsByName[capability]; !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "capability %s not found", capability)
-		}
-		requested[capability] = true
-	}
-
-	states := make([]models.CapabilityState, 0, len(definitions))
-	for _, definition := range definitions {
-		state := core.IntegrationCapabilityStateUnavailable
-		if requested[definition.Name] {
-			state = core.IntegrationCapabilityStateRequested
-		}
-
-		states = append(states, models.CapabilityState{
-			Name:  definition.Name,
-			State: state,
-		})
-	}
-
-	return states, nil
 }
 
 func syncIntegration(
@@ -218,6 +181,7 @@ func syncIntegration(
 		nil,
 	)
 
+	logging.ForIntegration(*newIntegration).WithField("source", "integration_create_sync").Info("Integration operation may write secrets")
 	syncErr := integrationImpl.Sync(core.SyncContext{
 		Logger:          logging.ForIntegration(*newIntegration),
 		HTTP:            registry.HTTPContext(),
@@ -231,7 +195,7 @@ func syncIntegration(
 
 	err := database.Conn().Save(newIntegration).Error
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to save integration after sync: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to save integration after sync")
 	}
 
 	if syncErr != nil {
@@ -239,13 +203,13 @@ func syncIntegration(
 		newIntegration.StateDescription = syncErr.Error()
 		err = database.Conn().Save(newIntegration).Error
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to save integration after sync: %v", err)
+			return nil, grpcerrors.Internal(err, "failed to save integration after sync")
 		}
 	}
 
 	proto, err := serializeIntegration(registry, newIntegration, []models.CanvasNodeReference{})
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to serialize integration: %v", err)
+		return nil, grpcerrors.Internal(err, "failed to serialize integration")
 	}
 
 	return &pb.CreateIntegrationResponse{
@@ -292,7 +256,7 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 			Metadata:         metadata,
 			UsedIn:           []*pb.Integration_NodeRef{},
 			Capabilities:     serializeCapabilities(registry, instance),
-			LegacySetup:      isLegacySetup(instance),
+			LegacySetup:      instance.IsLegacy(),
 		},
 	}
 
@@ -312,6 +276,7 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 			CanvasName: nodeRef.CanvasName,
 			NodeId:     nodeRef.NodeID,
 			NodeName:   nodeRef.NodeName,
+			Component:  nodeRef.ComponentName(),
 		})
 	}
 
@@ -322,11 +287,11 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		}
 
 		if state.CurrentStep != nil {
-			proto.Status.SetupState.CurrentStep = serializeNextStep(*state.CurrentStep)
+			proto.Status.SetupState.CurrentStep = serializeStep(*state.CurrentStep)
 		}
 
 		for _, step := range state.PreviousSteps {
-			proto.Status.SetupState.PreviousSteps = append(proto.Status.SetupState.PreviousSteps, serializeNextStep(step))
+			proto.Status.SetupState.PreviousSteps = append(proto.Status.SetupState.PreviousSteps, serializeStep(step))
 		}
 	}
 
@@ -371,9 +336,9 @@ func integrationParameterValueToString(value any) string {
 	return string(encoded)
 }
 
-func serializeNextStep(step core.SetupStep) *pb.Integration_SetupStepDefinition {
+func serializeStep(step core.SetupStep) *pb.Integration_SetupStepDefinition {
 	def := &pb.Integration_SetupStepDefinition{
-		Type:         serializeNextStepType(step.Type),
+		Type:         serializeStepType(step.Type),
 		Name:         step.Name,
 		Label:        step.Label,
 		Instructions: step.Instructions,
@@ -392,15 +357,21 @@ func serializeNextStep(step core.SetupStep) *pb.Integration_SetupStepDefinition 
 		}
 	}
 
+	if len(step.Capabilities) > 0 {
+		def.Capabilities = step.Capabilities
+	}
+
 	return def
 }
 
-func serializeNextStepType(stepType core.SetupStepType) pb.Integration_SetupStepDefinition_Type {
+func serializeStepType(stepType core.SetupStepType) pb.Integration_SetupStepDefinition_Type {
 	switch stepType {
 	case core.SetupStepTypeInputs:
 		return pb.Integration_SetupStepDefinition_INPUTS
 	case core.SetupStepTypeRedirectPrompt:
 		return pb.Integration_SetupStepDefinition_REDIRECT_PROMPT
+	case core.SetupStepTypeCapabilitySelection:
+		return pb.Integration_SetupStepDefinition_CAPABILITY_SELECTION
 	case core.SetupStepTypeDone:
 		return pb.Integration_SetupStepDefinition_DONE
 	default:
@@ -469,6 +440,8 @@ func ProtoToCapabilityState(s pb.Integration_CapabilityState_State) core.Integra
 		return core.IntegrationCapabilityStateDisabled
 	case pb.Integration_CapabilityState_STATE_REQUESTED:
 		return core.IntegrationCapabilityStateRequested
+	case pb.Integration_CapabilityState_STATE_AVAILABLE:
+		return core.IntegrationCapabilityStateAvailable
 	}
 	return core.IntegrationCapabilityStateUnavailable
 }
@@ -481,8 +454,8 @@ func CapabilityStateToProto(t core.IntegrationCapabilityState) pb.Integration_Ca
 		return pb.Integration_CapabilityState_STATE_DISABLED
 	case core.IntegrationCapabilityStateRequested:
 		return pb.Integration_CapabilityState_STATE_REQUESTED
-	case core.IntegrationCapabilityStateUnavailable:
-		return pb.Integration_CapabilityState_STATE_UNAVAILABLE
+	case core.IntegrationCapabilityStateAvailable:
+		return pb.Integration_CapabilityState_STATE_AVAILABLE
 	}
 	return pb.Integration_CapabilityState_STATE_UNAVAILABLE
 }
@@ -551,8 +524,4 @@ func sanitizeConfigurationIfNeeded(integration core.Integration, config map[stri
 	}
 
 	return sanitized
-}
-
-func isLegacySetup(integration *models.Integration) bool {
-	return len(integration.Capabilities) == 0
 }

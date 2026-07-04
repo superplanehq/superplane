@@ -4,20 +4,20 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useAvailableIntegrations, useDeleteIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { appPath } from "@/lib/appPaths";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft, CircleX, ExternalLink, Plug, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { renderIntegrationMetadata } from "./metadataRenderers";
 import { useIntegrationConfigureOpen } from "@/lib/analytics";
 
 interface LegacyIntegrationDetailsProps {
@@ -130,11 +130,6 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
       nodes: data.nodes,
     }));
   }, [integration?.status?.usedIn]);
-
-  const metadataContent = useMemo(
-    () => renderIntegrationMetadata(integration?.metadata?.integrationName, integration!),
-    [integration],
-  );
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,7 +258,6 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
         )}
 
         {instructionsContent}
-        {metadataContent}
 
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
           <div className="p-6">
@@ -356,7 +350,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                   {workflowGroups.map((group) => (
                     <button
                       key={group.canvasId}
-                      onClick={() => window.open(`/${organizationId}/canvases/${group.canvasId}`, "_blank")}
+                      onClick={() => window.open(appPath(organizationId, group.canvasId), "_blank")}
                       className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
                     >
                       <div className="flex-1">

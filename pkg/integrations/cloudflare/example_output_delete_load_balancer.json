@@ -1,0 +1,9 @@
+{
+  "data": {
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353",
+    "loadBalancerId": "699d98642c564d2e855e9661899b7252",
+    "deleted": true
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.loadBalancer.deleted"
+}

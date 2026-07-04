@@ -1,7 +1,6 @@
 package webhook
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,11 +9,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const (
-	MaxEventSize             = 64 * 1024
+	MaxEventSize             = 512 * 1024
 	DefaultHeaderTokenName   = "X-Webhook-Token"
 	DefaultSignatureHeader   = "X-Signature-256"
 	MinSignatureHeaderLength = 1
@@ -83,7 +83,7 @@ The webhook payload includes:
 
 - Each webhook has a unique secret key for authentication
 - Secrets can be reset using the "Reset Authentication" action
-- Maximum payload size: 64KB
+- Maximum payload size: 512KB
 
 ## Example Usage
 
@@ -299,7 +299,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	}
 
 	var parsedData any
-	err = json.Unmarshal(ctx.Body, &parsedData)
+	err = models.UnmarshalJSONValue(ctx.Body, &parsedData)
 	if err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}

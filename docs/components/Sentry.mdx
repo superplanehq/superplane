@@ -42,6 +42,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Issue Event
 
+**Trigger key:** `sentry.onIssue`
+
 The On Issue Event trigger starts a workflow execution when Sentry sends issue webhooks for the connected organization.
 
 ### Use Cases
@@ -116,6 +118,8 @@ This trigger uses the webhook URL configured on your Sentry internal integration
 <a id="create-alert"></a>
 
 ## Create Alert
+
+**Component key:** `sentry.createAlert`
 
 The Create Alert component creates a Sentry metric alert rule for a selected project.
 
@@ -202,6 +206,8 @@ Returns the created Sentry metric alert rule, including triggers, actions, and p
 
 ## Create Deploy
 
+**Component key:** `sentry.createDeploy`
+
 The Create Deploy component marks a deploy against an existing Sentry release.
 
 ### Use Cases
@@ -248,6 +254,8 @@ Returns the created deploy record, including environment, timestamps, URL, and r
 <a id="create-release"></a>
 
 ## Create Release
+
+**Component key:** `sentry.createRelease`
 
 The Create Release component registers a new release in Sentry for a selected project.
 
@@ -301,6 +309,8 @@ Returns the created Sentry release object, including version, associated project
 
 ## Delete Alert
 
+**Component key:** `sentry.deleteAlert`
+
 The Delete Alert component deletes an existing Sentry metric alert rule.
 
 ### Use Cases
@@ -335,6 +345,8 @@ Returns the deleted alert ID and name so downstream steps can record the removal
 <a id="get-alert"></a>
 
 ## Get Alert
+
+**Component key:** `sentry.getAlert`
 
 The Get Alert component retrieves a Sentry metric alert rule and returns its full configuration.
 
@@ -403,6 +415,8 @@ Returns the selected metric alert rule, including projects, query, thresholds, t
 <a id="get-issue"></a>
 
 ## Get Issue
+
+**Component key:** `sentry.getIssue`
 
 The Get Issue component retrieves a Sentry issue and enriches it with recent events for downstream routing and escalation.
 
@@ -491,6 +505,8 @@ Returns the Sentry issue object including:
 
 ## List Alerts
 
+**Component key:** `sentry.listAlerts`
+
 The List Alerts component lists Sentry metric alert rules for the connected organization.
 
 ### Use Cases
@@ -557,6 +573,8 @@ Returns an object containing the list of matching metric alert rules and their c
 <a id="update-alert"></a>
 
 ## Update Alert
+
+**Component key:** `sentry.updateAlert`
 
 The Update Alert component updates an existing Sentry metric alert rule.
 
@@ -636,6 +654,8 @@ Returns the updated Sentry metric alert rule after the change is applied.
 <a id="update-issue"></a>
 
 ## Update Issue
+
+**Component key:** `sentry.updateIssue`
 
 The Update Issue component updates an existing issue in Sentry.
 

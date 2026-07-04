@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -139,6 +140,15 @@ func parseSigner(keyBytes []byte, passphrase []byte) (ssh.Signer, error) {
 }
 
 func (c *Client) ExecuteCommand(command string, timeout time.Duration) (*CommandResult, error) {
+	return c.ExecuteScript(command, nil, timeout)
+}
+
+// ExecuteScript runs `command` in a new session with optional stdin. When
+// stdin is non-nil it is streamed to the remote process — useful for
+// `bash -s` style invocations where a multi-line script is piped in instead
+// of being embedded in the command line. This avoids argv-size limits and the
+// quoting fragility of wrapping a whole script in `bash -lc '...'`.
+func (c *Client) ExecuteScript(command string, stdin io.Reader, timeout time.Duration) (*CommandResult, error) {
 	conn, err := c.Connect()
 	if err != nil {
 		return nil, err
@@ -153,6 +163,9 @@ func (c *Client) ExecuteCommand(command string, timeout time.Duration) (*Command
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout
 	session.Stderr = &stderr
+	if stdin != nil {
+		session.Stdin = stdin
+	}
 
 	if timeout > 0 {
 		go func() {

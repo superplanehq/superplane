@@ -23,6 +23,7 @@ import { UserFieldRenderer } from "./UserFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
+import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
@@ -30,6 +31,11 @@ import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
 import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
 import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSubmission } from "../../lib/components";
 import type { AuthorizationDomainType } from "@/api-client";
+import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
+import { getRunTitlePresentation, RUN_TITLE_EXCLUDED_SUGGESTIONS } from "./runTitlePresentation";
+
+const REQUIRED_FIELD_BADGE_CLASS =
+  "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   allowExpressions?: boolean;
@@ -46,9 +52,6 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
 }
 
 type ConfigurationField = FieldRendererProps["field"];
-
-/** Stable reference for trigger run-title fields — hides node/previous sources that don't apply. */
-const RUN_TITLE_EXCLUDED_SUGGESTIONS = ["$", "previous"];
 
 function getInitialSelectValue(field: ConfigurationField, parsedDefaultValue: unknown): unknown {
   const selectOptions = field.typeOptions?.select?.options;
@@ -181,7 +184,7 @@ export const ConfigurationFieldRenderer = ({
       message: error,
       type: "validation_rule" as const,
     }));
-  }, [field, value, allValues, validationErrors, enableRealtimeValidation]);
+  }, [field, value, validationErrors, enableRealtimeValidation]);
 
   // Get field-specific validation errors
   const fieldErrors = React.useMemo(() => {
@@ -261,23 +264,49 @@ export const ConfigurationFieldRenderer = ({
     return hasError;
   }, [allFieldErrors, isRequired, value, validationErrors, enableRealtimeValidation, hasError]);
 
+  const resolvedAutocompleteExampleObj = React.useMemo(() => {
+    if (field.name !== "payload") {
+      return autocompleteExampleObj;
+    }
+
+    const parameters = buildTemplateParametersAutocompleteObject(allValues);
+    if (!parameters) {
+      return autocompleteExampleObj;
+    }
+
+    return {
+      ...(autocompleteExampleObj ?? {}),
+      parameters,
+    };
+  }, [field.name, allValues, autocompleteExampleObj]);
+
   if (!isVisible) {
     return null;
   }
-  const renderField = () => {
-    const commonProps = {
-      field,
-      value,
-      onChange,
-      allValues,
-      hasError: hasFieldError,
-      autocompleteExampleObj,
-      integrationId,
-      organizationId,
-      allowExpressions,
-      excludedSuggestions: field.name === "customName" ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
-    };
 
+  const fieldAllowsExpressions =
+    allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
+  const runTitlePresentation = getRunTitlePresentation(field.name, isEnabled);
+  // `field.label` arrives as an empty string (not undefined) when a component omits it,
+  // so fall back to the field name whenever the label is blank.
+  const fieldLabel = runTitlePresentation?.label || field.label || field.name;
+  const fieldDescription = runTitlePresentation?.description ?? field.description;
+
+  const commonProps = {
+    field,
+    value,
+    onChange,
+    allValues,
+    hasError: hasFieldError,
+    autocompleteExampleObj: resolvedAutocompleteExampleObj,
+    integrationId,
+    organizationId,
+    allowExpressions: fieldAllowsExpressions,
+    excludedSuggestions: runTitlePresentation ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
+    valuePreviewLabel: runTitlePresentation?.previewLabel,
+  };
+
+  const renderField = () => {
     switch (field.type) {
       case "string":
         return <StringFieldRenderer {...commonProps} />;
@@ -345,6 +374,9 @@ export const ConfigurationFieldRenderer = ({
 
       case "git-ref":
         return <GitRefFieldRenderer {...commonProps} />;
+
+      case "repository-file":
+        return <RepositoryFileFieldRenderer {...commonProps} />;
 
       case "user":
         if (!domainId) {
@@ -433,15 +465,14 @@ export const ConfigurationFieldRenderer = ({
     }
   };
 
-  // For boolean fields, render label inline with switch
-  if (field.type === "boolean") {
+  // Togglable booleans use the standard label row plus an optional labeled value switch.
+  if (field.type === "boolean" && isTogglable) {
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
-          {isEnabled && renderField()}
-          <Label className="text-left cursor-pointer">
-            {field.label || field.name}
+          <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
+          <Label className="block text-left flex-1 min-w-0">
+            {fieldLabel}
             {isRequired && <span className="text-gray-800 ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
@@ -449,12 +480,16 @@ export const ConfigurationFieldRenderer = ({
                   validationErrors &&
                   isRequired &&
                   (value === undefined || value === null || value === ""))) && (
-                <span className="text-red-500 text-xs ml-2">Required</span>
+                <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
               )}
           </Label>
         </div>
+        {isEnabled && (
+          <div className="flex items-center gap-3">
+            <BooleanFieldRenderer {...commonProps} labeled />
+          </div>
+        )}
 
-        {/* Display validation errors */}
         {allFieldErrors.filter((error) => error.message && !error.message.toLowerCase().includes("required")).length >
           0 && (
           <div className="space-y-1">
@@ -468,9 +503,48 @@ export const ConfigurationFieldRenderer = ({
           </div>
         )}
 
-        {/* Display field description */}
-        {field.description && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
+        {fieldDescription && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
+        )}
+      </div>
+    );
+  }
+
+  // Non-togglable booleans render the switch inline with the label.
+  if (field.type === "boolean") {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          {renderField()}
+          <Label className="text-left cursor-pointer">
+            {fieldLabel}
+            {isRequired && <span className="text-gray-800 ml-1">*</span>}
+            {hasFieldError &&
+              ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+                (!enableRealtimeValidation &&
+                  validationErrors &&
+                  isRequired &&
+                  (value === undefined || value === null || value === ""))) && (
+                <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
+              )}
+          </Label>
+        </div>
+
+        {allFieldErrors.filter((error) => error.message && !error.message.toLowerCase().includes("required")).length >
+          0 && (
+          <div className="space-y-1">
+            {allFieldErrors
+              .filter((error) => error.message && !error.message.toLowerCase().includes("required"))
+              .map((error, index) => (
+                <p key={index} className="text-xs text-red-500 dark:text-red-400 text-left">
+                  {error.message}
+                </p>
+              ))}
+          </div>
+        )}
+
+        {fieldDescription && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
         )}
       </div>
     );
@@ -482,7 +556,7 @@ export const ConfigurationFieldRenderer = ({
       <div className="flex items-center gap-3">
         {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
         <Label className="block text-left flex-1 min-w-0">
-          {field.label || field.name}
+          {fieldLabel}
           {isRequired && <span className="text-gray-800 ml-1">*</span>}
           {hasFieldError &&
             ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
@@ -490,14 +564,14 @@ export const ConfigurationFieldRenderer = ({
                 validationErrors &&
                 isRequired &&
                 (value === undefined || value === null || value === ""))) && (
-              <span className="text-red-500 text-xs ml-2 leading-0">Required</span>
+              <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
             )}
         </Label>
         <div ref={labelRightRef} className="ml-auto shrink-0" />
       </div>
       {isEnabled && (
         <div className="flex items-center gap-2">
-          <div className="flex-1">{renderField()}</div>
+          <div className="flex-1 min-w-0">{renderField()}</div>
         </div>
       )}
 
@@ -516,8 +590,8 @@ export const ConfigurationFieldRenderer = ({
       )}
 
       {/* Display field description */}
-      {field.description && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
+      {fieldDescription && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
       )}
     </div>
   );

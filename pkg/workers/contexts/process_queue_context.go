@@ -37,6 +37,7 @@ func BuildProcessQueueContext(
 	queueItem *models.CanvasNodeQueueItem,
 	configFields []configuration.Field,
 	onNewEvents func([]models.CanvasEvent),
+	repoFiles core.RepositoryFilesContext,
 ) (*core.ProcessQueueContext, error) {
 	event, err := models.FindCanvasEventInTransaction(tx, queueItem.EventID)
 	if err != nil {
@@ -47,18 +48,10 @@ func BuildProcessQueueContext(
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
+		WithIncomingEventID(&event.ID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
-	}
-
-	if node.ParentNodeID != nil {
-		parent, err := models.FindCanvasNode(tx, node.WorkflowID, *node.ParentNodeID)
-		if err != nil {
-			return nil, err
-		}
-
-		configBuilder = configBuilder.ForBlueprintNode(parent)
 	}
 
 	config, err := configBuilder.Build(node.Configuration.Data())
@@ -75,6 +68,7 @@ func BuildProcessQueueContext(
 	builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
+		WithIncomingEventID(&event.ID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if event.ExecutionID != nil {
 		builder = builder.WithPreviousExecution(event.ExecutionID)
@@ -87,7 +81,7 @@ func BuildProcessQueueContext(
 		RootEventID:   queueItem.RootEventID.String(),
 		EventID:       event.ID.String(),
 		SourceNodeID:  event.NodeID,
-		Input:         event.Data.Data(),
+		Input:         map[string]any{event.NodeID: normalizeExpressionValue(event.Data.Data())},
 		Expressions:   NewExpressionContext(builder),
 	}
 
@@ -98,6 +92,7 @@ func BuildProcessQueueContext(
 			WorkflowID:          queueItem.WorkflowID,
 			NodeID:              node.NodeID,
 			RootEventID:         queueItem.RootEventID,
+			RunID:               queueItem.RunID,
 			EventID:             event.ID,
 			PreviousExecutionID: event.ExecutionID,
 			State:               models.CanvasNodeExecutionStatePending,
@@ -106,27 +101,14 @@ func BuildProcessQueueContext(
 			UpdatedAt:           &now,
 		}
 
-		// If this queue item originated from an internal (blueprint) execution chain,
-		// propagate the parent execution id from the previous execution so that
-		// child executions are linked to the top-level blueprint execution.
-		if event.ExecutionID != nil {
-			if prev, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, *event.ExecutionID); err == nil {
-				if prev.ParentExecutionID != nil {
-					execution.ParentExecutionID = prev.ParentExecutionID
-				}
-			}
-		}
-
 		err := tx.Create(&execution).Error
 		if err != nil {
 			return nil, err
 		}
 
-		orgUUID := uuid.Nil
 		orgID := ""
 		canvasName := ""
 		if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
-			orgUUID = workflow.OrganizationID
 			orgID = workflow.OrganizationID.String()
 			canvasName = workflow.Name
 		}
@@ -144,14 +126,25 @@ func BuildProcessQueueContext(
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
 			ExecutionState: NewExecutionStateContext(tx, &execution, onNewEvents),
 			Requests:       NewExecutionRequestContext(tx, &execution),
-			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
-			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
+			Logger:         logging.WithExecution(logging.ForNode(*node), &execution),
 			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
+			Files:          repoFiles,
 		}, nil
 	}
 
 	ctx.DequeueItem = func() error {
 		return queueItem.Delete(tx)
+	}
+
+	//
+	// The node queue is a FIFO ordered by created_at (see CanvasNode.FirstQueueItem),
+	// so deferring an item is simply moving it to the tail by stamping created_at to
+	// now. This lets other already-queued items (e.g. feedback for an in-progress run)
+	// be processed ahead of it, instead of the worker re-picking this same item forever.
+	//
+	ctx.DeferQueueItem = func() error {
+		now := time.Now()
+		return tx.Model(queueItem).Update("created_at", &now).Error
 	}
 
 	ctx.UpdateNodeState = func(state string) error {
@@ -176,39 +169,6 @@ func BuildProcessQueueContext(
 	}
 
 	ctx.DistinctIncomingSources = func() ([]core.Node, error) {
-		// Similar blueprint-aware logic as CountIncomingEdges, but count
-		// distinct source nodes rather than edge count.
-		if node.ParentNodeID != nil && *node.ParentNodeID != "" {
-			parent, err := models.FindCanvasNode(tx, node.WorkflowID, *node.ParentNodeID)
-			if err != nil {
-				return nil, err
-			}
-
-			blueprintID := parent.Ref.Data().Blueprint.ID
-			if blueprintID != "" {
-				bp, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
-				if err != nil {
-					return nil, err
-				}
-
-				prefix := parent.NodeID + ":"
-				childID := node.NodeID
-				if len(childID) > len(prefix) && childID[:len(prefix)] == prefix {
-					childID = childID[len(prefix):]
-				}
-
-				sources := []core.Node{}
-				for _, e := range bp.Edges {
-					if e.TargetID == childID {
-						sources = append(sources, core.Node{
-							ID: fmt.Sprintf("%s:%s", parent.NodeID, e.SourceID),
-						})
-					}
-				}
-				return uniqueSourceNodes(sources), nil
-			}
-		}
-
 		wf, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 		if err != nil {
 			return nil, err
@@ -239,11 +199,9 @@ func BuildProcessQueueContext(
 			return nil, err
 		}
 
-		orgUUID := uuid.Nil
 		orgID := ""
 		canvasName := ""
 		if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
-			orgUUID = workflow.OrganizationID
 			orgID = workflow.OrganizationID.String()
 			canvasName = workflow.Name
 		}
@@ -261,10 +219,18 @@ func BuildProcessQueueContext(
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
 			ExecutionState: NewExecutionStateContext(tx, execution, onNewEvents),
 			Requests:       NewExecutionRequestContext(tx, execution),
-			Logger:         logging.WithExecution(logging.ForNode(*node), execution, nil),
-			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),
+			Logger:         logging.WithExecution(logging.ForNode(*node), execution),
 			CanvasMemory:   NewCanvasMemoryContext(tx, execution.WorkflowID),
+			Files:          repoFiles,
 		}, nil
+	}
+
+	ctx.HasRunningExecutions = func() (bool, error) {
+		count, err := models.CountRunningExecutionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
+		if err != nil {
+			return false, err
+		}
+		return count > 0, nil
 	}
 
 	return ctx, nil

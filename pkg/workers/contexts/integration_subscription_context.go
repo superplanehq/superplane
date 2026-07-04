@@ -74,7 +74,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToAction(message any) error 
 	}
 
 	return integrationAction.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:          c.registry.HTTPContext(),
+		HTTP:          c.registry.HTTPContextInTransaction(c.tx),
 		Configuration: c.node.Configuration.Data(),
 		NodeMetadata:  NewNodeMetadataContext(c.tx, c.node),
 		Integration:   c.integrationCtx,
@@ -105,7 +105,7 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 	}
 
 	return integrationTrigger.OnIntegrationMessage(core.IntegrationMessageContext{
-		HTTP:              c.registry.HTTPContext(),
+		HTTP:              c.registry.HTTPContextInTransaction(c.tx),
 		Configuration:     c.node.Configuration.Data(),
 		NodeMetadata:      NewNodeMetadataContext(c.tx, c.node),
 		Integration:       c.integrationCtx,
@@ -139,14 +139,13 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		NodeID:         execution.NodeID,
 		NodeName:       c.node.Name,
 		Configuration:  execution.Configuration.Data(),
-		HTTP:           c.registry.HTTPContext(),
+		HTTP:           c.registry.HTTPContextInTransaction(c.tx),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),
 		NodeMetadata:   NewNodeMetadataContext(c.tx, c.node),
 		ExecutionState: NewExecutionStateContext(c.tx, execution, c.onNewEvents),
 		Requests:       NewExecutionRequestContext(c.tx, execution),
 		Integration:    c.integrationCtx,
-		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution, nil),
-		Notifications:  NewNotificationContext(c.tx, c.integration.OrganizationID, execution.WorkflowID),
+		Logger:         logging.WithExecution(logging.ForNode(*c.node), execution),
 		CanvasMemory:   NewCanvasMemoryContext(c.tx, execution.WorkflowID),
 	}, nil
 }

@@ -270,14 +270,16 @@ type BrowserAction struct {
 }
 
 type HTTPRequestContext struct {
-	Logger          *logrus.Entry
-	Request         *http.Request
-	Response        http.ResponseWriter
-	OrganizationID  string
-	BaseURL         string
-	WebhooksBaseURL string
-	HTTP            HTTPContext
-	Integration     IntegrationContext
+	Logger           *logrus.Entry
+	Request          *http.Request
+	Response         http.ResponseWriter
+	OrganizationID   string
+	BaseURL          string
+	WebhooksBaseURL  string
+	HTTP             HTTPContext
+	Integration      IntegrationContext
+	Capabilities     CapabilityContext
+	IntegrationSetup IntegrationSetupContext
 }
 
 /*

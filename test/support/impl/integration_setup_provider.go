@@ -29,12 +29,6 @@ func NewDummyIntegrationSetupProvider(opts DummyIntegrationSetupProviderOptions)
 	return &DummyIntegrationSetupProvider{opts: opts}
 }
 
-// NewStubIntegrationSetupProvider returns an IntegrationSetupProvider with empty defaults
-// (same behavior as the historical StubIntegrationSetupProvider).
-func NewStubIntegrationSetupProvider() *DummyIntegrationSetupProvider {
-	return NewDummyIntegrationSetupProvider(DummyIntegrationSetupProviderOptions{})
-}
-
 func (p *DummyIntegrationSetupProvider) CapabilityGroups() []core.CapabilityGroup {
 	return p.opts.CapabilityGroups
 }

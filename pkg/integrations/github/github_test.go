@@ -13,14 +13,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 type githubManifest struct {
-	DefaultEvents []string `json:"default_events"`
+	DefaultEvents      []string          `json:"default_events"`
+	DefaultPermissions map[string]string `json:"default_permissions"`
 }
 
-func Test__GitHub__Setup(t *testing.T) {
+func Test__GitHub__Sync(t *testing.T) {
 	g := &GitHub{}
 
 	t.Run("personal scope", func(t *testing.T) {
@@ -40,7 +42,7 @@ func Test__GitHub__Setup(t *testing.T) {
 		// Metadata is set
 		//
 		require.NotNil(t, integrationCtx.Metadata)
-		metadata := integrationCtx.Metadata.(Metadata)
+		metadata := integrationCtx.Metadata.(common.Metadata)
 		assert.Empty(t, metadata.Owner)
 		assert.NotEmpty(t, metadata.State)
 	})
@@ -65,7 +67,7 @@ func Test__GitHub__Setup(t *testing.T) {
 		// Metadata is set
 		//
 		require.NotNil(t, integrationCtx.Metadata)
-		metadata := integrationCtx.Metadata.(Metadata)
+		metadata := integrationCtx.Metadata.(common.Metadata)
 		assert.Equal(t, metadata.Owner, "testhq")
 		assert.NotEmpty(t, metadata.State)
 	})
@@ -152,4 +154,5 @@ func assertManifestContainsDefaultEvents(t *testing.T, manifestJSON string) {
 	var manifest githubManifest
 	require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifest))
 	require.Equal(t, defaultGitHubAppEvents, manifest.DefaultEvents)
+	require.Equal(t, "read", manifest.DefaultPermissions["checks"])
 }

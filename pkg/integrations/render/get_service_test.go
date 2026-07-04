@@ -36,6 +36,12 @@ func Test__Render_GetService__Execute(t *testing.T) {
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"id":"srv-123","name":"backend-api","suspended":"not_suspended"}`)),
 				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`[{"id":"cdm-123","name":"app.example.com","verificationStatus":"verified"}]`,
+					)),
+				},
 			},
 		}
 
@@ -60,9 +66,19 @@ func Test__Render_GetService__Execute(t *testing.T) {
 		assert.Equal(t, "backend-api", data["serviceName"])
 		assert.Equal(t, "not_suspended", data["suspended"])
 
-		require.Len(t, httpCtx.Requests, 1)
+		customDomains, ok := data["customDomains"].([]map[string]any)
+		require.True(t, ok)
+		require.Len(t, customDomains, 1)
+		assert.Equal(t, "cdm-123", customDomains[0]["id"])
+		assert.Equal(t, "app.example.com", customDomains[0]["name"])
+		assert.Equal(t, "verified", customDomains[0]["verificationStatus"])
+
+		require.Len(t, httpCtx.Requests, 2)
 		request := httpCtx.Requests[0]
 		assert.Equal(t, http.MethodGet, request.Method)
 		assert.Contains(t, request.URL.Path, "/v1/services/srv-123")
+		request = httpCtx.Requests[1]
+		assert.Equal(t, http.MethodGet, request.Method)
+		assert.Contains(t, request.URL.Path, "/v1/services/srv-123/custom-domains")
 	})
 }

@@ -1,0 +1,209 @@
+[
+  {
+    "repo": "github.com/superplanehq/app_preview-env-digitalocean",
+    "icon": "digitalocean",
+    "title": "Preview Environments on DigitalOcean",
+    "description": "Spin up a live preview environment for every pull request. Comment /start on a PR, get a running app in ~2 minutes using DigitalOcean Droplets.",
+    "integrations": [
+      "github",
+      "digitalocean"
+    ],
+    "tags": [
+      "CI/CD",
+      "Preview"
+    ],
+    "requirements": [
+      "GitHub integration with Deployments permission",
+      "DigitalOcean integration",
+      "An SSH key registered on DigitalOcean",
+      "A SuperPlane secret with the matching private key"
+    ],
+    "agentInstructions": "The user just installed the Preview Environments app. This canvas creates ephemeral preview environments for pull requests using GitHub and DigitalOcean. If the user completed the install wizard, the repository, SSH secret, SSH key, region, size, and image are already configured. The main remaining task is customizing scripts/preview-setup.sh in the Files tab to match their application. If the user skipped the wizard, setup involves: 1) Connecting GitHub and DigitalOcean integrations, 2) Creating an SSH key secret, 3) Updating the repository name, SSH secret, and SSH key on the canvas nodes.",
+    "agentInitialMessage": "Welcome! This canvas manages the full lifecycle of preview environments for pull requests \u2014 provisioning DigitalOcean droplets, deploying your app via SSH, posting preview URLs, and tearing everything down when PRs close or after the TTL expires.\n\n---\n\n**If you used the install wizard**, your repository, SSH credentials, and droplet settings are already configured. Here's what you need to do next:\n\n**1. Customize the setup script**\nOpen `scripts/preview-setup.sh` in the **Files** tab. The default script sets up a Node.js app with nginx. Update it to install your runtime, build your app, and start your services.\n\nThe script receives two environment variables:\n- `PR_NUMBER` \u2014 the pull request number\n- `REPO_URL` \u2014 the full clone URL of your repository\n\n**2. Test it**\nOpen a PR on your repository and comment `/start`. The workflow will create a droplet, run your setup script, and post the preview URL as a PR comment.\n\n---\n\n**If you skipped the wizard**, here's the full setup checklist:\n\n**1. Connect GitHub** - [GitHub](integration:github)\nNeeds the **Deployments** permission for deployment statuses.\n\n**2. Connect DigitalOcean** - [DigitalOcean](integration:digitalocean)\nUsed to create and delete droplets.\n\n**3. Add your SSH private key as a secret**\nThe [Setup App](node:setup-app) node SSHs into droplets using a secret with key `private_key`. Create a secret containing the private key that matches your DigitalOcean SSH key.\n\n**4. Update the canvas nodes**\n- Set the repository name on all GitHub trigger and action nodes\n- Set your SSH secret on the [Setup App](node:setup-app) node\n- Set your DigitalOcean SSH key on the [Create Droplet](node:create-droplet) node\n\n**5. Customize the setup script**\nEdit `scripts/preview-setup.sh` in the **Files** tab to match your application.\n\n---\n\nLet me know if you need help with any of these steps!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_preview-env-github-aws",
+    "icon": "aws",
+    "title": "Preview Environments on AWS",
+    "description": "Spin up a live preview environment for every pull request. Comment /start on a PR, get a running app in ~2 minutes using AWS EC2 instances.",
+    "integrations": [
+      "github",
+      "aws"
+    ],
+    "tags": [
+      "CI/CD",
+      "Preview"
+    ],
+    "requirements": [
+      "GitHub integration with Deployments permission",
+      "AWS integration",
+      "An EC2 key pair registered in AWS",
+      "A SuperPlane secret with the matching private key"
+    ],
+    "agentInstructions": "The user just installed the Preview Environments app. This canvas creates ephemeral preview environments for pull requests using GitHub and AWS EC2. If the user completed the install wizard, the repository, SSH secret, and EC2 key pair name are already configured. The main remaining task is customizing scripts/preview-setup.sh in the Files tab to match their application. If the user skipped the wizard, setup involves: 1) Connecting GitHub and AWS integrations, 2) Creating an SSH key secret, 3) Updating the repository name, SSH secret, and EC2 key pair name on the canvas nodes.",
+    "agentInitialMessage": "Welcome! This canvas manages the full lifecycle of preview environments for pull requests \u2014 provisioning AWS EC2 instances, deploying your app via SSH, posting preview URLs, and tearing everything down when PRs close or after the TTL expires.\n\n---\n\n**If you used the install wizard**, your repository, SSH credentials, and EC2 key pair are already configured. Here's what you need to do next:\n\n**1. Review EC2 settings**\nCheck the [Create Instance](node:create-droplet) node for instance type, AMI, subnet, and security group. Update them if the defaults don't match your AWS account.\n\n**2. Customize the setup script**\nOpen `scripts/preview-setup.sh` in the **Files** tab. The default script sets up a Node.js app with nginx. Update it to install your runtime, build your app, and start your services.\n\nThe script receives two environment variables:\n- `PR_NUMBER` \u2014 the pull request number\n- `REPO_URL` \u2014 the full clone URL of your repository\n\n**3. Test it**\nOpen a PR on your repository and comment `/start`.\n\n---\n\n**If you skipped the wizard**, here's the full setup checklist:\n\n**1. Connect GitHub** - [GitHub](integration:github)\nNeeds the **Deployments** permission.\n\n**2. Connect AWS** - [AWS](integration:aws)\nUsed to create and terminate EC2 instances.\n\n**3. Add your SSH private key as a secret**\nThe [Setup App](node:setup-app) node SSHs into instances using a secret with key `private-key`. Create a secret containing the private key that matches your EC2 key pair.\n\n**4. Update the canvas nodes**\n- Set the repository name on all GitHub nodes\n- Set your SSH secret on the [Setup App](node:setup-app) node\n- Set your EC2 key pair name on the [Create Instance](node:create-droplet) node\n- Review instance type, AMI, subnet, and security group settings\n\n**5. Customize the setup script**\nEdit `scripts/preview-setup.sh` in the **Files** tab to match your application.\n\n---\n\nLet me know if you need help with any of these steps!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_cluster-auto-scaler-hetzner-grafana-slack",
+    "icon": "hetzner",
+    "title": "Cluster Autoscaler (Hetzner + Grafana + Slack)",
+    "description": "Autoscale a Hetzner Cloud worker fleet from Grafana CPU alerts. The canvas provisions workers, bootstraps a Docker workload over SSH, tracks active nodes in memory, scales down quiet clusters, and posts Slack notifications.",
+    "integrations": [
+      "grafana",
+      "hetzner",
+      "slack"
+    ],
+    "tags": [
+      "Infrastructure",
+      "Autoscaling",
+      "Alerts"
+    ],
+    "requirements": [
+      "Grafana integration with a HighCPU alert and a Prometheus data source named prometheus",
+      "Hetzner Cloud integration with permission to create and delete servers",
+      "Slack integration with chat:write access to the target channel",
+      "SSH private key secret named cluster-deploy with key private-key, matching a Hetzner SSH key named cluster-deploy"
+    ],
+    "agentInstructions": "The user just installed the Cluster Autoscaler app. This canvas reacts to Grafana HighCPU alerts, queries a Prometheus data source through Grafana, provisions Hetzner workers, bootstraps a Docker workload over SSH, stores active workers in the cluster_nodes memory namespace, periodically scales down when the cluster is above the minimum, and sends Slack notifications. Setup usually involves: 1) Connecting Grafana, Hetzner, and Slack integrations, 2) Creating the cluster-deploy secret with key private-key for SSH access, 3) Confirming the matching Hetzner SSH key is named cluster-deploy, 4) Reviewing the Grafana data source name and HighCPU alert, 5) Updating the Slack channel, min/max bounds, Hetzner server settings, and workload bootstrap commands.",
+    "agentInitialMessage": "Welcome! This canvas is a closed-loop autoscaler for a Hetzner-backed worker fleet. It scales up from a Grafana `HighCPU` alert, records active workers in SuperPlane memory, runs a scheduled scale-down check every 10 minutes, and posts capacity changes to Slack.\n\nThe canvas is structurally wired, but it still uses template defaults. Here's the full setup checklist:\n\n---\n\n**What needs to be done:**\n\n**1. Connect Grafana** - [Grafana](integration:grafana)\nThe [Grafana HighCPU Alert](node:t-alert-up) trigger listens for alerts matching `HighCPU`, and the query nodes use a Prometheus data source named `prometheus`.\n\n**2. Connect Hetzner Cloud** - [Hetzner](integration:hetzner)\nThe [Create Server](node:create-server) and [Delete Newest Node](node:delete-server) nodes manage worker servers. The template currently uses `ubuntu-24.04`, server type `cpx11`, location `fsn1`, and a Hetzner SSH key named `cluster-deploy`.\n\n**3. Connect Slack** - [Slack](integration:slack)\nScale-up, scale-down, capacity, and bootstrap failure notifications go to `#cluster-ops` by default.\n\n**4. Add the SSH private key secret**\nThe [Bootstrap Worker](node:join-ssh) node connects as `root` using a secret named `cluster-deploy` with key `private-key`. The matching public key must be uploaded to Hetzner as `cluster-deploy`.\n\n**5. Review the autoscaling policy and workload**\nThe template scales up while [Below Max (4)?](node:check-max) is true and scales down while [Above Min (2)?](node:check-min) is true. The default workload is `nginxdemos/hello:latest`; update the bootstrap commands for your real worker process.\n\n---\n\nLet's start with the environment-specific values:\n\n:::survey\nWhat Slack channel should autoscaling notifications use? (e.g. `#cluster-ops`)\n- [input]\n\nDoes the secret `cluster-deploy` already exist in your org?\n- I need to create it\n- It already exists\n\nShould we keep the default Hetzner server settings (`cpx11`, `fsn1`, `ubuntu-24.04`)?\n- Keep the defaults\n- I need different settings\n:::\n\nOnce you've shared those details, I'll update the canvas nodes and get the autoscaler ready for your cluster."
+  },
+  {
+    "repo": "github.com/superplanehq/app_cluster-auto-scaler-digital-ocean",
+    "icon": "digitalocean",
+    "title": "Cluster Autoscaler (DigitalOcean + Grafana + Discord)",
+    "description": "Autoscale a DigitalOcean droplet fleet from Grafana CPU alerts. Provisions workers, bootstraps Docker workloads over SSH, tracks active nodes in memory, scales down quiet clusters, and posts Discord notifications.",
+    "integrations": [
+      "grafana",
+      "digitalocean",
+      "discord"
+    ],
+    "tags": [
+      "Infrastructure",
+      "Autoscaling",
+      "Alerts"
+    ],
+    "requirements": [
+      "Grafana integration with a HighCPU alert and a Prometheus data source named prometheus",
+      "DigitalOcean integration with permission to create and delete droplets",
+      "Discord integration for scale notifications",
+      "SSH private key secret with key private-key, matching a DigitalOcean SSH key"
+    ],
+    "agentInstructions": "The user just installed the Cluster Autoscaler app (DigitalOcean variant). This canvas reacts to Grafana HighCPU alerts, provisions DigitalOcean droplets, bootstraps a Docker workload over SSH, stores active workers in the cluster_nodes memory namespace, periodically scales down when the cluster is above the minimum, and sends Discord notifications. If the user completed the install wizard, the SSH secret, SSH key, Discord channel, and droplet settings are already configured. The main remaining task is updating the bootstrap commands in the SSH node to match their workload. If the user skipped the wizard, setup involves: 1) Connecting Grafana, DigitalOcean, and Discord integrations, 2) Creating the SSH secret, 3) Updating the Discord channel, droplet settings, and workload bootstrap commands.",
+    "agentInitialMessage": "Welcome! This canvas is a closed-loop autoscaler for a DigitalOcean droplet fleet. It scales up from a Grafana `HighCPU` alert, records active workers in SuperPlane memory, runs a scheduled scale-down check every 10 minutes, and posts capacity changes to Discord.\n\n---\n\n**If you used the install wizard**, your SSH credentials, Discord channel, and droplet settings are already configured. Here's what's left:\n\n**1. Review the bootstrap commands**\nThe [Bootstrap Worker](node:join-ssh) SSH node runs `docker pull` and `docker run` with `nginxdemos/hello:latest` as the default workload. Update these commands for your real worker process.\n\n**2. Verify the Grafana alert**\nThe [Grafana HighCPU Alert](node:t-alert-up) trigger listens for alerts matching `HighCPU`. The query nodes use a Prometheus data source named `prometheus`. Make sure both are configured in your Grafana.\n\n**3. Test it**\nTrigger the Grafana alert or use the canvas manually to verify a droplet is created and bootstrapped.\n\n---\n\n**If you skipped the wizard:**\n\n1. Connect [Grafana](integration:grafana), [DigitalOcean](integration:digitalocean), and [Discord](integration:discord)\n2. Create an SSH secret with key `private-key` matching a DigitalOcean SSH key\n3. Set the SSH secret and SSH key on the [Bootstrap Worker](node:join-ssh) and [Create Droplet](node:create-server) nodes\n4. Set the Discord channel on all notification nodes\n5. Review droplet settings (region, size, image) on the [Create Droplet](node:create-server) node\n6. Update bootstrap commands for your workload\n\nLet me know if you need help!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_coolify-watcher",
+    "icon": "coolify",
+    "title": "Coolify Watcher",
+    "description": "Keep an eye on a Coolify host. On every poll it SSHes into the server, captures a JSON snapshot of host and container stats, stores it in canvas memory, and renders it on a live dashboard - including one-click restarts of any Coolify-managed app or service.",
+    "integrations": [
+      "coolify"
+    ],
+    "tags": [
+      "Monitoring",
+      "Infrastructure"
+    ],
+    "requirements": [
+      "Coolify integration with permission to list and control applications and services",
+      "A reachable Coolify host with SSH access",
+      "An SSH secret in your org with key 'pw' holding the host password",
+      "The Coolify host IP and SSH username for the install parameters"
+    ],
+    "agentInstructions": "The user just installed the Coolify Watcher app. This canvas monitors a Coolify host: a scheduled trigger lists Coolify applications and services, runs an SSH health script that returns a JSON snapshot of host and container stats, and writes the results into the coolifyHost, coolifyStats, coolifyApps, and coolifyServices memory namespaces for a live dashboard. A second trigger restarts a selected app or service (via coolify.controlApplication / coolify.controlService). Setup usually involves: 1) Connecting the Coolify integration, 2) Creating an org secret with key 'pw' containing the SSH password for the host, 3) Supplying the SSH host IP, SSH user, and secret name as install parameters. SSH uses password authentication against the secret key 'pw'.",
+    "agentInitialMessage": "Welcome! This canvas is a health monitor for a Coolify host. On each scan it lists your Coolify apps and services, SSHes into the host to capture CPU, memory, disk, uptime, and per-container stats, stores everything in SuperPlane memory, and powers a live dashboard. It can also restart any Coolify-managed app or service on demand.\n\nThe canvas is structurally wired, but it still needs your environment-specific values. Here's the setup checklist:\n\n---\n\n**What needs to be done:**\n\n**1. Connect Coolify** - [Coolify](integration:coolify)\nThe list and control nodes ([List Applications](node:coolify-listapplications-coolify-listapplications-9cp6fn), [List Services](node:coolify-listservices-coolify-listservices-iwmbto), [Control Application](node:coolify-controlapplication-coolify-controlapplication-j8d2ha), [Control Service](node:coolify-controlservice-coolify-controlservice-r3n7c6)) all use your Coolify integration.\n\n**2. Create the SSH secret**\nThe [SSH Dump](node:ssh-ssh-jca97f) node connects to the host with password authentication, reading a secret with the key `pw`. Create an org secret holding your Coolify host's SSH password under that key.\n\n**3. Provide the SSH connection details**\nThe install asks for the Coolify host IP (`SSH Host`), the SSH username (`SSH User`), and the name of the secret you just created (`SSH Secret Name`).\n\n---\n\nLet's gather the environment-specific values:\n\n:::survey\nWhat is the Coolify host IP for SSH? (e.g. `1.1.1.1`)\n- [input]\n\nWhat SSH user should connect to the host? (e.g. `root`)\n- [input]\n\nDoes the SSH password secret (with key `pw`) already exist in your org?\n- I need to create it\n- It already exists\n:::\n\nOnce you've shared those details, I'll get the watcher polling your Coolify host and populating the dashboard."
+  },
+  {
+    "repo": "github.com/superplanehq/app_tls_monitor",
+    "icon": "shield-check",
+    "title": "TLS Monitor",
+    "description": "Monitor TLS certificate expiry for HTTPS endpoints. Add hostnames, check certificates on a schedule, and get Discord notifications when certificates are expiring.",
+    "integrations": [
+      "discord"
+    ],
+    "tags": [
+      "Monitoring",
+      "Security"
+    ],
+    "requirements": [
+      "Discord integration for expiry notifications (optional)"
+    ],
+    "agentInstructions": "The user just installed TLS Monitor. This canvas checks TLS certificate expiry for HTTPS endpoints. Setup involves: 1) Adding endpoints via the 'Add Endpoint' manual trigger, 2) Optionally connecting Discord and setting a channel on the notification nodes, 3) Running 'Run Checks Now' to do the first scan. The schedule runs checks hourly by default.",
+    "agentInitialMessage": "Welcome! TLS Monitor checks certificate expiry for your HTTPS endpoints.\n\n**1. Add endpoints**\nClick **Add Endpoint** and enter a hostname (e.g. `example.com`). Add as many as you need.\n\n**2. Run the first check**\nClick **Run Checks Now** to scan all endpoints immediately. After this, checks run automatically every hour.\n\n**3. (Optional) Discord notifications**\nConnect a [Discord](integration:discord) integration and set the channel on the three notification nodes (expiring soon, expired, invalid) to get alerts when certificates need attention.\n\nThe console shows all endpoints with their status, expiry date, and days remaining. Let me know if you need help!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_auto_merge_bot",
+    "icon": "github",
+    "title": "Auto Merge Bot",
+    "description": "Automatically merge pull requests when all CI checks pass and a configured label is applied. Supports squash, merge, and rebase.",
+    "integrations": [
+      "github"
+    ],
+    "tags": [
+      "CI/CD",
+      "Automation"
+    ],
+    "requirements": [
+      "GitHub integration connected to the target repository"
+    ],
+    "agentInstructions": "The user just installed the Auto Merge Bot. This canvas auto-merges PRs when all CI checks pass and a configured label is applied. If the user completed the install wizard, the repository, merge method, and label are configured. If the user skipped the wizard, they need to set the repository on all GitHub nodes and optionally change the merge method and label name.",
+    "agentInitialMessage": "Welcome! This app auto-merges pull requests when all checks pass and a label is applied.\n\n**If you used the install wizard**, everything is configured. Just add the label (default: `merge-when-ready`) to a PR and it will merge automatically once CI is green.\n\n**If you skipped the wizard:**\n\n1. Connect [GitHub](integration:github)\n2. Set the repository on all GitHub nodes\n3. Optionally change the merge method (default: squash) and label name\n\nLet me know if you need help!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_semantic_pull_requests",
+    "icon": "github",
+    "title": "Semantic Pull Requests",
+    "description": "Enforce semantic PR title conventions, publish commit statuses, and track merged PRs by type in a weekly bar chart.",
+    "integrations": [
+      "github"
+    ],
+    "tags": [
+      "CI/CD",
+      "Compliance"
+    ],
+    "requirements": [
+      "GitHub integration connected to the target repository"
+    ],
+    "agentInstructions": "The user just installed Semantic Pull Requests. This canvas validates PR titles against semantic types (feat, fix, docs, chore), publishes commit statuses, and tracks merge statistics. Setup involves: 1) Connecting the GitHub integration, 2) Running the Setup trigger with the repository as owner/repo to backfill weekly stats. For private repos, a GITHUB_TOKEN secret is needed on the Fetch weekly stats node.",
+    "agentInitialMessage": "Welcome! Semantic Pull Requests enforces title conventions on your PRs and tracks merge statistics.\n\n**1. Connect GitHub** - [GitHub](integration:github)\nThe integration needs access to the repository you want to monitor.\n\n**2. Run Setup**\nClick the **Setup** trigger and enter your repository as `owner/repo` (e.g. `my-org/my-app`). This backfills weekly merge statistics for the current year.\n\n**3. (Optional) Private repos**\nAdd a `GITHUB_TOKEN` secret to the **Fetch weekly stats** runner node. The token needs Pull requests:Read permission.\n\nOnce set up, every new PR will get a title check with a commit status. Let me know if you need help!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_pr_docs_drift",
+    "icon": "claude",
+    "title": "PR Docs Review",
+    "description": "Review every pull request for documentation impact using Claude AI. Maintainers approve or reject via PR comments, and tracking issues are created automatically.",
+    "integrations": [
+      "github",
+      "claude"
+    ],
+    "tags": [
+      "CI/CD",
+      "AI",
+      "Documentation"
+    ],
+    "requirements": [
+      "GitHub integration connected to both the source and docs repositories",
+      "Claude integration with a configured agent"
+    ],
+    "agentInstructions": "The user just installed the PR Docs Review app. This canvas uses a Claude AI agent to review PRs for documentation impact. If the user completed the install wizard, the source and docs repositories are configured. The remaining setup is: 1) Connecting a Claude integration and setting the agent on the Analyze Docs Impact node, 2) Customizing docs_review_guidelines.md in the Files tab for their project. If the user skipped the wizard, they also need to set the repository names on all GitHub nodes.",
+    "agentInitialMessage": "Welcome! This app reviews every PR for documentation impact using Claude AI.\n\n---\n\n**If you used the install wizard**, your repositories are already configured. Here's what's left:\n\n**1. Connect Claude**\nConnect a [Claude](integration:claude) integration and set the agent on the [Analyze Docs Impact](node:analyze-docs) node.\n\n**2. Customize the review guidelines**\nEdit `docs_review_guidelines.md` in the **Files** tab. This tells the AI agent what to check, what to skip, and how to format its response. Add your docs site URL, list files to skip, and tailor the review criteria to your project.\n\n**3. Test it**\nOpen a PR on your source repository. The agent will analyze it and post a comment if docs changes are needed. Use `/docs-agree` to create a tracking issue or `/docs-reject` to override.\n\n---\n\n**If you skipped the wizard:**\n\n1. Connect [GitHub](integration:github) and [Claude](integration:claude)\n2. Set the source repository on all GitHub trigger and action nodes\n3. Set the docs repository on the Create Docs Issue and Close Docs Issue nodes\n4. Configure the Claude agent on the Analyze Docs Impact node\n5. Customize `docs_review_guidelines.md`\n\nLet me know if you need help!"
+  },
+  {
+    "repo": "github.com/superplanehq/app_oss_guard",
+    "icon": "github",
+    "title": "OSS Guard",
+    "description": "Check open-source license compatibility on every pull request using osv-scanner. Publishes commit statuses, comments on failures, and tracks dependency license statistics.",
+    "integrations": [
+      "github"
+    ],
+    "tags": [
+      "Compliance",
+      "Security"
+    ],
+    "requirements": [
+      "GitHub integration connected to the target repository",
+      "A project license declared in the repository (LICENSE, package.json, or pyproject.toml)"
+    ],
+    "agentInstructions": "The user just installed OSS Guard. This canvas checks open-source license compatibility on pull requests using osv-scanner. Setup involves: 1) Connecting the GitHub integration, 2) Running the 'Run Setup' manual trigger with the repository as owner/repo, 3) Running 'Scan Main' to populate the console dashboard. For private repos, a GITHUB_TOKEN secret is needed on the runner nodes.",
+    "agentInitialMessage": "Welcome! OSS Guard checks open-source license compatibility on every pull request.\n\nHere's how to get started:\n\n**1. Connect GitHub** - [GitHub](integration:github)\nThe integration needs access to the repository you want to monitor.\n\n**2. Run Setup**\nClick the **Run Setup** trigger and enter your repository as `owner/repo` (for example, `my-org/my-app`). This saves the repository to canvas memory.\n\n**3. Scan Main**\nClick **Scan Main** to run the first license scan against your `main` branch. This populates the console dashboard with license statistics and any unapproved dependencies.\n\n**4. (Optional) Private repos**\nIf your repository is private, add a `GITHUB_TOKEN` secret to the **Run license check** and **Run setup scan** runner nodes. The token needs Contents:Read permission.\n\n---\n\nOnce setup is complete, every new PR will automatically get a license check with a commit status. Let me know if you need help!"
+  }
+]

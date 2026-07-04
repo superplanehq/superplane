@@ -2,12 +2,23 @@ package actions
 
 import (
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/registryimports"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
+
+var _ = registryimports.Loaded
 
 func TestConfigurationFieldToProto(t *testing.T) {
 	t.Run("roundtrip string default value does not introduce extra quotes", func(t *testing.T) {
@@ -63,6 +74,38 @@ func TestConfigurationFieldToProto(t *testing.T) {
 		}
 	})
 
+	t.Run("roundtrip list type options with Accordion and Reorderable preserves fields", func(t *testing.T) {
+		field := configuration.Field{
+			Name:  "parameters",
+			Label: "Parameters",
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:   "Parameter",
+					Accordion:   true,
+					Reorderable: true,
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+					},
+				},
+			},
+		}
+
+		pbField := ConfigurationFieldToProto(field)
+		require.NotNil(t, pbField.TypeOptions)
+		require.NotNil(t, pbField.TypeOptions.List)
+		require.NotNil(t, pbField.TypeOptions.List.Accordion)
+		require.True(t, *pbField.TypeOptions.List.Accordion)
+		require.NotNil(t, pbField.TypeOptions.List.Reorderable)
+		require.True(t, *pbField.TypeOptions.List.Reorderable)
+
+		field2 := ProtoToConfigurationField(pbField)
+		require.NotNil(t, field2.TypeOptions)
+		require.NotNil(t, field2.TypeOptions.List)
+		assert.True(t, field2.TypeOptions.List.Accordion)
+		assert.True(t, field2.TypeOptions.List.Reorderable)
+	})
+
 	t.Run("roundtrip list type options with MaxItems preserves field", func(t *testing.T) {
 		maxItems := 4
 
@@ -95,4 +138,325 @@ func TestConfigurationFieldToProto(t *testing.T) {
 		require.NotNil(t, field2.TypeOptions.List.MaxItems, "expected MaxItems to be set after roundtrip")
 		assert.Equal(t, maxItems, *field2.TypeOptions.List.MaxItems)
 	})
+}
+
+func TestSerializeTriggersAddsDefaultRunTitleExpression(t *testing.T) {
+	triggers := SerializeTriggers([]core.Trigger{
+		&testTriggerDefinition{name: "github.onPush"},
+	})
+
+	require.Len(t, triggers, 1)
+	require.Len(t, triggers[0].Configuration, 1)
+
+	runTitle := triggers[0].Configuration[0]
+	require.Equal(t, "customName", runTitle.Name)
+	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", runTitle.GetDefaultValue())
+}
+
+func TestDefaultRunTitleExpressionsResolveAgainstExampleData(t *testing.T) {
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	require.NoError(t, err)
+
+	for triggerName, exampleData := range builtInTriggerExamples(reg) {
+		t.Run(triggerName, func(t *testing.T) {
+			resolved, err := contexts.NewNodeConfigurationBuilder(nil, uuid.Nil).
+				WithRootPayload(rootPayloadFromExample(triggerName, exampleData)).
+				ResolveTemplateExpressions(defaultRunTitleExpression(triggerName))
+
+			require.NoError(t, err)
+			require.NotEmpty(t, resolved)
+			require.NotContains(t, resolved, "<nil>")
+			require.NotContains(t, resolved, "<no value>")
+		})
+	}
+}
+
+func TestBuiltInTriggersHaveDefaultRunTitleExpressions(t *testing.T) {
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	require.NoError(t, err)
+
+	missing := []string{}
+	for _, triggerName := range builtInTriggerNames(reg) {
+		if defaultRunTitleExpression(triggerName) == "" {
+			missing = append(missing, triggerName)
+		}
+	}
+
+	require.Empty(t, missing, "missing default run title expressions")
+}
+
+func builtInTriggerNames(reg *registry.Registry) []string {
+	names := []string{}
+
+	for triggerName := range builtInTriggerExamples(reg) {
+		names = append(names, triggerName)
+	}
+
+	return names
+}
+
+func builtInTriggerExamples(reg *registry.Registry) map[string]map[string]any {
+	examples := map[string]map[string]any{}
+
+	for _, trigger := range reg.ListTriggers() {
+		examples[trigger.Name()] = trigger.ExampleData()
+	}
+
+	for _, integration := range reg.ListIntegrations() {
+		for _, trigger := range integration.Triggers() {
+			examples[trigger.Name()] = trigger.ExampleData()
+		}
+
+		setupProvider := reg.SetupProviders[integration.Name()]
+		if setupProvider == nil {
+			continue
+		}
+
+		for _, group := range setupProvider.CapabilityGroups() {
+			for _, capability := range group.Capabilities {
+				if capability.Type == core.IntegrationCapabilityTypeTrigger {
+					if len(capability.ExampleData) > 0 {
+						examples[capability.Name] = capability.ExampleData
+					} else if _, ok := examples[capability.Name]; !ok {
+						examples[capability.Name] = nil
+					}
+				}
+			}
+		}
+	}
+
+	return examples
+}
+
+func rootPayloadFromExample(triggerName string, exampleData map[string]any) map[string]any {
+	if exampleData == nil {
+		return map[string]any{
+			"type":      triggerName,
+			"timestamp": time.Now(),
+			"data":      map[string]any{},
+		}
+	}
+
+	if isRootEventExample(exampleData) {
+		payload := cloneExampleData(exampleData)
+		if _, ok := payload["timestamp"].(time.Time); !ok {
+			payload["timestamp"] = time.Now()
+		}
+
+		return payload
+	}
+
+	return map[string]any{
+		"type":      triggerName,
+		"timestamp": time.Now(),
+		"data":      cloneExampleData(exampleData),
+	}
+}
+
+func isRootEventExample(exampleData map[string]any) bool {
+	_, hasType := exampleData["type"]
+	_, hasData := exampleData["data"]
+	return hasType && hasData
+}
+
+func cloneExampleData(exampleData map[string]any) map[string]any {
+	clone := make(map[string]any, len(exampleData))
+	for key, value := range exampleData {
+		clone[key] = cloneExampleValue(value)
+	}
+
+	return clone
+}
+
+func cloneExampleValue(value any) any {
+	switch typedValue := value.(type) {
+	case map[string]any:
+		return cloneExampleData(typedValue)
+	case []any:
+		clone := make([]any, len(typedValue))
+		for i, item := range typedValue {
+			clone[i] = cloneExampleValue(item)
+		}
+
+		return clone
+	default:
+		return value
+	}
+}
+
+type testTriggerDefinition struct {
+	name string
+}
+
+func (t *testTriggerDefinition) Name() string                         { return t.name }
+func (t *testTriggerDefinition) Label() string                        { return t.name }
+func (t *testTriggerDefinition) Description() string                  { return t.name }
+func (t *testTriggerDefinition) Documentation() string                { return "" }
+func (t *testTriggerDefinition) Icon() string                         { return "" }
+func (t *testTriggerDefinition) Color() string                        { return "" }
+func (t *testTriggerDefinition) ExampleData() map[string]any          { return nil }
+func (t *testTriggerDefinition) Configuration() []configuration.Field { return nil }
+func (t *testTriggerDefinition) HandleWebhook(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return 200, nil, nil
+}
+func (t *testTriggerDefinition) Setup(core.TriggerContext) error { return nil }
+func (t *testTriggerDefinition) Hooks() []core.Hook              { return nil }
+func (t *testTriggerDefinition) HandleHook(core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
+}
+func (t *testTriggerDefinition) Cleanup(core.TriggerContext) error { return nil }
+
+func TestCapabilityStateToProto(t *testing.T) {
+	tests := []struct {
+		name     string
+		state    string
+		expected organizationpb.Integration_CapabilityState_State
+	}{
+		{
+			name:     "requested",
+			state:    string(core.IntegrationCapabilityStateRequested),
+			expected: organizationpb.Integration_CapabilityState_STATE_REQUESTED,
+		},
+		{
+			name:     "enabled",
+			state:    string(core.IntegrationCapabilityStateEnabled),
+			expected: organizationpb.Integration_CapabilityState_STATE_ENABLED,
+		},
+		{
+			name:     "disabled",
+			state:    string(core.IntegrationCapabilityStateDisabled),
+			expected: organizationpb.Integration_CapabilityState_STATE_DISABLED,
+		},
+		{
+			name:     "available",
+			state:    string(core.IntegrationCapabilityStateAvailable),
+			expected: organizationpb.Integration_CapabilityState_STATE_AVAILABLE,
+		},
+		{
+			name:     "unavailable defaults to unavailable",
+			state:    string(core.IntegrationCapabilityStateUnavailable),
+			expected: organizationpb.Integration_CapabilityState_STATE_UNAVAILABLE,
+		},
+		{
+			name:     "unknown defaults to unavailable",
+			state:    "unknown",
+			expected: organizationpb.Integration_CapabilityState_STATE_UNAVAILABLE,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, CapabilityStateToProto(tt.state))
+		})
+	}
+}
+
+func TestProtoToCapabilityState(t *testing.T) {
+	tests := []struct {
+		name     string
+		state    organizationpb.Integration_CapabilityState_State
+		expected string
+	}{
+		{
+			name:     "available",
+			state:    organizationpb.Integration_CapabilityState_STATE_AVAILABLE,
+			expected: string(core.IntegrationCapabilityStateAvailable),
+		},
+		{
+			name:     "unavailable",
+			state:    organizationpb.Integration_CapabilityState_STATE_UNAVAILABLE,
+			expected: string(core.IntegrationCapabilityStateUnavailable),
+		},
+		{
+			name:     "requested",
+			state:    organizationpb.Integration_CapabilityState_STATE_REQUESTED,
+			expected: string(core.IntegrationCapabilityStateRequested),
+		},
+		{
+			name:     "enabled",
+			state:    organizationpb.Integration_CapabilityState_STATE_ENABLED,
+			expected: string(core.IntegrationCapabilityStateEnabled),
+		},
+		{
+			name:     "disabled",
+			state:    organizationpb.Integration_CapabilityState_STATE_DISABLED,
+			expected: string(core.IntegrationCapabilityStateDisabled),
+		},
+		{
+			name:     "unknown returns empty string",
+			state:    organizationpb.Integration_CapabilityState_State(99),
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, ProtoToCapabilityState(tt.state))
+		})
+	}
+}
+
+func TestCapabilityTypeToProto(t *testing.T) {
+	tests := []struct {
+		name     string
+		typ      string
+		expected integrationpb.CapabilityDefinition_Type
+	}{
+		{
+			name:     "action",
+			typ:      string(core.IntegrationCapabilityTypeAction),
+			expected: integrationpb.CapabilityDefinition_TYPE_ACTION,
+		},
+		{
+			name:     "trigger",
+			typ:      string(core.IntegrationCapabilityTypeTrigger),
+			expected: integrationpb.CapabilityDefinition_TYPE_TRIGGER,
+		},
+		{
+			name:     "unknown defaults to unknown",
+			typ:      "unknown",
+			expected: integrationpb.CapabilityDefinition_TYPE_UNKNOWN,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, CapabilityTypeToProto(tt.typ))
+		})
+	}
+}
+
+func TestProtoToCapabilityType(t *testing.T) {
+	tests := []struct {
+		name     string
+		typ      integrationpb.CapabilityDefinition_Type
+		expected string
+	}{
+		{
+			name:     "action",
+			typ:      integrationpb.CapabilityDefinition_TYPE_ACTION,
+			expected: string(core.IntegrationCapabilityTypeAction),
+		},
+		{
+			name:     "trigger",
+			typ:      integrationpb.CapabilityDefinition_TYPE_TRIGGER,
+			expected: string(core.IntegrationCapabilityTypeTrigger),
+		},
+		{
+			name:     "unknown returns empty string",
+			typ:      integrationpb.CapabilityDefinition_TYPE_UNKNOWN,
+			expected: "",
+		},
+		{
+			name:     "unmapped returns empty string",
+			typ:      integrationpb.CapabilityDefinition_Type(99),
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, ProtoToCapabilityType(tt.typ))
+		})
+	}
 }

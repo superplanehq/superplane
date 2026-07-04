@@ -22,8 +22,16 @@ const integrationsListResponse = `{
 			"description": "Slack integration",
 			"configuration": [{"name": "token", "type": "string", "required": true}],
 			"capabilities": [
-				{"type": "TYPE_ACTION", "name": "slack.post-message"},
-				{"type": "TYPE_TRIGGER", "name": "slack.message-received"}
+				{
+					"type": "TYPE_ACTION",
+					"name": "slack.post-message",
+					"exampleOutput": {"channel": "C123", "ts": "1712345678.000100"}
+				},
+				{
+					"type": "TYPE_TRIGGER",
+					"name": "slack.message-received",
+					"exampleData": {"channel": "C123", "text": "hello"}
+				}
 			]
 		}
 	]
@@ -134,6 +142,65 @@ func TestActionsListReturnsFullJSON(t *testing.T) {
 	require.Contains(t, raw, "http")
 }
 
+func TestActionsDescribeIntegrationActionIncludesExamplePayload(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := "slack.post-message"
+	from := ""
+	full := false
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	out := stdout.String()
+	require.Contains(t, out, "Name: slack.post-message")
+	require.Contains(t, out, "Example Payload:")
+	require.Contains(t, out, `"channel": "C123"`)
+	require.Contains(t, out, `"ts": "1712345678.000100"`)
+}
+
+func TestRenderConfigurationTextOmitsNestedDetailsInTable(t *testing.T) {
+	var configuration []openapi_client.ConfigurationField
+	err := json.Unmarshal([]byte(`[
+		{
+			"name": "bootstrap",
+			"type": "object",
+			"required": false,
+			"description": "Execute script after the sandbox starts",
+			"typeOptions": {
+				"object": {
+					"schema": [
+						{
+							"name": "from",
+							"type": "select",
+							"required": true,
+							"typeOptions": {
+								"select": {
+									"options": [
+										{"label": "Inline Script", "value": "inline"},
+										{"label": "Repository File", "value": "file"}
+									]
+								}
+							}
+						}
+					]
+				}
+			}
+		}
+	]`), &configuration)
+	require.NoError(t, err)
+
+	stdout := bytes.NewBuffer(nil)
+	require.NoError(t, renderConfigurationText(stdout, configuration))
+
+	raw := stdout.String()
+	require.Contains(t, raw, "bootstrap")
+	require.Contains(t, raw, "object")
+	require.NotContains(t, raw, "Inline Script")
+}
+
 // Triggers tests
 
 func TestTriggersListReturnsSummaryJSON(t *testing.T) {
@@ -173,6 +240,25 @@ func TestTriggersListReturnsFullJSON(t *testing.T) {
 	raw := stdout.String()
 	require.Contains(t, raw, "schedule")
 	require.Contains(t, raw, "cron")
+}
+
+func TestTriggersDescribeIntegrationTriggerIncludesExamplePayload(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "text")
+	name := "slack.message-received"
+	from := ""
+	full := false
+	cmd := &triggersCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	out := stdout.String()
+	require.Contains(t, out, "Name: slack.message-received")
+	require.Contains(t, out, "Example Payload:")
+	require.Contains(t, out, `"channel": "C123"`)
+	require.Contains(t, out, `"text": "hello"`)
 }
 
 func TestIntegrationsListTextOutput(t *testing.T) {
@@ -237,6 +323,23 @@ func TestActionsListFromIntegrationTextOutput(t *testing.T) {
 	require.Contains(t, out, "slack.post-message")
 }
 
+func TestActionsListFromIntegrationFullJSONIncludesExamplePayload(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "json")
+	name := ""
+	from := "slack"
+	full := true
+	cmd := &actionsCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	raw := stdout.String()
+	require.Contains(t, raw, `"exampleOutput"`)
+	require.Contains(t, raw, `"ts": "1712345678.000100"`)
+}
+
 func TestActionsDescribeByNameTextOutput(t *testing.T) {
 	const describeHTTP = `{
 		"action": {
@@ -297,6 +400,23 @@ func TestTriggersListFromIntegrationTextOutput(t *testing.T) {
 
 	require.NoError(t, cmd.Execute(ctx))
 	require.Contains(t, stdout.String(), "slack.message-received")
+}
+
+func TestTriggersListFromIntegrationFullJSONIncludesExamplePayload(t *testing.T) {
+	server := newMultiRouteIndexServer(t, map[string]string{
+		"/api/v1/integrations": integrationsListResponse,
+	})
+	ctx, stdout := newIndexCommandContext(t, server, "json")
+	name := ""
+	from := "slack"
+	full := true
+	cmd := &triggersCommand{name: &name, from: &from, full: &full}
+
+	require.NoError(t, cmd.Execute(ctx))
+
+	raw := stdout.String()
+	require.Contains(t, raw, `"exampleData"`)
+	require.Contains(t, raw, `"text": "hello"`)
 }
 
 func TestTriggersDescribeByNameTextOutput(t *testing.T) {

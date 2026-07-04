@@ -571,6 +571,221 @@ func (c *Client) UpdateEnvVar(serviceID string, key string, request UpdateEnvVar
 	return response, nil
 }
 
+type CustomDomainResponse struct {
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	ServiceID          string `json:"serviceId"`
+	VerificationStatus string `json:"verificationStatus"`
+	CreatedAt          string `json:"createdAt,omitempty"`
+	UpdatedAt          string `json:"updatedAt,omitempty"`
+}
+
+type customDomainWithCursor struct {
+	Cursor       string               `json:"cursor"`
+	CustomDomain CustomDomainResponse `json:"customDomain"`
+}
+
+type addCustomDomainRequest struct {
+	Name string `json:"name"`
+}
+
+func (c *Client) ListCustomDomains(serviceID string) ([]CustomDomainResponse, error) {
+	if serviceID == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+
+	query := url.Values{}
+	query.Set("limit", "100")
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains",
+		query,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := parseCustomDomains(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal custom domains response: %w", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) AddCustomDomain(serviceID string, domainName string) (CustomDomainResponse, error) {
+	if serviceID == "" {
+		return CustomDomainResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if domainName == "" {
+		return CustomDomainResponse{}, fmt.Errorf("domainName is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains",
+		nil,
+		addCustomDomainRequest{Name: domainName},
+	)
+	if err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	response, err := parseCustomDomain(body, domainName)
+	if err != nil {
+		return CustomDomainResponse{}, fmt.Errorf("failed to unmarshal custom domain response: %w", err)
+	}
+
+	return response, nil
+}
+
+func (c *Client) GetCustomDomain(serviceID string, domainNameOrID string) (CustomDomainResponse, error) {
+	if serviceID == "" {
+		return CustomDomainResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if domainNameOrID == "" {
+		return CustomDomainResponse{}, fmt.Errorf("domainNameOrID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains/"+url.PathEscape(domainNameOrID),
+		nil,
+		nil,
+	)
+	if err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	response, err := parseCustomDomain(body, domainNameOrID)
+	if err != nil {
+		return CustomDomainResponse{}, fmt.Errorf("failed to unmarshal custom domain response: %w", err)
+	}
+
+	return response, nil
+}
+
+// VerifyCustomDomain triggers DNS verification for a custom domain. Render's
+// /verify endpoint normally returns 202 Accepted with an empty body because
+// verification runs asynchronously. If Render ever returns a domain body, parse
+// and return it; otherwise callers should retrieve the domain after triggering.
+func (c *Client) VerifyCustomDomain(serviceID string, domainNameOrID string) (CustomDomainResponse, error) {
+	if serviceID == "" {
+		return CustomDomainResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if domainNameOrID == "" {
+		return CustomDomainResponse{}, fmt.Errorf("domainNameOrID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains/"+url.PathEscape(domainNameOrID)+"/verify",
+		nil,
+		nil,
+	)
+	if err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	if len(bytes.TrimSpace(body)) == 0 {
+		return CustomDomainResponse{}, nil
+	}
+
+	response, err := parseCustomDomain(body, domainNameOrID)
+	if err != nil {
+		return CustomDomainResponse{}, nil
+	}
+
+	return response, nil
+}
+
+func (c *Client) RemoveCustomDomain(serviceID string, domainNameOrID string) error {
+	if serviceID == "" {
+		return fmt.Errorf("serviceID is required")
+	}
+	if domainNameOrID == "" {
+		return fmt.Errorf("domainNameOrID is required")
+	}
+
+	_, _, err := c.execRequestWithResponse(
+		http.MethodDelete,
+		"/services/"+url.PathEscape(serviceID)+"/custom-domains/"+url.PathEscape(domainNameOrID),
+		nil,
+		nil,
+	)
+	return err
+}
+
+func parseCustomDomains(body []byte) ([]CustomDomainResponse, error) {
+	var domains []CustomDomainResponse
+	if err := json.Unmarshal(body, &domains); err == nil {
+		domains = compactCustomDomains(domains)
+		if len(domains) > 0 {
+			return domains, nil
+		}
+	}
+
+	var wrapped []customDomainWithCursor
+	if err := json.Unmarshal(body, &wrapped); err == nil {
+		domains := make([]CustomDomainResponse, 0, len(wrapped))
+		for _, item := range wrapped {
+			domains = append(domains, item.CustomDomain)
+		}
+
+		return compactCustomDomains(domains), nil
+	}
+
+	if err := json.Unmarshal(body, &domains); err != nil {
+		return nil, err
+	}
+
+	return compactCustomDomains(domains), nil
+}
+
+func parseCustomDomain(body []byte, domainNameOrID string) (CustomDomainResponse, error) {
+	var domain CustomDomainResponse
+	if err := json.Unmarshal(body, &domain); err == nil && (domain.ID != "" || domain.Name != "") {
+		return domain, nil
+	}
+
+	wrapper := customDomainWithCursor{}
+	if err := json.Unmarshal(body, &wrapper); err == nil && (wrapper.CustomDomain.ID != "" || wrapper.CustomDomain.Name != "") {
+		return wrapper.CustomDomain, nil
+	}
+
+	domains, err := parseCustomDomains(body)
+	if err != nil {
+		return CustomDomainResponse{}, err
+	}
+
+	for _, domain := range domains {
+		if domain.ID == domainNameOrID || domain.Name == domainNameOrID {
+			return domain, nil
+		}
+	}
+
+	if len(domains) == 0 {
+		return CustomDomainResponse{}, fmt.Errorf("empty custom domain response")
+	}
+
+	return domains[0], nil
+}
+
+func compactCustomDomains(domains []CustomDomainResponse) []CustomDomainResponse {
+	result := make([]CustomDomainResponse, 0, len(domains))
+	for _, domain := range domains {
+		if domain.ID == "" && domain.Name == "" {
+			continue
+		}
+
+		result = append(result, domain)
+	}
+
+	return result
+}
+
 func (c *Client) GetEvent(eventID string) (EventResponse, error) {
 	if eventID == "" {
 		return EventResponse{}, fmt.Errorf("eventID is required")

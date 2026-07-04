@@ -127,6 +127,11 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 			Required:    true,
 			Description: `JSON array of build steps. Each step needs a "name" (builder image) and optional "args".`,
 			Placeholder: `[{"name":"gcr.io/cloud-builders/docker","args":["build","."]}]`,
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "json",
+				},
+			},
 		},
 		{
 			Name:        "source",
@@ -137,6 +142,11 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 			Placeholder: `{"gitSource":{"url":"https://github.com/org/repo.git","revision":"main"}}`,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "useConnectedRepository", Values: []string{"", "false"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "json",
+				},
 			},
 		},
 		{
@@ -362,6 +372,11 @@ func (c *CreateBuild) Configuration() []configuration.Field {
 			Required:    false,
 			Description: `JSON object of substitution key-value pairs.`,
 			Placeholder: `{"_ENV":"production","_VERSION":"1.0.0"}`,
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "json",
+				},
+			},
 		},
 		{
 			Name:        "timeout",

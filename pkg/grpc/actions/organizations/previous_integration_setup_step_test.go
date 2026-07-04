@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__PreviousIntegrationSetupStep(t *testing.T) {
@@ -31,7 +31,7 @@ func Test__PreviousIntegrationSetupStep(t *testing.T) {
 			return core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_one"}
 		},
 		OnStepSubmit: func(ctx core.SetupStepContext) (*core.SetupStep, error) {
-			switch ctx.Step {
+			switch ctx.Step.Name {
 			case "step_one":
 				return &core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_two"}, nil
 
@@ -64,10 +64,10 @@ func Test__PreviousIntegrationSetupStep(t *testing.T) {
 		_, err = PreviousIntegrationSetupStep(ctx, r.Registry, r.Organization.ID.String(), resp.Integration.Metadata.Id)
 		require.Error(t, err)
 
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "no previous steps")
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "no previous steps")
 	})
 
 	t.Run("after advancing once -> previous restores first step", func(t *testing.T) {
@@ -85,7 +85,7 @@ func Test__PreviousIntegrationSetupStep(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Integration)
 
-		_, err = NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil)
+		_, err = NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil, nil)
 		require.NoError(t, err)
 
 		back, err := PreviousIntegrationSetupStep(ctx, r.Registry, r.Organization.ID.String(), resp.Integration.Metadata.Id)

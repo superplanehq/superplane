@@ -9,11 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__NextIntegrationSetupStep(t *testing.T) {
@@ -28,7 +29,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 			return core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_one"}
 		},
 		OnStepSubmit: func(ctx core.SetupStepContext) (*core.SetupStep, error) {
-			switch ctx.Step {
+			switch ctx.Step.Name {
 			case "step_one":
 				return &core.SetupStep{Type: core.SetupStepTypeInputs, Name: "step_two"}, nil
 
@@ -44,19 +45,19 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 	baseURL := "http://localhost"
 
 	t.Run("invalid organization ID -> invalid argument", func(t *testing.T) {
-		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, "not-a-uuid", uuid.NewString(), nil)
+		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, "not-a-uuid", uuid.NewString(), nil, nil)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("integration not found -> not found", func(t *testing.T) {
-		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), nil)
+		_, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), uuid.NewString(), nil, nil)
 		require.Error(t, err)
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("submit advances step and completes flow", func(t *testing.T) {
@@ -75,20 +76,66 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Integration)
 
-		afterOne, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil)
+		afterOne, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, afterOne.Integration)
 		require.NotNil(t, afterOne.Integration.Status.SetupState)
 		require.NotNil(t, afterOne.Integration.Status.SetupState.CurrentStep)
 		assert.Equal(t, "step_two", afterOne.Integration.Status.SetupState.CurrentStep.Name)
 
-		afterTwo, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil)
+		afterTwo, err := NextIntegrationSetupStep(ctx, r.Registry, baseURL, baseURL, r.Organization.ID.String(), resp.Integration.Metadata.Id, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, afterTwo.Integration)
 
 		stored, err := models.FindIntegration(r.Organization.ID, uuid.MustParse(resp.Integration.Metadata.Id))
 		require.NoError(t, err)
 		assert.Nil(t, stored.SetupState)
+	})
+
+	t.Run("capability selection with invalid capability -> invalid argument", func(t *testing.T) {
+		r4 := support.Setup(t)
+		ctx4 := authentication.SetUserIdInMetadata(context.Background(), r4.User.String())
+		onStepSubmitCalled := false
+
+		r4.Registry.AppEnv = "development"
+		r4.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+		r4.Registry.SetupProviders["dummy"] = impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{
+			CapabilityGroups: []core.CapabilityGroup{{Capabilities: []core.Capability{{Name: "feat"}}}},
+			FirstStep: func(ctx core.SetupStepContext) core.SetupStep {
+				return core.SetupStep{Type: core.SetupStepTypeCapabilitySelection, Name: "select_capabilities", Capabilities: []string{"feat"}}
+			},
+			OnStepSubmit: func(ctx core.SetupStepContext) (*core.SetupStep, error) {
+				onStepSubmitCalled = true
+				return nil, nil
+			},
+		})
+
+		resp, err := CreateIntegration(
+			ctx4,
+			r4.Registry,
+			nil,
+			"http://localhost",
+			"http://localhost",
+			r4.Organization.ID.String(),
+			"dummy",
+			support.RandomName("installation"),
+			nil,
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, resp.Integration)
+		require.NotNil(t, resp.Integration.Status.SetupState)
+		require.NotNil(t, resp.Integration.Status.SetupState.CurrentStep)
+		assert.Equal(t, "select_capabilities", resp.Integration.Status.SetupState.CurrentStep.Name)
+		assert.Equal(t, pb.Integration_SetupStepDefinition_CAPABILITY_SELECTION, resp.Integration.Status.SetupState.CurrentStep.Type)
+
+		_, err = NextIntegrationSetupStep(ctx4, r4.Registry, baseURL, baseURL, r4.Organization.ID.String(), resp.Integration.Metadata.Id, nil, []string{"invalid-capability"})
+		require.Error(t, err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "invalid capability: invalid-capability", msg)
+		assert.False(t, onStepSubmitCalled)
 	})
 
 	t.Run("done step clears setup and marks ready", func(t *testing.T) {
@@ -118,7 +165,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp.Integration)
 
-		nextResponse, err := NextIntegrationSetupStep(ctx3, r3.Registry, baseURL, baseURL, r3.Organization.ID.String(), resp.Integration.Metadata.Id, nil)
+		nextResponse, err := NextIntegrationSetupStep(ctx3, r3.Registry, baseURL, baseURL, r3.Organization.ID.String(), resp.Integration.Metadata.Id, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, nextResponse.Integration)
 

@@ -1,0 +1,36 @@
+{
+  "data": {
+    "packages": [
+      {
+        "description": "Example application container image",
+        "display_name": "example-app",
+        "format": "docker",
+        "is_quarantined": false,
+        "license": "MIT",
+        "policy_violated": false,
+        "repository": "example-repo",
+        "security_scan_status": "No Vulnerabilities Found",
+        "slug_perm": "example-pkg-id-1",
+        "stage_str": "Fully Synchronised",
+        "status_str": "Available",
+        "tags": {}
+      },
+      {
+        "description": "Example application container image (previous release)",
+        "display_name": "example-app",
+        "format": "docker",
+        "is_quarantined": true,
+        "license": "MIT",
+        "policy_violated": true,
+        "repository": "example-repo",
+        "security_scan_status": "Scan Detected Vulnerabilities",
+        "slug_perm": "example-pkg-id-2",
+        "stage_str": "Fully Synchronised",
+        "status_str": "Available",
+        "tags": {}
+      }
+    ]
+  },
+  "timestamp": "2026-01-15T14:35:00Z",
+  "type": "cloudsmith.packages.listed"
+}

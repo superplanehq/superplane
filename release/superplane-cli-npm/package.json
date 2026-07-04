@@ -1,0 +1,42 @@
+{
+  "name": "@superplane/cli",
+  "version": "0.0.0",
+  "description": "SuperPlane CLI — manage canvases, integrations, and runtime operations.",
+  "bin": {
+    "superplane": "bin/run.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "files": [
+    "bin/run.js",
+    "install.js",
+    "README.md"
+  ],
+  "keywords": [
+    "superplane",
+    "cli",
+    "devops",
+    "workflows"
+  ],
+  "homepage": "https://superplane.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/superplanehq/superplane.git"
+  },
+  "bugs": {
+    "url": "https://github.com/superplanehq/superplane/issues"
+  },
+  "license": "Apache-2.0",
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

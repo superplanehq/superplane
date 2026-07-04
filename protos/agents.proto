@@ -25,36 +25,13 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Agents {
-  rpc ListAgentChats(ListAgentChatsRequest) returns (ListAgentChatsResponse) {
+  rpc GetCanvasAgentChat(GetCanvasAgentChatRequest) returns (GetCanvasAgentChatResponse) {
     option (google.api.http) = {
-      get: "/api/v1/agents/chats"
+      get: "/api/v1/agents/canvases/{canvas_id}/chat"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List agent chats for the authenticated user";
-      description: "Returns a list of agent chats for the authenticated user";
-      tags: "Agent";
-    };
-  }
-
-  rpc CreateAgentChat(CreateAgentChatRequest) returns (CreateAgentChatResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/agents/chats"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Creates a new agent chat";
-      description: "Create a new agent chat. The response includes the URL and token for initiating the chat stream";
-      tags: "Agent";
-    };
-  }
-
-  rpc DescribeAgentChat(DescribeAgentChatRequest) returns (DescribeAgentChatResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/agents/chats/{chat_id}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describes an agent chat for the authenticated user";
-      description: "Describes an agent chat for the authenticated user";
+      summary: "Get or create the user's chat for a canvas";
+      description: "Returns the user's single chat session for the given canvas, provisioning it on first call. The session is permanent.";
       tags: "Agent";
     };
   }
@@ -64,61 +41,120 @@ service Agents {
       get: "/api/v1/agents/chats/{chat_id}/messages"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List the messages in an agent chat";
-      description: "List the messages in an agent chat";
+      summary: "List messages older than a cursor";
+      description: "Returns up to `limit` messages strictly older than `before_id`, oldest-first. Omit `before_id` to fetch the most recent page.";
       tags: "Agent";
     };
   }
 
-  rpc ResumeAgentChat(ResumeAgentChatRequest) returns (ResumeAgentChatResponse) {
+  rpc SendAgentChatMessage(SendAgentChatMessageRequest) returns (SendAgentChatMessageResponse) {
     option (google.api.http) = {
-      post: "/api/v1/agents/chats/{chat_id}/resume"
+      post: "/api/v1/agents/chats/{chat_id}/messages"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Resume an agent chat";
-      description: "Resumes an agent chat. The response includes the URL and token for resuming the chat";
+      summary: "Send a user message to the chat";
+      description: "Persists the user message, forwards it to the upstream provider, and triggers an async stream of assistant events broadcast over the chat's websocket topic.";
       tags: "Agent";
     };
   }
 
-  rpc DeleteAgentChat(DeleteAgentChatRequest) returns (DeleteAgentChatResponse) {
+  rpc InterruptAgentChat(InterruptAgentChatRequest) returns (InterruptAgentChatResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/agents/chats/{chat_id}"
+      post: "/api/v1/agents/chats/{chat_id}/interrupt"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Delete an agent chat";
-      description: "Permanently deletes an agent chat and all its messages";
+      summary: "Interrupt agent execution";
+      description: "Sends a user.interrupt event to stop the agent mid-execution.";
       tags: "Agent";
     };
   }
 
+  rpc DefineAgentOutcome(DefineAgentOutcomeRequest) returns (DefineAgentOutcomeResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agents/chats/{chat_id}/outcome"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Define outcome for agent";
+      description: "Sends a user.define_outcome event with a rubric. The agent works toward the rubric with a grader evaluating each iteration.";
+      tags: "Agent";
+    };
+  }
 }
 
-message ListAgentChatsRequest {
+enum AgentMode {
+  MODE_UNSPECIFIED = 0;
+  MODE_BUILDER = 1;
+  MODE_OPERATOR = 2;
+  MODE_ARCHITECT = 3;
+}
+
+message GetCanvasAgentChatRequest {
   string canvas_id = 1;
 }
 
-message ListAgentChatsResponse {
-  repeated AgentChatInfo chats = 1;
-}
-
-message DescribeAgentChatRequest {
-  string canvas_id = 1;
-  string chat_id = 2;
-}
-
-message DescribeAgentChatResponse {
+message GetCanvasAgentChatResponse {
   AgentChatInfo chat = 1;
 }
 
 message ListAgentChatMessagesRequest {
-  string canvas_id = 1;
-  string chat_id = 2;
+  string chat_id = 1;
+  string before_id = 2;
+  int32 limit = 3;
 }
 
 message ListAgentChatMessagesResponse {
   repeated AgentChatMessage messages = 1;
+  bool has_more = 2;
+}
+
+message SendAgentChatMessageRequest {
+  string chat_id = 1;
+  string content = 2;
+  AgentMode mode = 3;
+  repeated AgentChatImage images = 4;
+}
+
+enum AgentChatImageMediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_PNG = 1;
+  MEDIA_TYPE_JPEG = 2;
+  MEDIA_TYPE_GIF = 3;
+  MEDIA_TYPE_WEBP = 4;
+}
+
+message AgentChatImage {
+  AgentChatImageMediaType media_type = 1;
+  bytes data = 2;
+}
+
+message SendAgentChatMessageResponse {
+  AgentChatMessage message = 1;
+}
+
+message InterruptAgentChatRequest {
+  string chat_id = 1;
+}
+
+message InterruptAgentChatResponse {}
+
+message DefineAgentOutcomeRequest {
+  string chat_id = 1;
+  string description = 2;
+  string rubric = 3;
+  int32 max_iterations = 4;
+}
+
+message DefineAgentOutcomeResponse {}
+
+message AgentChatInfo {
+  string id = 1;
+  string canvas_id = 2;
+  string provider = 3;
+  string status = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
 }
 
 message AgentChatMessage {
@@ -126,38 +162,21 @@ message AgentChatMessage {
   string role = 2;
   string content = 3;
   string tool_call_id = 4;
-  string tool_status = 5;
-  google.protobuf.Timestamp created_at = 6;
+  string tool_name = 5;
+  string tool_status = 6;
+  google.protobuf.Timestamp created_at = 7;
+  repeated AgentChatImage images = 8;
 }
 
-message CreateAgentChatRequest {
-  string canvas_id = 1;
-}
-
-message CreateAgentChatResponse {
-  string token = 1;
-  string url = 2;
-}
-
-message ResumeAgentChatRequest {
-  string canvas_id = 1;
+message AgentRunFinishedMessage {
+  string organization_id = 1;
   string chat_id = 2;
-}
-
-message ResumeAgentChatResponse {
-  string token = 1;
-  string url = 2;
-}
-
-message DeleteAgentChatRequest {
-  string canvas_id = 1;
-  string chat_id = 2;
-}
-
-message DeleteAgentChatResponse {}
-
-message AgentChatInfo {
-  string id = 1;
-  string initial_message = 2;
-  google.protobuf.Timestamp created_at = 3;
+  string model = 3;
+  int64 input_tokens = 4;
+  int64 output_tokens = 5;
+  int64 total_tokens = 6;
+  int64 cache_read_tokens = 7;
+  int64 cache_write_tokens = 8;
+  string idempotency_key = 9;
+  string session_id = 10;
 }

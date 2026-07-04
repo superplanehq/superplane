@@ -23,25 +23,12 @@ func Test__CapabilityContext(t *testing.T) {
 			{Name: "rollback", State: core.IntegrationCapabilityStateEnabled},
 		})
 
-		require.NoError(t, ctx.Enable("deploy"))
-		require.NoError(t, ctx.Disable("rollback"))
+		ctx.Enable("deploy")
+		ctx.Disable("rollback")
 
 		states := ctx.States()
 		assertCapabilityState(t, states, "deploy", core.IntegrationCapabilityStateEnabled)
 		assertCapabilityState(t, states, "rollback", core.IntegrationCapabilityStateDisabled)
-	})
-
-	t.Run("rejects unknown capabilities on enable and disable", func(t *testing.T) {
-		ctx := NewCapabilityContext(definitions, nil)
-
-		err := ctx.Enable("missing")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "capability missing not found")
-
-		err = ctx.Disable("missing")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "capability missing not found")
-		assert.Empty(t, ctx.States())
 	})
 
 	t.Run("checks requested capabilities", func(t *testing.T) {
@@ -51,18 +38,9 @@ func Test__CapabilityContext(t *testing.T) {
 			{Name: "promote", State: core.IntegrationCapabilityStateRequested},
 		})
 
-		requested, err := ctx.IsRequested("deploy", "promote")
-		require.NoError(t, err)
-		assert.True(t, requested)
-
-		requested, err = ctx.IsRequested("deploy", "rollback")
-		require.NoError(t, err)
-		assert.False(t, requested)
-
-		requested, err = ctx.IsRequested("missing")
-		require.Error(t, err)
-		assert.False(t, requested)
-		assert.Contains(t, err.Error(), "capability missing not found")
+		assert.True(t, ctx.IsRequested("deploy", "promote"))
+		assert.False(t, ctx.IsRequested("deploy", "rollback"))
+		assert.False(t, ctx.IsRequested("missing"))
 	})
 
 	t.Run("returns requested capability names", func(t *testing.T) {

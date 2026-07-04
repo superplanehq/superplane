@@ -1,7 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback } from "react";
 import type {
-  IntegrationSetupMetadata,
   IntegrationSetupMutations,
   IntegrationSetupProgress,
   IntegrationSetupRoute,
@@ -9,19 +8,21 @@ import type {
 } from "./useIntegrationSetupController";
 import { showErrorToast } from "@/lib/toast";
 import { getGroupToggleState } from "./lib";
+import type { IntegrationSetupStepDefinitionType } from "@/api-client";
 
 interface SetupActionsParams {
   route: IntegrationSetupRoute;
   state: IntegrationSetupState;
   progress: IntegrationSetupProgress;
-  metadata: IntegrationSetupMetadata;
   mutations: IntegrationSetupMutations;
 }
 
-export function useIntegrationSetupActions({ route, state, progress, metadata, mutations }: SetupActionsParams) {
-  const handleCreateIntegration = useCreateIntegrationHandler({ route, state, metadata, mutations });
+export function useIntegrationSetupActions({ route, state, progress, mutations }: SetupActionsParams) {
+  const handleCreateIntegration = useCreateIntegrationHandler({ route, state, mutations });
   const capabilityToggles = useCapabilitySelectionActions({
     createMutation: mutations.createMutation,
+    submitStepMutation: mutations.submitStepMutation,
+    revertStepMutation: mutations.revertStepMutation,
     setSelectedCapabilities: state.setSelectedCapabilities,
   });
   const handleStepInputChange = useStepInputChange(state.setStepInputs);
@@ -31,7 +32,6 @@ export function useIntegrationSetupActions({ route, state, progress, metadata, m
   const handleSetupStepBack = useSetupStepBackAction({
     state,
     progress,
-    mutations,
     handleRevertCurrentStep,
   });
 
@@ -48,11 +48,10 @@ export function useIntegrationSetupActions({ route, state, progress, metadata, m
 interface CreateIntegrationHandlerParams {
   route: IntegrationSetupRoute;
   state: IntegrationSetupState;
-  metadata: IntegrationSetupMetadata;
   mutations: Pick<IntegrationSetupMutations, "createMutation">;
 }
 
-function useCreateIntegrationHandler({ route, state, metadata, mutations }: CreateIntegrationHandlerParams) {
+function useCreateIntegrationHandler({ route, state, mutations }: CreateIntegrationHandlerParams) {
   return useCallback(async () => {
     const trimmedName = state.instanceName.trim();
     if (!trimmedName) {
@@ -60,34 +59,35 @@ function useCreateIntegrationHandler({ route, state, metadata, mutations }: Crea
       return;
     }
 
-    if (metadata.integrationCapabilities.length > 0 && state.selectedCapabilities.size === 0) {
-      showErrorToast("Select at least one capability");
-      return;
-    }
-
     try {
       const response = await mutations.createMutation.mutateAsync({
         integrationName: route.integrationName,
         name: trimmedName,
-        capabilities: Array.from(state.selectedCapabilities),
       });
       state.setCreatedIntegration(response.data?.integration || null);
       state.setStepInputs({});
     } catch {
       // Error is shown by inline alert.
     }
-  }, [route.integrationName, state, metadata.integrationCapabilities, mutations.createMutation]);
+  }, [route.integrationName, state, mutations.createMutation]);
 }
 
 interface CapabilitySelectionActionsParams {
   createMutation: IntegrationSetupMutations["createMutation"];
+  submitStepMutation: IntegrationSetupMutations["submitStepMutation"];
+  revertStepMutation: IntegrationSetupMutations["revertStepMutation"];
   setSelectedCapabilities: Dispatch<SetStateAction<Set<string>>>;
 }
 
-function useCapabilitySelectionActions({ createMutation, setSelectedCapabilities }: CapabilitySelectionActionsParams) {
+function useCapabilitySelectionActions({
+  createMutation,
+  submitStepMutation,
+  revertStepMutation,
+  setSelectedCapabilities,
+}: CapabilitySelectionActionsParams) {
   const toggleCapabilitySelection = useCallback(
     (capabilityName: string) => {
-      if (createMutation.isPending) {
+      if (createMutation.isPending || submitStepMutation.isPending || revertStepMutation.isPending) {
         return;
       }
 
@@ -101,19 +101,24 @@ function useCapabilitySelectionActions({ createMutation, setSelectedCapabilities
         return next;
       });
     },
-    [createMutation, setSelectedCapabilities],
+    [createMutation.isPending, submitStepMutation.isPending, revertStepMutation.isPending, setSelectedCapabilities],
   );
 
   const toggleCapabilityGroup = useCallback(
     (capabilityNames: string[]) => {
-      if (createMutation.isPending || capabilityNames.length === 0) {
+      if (
+        createMutation.isPending ||
+        submitStepMutation.isPending ||
+        revertStepMutation.isPending ||
+        capabilityNames.length === 0
+      ) {
         return;
       }
 
       setSelectedCapabilities((previous) => {
-        const state = getGroupToggleState(capabilityNames, previous);
+        const groupState = getGroupToggleState(capabilityNames, previous);
         const next = new Set(previous);
-        if (state === "all") {
+        if (groupState === "all") {
           capabilityNames.forEach((name) => next.delete(name));
         } else {
           capabilityNames.forEach((name) => next.add(name));
@@ -121,7 +126,7 @@ function useCapabilitySelectionActions({ createMutation, setSelectedCapabilities
         return next;
       });
     },
-    [createMutation, setSelectedCapabilities],
+    [createMutation.isPending, submitStepMutation.isPending, revertStepMutation.isPending, setSelectedCapabilities],
   );
 
   return {
@@ -145,6 +150,22 @@ interface CurrentStepActionParams {
   mutations: Pick<IntegrationSetupMutations, "submitStepMutation" | "revertStepMutation">;
 }
 
+function submitStepBody(type: IntegrationSetupStepDefinitionType, state: IntegrationSetupState) {
+  switch (type) {
+    case "INPUTS":
+      return {
+        inputs: state.stepInputs,
+      };
+
+    case "CAPABILITY_SELECTION":
+      return {
+        capabilities: Array.from(state.selectedCapabilities),
+      };
+  }
+
+  return {};
+}
+
 function useSubmitCurrentStepAction({ state, progress, mutations }: CurrentStepActionParams) {
   return useCallback(async () => {
     const integrationId = state.createdIntegration?.metadata?.id;
@@ -156,10 +177,18 @@ function useSubmitCurrentStepAction({ state, progress, mutations }: CurrentStepA
       return;
     }
 
+    if (progress.currentStep.type === "CAPABILITY_SELECTION") {
+      const offered = progress.currentStep.capabilities ?? [];
+      if (offered.length > 0 && state.selectedCapabilities.size === 0) {
+        showErrorToast("Select at least one capability");
+        return;
+      }
+    }
+
     try {
       const response = await mutations.submitStepMutation.mutateAsync({
         integrationId,
-        inputs: progress.currentStep.type === "INPUTS" ? state.stepInputs : undefined,
+        ...submitStepBody(progress.currentStep.type!, state),
       });
       state.setCreatedIntegration(response.data?.integration || null);
       state.setStepInputs({});
@@ -202,7 +231,7 @@ function useDiscardIntegrationAction({ route, state, mutations }: DiscardIntegra
     if (!integrationId) {
       return;
     }
-    if (!window.confirm("Discard this integration? It will be removed and this cannot be undone.")) {
+    if (!window.confirm("Delete this integration? It will be removed and this cannot be undone.")) {
       return;
     }
     try {
@@ -220,41 +249,15 @@ function useDiscardIntegrationAction({ route, state, mutations }: DiscardIntegra
 interface SetupStepBackActionParams {
   state: IntegrationSetupState;
   progress: IntegrationSetupProgress;
-  mutations: Pick<IntegrationSetupMutations, "deleteIntegrationMutation">;
   handleRevertCurrentStep: () => Promise<void>;
 }
 
-function useSetupStepBackAction({ state, progress, mutations, handleRevertCurrentStep }: SetupStepBackActionParams) {
+function useSetupStepBackAction({ state, progress, handleRevertCurrentStep }: SetupStepBackActionParams) {
   return useCallback(async () => {
     if (!progress.currentStep || !state.createdIntegration?.metadata?.id) {
       return;
     }
 
-    if (progress.canRevertCurrentStep) {
-      await handleRevertCurrentStep();
-      return;
-    }
-
-    if (
-      !window.confirm("Remove this partially configured integration? You'll return to naming and capability selection.")
-    ) {
-      return;
-    }
-
-    try {
-      await mutations.deleteIntegrationMutation.mutateAsync({
-        integrationName: state.createdIntegration?.metadata?.integrationName ?? "",
-      });
-      state.setCreatedIntegration(null);
-      state.setStepInputs({});
-    } catch {
-      showErrorToast("Failed to remove integration");
-    }
-  }, [
-    state,
-    progress.currentStep,
-    progress.canRevertCurrentStep,
-    mutations.deleteIntegrationMutation,
-    handleRevertCurrentStep,
-  ]);
+    await handleRevertCurrentStep();
+  }, [state, progress.currentStep, handleRevertCurrentStep]);
 }

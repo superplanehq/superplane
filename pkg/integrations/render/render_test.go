@@ -184,16 +184,6 @@ func Test__Render__Sync(t *testing.T) {
 
 func Test__Render__ListResources(t *testing.T) {
 	integration := &Render{}
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Body: io.NopCloser(strings.NewReader(
-					`[{"cursor":"a","service":{"id":"srv-1","name":"backend"}},{"cursor":"b","service":{"id":"srv-2","name":"worker"}}]`,
-				)),
-			},
-		},
-	}
 
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{"apiKey": "rnd_test"},
@@ -204,20 +194,70 @@ func Test__Render__ListResources(t *testing.T) {
 		},
 	}
 
-	resources, err := integration.ListResources("service", core.ListResourcesContext{
-		HTTP:        httpCtx,
-		Integration: integrationCtx,
+	t.Run("services", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`[{"cursor":"a","service":{"id":"srv-1","name":"backend"}},{"cursor":"b","service":{"id":"srv-2","name":"worker"}}]`,
+					)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("service", core.ListResourcesContext{
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "backend", resources[0].Name)
+		assert.Equal(t, "srv-1", resources[0].ID)
+		assert.Equal(t, "worker", resources[1].Name)
+		assert.Equal(t, "srv-2", resources[1].ID)
+
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Contains(t, httpCtx.Requests[0].URL.String(), "ownerId=usr-123")
 	})
 
-	require.NoError(t, err)
-	require.Len(t, resources, 2)
-	assert.Equal(t, "backend", resources[0].Name)
-	assert.Equal(t, "srv-1", resources[0].ID)
-	assert.Equal(t, "worker", resources[1].Name)
-	assert.Equal(t, "srv-2", resources[1].ID)
+	t.Run("custom domains", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`[
+							{
+								"cursor":"cursor-1",
+								"customDomain":{
+									"id":"cdm-123",
+									"name":"app.example.com",
+									"verificationStatus":"verified"
+								}
+							}
+						]`,
+					)),
+				},
+			},
+		}
 
-	require.Len(t, httpCtx.Requests, 1)
-	assert.Contains(t, httpCtx.Requests[0].URL.String(), "ownerId=usr-123")
+		resources, err := integration.ListResources("custom_domain", core.ListResourcesContext{
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Parameters:  map[string]string{"service": "srv-123"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "app.example.com", resources[0].Name)
+		assert.Equal(t, "cdm-123", resources[0].ID)
+
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Contains(t, httpCtx.Requests[0].URL.Path, "/v1/services/srv-123/custom-domains")
+		assert.Equal(t, "100", httpCtx.Requests[0].URL.Query().Get("limit"))
+	})
 }
 
 func Test__Render__SetupWebhook(t *testing.T) {

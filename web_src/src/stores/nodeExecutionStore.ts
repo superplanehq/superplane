@@ -15,6 +15,7 @@ import {
   nodeQueueItemsQueryOptions,
   nodeEventsQueryOptions,
 } from "@/hooks/useCanvasData";
+import { shouldAcceptExecutionUpdate } from "@/hooks/canvasInfiniteCache";
 
 interface NodeExecutionData {
   executions: CanvasesCanvasNodeExecution[];
@@ -52,91 +53,6 @@ const emptyNodeData: NodeExecutionData = {
   totalInHistoryCount: 0,
   totalInQueueCount: 0,
 };
-
-/**
- * Updates a child execution within the array of parent executions.
- *
- * @param executions The array of parent executions.
- * @param childExecution The child execution to update.
- * @returns
- */
-function updateChildExecution(
-  executions: CanvasesCanvasNodeExecution[],
-  childExecution: CanvasesCanvasNodeExecution,
-): CanvasesCanvasNodeExecution[] {
-  const parentIndex = executions.findIndex((e) => e.id === childExecution.parentExecutionId);
-
-  /*
-   * Parent not found yet.
-   * Add as top-level temporarily - will be nested when parent arrives.
-   */
-  if (parentIndex < 0) {
-    const existingIndex = executions.findIndex((e) => e.id === childExecution.id);
-    if (existingIndex >= 0) {
-      return executions.map((e, i) => (i === existingIndex ? childExecution : e));
-    }
-    return [childExecution, ...executions];
-  }
-
-  /*
-   * Parent found - update child within parent's childExecutions.
-   */
-  const parent = executions[parentIndex];
-  const childExecutions = parent.childExecutions || [];
-  const childIndex = childExecutions.findIndex((ce) => ce.id === childExecution.id);
-
-  const updatedChildren =
-    childIndex >= 0
-      ? childExecutions.map((ce, i) => (i === childIndex ? childExecution : ce))
-      : [...childExecutions, childExecution];
-
-  return executions.map((e, i) => (i === parentIndex ? { ...e, childExecutions: updatedChildren } : e));
-}
-
-/**
- * Updates a parent execution within the array of parent executions.
- *
- * @param executions The array of parent executions.
- * @param parentExecution The parent execution to update.
- * @returns The updated array of parent executions.
- */
-function updateParentExecution(
-  executions: CanvasesCanvasNodeExecution[],
-  parentExecution: CanvasesCanvasNodeExecution,
-): CanvasesCanvasNodeExecution[] {
-  const existingIndex = executions.findIndex((e) => e.id === parentExecution.id);
-
-  /*
-   * Update existing parent - preserve childExecutions
-   */
-  if (existingIndex >= 0) {
-    const existing = executions[existingIndex];
-    const finalChildExecutions = parentExecution.childExecutions || existing.childExecutions || [];
-    return executions.map((e, i) =>
-      i === existingIndex ? { ...parentExecution, childExecutions: finalChildExecutions } : e,
-    );
-  }
-
-  /*
-   * New parent execution arriving.
-   * Check for orphaned children that belong to it
-   */
-  const orphanedChildren = executions.filter((e) => e.parentExecutionId === parentExecution.id);
-  if (orphanedChildren.length === 0) {
-    return [{ ...parentExecution, childExecutions: parentExecution.childExecutions || [] }, ...executions];
-  }
-
-  /*
-   * Move orphaned children from top-level into parent
-   */
-  const withoutOrphans = executions.filter((e) => e.parentExecutionId !== parentExecution.id);
-  const parentWithChildren = {
-    ...parentExecution,
-    childExecutions: [...(parentExecution.childExecutions || []), ...orphanedChildren],
-  };
-
-  return [parentWithChildren, ...withoutOrphans];
-}
 
 /**
  * Invalidates queries for a specific node based on its type
@@ -335,10 +251,18 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
     set((state) => {
       const newData = new Map(state.data);
       const existing = newData.get(nodeId) || emptyNodeData;
+      const existingIndex = existing.executions.findIndex((e) => e.id === execution.id);
 
-      const updatedExecutions = execution.parentExecutionId
-        ? updateChildExecution(existing.executions, execution)
-        : updateParentExecution(existing.executions, execution);
+      // Ignore stale out-of-order updates so a finished node isn't downgraded
+      // back to running.
+      if (existingIndex >= 0 && !shouldAcceptExecutionUpdate(existing.executions[existingIndex], execution)) {
+        return state;
+      }
+
+      const updatedExecutions =
+        existingIndex >= 0
+          ? existing.executions.map((e, i) => (i === existingIndex ? execution : e))
+          : [execution, ...existing.executions];
 
       newData.set(nodeId, {
         ...existing,

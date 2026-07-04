@@ -37,12 +37,11 @@ export function SetupView({ setup }: SetupViewProps) {
       createdIntegration={state.createdIntegration}
       currentStep={progress.currentStep}
       stepInputs={state.stepInputs}
-      showSetupStepBack={progress.showSetupStepBack}
+      canRevertCurrentStep={progress.canRevertCurrentStep}
       instanceName={state.instanceName}
       integrationName={route.integrationName}
+      integrationDefinition={metadata.integrationDefinition}
       integrationCapabilities={metadata.integrationCapabilities}
-      capabilitySections={metadata.capabilitySections}
-      capabilityByName={metadata.capabilityByName}
       selectedCapabilities={state.selectedCapabilities}
       isCreatePending={mutations.createMutation.isPending}
       isSubmitting={mutations.submitStepMutation.isPending}

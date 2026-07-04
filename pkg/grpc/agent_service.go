@@ -3,144 +3,80 @@ package grpc
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/config"
-	agents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
-	"github.com/superplanehq/superplane/pkg/jwt"
+	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type AgentsService struct {
-	authService authorization.Authorization
-	jwtSigner   *jwt.Signer
+	pb.UnimplementedAgentsServer
+	service agentsActions.AgentsService
 }
 
-func NewAgentsService(authService authorization.Authorization, jwtSigner *jwt.Signer) *AgentsService {
-	return &AgentsService{
-		authService: authService,
-		jwtSigner:   jwtSigner,
-	}
+func NewAgentsService(service agentsActions.AgentsService) *AgentsService {
+	return &AgentsService{service: service}
 }
 
-func (s *AgentsService) CreateAgentChat(ctx context.Context, req *pb.CreateAgentChatRequest) (*pb.CreateAgentChatResponse, error) {
-	agentPublicURL := config.AgentHTTPURL()
-	if agentPublicURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
+func (s *AgentsService) ensureEnabled() error {
+	if s.service == nil {
+		return status.Error(codes.Unavailable, "agents are not enabled on this installation")
 	}
+	return nil
+}
 
-	agentInternalURL := config.AgentGRPCURL()
-	if agentInternalURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
+func (s *AgentsService) requestContext(ctx context.Context) (orgID, userID string, err error) {
+	if err := s.ensureEnabled(); err != nil {
+		return "", "", err
 	}
+	orgIDVal, _ := ctx.Value(authorization.OrganizationContextKey).(string)
+	if orgIDVal == "" {
+		return "", "", status.Error(codes.Unauthenticated, "missing organization")
+	}
+	userID, err = userIDFromContext(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	return orgIDVal, userID, nil
+}
 
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
+func (s *AgentsService) GetCanvasAgentChat(ctx context.Context, req *pb.GetCanvasAgentChatRequest) (*pb.GetCanvasAgentChatResponse, error) {
+	orgID, userID, err := s.requestContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	return agents.CreateAgentChat(
-		ctx,
-		s.authService,
-		s.jwtSigner,
-		agentInternalURL,
-		agentPublicURL,
-		userID,
-		organizationID,
-		req.CanvasId,
-	)
-}
-
-func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgentChatRequest) (*pb.ResumeAgentChatResponse, error) {
-	agentPublicURL := config.AgentHTTPURL()
-	if agentPublicURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
-	}
-
-	agentInternalURL := config.AgentGRPCURL()
-	if agentInternalURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return agents.ResumeAgentChat(
-		ctx,
-		s.authService,
-		s.jwtSigner,
-		agentInternalURL,
-		agentPublicURL,
-		organizationID,
-		userID,
-		req.CanvasId,
-		req.ChatId,
-	)
-}
-
-func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
-	url := config.AgentGRPCURL()
-	if url == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return agents.DescribeAgentChat(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
-}
-
-func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
-	url := config.AgentGRPCURL()
-	if url == "" {
-		log.WithField("canvas_id", req.CanvasId).Warn("agent GRPC URL not configured")
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return agents.ListAgentChats(ctx, url, organizationID, userID, req.CanvasId)
-}
-
-func (s *AgentsService) DeleteAgentChat(ctx context.Context, req *pb.DeleteAgentChatRequest) (*pb.DeleteAgentChatResponse, error) {
-	url := config.AgentGRPCURL()
-	if url == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return agents.DeleteAgentChat(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
+	return agentsActions.GetCanvasAgentChat(ctx, s.service, orgID, userID, req)
 }
 
 func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
-	url := config.AgentGRPCURL()
-	if url == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
+	orgID, userID, err := s.requestContext(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return agentsActions.ListAgentChatMessages(ctx, s.service, orgID, userID, req)
+}
 
-	return agents.ListAgentChatMessages(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
+func (s *AgentsService) SendAgentChatMessage(ctx context.Context, req *pb.SendAgentChatMessageRequest) (*pb.SendAgentChatMessageResponse, error) {
+	orgID, userID, err := s.requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return agentsActions.SendAgentChatMessage(ctx, s.service, orgID, userID, req)
+}
+
+func (s *AgentsService) InterruptAgentChat(ctx context.Context, req *pb.InterruptAgentChatRequest) (*pb.InterruptAgentChatResponse, error) {
+	orgID, userID, err := s.requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return agentsActions.InterruptAgentChat(ctx, s.service, orgID, userID, req)
+}
+
+func (s *AgentsService) DefineAgentOutcome(ctx context.Context, req *pb.DefineAgentOutcomeRequest) (*pb.DefineAgentOutcomeResponse, error) {
+	orgID, userID, err := s.requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return agentsActions.DefineAgentOutcome(ctx, s.service, orgID, userID, req)
 }

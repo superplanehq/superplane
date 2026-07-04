@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -14,7 +15,17 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore/components"
 )
 
-type SetupProvider struct{}
+const (
+	SetupStepCapabilitySelection = "capabilitySelection"
+	SetupStepSelectOrganization  = "selectOrganization"
+	SetupStepEnterAPIToken       = "enterAPIToken"
+	SetupStepDone                = "done"
+)
+
+const (
+	PropertyOrganizationURL = "organizationUrl"
+	SecretAPIToken          = "apiToken"
+)
 
 //go:embed templates/organization-url-instructions.tpl
 var organizationURLInstructionsTemplate []byte
@@ -24,6 +35,8 @@ var apiTokenInstructionsTemplate []byte
 
 //go:embed templates/setup-complete.tpl
 var setupCompleteTemplate []byte
+
+type SetupProvider struct{}
 
 func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.Trigger) []core.Capability {
 	capabilities := []core.Capability{}
@@ -35,6 +48,7 @@ func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.T
 			Description:    action.Description(),
 			Configuration:  action.Configuration(),
 			OutputChannels: action.OutputChannels(nil),
+			ExampleOutput:  action.ExampleOutput(),
 		})
 	}
 	for _, trigger := range triggers {
@@ -44,10 +58,29 @@ func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.T
 			Label:         trigger.Label(),
 			Description:   trigger.Description(),
 			Configuration: trigger.Configuration(),
+			ExampleData:   trigger.ExampleData(),
 		})
 	}
 
 	return capabilities
+}
+
+/*
+ * Returns all the capabilities, minus the ones being passed in.
+ */
+func (s *SetupProvider) capabilityDiff(capabilities []string) []string {
+	groups := s.CapabilityGroups()
+
+	diff := []string{}
+	for _, group := range groups {
+		for _, capability := range group.Capabilities {
+			if !slices.Contains(capabilities, capability.Name) {
+				diff = append(diff, capability.Name)
+			}
+		}
+	}
+
+	return diff
 }
 
 func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
@@ -77,18 +110,56 @@ func (s *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 		return nil, errors.New("no requested capabilities")
 	}
 
-	ctx.Logger.Infof("requested capabilities: %v", requested)
-	return nil, ctx.Capabilities.Enable(requested...)
+	ctx.Capabilities.Enable(requested...)
+	return nil, nil
 }
 
 func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
+	capabilities := []string{}
+	for _, group := range s.CapabilityGroups() {
+		for _, capability := range group.Capabilities {
+			capabilities = append(capabilities, capability.Name)
+		}
+	}
+
 	return core.SetupStep{
+		Type:         core.SetupStepTypeCapabilitySelection,
+		Name:         SetupStepCapabilitySelection,
+		Label:        "Select capabilities",
+		Capabilities: capabilities,
+	}
+}
+
+func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
+	switch ctx.Step.Name {
+	case SetupStepCapabilitySelection:
+		return s.onCapabilitySelectionSubmit(ctx)
+	case SetupStepSelectOrganization:
+		return s.onSelectOrganizationSubmit(ctx.Step.Inputs, ctx)
+	case SetupStepEnterAPIToken:
+		return s.onEnterAPITokenSubmit(ctx.Step.Inputs, ctx)
+	}
+
+	return nil, errors.New("unknown step")
+}
+
+func (s *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
+
+	//
+	// We move the requested capabilities to the REQUESTED state,
+	// and the not requested ones to the AVAILABLE state,
+	// since they were not requested yet, but they could be later on.
+	//
+	ctx.Capabilities.Request(ctx.Step.Capabilities...)
+	ctx.Capabilities.Available(s.capabilityDiff(ctx.Step.Capabilities)...)
+
+	return &core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
-		Name:  "selectOrganization",
+		Name:  SetupStepSelectOrganization,
 		Label: "What is your Semaphore Organization URL?",
 		Inputs: []configuration.Field{
 			{
-				Name:     "organizationUrl",
+				Name:     PropertyOrganizationURL,
 				Label:    "Semaphore Organization URL",
 				Type:     configuration.FieldTypeString,
 				Required: true,
@@ -96,37 +167,33 @@ func (s *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 			},
 		},
 		Instructions: string(organizationURLInstructionsTemplate),
-	}
-}
-
-func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
-	switch ctx.Step {
-	case "selectOrganization":
-		return s.onSelectOrganizationSubmit(ctx.Inputs, ctx)
-	case "enterAPIToken":
-		return s.onEnterAPITokenSubmit(ctx.Inputs, ctx)
-	}
-
-	return nil, errors.New("unknown step")
+	}, nil
 }
 
 func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
-	switch ctx.Step {
-	case "selectOrganization":
+	switch ctx.Step.Name {
+	case SetupStepCapabilitySelection:
+		return s.onCapabilitySelectionRevert(ctx)
+	case SetupStepSelectOrganization:
 		return s.onSelectOrganizationRevert(ctx)
-	case "enterAPIToken":
+	case SetupStepEnterAPIToken:
 		return s.onEnterAPITokenRevert(ctx)
 	}
 
 	return errors.New("unknown step")
 }
 
+func (s *SetupProvider) onCapabilitySelectionRevert(ctx core.SetupStepContext) error {
+	ctx.Capabilities.Clear()
+	return nil
+}
+
 func (s *SetupProvider) onSelectOrganizationRevert(ctx core.SetupStepContext) error {
-	return ctx.Properties.Delete("organizationUrl")
+	return ctx.Properties.Delete(PropertyOrganizationURL)
 }
 
 func (s *SetupProvider) onEnterAPITokenRevert(ctx core.SetupStepContext) error {
-	return ctx.Secrets.Delete("apiToken")
+	return ctx.Secrets.Delete(SecretAPIToken)
 }
 
 func (s *SetupProvider) OnPropertyUpdate(ctx core.PropertyUpdateContext) (*core.SetupStep, error) {
@@ -135,7 +202,7 @@ func (s *SetupProvider) OnPropertyUpdate(ctx core.PropertyUpdateContext) (*core.
 
 func (s *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.SetupStep, error) {
 	switch ctx.SecretName {
-	case "apiToken":
+	case SecretAPIToken:
 		v := strings.TrimSpace(ctx.Value)
 		if v == "" {
 			return nil, fmt.Errorf("value is required")
@@ -158,7 +225,7 @@ func (s *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.Setu
 			return nil, fmt.Errorf("error listing projects: %v", err)
 		}
 
-		return nil, ctx.Secrets.Update("apiToken", v)
+		return nil, ctx.Secrets.Update(SecretAPIToken, v)
 
 	default:
 		return nil, fmt.Errorf("unknown secret: %s", ctx.SecretName)
@@ -171,7 +238,7 @@ func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupSte
 		return nil, errors.New("invalid input")
 	}
 
-	organizationURL, ok := m["organizationUrl"].(string)
+	organizationURL, ok := m[PropertyOrganizationURL].(string)
 	if !ok {
 		return nil, errors.New("invalid organization URL")
 	}
@@ -185,7 +252,7 @@ func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupSte
 	// so once it's set, you cannot change it.
 	//
 	err := ctx.Properties.Create(core.IntegrationPropertyDefinition{
-		Name:        "organizationUrl",
+		Name:        PropertyOrganizationURL,
 		Label:       "Organization URL",
 		Description: "The URL of the Semaphore organization you are connected",
 		Type:        configuration.FieldTypeString,
@@ -213,11 +280,11 @@ func (s *SetupProvider) onSelectOrganizationSubmit(inputs any, ctx core.SetupSte
 
 	return &core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
-		Name:  "enterAPIToken",
+		Name:  SetupStepEnterAPIToken,
 		Label: "Enter Semaphore API token",
 		Inputs: []configuration.Field{
 			{
-				Name:      "apiToken",
+				Name:      SecretAPIToken,
 				Label:     "API Token",
 				Type:      configuration.FieldTypeString,
 				Required:  true,
@@ -234,7 +301,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 		return nil, errors.New("invalid input")
 	}
 
-	apiToken, ok := m["apiToken"].(string)
+	apiToken, ok := m[SecretAPIToken].(string)
 	if !ok {
 		return nil, errors.New("invalid API token")
 	}
@@ -248,7 +315,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 	// so we store it as an editable secret.
 	//
 	err := ctx.Secrets.Create(core.IntegrationSecretDefinition{
-		Name:        "apiToken",
+		Name:        SecretAPIToken,
 		Label:       "API Token",
 		Description: "The API token for the Semaphore organization",
 		Value:       apiToken,
@@ -276,11 +343,7 @@ func (s *SetupProvider) onEnterAPITokenSubmit(input any, ctx core.SetupStepConte
 		return nil, fmt.Errorf("error listing projects: %v", err)
 	}
 
-	err = ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
-	if err != nil {
-		return nil, fmt.Errorf("error enabling capability group: %v", err)
-	}
-
+	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
 	url, err := ctx.Properties.GetString("organizationUrl")
 	if err != nil {
 		return nil, fmt.Errorf("error getting organization URL: %v", err)

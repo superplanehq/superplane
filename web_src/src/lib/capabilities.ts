@@ -1,11 +1,11 @@
 import type {
   IntegrationsCapabilityDefinition,
   IntegrationsIntegrationDefinition,
-  SuperplaneActionsAction,
+  ActionsAction,
   TriggersTrigger,
 } from "@/api-client";
 
-export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefinition[]): SuperplaneActionsAction[] {
+export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefinition[]): ActionsAction[] {
   return capabilities
     .filter((capability) => capability.type === "TYPE_ACTION")
     .map((capability) => ({
@@ -14,6 +14,7 @@ export function actionsFromCapabilities(capabilities: IntegrationsCapabilityDefi
       description: capability.description,
       configuration: capability.configuration,
       outputChannels: capability.outputChannels,
+      exampleOutput: capability.exampleOutput,
     }));
 }
 
@@ -25,6 +26,7 @@ export function triggersFromCapabilities(capabilities: IntegrationsCapabilityDef
       label: capability.label,
       description: capability.description,
       configuration: capability.configuration,
+      exampleData: capability.exampleData,
     }));
 }
 
@@ -33,6 +35,20 @@ export type CapabilityGroupSection = {
   label: string;
   names: string[];
 };
+
+/**
+ * Returns capability definitions offered by a setup step (by name), preserving {@link defsSorted} order.
+ */
+export function capabilityDefinitionsForStepOffer(
+  defsSorted: IntegrationsCapabilityDefinition[],
+  offeredNames: string[] | undefined,
+): IntegrationsCapabilityDefinition[] {
+  const allowed = new Set((offeredNames ?? []).filter(Boolean));
+  if (allowed.size === 0) {
+    return [];
+  }
+  return defsSorted.filter((def) => Boolean(def.name) && allowed.has(def.name!));
+}
 
 /**
  * Groups capability names using {@link IntegrationsIntegrationDefinition.capabilityGroups} when present.
@@ -89,5 +105,5 @@ export function buildIntegrationCapabilityGroupSections(
     });
   }
 
-  return sections;
+  return [...sections].sort((left, right) => left.label.localeCompare(right.label));
 }

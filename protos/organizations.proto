@@ -72,40 +72,6 @@ service Organizations {
     };
   }
 
-  rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/invitations"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create an organization invitation";
-      description: "Invites a user to join an organization by email";
-      tags: "Organization";
-    };
-  }
-
-  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/invitations"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List organization invitations";
-      description: "Returns pending invitations for an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc RemoveInvitation(RemoveInvitationRequest) returns (RemoveInvitationResponse) {
-    option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}/invitations/{invitation_id}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Remove an organization invitation";
-      description: "Removes an organization invitation";
-      tags: "Organization";
-    };
-  }
-
   rpc GetInviteLink(GetInviteLinkRequest) returns (GetInviteLinkResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/invite-link"
@@ -136,52 +102,6 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Reset an organization invite link";
       description: "Generates a new invite link token for an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc GetAgentSettings(GetAgentSettingsRequest) returns (GetAgentSettingsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/agent-settings"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get organization Agent Mode settings";
-      description: "Returns Agent Mode enablement and OpenAI key status for an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc UpdateAgentSettings(UpdateAgentSettingsRequest) returns (UpdateAgentSettingsResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/organizations/{id}/agent-settings"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update organization Agent Mode settings";
-      description: "Updates Agent Mode enablement for an organization";
-      tags: "Organization";
-    };
-  }
-
-  rpc SetAgentOpenAIKey(SetAgentOpenAIKeyRequest) returns (SetAgentOpenAIKeyResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/organizations/{id}/agent-settings/openai-key"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create or update organization OpenAI key for Agent Mode";
-      description: "Sets the OpenAI key used by organization Agent Mode";
-      tags: "Organization";
-    };
-  }
-
-  rpc DeleteAgentOpenAIKey(DeleteAgentOpenAIKeyRequest) returns (DeleteAgentOpenAIKeyResponse) {
-    option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}/agent-settings/openai-key"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Delete organization OpenAI key for Agent Mode";
-      description: "Deletes the OpenAI key used by organization Agent Mode";
       tags: "Organization";
     };
   }
@@ -348,7 +268,7 @@ message Organization {
   }
 
   message Spec {
-    optional bool change_management_enabled = 1;
+    repeated string enabled_experimental_features = 2;
   }
 
   Metadata metadata = 1;
@@ -378,14 +298,6 @@ message DeleteOrganizationRequest {
 
 message DeleteOrganizationResponse {}
 
-message Invitation {
-  string id = 1;
-  string organization_id = 2;
-  string email = 3;
-  string state = 4;
-  google.protobuf.Timestamp created_at = 5;
-}
-
 message InviteLink {
   string id = 1;
   string organization_id = 2;
@@ -394,47 +306,6 @@ message InviteLink {
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
 }
-
-message AgentOpenAIKey {
-  bool configured = 1;
-  string last4 = 2;
-  string status = 3;
-  string validation_error = 4;
-  google.protobuf.Timestamp validated_at = 5;
-  google.protobuf.Timestamp updated_at = 6;
-  string updated_by = 7;
-}
-
-message AgentSettings {
-  string organization_id = 1;
-  bool agent_mode_enabled = 2;
-  bool agent_mode_effective = 3;
-  AgentOpenAIKey openai_key = 4;
-}
-
-message CreateInvitationRequest {
-  string id = 1;
-  string email = 2;
-}
-
-message CreateInvitationResponse {
-  Invitation invitation = 1;
-}
-
-message ListInvitationsRequest {
-  string id = 1;
-}
-
-message ListInvitationsResponse {
-  repeated Invitation invitations = 1;
-}
-
-message RemoveInvitationRequest {
-  string id = 1;
-  string invitation_id = 2;
-}
-
-message RemoveInvitationResponse {}
 
 message GetInviteLinkRequest {
   string id = 1;
@@ -459,41 +330,6 @@ message ResetInviteLinkRequest {
 
 message ResetInviteLinkResponse {
   InviteLink invite_link = 1;
-}
-
-message GetAgentSettingsRequest {
-  string id = 1;
-}
-
-message GetAgentSettingsResponse {
-  AgentSettings agent_settings = 1;
-}
-
-message UpdateAgentSettingsRequest {
-  string id = 1;
-  bool agent_mode_enabled = 2;
-}
-
-message UpdateAgentSettingsResponse {
-  AgentSettings agent_settings = 1;
-}
-
-message SetAgentOpenAIKeyRequest {
-  string id = 1;
-  string api_key = 2;
-  bool validate = 3;
-}
-
-message SetAgentOpenAIKeyResponse {
-  AgentSettings agent_settings = 1;
-}
-
-message DeleteAgentOpenAIKeyRequest {
-  string id = 1;
-}
-
-message DeleteAgentOpenAIKeyResponse {
-  AgentSettings agent_settings = 1;
 }
 
 message OrganizationLimits {
@@ -549,7 +385,6 @@ message CreateIntegrationRequest {
   string name = 2;
   string integration_name = 3;
   google.protobuf.Struct configuration = 4;
-  repeated string capabilities = 5;
 }
 
 message CreateIntegrationResponse {
@@ -603,6 +438,7 @@ message NextIntegrationSetupStepRequest {
   string id = 1;
   string integration_id = 2;
   google.protobuf.Struct inputs = 3;
+  repeated string capabilities = 4;
 }
 
 message NextIntegrationSetupStepResponse {
@@ -703,7 +539,8 @@ message Integration {
       UNKNOWN = 0;
       INPUTS = 1;
       REDIRECT_PROMPT = 2;
-      DONE = 3;
+      CAPABILITY_SELECTION = 3;
+      DONE = 4;
     }
 
     message RedirectPrompt {
@@ -718,36 +555,47 @@ message Integration {
     string instructions = 4;
     repeated Configuration.Field inputs = 5;
     RedirectPrompt redirect_prompt = 6;
+    repeated string capabilities = 7;
   }
 
   message CapabilityState {
     enum State {
+
       //
-      // The integration itself has the capability available,
-      // but the capability was not requested as part of the setup flow.
+      // The integration has the capability available,
+      // but the integration setup did not expose it,
+      // and the user cannot request it anymore.
       //
       STATE_UNAVAILABLE = 0;
+
+      //
+      // THe integration has the capability available,
+      // but the integration setup did not expose it yet.
+      // The user can still request it, though.
+      //
+      STATE_AVAILABLE = 1;
 
       //
       // The capability was requested,
       // but the setup flow did not yet exposed the capability requested.
       //
-      STATE_REQUESTED = 1;
+      STATE_REQUESTED = 2;
 
       //
       // The capability is fully available for use.
       //
-      STATE_ENABLED = 2;
+      STATE_ENABLED = 3;
 
       //
       // The capability was made available during the setup flow,
       // but has been manually disabled by the user.
       //
-      STATE_DISABLED = 3;
+      STATE_DISABLED = 4;
     }
 
     string name = 1;
     State state = 2;
+    optional string reason = 3;
   }
 
   message NodeRef {
@@ -755,6 +603,7 @@ message Integration {
     string canvas_name = 2;
     string node_id = 3;
     string node_name = 4;
+    string component = 5;
   }
 
   Metadata metadata = 1;
@@ -782,10 +631,5 @@ message OrganizationUpdated {
 
 message OrganizationDeleted {
   string organization_id = 1;
-  google.protobuf.Timestamp timestamp = 2;
-}
-
-message InvitationCreated {
-  string invitation_id = 1;
   google.protobuf.Timestamp timestamp = 2;
 }

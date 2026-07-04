@@ -20,7 +20,7 @@ import type {
 } from "@/api-client/types.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
-import { analytics } from "@/lib/analytics";
+import { analytics, type IntegrationSource } from "@/lib/analytics";
 
 export const integrationKeys = {
   all: ["integrations"] as const,
@@ -73,6 +73,7 @@ export const useConnectedIntegrations = (organizationId: string, options?: { ena
     queryFn: async () => {
       const response = await organizationsListIntegrations(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
         }),
       );
@@ -91,6 +92,7 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
     queryFn: async () => {
       const response = await organizationsDescribeIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
         }),
       );
@@ -121,6 +123,7 @@ export const useIntegrationResources = (
 
       const response = await organizationsListIntegrationResources(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           query,
         }),
@@ -134,7 +137,7 @@ export const useIntegrationResources = (
 };
 
 // Hook to create an integration
-export const useCreateIntegration = (organizationId: string, source: "node_configuration" | "integrations_page") => {
+export const useCreateIntegration = (organizationId: string, source: IntegrationSource) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -146,6 +149,7 @@ export const useCreateIntegration = (organizationId: string, source: "node_confi
     }) => {
       return await organizationsCreateIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
           body: {
             integrationName: data.integrationName,
@@ -170,12 +174,13 @@ export const useNextIntegrationSetupStep = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { integrationId: string; inputs?: Record<string, unknown> }) => {
+    mutationFn: async (data: { integrationId: string; inputs?: Record<string, unknown>; capabilities?: string[] }) => {
       return await organizationsNextIntegrationSetupStep(
         withOrganizationHeader({
           path: { id: organizationId, integrationId: data.integrationId },
           body: {
             inputs: data.inputs,
+            capabilities: data.capabilities,
           },
         }),
       );
@@ -228,6 +233,7 @@ export const useUpdateIntegration = (organizationId: string, integrationId: stri
     mutationFn: async (data: { name?: string; configuration?: Record<string, unknown> }) => {
       return await organizationsUpdateIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           body: {
             name: data.name,
