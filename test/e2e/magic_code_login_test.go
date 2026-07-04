@@ -180,7 +180,7 @@ func (s *magicCodeSteps) createInviteLink() string {
 	if err == nil {
 		return inviteLink.Token.String()
 	}
-	inviteLink, err = models.CreateInviteLink(s.session.OrgID)
+	inviteLink, err = models.CreateInviteLink(database.DB(s.t.Context()), s.session.OrgID)
 	require.NoError(s.t, err)
 	return inviteLink.Token.String()
 }
