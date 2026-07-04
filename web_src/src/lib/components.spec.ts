@@ -29,6 +29,20 @@ describe("components visibility helpers", () => {
     expect(isFieldVisible(field, { provider: "github", token: "" })).toBe(false);
   });
 
+  it("treats boolean true/false as the string values 'true'/'false'", () => {
+    // Boolean config fields gate dependents via values: ["true"] (e.g. memory
+    // components list mode). The helper stringifies the actual value before
+    // comparing, so JSON booleans satisfy these conditions.
+    const field = buildField({
+      visibilityConditions: [{ field: "iterateList", values: ["true"] }],
+    });
+
+    expect(isFieldVisible(field, { iterateList: true })).toBe(true);
+    expect(isFieldVisible(field, { iterateList: false })).toBe(false);
+    expect(isFieldVisible(field, { iterateList: "true" })).toBe(true);
+    expect(isFieldVisible(field, {})).toBe(false);
+  });
+
   it("filters hidden nested fields from objects and lists", () => {
     const fields: ConfigurationField[] = [
       buildField({ name: "provider" }),
@@ -105,6 +119,8 @@ describe("components visibility helpers", () => {
 describe("components value parsing and validation", () => {
   it("validates cron and number submission values", () => {
     expect(validateFieldForSubmission(buildField({ type: "cron" }), "bad")).toEqual(["Cron expression too short"]);
+    expect(validateFieldForSubmission(buildField({ type: "cron" }), "0 9 31 * *")).toEqual([]);
+    expect(validateFieldForSubmission(buildField({ type: "cron" }), "0 24 * * *")).toEqual(["Invalid hour value"]);
     expect(
       validateFieldForSubmission(
         buildField({

@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
 
@@ -31,9 +31,9 @@ func Test__ListNodeExecutions(t *testing.T) {
 			nil,
 		)
 
-		s, ok := status.FromError(err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("node does not exist -> 404 error", func(t *testing.T) {
@@ -74,10 +74,10 @@ func Test__ListNodeExecutions(t *testing.T) {
 		//
 		// Verify we get a NotFound error
 		//
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "canvas node not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "canvas node not found")
 	})
 
 	t.Run("canvas does not exist -> 404 error", func(t *testing.T) {
@@ -98,10 +98,10 @@ func Test__ListNodeExecutions(t *testing.T) {
 		//
 		// Verify we get a NotFound error
 		//
-		s, ok := status.FromError(err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.NotFound, s.Code())
-		assert.Contains(t, s.Message(), "canvas node not found")
+		assert.Equal(t, codes.NotFound, code)
+		assert.Contains(t, msg, "canvas node not found")
 	})
 
 	t.Run("returns executions for existing node", func(t *testing.T) {
@@ -133,7 +133,7 @@ func Test__ListNodeExecutions(t *testing.T) {
 		rootEvent.CustomName = &customName
 		require.NoError(t, database.Conn().Save(rootEvent).Error)
 		event := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID, nil)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, event.ID)
 
 		//
 		// List executions for the node
@@ -192,7 +192,7 @@ func SerializeThosandNodeExecutions(b *testing.B) {
 	//
 	for i := 0; i < 1000; i++ {
 		event := support.EmitCanvasEventForNode(b, canvas.ID, "manual", "default", nil)
-		execution := support.CreateCanvasNodeExecution(b, canvas.ID, "node-1", event.ID, event.ID, nil)
+		execution := support.CreateCanvasNodeExecution(b, canvas.ID, "node-1", event.ID, event.ID)
 		_, err := execution.Pass(map[string][]any{"default": {map[string]any{"data": "test"}}})
 		require.NoError(b, err)
 	}
@@ -200,9 +200,12 @@ func SerializeThosandNodeExecutions(b *testing.B) {
 	executions, err := models.ListNodeExecutions(canvas.ID, "node-1", []string{}, []string{}, 1000, nil)
 	require.NoError(b, err)
 
+	resources, err := LoadNodeExecutionResources(database.Conn(), executions)
+	require.NoError(b, err)
+
 	b.ResetTimer()
 	for b.Loop() {
-		pb, err := SerializeNodeExecutions(executions, []models.CanvasNodeExecution{})
+		pb, err := SerializeNodeExecutions(executions, resources)
 		require.NoError(b, err)
 		require.NotNil(b, pb)
 		assert.Len(b, pb, 1000)

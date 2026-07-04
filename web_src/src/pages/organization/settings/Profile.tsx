@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { meRegenerateToken } from "@/api-client/sdk.gen";
 import { Avatar } from "@/components/Avatar/avatar";
 import { Heading } from "@/components/Heading/heading";
@@ -12,20 +13,29 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
-import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
+import { CopyButton } from "@/ui/CopyButton";
+import { useAccount } from "@/contexts/useAccount";
+import { showErrorToast } from "@/lib/toast.ts";
+import { ChangePasswordDialog } from "./components/ChangePasswordDialog";
 
 export function Profile() {
   usePageTitle(["Profile"]);
   const queryClient = useQueryClient();
   const organizationId = useOrganizationId();
   const { data: user, isLoading: loading, error: meError } = useMe();
+  const { account } = useAccount();
   const [actionError, setActionError] = useState<string | null>(null);
   const [token, setToken] = useState<string>("");
   const [tokenVisible, setTokenVisible] = useState(false);
   const [regeneratingToken, setRegeneratingToken] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
   const errorMessage =
     actionError || (meError instanceof Error ? meError.message : meError ? "Failed to load profile" : null);
+
+  useReportPageReady(!loading, {
+    failed: !!errorMessage,
+  });
 
   const handleRegenerateToken = async () => {
     try {
@@ -39,17 +49,6 @@ export function Profile() {
       setActionError(err instanceof Error ? err.message : "Failed to regenerate token");
     } finally {
       setRegeneratingToken(false);
-    }
-  };
-
-  const copyToken = async () => {
-    if (!token) return;
-
-    try {
-      await navigator.clipboard.writeText(token);
-      showSuccessToast("API token copied.");
-    } catch {
-      showErrorToast("Failed to copy API token.");
     }
   };
 
@@ -82,6 +81,8 @@ export function Profile() {
       </div>
     );
   }
+
+  const canChangePassword = account?.has_password === true;
 
   return (
     <div className="pt-6 max-w-none">
@@ -124,6 +125,20 @@ export function Profile() {
                 </Text>
               </div>
             </div>
+
+            {canChangePassword && (
+              <div className="flex items-center gap-4">
+                <Button
+                  type="button"
+                  onClick={() => setPasswordModalOpen(true)}
+                  className="flex items-center gap-2"
+                  data-testid="change-password-button"
+                >
+                  <Icon name="lock" />
+                  Change password
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -180,10 +195,13 @@ export function Profile() {
                   >
                     <Icon name={tokenVisible ? "eye-closed" : "eye"} />
                   </Button>
-                  <Button variant="outline" onClick={copyToken} className="flex items-center gap-1">
-                    <Icon name="copy" />
+                  <CopyButton
+                    variant="button"
+                    text={token}
+                    onCopyError={() => showErrorToast("Failed to copy API token.")}
+                  >
                     Copy
-                  </Button>
+                  </CopyButton>
                 </div>
                 <div className="bg-orange-50 dark:bg-amber-900/20 border border-amber-950/15 dark:border-amber-100/15 rounded-lg p-3">
                   <div className="flex items-start gap-2">
@@ -199,6 +217,8 @@ export function Profile() {
           </div>
         </div>
       </div>
+
+      {canChangePassword && <ChangePasswordDialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen} />}
     </div>
   );
 }

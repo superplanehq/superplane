@@ -1,53 +1,128 @@
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
+import { upsertRunIntoDescribeRunData } from "./canvasInfiniteCache";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
   canvasesDescribeCanvasVersion,
   canvasesCreateCanvas,
   canvasesUpdateCanvas,
-  canvasesCreateCanvasVersion,
+  canvasFoldersListCanvasFolders,
+  canvasFoldersCreateCanvasFolder,
+  canvasFoldersUpdateCanvasFolder,
+  canvasFoldersUpdateCanvasFolderPosition,
+  canvasFoldersDeleteCanvasFolder,
   canvasesListCanvasVersions,
-  canvasesUpdateCanvasVersion,
-  canvasesUpdateCanvasVersion2,
-  canvasesCreateCanvasChangeRequest,
-  canvasesActOnCanvasChangeRequest,
-  canvasesResolveCanvasChangeRequest,
-  canvasesListCanvasChangeRequests,
-  canvasesDescribeCanvasChangeRequest,
   canvasesDeleteCanvas,
-  canvasesDeleteCanvasVersion,
-  canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
-  canvasesListCanvasEvents,
+  canvasesListRuns,
+  canvasesDescribeRun,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
+  canvasesCreateCanvasMemoryNamespace,
+  canvasesUpdateCanvasMemoryNamespace,
   canvasesListEventExecutions,
-  canvasesListChildExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
+  canvasesGetCanvasRepository,
+  canvasesListCanvasRepositoryFiles,
+  canvasesPutCanvasStaging,
+  canvasesCommitCanvasStaging,
+  canvasesDeleteCanvasStaging,
   triggersListTriggers,
   triggersDescribeTrigger,
   widgetsListWidgets,
   widgetsDescribeWidget,
 } from "../api-client/sdk.gen";
 import type {
+  CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasSummary,
+  CanvasesCanvasRun,
+  CanvasesCanvasRunResult,
+  CanvasesCanvasRunState,
   CanvasesCanvasVersion,
-  CanvasChangeManagement,
-  SuperplaneComponentsNode,
-  ComponentsPosition,
+  CanvasesCanvasRepositoryFileOperation,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
+import { registerLocalStagingWrite } from "../lib/canvasStagingEcho";
 import { analytics } from "../lib/analytics";
-import { isPublishedVersion } from "../pages/workflowv2/lib/canvas-versions";
+import {
+  canvasVersionWithSpecFromYaml,
+  fetchCanvasVersionWithSpec,
+  fetchCanvasStagingSummary,
+  fetchConsoleSpecFromRepository,
+  fetchRepositorySpecFileContent,
+} from "../pages/app/lib/repository-spec-files";
+import { encodeRepositoryFileContent } from "../pages/app/files/lib/repository-files";
+import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "../pages/app/lib/workflow-spec-paths";
+import { matchesCommittedCanvasYaml, matchesCommittedConsoleYaml } from "../pages/app/lib/staging-content-match";
+import { dematerializeConsoleSpec, materializeConsoleSpec } from "../pages/app/lib/workflow-spec-files";
+
+function versionWithSpecFromYaml(
+  version: CanvasesCanvasVersion | undefined,
+  canvasYaml: string | undefined,
+): CanvasesCanvasVersion | undefined {
+  return canvasVersionWithSpecFromYaml(version, canvasYaml);
+}
+
+// stageSpecOperations writes canvas.yaml/console.yaml edits to the user's
+// canvas staging layer without creating a new version row.
+async function stageSpecOperations(canvasId: string, operations: CanvasesCanvasRepositoryFileOperation[]) {
+  registerLocalStagingWrite(canvasId);
+  await canvasesPutCanvasStaging(
+    withOrganizationHeader({
+      path: { canvasId },
+      body: { operations },
+    }),
+  );
+}
+
+async function discardStagedPaths(canvasId: string, paths: string[]) {
+  registerLocalStagingWrite(canvasId);
+  await canvasesDeleteCanvasStaging(
+    withOrganizationHeader({
+      path: { canvasId },
+      query: paths.length > 0 ? { paths } : undefined,
+    }),
+  );
+}
+
+export type CanvasConsoleData = {
+  canvasId: string;
+  versionId?: string;
+  updatedAt?: string;
+  panels: ConsolePanel[];
+  layout: ConsoleLayoutItem[];
+  consoleYaml: string;
+};
+
+function consoleDataFromYaml(
+  canvasId: string,
+  versionId: string | undefined,
+  consoleYaml: string,
+): CanvasConsoleData | undefined {
+  const parsed = dematerializeConsoleSpec(consoleYaml);
+  if (!parsed) {
+    return undefined;
+  }
+
+  return {
+    canvasId,
+    versionId,
+    panels: parsed.panels,
+    layout: parsed.layout,
+    consoleYaml,
+  };
+}
 
 // Query Keys
 export const canvasKeys = {
   all: ["canvases"] as const,
   lists: () => [...canvasKeys.all, "list"] as const,
   list: (orgId: string) => [...canvasKeys.lists(), orgId] as const,
-  templates: () => [...canvasKeys.all, "templates"] as const,
-  templateList: (orgId: string) => [...canvasKeys.templates(), orgId] as const,
+  folders: () => [...canvasKeys.all, "folders"] as const,
+  folderList: (orgId: string) => [...canvasKeys.folders(), orgId] as const,
   details: () => [...canvasKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
@@ -56,26 +131,14 @@ export const canvasKeys = {
   versionDetails: () => [...canvasKeys.versions(), "detail"] as const,
   versionDetail: (canvasId: string, versionId: string) =>
     [...canvasKeys.versionDetails(), canvasId, versionId] as const,
-  changeRequests: () => [...canvasKeys.all, "changeRequests"] as const,
-  changeRequestList: (canvasId: string) => [...canvasKeys.changeRequests(), canvasId] as const,
-  changeRequestHistory: (
-    canvasId: string,
-    statusFilter: string,
-    onlyMine: boolean,
-    searchQuery: string,
-    limit: number,
-  ) =>
-    [
-      ...canvasKeys.changeRequestList(canvasId),
-      "history",
-      statusFilter,
-      onlyMine ? "mine" : "all",
-      searchQuery,
-      limit,
-    ] as const,
-  changeRequestDetails: () => [...canvasKeys.changeRequests(), "detail"] as const,
-  changeRequestDetail: (canvasId: string, changeRequestId: string) =>
-    [...canvasKeys.changeRequestDetails(), canvasId, changeRequestId] as const,
+  // Staged reads overlay uncommitted edits on the committed version. They must
+  // not share the committed `versionDetail` cache entry, otherwise a committed
+  // (stage=false) fetch for the same version overwrites the staged content and
+  // the editor loses pending edits. Kept as a prefix-extension of versionDetail
+  // so prefix invalidations of versionDetail also refresh the staged read.
+  versionStagedDetail: (canvasId: string, versionId: string) =>
+    [...canvasKeys.versionDetails(), canvasId, versionId, "staged"] as const,
+  canvasStaging: (canvasId: string) => [...canvasKeys.versions(), "staging", canvasId] as const,
   nodeExecutions: () => [...canvasKeys.all, "nodeExecutions"] as const,
   nodeExecution: (canvasId: string, nodeId: string, states?: string[], limit?: number) =>
     [
@@ -85,14 +148,18 @@ export const canvasKeys = {
       ...(states || []),
       ...(limit === undefined ? [] : [limit]),
     ] as const,
-  events: () => [...canvasKeys.all, "events"] as const,
-  eventList: (canvasId: string, limit?: number) => [...canvasKeys.events(), canvasId, limit] as const,
-  infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
+  runs: () => [...canvasKeys.all, "runs"] as const,
+  infiniteRuns: (canvasId: string, filters?: CanvasRunsFilters) =>
+    [
+      ...canvasKeys.runs(),
+      canvasId,
+      "infinite",
+      ...(filters?.states?.length ? ["states", ...filters.states] : []),
+      ...(filters?.results?.length ? ["results", ...filters.results] : []),
+    ] as const,
+  run: (canvasId: string, runId: string) => [...canvasKeys.runs(), canvasId, runId] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
-  childExecutions: () => [...canvasKeys.all, "childExecutions"] as const,
-  childExecution: (canvasId: string, executionId: string) =>
-    [...canvasKeys.childExecutions(), canvasId, executionId] as const,
   nodeQueueItems: () => [...canvasKeys.all, "nodeQueueItems"] as const,
   nodeQueueItem: (canvasId: string, nodeId: string) => [...canvasKeys.nodeQueueItems(), canvasId, nodeId] as const,
   nodeEvents: () => [...canvasKeys.all, "nodeEvents"] as const,
@@ -105,7 +172,75 @@ export const canvasKeys = {
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
+  console: (canvasId: string, versionId?: string) =>
+    [...canvasKeys.all, "console", canvasId, versionId ?? "live"] as const,
+  // Staged console overlays uncommitted edits; kept separate from the committed
+  // `console` entry so a committed (stage=false) refetch cannot overwrite the
+  // editor's pending edits. Prefix-extends `console`, so invalidating `console`
+  // (or `consoleAll`) also refreshes the staged read.
+  consoleStaged: (canvasId: string, versionId?: string) =>
+    [...canvasKeys.console(canvasId, versionId), "staged"] as const,
+  consoleAll: (canvasId: string) => [...canvasKeys.all, "console", canvasId] as const,
+  repository: (canvasId: string) => [...canvasKeys.all, "repository", canvasId] as const,
+  repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
+  repositoryFile: (canvasId: string, path: string, versionId?: string, stage = false) =>
+    [...canvasKeys.repository(canvasId), "file", path, versionId ?? "live", stage ? "staged" : "committed"] as const,
+  // Raw repository-file content keyed per stage so cached reads can be reused
+  // and deduped (e.g. the Files diff and committed-baseline lookups). It
+  // prefix-extends `repositoryFile`, so any invalidation of a file (or the
+  // whole repository) also clears its cached content.
+  repositoryFileContent: (canvasId: string, path: string, versionId: string | undefined, stage: boolean) =>
+    [...canvasKeys.repositoryFile(canvasId, path, versionId), "content", stage ? "staged" : "committed"] as const,
 };
+
+function canvasVersionScopedQueryKeys(canvasId: string, versionId: string) {
+  return [
+    canvasKeys.versionDetail(canvasId, versionId),
+    canvasKeys.versionStagedDetail(canvasId, versionId),
+    canvasKeys.canvasStaging(canvasId),
+    canvasKeys.console(canvasId, versionId),
+    canvasKeys.consoleStaged(canvasId, versionId),
+  ];
+}
+
+export async function cancelCanvasVersionQueries(queryClient: QueryClient, canvasId: string, versionId: string) {
+  await Promise.all(
+    canvasVersionScopedQueryKeys(canvasId, versionId).map((queryKey) => queryClient.cancelQueries({ queryKey })),
+  );
+}
+
+export async function invalidateCanvasVersionQueries(queryClient: QueryClient, canvasId: string, versionId: string) {
+  await Promise.all(
+    canvasVersionScopedQueryKeys(canvasId, versionId).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+  );
+}
+
+export async function removeCanvasVersionQueries(queryClient: QueryClient, canvasId: string, versionId: string) {
+  await cancelCanvasVersionQueries(queryClient, canvasId, versionId);
+  for (const queryKey of canvasVersionScopedQueryKeys(canvasId, versionId)) {
+    queryClient.removeQueries({ queryKey });
+  }
+}
+
+export interface ConsolePanel {
+  id: string;
+  type: string;
+  content: Record<string, unknown>;
+}
+
+export interface ConsoleLayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+}
+
+export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "yellow", "slate", "orange"] as const;
+export type CanvasFolderColor = (typeof CANVAS_FOLDER_COLORS)[number];
+export const DEFAULT_CANVAS_FOLDER_COLOR: CanvasFolderColor = "blue";
 
 export const triggerKeys = {
   all: ["triggers"] as const,
@@ -132,7 +267,7 @@ export const useCanvases = (organizationId: string) => {
     queryFn: async () => {
       const response = await canvasesListCanvases(
         withOrganizationHeader({
-          query: { includeTemplates: false },
+          organizationId,
         }),
       );
       return response.data?.canvases || [];
@@ -141,17 +276,12 @@ export const useCanvases = (organizationId: string) => {
   });
 };
 
-export const useCanvasTemplates = (organizationId: string) => {
+export const useCanvasFolders = (organizationId: string) => {
   return useQuery({
-    queryKey: canvasKeys.templateList(organizationId),
+    queryKey: canvasKeys.folderList(organizationId),
     queryFn: async () => {
-      const response = await canvasesListCanvases(
-        withOrganizationHeader({
-          query: { includeTemplates: true },
-        }),
-      );
-      const canvases = response.data?.canvases || [];
-      return canvases.filter((canvas) => canvas.metadata?.isTemplate);
+      const response = await canvasFoldersListCanvasFolders(withOrganizationHeader({ organizationId }));
+      return response.data?.folders || [];
     },
     enabled: !!organizationId,
   });
@@ -212,7 +342,7 @@ export const useInfiniteCanvasLiveVersions = (
   organizationId: string,
   canvasId: string,
   enabled: boolean = true,
-  limit: number = 20,
+  limit: number = 50,
 ) => {
   return useInfiniteQuery({
     queryKey: canvasKeys.versionHistory(canvasId),
@@ -229,109 +359,9 @@ export const useInfiniteCanvasLiveVersions = (
       return response.data;
     },
     getNextPageParam: (lastPage, allPages) => {
-      const loadedPublishedCount = allPages.reduce(
-        (acc, page) => acc + (page?.versions?.filter((version) => isPublishedVersion(version)).length || 0),
-        0,
-      );
+      const loadedCount = allPages.reduce((acc, page) => acc + (page?.versions?.length || 0), 0);
       const totalCount = lastPage?.totalCount || 0;
 
-      if (loadedPublishedCount >= totalCount) return undefined;
-      if (!lastPage?.hasNextPage) return undefined;
-      return lastPage?.lastTimestamp || undefined;
-    },
-    initialPageParam: undefined as string | undefined,
-    enabled: enabled && !!organizationId && !!canvasId,
-    refetchOnWindowFocus: false,
-  });
-};
-
-export const useCanvasVersion = (organizationId: string, canvasId: string, versionId: string, enabled = true) => {
-  return useQuery({
-    queryKey: canvasKeys.versionDetail(canvasId, versionId),
-    queryFn: async () => {
-      const response = await canvasesDescribeCanvasVersion(
-        withOrganizationHeader({
-          path: { canvasId, versionId },
-        }),
-      );
-      return response.data?.version;
-    },
-    enabled: !!organizationId && !!canvasId && !!versionId && enabled,
-  });
-};
-
-export const useCanvasChangeRequests = (organizationId: string, canvasId: string) => {
-  return useQuery({
-    queryKey: canvasKeys.changeRequestList(canvasId),
-    queryFn: async () => {
-      const response = await canvasesListCanvasChangeRequests(
-        withOrganizationHeader({
-          path: { canvasId },
-          query: { limit: 25, statusFilter: "all" },
-        }),
-      );
-      return response.data?.changeRequests || [];
-    },
-    enabled: !!organizationId && !!canvasId,
-  });
-};
-
-type CanvasChangeRequestFilter = "open" | "rejected" | "merged" | "all";
-
-type CanvasGraphData = {
-  nodes?: unknown[];
-  edges?: unknown[];
-};
-
-type PositionedNode = SuperplaneComponentsNode & {
-  id: string;
-  position: ComponentsPosition;
-};
-
-const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
-  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
-  if (!raw) return 0;
-  const parsed = Date.parse(raw);
-  return Number.isNaN(parsed) ? 0 : parsed;
-};
-
-export const useInfiniteCanvasChangeRequests = (
-  organizationId: string,
-  canvasId: string,
-  options?: {
-    enabled?: boolean;
-    limit?: number;
-    statusFilter?: CanvasChangeRequestFilter;
-    onlyMine?: boolean;
-    searchQuery?: string;
-  },
-) => {
-  const limit = options?.limit || 10;
-  const statusFilter = options?.statusFilter || "open";
-  const onlyMine = options?.onlyMine || false;
-  const searchQuery = options?.searchQuery || "";
-  const enabled = options?.enabled ?? true;
-
-  return useInfiniteQuery({
-    queryKey: canvasKeys.changeRequestHistory(canvasId, statusFilter, onlyMine, searchQuery, limit),
-    queryFn: async ({ pageParam }: { pageParam?: string }) => {
-      const response = await canvasesListCanvasChangeRequests(
-        withOrganizationHeader({
-          path: { canvasId },
-          query: {
-            limit,
-            statusFilter,
-            onlyMine,
-            ...(searchQuery ? { query: searchQuery } : {}),
-            ...(pageParam ? { before: pageParam } : {}),
-          },
-        }),
-      );
-      return response.data;
-    },
-    getNextPageParam: (lastPage, allPages) => {
-      const loadedCount = allPages.reduce((acc, page) => acc + (page?.changeRequests?.length || 0), 0);
-      const totalCount = lastPage?.totalCount || 0;
       if (loadedCount >= totalCount) return undefined;
       if (!lastPage?.hasNextPage) return undefined;
       return lastPage?.lastTimestamp || undefined;
@@ -342,24 +372,58 @@ export const useInfiniteCanvasChangeRequests = (
   });
 };
 
-export const useCanvasChangeRequest = (
+function resolveCanvasVersionStage(stage: boolean | CanvasesCanvasVersion | null | undefined): boolean {
+  if (typeof stage === "boolean") {
+    return stage;
+  }
+
+  return !!stage;
+}
+
+export const useCanvasVersion = (
   organizationId: string,
   canvasId: string,
-  changeRequestId: string,
+  versionId: string,
   enabled = true,
+  stage: boolean | CanvasesCanvasVersion | null = false,
 ) => {
+  const readStaged = resolveCanvasVersionStage(stage);
   return useQuery({
-    queryKey: canvasKeys.changeRequestDetail(canvasId, changeRequestId),
-    queryFn: async () => {
-      const response = await canvasesDescribeCanvasChangeRequest(
-        withOrganizationHeader({
-          path: { canvasId, changeRequestId },
-        }),
-      );
-      return response.data?.changeRequest;
-    },
-    enabled: !!organizationId && !!canvasId && !!changeRequestId && enabled,
+    queryKey: readStaged
+      ? canvasKeys.versionStagedDetail(canvasId, versionId)
+      : canvasKeys.versionDetail(canvasId, versionId),
+    queryFn: async () => fetchCanvasVersionWithSpec(canvasId, versionId, readStaged),
+    enabled: !!organizationId && !!canvasId && !!versionId && enabled,
   });
+};
+
+// useCanvasStaging exposes the uncommitted StagingSummary for the current user.
+export const useCanvasStaging = (canvasId: string | undefined, enabled = true) => {
+  return useQuery({
+    queryKey: canvasKeys.canvasStaging(canvasId ?? ""),
+    queryFn: async () => {
+      const state = await fetchCanvasStagingSummary(canvasId!);
+      return state ?? { hasStaging: false, stagedPaths: [] };
+    },
+    enabled: enabled && !!canvasId,
+    staleTime: 0,
+  });
+};
+
+/** @deprecated Use useCanvasStaging — staging is canvas-scoped, not per-version. */
+export const useCanvasVersionStaging = (canvasId: string, _versionId: string | undefined, enabled = true) =>
+  useCanvasStaging(canvasId, enabled);
+
+type CanvasGraphData = {
+  nodes?: unknown[];
+  edges?: unknown[];
+};
+
+const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
+  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
+  if (!raw) return 0;
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? 0 : parsed;
 };
 
 export const useCreateCanvas = (organizationId: string) => {
@@ -399,12 +463,22 @@ export const useCreateCanvas = (organizationId: string) => {
 
       // Set the workflow detail in cache immediately so it's available when navigating
       if (response?.data?.canvas?.metadata?.id) {
-        queryClient.setQueryData(
-          canvasKeys.detail(organizationId, response.data.canvas.metadata.id),
-          response.data.canvas,
-        );
+        const canvasId = response.data.canvas.metadata.id;
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), response.data.canvas);
+        void queryClient.prefetchQuery({
+          queryKey: canvasKeys.versionList(canvasId),
+          queryFn: async () => {
+            const listResponse = await canvasesListCanvasVersions(
+              withOrganizationHeader({
+                path: { canvasId },
+                query: { limit: 1 },
+              }),
+            );
+            return listResponse.data?.versions || [];
+          },
+        });
         analytics.canvasCreate(
-          response.data.canvas.metadata.id,
+          canvasId,
           organizationId,
           variables.method ?? "ui",
           variables.templateId,
@@ -419,21 +493,13 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: {
-      name?: string;
-      description?: string;
-      changeManagement?: {
-        enabled?: boolean;
-        approvals?: Array<{ type?: string; userId?: string; roleName?: string }>;
-      };
-    }) => {
+    mutationFn: async (data: { name?: string; description?: string }) => {
       return await canvasesUpdateCanvas(
         withOrganizationHeader({
           path: { id: canvasId },
           body: {
             name: data.name,
             description: data.description,
-            changeManagement: data.changeManagement,
           },
         }),
       );
@@ -461,11 +527,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
               name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
               description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
             },
-            spec: {
-              ...current.spec,
-              changeManagement:
-                updatedSpec?.changeManagement ?? variables.changeManagement ?? current.spec?.changeManagement,
-            },
+            spec: updatedSpec ?? current.spec,
           };
         });
       }
@@ -473,116 +535,332 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
   });
 };
 
-export const useCreateCanvasVersion = (organizationId: string, canvasId: string) => {
+export const useCreateCanvasFolder = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      return await canvasesCreateCanvasVersion(
+    mutationFn: async (data: { title: string; backgroundColor?: CanvasFolderColor }) => {
+      return await canvasFoldersCreateCanvasFolder(
         withOrganizationHeader({
-          path: { canvasId },
-          body: {},
+          organizationId,
+          body: {
+            folder: {
+              spec: {
+                title: data.title,
+                backgroundColor: data.backgroundColor || DEFAULT_CANVAS_FOLDER_COLOR,
+              },
+            },
+          },
         }),
       );
     },
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      if (response?.data?.version?.metadata?.id) {
-        analytics.versionPublish(canvasId, organizationId);
+      const createdFolder = response?.data?.folder;
+      queryClient.setQueryData(
+        canvasKeys.folderList(organizationId),
+        (current: CanvasFoldersCanvasFolder[] | undefined) => {
+          if (!createdFolder?.metadata?.id) {
+            return current;
+          }
+
+          const nextFolders = current ? [...current] : [];
+          const existingFolderIndex = nextFolders.findIndex(
+            (folder) => folder.metadata?.id === createdFolder.metadata?.id,
+          );
+          if (existingFolderIndex >= 0) {
+            nextFolders[existingFolderIndex] = createdFolder;
+          } else {
+            nextFolders.unshift(createdFolder);
+          }
+
+          return nextFolders;
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
+    },
+  });
+};
+
+export const useUpdateCanvasFolder = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { folderId: string; title: string; backgroundColor: CanvasFolderColor }) => {
+      return await canvasFoldersUpdateCanvasFolder(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: data.folderId },
+          body: {
+            folder: {
+              spec: {
+                title: data.title,
+                backgroundColor: data.backgroundColor,
+              },
+            },
+          },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const updatedFolder = response?.data?.folder;
+      queryClient.setQueryData(
+        canvasKeys.folderList(organizationId),
+        (current: CanvasFoldersCanvasFolder[] | undefined) => {
+          if (!current || !updatedFolder?.metadata?.id) {
+            return current;
+          }
+
+          const nextFolders = current.map((folder) =>
+            folder.metadata?.id === updatedFolder.metadata?.id ? updatedFolder : folder,
+          );
+          return nextFolders;
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
+    },
+  });
+};
+
+export const useMoveCanvasFolder = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { folderId: string; direction: "DIRECTION_UP" | "DIRECTION_DOWN" }) => {
+      return await canvasFoldersUpdateCanvasFolderPosition(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: data.folderId },
+          body: {
+            direction: data.direction,
+          },
+        }),
+      );
+    },
+    onSuccess: (response) => {
+      const folders = response?.data?.folders;
+      if (folders) {
+        queryClient.setQueryData(canvasKeys.folderList(organizationId), folders);
+      }
+
+      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
+    },
+  });
+};
+
+export const useDeleteCanvasFolder = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (folderId: string) => {
+      return await canvasFoldersDeleteCanvasFolder(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: folderId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    },
+  });
+};
+
+type UpdateCanvasFolderMembershipInput = {
+  folderId: string;
+  title: string;
+  backgroundColor: CanvasFolderColor;
+  canvasIds: string[];
+};
+
+function updateCanvasListFolderMembership(
+  canvases: CanvasesCanvasSummary[] | undefined,
+  data: UpdateCanvasFolderMembershipInput,
+) {
+  if (!canvases) {
+    return canvases;
+  }
+
+  const targetCanvasIds = new Set(data.canvasIds);
+
+  return canvases.map((canvas) => {
+    const canvasId = canvas.id;
+    if (!canvasId) {
+      return canvas;
+    }
+
+    if (targetCanvasIds.has(canvasId)) {
+      return {
+        ...canvas,
+        folderId: data.folderId,
+      };
+    }
+
+    if (canvas.folderId !== data.folderId) {
+      return canvas;
+    }
+
+    return {
+      ...canvas,
+      folderId: undefined,
+    };
+  });
+}
+
+function updateCanvasFolderListMembership(
+  folders: CanvasFoldersCanvasFolder[] | undefined,
+  data: UpdateCanvasFolderMembershipInput,
+) {
+  if (!folders) {
+    return folders;
+  }
+
+  const targetCanvasIds = new Set(data.canvasIds);
+
+  return folders.map((folder) => {
+    const folderId = folder.metadata?.id;
+    if (!folderId) {
+      return folder;
+    }
+
+    if (folderId === data.folderId) {
+      return {
+        ...folder,
+        spec: {
+          ...folder.spec,
+          title: data.title,
+          backgroundColor: data.backgroundColor,
+          canvases: data.canvasIds.map((id) => ({ id })),
+        },
+      };
+    }
+
+    const canvases = folder.spec?.canvases || [];
+    const nextCanvases = canvases.filter((canvas) => !canvas.id || !targetCanvasIds.has(canvas.id));
+    if (nextCanvases.length === canvases.length) {
+      return folder;
+    }
+
+    return {
+      ...folder,
+      spec: {
+        ...folder.spec,
+        canvases: nextCanvases,
+      },
+    };
+  });
+}
+
+export const useUpdateCanvasFolderMembership = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: UpdateCanvasFolderMembershipInput) => {
+      return await canvasFoldersUpdateCanvasFolder(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: data.folderId },
+          body: {
+            folder: {
+              spec: {
+                title: data.title,
+                backgroundColor: data.backgroundColor,
+                canvases: data.canvasIds.map((id) => ({ id })),
+              },
+            },
+            replaceMembership: true,
+          },
+        }),
+      );
+    },
+    onMutate: async (data) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: canvasKeys.list(organizationId) }),
+        queryClient.cancelQueries({ queryKey: canvasKeys.folderList(organizationId) }),
+      ]);
+
+      const previousCanvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
+      const previousFolders = queryClient.getQueryData<CanvasFoldersCanvasFolder[]>(
+        canvasKeys.folderList(organizationId),
+      );
+
+      queryClient.setQueryData(canvasKeys.list(organizationId), (current: CanvasesCanvasSummary[] | undefined) =>
+        updateCanvasListFolderMembership(current, data),
+      );
+      queryClient.setQueryData(
+        canvasKeys.folderList(organizationId),
+        (current: CanvasFoldersCanvasFolder[] | undefined) => updateCanvasFolderListMembership(current, data),
+      );
+
+      return { previousCanvases, previousFolders };
+    },
+    onError: (_error, _data, context) => {
+      if (context?.previousCanvases) {
+        queryClient.setQueryData(canvasKeys.list(organizationId), context.previousCanvases);
+      }
+
+      if (context?.previousFolders) {
+        queryClient.setQueryData(canvasKeys.folderList(organizationId), context.previousFolders);
       }
     },
-  });
-};
-
-export const useDeleteCanvasVersion = (organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (versionId: string) => {
-      return await canvasesDeleteCanvasVersion(
-        withOrganizationHeader({
-          path: { canvasId, versionId },
-        }),
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
     },
   });
 };
 
-export const usePublishCanvasVersion = (organizationId: string, canvasId: string) => {
+export const useUpdateCanvasVersion = (canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (versionId: string) => {
-      return await canvasesPublishCanvasVersion(
-        withOrganizationHeader({
-          path: { canvasId, versionId },
-          body: {},
-        }),
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-    },
-  });
-};
+    mutationFn: async (data: { versionId?: string; canvasYaml: string }) => {
+      if (!data.versionId) {
+        throw new Error("version id is required");
+      }
 
-export const useUpdateCanvasVersion = (organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: {
-      versionId?: string;
-      name: string;
-      description?: string;
-      nodes?: unknown[];
-      edges?: unknown[];
-      changeManagement?: CanvasChangeManagement;
-      autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
-      preserveLocalCanvasState?: boolean;
-      invalidateRelatedQueries?: boolean;
-    }) => {
-      const body = {
-        canvas: {
-          metadata: {
-            name: data.name,
-            description: data.description || "",
+      // Stage-only: write canvas.yaml to the draft's staging layer. The
+      // committed version row is only updated by an explicit Commit
+      // (useCommitCanvasStaging).
+      const canvasMatchesCommitted = await matchesCommittedCanvasYaml(canvasId, data.versionId, data.canvasYaml);
+      if (canvasMatchesCommitted) {
+        await discardStagedPaths(canvasId, [CANVAS_YAML_PATH]);
+      } else {
+        await stageSpecOperations(canvasId, [
+          {
+            path: CANVAS_YAML_PATH,
+            content: encodeRepositoryFileContent(data.canvasYaml),
           },
-          spec: {
-            nodes: data.nodes || [],
-            edges: data.edges || [],
-            changeManagement: data.changeManagement,
-          },
-        },
-        autoLayout: data.autoLayout,
-      };
+        ]);
+      }
 
-      if (data.versionId) {
-        return await canvasesUpdateCanvasVersion(
-          withOrganizationHeader({
-            path: { canvasId, versionId: data.versionId },
-            body,
-          }),
+      const [canvasYaml, stagingSummary] = await Promise.all([
+        fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, data.versionId, true),
+        fetchCanvasStagingSummary(canvasId),
+      ]);
+
+      const version = versionWithSpecFromYaml(
+        (
+          await canvasesDescribeCanvasVersion(
+            withOrganizationHeader({
+              path: { canvasId, versionId: data.versionId },
+            }),
+          )
+        ).data?.version,
+        canvasYaml,
+      );
+      return { data: { canvasYaml, version, stagingSummary } };
+    },
+    onSuccess: (response, variables) => {
+      const version = versionWithSpecFromYaml(response?.data?.version, response?.data?.canvasYaml);
+
+      if (variables.versionId) {
+        queryClient.setQueryData(
+          canvasKeys.canvasStaging(canvasId),
+          response?.data?.stagingSummary ?? { hasStaging: false, stagedPaths: [] },
         );
       }
 
-      return await canvasesUpdateCanvasVersion2(
-        withOrganizationHeader({
-          path: { canvasId },
-          body,
-        }),
-      );
-    },
-    onSuccess: (response, variables) => {
-      const version = response?.data?.version;
       if (!version) {
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
@@ -590,7 +868,10 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       }
 
       if (variables.versionId) {
-        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, variables.versionId), version);
+        // `version` carries the effective staged spec (fetched with stage=true),
+        // so it belongs to the staged cache entry the editor reads — not the
+        // committed `versionDetail` used by the draft branch list.
+        queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, variables.versionId), version);
       }
 
       queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
@@ -614,162 +895,6 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         next.sort((left, right) => versionSortTimestamp(right) - versionSortTimestamp(left));
         return next;
       });
-
-      if (!variables.preserveLocalCanvasState) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
-          if (!current) {
-            return current;
-          }
-
-          // When the server computed a new layout (autoLayout), accept the
-          // server positions as authoritative. Otherwise preserve current
-          // local node positions to avoid overwriting positions that changed
-          // while the save was in flight.
-          if (variables.autoLayout) {
-            return { ...current, spec: { ...current.spec, ...version.spec } };
-          }
-
-          const currentPositionsByNodeId = new Map(
-            (current.spec?.nodes ?? [])
-              .filter((node): node is PositionedNode => Boolean(node.id && node.position))
-              .map((node) => [node.id, node.position] as const),
-          );
-
-          const mergedNodes = (version.spec?.nodes ?? []).map((serverNode) => {
-            if (!serverNode.id) {
-              return serverNode;
-            }
-
-            const localPosition = currentPositionsByNodeId.get(serverNode.id);
-            if (localPosition) {
-              return { ...serverNode, position: localPosition };
-            }
-            return serverNode;
-          });
-
-          return {
-            ...current,
-            spec: { ...current.spec, ...version.spec, nodes: mergedNodes },
-          };
-        });
-      }
-
-      if (variables.invalidateRelatedQueries !== false) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      }
-    },
-  });
-};
-
-export const useCreateCanvasChangeRequest = (_organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: { versionId?: string; title?: string; description?: string }) => {
-      return await canvasesCreateCanvasChangeRequest(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: {
-            title: data.title,
-            description: data.description,
-            ...(data.versionId ? { versionId: data.versionId } : {}),
-          },
-        }),
-      );
-    },
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-
-      const changeRequest = response?.data?.changeRequest;
-      const changeRequestID = changeRequest?.metadata?.id;
-      if (changeRequest && changeRequestID) {
-        queryClient.setQueryData(canvasKeys.changeRequestDetail(canvasId, changeRequestID), changeRequest);
-      }
-    },
-  });
-};
-
-export const useActOnCanvasChangeRequest = (organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: {
-      changeRequestId: string;
-      action: "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_REJECT" | "ACTION_REOPEN" | "ACTION_PUBLISH";
-    }) => {
-      return await canvasesActOnCanvasChangeRequest(
-        withOrganizationHeader({
-          path: { canvasId, changeRequestId: data.changeRequestId },
-          body: {
-            action: data.action,
-          },
-        }),
-      );
-    },
-    onSuccess: (_response, variables) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-      queryClient.removeQueries({ queryKey: canvasKeys.changeRequestDetail(canvasId, variables.changeRequestId) });
-    },
-  });
-};
-
-export const useResolveCanvasChangeRequest = (organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: {
-      changeRequestId: string;
-      name: string;
-      description?: string;
-      nodes?: unknown[];
-      edges?: unknown[];
-      autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
-    }) => {
-      return await canvasesResolveCanvasChangeRequest(
-        withOrganizationHeader({
-          path: { canvasId, changeRequestId: data.changeRequestId },
-          body: {
-            canvas: {
-              metadata: {
-                name: data.name,
-                description: data.description || "",
-              },
-              spec: {
-                nodes: data.nodes || [],
-                edges: data.edges || [],
-              },
-            },
-            autoLayout: data.autoLayout,
-          },
-        }),
-      );
-    },
-    onSuccess: (response, variables) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-
-      const version = response?.data?.version;
-      if (version?.metadata?.id) {
-        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, version.metadata.id), version);
-      }
-
-      const changeRequest = response?.data?.changeRequest;
-      if (changeRequest?.metadata?.id) {
-        queryClient.setQueryData(canvasKeys.changeRequestDetail(canvasId, changeRequest.metadata.id), changeRequest);
-      } else {
-        queryClient.removeQueries({ queryKey: canvasKeys.changeRequestDetail(canvasId, variables.changeRequestId) });
-      }
     },
   });
 };
@@ -782,9 +907,9 @@ export const useDeleteCanvas = (organizationId: string) => {
       // Capture node count before removing from cache.
       // Fall back to the list cache if the detail page was never opened.
       const cachedDetail = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
-      const cachedList = queryClient.getQueryData<CanvasesCanvas[]>(canvasKeys.list(organizationId));
-      const cachedCanvas = cachedDetail ?? cachedList?.find((c) => c.metadata?.id === canvasId);
-      const nodeCount = cachedCanvas?.spec?.nodes?.length ?? 0;
+      const cachedList = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
+      const cachedSummary = cachedList?.find((canvas) => canvas.id === canvasId);
+      const nodeCount = cachedDetail?.spec?.nodes?.length ?? cachedSummary?.nodes?.length ?? 0;
 
       // Remove from cache immediately before deletion to prevent 404 flash
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
@@ -806,17 +931,51 @@ export const useDeleteCanvas = (organizationId: string) => {
   });
 };
 
-export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
+export type CanvasRunsFilters = {
+  states?: CanvasesCanvasRunState[];
+  results?: CanvasesCanvasRunResult[];
+};
+
+export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true) => {
+  const queryClient = useQueryClient();
+
+  return useQuery({
+    queryKey: canvasKeys.run(canvasId, runId!),
+    queryFn: async () => {
+      const response = await canvasesDescribeRun(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            runId: runId!,
+          },
+        }),
+      );
+      const described = response.data;
+      if (!described?.run) {
+        return described;
+      }
+
+      const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(canvasKeys.run(canvasId, runId!));
+      return upsertRunIntoDescribeRunData(current, described.run);
+    },
+    refetchOnWindowFocus: false,
+    enabled: !!canvasId && !!runId && enabled,
+  });
+};
+
+export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {
   const limit = 25;
 
   return useInfiniteQuery({
-    queryKey: canvasKeys.infiniteEvents(canvasId),
+    queryKey: canvasKeys.infiniteRuns(canvasId, filters),
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
-      const response = await canvasesListCanvasEvents(
+      const response = await canvasesListRuns(
         withOrganizationHeader({
           path: { canvasId },
           query: {
             limit,
+            ...(filters.states?.length ? { states: filters.states } : {}),
+            ...(filters.results?.length ? { results: filters.results } : {}),
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),
@@ -824,31 +983,45 @@ export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
       return response.data;
     },
     getNextPageParam: (lastPage, allPages) => {
-      const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.events?.length || 0), 0);
+      const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.runs?.length || 0), 0);
       const totalCount = lastPage?.totalCount || 0;
 
       if (currentLoadedCount >= totalCount) return undefined;
-
-      if (lastPage?.events && lastPage.events.length > 0) {
-        const lastEvent = lastPage.events[lastPage.events.length - 1];
-        return lastEvent.createdAt;
-      }
-      return undefined;
+      return lastPage?.lastTimestamp;
     },
     initialPageParam: undefined as string | undefined,
     staleTime: 0,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     enabled: !!canvasId && enabled,
   });
 };
 
+export type CanvasMemoryEntrySource = "node" | "manual" | "unknown";
+
 export interface CanvasMemoryEntry {
   id: string;
   namespace: string;
   values: unknown;
+  source: CanvasMemoryEntrySource;
+  /** Server timestamp the entry was first persisted. ISO-8601 string. */
+  createdAt?: string;
+  /** Server timestamp the entry was last updated. ISO-8601 string. */
+  updatedAt?: string;
+}
+
+function normalizeCanvasMemorySource(source: string | undefined): CanvasMemoryEntrySource {
+  if (source === "SOURCE_MANUAL") return "manual";
+  if (source === "SOURCE_NODE") return "node";
+  return "unknown";
 }
 
 export const useCanvasMemoryEntries = (canvasId: string, enabled = true) => {
+  // Memory updates are pushed via the `memory_updated` websocket event
+  // (see useCanvasWebsocket), so we no longer poll on an interval. The
+  // websocket handler invalidates this query whenever memory changes from a
+  // node execution, manual mutation, or another tab; a reconnect also
+  // invalidates so we never miss updates received while disconnected.
   return useQuery({
     queryKey: canvasKeys.canvasMemoryEntries(canvasId),
     queryFn: async () => {
@@ -862,10 +1035,12 @@ export const useCanvasMemoryEntries = (canvasId: string, enabled = true) => {
         id: item.id || "",
         namespace: item.namespace || "",
         values: item.values,
+        source: normalizeCanvasMemorySource(item.source),
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
       }));
     },
     refetchOnWindowFocus: false,
-    refetchInterval: 3000,
     enabled: !!canvasId && enabled,
   });
 };
@@ -880,6 +1055,56 @@ export const useDeleteCanvasMemoryEntry = (canvasId: string) => {
           path: {
             canvasId,
             memoryId,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasMemoryEntries(canvasId) });
+    },
+  });
+};
+
+export interface CreateCanvasMemoryNamespaceInput {
+  namespace: string;
+  entries: unknown[];
+}
+
+export const useCreateCanvasMemoryNamespace = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ namespace, entries }: CreateCanvasMemoryNamespaceInput) => {
+      await canvasesCreateCanvasMemoryNamespace(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: { namespace, entries },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasMemoryEntries(canvasId) });
+    },
+  });
+};
+
+export interface UpdateCanvasMemoryNamespaceInput {
+  namespace: string;
+  newNamespace?: string;
+  entries: unknown[];
+}
+
+export const useUpdateCanvasMemoryNamespace = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ namespace, newNamespace, entries }: UpdateCanvasMemoryNamespaceInput) => {
+      await canvasesUpdateCanvasMemoryNamespace(
+        withOrganizationHeader({
+          path: { canvasId, namespace },
+          body: {
+            newNamespace: newNamespace && newNamespace !== namespace ? newNamespace : undefined,
+            entries,
           },
         }),
       );
@@ -909,24 +1134,34 @@ export const useEventExecutions = (canvasId: string, eventId: string | null) => 
   });
 };
 
-export const useChildExecutions = (canvasId: string, executionId: string | null) => {
-  return useQuery({
-    queryKey: canvasKeys.childExecution(canvasId, executionId!),
-    queryFn: async () => {
-      const response = await canvasesListChildExecutions(
-        withOrganizationHeader({
-          path: {
-            canvasId,
-            executionId: executionId!,
-          },
-          body: {},
-        }),
-      );
-      return response.data;
-    },
-    refetchOnWindowFocus: false,
-    enabled: !!canvasId && !!executionId,
+/**
+ * Fetch executions for multiple root event ids in parallel. Each query is
+ * keyed by `(canvasId, eventId)`, identical to `useEventExecutions`, so the
+ * results dedupe with any single-event consumer (e.g. `RunNodeDetailModal`)
+ * already in the React Query cache. Returns the per-event results array
+ * along with an aggregate `isLoading` flag that's `true` while any of the
+ * underlying queries hasn't resolved yet.
+ */
+export const useEventExecutionsBatch = (canvasId: string, eventIds: string[]) => {
+  const queries = useQueries({
+    queries: eventIds.map((eventId) => ({
+      queryKey: canvasKeys.eventExecution(canvasId, eventId),
+      queryFn: async () => {
+        const response = await canvasesListEventExecutions(
+          withOrganizationHeader({
+            path: { canvasId, eventId },
+          }),
+        );
+        return response.data;
+      },
+      refetchOnWindowFocus: false,
+      enabled: !!canvasId && !!eventId,
+      staleTime: 30 * 1000,
+      gcTime: 5 * 60 * 1000,
+    })),
   });
+  const isLoading = queries.some((q) => q.isLoading);
+  return { queries, isLoading };
 };
 
 export const useNodeQueueItems = (canvasId: string, nodeId: string) => {
@@ -1199,3 +1434,366 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
     refetchOnWindowFocus: false,
   });
 };
+
+// fetchCanvasConsoleData reads console.yaml from the repository and parses it
+// into console data. Shared by useCanvasConsole and committed-baseline lookups
+// so both reuse the same query cache entry (deduping the read).
+export async function fetchCanvasConsoleData(
+  canvasId: string,
+  versionId: string | undefined,
+  stage: boolean,
+): Promise<CanvasConsoleData | undefined> {
+  const spec = await fetchConsoleSpecFromRepository(canvasId, versionId, stage);
+  if (!spec) {
+    return undefined;
+  }
+  return consoleDataFromYaml(canvasId, versionId, spec.consoleYaml);
+}
+
+export const useCanvasConsole = (
+  canvasId: string,
+  versionId: string | undefined,
+  enabled: boolean = true,
+  stage = false,
+) => {
+  return useQuery({
+    queryKey: stage ? canvasKeys.consoleStaged(canvasId, versionId) : canvasKeys.console(canvasId, versionId),
+    queryFn: () => fetchCanvasConsoleData(canvasId, versionId, stage),
+    enabled: enabled && !!canvasId,
+    staleTime: 30_000,
+  });
+};
+
+type UseUpdateCanvasConsoleOptions = {
+  getMutationGeneration?: () => number;
+};
+
+function toCanvasConsole(
+  canvasId: string,
+  versionId: string | undefined,
+  input: { panels: ConsolePanel[]; layout: ConsoleLayoutItem[] },
+  previous?: CanvasConsoleData,
+): CanvasConsoleData {
+  const consoleYaml =
+    previous?.consoleYaml ??
+    materializeConsoleSpec({
+      panels: input.panels,
+      layout: input.layout,
+      canvasId,
+    });
+
+  return {
+    ...previous,
+    canvasId: previous?.canvasId ?? canvasId,
+    ...(versionId ? { versionId: previous?.versionId ?? versionId } : {}),
+    panels: input.panels,
+    layout: input.layout,
+    consoleYaml,
+  };
+}
+
+export const useUpdateCanvasConsole = (
+  canvasId: string,
+  versionId: string | undefined,
+  options?: UseUpdateCanvasConsoleOptions,
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    onMutate: async (input) => {
+      // Console edits are stage-only; write to the staged cache the editor reads.
+      const queryKey = canvasKeys.consoleStaged(canvasId, versionId);
+      const mutationGeneration = options?.getMutationGeneration?.() ?? 0;
+      if (input.panels === undefined || input.layout === undefined) {
+        return { previous: queryClient.getQueryData<CanvasConsoleData>(queryKey), queryKey, mutationGeneration };
+      }
+
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<CanvasConsoleData>(queryKey);
+      queryClient.setQueryData(
+        queryKey,
+        toCanvasConsole(canvasId, versionId, { panels: input.panels, layout: input.layout }, previous),
+      );
+      return { previous, queryKey, mutationGeneration };
+    },
+    mutationFn: async (input: { panels?: ConsolePanel[]; layout?: ConsoleLayoutItem[]; consoleYaml?: string }) => {
+      if (!versionId) {
+        throw new Error("version id is required");
+      }
+
+      const consoleYaml =
+        input.consoleYaml ??
+        materializeConsoleSpec({
+          panels: input.panels ?? [],
+          layout: input.layout ?? [],
+          canvasId,
+        });
+
+      const consoleMatchesCommitted = await matchesCommittedConsoleYaml(canvasId, versionId, consoleYaml);
+      if (consoleMatchesCommitted) {
+        await discardStagedPaths(canvasId, [CONSOLE_YAML_PATH]);
+      } else {
+        await stageSpecOperations(canvasId, [
+          {
+            path: CONSOLE_YAML_PATH,
+            content: encodeRepositoryFileContent(consoleYaml),
+          },
+        ]);
+      }
+
+      const [spec, stagingSummary] = await Promise.all([
+        fetchConsoleSpecFromRepository(canvasId, versionId, true),
+        fetchCanvasStagingSummary(canvasId),
+      ]);
+      const consoleData = spec
+        ? consoleDataFromYaml(canvasId, versionId, spec.consoleYaml)
+        : consoleDataFromYaml(canvasId, versionId, consoleYaml);
+      return {
+        consoleData,
+        stagingSummary,
+      };
+    },
+    onError: (_error, _input, context) => {
+      if (!context) return;
+      const latestGeneration = options?.getMutationGeneration?.() ?? context.mutationGeneration;
+      if (context.mutationGeneration !== latestGeneration) {
+        return;
+      }
+      queryClient.setQueryData(context.queryKey, context.previous);
+    },
+    onSuccess: (result, _input, context) => {
+      const latestGeneration = options?.getMutationGeneration?.() ?? context?.mutationGeneration;
+      if (context && context.mutationGeneration !== latestGeneration) {
+        return;
+      }
+      if (result.consoleData) {
+        queryClient.setQueryData(canvasKeys.consoleStaged(canvasId, versionId), result.consoleData);
+      }
+      if (versionId) {
+        queryClient.setQueryData(
+          canvasKeys.canvasStaging(canvasId),
+          result.stagingSummary ?? { hasStaging: false, stagedPaths: [] },
+        );
+      }
+    },
+  });
+};
+
+export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
+export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;
+
+async function fetchRepositoryFileContent(
+  canvasId: string,
+  path: string,
+  versionId?: string,
+  stage = false,
+): Promise<string> {
+  return fetchRepositorySpecFileContent(canvasId, path, versionId, stage);
+}
+
+// fetchRepositoryFileContentCached reads raw repository-file content through the
+// React Query cache so callers (the Files diff, committed baselines, selection)
+// reuse and dedupe identical reads. Committed (stage=false) content only changes
+// on publish/commit, so it is cached; staged (stage=true) content changes on
+// every autosave, so it always refetches to stay correct.
+export function fetchRepositoryFileContentCached(
+  queryClient: QueryClient,
+  canvasId: string,
+  path: string,
+  versionId: string | undefined,
+  stage: boolean,
+): Promise<string> {
+  return queryClient.fetchQuery({
+    queryKey: canvasKeys.repositoryFileContent(canvasId, path, versionId, stage),
+    queryFn: () => fetchRepositorySpecFileContent(canvasId, path, versionId, stage),
+    staleTime: stage ? 0 : 30_000,
+  });
+}
+
+export const useCanvasRepository = (canvasId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: canvasKeys.repository(canvasId),
+    queryFn: async () => {
+      const response = await canvasesGetCanvasRepository(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      return response.data?.repository;
+    },
+    enabled: enabled && !!canvasId,
+    staleTime: 30_000,
+    refetchInterval: (query) => {
+      const state = query.state.data?.status?.state;
+      return state === "STATE_PENDING" ? 3000 : false;
+    },
+  });
+};
+
+export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: canvasKeys.repositoryFiles(canvasId),
+    queryFn: async () => {
+      const response = await canvasesListCanvasRepositoryFiles(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      return response.data;
+    },
+    enabled: enabled && !!canvasId,
+    staleTime: 15_000,
+  });
+};
+
+export const useCanvasRepositoryFile = (
+  canvasId: string,
+  path: string | null,
+  enabled: boolean = true,
+  versionId?: string,
+  stage = false,
+) => {
+  const normalizedPath = path ?? "";
+  return useQuery({
+    queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, versionId, stage),
+    queryFn: async () => {
+      const content = await fetchRepositoryFileContent(canvasId, normalizedPath, versionId, stage);
+      return {
+        path: normalizedPath,
+        content,
+      };
+    },
+    enabled: enabled && !!canvasId && !!normalizedPath,
+    staleTime: 15_000,
+  });
+};
+
+// useStageCanvasSpecFiles writes canvas.yaml/console.yaml edits to staging (no commit).
+export const useStageCanvasSpecFiles = (canvasId: string) => {
+  return useMutation({
+    mutationFn: async (operations: CanvasesCanvasRepositoryFileOperation[]) => {
+      registerLocalStagingWrite(canvasId);
+      const response = await canvasesPutCanvasStaging(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: { operations },
+        }),
+      );
+      return response.data?.stagingSummary;
+    },
+  });
+};
+
+// useCommitCanvasStaging commits staged edits to the main branch and clears staging.
+export const useCommitCanvasStaging = (canvasId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (commitMessage: string) => {
+      registerLocalStagingWrite(canvasId);
+      const response = await canvasesCommitCanvasStaging(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: { commitMessage },
+        }),
+      );
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        canvasKeys.canvasStaging(canvasId),
+        data?.stagingSummary ?? { hasStaging: false, stagedPaths: [] },
+      );
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+    },
+  });
+};
+
+// useDiscardCanvasStaging deletes staging rows for a canvas. Pass paths to revert
+// specific files; omit to discard everything.
+export const useDiscardCanvasStaging = (canvasId: string, versionId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (paths?: string[]) => {
+      registerLocalStagingWrite(canvasId);
+      const response = await canvasesDeleteCanvasStaging(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: paths && paths.length > 0 ? { paths } : undefined,
+        }),
+      );
+      return response.data?.stagingSummary;
+    },
+    onSuccess: (stagingSummary, _paths, _context) => {
+      queryClient.setQueryData(
+        canvasKeys.canvasStaging(canvasId),
+        stagingSummary ?? { hasStaging: false, stagedPaths: [] },
+      );
+      if (versionId) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) });
+      }
+      queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
+    },
+  });
+};
+
+// useStageRepositoryFiles stages arbitrary repository file edits into staging.
+export const useStageRepositoryFiles = (canvasId: string, versionId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (operations: CanvasesCanvasRepositoryFileOperation[]) => {
+      registerLocalStagingWrite(canvasId);
+      const response = await canvasesPutCanvasStaging(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: { operations },
+        }),
+      );
+      return response.data?.stagingSummary;
+    },
+    onSuccess: (stagingSummary, operations) => {
+      queryClient.setQueryData(
+        canvasKeys.canvasStaging(canvasId),
+        stagingSummary ?? { hasStaging: false, stagedPaths: [] },
+      );
+      queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+
+      const affectedPaths = new Set(
+        operations.map((operation) => operation.path).filter((path): path is string => !!path),
+      );
+      for (const path of affectedPaths) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFile(canvasId, path, versionId) });
+      }
+    },
+  });
+};
+
+// useDiscardRepositoryFilePaths reverts specific staged paths, refreshing StagingSummary.
+export const useDiscardRepositoryFilePaths = (canvasId: string, versionId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (paths: string[]) => {
+      registerLocalStagingWrite(canvasId);
+      const response = await canvasesDeleteCanvasStaging(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: paths.length > 0 ? { paths } : undefined,
+        }),
+      );
+      return response.data?.stagingSummary;
+    },
+    onSuccess: (stagingSummary, paths) => {
+      queryClient.setQueryData(
+        canvasKeys.canvasStaging(canvasId),
+        stagingSummary ?? { hasStaging: false, stagedPaths: [] },
+      );
+      queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+      for (const path of new Set(paths)) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFile(canvasId, path, versionId) });
+      }
+    },
+  });
+};
+
+export type CanvasRepositoryFilesQueryResult = ReturnType<typeof useCanvasRepositoryFiles>;
+export type CanvasRepositoryFileQueryResult = ReturnType<typeof useCanvasRepositoryFile>;

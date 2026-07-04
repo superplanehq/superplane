@@ -43,12 +43,13 @@ func (p *OnPullRequest) Documentation() string {
 ## Configuration
 
 - **Repository**: Select the GitHub repository to monitor
-- **Actions**: Select which PR actions to listen for (opened, closed, synchronize, etc.)
+- **Actions**: Select which PR actions to listen for (opened, edited, closed, synchronize, etc.)
 
 ## Event Data
 
 Each PR event includes:
-- **action**: The action that triggered the event (opened, closed, synchronize, etc.)
+- **action**: The action that triggered the event (opened, edited, closed, synchronize, etc.)
+- **changes**: When action is edited, includes what changed (title, body, base branch)
 - **pull_request**: Complete PR information including title, body, state, labels
 - **repository**: Repository information
 - **sender**: User who triggered the event
@@ -91,12 +92,25 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "Assigned", Value: "assigned"},
 						{Label: "Unassigned", Value: "unassigned"},
-						{Label: "Opened", Value: "opened"},
-						{Label: "Closed", Value: "closed"},
 						{Label: "Labeled", Value: "labeled"},
 						{Label: "Unlabeled", Value: "unlabeled"},
+						{Label: "Opened", Value: "opened"},
+						{Label: "Edited", Value: "edited"},
+						{Label: "Closed", Value: "closed"},
 						{Label: "Reopened", Value: "reopened"},
 						{Label: "Synchronize", Value: "synchronize"},
+						{Label: "Converted to draft", Value: "converted_to_draft"},
+						{Label: "Locked", Value: "locked"},
+						{Label: "Unlocked", Value: "unlocked"},
+						{Label: "Enqueued", Value: "enqueued"},
+						{Label: "Dequeued", Value: "dequeued"},
+						{Label: "Milestoned", Value: "milestoned"},
+						{Label: "Demilestoned", Value: "demilestoned"},
+						{Label: "Ready for review", Value: "ready_for_review"},
+						{Label: "Review requested", Value: "review_requested"},
+						{Label: "Review request removed", Value: "review_request_removed"},
+						{Label: "Auto merge enabled", Value: "auto_merge_enabled"},
+						{Label: "Auto merge disabled", Value: "auto_merge_disabled"},
 					},
 				},
 			},
@@ -108,6 +122,7 @@ func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 	err := common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 

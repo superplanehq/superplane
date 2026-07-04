@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
 
@@ -276,13 +276,13 @@ func Test__ListNodeQueueItems__ReturnsErrorForInvalidCanvasID(t *testing.T) {
 	response, err := ListNodeQueueItems(context.Background(), r.Registry, "invalid-uuid", "node-1", 10, nil)
 	require.Error(t, err)
 	assert.Nil(t, response)
-	s, ok := status.FromError(err)
+	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
-	assert.Equal(t, codes.InvalidArgument, s.Code())
+	assert.Equal(t, codes.InvalidArgument, code)
 }
 
 func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {
-	result, err := SerializeNodeQueueItems([]models.CanvasNodeQueueItem{})
+	result, err := SerializeNodeQueueItems(database.Conn(), []models.CanvasNodeQueueItem{})
 	require.NoError(t, err)
 	assert.Empty(t, result)
 }

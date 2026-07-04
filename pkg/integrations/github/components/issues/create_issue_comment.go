@@ -124,6 +124,7 @@ func (c *CreateIssueComment) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -139,12 +140,7 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("issue number is not a number: %v", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -153,14 +149,7 @@ func (c *CreateIssueComment) Execute(ctx core.ExecutionContext) error {
 		Body: &config.Body,
 	}
 
-	createdComment, _, err := client.Issues.CreateComment(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		issueNumber,
-		comment,
-	)
-
+	createdComment, _, err := client.CreateIssueComment(context.Background(), config.Repository, issueNumber, comment)
 	if err != nil {
 		return fmt.Errorf("failed to create issue comment: %w", err)
 	}

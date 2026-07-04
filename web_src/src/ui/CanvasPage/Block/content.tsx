@@ -10,7 +10,7 @@ import {
   getSafeCompositeProps,
   getSafeTriggerProps,
 } from "./data";
-import { isRecord } from "@/pages/workflowv2/mappers/safeMappers";
+import { isRecord } from "@/pages/app/mappers/safeMappers";
 
 function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isCompactView"]) {
   if (isCompactView !== undefined) {
@@ -29,15 +29,9 @@ function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isC
   }
 }
 
-function getActionProps(data: BlockProps["data"], compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
+function getActionProps(compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
   return {
-    onRun: props.onRun,
-    runDisabled: props.runDisabled,
-    runDisabledTooltip: props.runDisabledTooltip,
-    onTogglePause: data.type === "trigger" ? undefined : props.onTogglePause,
-    onEdit: props.onEdit,
     onDuplicate: props.onDuplicate,
-    onDeactivate: props.onDeactivate,
     onToggleView: props.onToggleView,
     onDelete: props.onDelete,
     isCompactView: compactView,
@@ -51,8 +45,9 @@ function renderFallbackBlock(args: {
   showHeader: boolean | undefined;
   canvasMode: BlockProps["canvasMode"];
   actionProps: ReturnType<typeof getActionProps>;
+  dimBodyBelowHeader?: boolean;
 }) {
-  const { data, fallbackTitle, selected, showHeader, canvasMode, actionProps } = args;
+  const { data, fallbackTitle, selected, showHeader, canvasMode, actionProps, dimBodyBelowHeader } = args;
 
   return (
     <ComponentBase
@@ -60,6 +55,8 @@ function renderFallbackBlock(args: {
       canvasMode={canvasMode}
       selected={selected}
       showHeader={showHeader}
+      dimBodyBelowHeader={dimBodyBelowHeader}
+      draftDiffStatus={data._draftDiffStatus}
       {...actionProps}
     />
   );
@@ -74,6 +71,7 @@ function AnnotationBlockContent({
   onAnnotationUpdate,
   onAnnotationBlur,
   actionProps,
+  dimBodyBelowHeader,
 }: {
   data: BlockProps["data"];
   nodeId?: string;
@@ -83,6 +81,7 @@ function AnnotationBlockContent({
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
+  dimBodyBelowHeader?: boolean;
 }) {
   const safeAnnotationProps = getSafeAnnotationProps(data);
   const handleAnnotationUpdate = (updates: {
@@ -106,6 +105,7 @@ function AnnotationBlockContent({
       showHeader,
       canvasMode,
       actionProps,
+      dimBodyBelowHeader,
     });
   }
 
@@ -114,8 +114,11 @@ function AnnotationBlockContent({
       {...safeAnnotationProps}
       noteId={nodeId}
       selected={selected}
+      canvasMode={canvasMode}
       onAnnotationUpdate={handleAnnotationUpdate}
       onAnnotationBlur={onAnnotationBlur}
+      dimBodyBelowHeader={dimBodyBelowHeader}
+      draftDiffStatus={data._draftDiffStatus}
       {...actionProps}
     />
   );
@@ -130,8 +133,20 @@ function renderBlockByType(args: {
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
+  dimBodyBelowHeader?: boolean;
 }) {
-  const { data, nodeId, selected, showHeader, canvasMode, onAnnotationUpdate, onAnnotationBlur, actionProps } = args;
+  const {
+    data,
+    nodeId,
+    selected,
+    showHeader,
+    canvasMode,
+    onAnnotationUpdate,
+    onAnnotationBlur,
+    actionProps,
+    dimBodyBelowHeader,
+  } = args;
+  const draftDiffStatus = data._draftDiffStatus;
 
   switch (data.type) {
     case "trigger":
@@ -143,6 +158,7 @@ function renderBlockByType(args: {
           showHeader,
           canvasMode,
           actionProps,
+          dimBodyBelowHeader,
         });
       }
       return (
@@ -151,6 +167,8 @@ function renderBlockByType(args: {
           canvasMode={canvasMode}
           selected={selected}
           showHeader={showHeader}
+          dimBodyBelowHeader={dimBodyBelowHeader}
+          draftDiffStatus={draftDiffStatus}
           {...actionProps}
         />
       );
@@ -160,9 +178,10 @@ function renderBlockByType(args: {
         <ComponentBase
           {...safeComponentProps}
           canvasMode={canvasMode}
-          paused={safeComponentProps.paused}
           selected={selected}
           showHeader={showHeader}
+          dimBodyBelowHeader={dimBodyBelowHeader}
+          draftDiffStatus={draftDiffStatus}
           {...actionProps}
         />
       );
@@ -174,6 +193,8 @@ function renderBlockByType(args: {
           canvasMode={canvasMode}
           selected={selected}
           showHeader={showHeader}
+          dimBodyBelowHeader={dimBodyBelowHeader}
+          draftDiffStatus={draftDiffStatus}
           {...actionProps}
         />
       );
@@ -188,6 +209,7 @@ function renderBlockByType(args: {
           onAnnotationUpdate={onAnnotationUpdate}
           onAnnotationBlur={onAnnotationBlur}
           actionProps={actionProps}
+          dimBodyBelowHeader={dimBodyBelowHeader}
         />
       );
     default:
@@ -198,6 +220,7 @@ function renderBlockByType(args: {
         showHeader,
         canvasMode,
         actionProps,
+        dimBodyBelowHeader,
       });
   }
 }
@@ -206,13 +229,7 @@ export function BlockContent({
   data,
   nodeId,
   selected = false,
-  onRun,
-  runDisabled,
-  runDisabledTooltip,
-  onTogglePause,
-  onEdit,
   onDuplicate,
-  onDeactivate,
   onToggleView,
   onDelete,
   showHeader,
@@ -220,16 +237,11 @@ export function BlockContent({
   isCompactView,
   onAnnotationUpdate,
   onAnnotationBlur,
+  dimBodyBelowHeader,
 }: BlockProps) {
   const compactView = getCompactView(data, isCompactView);
-  const actionProps = getActionProps(data, compactView, {
-    onRun,
-    runDisabled,
-    runDisabledTooltip,
-    onTogglePause,
-    onEdit,
+  const actionProps = getActionProps(compactView, {
     onDuplicate,
-    onDeactivate,
     onToggleView,
     onDelete,
   });
@@ -243,5 +255,6 @@ export function BlockContent({
     onAnnotationUpdate,
     onAnnotationBlur,
     actionProps,
+    dimBodyBelowHeader,
   });
 }

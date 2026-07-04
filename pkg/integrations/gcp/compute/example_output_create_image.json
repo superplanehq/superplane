@@ -1,0 +1,19 @@
+{
+  "type": "gcp.compute.image.created",
+  "data": {
+    "imageId": "1234567890123456789",
+    "name": "my-app-2026-06-02",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/global/images/my-app-2026-06-02",
+    "family": "my-app",
+    "status": "READY",
+    "diskSizeGb": 10,
+    "sourceDisk": "my-disk",
+    "storageLocations": ["us"],
+    "labels": {
+      "env": "production"
+    },
+    "deprecationState": "ACTIVE",
+    "creationTimestamp": "2026-06-02T12:00:00.000-07:00"
+  },
+  "timestamp": "2026-06-02T12:00:00Z"
+}

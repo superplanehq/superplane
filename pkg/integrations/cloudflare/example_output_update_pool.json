@@ -1,0 +1,26 @@
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my updated pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-updated-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "192.0.2.1:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
+    },
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
+  },
+  "timestamp": "2026-05-05T05:57:59.044021383Z",
+  "type": "cloudflare.pool.updated"
+}

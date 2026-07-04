@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -13,25 +14,50 @@ import (
 )
 
 func TestTriggerRunTitle(t *testing.T) {
-	t.Run("resolves run title expression when event is emitted", func(t *testing.T) {
-		steps := &triggerRunTitleSteps{t: t}
-		steps.start()
-		steps.givenACanvasWithManualTrigger("RunTitle Resolve", "Start")
+	testCases := []struct {
+		name          string
+		titleTemplate string
+		expectedTitle string
+	}{
+		{
+			name:          "static title",
+			titleTemplate: "Manual run title",
+			expectedTitle: "Manual run title",
+		},
+		{
+			name:          "root function",
+			titleTemplate: "Run: {{ root().data.message }}",
+			expectedTitle: "Run: Hello, World!",
+		},
+		{
+			name:          "previous function",
+			titleTemplate: "Run: {{ previous().data.message }}",
+			expectedTitle: "Run: Hello, World!",
+		},
+		{
+			name:          "node reference",
+			titleTemplate: `Run: {{ $["Start"].data.message }}`,
+			expectedTitle: "Run: Hello, World!",
+		},
+	}
 
-		// Set a run title that references the trigger payload.
-		// The default manual trigger template sends {"message": "Hello, World!"}
-		steps.whenRunTitleToggleIsEnabled()
-		steps.whenRunTitleIsSetTo("Run: {{ root().message }}")
-		steps.waitForAutoSave()
-		steps.thenRunTitleInDBEquals("Run: {{ root().message }}")
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			steps := &triggerRunTitleSteps{t: t}
+			steps.start()
+			steps.givenACanvasWithManualTrigger("RunTitle "+testCase.name, "Start")
 
-		// Publish and trigger an event
-		steps.saveAndPublish()
-		steps.runManualTrigger()
+			steps.whenRunTitleToggleIsEnabled()
+			steps.whenRunTitleIsSetTo(testCase.titleTemplate)
+			steps.waitForAutoSave()
+			steps.thenRunTitleInDBEquals(testCase.titleTemplate)
 
-		// The emitted event should have the resolved custom name
-		steps.thenEventCustomNameEquals("Run: Hello, World!")
-	})
+			steps.saveAndPublish()
+			steps.runManualTrigger()
+
+			steps.thenEventCustomNameEquals(testCase.expectedTitle)
+		})
+	}
 }
 
 type triggerRunTitleSteps struct {
@@ -39,6 +65,7 @@ type triggerRunTitleSteps struct {
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
 	nodeID  string
+	trigger string
 }
 
 func (s *triggerRunTitleSteps) start() {
@@ -52,6 +79,7 @@ func (s *triggerRunTitleSteps) givenACanvasWithManualTrigger(canvasName, trigger
 	s.canvas.Create()
 	s.canvas.EnterEditMode()
 	s.canvas.AddManualTrigger(triggerName, models.Position{X: 500, Y: 250})
+	s.trigger = triggerName
 	s.nodeID = s.waitForNodeID()
 }
 
@@ -71,11 +99,11 @@ func (s *triggerRunTitleSteps) waitForAutoSave() {
 
 func (s *triggerRunTitleSteps) saveAndPublish() {
 	s.canvas.Save()
-	s.canvas.Publish()
+	s.canvas.CommitAndPublish()
 }
 
 func (s *triggerRunTitleSteps) runManualTrigger() {
-	s.canvas.RunManualTrigger("Start")
+	s.session.Click(q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(s.trigger) + `-header"]) [data-testid="start-template-run"]`))
 	s.session.Sleep(2000)
 }
 
@@ -128,17 +156,14 @@ func (s *triggerRunTitleSteps) findLatestRootEvent() *models.CanvasEvent {
 func (s *triggerRunTitleSteps) waitForNodeID() string {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		draft := s.canvas.FindCurrentDraft()
-		if draft != nil && len(draft.Nodes) == 1 {
-			return draft.Nodes[0].ID
+		if node, ok := s.canvas.DraftNodeByName(s.trigger); ok {
+			return node.ID
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	draft := s.canvas.FindCurrentDraft()
-	require.NotNil(s.t, draft, "no draft version found")
-	require.Len(s.t, draft.Nodes, 1, "expected exactly one node in draft")
-	return draft.Nodes[0].ID
+	require.FailNow(s.t, "expected trigger node in draft")
+	return ""
 }
 
 func (s *triggerRunTitleSteps) getCustomNameField() (any, bool, bool) {
@@ -146,12 +171,8 @@ func (s *triggerRunTitleSteps) getCustomNameField() (any, bool, bool) {
 		return nil, false, false
 	}
 
-	draft := s.canvas.FindCurrentDraft()
-	if draft == nil {
-		return nil, false, false
-	}
-
-	for _, node := range draft.Nodes {
+	nodes, _ := s.canvas.DraftEffectiveSpec()
+	for _, node := range nodes {
 		if node.ID == s.nodeID {
 			val, exists := node.Configuration["customName"]
 			return val, exists, true

@@ -105,11 +105,16 @@ func (h *SemaphoreWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error 
 	}
 
 	err = client.DeleteNotification(metadata.Notification.ID)
-	if err != nil {
+	if err != nil && !common.IsNotFoundError(err) {
 		return fmt.Errorf("error deleting notification: %v", err)
 	}
 
-	return client.DeleteSecret(metadata.Secret.Name)
+	err = client.DeleteSecret(metadata.Secret.Name)
+	if err != nil && !common.IsNotFoundError(err) {
+		return err
+	}
+
+	return nil
 }
 
 func upsertSecret(client *common.Client, name string, key []byte) (*common.Secret, error) {

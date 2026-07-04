@@ -1,0 +1,152 @@
+syntax = "proto3";
+
+package Superplane.CanvasFolders;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/canvas_folders";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Canvas Folders API";
+    version: "1.0";
+    description: "API for SuperPlane canvas folders";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTPS;
+  schemes: HTTP;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service CanvasFolders {
+  rpc ListCanvasFolders(ListCanvasFoldersRequest) returns (ListCanvasFoldersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvas-folders"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas folders";
+      description: "Returns all canvas folders for an organization";
+      tags: "CanvasFolder";
+    };
+  }
+
+  rpc CreateCanvasFolder(CreateCanvasFolderRequest) returns (CreateCanvasFolderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvas-folders"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create canvas folder";
+      description: "Creates a canvas folder";
+      tags: "CanvasFolder";
+    };
+  }
+
+  rpc UpdateCanvasFolder(UpdateCanvasFolderRequest) returns (UpdateCanvasFolderResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvas-folders/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas folder";
+      description: "Updates a canvas folder";
+      tags: "CanvasFolder";
+    };
+  }
+
+  rpc UpdateCanvasFolderPosition(UpdateCanvasFolderPositionRequest) returns (UpdateCanvasFolderPositionResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvas-folders/{id}/position"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas folder position";
+      description: "Moves a canvas folder up or down";
+      tags: "CanvasFolder";
+    };
+  }
+
+  rpc DeleteCanvasFolder(DeleteCanvasFolderRequest) returns (DeleteCanvasFolderResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvas-folders/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete canvas folder";
+      description: "Deletes a canvas folder without deleting its canvases";
+      tags: "CanvasFolder";
+    };
+  }
+}
+
+message ListCanvasFoldersRequest {}
+
+message ListCanvasFoldersResponse {
+  repeated CanvasFolder folders = 1;
+}
+
+message CreateCanvasFolderRequest {
+  CanvasFolder folder = 1;
+}
+
+message CreateCanvasFolderResponse {
+  CanvasFolder folder = 1;
+}
+
+message UpdateCanvasFolderRequest {
+  string id = 1;
+  CanvasFolder folder = 2;
+  bool replace_membership = 3;
+}
+
+message UpdateCanvasFolderResponse {
+  CanvasFolder folder = 1;
+}
+
+message UpdateCanvasFolderPositionRequest {
+  enum Direction {
+    DIRECTION_UNSPECIFIED = 0;
+    DIRECTION_UP = 1;
+    DIRECTION_DOWN = 2;
+  }
+
+  string id = 1;
+  Direction direction = 2;
+}
+
+message UpdateCanvasFolderPositionResponse {
+  repeated CanvasFolder folders = 1;
+}
+
+message DeleteCanvasFolderRequest {
+  string id = 1;
+}
+
+message DeleteCanvasFolderResponse {}
+
+message CanvasRef {
+  string id = 1;
+}
+
+message CanvasFolder {
+  message Metadata {
+    string id = 1;
+    string organization_id = 2;
+    google.protobuf.Timestamp created_at = 3;
+    google.protobuf.Timestamp updated_at = 4;
+  }
+
+  message Spec {
+    string title = 1;
+    string background_color = 2;
+    repeated CanvasRef canvases = 3;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+}

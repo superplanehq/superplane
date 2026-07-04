@@ -1,7 +1,8 @@
 import { Loader2, Plug, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
 import {
   useAvailableIntegrations,
   useConnectedIntegrations,
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { ConfigurationFieldRenderer } from "../../../ui/configurationFieldRenderer";
 import type { IntegrationsIntegrationDefinition } from "../../../api-client/types.gen";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -25,6 +26,9 @@ import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { analytics } from "@/lib/analytics";
 import { isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
+import { posthog, isPostHogEnabled } from "@/posthog";
+
+const INTEGRATION_SURVEY_NAME = "Integration Survey";
 
 interface IntegrationsProps {
   organizationId: string;
@@ -39,14 +43,29 @@ export function Integrations({ organizationId }: IntegrationsProps) {
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
+  const [isIntegrationSurveyActive, setIsIntegrationSurveyActive] = useState(false);
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
+
+  useEffect(() => {
+    if (!isPostHogEnabled) return;
+
+    posthog.getSurveys((surveys) => {
+      const isActive = surveys.some(
+        (survey) => survey.name === INTEGRATION_SURVEY_NAME && survey.start_date != null && survey.end_date == null,
+      );
+      setIsIntegrationSurveyActive(isActive);
+    }, true);
+  }, []);
 
   const { data: availableIntegrations = [], isLoading: loadingAvailable } = useAvailableIntegrations();
   const { data: organizationIntegrations = [], isLoading: loadingInstalled } = useConnectedIntegrations(organizationId);
   const createIntegrationMutation = useCreateIntegration(organizationId, "integrations_page");
 
   const isLoading = loadingAvailable || loadingInstalled;
+
+  useReportPageReady(!isLoading && !permissionsLoading);
+
   const integrationNames = useMemo(() => {
     return new Set(
       organizationIntegrations.map((integration) => integration.metadata?.name?.trim()).filter(Boolean) as string[],
@@ -113,7 +132,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
       });
     });
 
-    return [...catalogByProvider.values()].sort((a, b) => a.providerLabel.localeCompare(b.providerLabel));
+    return [...catalogByProvider.values()].sort((a, b) => {
+      const aHasInstances = a.instances.length > 0;
+      const bHasInstances = b.instances.length > 0;
+      if (aHasInstances !== bHasInstances) {
+        return aHasInstances ? -1 : 1;
+      }
+      return a.providerLabel.localeCompare(b.providerLabel);
+    });
   }, [availableIntegrations, connectedInstancesByProvider]);
   const filteredIntegrationCatalog = useMemo(() => {
     const normalizedQuery = filterQuery.trim().toLowerCase();
@@ -197,6 +223,10 @@ export function Integrations({ organizationId }: IntegrationsProps) {
     }
   };
 
+  const handleRequestIntegration = () => {
+    analytics.integrationRequested(organizationId);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedIntegration(null);
@@ -247,6 +277,18 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           <p className="text-sm text-gray-800">
             {integrationCatalog.length === 0 ? "No integrations available." : "No integrations match your filter."}
           </p>
+          {isIntegrationSurveyActive ? (
+            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              Can't find your integration?{" "}
+              <button
+                type="button"
+                onClick={handleRequestIntegration}
+                className="text-blue-600 hover:underline dark:text-blue-400 font-medium"
+              >
+                Request it
+              </button>
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-4">
@@ -370,6 +412,18 @@ export function Integrations({ organizationId }: IntegrationsProps) {
               </div>
             );
           })}
+          {isIntegrationSurveyActive ? (
+            <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              Can't find your integration?{" "}
+              <button
+                type="button"
+                onClick={handleRequestIntegration}
+                className="text-blue-600 hover:underline dark:text-blue-400 font-medium"
+              >
+                Request it
+              </button>
+            </p>
+          ) : null}
         </div>
       )}
 

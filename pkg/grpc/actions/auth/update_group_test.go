@@ -30,7 +30,7 @@ func TestUpdateGroup(t *testing.T) {
 		assert.NotNil(t, resp)
 		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
 
-		role, err := r.AuthService.GetGroupRole(orgID, models.DomainTypeOrganization, "test-group")
+		role, err := r.AuthService.GetGroupRole(context.Background(), orgID, models.DomainTypeOrganization, "test-group")
 		require.NoError(t, err)
 		assert.Equal(t, models.RoleOrgAdmin, role)
 	})
@@ -88,11 +88,23 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		users, err := r.AuthService.GetGroupUsers(orgID, models.DomainTypeOrganization, "membership-group")
+		users, err := r.AuthService.GetGroupUsers(context.Background(), orgID, models.DomainTypeOrganization, "membership-group")
 		require.NoError(t, err)
 		assert.Contains(t, users, userID1)
 		assert.Contains(t, users, userID2)
 		assert.Len(t, users, 2)
+	})
+
+	t.Run("nil spec returns current state without panic", func(t *testing.T) {
+		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "nil-spec-group", models.RoleOrgViewer, "Nil Spec Group", "Nil Spec Description")
+		require.NoError(t, err)
+
+		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "nil-spec-group", nil, r.AuthService)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, models.RoleOrgViewer, resp.Group.Spec.Role)
+		assert.Equal(t, "Nil Spec Group", resp.Group.Spec.DisplayName)
+		assert.Equal(t, "Nil Spec Description", resp.Group.Spec.Description)
 	})
 
 	t.Run("group not found", func(t *testing.T) {

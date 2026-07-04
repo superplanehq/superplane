@@ -84,6 +84,10 @@ func validateString(field Field, value any) error {
 	}
 
 	options := field.TypeOptions.String
+	if options.AllowExpressions != nil && !*options.AllowExpressions && ExpressionPlaceholderRegex.MatchString(text) {
+		return fmt.Errorf("expressions are not supported for this field")
+	}
+
 	textLength := len(text)
 
 	if options.MinLength != nil && textLength < *options.MinLength {

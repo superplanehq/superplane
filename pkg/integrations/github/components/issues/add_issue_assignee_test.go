@@ -5,12 +5,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func Test__AddIssueAssignee__Setup(t *testing.T) {
-	helloRepo := common.Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
 	component := AddIssueAssignee{}
 
 	t.Run("repository is required", func(t *testing.T) {
@@ -41,38 +39,6 @@ func Test__AddIssueAssignee__Setup(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "at least one assignee is required")
-	})
-
-	t.Run("repository is not accessible", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-		err := component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"issueNumber": "42", "assignees": []string{"octocat"}, "repository": "world"},
-		})
-
-		require.ErrorContains(t, err, "repository world is not accessible to app installation")
-	})
-
-	t.Run("metadata is set successfully", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-
-		nodeMetadataCtx := contexts.MetadataContext{}
-		require.NoError(t, component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &nodeMetadataCtx,
-			Configuration: map[string]any{"issueNumber": "42", "assignees": []string{"octocat"}, "repository": "hello"},
-		}))
-
-		require.Equal(t, nodeMetadataCtx.Get(), common.NodeMetadata{Repository: &helloRepo})
 	})
 }
 

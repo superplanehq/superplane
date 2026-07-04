@@ -53,13 +53,27 @@ func (e *EventDistributer) Start() error {
 		RoutingKey string
 		Handler    func(delivery tackle.Delivery) error
 	}{
-		{messages.CanvasExchange, messages.CanvasEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasEventCreated)},
-		{messages.CanvasExchange, messages.CanvasExecutionRoutingKey, e.createHandler(eventdistributer.HandleCanvasExecution)},
+		{messages.EventsExchange, messages.EventCreatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasEventCreated)},
+		{messages.CanvasExchange, messages.CanvasRunRoutingKey, e.createHandler(eventdistributer.HandleCanvasRun)},
 		{messages.CanvasExchange, messages.CanvasQueueItemCreatedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemCreated)},
 		{messages.CanvasExchange, messages.CanvasQueueItemConsumedRoutingKey, e.createHandler(eventdistributer.HandleQueueItemConsumed)},
 		{messages.CanvasExchange, messages.CanvasUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasUpdated)},
-		{messages.CanvasExchange, messages.CanvasVersionUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasVersionUpdated)},
+		{messages.CanvasExchange, messages.CanvasStagingUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasStagingUpdated)},
 		{messages.CanvasExchange, messages.CanvasDeletedRoutingKey, e.createHandler(eventdistributer.HandleCanvasDeleted)},
+		{messages.CanvasExchange, messages.CanvasMemoryUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasMemoryUpdated)},
+		{messages.CanvasExchange, messages.AgentSessionEventRoutingKey, e.createHandler(eventdistributer.HandleAgentSessionEvent)},
+	}
+
+	for _, routingKey := range messages.ExecutionRoutingKeys {
+		routes = append(routes, struct {
+			Exchange   string
+			RoutingKey string
+			Handler    func(delivery tackle.Delivery) error
+		}{
+			messages.ExecutionsExchange,
+			routingKey,
+			e.createHandler(eventdistributer.HandleCanvasExecution),
+		})
 	}
 
 	// Start a consumer for each route

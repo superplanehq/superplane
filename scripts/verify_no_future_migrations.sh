@@ -27,7 +27,7 @@ yellow "Current timestamp (UTC): $current_timestamp"
 yellow ""
 
 # Find all migration files and extract their timestamps
-migration_dirs=("db/migrations" "db/data_migrations" "agent/db/migrations")
+migration_dirs=("db/migrations" "db/data_migrations")
 future_migrations=()
 files=()
 
@@ -82,7 +82,6 @@ if [ ${#future_migrations[@]} -gt 0 ]; then
   red "with incorrect system time. Please recreate these migrations with the"
   red "correct timestamp using:"
   red "    make db.migration.create NAME=<descriptive-name>"
-  red "or make db.agent_migration.create NAME=<descriptive-name>"
   red ""
   
   exit 1

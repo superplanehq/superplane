@@ -1,0 +1,9 @@
+{
+  "data": {
+    "sha": "0e98bc41ab56cee9ff17883607b56f96e7814c98",
+    "merged": true,
+    "message": "Pull Request successfully merged"
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequestMerge"
+}

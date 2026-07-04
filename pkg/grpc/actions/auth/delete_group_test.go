@@ -24,11 +24,11 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 		err = r.AuthService.AddUserToGroup(orgID, models.DomainTypeOrganization, userID, "test-group")
 		require.NoError(t, err)
 
-		groups, err := r.AuthService.GetGroups(orgID, models.DomainTypeOrganization)
+		groups, err := r.AuthService.GetGroups(context.Background(), orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "test-group")
 
-		users, err := r.AuthService.GetGroupUsers(orgID, models.DomainTypeOrganization, "test-group")
+		users, err := r.AuthService.GetGroupUsers(context.Background(), orgID, models.DomainTypeOrganization, "test-group")
 		require.NoError(t, err)
 		assert.Contains(t, users, userID)
 
@@ -36,12 +36,12 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		users, err = r.AuthService.GetGroupUsers(orgID, models.DomainTypeOrganization, "test-group")
+		users, err = r.AuthService.GetGroupUsers(context.Background(), orgID, models.DomainTypeOrganization, "test-group")
 		require.Error(t, err)
 		assert.Nil(t, users)
 
 		// Verify the group no longer exists in the groups list
-		groups, err = r.AuthService.GetGroups(orgID, models.DomainTypeOrganization)
+		groups, err = r.AuthService.GetGroups(context.Background(), orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 		assert.NotContains(t, groups, "test-group")
 	})

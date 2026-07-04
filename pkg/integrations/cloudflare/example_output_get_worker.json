@@ -1,0 +1,27 @@
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deployments": [
+      {
+        "created_on": "2026-05-05T12:00:00Z",
+        "id": "182bd5e5-6e1a-4fe4-a799-aa6d9a6ab26e",
+        "source": "api",
+        "strategy": "percentage",
+        "versions": [
+          {
+            "percentage": 100,
+            "version_id": "18f97339-c287-4872-9bdd-e2135c07ec12"
+          }
+        ]
+      }
+    ],
+    "workerScript": "my-worker",
+    "settings": {
+      "bindings": [],
+      "compatibility_date": "2024-01-01",
+      "usage_model": "standard"
+    }
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.worker.fetched"
+}

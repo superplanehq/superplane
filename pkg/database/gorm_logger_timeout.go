@@ -9,6 +9,11 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v5/pgconn"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	"go.opentelemetry.io/otel/trace"
 	gormlogger "gorm.io/gorm/logger"
 )
 
@@ -45,7 +50,101 @@ func (w *gormTimeoutLogger) Trace(
 	if err != nil {
 		logPostgresSessionTimeoutIfMatched(err)
 	}
+
+	parent := trace.SpanFromContext(ctx)
+	if parent != nil && parent.IsRecording() {
+		sql, rowsAffected := fc()
+		end := time.Now()
+
+		_, span := otel.Tracer("superplane").Start(
+			ctx,
+			dbSpanName(sql),
+			trace.WithTimestamp(begin),
+			trace.WithSpanKind(trace.SpanKindClient),
+		)
+		span.SetAttributes(
+			semconv.DBSystemNamePostgreSQL,
+			attribute.String("db.operation", dbOperation(sql)),
+			attribute.String("db.statement", truncateSQL(sanitizeSQLStatement(sql))),
+			attribute.Int64("db.rows_affected", rowsAffected),
+		)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		span.End(trace.WithTimestamp(end))
+		return
+	}
+
 	w.base.Trace(ctx, begin, fc, err)
+}
+
+func (w *gormTimeoutLogger) ParamsFilter(
+	ctx context.Context,
+	sql string,
+	params ...interface{},
+) (string, []interface{}) {
+	return sql, redactSQLParams(params...)
+}
+
+func dbOperation(sql string) string {
+	fields := strings.Fields(strings.TrimSpace(sql))
+	if len(fields) == 0 {
+		return "query"
+	}
+
+	return strings.ToUpper(fields[0])
+}
+
+func dbSpanName(sql string) string {
+	operation := dbOperation(sql)
+	table := dbTableHint(sql)
+	if table == "" {
+		return "db." + strings.ToLower(operation)
+	}
+
+	return "db." + strings.ToLower(operation) + " " + table
+}
+
+func dbTableHint(sql string) string {
+	upper := strings.ToUpper(strings.TrimSpace(sql))
+	switch {
+	case strings.HasPrefix(upper, "SELECT"):
+		if idx := strings.Index(upper, " FROM "); idx >= 0 {
+			return firstIdentifier(upper[idx+6:])
+		}
+	case strings.HasPrefix(upper, "INSERT INTO "):
+		return firstIdentifier(upper[len("INSERT INTO "):])
+	case strings.HasPrefix(upper, "UPDATE "):
+		return firstIdentifier(upper[len("UPDATE "):])
+	case strings.HasPrefix(upper, "DELETE FROM "):
+		return firstIdentifier(upper[len("DELETE FROM "):])
+	}
+
+	return ""
+}
+
+func firstIdentifier(source string) string {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return ""
+	}
+
+	end := strings.IndexAny(source, " \t\n(,;")
+	if end == -1 {
+		return strings.ToLower(source)
+	}
+
+	return strings.ToLower(strings.TrimSpace(source[:end]))
+}
+
+func truncateSQL(sql string) string {
+	const maxLen = 512
+	if len(sql) <= maxLen {
+		return sql
+	}
+
+	return sql[:maxLen] + "..."
 }
 
 type postgresTimeoutKind string

@@ -20,10 +20,11 @@ All e2e tests live under the `test/e2e` directory.
 
 ## How to run e2e tests
 
-Before running the tests, run the setup steps:
+Before running the tests, use the same Docker setup as CI (`make dev.up` and `make dev.setup` with both databases), then install Playwright browsers:
 
 ```
-make test.setup
+make dev.up
+DEV_SETUP_DBS="superplane_dev superplane_test" make dev.setup
 make setup.playwright
 ```
 
@@ -137,7 +138,9 @@ Use the `test/e2e/helpers/query.go` for lookup:
 
 Common test IDs:
 
-- Canvas: `canvas-drop-area`, `save-canvas-button`, `canvas-group-node` (group container), `multi-select-group` (multi-select toolbar)
+- Canvas: `canvas-drop-area`, `canvas-commit-staging-button`, `canvas-commit-message-input`, `canvas-commit-message-submit`, `canvas-group-node` (group container), `multi-select-group` (multi-select toolbar)
+
+When a test edits a canvas and promotes changes to live, call `canvas.CommitAndPublish()` from `test/e2e/shared/canvas_steps.go`. That helper opens the commit dialog, submits a message, and waits for staging to clear (commit replaces the old publish step).
 - Modals/Forms: `canvas-name-input`, `component-name-input`, `save-node-button`
 - Building blocks: `building-block-<name>` (e.g., `building-block-noop`, `building-block-approval`)
 

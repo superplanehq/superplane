@@ -47,7 +47,6 @@ func TestRegistry_FindActionHook(t *testing.T) {
 			Auth:           &supportcontexts.AuthContext{},
 			Requests:       &supportcontexts.RequestContext{},
 			Integration:    &supportcontexts.IntegrationContext{},
-			Notifications:  &supportcontexts.NotificationContext{},
 			Secrets:        &supportcontexts.SecretsContext{Values: map[string][]byte{}},
 		})
 		require.NoError(t, err)
@@ -91,7 +90,6 @@ func TestRegistry_FindActionHook(t *testing.T) {
 			Auth:           &supportcontexts.AuthContext{},
 			Requests:       &supportcontexts.RequestContext{},
 			Integration:    &supportcontexts.IntegrationContext{},
-			Notifications:  &supportcontexts.NotificationContext{},
 			Secrets:        &supportcontexts.SecretsContext{Values: map[string][]byte{}},
 		})
 		require.NoError(t, err)
@@ -467,7 +465,7 @@ func TestRegistry_ComponentType(t *testing.T) {
 }
 
 func TestRegistry_SupportsNewSetupFlow(t *testing.T) {
-	stub := impl.NewStubIntegrationSetupProvider()
+	stub := impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{})
 	t.Run("true when provider exists and app env is development", func(t *testing.T) {
 		r := &registry.Registry{
 			AppEnv:         "development",
@@ -494,7 +492,7 @@ func TestRegistry_SupportsNewSetupFlow(t *testing.T) {
 }
 
 func TestRegistry_GetSetupProvider(t *testing.T) {
-	stub := impl.NewStubIntegrationSetupProvider()
+	stub := impl.NewDummyIntegrationSetupProvider(impl.DummyIntegrationSetupProviderOptions{})
 	r := &registry.Registry{
 		SetupProviders: map[string]core.IntegrationSetupProvider{"acme": stub},
 	}
@@ -592,4 +590,40 @@ func TestRegistry_ListFunctionsSortByName(t *testing.T) {
 	require.Len(t, widgets, 2)
 	assert.Equal(t, "w1", widgets[0].Name())
 	assert.Equal(t, "w2", widgets[1].Name())
+}
+
+func TestRegistry__AllCapability(t *testing.T) {
+	trigger1 := impl.NewDummyTrigger(impl.DummyTriggerOptions{Name: "app.trigger1"})
+	trigger2 := impl.NewDummyTrigger(impl.DummyTriggerOptions{Name: "app.trigger2"})
+	action1 := impl.NewDummyAction(impl.DummyActionOptions{Name: "app.action1"})
+	action2 := impl.NewDummyAction(impl.DummyActionOptions{Name: "app.action2"})
+	integration := impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		Triggers: []core.Trigger{trigger1, trigger2},
+		Actions:  []core.Action{action1, action2},
+	})
+
+	r := &registry.Registry{
+		Integrations: map[string]core.Integration{"app": registry.NewPanicableIntegration(integration)},
+		SetupProviders: map[string]core.IntegrationSetupProvider{
+			"app": impl.NewDummyIntegrationSetupProvider(
+				impl.DummyIntegrationSetupProviderOptions{
+					CapabilityGroups: []core.CapabilityGroup{
+						{Capabilities: []core.Capability{
+							{Name: "app.trigger1"},
+							{Name: "app.trigger2"},
+							{Name: "app.action1"},
+							{Name: "app.action2"},
+						}},
+					},
+				},
+			),
+		},
+	}
+
+	capabilities := r.AllCapabilities("app")
+	require.Len(t, capabilities, 4)
+	assert.Contains(t, capabilities, core.Capability{Name: "app.trigger1"})
+	assert.Contains(t, capabilities, core.Capability{Name: "app.trigger2"})
+	assert.Contains(t, capabilities, core.Capability{Name: "app.action1"})
+	assert.Contains(t, capabilities, core.Capability{Name: "app.action2"})
 }

@@ -146,6 +146,7 @@ func (c *DeleteRelease) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -161,12 +162,7 @@ func (c *DeleteRelease) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -174,7 +170,7 @@ func (c *DeleteRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	// Fetch the release based on the selected strategy
 	//
-	release, err := fetchReleaseByStrategy(client, appMetadata.Owner, config.Repository, config.ReleaseStrategy, config.TagName)
+	release, err := fetchReleaseByStrategy(client, config.Repository, config.ReleaseStrategy, config.TagName)
 	if err != nil {
 		return err
 	}
@@ -196,12 +192,7 @@ func (c *DeleteRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	// Delete the release
 	//
-	_, err = client.Repositories.DeleteRelease(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		release.GetID(),
-	)
+	_, err = client.DeleteRelease(context.Background(), config.Repository, release.GetID())
 	if err != nil {
 		return fmt.Errorf("failed to delete release: %w", err)
 	}
@@ -210,12 +201,7 @@ func (c *DeleteRelease) Execute(ctx core.ExecutionContext) error {
 	// Optionally delete the Git tag
 	//
 	if config.DeleteTag {
-		_, err = client.Git.DeleteRef(
-			context.Background(),
-			appMetadata.Owner,
-			config.Repository,
-			fmt.Sprintf("tags/%s", release.GetTagName()),
-		)
+		_, err = client.DeleteRef(context.Background(), config.Repository, fmt.Sprintf("tags/%s", release.GetTagName()))
 		if err != nil {
 			// Log warning but don't fail the operation since release deletion succeeded
 			ctx.Logger.Warnf("Release deleted successfully, but failed to delete Git tag %s: %v", release.GetTagName(), err)
@@ -258,16 +244,11 @@ func (c *DeleteRelease) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
-func fetchReleaseByStrategy(client *github.Client, owner, repo, strategy, tagName string) (*github.RepositoryRelease, error) {
+func fetchReleaseByStrategy(client *common.Client, repository, strategy, tagName string) (*github.RepositoryRelease, error) {
 	switch strategy {
 	case "specific":
 		// Fetch by specific tag name
-		release, _, err := client.Repositories.GetReleaseByTag(
-			context.Background(),
-			owner,
-			repo,
-			tagName,
-		)
+		release, _, err := client.GetReleaseByTag(context.Background(), repository, tagName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find release with tag %s: %w", tagName, err)
 		}
@@ -275,11 +256,7 @@ func fetchReleaseByStrategy(client *github.Client, owner, repo, strategy, tagNam
 
 	case "latest":
 		// Fetch latest published release
-		release, _, err := client.Repositories.GetLatestRelease(
-			context.Background(),
-			owner,
-			repo,
-		)
+		release, _, err := client.GetLatestRelease(context.Background(), repository)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch latest release: %w", err)
 		}
@@ -287,12 +264,7 @@ func fetchReleaseByStrategy(client *github.Client, owner, repo, strategy, tagNam
 
 	case "latestDraft":
 		// List releases and find the latest draft
-		releases, _, err := client.Repositories.ListReleases(
-			context.Background(),
-			owner,
-			repo,
-			&github.ListOptions{PerPage: 100},
-		)
+		releases, _, err := client.ListReleases(context.Background(), repository, &github.ListOptions{PerPage: 100})
 		if err != nil {
 			return nil, fmt.Errorf("failed to list releases: %w", err)
 		}
@@ -306,12 +278,7 @@ func fetchReleaseByStrategy(client *github.Client, owner, repo, strategy, tagNam
 
 	case "latestPrerelease":
 		// List releases and find the latest prerelease
-		releases, _, err := client.Repositories.ListReleases(
-			context.Background(),
-			owner,
-			repo,
-			&github.ListOptions{PerPage: 100},
-		)
+		releases, _, err := client.ListReleases(context.Background(), repository, &github.ListOptions{PerPage: 100})
 		if err != nil {
 			return nil, fmt.Errorf("failed to list releases: %w", err)
 		}

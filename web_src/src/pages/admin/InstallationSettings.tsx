@@ -2,12 +2,16 @@ import { Text } from "@/components/Text/text";
 import { Input, InputGroup } from "@/components/Input/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { hasSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Switch } from "@/ui/switch";
 import React, { useCallback, useEffect, useState } from "react";
 
 type InstallationSettingsResponse = {
   allow_private_network_access: boolean;
+  signups_enabled: boolean;
+  signups_blocked_by_environment: boolean;
   effective_blocked_http_hosts: string[];
   effective_private_ip_ranges: string[];
   blocked_http_hosts_overridden: boolean;
@@ -37,7 +41,17 @@ type DerivedState = {
   blockedHosts: string[];
   privateRanges: string[];
   hasNetworkChanges: boolean;
+  hasSignupChanges: boolean;
   hasSMTPChanges: boolean;
+};
+
+type SignupAccessSectionProps = {
+  enabled: boolean;
+  blockedByEnvironment: boolean;
+  hasChanges: boolean;
+  saving: boolean;
+  onChange: (checked: boolean) => void;
+  onSave: () => void;
 };
 
 type NetworkPolicySectionProps = {
@@ -65,6 +79,13 @@ type SMTPFieldsProps = {
   form: SMTPFormState;
   passwordConfigured: boolean;
   onFieldChange: (field: keyof SMTPFormState, value: boolean | string) => void;
+};
+
+type PolicyListProps = {
+  title: string;
+  items: string[];
+  overridden: boolean;
+  emptyMessage: string;
 };
 
 const emptySMTPForm: SMTPFormState = {
@@ -109,6 +130,7 @@ const toSMTPFormState = (data: InstallationSettingsResponse): SMTPFormState => (
 const getDerivedState = (
   settings: InstallationSettingsResponse | null,
   allowPrivateNetworkAccess: boolean,
+  signupsEnabled: boolean,
   form: SMTPFormState,
 ): DerivedState => {
   const hasSMTPSettings = settings?.smtp_enabled ?? false;
@@ -117,6 +139,7 @@ const getDerivedState = (
     blockedHosts: settings?.effective_blocked_http_hosts ?? [],
     privateRanges: settings?.effective_private_ip_ranges ?? [],
     hasNetworkChanges: settings != null && allowPrivateNetworkAccess !== settings.allow_private_network_access,
+    hasSignupChanges: settings != null && signupsEnabled !== settings.signups_enabled,
     hasSMTPChanges:
       settings != null &&
       (form.enabled !== settings.smtp_enabled ||
@@ -128,6 +151,18 @@ const getDerivedState = (
         ((form.enabled || hasSMTPSettings) && form.useTLS !== settings.smtp_use_tls) ||
         form.password !== ""),
   };
+};
+
+const getSignupAccessDescription = (enabled: boolean, blockedByEnvironment: boolean) => {
+  if (enabled && !blockedByEnvironment) {
+    return "New users can create accounts.";
+  }
+
+  if (blockedByEnvironment) {
+    return "The signup page shows the closed-signup notice.";
+  }
+
+  return "The signup page shows the waitlist.";
 };
 
 const buildSMTPRequestBody = (form: SMTPFormState) => {
@@ -153,6 +188,79 @@ const buildSMTPRequestBody = (form: SMTPFormState) => {
   return body;
 };
 
+const SignupAccessSection = ({
+  enabled,
+  blockedByEnvironment,
+  hasChanges,
+  saving,
+  onChange,
+  onSave,
+}: SignupAccessSectionProps) => {
+  const effectiveEnabled = enabled && !blockedByEnvironment;
+
+  return (
+    <section className="border-t border-slate-200 py-6">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Signup access</p>
+          <h2 className="mt-1 text-base font-semibold text-gray-900">Public signups</h2>
+          <Text className="mt-2 text-sm text-gray-600">
+            Control whether visitors can create new accounts from the signup page. Invite links can still create
+            accounts while public signups are closed.
+          </Text>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 lg:justify-end">
+          <div className="space-y-1 lg:text-right">
+            <p className="text-sm font-medium text-gray-900">{effectiveEnabled ? "Signups open" : "Signups closed"}</p>
+            <Text className="text-xs text-gray-500">{getSignupAccessDescription(enabled, blockedByEnvironment)}</Text>
+          </div>
+          <Switch
+            data-testid="installation-signups-switch"
+            checked={enabled}
+            disabled={blockedByEnvironment}
+            onCheckedChange={onChange}
+          />
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          data-testid="installation-signups-save"
+          onClick={onSave}
+          disabled={saving || !hasChanges || blockedByEnvironment}
+        >
+          {saving ? "Saving..." : "Save signup settings"}
+        </Button>
+        <Text className="text-xs text-gray-500">
+          {blockedByEnvironment
+            ? "`BLOCK_SIGNUP` is active, so public signups remain closed until the environment override is removed."
+            : "When closed, /signup collects waitlist emails instead of creating accounts."}
+        </Text>
+      </div>
+    </section>
+  );
+};
+
+const PolicyList = ({ title, items, overridden, emptyMessage }: PolicyListProps) => (
+  <div className="min-w-0">
+    <h3 className="text-sm font-medium text-gray-900">{title}</h3>
+    <Text className="mt-1 text-xs text-gray-500">
+      {overridden ? "Overridden by environment." : "Resolved from installation settings."}
+    </Text>
+    {items.length === 0 ? (
+      <Text className="mt-3 text-sm text-gray-500">{emptyMessage}</Text>
+    ) : (
+      <ul className="mt-3 max-h-40 space-y-1 overflow-auto font-mono text-xs text-gray-700">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    )}
+  </div>
+);
+
 const NetworkPolicySection = ({
   allowPrivateNetworkAccess,
   blockedHosts,
@@ -164,94 +272,50 @@ const NetworkPolicySection = ({
   onChange,
   onSave,
 }: NetworkPolicySectionProps) => (
-  <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 shadow-sm">
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+  <section className="border-t border-slate-200 py-6">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
       <div className="max-w-2xl">
-        <div className="inline-flex rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
-          Network Policy
-        </div>
-        <h2 className="mt-4 text-lg font-semibold text-gray-900">Private network access</h2>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Network policy</p>
+        <h2 className="mt-1 text-base font-semibold text-gray-900">Private network access</h2>
         <Text className="mt-2 text-sm text-gray-600">
           Control whether integrations, components, and triggers can reach internal Kubernetes DNS names or private IP
           ranges.
         </Text>
       </div>
 
-      <div
-        className={`rounded-2xl border px-4 py-3 shadow-sm ${
-          allowPrivateNetworkAccess ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
-        }`}
-      >
-        <div className="flex items-center gap-4">
-          <div
-            className={`flex h-11 w-11 items-center justify-center rounded-full ${
-              allowPrivateNetworkAccess ? "bg-emerald-500/15" : "bg-amber-500/15"
-            }`}
-          >
-            <span className={`h-3 w-3 rounded-full ${allowPrivateNetworkAccess ? "bg-emerald-600" : "bg-amber-600"}`} />
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-gray-900">
-              {allowPrivateNetworkAccess ? "Enabled for private targets" : "Blocked for private targets"}
-            </p>
-            <Text className="mt-1 text-xs text-gray-600">
-              {allowPrivateNetworkAccess
-                ? "SuperPlane can reach internal hosts and private IPs."
-                : "SSRF safeguards remain active for internal hosts and private IPs."}
-            </Text>
-          </div>
-
-          <Switch
-            data-testid="installation-network-switch"
-            checked={allowPrivateNetworkAccess}
-            onCheckedChange={onChange}
-          />
+      <div className="flex items-center justify-between gap-4 lg:justify-end">
+        <div className="space-y-1 lg:text-right">
+          <p className="text-sm font-medium text-gray-900">
+            {allowPrivateNetworkAccess ? "Private access enabled" : "Private access blocked"}
+          </p>
+          <Text className="text-xs text-gray-500">
+            {allowPrivateNetworkAccess ? "Internal hosts can be reached." : "SSRF safeguards remain active."}
+          </Text>
         </div>
+        <Switch
+          data-testid="installation-network-switch"
+          checked={allowPrivateNetworkAccess}
+          onCheckedChange={onChange}
+        />
       </div>
     </div>
 
-    <div className="mt-6">
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-base font-medium text-gray-900">Effective blocked hosts</h2>
-          <Text className="mt-1 text-sm text-gray-500">
-            {blockedHTTPHostsOverridden ? "Overridden by env var." : "Resolved from installation settings."}
-          </Text>
-          <div className="mt-4 rounded-xl border border-slate-200/80 p-4 bg-slate-100">
-            {blockedHosts.length === 0 ? (
-              <Text className="text-sm text-gray-500">No blocked hosts.</Text>
-            ) : (
-              <ul className="space-y-1 font-mono text-xs text-gray-700">
-                {blockedHosts.map((host) => (
-                  <li key={host}>{host}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <h2 className="text-base font-medium text-gray-900">Effective blocked private IP ranges</h2>
-          <Text className="mt-1 text-sm text-gray-500">
-            {privateIPRangesOverridden ? "Overridden by env var." : "Resolved from installation settings."}
-          </Text>
-          <div className="mt-4 rounded-xl border border-slate-200/80 p-4 bg-slate-100">
-            {privateRanges.length === 0 ? (
-              <Text className="text-sm text-gray-500">No blocked private IP ranges.</Text>
-            ) : (
-              <ul className="space-y-1 font-mono text-xs text-gray-700">
-                {privateRanges.map((range) => (
-                  <li key={range}>{range}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
+    <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <PolicyList
+        title="Effective blocked hosts"
+        items={blockedHosts}
+        overridden={blockedHTTPHostsOverridden}
+        emptyMessage="No blocked hosts."
+      />
+      <PolicyList
+        title="Effective blocked private IP ranges"
+        items={privateRanges}
+        overridden={privateIPRangesOverridden}
+        emptyMessage="No blocked private IP ranges."
+      />
     </div>
 
-    <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6">
+    <div className="mt-6 flex flex-wrap items-center gap-3">
       <Button type="button" data-testid="installation-network-save" onClick={onSave} disabled={saving || !hasChanges}>
         {saving ? "Saving..." : "Save network settings"}
       </Button>
@@ -266,7 +330,7 @@ const NetworkPolicySection = ({
         </Text>
       )}
     </div>
-  </div>
+  </section>
 );
 
 const SMTPFields = ({ form, passwordConfigured, onFieldChange }: SMTPFieldsProps) => (
@@ -342,63 +406,54 @@ const SMTPFields = ({ form, passwordConfigured, onFieldChange }: SMTPFieldsProps
       </div>
     </div>
 
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-gray-900">Use TLS (STARTTLS)</p>
-          <Text className="mt-1 text-xs text-gray-600">
-            Enable transport encryption when connecting to the SMTP server.
-          </Text>
-        </div>
-        <Switch
-          data-testid="installation-smtp-tls-switch"
-          checked={form.useTLS}
-          onCheckedChange={(checked) => onFieldChange("useTLS", checked)}
-        />
+    <div className="flex items-center justify-between gap-4 pt-2">
+      <div>
+        <p className="text-sm font-medium text-gray-900">Use TLS (STARTTLS)</p>
+        <Text className="mt-1 text-xs text-gray-500">
+          Enable transport encryption when connecting to the SMTP server.
+        </Text>
       </div>
+      <Switch
+        data-testid="installation-smtp-tls-switch"
+        checked={form.useTLS}
+        onCheckedChange={(checked) => onFieldChange("useTLS", checked)}
+      />
     </div>
   </div>
 );
 
 const SMTPSection = ({ form, hasChanges, passwordConfigured, saving, onFieldChange, onSave }: SMTPSectionProps) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+  <section className="border-t border-slate-200 py-6">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
       <div className="max-w-2xl">
-        <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-700">
-          Email Delivery
-        </div>
-        <h2 className="mt-4 text-lg font-semibold text-gray-900">SMTP configuration</h2>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Email delivery</p>
+        <h2 className="mt-1 text-base font-semibold text-gray-900">SMTP configuration</h2>
         <Text className="mt-2 text-sm text-gray-600">
           Manage the SMTP credentials used for installation-wide notifications and emails.
         </Text>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-gray-900">{form.enabled ? "SMTP enabled" : "SMTP disabled"}</p>
-            <Text className="text-xs text-gray-600">
-              {form.enabled ? "Emails can be sent from this instance." : "Notification email delivery is turned off."}
-            </Text>
-          </div>
-
-          <Switch
-            data-testid="installation-smtp-switch"
-            checked={form.enabled}
-            onCheckedChange={(checked) => onFieldChange("enabled", checked)}
-          />
+      <div className="flex items-center justify-between gap-4 lg:justify-end">
+        <div className="space-y-1 lg:text-right">
+          <p className="text-sm font-medium text-gray-900">{form.enabled ? "SMTP enabled" : "SMTP disabled"}</p>
+          <Text className="text-xs text-gray-500">
+            {form.enabled ? "Emails can be sent from this instance." : "Notification email delivery is off."}
+          </Text>
         </div>
+        <Switch
+          data-testid="installation-smtp-switch"
+          checked={form.enabled}
+          onCheckedChange={(checked) => onFieldChange("enabled", checked)}
+        />
       </div>
     </div>
 
     {form.enabled ? (
       <SMTPFields form={form} passwordConfigured={passwordConfigured} onFieldChange={onFieldChange} />
     ) : (
-      <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6">
-        <Text className="text-sm text-gray-600">
-          Enable SMTP to configure the installation-wide email provider used by SuperPlane notifications.
-        </Text>
-      </div>
+      <Text className="mt-5 text-sm text-gray-500">
+        Enable SMTP to configure the installation-wide email provider used by SuperPlane notifications.
+      </Text>
     )}
 
     <div className="mt-6 flex items-center gap-3">
@@ -407,7 +462,7 @@ const SMTPSection = ({ form, hasChanges, passwordConfigured, saving, onFieldChan
       </Button>
       <Text className="text-xs text-gray-500">SMTP changes apply to installation-wide email delivery.</Text>
     </div>
-  </div>
+  </section>
 );
 
 const useInstallationSettingsState = () => {
@@ -415,12 +470,15 @@ const useInstallationSettingsState = () => {
   const [loading, setLoading] = useState(true);
   const [allowPrivateNetworkAccess, setAllowPrivateNetworkAccess] = useState(false);
   const [savingNetwork, setSavingNetwork] = useState(false);
+  const [signupsEnabled, setSignupsEnabled] = useState(true);
+  const [savingSignups, setSavingSignups] = useState(false);
   const [smtpForm, setSMTPForm] = useState<SMTPFormState>(emptySMTPForm);
   const [savingSMTP, setSavingSMTP] = useState(false);
 
   const applySettings = useCallback((data: InstallationSettingsResponse) => {
     setSettings(data);
     setAllowPrivateNetworkAccess(data.allow_private_network_access);
+    setSignupsEnabled(data.signups_enabled);
     setSMTPForm(toSMTPFormState(data));
   }, []);
 
@@ -480,6 +538,21 @@ const useInstallationSettingsState = () => {
     }
   }, [allowPrivateNetworkAccess, patchSettings]);
 
+  const saveSignupSettings = useCallback(async () => {
+    setSavingSignups(true);
+    try {
+      await patchSettings(
+        { signups_enabled: signupsEnabled },
+        "Signup settings updated",
+        "Failed to update signup settings",
+      );
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "Failed to update signup settings");
+    } finally {
+      setSavingSignups(false);
+    }
+  }, [patchSettings, signupsEnabled]);
+
   const saveSMTPSettings = useCallback(async () => {
     setSavingSMTP(true);
     try {
@@ -503,11 +576,15 @@ const useInstallationSettingsState = () => {
     loading,
     allowPrivateNetworkAccess,
     savingNetwork,
+    signupsEnabled,
+    savingSignups,
     smtpForm,
     savingSMTP,
     setAllowPrivateNetworkAccess,
+    setSignupsEnabled,
     setSMTPField,
     saveNetworkSettings,
+    saveSignupSettings,
     saveSMTPSettings,
   };
 };
@@ -518,13 +595,19 @@ const InstallationSettings: React.FC = () => {
     loading,
     allowPrivateNetworkAccess,
     savingNetwork,
+    signupsEnabled,
+    savingSignups,
     smtpForm,
     savingSMTP,
     setAllowPrivateNetworkAccess,
+    setSignupsEnabled,
     setSMTPField,
     saveNetworkSettings,
+    saveSignupSettings,
     saveSMTPSettings,
   } = useInstallationSettingsState();
+
+  useReportPageReady(!loading || !!settings);
 
   if (loading && !settings) {
     return (
@@ -535,37 +618,51 @@ const InstallationSettings: React.FC = () => {
     );
   }
 
-  const derivedState = getDerivedState(settings, allowPrivateNetworkAccess, smtpForm);
+  const derivedState = getDerivedState(settings, allowPrivateNetworkAccess, signupsEnabled, smtpForm);
+  const showSignupAccessSection = hasSignupWaitlistConfig();
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div>
+      <div className="pb-2">
         <h1 className="text-xl font-semibold text-gray-900">Installation Settings</h1>
         <Text className="mt-1 text-sm text-gray-500">
           Configure installation-wide network policy and email delivery for this SuperPlane instance.
         </Text>
       </div>
 
-      <NetworkPolicySection
-        allowPrivateNetworkAccess={allowPrivateNetworkAccess}
-        blockedHosts={derivedState.blockedHosts}
-        blockedHTTPHostsOverridden={settings?.blocked_http_hosts_overridden ?? false}
-        hasChanges={derivedState.hasNetworkChanges}
-        privateRanges={derivedState.privateRanges}
-        privateIPRangesOverridden={settings?.private_ip_ranges_overridden ?? false}
-        saving={savingNetwork}
-        onChange={setAllowPrivateNetworkAccess}
-        onSave={saveNetworkSettings}
-      />
+      <div className="mt-5 bg-white px-6">
+        {showSignupAccessSection ? (
+          <SignupAccessSection
+            enabled={signupsEnabled}
+            blockedByEnvironment={settings?.signups_blocked_by_environment ?? false}
+            hasChanges={derivedState.hasSignupChanges}
+            saving={savingSignups}
+            onChange={setSignupsEnabled}
+            onSave={saveSignupSettings}
+          />
+        ) : null}
 
-      <SMTPSection
-        form={smtpForm}
-        hasChanges={derivedState.hasSMTPChanges}
-        passwordConfigured={settings?.smtp_password_configured ?? false}
-        saving={savingSMTP}
-        onFieldChange={setSMTPField}
-        onSave={saveSMTPSettings}
-      />
+        <NetworkPolicySection
+          allowPrivateNetworkAccess={allowPrivateNetworkAccess}
+          blockedHosts={derivedState.blockedHosts}
+          blockedHTTPHostsOverridden={settings?.blocked_http_hosts_overridden ?? false}
+          hasChanges={derivedState.hasNetworkChanges}
+          privateRanges={derivedState.privateRanges}
+          privateIPRangesOverridden={settings?.private_ip_ranges_overridden ?? false}
+          saving={savingNetwork}
+          onChange={setAllowPrivateNetworkAccess}
+          onSave={saveNetworkSettings}
+        />
+
+        <SMTPSection
+          form={smtpForm}
+          hasChanges={derivedState.hasSMTPChanges}
+          passwordConfigured={settings?.smtp_password_configured ?? false}
+          saving={savingSMTP}
+          onFieldChange={setSMTPField}
+          onSave={saveSMTPSettings}
+        />
+      </div>
     </div>
   );
 };

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -19,6 +21,15 @@ const (
 	channelSuccess = "success"
 	channelFailed  = "failed"
 )
+
+const (
+	CommandSourceInline = "inline"
+	CommandSourceFile   = "file"
+)
+
+// Cap the size of a command file we are willing to load over SSH so that a
+// runaway script cannot blow up worker memory or push past shell argv limits.
+const maxCommandFileSize = 256 * 1024
 
 var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
@@ -35,11 +46,14 @@ type AuthSpec struct {
 	Password   configuration.SecretKeyRef `json:"password" mapstructure:"password"`
 }
 
-type ConnectionRetrySpec struct {
+type RetrySpec struct {
 	Enabled         bool `json:"enabled" mapstructure:"enabled"`
 	Retries         int  `json:"retries" mapstructure:"retries"`
 	IntervalSeconds int  `json:"intervalSeconds" mapstructure:"intervalSeconds"`
 }
+
+type ConnectionRetrySpec = RetrySpec
+type ExecutionRetrySpec = RetrySpec
 
 type EnvironmentVariable struct {
 	Name  string `json:"name" mapstructure:"name"`
@@ -51,11 +65,31 @@ type Spec struct {
 	Port             int                   `json:"port" mapstructure:"port"`
 	User             string                `json:"username" mapstructure:"username"`
 	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
+	CommandSource    string                `json:"commandSource,omitempty" mapstructure:"commandSource"`
 	Commands         string                `json:"commands" mapstructure:"commands"`
+	CommandFile      string                `json:"commandFile,omitempty" mapstructure:"commandFile"`
 	WorkingDirectory string                `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
 	Environment      []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
 	ConnectionRetry  *ConnectionRetrySpec  `json:"connectionRetry,omitempty" mapstructure:"connectionRetry"`
+	ExecutionRetry   *ExecutionRetrySpec   `json:"executionRetry,omitempty" mapstructure:"executionRetry"`
+}
+
+// commandSourceOrDefault returns the command source for the spec. A truly
+// unset (empty or whitespace-only) value defaults to inline so nodes saved
+// before the file feature keep working. Any other value is returned verbatim
+// and must match a known source exactly. We must NOT trim a non-empty value:
+// the UI evaluates the commandFile/commands visibility and required conditions
+// with an exact string comparison, so a padded value like "\tfile\n" would be
+// treated as hidden there (dropping commandFile from the saved payload) while a
+// trimmed value here would still run in file mode on the worker. Returning the
+// value verbatim keeps both sides in agreement and makes a padded value fail
+// loudly as an invalid command source instead of silently losing the path.
+func (s Spec) commandSourceOrDefault() string {
+	if strings.TrimSpace(s.CommandSource) == "" {
+		return CommandSourceInline
+	}
+	return s.CommandSource
 }
 
 type ExecutionMetadata struct {
@@ -63,12 +97,16 @@ type ExecutionMetadata struct {
 	Host             string                `json:"host" mapstructure:"host"`
 	Port             int                   `json:"port" mapstructure:"port"`
 	User             string                `json:"user" mapstructure:"user"`
+	CommandSource    string                `json:"commandSource" mapstructure:"commandSource"`
 	Commands         string                `json:"commands" mapstructure:"commands"`
+	CommandFile      string                `json:"commandFile" mapstructure:"commandFile"`
 	WorkingDirectory string                `json:"workingDirectory" mapstructure:"workingDirectory"`
 	Environment      []EnvironmentVariable `json:"environment" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
 	ConnectionRetry  *ConnectionRetrySpec  `json:"connectionRetry" mapstructure:"connectionRetry"`
+	ExecutionRetry   *ExecutionRetrySpec   `json:"executionRetry" mapstructure:"executionRetry"`
 	Attempt          int                   `json:"attempt" mapstructure:"attempt"`
+	ExecutionAttempt int                   `json:"executionAttempt" mapstructure:"executionAttempt"`
 	MaxRetries       int                   `json:"maxRetries" mapstructure:"maxRetries"`
 	IntervalSeconds  int                   `json:"intervalSeconds" mapstructure:"intervalSeconds"`
 	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
@@ -98,11 +136,14 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 ## Configuration
 
 - **Host**, **Port** (default 22), **Username**: Connection details.
-- **Commands**: One or more commands to run, one per line (supports expressions). The output payload is based on the last command.
+- **Command source**: Choose **Inline** to type commands directly, or **From file** to load them from a file in the app's repository (e.g. scripts/deploy.sh).
+- **Commands** (inline mode): One or more commands to run, one per line (supports expressions). Each non-empty line becomes a command joined with &&. The output payload is based on the last command.
+- **Command file** (file mode): Path to a file in the app's repository (e.g. ` + "`scripts/deploy.sh`" + `).
 - **Working directory**: Optional; Changes to this directory before running the command.
 - **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).
 - **Connection retry** (optional): Enable to retry connecting when the host is not reachable yet (e.g. server still booting). Set number of retries and interval between attempts.
+- **Execution retry** (optional): Enable to retry running the command when the exit status is not 0. Set number of retries and interval between attempts.
 
 ## Output
 
@@ -206,12 +247,50 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "commands",
-			Label:       "Commands",
-			Type:        configuration.FieldTypeText,
-			Description: "One or more commands to run on the remote host, one per line",
-			Placeholder: "e.g. echo hello\nls -la /tmp",
-			Required:    true,
+			Name:        "commandSource",
+			Label:       "Command source",
+			Type:        configuration.FieldTypeSelect,
+			Description: "Where the commands come from",
+			// Optional at the schema level even though it has a default:
+			// configuration.ValidateConfiguration does not apply Field.Default, so
+			// requiring it would reject legacy SSH nodes saved before this field
+			// existed when their configuration is re-validated or patched. The
+			// worker defaults a missing/blank value to inline via
+			// commandSourceOrDefault, and the UI uses Default to pre-fill new nodes.
+			Required: false,
+			Default:  CommandSourceInline,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Inline", Value: CommandSourceInline, Description: "Type commands directly into the node"},
+						{Label: "From file", Value: CommandSourceFile, Description: "Load commands from a file in the app's repository"},
+					},
+				},
+			},
+		},
+		{
+			Name:                 "commands",
+			Label:                "Commands",
+			Type:                 configuration.FieldTypeText,
+			Description:          "One or more commands to run on the remote host, one per line",
+			Placeholder:          "e.g. echo hello\nls -la /tmp",
+			Required:             false,
+			VisibilityConditions: []configuration.VisibilityCondition{{Field: "commandSource", Values: []string{CommandSourceInline}}},
+			RequiredConditions:   []configuration.RequiredCondition{{Field: "commandSource", Values: []string{CommandSourceInline}}},
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "shell",
+				},
+			},
+		},
+		{
+			Name:                 "commandFile",
+			Label:                "Command file",
+			Type:                 configuration.FieldTypeRepositoryFile,
+			Description:          "Path to a file in the app's repository (e.g. scripts/deploy.sh).",
+			Required:             false,
+			VisibilityConditions: []configuration.VisibilityCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
+			RequiredConditions:   []configuration.RequiredCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
 		},
 		{
 			Name:        "workingDirectory",
@@ -305,6 +384,49 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "executionRetry",
+			Label:       "Execution retry",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Description: "Optionally retry running the command when the exit status is not 0.",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "enabled",
+							Label:       "Enable execution retry",
+							Type:        configuration.FieldTypeBool,
+							Required:    false,
+							Default:     false,
+							Description: "Retry running the command if the exit status is not 0.",
+						},
+						{
+							Name:        "retries",
+							Label:       "Retries",
+							Type:        configuration.FieldTypeNumber,
+							Required:    false,
+							Default:     5,
+							Description: "Number of retry attempts.",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "enabled", Values: []string{"true"}},
+							},
+						},
+						{
+							Name:        "intervalSeconds",
+							Label:       "Retry interval (seconds)",
+							Type:        configuration.FieldTypeNumber,
+							Required:    false,
+							Default:     15,
+							Description: "Seconds to wait between command attempts.",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "enabled", Values: []string{"true"}},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -324,8 +446,8 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	if spec.User == "" {
 		return errors.New("username is required")
 	}
-	if strings.TrimSpace(spec.Commands) == "" {
-		return errors.New("commands is required")
+	if err := validateCommandSource(ctx, spec); err != nil {
+		return err
 	}
 	if spec.Port != 0 && (spec.Port < 1 || spec.Port > 65535) {
 		return fmt.Errorf("invalid port: %d", spec.Port)
@@ -362,6 +484,14 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 			return errors.New("connection retry: interval must be at least 1 second")
 		}
 	}
+	if spec.ExecutionRetry != nil && spec.ExecutionRetry.Enabled {
+		if spec.ExecutionRetry.Retries < 0 {
+			return errors.New("execution retry: retries must be 0 or greater")
+		}
+		if spec.ExecutionRetry.IntervalSeconds < 1 {
+			return errors.New("execution retry: interval must be at least 1 second")
+		}
+	}
 
 	return nil
 }
@@ -372,9 +502,21 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(spec.Commands) == "" {
-		return errors.New("commands is required")
+
+	source := spec.commandSourceOrDefault()
+
+	// Inline mode: the (already template-resolved) commands are stored in
+	// metadata so retries don't have to re-evaluate expressions. File mode:
+	// metadata only carries the path; the file is re-read from the repo on
+	// every attempt so the script content never lives in the database.
+	resolvedCommands := ""
+	if source == CommandSourceInline {
+		if strings.TrimSpace(spec.Commands) == "" {
+			return errors.New("commands is required")
+		}
+		resolvedCommands = spec.Commands
 	}
+
 	for _, variable := range spec.Environment {
 		if variable.Name == "" {
 			return errors.New("environment variable name is required")
@@ -388,12 +530,16 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		Host:             spec.Host,
 		Port:             spec.Port,
 		User:             spec.User,
-		Commands:         spec.Commands,
+		CommandSource:    source,
+		Commands:         resolvedCommands,
+		CommandFile:      spec.CommandFile,
 		WorkingDirectory: spec.WorkingDirectory,
 		Environment:      spec.Environment,
 		Timeout:          spec.Timeout,
 		ConnectionRetry:  spec.ConnectionRetry,
+		ExecutionRetry:   spec.ExecutionRetry,
 		Attempt:          0,
+		ExecutionAttempt: 0,
 		MaxRetries:       0,
 		IntervalSeconds:  0,
 		Authentication:   spec.Authentication,
@@ -408,19 +554,68 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// File mode: load the script body now so file errors surface before
+	// we try to open an SSH session. This re-checks the same size and
+	// empty-file guards Setup ran at publish time, in case the file
+	// changed in the repo between publish and run.
+	scriptBody := ""
+	if source == CommandSourceFile {
+		scriptBody, err = loadCommandFile(ctx.Files, spec.CommandFile)
+		if err != nil {
+			return err
+		}
+	}
+
 	execCtx := ExecuteSSHContext{
 		secretsCtx:   ctx.Secrets,
 		requestsCtx:  ctx.Requests,
 		stateCtx:     ctx.ExecutionState,
 		metadataCtx:  ctx.Metadata,
 		execMetadata: metadata,
+		scriptBody:   scriptBody,
 	}
 
 	return c.executeSSH(execCtx)
 }
 
+// loadCommandFile reads, size-limits, and validates the command file referenced
+// by rawPath, returning its content verbatim. It rejects empty or
+// whitespace-only files so both Setup (publish time) and Execute (run time)
+// agree on what counts as a runnable script.
+func loadCommandFile(files core.RepositoryFilesContext, rawPath string) (string, error) {
+	path := strings.TrimSpace(rawPath)
+	if path == "" {
+		return "", errors.New("command file is required")
+	}
+	normalized, err := gitprovider.ValidateUserPath(path)
+	if err != nil {
+		return "", fmt.Errorf("invalid command file %q: %w", path, err)
+	}
+	if files == nil {
+		return "", errors.New("command file configured but file access is not available")
+	}
+	reader, err := files.Read(normalized)
+	if err != nil {
+		return "", fmt.Errorf("read command file %q: %w", path, err)
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(io.LimitReader(reader, maxCommandFileSize+1))
+	if err != nil {
+		return "", fmt.Errorf("read command file %q: %w", path, err)
+	}
+	if len(data) > maxCommandFileSize {
+		return "", fmt.Errorf("command file %q exceeds maximum size of %d bytes", path, maxCommandFileSize)
+	}
+	if strings.TrimSpace(string(data)) == "" {
+		return "", fmt.Errorf("command file %q is empty", path)
+	}
+	return string(data), nil
+}
+
 func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
-	if ctx.Name == "connectionRetry" {
+	switch ctx.Name {
+	case "connectionRetry", "executionRetry":
 		if ctx.ExecutionState.IsFinished() {
 			return nil
 		}
@@ -431,18 +626,31 @@ func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
 			return err
 		}
 
+		// Re-read the command file on every retry so the script body
+		// never lives in stored metadata. Same guards Execute applies on
+		// the initial attempt: a missing file or empty content fails
+		// fast before we try to open an SSH session.
+		scriptBody := ""
+		if metadata.CommandSource == CommandSourceFile {
+			scriptBody, err = loadCommandFile(ctx.Files, metadata.CommandFile)
+			if err != nil {
+				return err
+			}
+		}
+
 		execCtx := ExecuteSSHContext{
 			secretsCtx:   ctx.Secrets,
 			requestsCtx:  ctx.Requests,
 			stateCtx:     ctx.ExecutionState,
 			metadataCtx:  ctx.Metadata,
 			execMetadata: metadata,
+			scriptBody:   scriptBody,
 		}
 
 		return c.executeSSH(execCtx)
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
-
-	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
 type ExecuteSSHContext struct {
@@ -452,6 +660,11 @@ type ExecuteSSHContext struct {
 	metadataCtx core.MetadataWriter
 
 	execMetadata ExecutionMetadata
+
+	// File-mode script body to stream as stdin. Loaded by the caller so
+	// file-system errors surface before the SSH client is created. Empty
+	// for inline mode.
+	scriptBody string
 }
 
 func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
@@ -461,19 +674,13 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	}
 	defer client.Close()
 
-	commandToExecute := buildCombinedCommands(ctx.execMetadata.Commands)
-	if commandToExecute == "" {
-		return errors.New("commands is required")
+	command, stdin, err := c.buildExecutionCommand(ctx.execMetadata, ctx.scriptBody)
+	if err != nil {
+		return err
 	}
-
-	command := c.buildRemoteCommand(
-		ctx.execMetadata.WorkingDirectory,
-		ctx.execMetadata.Environment,
-		commandToExecute,
-	)
-	result, err := client.ExecuteCommand(command, time.Duration(ctx.execMetadata.Timeout)*time.Second)
+	result, err := client.ExecuteScript(command, stdin, time.Duration(ctx.execMetadata.Timeout)*time.Second)
 	if c.isConnectError(err) {
-		if c.shouldRetry(ctx.execMetadata.ConnectionRetry, ctx.metadataCtx) {
+		if c.shouldRetry(ctx.execMetadata.ConnectionRetry, c.getRetryAttempt(ctx.metadataCtx)) {
 			err = c.incrementRetryCount(ctx.metadataCtx)
 			if err != nil {
 				return err
@@ -502,6 +709,21 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 		return err
 	}
 
+	if result.ExitCode != 0 {
+		if c.shouldRetry(ctx.execMetadata.ExecutionRetry, c.getExecutionAttempt(ctx.metadataCtx)) {
+			err = c.incrementExecutionRetryCount(ctx.metadataCtx)
+			if err != nil {
+				return err
+			}
+
+			return ctx.requestsCtx.ScheduleActionCall(
+				"executionRetry",
+				map[string]any{},
+				time.Duration(ctx.execMetadata.ExecutionRetry.IntervalSeconds)*time.Second,
+			)
+		}
+	}
+
 	err = c.setResultMetadata(ctx.metadataCtx, result)
 	if err != nil {
 		return err
@@ -515,12 +737,12 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	return ctx.stateCtx.Emit(channel, "ssh.command.executed", []any{result})
 }
 
-func (c *SSHCommand) shouldRetry(retrySpec *ConnectionRetrySpec, metadata core.MetadataWriter) bool {
+func (c *SSHCommand) shouldRetry(retrySpec *RetrySpec, attempt int) bool {
 	if retrySpec == nil || !retrySpec.Enabled {
 		return false
 	}
 
-	return c.getRetryAttempt(metadata) < retrySpec.Retries
+	return attempt < retrySpec.Retries
 }
 
 func (c *SSHCommand) incrementRetryCount(metadata core.MetadataWriter) error {
@@ -530,16 +752,31 @@ func (c *SSHCommand) incrementRetryCount(metadata core.MetadataWriter) error {
 	return metadata.Set(current)
 }
 
+func (c *SSHCommand) incrementExecutionRetryCount(metadata core.MetadataWriter) error {
+	current := c.getMetadataMap(metadata)
+	current["executionAttempt"] = c.getExecutionAttempt(metadata) + 1
+
+	return metadata.Set(current)
+}
+
+func (c *SSHCommand) getExecutionAttempt(metadata core.MetadataWriter) int {
+	return c.getMetadataInt(metadata, "executionAttempt")
+}
+
 func (c *SSHCommand) getRetryAttempt(metadata core.MetadataWriter) int {
+	return c.getMetadataInt(metadata, "attempt")
+}
+
+func (c *SSHCommand) getMetadataInt(metadata core.MetadataWriter, key string) int {
 	meta := c.getMetadataMap(metadata)
 
-	attempt, ok := meta["attempt"]
+	value, ok := meta[key]
 	if !ok {
 		return 0
 	}
 
 	// JSON numbers deserialize as float64
-	switch v := attempt.(type) {
+	switch v := value.(type) {
 	case float64:
 		return int(v)
 	case int:
@@ -617,6 +854,109 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 	return fmt.Sprintf("env %s sh -lc %s", strings.Join(envAssignments, " "), shellQuote(finalCommand))
 }
 
+// buildExecutionCommand assembles the final command sent to the remote host
+// and, for file mode, returns the script body to stream as stdin.
+//
+// Inline mode keeps the long-standing behavior of stripping blank lines and
+// joining the rest with `&&` so a list of one-liners runs as a chain. The
+// remote shell receives a single string and no stdin payload.
+//
+// File mode pipes the (already-loaded) script body to `bash -s` over stdin.
+// This avoids embedding the whole script in the command line — argv has size
+// limits and nested quoting is fragile — while preserving multi-line
+// constructs, comments, and bash-only features (pipefail, declare -A,
+// here-docs, process substitution) exactly as written. The stream is always
+// interpreted by bash, so any leading `#!` line is just a comment: non-bash
+// shebangs are not honored.
+func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBody string) (string, io.Reader, error) {
+	if metadata.CommandSource == CommandSourceFile {
+		if scriptBody == "" {
+			return "", nil, errors.New("command file body is required")
+		}
+		command, payload := c.buildScriptCommand(metadata.WorkingDirectory, metadata.Environment, scriptBody)
+		return command, strings.NewReader(payload), nil
+	}
+
+	combined := buildCombinedCommands(metadata.Commands)
+	if combined == "" {
+		return "", nil, errors.New("commands is required")
+	}
+	return c.buildRemoteCommand(metadata.WorkingDirectory, metadata.Environment, combined), nil, nil
+}
+
+// buildScriptCommand returns the remote command (`env VAR=v ... bash -s`) and
+// the script body to stream over stdin. The working-directory change is
+// prepended on its own line (followed by `|| exit 1`) so a leading shebang or
+// comment in the script cannot swallow the `cd` via `#`-to-end-of-line.
+func (c *SSHCommand) buildScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
+	payload := script
+	if workingDirectory != "" {
+		payload = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), script)
+	}
+
+	command := "bash -s"
+	if len(environment) > 0 {
+		envAssignments := make([]string, 0, len(environment))
+		for _, variable := range environment {
+			envAssignments = append(envAssignments, fmt.Sprintf("%s=%s", variable.Name, shellQuote(variable.Value)))
+		}
+		command = fmt.Sprintf("env %s %s", strings.Join(envAssignments, " "), command)
+	}
+
+	return command, payload
+}
+
+// validateCommandSource enforces the configured command-source variant.
+// Inline mode requires a non-empty commands string. File mode requires a path
+// that resolves to a real file in the canvas's git repository so Setup catches
+// typos at publish time instead of at every execution.
+func validateCommandSource(ctx core.SetupContext, spec Spec) error {
+	switch spec.commandSourceOrDefault() {
+	case CommandSourceInline:
+		if strings.TrimSpace(spec.Commands) == "" {
+			return errors.New("commands is required")
+		}
+		return nil
+
+	case CommandSourceFile:
+		path := strings.TrimSpace(spec.CommandFile)
+		if path == "" {
+			return errors.New("command file is required")
+		}
+		normalized, err := gitprovider.ValidateUserPath(path)
+		if err != nil {
+			return fmt.Errorf("invalid command file %q: %w", path, err)
+		}
+		if ctx.Files == nil {
+			return errors.New("command file configured but file access is not available")
+		}
+		available, err := ctx.Files.List()
+		if err != nil {
+			return fmt.Errorf("failed to list repository files: %w", err)
+		}
+		found := false
+		for _, candidate := range available {
+			if norm, normErr := gitprovider.NormalizePath(candidate); normErr == nil && norm == normalized {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("command file %q not found in app repository", path)
+		}
+		// The file exists; read it now so publish fails fast on empty or
+		// whitespace-only scripts instead of letting every execution fail
+		// with an empty-file error.
+		if _, err := loadCommandFile(ctx.Files, spec.CommandFile); err != nil {
+			return err
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("invalid command source: %s", spec.CommandSource)
+	}
+}
+
 func buildCombinedCommands(commands string) string {
 	lines := strings.Split(commands, "\n")
 	parts := make([]string, 0, len(lines))
@@ -649,6 +989,10 @@ func (c *SSHCommand) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: "connectionRetry",
+			Type: core.HookTypeInternal,
+		},
+		{
+			Name: "executionRetry",
 			Type: core.HookTypeInternal,
 		},
 	}

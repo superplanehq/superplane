@@ -99,14 +99,12 @@ func (s *CanvasNodeExecutionKVTestSteps) CreateCanvas() {
 			return err
 		}
 		return tx.Create(&CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  wf.ID,
-			State:       CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice([]Node{}),
-			Edges:       datatypes.NewJSONSlice([]Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:         liveVersionID,
+			WorkflowID: wf.ID,
+			Nodes:      datatypes.NewJSONSlice([]Node{}),
+			Edges:      datatypes.NewJSONSlice([]Edge{}),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
 		}).Error
 	}))
 	s.wf = wf
@@ -127,7 +125,7 @@ func (s *CanvasNodeExecutionKVTestSteps) CreateEvent() {
 		WorkflowID: s.wf.ID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       JSONValue{},
 		State:      CanvasEventStatePending,
 	}
 	require.NoError(s.t, database.Conn().Create(s.rootEvent).Error)

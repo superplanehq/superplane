@@ -23,14 +23,3 @@ docker buildx build \
   -t "${IMAGE_REPO}:app-latest-${ARCH}" \
   -f Dockerfile \
   .
-
-docker buildx build \
-  --platform "linux/${ARCH}" \
-  --progress=plain \
-  --provenance=false \
-  --push \
-  --target dev \
-  --cache-to type=inline \
-  -t "${IMAGE_REPO}:agent-latest-${ARCH}" \
-  -f agent/Dockerfile \
-  agent

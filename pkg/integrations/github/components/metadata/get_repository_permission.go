@@ -92,6 +92,7 @@ func (c *GetRepositoryPermission) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -102,23 +103,13 @@ func (c *GetRepositoryPermission) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	var integrationMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &integrationMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, integrationMetadata.GitHubApp.ID, integrationMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
 	username := strings.TrimPrefix(config.Username, "@")
-	permission, _, err := client.Repositories.GetPermissionLevel(
-		context.Background(),
-		integrationMetadata.Owner,
-		config.Repository,
-		username,
-	)
+	permission, _, err := client.GetRepositoryPermissionLevel(context.Background(), config.Repository, username)
 	if err != nil {
 		return fmt.Errorf("failed to get repository permission level: %w", err)
 	}

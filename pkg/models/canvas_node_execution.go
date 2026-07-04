@@ -41,6 +41,7 @@ type CanvasNodeExecution struct {
 	// for that event with a simple query.
 	//
 	RootEventID uuid.UUID
+	RunID       uuid.UUID
 
 	//
 	// Reference to the previous execution.
@@ -48,13 +49,6 @@ type CanvasNodeExecution struct {
 	// from any execution.
 	//
 	PreviousExecutionID *uuid.UUID
-
-	//
-	// Reference to the parent execution.
-	// This is used for node executions inside of a blueprint node,
-	// to reference the parent blueprint node execution.
-	//
-	ParentExecutionID *uuid.UUID
 
 	//
 	// The reference to a WorkflowEvent record,
@@ -90,57 +84,60 @@ func (e *CanvasNodeExecution) TableName() string {
 	return "workflow_node_executions"
 }
 
-func LockCanvasNodeExecution(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
-	var execution CanvasNodeExecution
+func (e *CanvasNodeExecution) BeforeCreate(tx *gorm.DB) error {
+	if e.RunID != uuid.Nil {
+		return nil
+	}
 
-	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("id = ?", id).
-		First(&execution).
-		Error
-
+	run, err := FindCanvasRunByRootEventInTransaction(tx, e.RootEventID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &execution, nil
-}
-
-func CreatePendingChildExecution(tx *gorm.DB, parent *CanvasNodeExecution, childNodeID string, config map[string]any) (*CanvasNodeExecution, error) {
-	now := time.Now()
-	execution := CanvasNodeExecution{
-		WorkflowID:          parent.WorkflowID,
-		RootEventID:         parent.RootEventID,
-		EventID:             parent.EventID,
-		PreviousExecutionID: &parent.ID,
-		ParentExecutionID:   &parent.ID,
-		NodeID:              fmt.Sprintf("%s:%s", parent.NodeID, childNodeID),
-		State:               CanvasNodeExecutionStatePending,
-		Configuration:       datatypes.NewJSONType(config),
-		CreatedAt:           &now,
-		UpdatedAt:           &now,
-	}
-
-	err := tx.Create(&execution).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return &execution, nil
+	e.RunID = run.ID
+	return nil
 }
 
 func ListPendingNodeExecutions() ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
 	query := database.Conn().
-		Where("state = ?", CanvasNodeExecutionStatePending).
-		Order("created_at DESC")
+		Table("workflow_node_executions").
+		Select("workflow_node_executions.*").
+		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStatePending).
+		Order("workflow_node_executions.created_at DESC")
 
-	err := query.Find(&executions).Error
+	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+		Find(&executions).
+		Error
 	if err != nil {
 		return nil, err
 	}
 
 	return executions, nil
+}
+
+func LockPendingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+
+	query := tx.
+		Table("workflow_node_executions").
+		Select("workflow_node_executions.*").
+		Clauses(clause.Locking{
+			Strength: lockingForUpdateNoKey,
+			Table:    clause.Table{Name: "workflow_node_executions"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_node_executions.id = ?", id).
+		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStatePending)
+
+	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+		First(&execution).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
 }
 
 func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, beforeTime *time.Time) ([]CanvasNodeExecution, error) {
@@ -184,7 +181,6 @@ func ListParentExecutionsForRootEventsInTransaction(tx *gorm.DB, canvasID uuid.U
 	query := tx.
 		Where("workflow_id = ?", canvasID).
 		Where("root_event_id IN ?", rootEventIDs).
-		Where("parent_execution_id IS NULL").
 		Order("created_at ASC")
 
 	err := query.Find(&executions).Error
@@ -328,39 +324,6 @@ func FindNodeExecutionsByIDs(workflowID uuid.UUID, executionIDs []uuid.UUID) ([]
 	return FindNodeExecutionsByIDsInTransaction(database.Conn(), workflowID, executionIDs)
 }
 
-func FindChildExecutionsForMultiple(parentExecutionIDs []string) ([]CanvasNodeExecution, error) {
-	var executions []CanvasNodeExecution
-	err := database.Conn().
-		Where("parent_execution_id IN ?", parentExecutionIDs).
-		Find(&executions).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return executions, nil
-}
-
-func FindChildExecutions(parentExecutionID uuid.UUID, states []string) ([]CanvasNodeExecution, error) {
-	return FindChildExecutionsInTransaction(database.Conn(), parentExecutionID, states)
-}
-
-func FindChildExecutionsInTransaction(tx *gorm.DB, parentExecutionID uuid.UUID, states []string) ([]CanvasNodeExecution, error) {
-	var executions []CanvasNodeExecution
-	err := tx.
-		Where("parent_execution_id = ?", parentExecutionID).
-		Where("state IN ?", states).
-		Find(&executions).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return executions, nil
-}
-
 func ResolveExecutionErrorsInTransaction(tx *gorm.DB, workflowID uuid.UUID, executionIDs []uuid.UUID) error {
 	now := time.Now()
 	return tx.Model(&CanvasNodeExecution{}).
@@ -385,14 +348,6 @@ func (e *CanvasNodeExecution) GetPreviousExecutionID() string {
 	return e.PreviousExecutionID.String()
 }
 
-func (e *CanvasNodeExecution) GetParentExecutionID() string {
-	if e.ParentExecutionID == nil {
-		return ""
-	}
-
-	return e.ParentExecutionID.String()
-}
-
 func (e *CanvasNodeExecution) Start() error {
 	return e.StartInTransaction(database.Conn())
 }
@@ -403,12 +358,13 @@ func (e *CanvasNodeExecution) StartInTransaction(tx *gorm.DB) error {
 		return fmt.Errorf("cannot start execution %s in state %s", e.ID, e.State)
 	}
 
-	//
-	// Update the execution state to started.
-	//
+	now := time.Now()
+	e.State = CanvasNodeExecutionStateStarted
+	e.UpdatedAt = &now
+
 	return tx.Model(e).
 		Update("state", CanvasNodeExecutionStateStarted).
-		Update("updated_at", time.Now()).
+		Update("updated_at", now).
 		Error
 }
 
@@ -439,8 +395,9 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 				WorkflowID:  e.WorkflowID,
 				NodeID:      e.NodeID,
 				Channel:     channel,
-				Data:        datatypes.NewJSONType(event),
+				Data:        NewJSONValue(event),
 				ExecutionID: &e.ID,
+				RunID:       e.RunID,
 				State:       CanvasEventStatePending,
 				CreatedAt:   &now,
 			})
@@ -463,17 +420,19 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err = node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return nil, err
-			}
+		err = node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	//
 	// Update execution state
 	//
+	e.State = CanvasNodeExecutionStateFinished
+	e.Result = CanvasNodeExecutionResultPassed
+	e.UpdatedAt = &now
+
 	err = tx.Model(e).
 		Updates(map[string]interface{}{
 			"state":      CanvasNodeExecutionStateFinished,
@@ -483,6 +442,61 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 
 	if err != nil {
 		return nil, err
+	}
+
+	//
+	// If execution produced events, we know for sure that the run is not finished yet.
+	// If the events produced are terminal, the EventRouter will handle the run finalization.
+	//
+	if len(events) > 0 {
+		return events, nil
+	}
+
+	return events, nil
+}
+
+func (e *CanvasNodeExecution) EmitOutputsInTransaction(tx *gorm.DB, channelOutputs map[string][]any) ([]CanvasEvent, error) {
+	now := time.Now()
+
+	events := []CanvasEvent{}
+	for channel, outputs := range channelOutputs {
+		for _, event := range outputs {
+			events = append(events, CanvasEvent{
+				WorkflowID:  e.WorkflowID,
+				NodeID:      e.NodeID,
+				Channel:     channel,
+				Data:        NewJSONValue(event),
+				ExecutionID: &e.ID,
+				RunID:       e.RunID,
+				State:       CanvasEventStatePending,
+				CreatedAt:   &now,
+			})
+		}
+	}
+
+	if len(events) > 0 {
+		err := tx.Create(&events).Error
+		if err != nil {
+			return nil, fmt.Errorf("failed to create events: %w", err)
+		}
+	}
+
+	node, err := FindCanvasNode(tx, e.WorkflowID, e.NodeID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if node != nil {
+		err = node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if e.State == CanvasNodeExecutionStatePending {
+		if err := e.StartInTransaction(tx); err != nil {
+			return nil, err
+		}
 	}
 
 	return events, nil
@@ -496,6 +510,12 @@ func (e *CanvasNodeExecution) Fail(reason, message string) error {
 
 func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) error {
 	now := time.Now()
+
+	e.State = CanvasNodeExecutionStateFinished
+	e.Result = CanvasNodeExecutionResultFailed
+	e.ResultReason = reason
+	e.ResultMessage = message
+	e.UpdatedAt = &now
 
 	err := tx.Model(e).
 		Updates(map[string]interface{}{
@@ -519,26 +539,10 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err := node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	//
-	// Since an execution failure does not emit anything,
-	// we need to update the parent execution here too,
-	// if this execution is a child one.
-	//
-	if e.ParentExecutionID != nil {
-		parent, err := FindNodeExecution(e.WorkflowID, *e.ParentExecutionID)
+		err := node.UpdateState(tx, CanvasNodeStateReady)
 		if err != nil {
 			return err
 		}
-
-		return parent.FailInTransaction(tx, reason, message)
 	}
 
 	return nil
@@ -550,6 +554,11 @@ func (e *CanvasNodeExecution) Cancel(cancelledBy *uuid.UUID) error {
 
 func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid.UUID) error {
 	now := time.Now()
+
+	e.State = CanvasNodeExecutionStateFinished
+	e.Result = CanvasNodeExecutionResultCancelled
+	e.CancelledBy = cancelledBy
+	e.UpdatedAt = &now
 
 	err := tx.Model(e).
 		Updates(map[string]interface{}{
@@ -569,11 +578,9 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 	}
 
 	if node != nil {
-		if node.State != CanvasNodeStatePaused {
-			err := node.UpdateState(tx, CanvasNodeStateReady)
-			if err != nil {
-				return err
-			}
+		err := node.UpdateState(tx, CanvasNodeStateReady)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -645,22 +652,24 @@ func (e *CanvasNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec No
 	}).Error
 }
 
-// FindLastExecutionPerNode finds the most recent execution for each node in a workflow
-// using DISTINCT ON to get one execution per node_id, ordered by created_at DESC
-// Only returns executions for nodes that have not been deleted
-func FindLastExecutionPerNode(workflowID uuid.UUID) ([]CanvasNodeExecution, error) {
+// FindLastExecutionPerNode finds the most recent execution for each node in a workflow.
+// Only returns executions for nodes that have not been deleted.
+func FindLastExecutionPerNode(tx *gorm.DB, workflowID uuid.UUID) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
-	err := database.Conn().
+	err := tx.
 		Raw(`
-			SELECT DISTINCT ON (wne.node_id) wne.*
-			FROM workflow_node_executions wne
-			INNER JOIN workflow_nodes wn
-				ON wne.workflow_id = wn.workflow_id
-				AND wne.node_id = wn.node_id
-			WHERE wne.workflow_id = ?
-			AND wne.parent_execution_id IS NULL
-			AND wn.deleted_at IS NULL
-			ORDER BY wne.node_id, wne.created_at DESC
+			SELECT wne.*
+			FROM workflow_nodes wn
+			INNER JOIN LATERAL (
+				SELECT *
+				FROM workflow_node_executions
+				WHERE workflow_id = wn.workflow_id
+				  AND node_id = wn.node_id
+				ORDER BY created_at DESC
+				LIMIT 1
+			) wne ON true
+			WHERE wn.workflow_id = ?
+			  AND wn.deleted_at IS NULL
 		`, workflowID).
 		Scan(&executions).
 		Error

@@ -4,7 +4,7 @@ import type {
   OrganizationsIntegration,
 } from "@/api-client";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import {
@@ -144,27 +144,39 @@ function useIntegrationSetupLocalState({
   resumeIntegrationDescribe,
 }: IntegrationSetupLocalStateParams) {
   const lastResumeDescribeKey = useRef<string | null>(null);
+  const hasEditedInstanceName = useRef(false);
   const [instanceName, setInstanceName] = useState("");
+  const handleInstanceNameChange = useCallback((value: string) => {
+    hasEditedInstanceName.current = true;
+    setInstanceName(value);
+  }, []);
   const [createdIntegration, setCreatedIntegration] = useState<OrganizationsIntegration | null>(null);
   const [stepInputs, setStepInputs] = useState<Record<string, unknown>>({});
   const [selectedCapabilities, setSelectedCapabilities] = useState<Set<string>>(new Set());
   const setters = useMemo(
     () => ({
       setCreatedIntegration,
+      hasEditedInstanceName,
       setInstanceName,
       setSelectedCapabilities,
       setStepInputs,
     }),
-    [],
+    [hasEditedInstanceName],
   );
 
   useResetSetupState(integrationName, lastResumeDescribeKey, setters);
-  useDefaultInstanceName(instanceName, integrationName, existingIntegrationNames, setInstanceName);
+  useDefaultInstanceName(
+    instanceName,
+    integrationName,
+    existingIntegrationNames,
+    hasEditedInstanceName,
+    setInstanceName,
+  );
   useResumeIntegrationDescribe(setupIntegrationId, resumeIntegrationDescribe, lastResumeDescribeKey, setters);
 
   return {
     instanceName,
-    setInstanceName,
+    setInstanceName: handleInstanceNameChange,
     createdIntegration,
     setCreatedIntegration,
     stepInputs,
@@ -208,7 +220,6 @@ function useIntegrationSetupProgress(createdIntegration: OrganizationsIntegratio
   const currentStep = getCurrentSetupStep(createdIntegration);
   const canRevertCurrentStep = canRevertSetupStep(createdIntegration);
   const integrationReady = createdIntegration?.status?.state === "ready";
-  const showSetupStepBack = Boolean(createdIntegration) && (!integrationReady || canRevertCurrentStep);
   const setupPageTitle = useMemo(
     () => getSetupPageTitle(createdIntegration, currentStep, integrationLabel),
     [createdIntegration, currentStep, integrationLabel],
@@ -218,7 +229,6 @@ function useIntegrationSetupProgress(createdIntegration: OrganizationsIntegratio
     currentStep,
     canRevertCurrentStep,
     integrationReady,
-    showSetupStepBack,
     setupPageTitle,
   };
 }
@@ -245,6 +255,7 @@ export type IntegrationSetupMutations = ReturnType<typeof useIntegrationSetupMut
 
 interface ResetStateSetters {
   setCreatedIntegration: Dispatch<SetStateAction<OrganizationsIntegration | null>>;
+  hasEditedInstanceName: MutableRefObject<boolean>;
   setInstanceName: Dispatch<SetStateAction<string>>;
   setSelectedCapabilities: Dispatch<SetStateAction<Set<string>>>;
   setStepInputs: Dispatch<SetStateAction<Record<string, unknown>>>;
@@ -257,6 +268,7 @@ function useResetSetupState(
 ) {
   useEffect(() => {
     lastResumeDescribeKey.current = null;
+    setters.hasEditedInstanceName.current = false;
     setters.setCreatedIntegration(null);
     setters.setStepInputs({});
     setters.setInstanceName("");
@@ -268,15 +280,16 @@ function useDefaultInstanceName(
   instanceName: string,
   integrationName: string,
   existingIntegrationNames: Set<string>,
+  hasEditedInstanceName: MutableRefObject<boolean>,
   setInstanceName: Dispatch<SetStateAction<string>>,
 ) {
   useEffect(() => {
-    if (instanceName || !integrationName) {
+    if (instanceName || !integrationName || hasEditedInstanceName.current) {
       return;
     }
 
     setInstanceName(getNextIntegrationName(integrationName, existingIntegrationNames));
-  }, [instanceName, integrationName, existingIntegrationNames, setInstanceName]);
+  }, [instanceName, integrationName, existingIntegrationNames, hasEditedInstanceName, setInstanceName]);
 }
 
 function useResumeIntegrationDescribe(
@@ -290,6 +303,7 @@ function useResumeIntegrationDescribe(
       setters.setCreatedIntegration(describe);
       setters.setStepInputs({});
       setters.setSelectedCapabilities(new Set());
+      setters.hasEditedInstanceName.current = true;
       setters.setInstanceName(describe.metadata?.name || describe.metadata?.integrationName || "");
     });
   }, [setupIntegrationId, resumeIntegrationDescribe, lastResumeDescribeKey, setters]);

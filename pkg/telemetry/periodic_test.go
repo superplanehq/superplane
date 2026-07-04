@@ -116,7 +116,7 @@ func TestCountPendingEvents(t *testing.T) {
 		WorkflowID: steps.workflow.ID,
 		NodeID:     steps.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 		State:      models.CanvasEventStateRouted,
 	}
 
@@ -243,14 +243,12 @@ func (s *stuckQueueItemsTestSteps) CreateWorkflow() {
 			return err
 		}
 		return tx.Create(&models.CanvasVersion{
-			ID:          liveVersionID,
-			WorkflowID:  workflow.ID,
-			State:       models.CanvasVersionStatePublished,
-			PublishedAt: &now,
-			Nodes:       datatypes.NewJSONSlice([]models.Node{}),
-			Edges:       datatypes.NewJSONSlice([]models.Edge{}),
-			CreatedAt:   &now,
-			UpdatedAt:   &now,
+			ID:         liveVersionID,
+			WorkflowID: workflow.ID,
+			Nodes:      datatypes.NewJSONSlice([]models.Node{}),
+			Edges:      datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
 		}).Error
 	}))
 
@@ -271,7 +269,7 @@ func (s *stuckQueueItemsTestSteps) CreateRootEvent() {
 		WorkflowID: s.workflow.ID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 		State:      models.CanvasEventStatePending,
 	}
 

@@ -89,3 +89,13 @@ func (c *CapabilityContext) Requested() []string {
 	}
 	return requested
 }
+
+func (c *CapabilityContext) Enabled() []string {
+	enabled := []string{}
+	for _, capability := range c.states {
+		if capability.State == core.IntegrationCapabilityStateEnabled {
+			enabled = append(enabled, capability.Name)
+		}
+	}
+	return enabled
+}

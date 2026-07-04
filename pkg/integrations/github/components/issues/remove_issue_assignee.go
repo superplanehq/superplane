@@ -134,6 +134,7 @@ func (c *RemoveIssueAssignee) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -149,24 +150,13 @@ func (c *RemoveIssueAssignee) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("issue number is not a number: %v", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
 	assignees := common.SanitizeAssignees(config.Assignees)
-	issue, _, err := client.Issues.RemoveAssignees(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		issueNumber,
-		assignees,
-	)
+	issue, _, err := client.RemoveIssueAssignees(context.Background(), config.Repository, issueNumber, assignees)
 	if err != nil {
 		return fmt.Errorf("failed to remove assignees from issue: %w", err)
 	}

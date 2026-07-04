@@ -1,0 +1,10 @@
+{
+  "type": "gcp.compute.loadBalancer.deleted",
+  "data": {
+    "forwardingRule": "web-lb-fr",
+    "backendService": "web-lb-backend",
+    "healthCheck": "web-lb-hc",
+    "region": "us-central1"
+  },
+  "timestamp": "2025-02-14T12:00:00Z"
+}

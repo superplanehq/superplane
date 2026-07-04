@@ -37,7 +37,7 @@ export function SetupView({ setup }: SetupViewProps) {
       createdIntegration={state.createdIntegration}
       currentStep={progress.currentStep}
       stepInputs={state.stepInputs}
-      showSetupStepBack={progress.showSetupStepBack}
+      canRevertCurrentStep={progress.canRevertCurrentStep}
       instanceName={state.instanceName}
       integrationName={route.integrationName}
       integrationDefinition={metadata.integrationDefinition}

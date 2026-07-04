@@ -1,11 +1,16 @@
 package networkpolicy
 
 import (
+	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 func TestResolveHTTPPolicyForSetting(t *testing.T) {
@@ -58,6 +63,32 @@ func TestResolveHTTPPolicyForSetting(t *testing.T) {
 		assert.True(t, policy.BlockedHostsOverridden)
 		assert.True(t, policy.PrivateIPRangesOverridden)
 	})
+}
+
+func TestResolveHTTPPolicyInTransaction(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	unsetEnvForTest(t, "BLOCKED_HTTP_HOSTS")
+	unsetEnvForTest(t, "BLOCKED_PRIVATE_IP_RANGES")
+
+	errRollback := errors.New("rollback")
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		metadata, err := models.GetInstallationMetadata(tx)
+		require.NoError(t, err)
+
+		metadata.AllowPrivateNetworkAccess = true
+		metadata.UpdatedAt = time.Now()
+		require.NoError(t, models.UpdateInstallationMetadata(tx, metadata))
+
+		policy, err := ResolveHTTPPolicyInTransaction(tx)
+		require.NoError(t, err)
+		assert.True(t, policy.AllowPrivateNetworkAccess)
+		assert.Empty(t, policy.BlockedHosts)
+		assert.Empty(t, policy.PrivateIPRanges)
+
+		return errRollback
+	})
+
+	require.ErrorIs(t, err, errRollback)
 }
 
 func unsetEnvForTest(t *testing.T, key string) {

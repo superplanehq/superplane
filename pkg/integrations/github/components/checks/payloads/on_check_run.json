@@ -1,0 +1,46 @@
+{
+  "data": {
+    "action": "completed",
+    "check_run": {
+      "id": 123456789,
+      "name": "DCO",
+      "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/acme/snaketoy/runs/123456789",
+      "details_url": "https://github.com/acme/snaketoy/runs/123456789",
+      "started_at": "2026-06-01T12:00:00Z",
+      "completed_at": "2026-06-01T12:02:00Z",
+      "app": {
+        "name": "DCO"
+      },
+      "check_suite": {
+        "head_branch": "feature/snake-updates",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+      },
+      "pull_requests": [
+        {
+          "number": 42,
+          "html_url": "https://github.com/acme/snaketoy/pull/42",
+          "head": {
+            "ref": "feature/snake-updates",
+            "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+          },
+          "base": {
+            "ref": "main"
+          }
+        }
+      ]
+    },
+    "repository": {
+      "full_name": "acme/snaketoy",
+      "html_url": "https://github.com/acme/snaketoy"
+    },
+    "sender": {
+      "login": "octocat",
+      "html_url": "https://github.com/octocat"
+    }
+  },
+  "timestamp": "2026-06-01T12:02:01Z",
+  "type": "github.checkRun"
+}

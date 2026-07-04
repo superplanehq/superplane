@@ -190,6 +190,7 @@ func (c *CreateRelease) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -205,12 +206,7 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -218,7 +214,7 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	// Determine the tag name based on version strategy
 	//
-	tagName, err := c.determineTagName(ctx, client, appMetadata.Owner, config)
+	tagName, err := c.determineTagName(ctx, client, config)
 	if err != nil {
 		return fmt.Errorf("failed to determine tag name: %w", err)
 	}
@@ -228,7 +224,7 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	var body string
 	if config.GenerateReleaseNotes {
-		generatedNotes, err := c.generateReleaseNotes(client, appMetadata.Owner, config.Repository, tagName)
+		generatedNotes, err := c.generateReleaseNotes(client, config.Repository, tagName)
 		if err != nil {
 			return fmt.Errorf("failed to generate release notes: %w", err)
 		}
@@ -262,12 +258,7 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 	//
 	// Create the release
 	//
-	release, _, err := client.Repositories.CreateRelease(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		releaseRequest,
-	)
+	release, _, err := client.CreateRelease(context.Background(), config.Repository, releaseRequest)
 	if err != nil {
 		return fmt.Errorf("failed to create release: %w", err)
 	}
@@ -282,7 +273,7 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func (c *CreateRelease) determineTagName(ctx core.ExecutionContext, client *github.Client, owner string, config CreateReleaseConfiguration) (string, error) {
+func (c *CreateRelease) determineTagName(ctx core.ExecutionContext, client *common.Client, config CreateReleaseConfiguration) (string, error) {
 	if config.VersionStrategy == "manual" {
 		return config.TagName, nil
 	}
@@ -290,11 +281,7 @@ func (c *CreateRelease) determineTagName(ctx core.ExecutionContext, client *gith
 	//
 	// Get latest release for auto-increment
 	//
-	latestRelease, _, err := client.Repositories.GetLatestRelease(
-		context.Background(),
-		owner,
-		config.Repository,
-	)
+	latestRelease, _, err := client.GetLatestRelease(context.Background(), config.Repository)
 	if err != nil {
 		return "", fmt.Errorf("no previous release found for auto-increment. Please create the first release manually: %w", err)
 	}
@@ -304,10 +291,10 @@ func (c *CreateRelease) determineTagName(ctx core.ExecutionContext, client *gith
 	//
 	// Try to find an available version (handle case where tag might exist from draft/prerelease)
 	//
-	return c.findAvailableVersion(ctx, client, owner, config.Repository, currentTag, config.VersionStrategy)
+	return c.findAvailableVersion(ctx, client, config.Repository, currentTag, config.VersionStrategy)
 }
 
-func (c *CreateRelease) findAvailableVersion(ctx core.ExecutionContext, client *github.Client, owner, repo, currentTag, strategy string) (string, error) {
+func (c *CreateRelease) findAvailableVersion(ctx core.ExecutionContext, client *common.Client, repository, currentTag, strategy string) (string, error) {
 	const maxAttempts = 10
 
 	for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -317,7 +304,7 @@ func (c *CreateRelease) findAvailableVersion(ctx core.ExecutionContext, client *
 		}
 
 		// Check if this tag already exists
-		exists, err := c.tagExists(client, owner, repo, newTag)
+		exists, err := c.tagExists(client, repository, newTag)
 		if err != nil {
 			// If we can't check, just try to create anyway
 			ctx.Logger.Warnf("Failed to check if tag %s exists: %v. Will attempt to create.", newTag, err)
@@ -342,14 +329,8 @@ func (c *CreateRelease) findAvailableVersion(ctx core.ExecutionContext, client *
 	return "", fmt.Errorf("failed to find available version after %d attempts. Last tried: %s. This may indicate many draft/prerelease versions exist. Please manually specify a version or clean up existing tags", maxAttempts, lastAttempt)
 }
 
-func (c *CreateRelease) tagExists(client *github.Client, owner, repo, tag string) (bool, error) {
-	_, resp, err := client.Git.GetRef(
-		context.Background(),
-		owner,
-		repo,
-		fmt.Sprintf("tags/%s", tag),
-	)
-
+func (c *CreateRelease) tagExists(client *common.Client, repository, tag string) (bool, error) {
+	_, resp, err := client.GetRef(repository, fmt.Sprintf("tags/%s", tag))
 	if err != nil {
 		// 404 means tag doesn't exist
 		if resp != nil && resp.StatusCode == 404 {
@@ -399,17 +380,12 @@ func (c *CreateRelease) incrementVersion(currentTag string, strategy string) (st
 	return newTag, nil
 }
 
-func (c *CreateRelease) generateReleaseNotes(client *github.Client, owner, repo, tagName string) (string, error) {
+func (c *CreateRelease) generateReleaseNotes(client *common.Client, repository, tagName string) (string, error) {
 	opts := &github.GenerateNotesOptions{
 		TagName: tagName,
 	}
 
-	notes, _, err := client.Repositories.GenerateReleaseNotes(
-		context.Background(),
-		owner,
-		repo,
-		opts,
-	)
+	notes, _, err := client.GenerateReleaseNotes(context.Background(), repository, opts)
 	if err != nil {
 		return "", err
 	}

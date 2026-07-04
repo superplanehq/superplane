@@ -5,67 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
-
-func Test__GetRepositoryPermission__Setup(t *testing.T) {
-	helloRepo := common.Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
-	component := GetRepositoryPermission{}
-
-	t.Run("username is required", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Integration:   &contexts.IntegrationContext{},
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": "hello", "username": ""},
-		})
-
-		require.ErrorContains(t, err, "username is required")
-	})
-
-	t.Run("repository is required", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Integration:   &contexts.IntegrationContext{},
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": "", "username": "octocat"},
-		})
-
-		require.ErrorContains(t, err, "repository is required")
-	})
-
-	t.Run("repository is not accessible", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-
-		err := component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": "world", "username": "octocat"},
-		})
-
-		require.ErrorContains(t, err, "repository world is not accessible to app installation")
-	})
-
-	t.Run("metadata is set successfully", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-		nodeMetadataCtx := contexts.MetadataContext{}
-
-		require.NoError(t, component.Setup(core.SetupContext{
-			Integration:   integrationCtx,
-			Metadata:      &nodeMetadataCtx,
-			Configuration: map[string]any{"repository": "hello", "username": "octocat"},
-		}))
-
-		require.Equal(t, common.NodeMetadata{Repository: &helloRepo}, nodeMetadataCtx.Get())
-	})
-}
 
 func Test__GetRepositoryPermission__Execute(t *testing.T) {
 	component := GetRepositoryPermission{}
@@ -94,6 +35,6 @@ func Test__GetRepositoryPermission__Execute(t *testing.T) {
 			},
 		})
 
-		require.ErrorContains(t, err, "failed to decode application metadata")
+		require.ErrorContains(t, err, "failed to decode metadata")
 	})
 }

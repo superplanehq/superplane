@@ -108,11 +108,34 @@ func FindWebhookNodes(webhookID uuid.UUID) ([]CanvasNode, error) {
 	return FindWebhookNodesInTransaction(database.Conn(), webhookID)
 }
 
+func FindActiveWebhookNodes(webhookID uuid.UUID) ([]CanvasNode, error) {
+	return FindActiveWebhookNodesInTransaction(database.Conn(), webhookID)
+}
+
 func FindWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]CanvasNode, error) {
 	var nodes []CanvasNode
 	err := tx.
 		Where("webhook_id = ?", webhookID).
 		Where("deleted_at IS NULL").
+		Find(&nodes).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+func FindActiveWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]CanvasNode, error) {
+	var nodes []CanvasNode
+	query := tx.
+		Table("workflow_nodes").
+		Select("workflow_nodes.*").
+		Where("workflow_nodes.webhook_id = ?", webhookID).
+		Where("workflow_nodes.deleted_at IS NULL")
+
+	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
 		Find(&nodes).
 		Error
 

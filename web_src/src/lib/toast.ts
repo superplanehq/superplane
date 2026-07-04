@@ -15,3 +15,11 @@ export const showErrorToast = (message: string): void => {
 export const showSuccessToast = (message: string): void => {
   toast.success(message);
 };
+
+/**
+ * Show a standardized informational toast notification (non-error, non-success)
+ * @param message - The message to display
+ */
+export const showInfoToast = (message: string): void => {
+  toast.info(message);
+};

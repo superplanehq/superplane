@@ -32,7 +32,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "Create a role from a file",
 		Args:  cobra.NoArgs,
 	}
-	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "path to a YAML file describing the role")
+	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "path to resource file, or - to read from stdin")
 	_ = createCmd.MarkFlagRequired("file")
 	core.Bind(createCmd, &createCommand{file: &createFile}, options)
 
@@ -42,7 +42,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "Update a role from a file",
 		Args:  cobra.NoArgs,
 	}
-	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "path to a YAML file describing the role")
+	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "path to resource file, or - to read from stdin")
 	_ = updateCmd.MarkFlagRequired("file")
 	core.Bind(updateCmd, &updateCommand{file: &updateFile}, options)
 

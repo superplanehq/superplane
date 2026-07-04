@@ -125,6 +125,7 @@ export function IntegrationTabs({
 
       <TabsContent value="capabilities" className="mt-4">
         <CapabilitiesTab
+          organizationId={organizationId}
           integration={integration}
           integrationDef={integrationDef}
           capabilityStates={detailsState.capabilityStates}

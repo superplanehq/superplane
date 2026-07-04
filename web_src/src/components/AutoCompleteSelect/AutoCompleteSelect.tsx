@@ -136,11 +136,11 @@ export function AutoCompleteSelect({
   }, [refs.reference, refs.floating]);
 
   return (
-    <div className="relative">
+    <div className="relative w-full min-w-0">
       <div
         ref={refs.setReference}
         className={twMerge(
-          "relative flex items-center w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100",
+          "relative flex items-center w-full min-w-0 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100",
           "border rounded-md focus-within:outline-none focus-within:ring-2 cursor-pointer",
           error
             ? "border-red-300 dark:border-red-600 focus-within:ring-red-500"
@@ -157,7 +157,7 @@ export function AutoCompleteSelect({
         }}
       >
         {!isOpen && selectedOption && query === "" ? (
-          <span className="flex-1 text-gray-800 dark:text-gray-100 truncate">{selectedOption.label}</span>
+          <span className="flex-1 min-w-0 text-gray-800 dark:text-gray-100 truncate">{selectedOption.label}</span>
         ) : (
           <input
             ref={inputRef}
@@ -165,7 +165,7 @@ export function AutoCompleteSelect({
             role="combobox"
             aria-expanded={isOpen}
             aria-haspopup="listbox"
-            className="flex-1 bg-transparent border-none outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            className="flex-1 min-w-0 bg-transparent border-none outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
             placeholder={placeholder}
             value={query}
             onChange={handleInputChange}

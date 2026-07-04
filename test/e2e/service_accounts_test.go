@@ -14,9 +14,8 @@ import (
 )
 
 func TestServiceAccounts(t *testing.T) {
-	steps := &serviceAccountSteps{t: t}
-
 	t.Run("creating a service account with viewer role", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.visitServiceAccountsPage()
 		steps.clickCreateServiceAccount()
@@ -30,6 +29,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("creating a service account with admin role", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.visitServiceAccountsPage()
 		steps.clickCreateServiceAccount()
@@ -43,6 +43,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("viewing service accounts in the list", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("list-test-bot", "For listing test")
 		steps.visitServiceAccountsPage()
@@ -51,6 +52,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("navigating to service account detail", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("detail-test-bot", "For detail test")
 		steps.visitServiceAccountsPage()
@@ -60,6 +62,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("editing a service account", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("edit-test-bot", "Original description")
 		steps.visitServiceAccountsPage()
@@ -72,6 +75,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("deleting a service account", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("delete-test-bot", "Will be deleted")
 		steps.visitServiceAccountsPage()
@@ -82,6 +86,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("regenerating a service account token", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("regen-test-bot", "Token regen test")
 		steps.visitServiceAccountsPage()
@@ -91,6 +96,7 @@ func TestServiceAccounts(t *testing.T) {
 	})
 
 	t.Run("viewer cannot create or manage service accounts", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
 		steps.start()
 		steps.givenServiceAccountExists("viewer-test-bot", "Viewer RBAC test")
 		steps.loginAsViewer()
@@ -181,7 +187,7 @@ func (s *serviceAccountSteps) dismissTokenModal() {
 
 func (s *serviceAccountSteps) assertServiceAccountSavedInDB(name, description, expectedRole string) {
 	orgID := s.session.OrgID.String()
-	serviceAccounts, err := models.FindServiceAccountsByOrganization(orgID)
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.DB(s.t.Context()), orgID)
 	require.NoError(s.t, err)
 
 	var found *models.User
@@ -274,7 +280,7 @@ func (s *serviceAccountSteps) submitEdit() {
 }
 
 func (s *serviceAccountSteps) assertServiceAccountNameInDB(name string) {
-	serviceAccounts, err := models.FindServiceAccountsByOrganization(s.session.OrgID.String())
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
 	require.NoError(s.t, err)
 
 	for _, sa := range serviceAccounts {
@@ -293,7 +299,7 @@ func (s *serviceAccountSteps) clickDeleteOnDetail() {
 }
 
 func (s *serviceAccountSteps) assertServiceAccountDeletedFromDB(name string) {
-	serviceAccounts, err := models.FindServiceAccountsByOrganization(s.session.OrgID.String())
+	serviceAccounts, err := models.FindServiceAccountsByOrganization(database.DB(s.t.Context()), s.session.OrgID.String())
 	require.NoError(s.t, err)
 
 	for _, sa := range serviceAccounts {

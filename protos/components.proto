@@ -24,7 +24,6 @@ message Node {
   optional IntegrationRef integration = 9;
   optional string error_message = 10;
   optional string warning_message = 11;
-  bool paused = 12;
 }
 
 message Position {

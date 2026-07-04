@@ -1,0 +1,9 @@
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "workerScript": "my-worker"
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.worker.deleted"
+}

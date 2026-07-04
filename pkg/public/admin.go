@@ -8,13 +8,18 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
 
@@ -30,6 +35,8 @@ type paginatedResponse struct {
 
 type installationSettingsResponse struct {
 	AllowPrivateNetworkAccess  bool     `json:"allow_private_network_access"`
+	SignupsEnabled             bool     `json:"signups_enabled"`
+	SignupsBlockedByEnv        bool     `json:"signups_blocked_by_environment"`
 	EffectiveBlockedHTTPHosts  []string `json:"effective_blocked_http_hosts"`
 	EffectivePrivateIPRanges   []string `json:"effective_private_ip_ranges"`
 	BlockedHTTPHostsOverridden bool     `json:"blocked_http_hosts_overridden"`
@@ -46,6 +53,7 @@ type installationSettingsResponse struct {
 
 type installationSettingsRequest struct {
 	AllowPrivateNetworkAccess *bool   `json:"allow_private_network_access"`
+	SignupsEnabled            *bool   `json:"signups_enabled"`
 	SMTPEnabled               *bool   `json:"smtp_enabled"`
 	SMTPHost                  *string `json:"smtp_host"`
 	SMTPPort                  *int    `json:"smtp_port"`
@@ -127,16 +135,23 @@ var errInvalidInstallationSettingsRequest = errors.New("invalid installation set
 
 func (s *Server) updateInstallationSettings(ctx context.Context, req installationSettingsRequest) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if req.AllowPrivateNetworkAccess != nil {
-			metadata, err := models.GetInstallationMetadataInTransaction(tx)
+		if req.AllowPrivateNetworkAccess != nil || req.SignupsEnabled != nil {
+			metadata, err := models.GetInstallationMetadata(tx)
 			if err != nil {
 				return err
 			}
 
-			metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
+			if req.AllowPrivateNetworkAccess != nil {
+				metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
+			}
+
+			if req.SignupsEnabled != nil {
+				metadata.SignupsEnabled = *req.SignupsEnabled
+			}
+
 			metadata.UpdatedAt = time.Now()
 
-			if err := models.UpdateInstallationMetadataInTransaction(tx, metadata); err != nil {
+			if err := models.UpdateInstallationMetadata(tx, metadata); err != nil {
 				return err
 			}
 		}
@@ -150,6 +165,11 @@ func (s *Server) updateInstallationSettings(ctx context.Context, req installatio
 }
 
 func (s *Server) buildInstallationSettingsResponse() (installationSettingsResponse, error) {
+	metadata, err := models.GetInstallationMetadata(database.Conn())
+	if err != nil {
+		return installationSettingsResponse{}, err
+	}
+
 	policy, err := networkpolicy.ResolveHTTPPolicy()
 	if err != nil {
 		return installationSettingsResponse{}, err
@@ -157,6 +177,8 @@ func (s *Server) buildInstallationSettingsResponse() (installationSettingsRespon
 
 	response := installationSettingsResponse{
 		AllowPrivateNetworkAccess:  policy.AllowPrivateNetworkAccess,
+		SignupsEnabled:             metadata.SignupsEnabled,
+		SignupsBlockedByEnv:        s.authHandler.SignupsBlockedByEnvironment(),
 		EffectiveBlockedHTTPHosts:  policy.BlockedHosts,
 		EffectivePrivateIPRanges:   policy.PrivateIPRanges,
 		BlockedHTTPHostsOverridden: policy.BlockedHostsOverridden,
@@ -324,42 +346,20 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	search, limit, offset := parsePagination(r)
 	sortBy, sortDirection := parseSorting(r)
 
-	organizations, total, err := models.ListAllOrganizations(search, limit, offset, sortBy, sortDirection)
+	organizations, total, err := listAllOrganizations(ctx, search, limit, offset, sortBy, sortDirection)
 	if err != nil {
 		log.Errorf("admin: failed to list organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
 		return
 	}
 
-	type orgItem struct {
-		ID          string  `json:"id"`
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		CanvasCount int64   `json:"canvas_count"`
-		MemberCount int64   `json:"member_count"`
-		CreatedAt   *string `json:"created_at,omitempty"`
-	}
+	type orgItem = adminOrgItem
 
-	items := make([]orgItem, 0, len(organizations))
-	for _, org := range organizations {
-		item := orgItem{
-			ID:          org.ID.String(),
-			Name:        org.Name,
-			Description: org.Description,
-			CanvasCount: org.CanvasCount,
-			MemberCount: org.MemberCount,
-		}
-
-		if org.CreatedAt != nil {
-			formatted := org.CreatedAt.Format(time.RFC3339)
-			item.CreatedAt = &formatted
-		}
-
-		items = append(items, item)
-	}
+	items := serializeAdminOrganizations(ctx, organizations)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(paginatedResponse{
@@ -673,4 +673,109 @@ func (s *Server) demoteAdmin(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "demoted"})
+}
+
+// adminEnableOrgExperimentalFeature toggles an experimental feature on for
+// the given organization.
+func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *http.Request) {
+	orgID := mux.Vars(r)["orgId"]
+	featureID := mux.Vars(r)["featureId"]
+
+	if !features.Exists(featureID) {
+		http.Error(w, "Unknown experimental feature", http.StatusBadRequest)
+		return
+	}
+
+	parsedOrgID, err := uuid.Parse(orgID)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	if _, err := models.FindOrganizationByID(orgID); err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	if err := models.EnableExperimentalFeature(parsedOrgID, featureID); err != nil {
+		log.Errorf("admin: failed to enable feature %s for org %s: %v", featureID, orgID, err)
+		http.Error(w, "Failed to enable feature", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "enabled"})
+}
+
+// adminDisableOrgExperimentalFeature toggles an experimental feature off for
+// the given organization. Disabling an id that is not enabled is a no-op.
+func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *http.Request) {
+	orgID := mux.Vars(r)["orgId"]
+	featureID := mux.Vars(r)["featureId"]
+
+	parsedOrgID, err := uuid.Parse(orgID)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	if _, err := models.FindOrganizationByID(orgID); err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	if err := models.DisableExperimentalFeature(parsedOrgID, featureID); err != nil {
+		log.Errorf("admin: failed to disable feature %s for org %s: %v", featureID, orgID, err)
+		http.Error(w, "Failed to disable feature", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "disabled"})
+}
+
+type adminOrgItem struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	CanvasCount int64   `json:"canvas_count"`
+	MemberCount int64   `json:"member_count"`
+	CreatedAt   *string `json:"created_at,omitempty"`
+}
+
+func listAllOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string) (organizations []models.OrganizationWithCounts, total int64, err error) {
+	ctx, done := telemetry.Span(ctx, "organizations.list")
+	defer done(&err)
+
+	return models.ListAllOrganizations(search, limit, offset, sortBy, sortDirection)
+}
+
+func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) []adminOrgItem {
+	var err error
+	ctx, done := telemetry.Span(ctx, "organizations.serialize")
+	defer done(&err)
+
+	items := make([]adminOrgItem, 0, len(organizations))
+	for _, org := range organizations {
+		item := adminOrgItem{
+			ID:          org.ID.String(),
+			Name:        org.Name,
+			Description: org.Description,
+			CanvasCount: org.CanvasCount,
+			MemberCount: org.MemberCount,
+		}
+
+		if org.CreatedAt != nil {
+			formatted := org.CreatedAt.Format(time.RFC3339)
+			item.CreatedAt = &formatted
+		}
+
+		items = append(items, item)
+	}
+
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(attribute.Int("organizations.count", len(items)))
+	}
+
+	return items
 }

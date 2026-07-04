@@ -29,7 +29,7 @@ export function PreCreateIntegrationSetup({
             id="integration-instance-name"
             value={instanceName}
             onChange={(event) => onInstanceNameChange(event.target.value)}
-            placeholder={`${integrationName}-integration`}
+            placeholder={`${integrationName} integration`}
             autoComplete="off"
             className="h-9 w-72 max-w-full"
           />

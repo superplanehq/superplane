@@ -9,22 +9,21 @@ import (
 // Verify if the workflow is acyclic using
 // topological sort algorithm - kahn's - to detect cycles
 func CheckForCycles(nodes []models.Node, edges []models.Edge) error {
+	loopNodeIDs := loopNodeIDSet(nodes)
 
-	//
-	// Build adjacency list
-	//
 	graph := make(map[string][]string)
 	inDegree := make(map[string]int)
 
-	//
-	// Initialize all nodesm and build the graph
-	//
 	for _, node := range nodes {
 		graph[node.ID] = []string{}
 		inDegree[node.ID] = 0
 	}
 
 	for _, edge := range edges {
+		if _, isLoopNode := loopNodeIDs[edge.TargetID]; isLoopNode {
+			continue
+		}
+
 		graph[edge.SourceID] = append(graph[edge.SourceID], edge.TargetID)
 		inDegree[edge.TargetID]++
 	}
@@ -57,4 +56,14 @@ func CheckForCycles(nodes []models.Node, edges []models.Edge) error {
 	}
 
 	return nil
+}
+
+func loopNodeIDSet(nodes []models.Node) map[string]struct{} {
+	ids := make(map[string]struct{})
+	for _, node := range nodes {
+		if node.Ref.Component != nil && node.Ref.Component.Name == "loop" {
+			ids[node.ID] = struct{}{}
+		}
+	}
+	return ids
 }

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { CanvasLogSidebar, type LogCounts, type LogEntry, type LogRunItem } from "./index";
+import { CanvasLogSidebar, type LogCounts, type LogEntry } from "./index";
 import { Button } from "@/components/ui/button";
 
 const meta = {
@@ -30,7 +30,7 @@ const sampleEntries: LogEntry[] = [
     type: "warning",
     title: "Rate limit nearing threshold",
     timestamp: "Tue 2025-12-30 10:16:24",
-    source: "runs",
+    source: "canvas",
     searchText: "rate limit warning",
   },
   {
@@ -38,48 +38,8 @@ const sampleEntries: LogEntry[] = [
     type: "error",
     title: "Webhook signature mismatch",
     timestamp: "Tue 2025-12-30 10:17:03",
-    source: "runs",
+    source: "canvas",
     searchText: "webhook signature mismatch",
-  },
-  {
-    id: "log-4",
-    type: "run",
-    title: "Run #1934: Checkout flow",
-    timestamp: "Tue 2025-12-30 10:18:19",
-    source: "runs",
-    runItems: [
-      {
-        id: "run-1",
-        type: "success",
-        title: (
-          <span>
-            Payment captured for{" "}
-            <a className="text-blue-600 underline" href="#">
-              order #1042
-            </a>
-          </span>
-        ),
-        timestamp: "Tue 2025-12-30 10:18:42",
-        detail: "Stripe charge confirmed and stored.",
-        searchText: "payment captured order 1042",
-      },
-      {
-        id: "run-2",
-        type: "warning",
-        title: "Inventory low for SKU-AX9",
-        timestamp: "Tue 2025-12-30 10:19:10",
-        detail: "Only 3 units left in stock.",
-        searchText: "inventory low sku ax9",
-      },
-      {
-        id: "run-3",
-        type: "error",
-        title: "Shipping label generation failed",
-        timestamp: "Tue 2025-12-30 10:19:55",
-        detail: "Carrier API returned 500.",
-        searchText: "shipping label failed",
-      },
-    ] as LogRunItem[],
   },
 ];
 
@@ -90,14 +50,6 @@ function getCounts(entries: LogEntry[]): LogCounts {
       if (entry.type === "error") acc.error += 1;
       if (entry.type === "warning") acc.warning += 1;
       if (entry.type === "success") acc.success += 1;
-      if (entry.runItems?.length) {
-        acc.total += entry.runItems.length;
-        entry.runItems.forEach((item) => {
-          if (item.type === "error") acc.error += 1;
-          if (item.type === "warning") acc.warning += 1;
-          if (item.type === "success") acc.success += 1;
-        });
-      }
       return acc;
     },
     { total: 0, error: 0, warning: 0, success: 0 },

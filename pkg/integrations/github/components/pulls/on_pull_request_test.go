@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
+	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
 
 func Test__OnPullRequest__HandleWebhook(t *testing.T) {
@@ -99,6 +100,86 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 		assert.Equal(t, eventContext.Count(), 1)
 	})
 
+	t.Run("edited action is in list -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"action":"edited","changes":{"title":{"from":"Old title"}}}`)
+
+		secret := "test-secret"
+		h := hmac.New(sha256.New, []byte(secret))
+		h.Write(body)
+		signature := fmt.Sprintf("%x", h.Sum(nil))
+
+		headers := http.Header{}
+		headers.Set("X-Hub-Signature-256", "sha256="+signature)
+		headers.Set("X-GitHub-Event", eventType)
+
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+				"actions":    []string{"edited"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: secret},
+			Events:  eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, eventContext.Count(), 1)
+	})
+
+	t.Run("newly supported actions emit when configured", func(t *testing.T) {
+		actions := []string{
+			"converted_to_draft",
+			"locked",
+			"unlocked",
+			"enqueued",
+			"dequeued",
+			"milestoned",
+			"demilestoned",
+			"ready_for_review",
+			"review_requested",
+			"review_request_removed",
+			"auto_merge_enabled",
+			"auto_merge_disabled",
+		}
+
+		secret := "test-secret"
+
+		for _, action := range actions {
+			t.Run(action, func(t *testing.T) {
+				body := []byte(fmt.Sprintf(`{"action":%q}`, action))
+
+				h := hmac.New(sha256.New, []byte(secret))
+				h.Write(body)
+				signature := fmt.Sprintf("%x", h.Sum(nil))
+
+				headers := http.Header{}
+				headers.Set("X-Hub-Signature-256", "sha256="+signature)
+				headers.Set("X-GitHub-Event", eventType)
+
+				eventContext := &contexts.EventContext{}
+				code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+					Body:    body,
+					Headers: headers,
+					Logger:  logrus.NewEntry(logrus.New()),
+					Configuration: map[string]any{
+						"repository": "test",
+						"actions":    []string{action},
+					},
+					Webhook: &contexts.NodeWebhookContext{Secret: secret},
+					Events:  eventContext,
+				})
+
+				assert.Equal(t, http.StatusOK, code)
+				assert.NoError(t, err)
+				assert.Equal(t, 1, eventContext.Count())
+			})
+		}
+	})
+
 	t.Run("action is not in list -> event is not emitted", func(t *testing.T) {
 		body := []byte(`{"action":"closed"}`)
 
@@ -131,52 +212,29 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 }
 
 func Test__OnPullRequest__Setup(t *testing.T) {
-	helloRepo := common.Repository{ID: 123456, Name: "hello", URL: "https://github.com/testhq/hello"}
 	trigger := OnPullRequest{}
 
-	t.Run("repository is required", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
-		err := trigger.Setup(core.TriggerContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": ""},
-		})
-
-		require.ErrorContains(t, err, "repository is required")
-	})
-
-	t.Run("repository is not accessible", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
-			},
-		}
-		err := trigger.Setup(core.TriggerContext{
-			Integration:   integrationCtx,
-			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"repository": "world"},
-		})
-
-		require.ErrorContains(t, err, "repository world is not accessible to app installation")
-	})
-
-	t.Run("metadata is set and webhook is requested", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Metadata: common.Metadata{
-				Repositories: []common.Repository{helloRepo},
+	t.Run("webhook is requested", func(t *testing.T) {
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{
+					"id": 123456,
+					"name": "hello",
+					"html_url": "https://github.com/testhq/hello"
+				}`),
 			},
 		}
 
 		nodeMetadataCtx := contexts.MetadataContext{}
 		require.NoError(t, trigger.Setup(core.TriggerContext{
 			Integration:   integrationCtx,
+			HTTP:          httpCtx,
 			Metadata:      &nodeMetadataCtx,
 			Configuration: map[string]any{"repository": "hello"},
 		}))
 
-		require.Equal(t, nodeMetadataCtx.Get(), common.NodeMetadata{Repository: &helloRepo})
 		require.Len(t, integrationCtx.WebhookRequests, 1)
-
 		webhookRequest := integrationCtx.WebhookRequests[0].(common.WebhookConfiguration)
 		assert.Equal(t, webhookRequest.EventType, "pull_request")
 		assert.Equal(t, webhookRequest.Repository, "hello")

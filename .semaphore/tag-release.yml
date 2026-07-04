@@ -1,0 +1,89 @@
+version: v1.0
+name: "Tag ${{parameters.REL_VERSION}}"
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+execution_time_limit:
+  hours: 1
+
+global_job_config:
+  env_vars:
+    - name: GITHUB_REPO
+      value: superplanehq/superplane
+
+  secrets:
+    - name: github-release-token
+
+blocks:
+  - name: Create tag
+    dependencies: []
+    task:
+      jobs:
+        - name: Create release tag
+          commands:
+            - sudo apt-get update
+            - sudo apt-get install -y curl jq
+            - |
+              set -euo pipefail
+
+              if [ -z "${REL_VERSION:-}" ]; then
+                echo "REL_VERSION is required" >&2
+                exit 1
+              fi
+
+              if [ -z "${GITHUB_RELEASE_TOKEN:-}" ]; then
+                echo "GITHUB_RELEASE_TOKEN is required" >&2
+                exit 1
+              fi
+
+              github_api() {
+                curl -fsSL \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Authorization: Bearer ${GITHUB_RELEASE_TOKEN}" \
+                  -H "X-GitHub-Api-Version: 2022-11-28" \
+                  "$@"
+              }
+
+              branch_ref="heads/release/${REL_VERSION}"
+              target_sha="$(github_api "https://api.github.com/repos/${GITHUB_REPO}/git/ref/${branch_ref}" | jq -r '.object.sha')"
+
+              if [ -z "${target_sha}" ] || [ "${target_sha}" = "null" ]; then
+                echo "Could not resolve release branch ${branch_ref}" >&2
+                exit 1
+              fi
+
+              existing_status="$(curl -sS -o /tmp/tag-ref.json -w "%{http_code}" \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${GITHUB_RELEASE_TOKEN}" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/repos/${GITHUB_REPO}/git/ref/tags/${REL_VERSION}")"
+
+              if [ "${existing_status}" = "200" ]; then
+                existing_sha="$(jq -r '.object.sha' /tmp/tag-ref.json)"
+                if [ "${existing_sha}" = "${target_sha}" ]; then
+                  echo "Tag ${REL_VERSION} already points at ${target_sha}"
+                  exit 0
+                fi
+
+                echo "Tag ${REL_VERSION} already exists at ${existing_sha}, expected ${target_sha}" >&2
+                exit 1
+              fi
+
+              if [ "${existing_status}" != "404" ]; then
+                cat /tmp/tag-ref.json >&2
+                exit 1
+              fi
+
+              payload="$(jq -n --arg ref "refs/tags/${REL_VERSION}" --arg sha "${target_sha}" '{ref: $ref, sha: $sha}')"
+              curl -fsSL \
+                -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${GITHUB_RELEASE_TOKEN}" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                -d "${payload}" \
+                "https://api.github.com/repos/${GITHUB_REPO}/git/refs"
+
+              echo "Created tag ${REL_VERSION} at ${target_sha}"

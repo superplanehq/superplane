@@ -17,15 +17,15 @@ import (
 )
 
 func TestMagicCodeLogin(t *testing.T) {
-	steps := &magicCodeSteps{t: t}
-
 	t.Run("magic code email form is shown as primary login method", func(t *testing.T) {
+		steps := &magicCodeSteps{t: t}
 		steps.start()
 		steps.visitLoginPage()
 		steps.assertMagicCodeFormVisible()
 	})
 
 	t.Run("requesting code transitions to code input step", func(t *testing.T) {
+		steps := &magicCodeSteps{t: t}
 		steps.start()
 		steps.visitLoginPage()
 		steps.enterEmailAndRequestCode("e2e@superplane.local")
@@ -33,6 +33,7 @@ func TestMagicCodeLogin(t *testing.T) {
 	})
 
 	t.Run("back button returns to email step", func(t *testing.T) {
+		steps := &magicCodeSteps{t: t}
 		steps.start()
 		steps.visitLoginPage()
 		steps.enterEmailAndRequestCode("e2e@superplane.local")
@@ -42,6 +43,7 @@ func TestMagicCodeLogin(t *testing.T) {
 	})
 
 	t.Run("existing user can login with magic code", func(t *testing.T) {
+		steps := &magicCodeSteps{t: t}
 		steps.start()
 		steps.visitLoginPage()
 		email := "e2e@superplane.local"
@@ -52,6 +54,7 @@ func TestMagicCodeLogin(t *testing.T) {
 	})
 
 	t.Run("new user can sign up with magic code via invite link", func(t *testing.T) {
+		steps := &magicCodeSteps{t: t}
 		steps.start()
 		inviteToken := steps.createInviteLink()
 		email := support.RandomName("magic") + "@superplane.local"
@@ -63,6 +66,7 @@ func TestMagicCodeLogin(t *testing.T) {
 	})
 
 	t.Run("invalid code shows error message", func(t *testing.T) {
+		steps := &magicCodeSteps{t: t}
 		steps.start()
 		steps.visitLoginPage()
 		email := "e2e@superplane.local"
@@ -73,6 +77,7 @@ func TestMagicCodeLogin(t *testing.T) {
 	})
 
 	t.Run("can toggle to password login and back", func(t *testing.T) {
+		steps := &magicCodeSteps{t: t}
 		steps.start()
 		steps.visitLoginPage()
 		steps.assertMagicCodeFormVisible()
@@ -171,11 +176,11 @@ func (s *magicCodeSteps) clickMagicCodeToggle() {
 }
 
 func (s *magicCodeSteps) createInviteLink() string {
-	inviteLink, err := models.FindInviteLinkByOrganizationID(s.session.OrgID.String())
+	inviteLink, err := models.FindInviteLinkByOrganizationID(database.DB(s.t.Context()), s.session.OrgID.String())
 	if err == nil {
 		return inviteLink.Token.String()
 	}
-	inviteLink, err = models.CreateInviteLink(s.session.OrgID)
+	inviteLink, err = models.CreateInviteLink(database.DB(s.t.Context()), s.session.OrgID)
 	require.NoError(s.t, err)
 	return inviteLink.Token.String()
 }

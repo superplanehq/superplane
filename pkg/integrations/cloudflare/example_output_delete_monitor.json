@@ -1,0 +1,10 @@
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitorId": "monitor_abc123",
+    "deleted": true,
+    "references": []
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.monitor.deleted"
+}

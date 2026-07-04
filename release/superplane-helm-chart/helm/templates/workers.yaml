@@ -51,6 +51,8 @@ spec:
               value: "yes"
             - name: START_EVENT_ROUTER
               value: "yes"
+            - name: START_RUN_FINALIZER
+              value: "yes"
             - name: START_NODE_EXECUTOR
               value: "yes"
             - name: START_NODE_QUEUE_WORKER
@@ -66,6 +68,8 @@ spec:
             - name: START_INTEGRATION_CLEANUP_WORKER
               value: "yes"
             - name: START_CANVAS_CLEANUP_WORKER
+              value: "yes"
+            - name: START_REPOSITORY_PROVISIONER
               value: "yes"
             - name: RBAC_MODEL_PATH
               value: /app/rbac/rbac_model.conf
@@ -93,6 +97,10 @@ spec:
               value: /app/oidc-keys
             - name: OTEL_ENABLED
               value: "yes"
+            - name: GIT_STORAGE_PROVIDER
+              value: supergit
+            - name: GIT_STORAGE_SUPERGIT_BASE_URL
+              value: {{ printf "http://%s:%v%s" .Values.supergit.host .Values.supergit.port .Values.supergit.apiPath | quote }}
 
           volumeMounts:
             - name: oidc-keys

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,7 +19,7 @@ func TestRequireInstallationAdmin(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
 
-	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	// Chain: AccountAuthMiddleware → RequireInstallationAdmin → final handler

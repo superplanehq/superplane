@@ -1,47 +1,31 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
-import { resolveIcon } from "@/lib/utils";
-import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
+import { cn, resolveIcon } from "@/lib/utils";
+import { Check, Copy, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import {
-  useAvailableIntegrations,
-  useCreateIntegration,
-  useIntegration,
-  useUpdateIntegration,
-} from "@/hooks/useIntegrations";
-import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
+import { useAvailableIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
+import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import type { TabData } from "./SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "./types";
 import { DocsTab } from "./DocsTab";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
-import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
+import { useSidebarLayoutStore, useSidebarLayoutViewport, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import type {
   AuthorizationDomainType,
   ConfigurationField,
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
-  SuperplaneActionsAction,
-  TriggersTrigger,
   OrganizationsIntegration,
   ComponentsIntegrationRef,
 } from "@/api-client";
 import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
-import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
-import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
-import { analytics, useIntegrationConfigureOpen } from "@/lib/analytics";
+import { HistoryQueuePage, PageHeader } from "./pages";
+import { analytics } from "@/lib/analytics";
+import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
 const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
@@ -52,6 +36,35 @@ const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
     webhookStepDescription?: ReactNode;
   }
 > = {};
+
+function BottomInspectorTabButton({
+  active,
+  icon,
+  label,
+  onClick,
+  trailing,
+}: {
+  active: boolean;
+  icon: string;
+  label: string;
+  onClick: () => void;
+  trailing?: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "mb-[-1px] flex items-center gap-1 self-stretch border-b px-2.5 text-[13px] font-medium",
+        active ? "border-gray-800 text-gray-800" : "border-transparent text-gray-500 hover:text-gray-800",
+      )}
+    >
+      {React.createElement(resolveIcon(icon), { size: RUN_NODE_ICON_SIZE, className: "h-3.5 w-3.5 shrink-0" })}
+      {label}
+      {trailing}
+    </button>
+  );
+}
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
@@ -91,14 +104,6 @@ interface ComponentSidebarProps {
   onLoadMoreQueue?: () => void;
   getHasMoreQueue?: () => boolean;
   getLoadingMoreQueue?: () => boolean;
-
-  // Execution chain lazy loading
-  loadExecutionChain?: (
-    eventId: string,
-    nodeId?: string,
-    currentExecution?: Record<string, unknown>,
-    forceReload?: boolean,
-  ) => Promise<any[]>;
 
   // State registry function for determining execution states
   getExecutionState?: (
@@ -142,23 +147,13 @@ interface ComponentSidebarProps {
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
-  configurationSaveMode?: "manual" | "auto";
 
-  // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  actions?: SuperplaneActionsAction[];
-  triggers?: TriggersTrigger[];
-
-  // Highlighting callback for execution chain nodes
-  onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
-
-  // External request to open execution chain
-  executionChainEventId?: string | null;
-  executionChainExecutionId?: string | null;
-  executionChainTriggerEvent?: SidebarEvent | null;
-  executionChainRequestId?: number;
-  onExecutionChainHandled?: () => void;
   readOnly?: boolean;
+  layout?: "sidebar" | "bottom";
+  resolveRunId?: (event: SidebarEvent) => string | null;
+  fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
+  onSelectRun?: (runId: string, options?: { nodeId?: string }) => void;
 }
 
 export const ComponentSidebar = ({
@@ -188,7 +183,6 @@ export const ComponentSidebar = ({
   getAllQueueEvents,
   getHasMoreQueue,
   getLoadingMoreQueue,
-  loadExecutionChain,
   getExecutionState,
   showSettingsTab = false,
   hideRunsTab = false,
@@ -214,36 +208,30 @@ export const ComponentSidebar = ({
   canCreateIntegrations,
   canUpdateIntegrations,
   autocompleteExampleObj,
-  configurationSaveMode = "manual",
   componentDescription,
   componentExamplePayload,
   componentPayloadLabel,
   componentDocumentationUrl,
   workflowNodes = [],
-  actions = [],
-  triggers = [],
-  onHighlightedNodesChange,
-  executionChainEventId,
-  executionChainExecutionId,
-  executionChainTriggerEvent,
-  executionChainRequestId,
-  onExecutionChainHandled,
   readOnly = false,
+  layout = "sidebar",
+  resolveRunId,
+  fetchRunId,
+  onSelectRun,
 }: ComponentSidebarProps) => {
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
-    return saved ? parseInt(saved, 10) : 450;
-  });
-  const [isResizing, setIsResizing] = useState(false);
+  const isBottomLayout = layout === "bottom";
+  const sidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
+  const isResizing = useSidebarLayoutStore((state) => state.isRightResizing);
+  const setRightResizing = useSidebarLayoutStore((state) => state.setRightResizing);
+  const resizeRight = useSidebarLayoutStore((state) => state.resizeRight);
+  useSidebarMount("right", Boolean(isOpen) && !isBottomLayout);
+  useSidebarLayoutViewport();
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const activeResizePointerIdRef = useRef<number | null>(null);
   // Keep expanded state stable across parent re-renders
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
 
-  const [page, setPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
-  const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
-  const [activeExecutionChainEventId, setActiveExecutionChainEventId] = useState<string | null>(null);
-  const [activeExecutionChainTriggerEvent, setActiveExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
+  const [page, setPage] = useState<"overview" | "history" | "queue">("overview");
   const shouldShowRunsTab = !hideRunsTab && canvasMode === "live";
   const activeTab = useMemo(() => {
     if (shouldShowRunsTab || currentTab !== "latest") {
@@ -262,32 +250,11 @@ export const ComponentSidebar = ({
   const [justCopied, setJustCopied] = useState(false);
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
-  const [configureIntegrationName, setConfigureIntegrationName] = useState("");
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
 
   const { data: availableIntegrationDefinitions = [] } = useAvailableIntegrations();
-  const { data: configureIntegration, isLoading: configureIntegrationLoading } = useIntegration(
-    domainId ?? "",
-    configureIntegrationId ?? "",
-  );
-  const updateIntegrationMutation = useUpdateIntegration(domainId ?? "", configureIntegrationId ?? "");
   const createIntegrationMutation = useCreateIntegration(domainId ?? "", "node_configuration");
-  const configureIntegrationDefinition = useMemo(
-    () =>
-      configureIntegration?.metadata?.integrationName
-        ? availableIntegrationDefinitions.find((d) => d.name === configureIntegration.metadata?.integrationName)
-        : undefined,
-    [availableIntegrationDefinitions, configureIntegration?.metadata?.integrationName],
-  );
-  const [configureIntegrationConfig, setConfigureIntegrationConfig] = useState<Record<string, unknown>>({});
-
-  useIntegrationConfigureOpen(
-    configureIntegration ?? undefined,
-    configureIntegrationId,
-    "node_configuration",
-    domainId,
-  );
 
   const createIntegrationDefinition = useMemo(
     () => (integrationName ? availableIntegrationDefinitions.find((d) => d.name === integrationName) : undefined),
@@ -331,130 +298,80 @@ export const ComponentSidebar = ({
 
   const handleCloseConfigureIntegrationDialog = useCallback(() => {
     setConfigureIntegrationId(null);
-    setConfigureIntegrationName("");
-    setConfigureIntegrationConfig({});
-    updateIntegrationMutation.reset();
-  }, [updateIntegrationMutation]);
-
-  const handleConfigureIntegrationSubmit = useCallback(async () => {
-    if (!configureIntegrationId || !domainId) return;
-
-    const nextName = configureIntegrationName.trim();
-    if (!nextName) {
-      showErrorToast("Integration name is required");
-      return;
-    }
-
-    try {
-      await updateIntegrationMutation.mutateAsync({ name: nextName, configuration: configureIntegrationConfig });
-      handleCloseConfigureIntegrationDialog();
-    } catch {
-      showErrorToast("Failed to update integration");
-    }
-  }, [
-    configureIntegrationId,
-    domainId,
-    configureIntegrationName,
-    configureIntegrationConfig,
-    updateIntegrationMutation,
-    handleCloseConfigureIntegrationDialog,
-  ]);
-
-  const handleConfigureBrowserAction = useCallback(() => {
-    const browserAction = configureIntegration?.status?.browserAction;
-    if (!browserAction) return;
-    const { url, method, formFields } = browserAction;
-    if (method?.toUpperCase() === "POST" && formFields) {
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = url || "";
-      form.target = "_blank";
-      form.style.display = "none";
-      Object.entries(formFields).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
-    } else if (url) {
-      window.open(url, "_blank");
-    }
-  }, [configureIntegration?.status?.browserAction]);
-
-  useEffect(() => {
-    if (configureIntegration?.spec?.configuration) {
-      setConfigureIntegrationConfig(configureIntegration.spec.configuration);
-    }
-  }, [configureIntegration?.spec?.configuration]);
-
-  useEffect(() => {
-    setConfigureIntegrationName(
-      configureIntegration?.metadata?.name || configureIntegration?.metadata?.integrationName || "",
-    );
-  }, [configureIntegration?.metadata?.name, configureIntegration?.metadata?.integrationName]);
+  }, []);
 
   // Seed open ids from incoming props (without closing already open ones)
   useEffect(() => {
-    const seeded = new Set(openEventIds);
-    latestEvents.forEach((e) => {
-      if (e.isOpen) seeded.add(e.id);
+    setOpenEventIds((current) => {
+      const seeded = new Set(current);
+      let changed = false;
+
+      for (const event of [...latestEvents, ...nextInQueueEvents]) {
+        if (event.isOpen && !seeded.has(event.id)) {
+          seeded.add(event.id);
+          changed = true;
+        }
+      }
+
+      return changed ? seeded : current;
     });
-    nextInQueueEvents.forEach((e) => {
-      if (e.isOpen) seeded.add(e.id);
-    });
-    if (seeded.size !== openEventIds.size) setOpenEventIds(seeded);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestEvents, nextInQueueEvents]);
 
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
   }, [iconSlug]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isResizing) return;
-
-      const newWidth = window.innerWidth - e.clientX;
-      // Set min width to 320px and max width to 800px
-      const clampedWidth = Math.max(320, Math.min(800, newWidth));
-      setSidebarWidth(clampedWidth);
+  const updateSidebarWidthFromPointer = useCallback(
+    (clientX: number) => {
+      resizeRight(window.innerWidth - clientX);
     },
-    [isResizing],
+    [resizeRight],
   );
 
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  // Save sidebar width to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "ew-resize";
-      document.body.style.userSelect = "none";
-
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      };
+    if (isBottomLayout || !isResizing) {
+      return;
     }
-  }, [isResizing, handleMouseMove, handleMouseUp]);
+
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      if (activeResizePointerIdRef.current !== null && event.pointerId !== activeResizePointerIdRef.current) {
+        return;
+      }
+      updateSidebarWidthFromPointer(event.clientX);
+    };
+
+    const finishResize = (event: PointerEvent) => {
+      if (activeResizePointerIdRef.current !== null && event.pointerId !== activeResizePointerIdRef.current) {
+        return;
+      }
+      activeResizePointerIdRef.current = null;
+      setRightResizing(false);
+    };
+
+    window.addEventListener("pointermove", handleWindowPointerMove);
+    window.addEventListener("pointerup", finishResize);
+    window.addEventListener("pointercancel", finishResize);
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      window.removeEventListener("pointermove", handleWindowPointerMove);
+      window.removeEventListener("pointerup", finishResize);
+      window.removeEventListener("pointercancel", finishResize);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isBottomLayout, isResizing, updateSidebarWidthFromPointer, setRightResizing]);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      activeResizePointerIdRef.current = e.pointerId;
+      updateSidebarWidthFromPointer(e.clientX);
+      setRightResizing(true);
+    },
+    [updateSidebarWidthFromPointer, setRightResizing],
+  );
 
   const handleToggleOpen = useCallback((eventId: string) => {
     setOpenEventIds((prev) => {
@@ -466,71 +383,23 @@ export const ComponentSidebar = ({
   }, []);
 
   const handleSeeQueue = useCallback(() => {
-    setPreviousPage(page as "overview" | "history" | "queue");
     setPage("queue");
     onSeeQueue?.();
-  }, [onSeeQueue, page]);
+  }, [onSeeQueue]);
 
   const handleSeeFullHistory = useCallback(() => {
-    setPreviousPage(page as "overview" | "history" | "queue" | "execution-chain");
     setPage("history");
     onSeeFullHistory?.();
-  }, [onSeeFullHistory, page]);
+  }, [onSeeFullHistory]);
 
   const handleBackToOverview = useCallback(() => {
-    if (page === "execution-chain") {
-      // When coming back from execution chain, go to the previous page
-      setPage(previousPage !== "execution-chain" ? previousPage : "overview");
-      // Clear highlights when leaving execution chain
-      onHighlightedNodesChange?.(new Set());
-    } else {
-      setPage("overview");
-    }
-    setActiveExecutionChainEventId(null);
-    setActiveExecutionChainTriggerEvent(null);
-    setSelectedExecutionId(null);
-  }, [page, previousPage, onHighlightedNodesChange]);
+    setPage("overview");
+  }, []);
 
-  const handleSeeExecutionChain = useCallback(
-    (eventId: string, triggerEvent?: SidebarEvent, selectedExecId?: string) => {
-      setPreviousPage(page as "overview" | "history" | "queue");
-      setActiveExecutionChainEventId(eventId);
-      setActiveExecutionChainTriggerEvent(triggerEvent || null);
-      setSelectedExecutionId(selectedExecId || null);
-      setPage("execution-chain");
-    },
-    [page],
-  );
-
-  useEffect(() => {
-    if (!executionChainEventId) {
-      return;
-    }
-
-    handleSeeExecutionChain(
-      executionChainEventId,
-      executionChainTriggerEvent || undefined,
-      executionChainExecutionId || undefined,
-    );
-  }, [
-    executionChainEventId,
-    executionChainExecutionId,
-    executionChainRequestId,
-    executionChainTriggerEvent,
-    handleSeeExecutionChain,
-  ]);
-
-  useEffect(() => {
-    if (page === "execution-chain") {
-      onExecutionChainHandled?.();
-    }
-  }, [page, onExecutionChainHandled]);
-
-  const listPage = page === "execution-chain" ? previousPage : page;
   const allEvents = React.useMemo(() => {
-    if (listPage === "overview") return [];
+    if (page === "overview") return [];
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return getAllHistoryEvents?.() || [];
       case "queue":
@@ -538,12 +407,12 @@ export const ComponentSidebar = ({
       default:
         return [];
     }
-  }, [getAllHistoryEvents, getAllQueueEvents, listPage]);
+  }, [getAllHistoryEvents, getAllQueueEvents, page]);
 
   const hasMoreItems = React.useMemo(() => {
-    if (listPage === "overview") return false;
+    if (page === "overview") return false;
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return getHasMoreHistory?.() || false;
       case "queue":
@@ -551,12 +420,12 @@ export const ComponentSidebar = ({
       default:
         return false;
     }
-  }, [getHasMoreHistory, getHasMoreQueue, listPage]);
+  }, [getHasMoreHistory, getHasMoreQueue, page]);
 
   const loadingMoreItems = React.useMemo(() => {
-    if (listPage === "overview") return false;
+    if (page === "overview") return false;
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return getLoadingMoreHistory?.() || false;
       case "queue":
@@ -564,12 +433,12 @@ export const ComponentSidebar = ({
       default:
         return false;
     }
-  }, [getLoadingMoreHistory, getLoadingMoreQueue, listPage]);
+  }, [getLoadingMoreHistory, getLoadingMoreQueue, page]);
 
   const handleLoadMoreItems = React.useCallback(() => {
-    if (listPage === "overview") return;
+    if (page === "overview") return;
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return onLoadMoreHistory?.();
       case "queue":
@@ -577,12 +446,12 @@ export const ComponentSidebar = ({
       default:
         return;
     }
-  }, [onLoadMoreHistory, onLoadMoreQueue, listPage]);
+  }, [onLoadMoreHistory, onLoadMoreQueue, page]);
 
   const showMoreCount = React.useMemo(() => {
-    if (listPage === "overview") return 0;
+    if (page === "overview") return 0;
 
-    switch (listPage) {
+    switch (page) {
       case "history":
         return totalInHistoryCount - allEvents.length;
       case "queue":
@@ -590,456 +459,353 @@ export const ComponentSidebar = ({
       default:
         return 0;
     }
-  }, [allEvents, totalInHistoryCount, totalInQueueCount, listPage]);
-
-  // Clear highlights when sidebar closes or when leaving execution chain page
-  useEffect(() => {
-    if (!isOpen && onHighlightedNodesChange) {
-      onHighlightedNodesChange(new Set());
-    }
-  }, [isOpen, onHighlightedNodesChange]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      onHighlightedNodesChange?.(new Set());
-    };
-  }, [onHighlightedNodesChange]);
+  }, [allEvents, totalInHistoryCount, totalInQueueCount, page]);
 
   const isDetailView = page !== "overview";
   const appIconSrc = getHeaderIconSrc(blockName);
   const headerIconSrc = iconSrc ?? appIconSrc;
+  const selectedWorkflowNode = useMemo(
+    () => (nodeId ? workflowNodes.find((node) => node.id === nodeId) : undefined),
+    [nodeId, workflowNodes],
+  );
+  const configurationHasError = Boolean(selectedWorkflowNode?.errorMessage);
 
   if (!isOpen) return null;
 
   return (
     <div
       ref={sidebarRef}
-      className="ph-no-capture border-l-1 border-border absolute right-0 top-0 h-full z-20 overflow-hidden bg-white flex flex-col"
-      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+      className={
+        isBottomLayout
+          ? "ph-no-capture flex min-h-0 flex-1 flex-col"
+          : "ph-no-capture absolute right-0 top-0 h-full z-20"
+      }
+      style={
+        isBottomLayout
+          ? undefined
+          : { width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }
+      }
     >
-      {/* Resize handle */}
+      {!isBottomLayout ? (
+        <div
+          onPointerDown={handlePointerDown}
+          data-testid="component-sidebar-resize-handle"
+          className="group absolute left-0 top-0 bottom-0 z-40 w-4 cursor-col-resize touch-none bg-transparent"
+          style={{ marginLeft: "-8px" }}
+        >
+          <div
+            aria-hidden
+            className={`pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 ${
+              isResizing ? "bg-slate-950/50" : ""
+            }`}
+          />
+        </div>
+      ) : null}
       <div
-        onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group z-30 ${
-          isResizing ? "bg-blue-50" : ""
-        }`}
-        style={{ marginLeft: "-8px" }}
+        className={
+          isBottomLayout
+            ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white"
+            : "border-l-1 border-border h-full overflow-hidden bg-white flex flex-col"
+        }
       >
         <div
-          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
-            isResizing ? "bg-blue-500" : ""
-          }`}
-        />
-      </div>
-      <div className={"flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")}>
-        <div className="flex flex-col items-start gap-3 w-full">
-          <div className="flex justify-between gap-3 w-full">
-            <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-2">
-                <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
-                  {headerIconSrc ? (
-                    <img src={headerIconSrc} alt={nodeName} className="w-4 h-4 object-contain" />
-                  ) : (
-                    <Icon size={16} />
-                  )}
-                </div>
-                <h2 className="text-base font-semibold">{nodeName}</h2>
-              </div>
-              {nodeId && !hideNodeId && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] text-gray-500 font-mono">{nodeId}</span>
-                  <button
-                    onClick={handleCopyNodeId}
-                    className={"text-gray-500 hover:text-gray-800"}
-                    title={justCopied ? "Copied!" : "Copy Node ID"}
-                  >
-                    {justCopied ? <Check size={14} /> : <Copy size={14} />}
-                  </button>
-                </div>
-              )}
-            </div>
-            {null}
-          </div>
-          <div
-            onClick={() => onClose?.()}
-            className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
-          >
-            <X size={16} />
-          </div>
-        </div>
-      </div>
-      <div className="relative flex-1 min-h-0 overflow-hidden">
-        <div
-          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
-            isDetailView ? "-translate-x-full" : "translate-x-0"
-          } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
+          className={
+            isBottomLayout
+              ? "flex h-9 shrink-0 items-stretch justify-between border-b border-slate-200 pl-3"
+              : "flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")
+          }
         >
-          <Tabs
-            value={activeTab}
-            onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs")}
-            className="flex-1"
-          >
-            {showSettingsTab && (
-              <div className="border-border border-b-1">
-                <div className="flex px-4">
-                  {shouldShowRunsTab && (
-                    <button
-                      onClick={() => onTabChange?.("latest")}
-                      className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
-                        activeTab === "latest"
-                          ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                      }`}
-                    >
-                      Runs
-                    </button>
-                  )}
-                  <button
-                    onClick={() => onTabChange?.("settings")}
-                    className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors flex items-center gap-1.5 ${
-                      activeTab === "settings"
-                        ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                    }`}
-                  >
-                    Configuration
-                    {nodeId && workflowNodes.find((n) => n.id === nodeId)?.errorMessage && (
-                      <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
-                    )}
-                  </button>
-                  {!hideDocsTab && (
-                    <button
-                      onClick={() => onTabChange?.("docs")}
-                      className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
-                        activeTab === "docs"
-                          ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
-                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                      }`}
-                    >
-                      Info
-                    </button>
-                  )}
+          {isBottomLayout ? (
+            <>
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <RunNodeIcon
+                  componentName={selectedWorkflowNode?.component}
+                  iconSrc={headerIconSrc}
+                  iconSlug={iconSlug}
+                  alt={nodeName}
+                  size={RUN_NODE_ICON_SIZE}
+                  className="h-3.5 w-3.5 shrink-0 text-gray-800"
+                />
+                <h3 className="truncate text-[13px] font-medium text-gray-900">{nodeName}</h3>
+              </div>
+              <div className="flex shrink-0 items-stretch">
+                <div className="flex items-center px-1">
+                  <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onClose?.()}>
+                    <X className="size-3.5" />
+                  </Button>
                 </div>
               </div>
-            )}
-
-            {shouldShowRunsTab && (
-              <TabsContent
-                value="latest"
-                className={!showSettingsTab ? "overflow-y-auto" : "mt-0"}
-                style={!showSettingsTab ? { maxHeight: "40vh" } : undefined}
+            </>
+          ) : (
+            <div className="flex flex-col items-start gap-3 w-full">
+              <div className="flex justify-between gap-3 w-full">
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <div className={`h-7 rounded-full overflow-hidden flex items-center justify-center`}>
+                      {headerIconSrc ? (
+                        <img src={headerIconSrc} alt={nodeName} className="w-4 h-4 object-contain" />
+                      ) : (
+                        <Icon size={16} />
+                      )}
+                    </div>
+                    <h2 className="text-base font-semibold">{nodeName}</h2>
+                  </div>
+                  {nodeId && !hideNodeId && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] text-gray-500 font-mono">{nodeId}</span>
+                      <button
+                        onClick={handleCopyNodeId}
+                        className={"text-gray-500 hover:text-gray-800"}
+                        title={justCopied ? "Copied!" : "Copy Node ID"}
+                      >
+                        {justCopied ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {null}
+              </div>
+              <div
+                onClick={() => onClose?.()}
+                className="absolute top-3 right-2 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
               >
-                <LatestTab
-                  latestEvents={latestEvents}
-                  nextInQueueEvents={nextInQueueEvents}
-                  totalInQueueCount={totalInQueueCount}
-                  hideQueueEvents={hideQueueEvents}
-                  openEventIds={openEventIds}
-                  onToggleOpen={handleToggleOpen}
-                  onEventClick={onEventClick}
-                  onSeeFullHistory={handleSeeFullHistory}
-                  onSeeQueue={handleSeeQueue}
-                  onSeeExecutionChain={handleSeeExecutionChain}
-                  getTabData={getTabData}
-                  onCancelQueueItem={onCancelQueueItem}
-                  onCancelExecution={onCancelExecution}
-                  onReEmit={onReEmit}
-                  loadExecutionChain={loadExecutionChain}
-                  getExecutionState={getExecutionState}
-                  workflowNodes={workflowNodes}
-                  actions={actions}
-                />
-              </TabsContent>
-            )}
-
-            {showSettingsTab && (
-              <TabsContent value="settings" className="mt-0">
-                <SettingsTab
-                  mode={nodeConfigMode}
-                  nodeId={nodeId}
-                  nodeName={nodeName}
-                  nodeLabel={nodeLabel}
-                  configuration={nodeConfiguration}
-                  configurationFields={nodeConfigurationFields}
-                  onSave={onNodeConfigSave || (() => {})}
-                  onCancel={onNodeConfigCancel}
-                  domainId={domainId}
-                  domainType={domainType}
-                  customField={customField}
-                  integrationName={integrationName}
-                  integrationRef={integrationRef}
-                  integrations={integrations}
-                  readOnly={readOnly}
-                  canReadIntegrations={canReadIntegrations}
-                  canCreateIntegrations={canCreateIntegrations}
-                  canUpdateIntegrations={canUpdateIntegrations}
-                  integrationDefinition={createIntegrationDefinition}
-                  autocompleteExampleObj={resolvedAutocompleteExampleObj}
-                  onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
-                  onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
-                  configurationSaveMode={configurationSaveMode}
-                />
-              </TabsContent>
-            )}
-
-            {showSettingsTab && !hideDocsTab && (
-              <TabsContent value="docs" className="mt-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
-                <DocsTab
-                  description={componentDescription}
-                  examplePayload={componentExamplePayload}
-                  payloadLabel={componentPayloadLabel}
-                  documentationUrl={componentDocumentationUrl}
-                  configurationFields={nodeConfigurationFields}
-                />
-              </TabsContent>
-            )}
-          </Tabs>
-        </div>
-
-        <div
-          className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
-            isDetailView ? "translate-x-0" : "translate-x-full"
-          } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
-        >
-          {page !== "overview" && (
-            <div className="flex flex-col flex-1 min-h-0 bg-white">
-              <PageHeader
-                page={page as "history" | "queue" | "execution-chain"}
-                onBackToOverview={handleBackToOverview}
-                previousPage={previousPage}
-              />
-
-              <div className="relative flex-1 min-h-0 overflow-hidden">
-                <div
-                  className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${
-                    page === "execution-chain" ? "-translate-x-full" : "translate-x-0"
-                  } ${page === "execution-chain" ? "pointer-events-none" : "pointer-events-auto"}`}
-                >
-                  {(page === "history" ||
-                    page === "queue" ||
-                    previousPage === "history" ||
-                    previousPage === "queue") && (
-                    <HistoryQueuePage
-                      page={(page === "execution-chain" ? previousPage : page) as "history" | "queue"}
-                      events={allEvents}
-                      openEventIds={openEventIds}
-                      onToggleOpen={handleToggleOpen}
-                      onEventClick={onEventClick}
-                      onTriggerNavigate={(event) => {
-                        if (event.kind === "trigger") {
-                          const eventId = event.triggerEventId || event.id;
-                          handleSeeExecutionChain(eventId, event);
-                        } else if (event.kind === "execution") {
-                          const node = workflowNodes?.find((n) => n.id === event.originalExecution?.rootEvent?.nodeId);
-
-                          const rootEventId = event.originalExecution?.rootEvent?.id;
-                          if (rootEventId && node && event.originalExecution?.rootEvent) {
-                            const triggerEvent = mapTriggerEventToSidebarEvent(
-                              event.originalExecution?.rootEvent,
-                              node,
-                            );
-                            handleSeeExecutionChain(rootEventId, triggerEvent, event.executionId);
-                          } else {
-                            const eventId = event.triggerEventId || event.id;
-                            handleSeeExecutionChain(eventId, event, event.executionId);
-                          }
-                        }
-                      }}
-                      getTabData={getTabData}
-                      onCancelExecution={onCancelExecution}
-                      onReEmit={onReEmit}
-                      loadExecutionChain={loadExecutionChain}
-                      getExecutionState={getExecutionState}
-                      hasMoreItems={hasMoreItems}
-                      loadingMoreItems={loadingMoreItems}
-                      showMoreCount={showMoreCount}
-                      onLoadMoreItems={handleLoadMoreItems}
-                    />
-                  )}
-                </div>
-                <div
-                  className={`absolute inset-0 flex flex-col transition-transform duration-300 ease-in-out ${
-                    page === "execution-chain" ? "translate-x-0" : "translate-x-full"
-                  } ${page === "execution-chain" ? "pointer-events-auto" : "pointer-events-none"}`}
-                >
-                  {page === "execution-chain" && (
-                    <ExecutionChainPage
-                      eventId={activeExecutionChainEventId}
-                      triggerEvent={activeExecutionChainTriggerEvent || undefined}
-                      selectedExecutionId={selectedExecutionId}
-                      loadExecutionChain={loadExecutionChain}
-                      openEventIds={openEventIds}
-                      onToggleOpen={handleToggleOpen}
-                      getExecutionState={getExecutionState}
-                      getTabData={getTabData}
-                      onEventClick={onEventClick}
-                      workflowNodes={workflowNodes}
-                      actions={actions}
-                      triggers={triggers}
-                      onHighlightedNodesChange={onHighlightedNodesChange}
-                      organizationId={domainId}
-                    />
-                  )}
-                </div>
+                <X size={16} />
               </div>
             </div>
           )}
         </div>
-      </div>
-
-      <IntegrationCreateDialog
-        open={isCreateIntegrationDialogOpen}
-        onOpenChange={(open) => !open && handleCloseCreateIntegrationDialog()}
-        integrationDefinition={createIntegrationDefinition}
-        organizationId={domainId ?? ""}
-        onCreateIntegration={async (payload) => {
-          const res = await createIntegrationMutation.mutateAsync(payload);
-          return res.data;
-        }}
-        onReset={() => createIntegrationMutation.reset()}
-        defaultName={createIntegrationDefinition?.name ?? ""}
-        integrationHomeHref={integrationHomeHref}
-        onCreated={() => handleCloseCreateIntegrationDialog()}
-        instructionsEndBeforeHeading={
-          CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.instructionsEndBeforeHeading
-        }
-        initialStepFieldNames={
-          CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.initialStepFieldNames
-        }
-        webhookStepDescription={
-          CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.webhookStepDescription
-        }
-      />
-
-      <Dialog open={!!configureIntegrationId} onOpenChange={(open) => !open && handleCloseConfigureIntegrationDialog()}>
-        <DialogContent
-          className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
-          showCloseButton={!updateIntegrationMutation.isPending}
-        >
-          {configureIntegrationLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-gray-500 dark:text-gray-400" />
-            </div>
-          ) : configureIntegrationId && configureIntegration ? (
-            <>
-              <DialogHeader>
-                <div className="flex items-center gap-3">
-                  <IntegrationIcon
-                    integrationName={configureIntegration.metadata?.integrationName}
-                    iconSlug={configureIntegrationDefinition?.icon}
-                    className="h-6 w-6 text-gray-500 dark:text-gray-400"
-                  />
-                  <div className="flex items-center gap-2">
-                    <DialogTitle>
-                      Configure{" "}
-                      {getIntegrationTypeDisplayName(undefined, configureIntegration.metadata?.integrationName) ||
-                        configureIntegration.metadata?.integrationName}
-                    </DialogTitle>
-                    <a
-                      href={
-                        configureIntegration.metadata?.id
-                          ? `/${domainId}/settings/integrations/${configureIntegration.metadata.id}`
-                          : `/${domainId}/settings/integrations`
-                      }
-                      className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
-                      aria-label="Open integration settings"
-                    >
-                      <Settings className="h-4 w-4" />
-                    </a>
-                  </div>
-                </div>
-              </DialogHeader>
-              {configureIntegration.status?.state === "error" && configureIntegration.status?.stateDescription && (
-                <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
-                  <TriangleAlert className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <p>{configureIntegration.status.stateDescription}</p>
-                </div>
-              )}
-              {configureIntegration?.status?.browserAction && (
-                <IntegrationInstructions
-                  description={configureIntegration.status.browserAction.description}
-                  onContinue={configureIntegration.status.browserAction.url ? handleConfigureBrowserAction : undefined}
-                  className="mb-6"
-                />
-              )}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void handleConfigureIntegrationSubmit();
-                }}
-                className="space-y-4"
-              >
-                <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                    Integration Name
-                    <span className="text-gray-800 ml-1">*</span>
-                  </Label>
-                  <Input
-                    type="text"
-                    value={configureIntegrationName}
-                    onChange={(e) => setConfigureIntegrationName(e.target.value)}
-                    placeholder="e.g., my-app-integration"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
-                </div>
-
-                {configureIntegrationDefinition?.configuration &&
-                configureIntegrationDefinition.configuration.length > 0 ? (
-                  configureIntegrationDefinition.configuration.map((field: ConfigurationField) => {
-                    if (!field.name) return null;
-                    return (
-                      <ConfigurationFieldRenderer
-                        key={field.name}
-                        field={field}
-                        value={configureIntegrationConfig[field.name]}
-                        onChange={(value) =>
-                          setConfigureIntegrationConfig((prev) => ({ ...prev, [field.name || ""]: value }))
-                        }
-                        allValues={configureIntegrationConfig}
-                        domainId={domainId ?? ""}
-                        domainType="DOMAIN_TYPE_ORGANIZATION"
-                        organizationId={domainId ?? ""}
-                        integrationId={configureIntegration.metadata?.id}
+        <div className="relative flex-1 min-h-0 overflow-hidden">
+          <div
+            className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+              isDetailView ? "-translate-x-full" : "translate-x-0"
+            } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
+          >
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs")}
+              className={isBottomLayout ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "flex-1"}
+            >
+              {showSettingsTab &&
+                (isBottomLayout ? (
+                  <div className="relative z-10 flex h-9 shrink-0 items-stretch overflow-visible border-b border-slate-200 px-2">
+                    {shouldShowRunsTab ? (
+                      <BottomInspectorTabButton
+                        active={activeTab === "latest"}
+                        icon="rabbit"
+                        label="Runs"
+                        onClick={() => onTabChange?.("latest")}
                       />
-                    );
-                  })
-                ) : (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No configuration fields available.</p>
-                )}
-
-                <DialogFooter className="gap-2 sm:justify-start pt-4">
-                  <LoadingButton
-                    type="submit"
-                    color="blue"
-                    disabled={!configureIntegrationName.trim()}
-                    loading={updateIntegrationMutation.isPending}
-                    loadingText="Saving..."
-                    className="flex items-center gap-2"
-                  >
-                    Save
-                  </LoadingButton>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCloseConfigureIntegrationDialog}
-                    disabled={updateIntegrationMutation.isPending}
-                  >
-                    Cancel
-                  </Button>
-                </DialogFooter>
-                {updateIntegrationMutation.isError && (
-                  <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                    <p className="text-sm text-red-800 dark:text-red-200">
-                      Failed to update integration: {getApiErrorMessage(updateIntegrationMutation.error)}
-                    </p>
+                    ) : null}
+                    <BottomInspectorTabButton
+                      active={activeTab === "settings"}
+                      icon="settings"
+                      label="Configuration"
+                      onClick={() => onTabChange?.("settings")}
+                      trailing={
+                        configurationHasError ? <span className="h-1.5 w-1.5 rounded-full bg-orange-500" /> : undefined
+                      }
+                    />
+                    {!hideDocsTab ? (
+                      <BottomInspectorTabButton
+                        active={activeTab === "docs"}
+                        icon="info"
+                        label="Info"
+                        onClick={() => onTabChange?.("docs")}
+                      />
+                    ) : null}
                   </div>
-                )}
-              </form>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+                ) : (
+                  <div className="border-b border-slate-950/15">
+                    <div className="flex px-4">
+                      {shouldShowRunsTab && (
+                        <button
+                          onClick={() => onTabChange?.("latest")}
+                          className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                            activeTab === "latest"
+                              ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                          }`}
+                        >
+                          Runs
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onTabChange?.("settings")}
+                        className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors flex items-center gap-1.5 ${
+                          activeTab === "settings"
+                            ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                            : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                        }`}
+                      >
+                        Configuration
+                        {configurationHasError ? <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" /> : null}
+                      </button>
+                      {!hideDocsTab && (
+                        <button
+                          onClick={() => onTabChange?.("docs")}
+                          className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                            activeTab === "docs"
+                              ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                              : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                          }`}
+                        >
+                          Info
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+              {shouldShowRunsTab && (
+                <TabsContent
+                  value="latest"
+                  className={cn(
+                    isBottomLayout
+                      ? "mt-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+                      : !showSettingsTab
+                        ? "overflow-y-auto"
+                        : "mt-0",
+                  )}
+                  style={!isBottomLayout && !showSettingsTab ? { maxHeight: "40vh" } : undefined}
+                >
+                  <LatestTab
+                    latestEvents={latestEvents}
+                    nextInQueueEvents={nextInQueueEvents}
+                    totalInQueueCount={totalInQueueCount}
+                    hideQueueEvents={hideQueueEvents}
+                    openEventIds={openEventIds}
+                    onToggleOpen={handleToggleOpen}
+                    onEventClick={onEventClick}
+                    onSeeFullHistory={handleSeeFullHistory}
+                    onSeeQueue={handleSeeQueue}
+                    getTabData={getTabData}
+                    onCancelQueueItem={onCancelQueueItem}
+                    onCancelExecution={onCancelExecution}
+                    onReEmit={onReEmit}
+                    getExecutionState={getExecutionState}
+                    compact={isBottomLayout}
+                    selectionNodeId={nodeId}
+                    resolveRunId={resolveRunId}
+                    fetchRunId={fetchRunId}
+                    onSelectRun={onSelectRun}
+                  />
+                </TabsContent>
+              )}
+
+              {showSettingsTab && (
+                <TabsContent
+                  value="settings"
+                  className={cn("mt-0", isBottomLayout && "min-h-0 flex-1 overflow-y-auto")}
+                >
+                  <SettingsTab
+                    mode={nodeConfigMode}
+                    nodeId={nodeId}
+                    nodeName={nodeName}
+                    nodeLabel={nodeLabel}
+                    configuration={nodeConfiguration}
+                    configurationFields={nodeConfigurationFields}
+                    onSave={onNodeConfigSave || (() => {})}
+                    onCancel={onNodeConfigCancel}
+                    domainId={domainId}
+                    domainType={domainType}
+                    customField={customField}
+                    integrationName={integrationName}
+                    integrationRef={integrationRef}
+                    integrations={integrations}
+                    readOnly={readOnly}
+                    canReadIntegrations={canReadIntegrations}
+                    canCreateIntegrations={canCreateIntegrations}
+                    canUpdateIntegrations={canUpdateIntegrations}
+                    integrationDefinition={createIntegrationDefinition}
+                    autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                    onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
+                    onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
+                  />
+                </TabsContent>
+              )}
+
+              {showSettingsTab && !hideDocsTab && (
+                <TabsContent
+                  value="docs"
+                  className={cn("mt-0", isBottomLayout ? "min-h-0 flex-1 overflow-y-auto" : "overflow-y-auto")}
+                  style={!isBottomLayout ? { maxHeight: "calc(100vh - 160px)" } : undefined}
+                >
+                  <DocsTab
+                    description={componentDescription}
+                    examplePayload={componentExamplePayload}
+                    payloadLabel={componentPayloadLabel}
+                    documentationUrl={componentDocumentationUrl}
+                    configurationFields={nodeConfigurationFields}
+                  />
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
+
+          <div
+            className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out ${
+              isDetailView ? "translate-x-0" : "translate-x-full"
+            } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
+          >
+            {page !== "overview" && (
+              <div className="flex flex-col flex-1 min-h-0 bg-white">
+                <PageHeader onBackToOverview={handleBackToOverview} compact={isBottomLayout} />
+                <HistoryQueuePage
+                  page={page}
+                  events={allEvents}
+                  openEventIds={openEventIds}
+                  onToggleOpen={handleToggleOpen}
+                  onEventClick={onEventClick}
+                  compact={isBottomLayout}
+                  selectionNodeId={nodeId}
+                  resolveRunId={resolveRunId}
+                  fetchRunId={fetchRunId}
+                  onSelectRun={onSelectRun}
+                  onCancelQueueItem={onCancelQueueItem}
+                  getTabData={getTabData}
+                  onCancelExecution={onCancelExecution}
+                  onReEmit={onReEmit}
+                  getExecutionState={getExecutionState}
+                  hasMoreItems={hasMoreItems}
+                  loadingMoreItems={loadingMoreItems}
+                  showMoreCount={showMoreCount}
+                  onLoadMoreItems={handleLoadMoreItems}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <IntegrationCreateDialog
+          open={isCreateIntegrationDialogOpen}
+          onOpenChange={(open) => !open && handleCloseCreateIntegrationDialog()}
+          integrationDefinition={createIntegrationDefinition}
+          organizationId={domainId ?? ""}
+          onCreateIntegration={async (payload) => {
+            const res = await createIntegrationMutation.mutateAsync(payload);
+            return res.data;
+          }}
+          onReset={() => createIntegrationMutation.reset()}
+          defaultName={createIntegrationDefinition?.name ?? ""}
+          integrationHomeHref={integrationHomeHref}
+          onCreated={() => handleCloseCreateIntegrationDialog()}
+          instructionsEndBeforeHeading={
+            CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.instructionsEndBeforeHeading
+          }
+          initialStepFieldNames={
+            CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.initialStepFieldNames
+          }
+          webhookStepDescription={
+            CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.webhookStepDescription
+          }
+        />
+
+        <ConfigureIntegrationDialog
+          integrationId={configureIntegrationId}
+          organizationId={domainId ?? ""}
+          onClose={handleCloseConfigureIntegrationDialog}
+        />
+      </div>
     </div>
   );
 };

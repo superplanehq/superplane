@@ -99,7 +99,7 @@ func (w *IntegrationCleanupWorker) processIntegration(tx *gorm.DB, integration *
 		Configuration:  integration.Configuration.Data(),
 		BaseURL:        w.baseURL,
 		OrganizationID: integration.OrganizationID.String(),
-		HTTP:           w.registry.HTTPContext(),
+		HTTP:           w.registry.HTTPContextInTransaction(tx),
 		Integration:    contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil),
 		Logger:         logging.ForIntegration(*integration),
 	})

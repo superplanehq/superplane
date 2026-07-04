@@ -58,6 +58,8 @@ SuperPlane will use Workload Identity Federation to authenticate without storing
 
 ## On Blob Created
 
+**Trigger key:** `azure.onBlobCreated`
+
 The On Blob Created trigger starts a workflow execution when a blob is created or replaced in an Azure Storage Account.
 
 ### Use Cases
@@ -123,6 +125,8 @@ Each blob created event includes:
 
 ## On Blob Deleted
 
+**Trigger key:** `azure.onBlobDeleted`
+
 The On Blob Deleted trigger starts a workflow execution when a blob is deleted from an Azure Storage Account.
 
 ### Use Cases
@@ -184,6 +188,8 @@ Each blob deleted event includes:
 <a id="on-image-deleted"></a>
 
 ## On Image Deleted
+
+**Trigger key:** `azure.onContainerImageDeleted`
 
 The On Image Deleted trigger starts a workflow execution when a container image is deleted from an Azure Container Registry.
 
@@ -262,6 +268,8 @@ Each delete event includes:
 <a id="on-image-pushed"></a>
 
 ## On Image Pushed
+
+**Trigger key:** `azure.onContainerImagePushed`
 
 The On Image Pushed trigger starts a workflow execution when a container image is pushed to an Azure Container Registry.
 
@@ -343,6 +351,8 @@ Each push event includes:
 <a id="on-vm-deallocated"></a>
 
 ## On VM Deallocated
+
+**Trigger key:** `azure.onVirtualMachineDeallocated`
 
 The On VM Deallocated trigger starts a workflow execution when an Azure Virtual Machine is deallocated.
 
@@ -436,6 +446,8 @@ No manual setup is required.
 
 ## On VM Deleted
 
+**Trigger key:** `azure.onVirtualMachineDeleted`
+
 The On VM Deleted trigger starts a workflow execution when an Azure Virtual Machine is deleted.
 
 ### Use Cases
@@ -521,6 +533,8 @@ No manual setup is required.
 <a id="on-vm-restarted"></a>
 
 ## On VM Restarted
+
+**Trigger key:** `azure.onVirtualMachineRestarted`
 
 The On VM Restarted trigger starts a workflow execution when an Azure Virtual Machine is restarted.
 
@@ -615,6 +629,8 @@ No manual setup is required.
 
 ## On VM Started
 
+**Trigger key:** `azure.onVirtualMachineStarted`
+
 The On VM Started trigger starts a workflow execution when an Azure Virtual Machine is started.
 
 ### Use Cases
@@ -703,6 +719,8 @@ No manual setup is required.
 <a id="on-vm-stopped"></a>
 
 ## On VM Stopped
+
+**Trigger key:** `azure.onVirtualMachineStopped`
 
 The On VM Stopped trigger starts a workflow execution when an Azure Virtual Machine is powered off.
 
@@ -795,6 +813,8 @@ No manual setup is required.
 
 ## Create Virtual Machine
 
+**Component key:** `azure.createVirtualMachine`
+
 The Create Virtual Machine component creates a new Azure VM with full configuration options.
 
 ### Use Cases
@@ -859,6 +879,8 @@ Returns the created VM information including:
 
 ## Deallocate Virtual Machine
 
+**Component key:** `azure.deallocateVirtualMachine`
+
 The Deallocate Virtual Machine component deallocates an existing Azure VM, stopping it and
 releasing its compute resources.
 
@@ -915,6 +937,8 @@ Returns the deallocated VM information including:
 
 ## Delete Virtual Machine
 
+**Component key:** `azure.deleteVirtualMachine`
+
 The Delete Virtual Machine component deletes an existing Azure VM.
 
 ### Use Cases
@@ -970,6 +994,8 @@ Returns the deleted VM information including:
 
 ## Restart Virtual Machine
 
+**Component key:** `azure.restartVirtualMachine`
+
 The Restart Virtual Machine component restarts an existing Azure VM in place.
 
 ### Use Cases
@@ -1023,6 +1049,8 @@ Returns the restarted VM information including:
 
 ## Start Virtual Machine
 
+**Component key:** `azure.startVirtualMachine`
+
 The Start Virtual Machine component starts a stopped or deallocated Azure VM.
 
 ### Use Cases
@@ -1075,6 +1103,8 @@ Returns the started VM information including:
 <a id="stop-virtual-machine"></a>
 
 ## Stop Virtual Machine
+
+**Component key:** `azure.stopVirtualMachine`
 
 The Stop Virtual Machine component powers off an existing Azure VM without deallocating it.
 

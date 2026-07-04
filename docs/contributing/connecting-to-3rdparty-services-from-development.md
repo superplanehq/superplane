@@ -6,15 +6,7 @@ expose it via a tunnel so external services can deliver webhooks.
 
 ### 1. Install and Authenticate ngrok
 
-Install [ngrok](https://ngrok.com/):
-
-```bash
-# Install (macOS)
-brew install ngrok
-
-# Authenticate
-ngrok config add-authtoken YOUR_AUTH_TOKEN
-```
+Install [ngrok](https://ngrok.com/download/mac-os).
 
 ### 2. Start ngrok Tunnel
 
@@ -48,7 +40,8 @@ Set the `WEBHOOKS_BASE_URL` environment variable to your tunnel’s **HTTPS** UR
 **Option A – Inline when running Make**
 
 ```bash
-WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app make dev.start
+WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app make dev.up
+make dev.server
 ```
 
 **Option B – In a `.env` file (project root)**
@@ -57,13 +50,14 @@ WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app make dev.start
 WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app
 ```
 
-Then run `make dev.start` as usual. Docker Compose reads `.env` and passes the value into the app container.
+Then run `make dev.up` and `make dev.server` as usual. Docker Compose reads `.env` and passes the value into the app container.
 
 **Option C – Export in the shell**
 
 ```bash
 export WEBHOOKS_BASE_URL=https://abc123.ngrok-free.app
-make dev.start
+make dev.up
+make dev.server
 ```
 
 After changing `WEBHOOKS_BASE_URL`, restart the app (`make dev.down` then start again) and **re-save any workflow** that uses webhooks so the URL is regenerated with the new base.
@@ -73,7 +67,7 @@ After changing `WEBHOOKS_BASE_URL`, restart the app (`make dev.down` then start 
 The AWS integration uses OpenID Connect. When running locally, AWS IAM needs an HTTPS Provider URL that serves `/.well-known/openid-configuration`. Use a tunnel and set SuperPlane’s base URL to that tunnel.
 
 1. **Tunnel:** Run `cloudflared tunnel --url http://localhost:8000` and note the HTTPS URL (e.g. `https://something.trycloudflare.com`). Prefer Cloudflare over ngrok free tier (ngrok can show an interstitial that breaks AWS).
-2. **Base URL:** Set `BASE_URL` and `WEBHOOKS_BASE_URL` to the tunnel URL (e.g. in `.env` or `BASE_URL=... WEBHOOKS_BASE_URL=... make dev.start`) and restart SuperPlane.
+2. **Base URL:** Set `BASE_URL` and `WEBHOOKS_BASE_URL` to the tunnel URL (e.g. in `.env` or `BASE_URL=... WEBHOOKS_BASE_URL=... make dev.up` followed by `make dev.server`) and restart SuperPlane.
 3. **Verify:** Open `https://<tunnel-url>/.well-known/openid-configuration` in a browser; the JSON `issuer` must match the tunnel URL.
 4. **IAM:** In AWS IAM → Identity providers → Add provider (OpenID Connect), set **Provider URL** to the tunnel URL and **Audience** to your SuperPlane AWS integration ID (shown in the app when configuring the integration).
 

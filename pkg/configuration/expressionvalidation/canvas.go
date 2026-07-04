@@ -2,6 +2,7 @@ package expressionvalidation
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -67,8 +68,8 @@ func schemaForNode(reg *registry.Registry, node *componentpb.Node) []configurati
 
 func validateNodeExpressions(nodeID, nodeName string, config map[string]any, fields []configuration.Field, knownNodeNames map[string]struct{}) []ExpressionError {
 	var errs []ExpressionError
-	walkConfiguration(config, fields, func(fieldPath, fieldType, value string) {
-		for _, e := range validateString(fieldPath, fieldType, value, knownNodeNames) {
+	walkConfiguration(config, fields, func(fieldPath string, field configuration.Field, value string) {
+		for _, e := range validateString(fieldPath, field, value, knownNodeNames) {
 			e.NodeID = nodeID
 			e.NodeName = nodeName
 			errs = append(errs, e)
@@ -77,7 +78,23 @@ func validateNodeExpressions(nodeID, nodeName string, config map[string]any, fie
 	return errs
 }
 
-func validateString(fieldPath, fieldType, value string, knownNodeNames map[string]struct{}) []ExpressionError {
+func validateString(fieldPath string, field configuration.Field, value string, knownNodeNames map[string]struct{}) []ExpressionError {
+	if field.Type == configuration.FieldTypeString &&
+		field.TypeOptions != nil &&
+		field.TypeOptions.String != nil &&
+		field.TypeOptions.String.AllowExpressions != nil &&
+		!*field.TypeOptions.String.AllowExpressions {
+		if configuration.ExpressionPlaceholderRegex.MatchString(value) {
+			return []ExpressionError{{
+				FieldPath:  fieldPath,
+				Expression: value,
+				Err:        fmt.Errorf("expressions are not supported for this field"),
+			}}
+		}
+		return nil
+	}
+
+	fieldType := field.Type
 	matches := configuration.ExpressionPlaceholderRegex.FindAllString(value, -1)
 
 	// FieldTypeExpression values without {{ }} framing flow through
@@ -95,9 +112,10 @@ func validateString(fieldPath, fieldType, value string, knownNodeNames map[strin
 	}
 
 	var errs []ExpressionError
+	extraEnv := expressionValidationExtraEnv(fieldPath)
 	for _, match := range matches {
 		body := match[2 : len(match)-2]
-		if err := ValidateExpression(body, knownNodeNames); err != nil {
+		if err := ValidateExpressionWithExtraEnv(body, knownNodeNames, extraEnv); err != nil {
 			errs = append(errs, ExpressionError{
 				FieldPath:  fieldPath,
 				Expression: match,
@@ -106,4 +124,13 @@ func validateString(fieldPath, fieldType, value string, knownNodeNames map[strin
 		}
 	}
 	return errs
+}
+
+var startTemplatePayloadFieldPattern = regexp.MustCompile(`^templates\[\d+\]\.payload(\.|$)`)
+
+func expressionValidationExtraEnv(fieldPath string) map[string]any {
+	if startTemplatePayloadFieldPattern.MatchString(fieldPath) {
+		return map[string]any{"parameters": map[string]any{}}
+	}
+	return nil
 }

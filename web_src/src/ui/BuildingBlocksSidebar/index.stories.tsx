@@ -189,3 +189,46 @@ export const OnlyTriggers: Story = {
     );
   },
 };
+
+const integrationBlocks: BuildingBlockCategory[] = [
+  { name: "Core", blocks: [...sampleTriggers, ...sampleComponents] },
+  {
+    name: "AWS",
+    blocks: [{ name: "aws.lambda", label: "Lambda", type: "component", integrationName: "aws" }],
+  },
+  {
+    name: "GitHub",
+    blocks: [{ name: "github.pr", label: "Open PR", type: "component", integrationName: "github" }],
+  },
+  {
+    name: "Zendesk",
+    blocks: [{ name: "zendesk.ticket", label: "Create Ticket", type: "component", integrationName: "zendesk" }],
+  },
+];
+
+export const WithIntegrations: Story = {
+  args: {
+    isOpen: true,
+    blocks: integrationBlocks,
+    // AWS is not connected; GitHub is connected (ready) and Zendesk is connected (error).
+    // With "Connected integrations on top" enabled, GitHub and Zendesk sort above AWS.
+    integrations: [
+      { metadata: { integrationName: "github" }, status: { state: "ready" } },
+      { metadata: { integrationName: "zendesk" }, status: { state: "error" } },
+    ],
+  },
+  render: (args) => {
+    const [isOpen, setIsOpen] = useState(args.isOpen);
+
+    const handleToggle = (open: boolean) => {
+      setIsOpen(open);
+      args.onToggle?.(open);
+    };
+
+    return (
+      <div className="h-screen w-screen flex bg-gray-100">
+        <BuildingBlocksSidebar {...args} isOpen={isOpen} onToggle={handleToggle} />
+      </div>
+    );
+  },
+};

@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -19,7 +19,7 @@ func TestCanvasAutoSave(t *testing.T) {
 	t.Run("versioned canvas auto-saves after moving a node", func(t *testing.T) {
 		steps := &canvasAutoSaveSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithChangeManagementEnabled("E2E Auto Save Versioning")
+		steps.givenCanvas("E2E Auto Save Versioning")
 		steps.enterEditMode()
 		steps.addNoopNode("Auto Save Node", models.Position{X: 500, Y: 220})
 		steps.waitForSaved()
@@ -31,7 +31,7 @@ func TestCanvasAutoSave(t *testing.T) {
 	t.Run("versioned canvas keeps the latest position after two quick moves", func(t *testing.T) {
 		steps := &canvasAutoSaveSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithChangeManagementEnabled("E2E Auto Save Queue")
+		steps.givenCanvas("E2E Auto Save Queue")
 		steps.enterEditMode()
 		steps.addNoopNode("Queued Move Node", models.Position{X: 500, Y: 220})
 		steps.waitForSaved()
@@ -56,7 +56,7 @@ func TestCanvasAutoSave(t *testing.T) {
 	t.Run("versioned canvas auto-saves note edits on blur", func(t *testing.T) {
 		steps := &canvasAutoSaveSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithChangeManagementEnabled("E2E Note Auto Save")
+		steps.givenCanvas("E2E Note Auto Save")
 		steps.enterEditMode()
 		steps.addNote()
 
@@ -88,41 +88,16 @@ func (s *canvasAutoSaveSteps) start() {
 	s.session.Login()
 }
 
-func (s *canvasAutoSaveSteps) givenCanvasWithChangeManagementEnabled(name string) {
-	err := database.Conn().
-		Model(&models.Organization{}).
-		Where("id = ?", s.session.OrgID).
-		Update("change_management_enabled", true).
-		Error
-	require.NoError(s.t, err)
-
+func (s *canvasAutoSaveSteps) givenCanvas(name string) {
 	s.canvas = shared.NewCanvasSteps(name, s.t, s.session)
 	s.canvas.Create()
 	s.canvas.Visit()
 
-	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
+	s.session.AssertVisible(q.TestID("canvas-edit-button"))
 }
 
 func (s *canvasAutoSaveSteps) enterEditMode() {
-	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
-
-	for {
-		disabled, err := editButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-
-		if time.Now().After(deadline) {
-			s.t.Fatalf("editor control did not become enabled")
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.Locator(`header button:has-text("Propose Change")`))
+	s.canvas.EnterEditMode()
 }
 
 func (s *canvasAutoSaveSteps) addNoopNode(name string, pos models.Position) {
@@ -165,19 +140,12 @@ func (s *canvasAutoSaveSteps) assertNotePreview(text string) {
 
 func (s *canvasAutoSaveSteps) assertNoteTextInDB(expected string) {
 	require.Eventually(s.t, func() bool {
-		draft := s.canvas.FindCurrentDraft()
-		if draft == nil {
+		node, ok := s.canvas.DraftNodeByName("Note")
+		if !ok {
 			return false
 		}
-
-		for _, node := range draft.Nodes {
-			if node.Name == "Note" {
-				text, _ := node.Configuration["text"].(string)
-				return text == expected
-			}
-		}
-
-		return false
+		text, _ := node.Configuration["text"].(string)
+		return text == expected
 	}, 10*time.Second, 200*time.Millisecond)
 }
 
@@ -239,6 +207,8 @@ func (s *canvasAutoSaveSteps) nodeCenter(name string) *pw.Rect {
 	}
 }
 
-// waitForSaved polls the canvas save status indicator until it reports "saved".
+// waitForSaved waits until the current user's staged canvas reflects the latest autosave.
 func (s *canvasAutoSaveSteps) waitForSaved() {
+	s.canvas.WaitForStaging(uuid.Nil)
+	s.session.Sleep(800)
 }

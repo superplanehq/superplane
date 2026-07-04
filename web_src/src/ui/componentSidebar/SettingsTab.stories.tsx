@@ -80,7 +80,6 @@ function SettingsTabPlayground() {
       onOpenConfigureIntegrationDialog={(integrationId) =>
         console.log("Open integration configuration dialog", integrationId)
       }
-      configurationSaveMode="manual"
     />
   );
 }
@@ -95,4 +94,40 @@ export const RendererCoverage: Story = {
     },
   },
   render: () => <SettingsTabPlayground />,
+};
+
+function ReadOnlyConfigurationPlayground() {
+  return (
+    <SettingsTab
+      mode="edit"
+      nodeId="node_renderer_coverage_readonly"
+      nodeName="Renderer Coverage Demo"
+      configuration={settingsTabConfiguration}
+      configurationFields={settingsTabFields}
+      onSave={() => undefined}
+      domainId={STORY_DOMAIN_ID}
+      domainType={STORY_DOMAIN_TYPE}
+      integrationName="github"
+      integrationRef={STORY_INTEGRATION_REF}
+      integrations={STORY_INTEGRATIONS}
+      integrationDefinition={{
+        name: "github",
+        label: "GitHub",
+        icon: "github",
+      }}
+      autocompleteExampleObj={STORY_AUTOCOMPLETE_CONTEXT}
+      readOnly={true}
+    />
+  );
+}
+
+export const ReadOnlyConfiguration: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: "Read-only configuration view shown when the component sidebar is not editable.",
+      },
+    },
+  },
+  render: () => <ReadOnlyConfigurationPlayground />,
 };

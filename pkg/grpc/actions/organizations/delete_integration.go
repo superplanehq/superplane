@@ -5,27 +5,26 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
 func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.DeleteIntegrationResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid organization ID: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
 	}
 
 	integrationID, err := uuid.Parse(ID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid integration ID: %v", err)
+		return nil, grpcerrors.InvalidArgument(err, "invalid integration ID")
 	}
 
 	integration, err := models.FindIntegration(org, integrationID)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "integration not found: %v", err)
+		return nil, grpcerrors.NotFound(err, "integration not found")
 	}
 
 	//
@@ -36,7 +35,7 @@ func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.Delete
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		webhooks, err := models.ListIntegrationWebhooks(tx, integration.ID)
 		if err != nil {
-			return status.Error(codes.Internal, "failed to list integration webhooks")
+			return grpcerrors.Internal(err, "failed to list integration webhooks")
 		}
 
 		//
@@ -45,17 +44,20 @@ func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.Delete
 		for _, webhook := range webhooks {
 			err = tx.Delete(&webhook).Error
 			if err != nil {
-				return status.Error(codes.Internal, "failed to delete webhook")
+				return grpcerrors.Internal(err, "failed to delete webhook")
 			}
 		}
 
 		err = integration.SoftDeleteInTransaction(tx)
 		if err != nil {
-			return status.Error(codes.Internal, "failed to delete integration")
+			return grpcerrors.Internal(err, "failed to delete integration")
 		}
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.DeleteIntegrationResponse{}, nil
 }

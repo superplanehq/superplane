@@ -83,10 +83,11 @@ func Test__NewCanvasPublisher(t *testing.T) {
 		nil,
 	)
 
-	draft, err := models.SaveCanvasDraftInTransaction(
+	draft, err := models.CreateCommitVersionWithSpecInTransaction(
 		database.Conn(),
 		canvas.ID,
 		r.User,
+		"Test commit",
 		[]models.Node{
 			componentNode("node-a", "Node A", "noop", map[string]any{"before": "value"}),
 		},
@@ -103,7 +104,7 @@ func Test__NewCanvasPublisher(t *testing.T) {
 }
 
 func Test__CanvasPublisher_Publish(t *testing.T) {
-	t.Run("publishes mixed changes and promotes draft to live", func(t *testing.T) {
+	t.Run("publishes mixed changes and promotes commit version to live", func(t *testing.T) {
 		r := support.Setup(t)
 
 		canvas, _ := support.CreateCanvas(
@@ -119,10 +120,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			},
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				componentNode("node-a", "Node A Updated", "noop", map[string]any{"value": "after"}),
 				componentNode("node-c", "Node C", "noop", map[string]any{"value": "new"}),
@@ -148,8 +150,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
 		require.NoError(t, err)
-		require.Equal(t, models.CanvasVersionStatePublished, publishedVersion.State)
-		require.NotNil(t, publishedVersion.PublishedAt)
+		require.NotEmpty(t, publishedVersion.CommitMessage)
 		require.Equal(
 			t,
 			datatypes.NewJSONSlice([]models.Edge{{SourceID: "node-a", TargetID: "node-c", Channel: "default"}}),
@@ -195,10 +196,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				componentNode("node-broken", "Node Broken", "missingcomponent", map[string]any{}),
@@ -247,10 +249,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			"authentication": "signature",
 		}
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				{
@@ -292,10 +295,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				{
 					ID:            "approval-node",
@@ -344,10 +348,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				triggerNode("schedule-trigger", "Schedule Trigger", "schedule", map[string]any{
 					"type":            "minutes",
@@ -388,10 +393,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		)
 
 		existingError := "invalid configuration from previous validation"
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				{
@@ -431,7 +437,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.Equal(t, existingError, *brokenVersionNode.ErrorMessage)
 	})
 
-	t.Run("update node skips setup when node already has error", func(t *testing.T) {
+	t.Run("add node with stale integration id publishes as errored node without foreign key", func(t *testing.T) {
 		r := support.Setup(t)
 
 		canvas, _ := support.CreateCanvas(
@@ -444,22 +450,20 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		existingError := "node has invalid setup data"
-		draft, err := models.SaveCanvasDraftInTransaction(
+		staleIntegrationID := uuid.New().String()
+		existingError := "integration not found or does not belong to this organization"
+		draftNode := componentNode("node-broken", "Node Broken", "github.getIssue", map[string]any{})
+		draftNode.IntegrationID = &staleIntegrationID
+		draftNode.ErrorMessage = &existingError
+
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
-				{
-					ID:            "node-a",
-					Name:          "Node A Updated",
-					Type:          models.NodeTypeComponent,
-					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "missingcomponent"}},
-					Configuration: map[string]any{"value": "after"},
-					Metadata:      map[string]any{},
-					Position:      models.Position{X: 10, Y: 20},
-					ErrorMessage:  &existingError,
-				},
+				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+				draftNode,
 			},
 			nil,
 		)
@@ -475,12 +479,68 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		activeNodes, err := models.FindCanvasNodes(canvas.ID)
 		require.NoError(t, err)
-		updatedNode := findCanvasNode(t, activeNodes, "node-a")
-		require.Equal(t, "Node A Updated", updatedNode.Name)
-		require.Equal(t, map[string]any{"value": "after"}, updatedNode.Configuration.Data())
-		require.Equal(t, models.CanvasNodeStateError, updatedNode.State)
-		require.NotNil(t, updatedNode.StateReason)
-		require.Equal(t, existingError, *updatedNode.StateReason)
+		brokenNode := findCanvasNode(t, activeNodes, "node-broken")
+		require.Equal(t, models.CanvasNodeStateError, brokenNode.State)
+		require.NotNil(t, brokenNode.StateReason)
+		require.Equal(t, existingError, *brokenNode.StateReason)
+		require.Nil(t, brokenNode.AppInstallationID)
+
+		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
+		require.NoError(t, err)
+		brokenVersionNode := findVersionNode(t, publishedVersion.Nodes, "node-broken")
+		require.Equal(t, &staleIntegrationID, brokenVersionNode.IntegrationID)
+		require.NotNil(t, brokenVersionNode.ErrorMessage)
+		require.Equal(t, existingError, *brokenVersionNode.ErrorMessage)
+	})
+
+	t.Run("update node skips setup when node already has error", func(t *testing.T) {
+		r := support.Setup(t)
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				componentCanvasNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			},
+			nil,
+		)
+
+		existingError := "node has invalid setup data"
+		staleIntegrationID := uuid.New().String()
+		draftNode := componentNode("node-a", "Node A Updated", "missingcomponent", map[string]any{"value": "after"})
+		draftNode.ErrorMessage = &existingError
+		draftNode.IntegrationID = &staleIntegrationID
+
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			"Test commit",
+			[]models.Node{
+				draftNode,
+			},
+			nil,
+		)
+		require.NoError(t, err)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, err)
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		activeNode := findCanvasNode(t, activeNodes, "node-a")
+		require.Equal(t, "Node A Updated", activeNode.Name)
+		require.Equal(t, map[string]any{"value": "after"}, activeNode.Configuration.Data())
+		require.Equal(t, models.CanvasNodeStateError, activeNode.State)
+		require.NotNil(t, activeNode.StateReason)
+		require.Equal(t, existingError, *activeNode.StateReason)
+		require.Nil(t, activeNode.AppInstallationID)
 
 		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
 		require.NoError(t, err)
@@ -509,10 +569,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&legacyNode).Error)
 		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				componentNode(conflictingID, "Node Conflict", "noop", map[string]any{"value": "new"}),
@@ -575,10 +636,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&legacyNode).Error)
 		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				triggerNode(conflictingID, "PR Opened", "schedule", map[string]any{
@@ -639,10 +701,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&legacyNode).Error)
 		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 				componentNode(conflictingID, "Node Conflict Broken", "missingcomponent", map[string]any{}),
@@ -711,10 +774,11 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		)
 
 		// Intentionally keep an invalid edge in draft to assert publisher-side sanitization.
-		draft, err := models.SaveCanvasDraftInTransaction(
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
 			canvas.ID,
 			r.User,
+			"Test commit",
 			[]models.Node{
 				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
 			},
