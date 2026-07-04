@@ -68,7 +68,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     itemDefinition.schema.some((schemaField) => schemaField.name === "type") &&
     itemDefinition.schema.some((schemaField) => ["user", "role", "group"].includes(schemaField.name || ""));
 
-  const [openItem, setOpenItem] = React.useState<string | undefined>(undefined);
+  // Keep Accordion controlled for its full lifetime: use "" as the "closed" value.
+  const [openItem, setOpenItem] = React.useState<string>("");
   const rowRefs = React.useRef<Array<HTMLDivElement | null>>([]);
   const {
     dragState,
@@ -85,9 +86,9 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
 
   React.useEffect(() => {
     if (items.length === 0) {
-      setOpenItem(undefined);
-    } else if (openItem !== undefined && Number(openItem) >= items.length) {
-      setOpenItem(undefined);
+      setOpenItem("");
+    } else if (openItem !== "" && Number(openItem) >= items.length) {
+      setOpenItem("");
     }
   }, [items.length, openItem]);
 
@@ -115,9 +116,9 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     if (!useAccordion) return;
 
     setOpenItem((current) => {
-      if (newItems.length === 0 || current === undefined) return undefined;
+      if (newItems.length === 0 || current === "") return "";
       const openIndex = Number(current);
-      if (openIndex === index) return undefined;
+      if (openIndex === index) return "";
       if (openIndex > index) return String(openIndex - 1);
       return current;
     });
