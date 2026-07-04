@@ -274,7 +274,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMiddlewares(
 			grpc.GatewayRecoveryMiddleware(),
-			grpc.GatewayAuthorizationMiddleware(authorizer),
+			grpc.GatewayAuthorizationMiddleware(&grpcGatewayMux, authorizer),
 		),
 		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
