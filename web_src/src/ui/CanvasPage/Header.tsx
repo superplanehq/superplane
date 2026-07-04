@@ -38,14 +38,19 @@ export interface HeaderProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  /** True when the active draft has uncommitted staged spec edits (shows Commit/Reset). */
+  /** True when the active edit session has uncommitted staged spec edits (shows Commit/Reset). */
   hasStagingChanges?: boolean;
-  /** Commit staged canvas.yaml/console.yaml into the draft version row. */
+  /** Staging is based on an outdated main-branch commit; only discard is allowed. */
+  stagingStale?: boolean;
+  /** Opens the commit dialog for staged edits. */
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
   resetStagingPending?: boolean;
-  /** Discard staged edits, reverting to the last committed draft. */
+  /** Discard staged edits, reverting to the last commit. */
   onResetStaging?: () => void;
+  /** Discard stale staging after main moved forward. */
+  onDiscardStaleStaging?: () => void;
+  discardStaleStagingPending?: boolean;
   mode?: HeaderMode;
   /** When true, the canvas draft is active regardless of the current Console / Canvas / Memory tab. */
   isEditing?: boolean;

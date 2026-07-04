@@ -25,6 +25,7 @@ describe("executeCommitStaging", () => {
       organizationId: "org-1",
       canvasId: "canvas-1",
       activeCanvasVersionId: "version-1",
+      commitMessage: "Update workflow",
       queryClient,
       commitCanvasStagingMutation,
       consoleMutationGenerationRef: { current: 0 },

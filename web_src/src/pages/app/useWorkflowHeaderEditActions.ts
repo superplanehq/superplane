@@ -13,6 +13,7 @@ interface WorkflowStartupActionsConfig {
   hasEditableVersion: boolean;
   canUpdateCanvas: boolean;
   canvas: CanvasesCanvas | null | undefined;
+  liveVersionLoading?: boolean;
   handlePlaceholderAdd?: PlaceholderAddHandler;
   searchParams: URLSearchParams;
 }
@@ -82,6 +83,7 @@ function useAutoEditMode(
   const hasEditableVersion = startup?.hasEditableVersion ?? false;
   const canUpdateCanvas = startup?.canUpdateCanvas ?? false;
   const canvasLoaded = Boolean(startup?.canvas);
+  const liveVersionLoading = startup?.liveVersionLoading ?? false;
   const searchParams = startup?.searchParams;
 
   useEffect(() => {
@@ -90,6 +92,7 @@ function useAutoEditMode(
     if (!canvasLoaded) return;
     if (hasEditableVersion) return;
     if (!canUpdateCanvas) return;
+    if (liveVersionLoading) return;
 
     triggeredRef.current = true;
 
@@ -117,6 +120,7 @@ function useAutoEditMode(
     hasEditableVersion,
     canUpdateCanvas,
     canvasLoaded,
+    liveVersionLoading,
     handleToggleEditMode,
   ]);
 }
