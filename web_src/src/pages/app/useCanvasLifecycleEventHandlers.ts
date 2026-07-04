@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, type MutableRefObject } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { consumeLocalStagingWrite } from "@/lib/canvasStagingEcho";
@@ -9,13 +9,11 @@ import { processCanvasLifecycleEvent } from "./lib/canvas-version-lifecycle";
 type UseCanvasLifecycleEventHandlersOptions = {
   canvasId?: string;
   currentUserId?: string;
-  activeCanvasVersionId: string;
-  editSessionActive: boolean;
+  editSessionActiveRef: MutableRefObject<boolean>;
   hasLocalSaveActivity: boolean;
   isViewingLiveVersion: boolean;
   canvasDeletedRemotely: boolean;
   consumeIgnoredCanvasUpdatedEcho: () => boolean;
-  resyncDraftToCommitted: (versionId: string) => Promise<void>;
   onRemoteStagingUpdated?: () => void;
   setCanvasDeletedRemotely: (value: boolean) => void;
   setRemoteCanvasUpdatePending: (value: boolean) => void;
@@ -24,28 +22,30 @@ type UseCanvasLifecycleEventHandlersOptions = {
 export function useCanvasLifecycleEventHandlers({
   canvasId,
   currentUserId,
-  activeCanvasVersionId,
-  editSessionActive,
+  editSessionActiveRef,
   hasLocalSaveActivity,
   isViewingLiveVersion,
   canvasDeletedRemotely,
   consumeIgnoredCanvasUpdatedEcho,
-  resyncDraftToCommitted,
   onRemoteStagingUpdated,
   setCanvasDeletedRemotely,
   setRemoteCanvasUpdatePending,
 }: UseCanvasLifecycleEventHandlersOptions) {
   const queryClient = useQueryClient();
 
-  const invalidateCanvasVersionData = useCallback(
-    (targetCanvasId: string, targetVersionId?: string) => {
+  const invalidateCanvasStaging = useCallback(
+    (targetCanvasId: string) => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(targetCanvasId) });
+    },
+    [queryClient],
+  );
+
+  const invalidateLiveVersionData = useCallback(
+    (targetCanvasId: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(targetCanvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(targetCanvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(targetCanvasId) });
-      if (targetVersionId) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(targetCanvasId, targetVersionId) });
-      }
+      queryClient.invalidateQueries({ queryKey: canvasKeys.console(targetCanvasId, undefined) });
     },
     [queryClient],
   );
@@ -56,25 +56,21 @@ export function useCanvasLifecycleEventHandlers({
         payload,
         eventName,
         canvasId,
-        activeCanvasVersionId,
-        editSessionActive,
+        editSessionActive: editSessionActiveRef.current,
         hasLocalSaveActivity,
         consumeIgnoredCanvasUpdatedEcho,
-        invalidateCanvasVersionData,
-        resyncDraftToCommitted: (versionId) => {
-          void resyncDraftToCommitted(versionId);
-        },
+        invalidateCanvasStaging,
+        invalidateLiveVersionData,
         setCanvasDeletedRemotely,
         setRemoteCanvasUpdatePending,
       }),
     [
-      activeCanvasVersionId,
+      editSessionActiveRef,
       canvasId,
       consumeIgnoredCanvasUpdatedEcho,
-      editSessionActive,
       hasLocalSaveActivity,
-      invalidateCanvasVersionData,
-      resyncDraftToCommitted,
+      invalidateCanvasStaging,
+      invalidateLiveVersionData,
       setCanvasDeletedRemotely,
       setRemoteCanvasUpdatePending,
     ],
@@ -95,7 +91,7 @@ export function useCanvasLifecycleEventHandlers({
         return false;
       }
 
-      if (activeCanvasVersionId && hasLocalSaveActivity) {
+      if (editSessionActiveRef.current && hasLocalSaveActivity) {
         setRemoteCanvasUpdatePending(true);
         return true;
       }
@@ -104,7 +100,7 @@ export function useCanvasLifecycleEventHandlers({
       return true;
     },
     [
-      activeCanvasVersionId,
+      editSessionActiveRef,
       canvasId,
       currentUserId,
       hasLocalSaveActivity,

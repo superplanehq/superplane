@@ -10,12 +10,11 @@ describe("processCanvasLifecycleEvent", () => {
       payload: { canvasId: "canvas-1" },
       eventName: "canvas_deleted",
       canvasId: "canvas-1",
-      activeCanvasVersionId: "",
       editSessionActive: false,
       hasLocalSaveActivity: false,
       consumeIgnoredCanvasUpdatedEcho: () => false,
-      invalidateCanvasVersionData: vi.fn(),
-      resyncDraftToCommitted: vi.fn(),
+      invalidateCanvasStaging: vi.fn(),
+      invalidateLiveVersionData: vi.fn(),
       setCanvasDeletedRemotely,
       setRemoteCanvasUpdatePending: vi.fn(),
     });
@@ -25,69 +24,90 @@ describe("processCanvasLifecycleEvent", () => {
   });
 
   it("skips canvas_updated invalidation when the echo is consumed", () => {
-    const invalidateCanvasVersionData = vi.fn();
+    const invalidateCanvasStaging = vi.fn();
+    const invalidateLiveVersionData = vi.fn();
 
     const result = processCanvasLifecycleEvent({
       payload: { canvasId: "canvas-1" },
       eventName: "canvas_updated",
       canvasId: "canvas-1",
-      activeCanvasVersionId: "version-1",
       editSessionActive: false,
       hasLocalSaveActivity: false,
       consumeIgnoredCanvasUpdatedEcho: () => true,
-      invalidateCanvasVersionData,
-      resyncDraftToCommitted: vi.fn(),
+      invalidateCanvasStaging,
+      invalidateLiveVersionData,
       setCanvasDeletedRemotely: vi.fn(),
       setRemoteCanvasUpdatePending: vi.fn(),
     });
 
     expect(result).toBe(false);
-    expect(invalidateCanvasVersionData).not.toHaveBeenCalled();
+    expect(invalidateCanvasStaging).not.toHaveBeenCalled();
+    expect(invalidateLiveVersionData).not.toHaveBeenCalled();
   });
 
-  it("resyncs the active draft when canvas_updated arrives during an edit session", () => {
-    const invalidateCanvasVersionData = vi.fn();
-    const resyncDraftToCommitted = vi.fn();
+  it("refreshes staging metadata only when canvas_updated arrives during an edit session", () => {
+    const invalidateCanvasStaging = vi.fn();
+    const invalidateLiveVersionData = vi.fn();
 
     const result = processCanvasLifecycleEvent({
       payload: { canvasId: "canvas-1" },
       eventName: "canvas_updated",
       canvasId: "canvas-1",
-      activeCanvasVersionId: "version-1",
       editSessionActive: true,
       hasLocalSaveActivity: false,
       consumeIgnoredCanvasUpdatedEcho: () => false,
-      invalidateCanvasVersionData,
-      resyncDraftToCommitted,
+      invalidateCanvasStaging,
+      invalidateLiveVersionData,
       setCanvasDeletedRemotely: vi.fn(),
       setRemoteCanvasUpdatePending: vi.fn(),
     });
 
     expect(result).toBe(true);
-    expect(invalidateCanvasVersionData).toHaveBeenCalledWith("canvas-1", "version-1");
-    expect(resyncDraftToCommitted).toHaveBeenCalledWith("version-1");
+    expect(invalidateCanvasStaging).toHaveBeenCalledWith("canvas-1");
+    expect(invalidateLiveVersionData).not.toHaveBeenCalled();
   });
 
-  it("flags a pending remote update when local save activity is in flight", () => {
-    const setRemoteCanvasUpdatePending = vi.fn();
-    const invalidateCanvasVersionData = vi.fn();
+  it("refreshes live metadata when canvas_updated arrives outside an edit session", () => {
+    const invalidateCanvasStaging = vi.fn();
+    const invalidateLiveVersionData = vi.fn();
 
     const result = processCanvasLifecycleEvent({
       payload: { canvasId: "canvas-1" },
       eventName: "canvas_updated",
       canvasId: "canvas-1",
-      activeCanvasVersionId: "version-1",
+      editSessionActive: false,
+      hasLocalSaveActivity: false,
+      consumeIgnoredCanvasUpdatedEcho: () => false,
+      invalidateCanvasStaging,
+      invalidateLiveVersionData,
+      setCanvasDeletedRemotely: vi.fn(),
+      setRemoteCanvasUpdatePending: vi.fn(),
+    });
+
+    expect(result).toBe(true);
+    expect(invalidateLiveVersionData).toHaveBeenCalledWith("canvas-1");
+    expect(invalidateCanvasStaging).not.toHaveBeenCalled();
+  });
+
+  it("flags a pending remote update when local save activity is in flight", () => {
+    const setRemoteCanvasUpdatePending = vi.fn();
+    const invalidateCanvasStaging = vi.fn();
+
+    const result = processCanvasLifecycleEvent({
+      payload: { canvasId: "canvas-1" },
+      eventName: "canvas_updated",
+      canvasId: "canvas-1",
       editSessionActive: true,
       hasLocalSaveActivity: true,
       consumeIgnoredCanvasUpdatedEcho: () => false,
-      invalidateCanvasVersionData,
-      resyncDraftToCommitted: vi.fn(),
+      invalidateCanvasStaging,
+      invalidateLiveVersionData: vi.fn(),
       setCanvasDeletedRemotely: vi.fn(),
       setRemoteCanvasUpdatePending,
     });
 
     expect(result).toBe(true);
     expect(setRemoteCanvasUpdatePending).toHaveBeenCalledWith(true);
-    expect(invalidateCanvasVersionData).toHaveBeenCalledWith("canvas-1", "version-1");
+    expect(invalidateCanvasStaging).toHaveBeenCalledWith("canvas-1");
   });
 });
