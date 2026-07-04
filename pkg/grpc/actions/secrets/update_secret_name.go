@@ -36,12 +36,29 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 		return &pb.UpdateSecretNameResponse{Secret: s}, nil
 	}
 
+	oldName := secret.Name
 	updated, err := secret.UpdateName(name)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, grpcerrors.InvalidArgument(err, "invalid secret name")
 		}
 		return nil, grpcerrors.Internal(err, "failed to update secret name")
+	}
+
+	if len(secret.Data) > 0 {
+		plainData, err := decryptSecretData(ctx, encryptor, models.Secret{Name: oldName, Data: secret.Data})
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "failed to decrypt secret data for re-encryption")
+		}
+		reEncrypted, err := encryptSecretData(ctx, encryptor, name, plainData)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "failed to re-encrypt secret data with new name")
+		}
+		updated, err = updated.UpdateData(reEncrypted)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "failed to persist re-encrypted secret data")
+		}
+		updated.Data = reEncrypted
 	}
 
 	s, err := serializeSecret(ctx, encryptor, *updated)
