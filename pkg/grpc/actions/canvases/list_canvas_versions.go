@@ -17,10 +17,6 @@ import (
 
 const MaxCanvasVersionLimit = 50
 
-func ListCanvasVersions(ctx context.Context, organizationID string, canvasID string) (*pb.ListCanvasVersionsResponse, error) {
-	return ListCanvasVersionsPaginated(ctx, organizationID, canvasID, 0, nil)
-}
-
 func ListCanvasVersionsPaginated(
 	ctx context.Context,
 	organizationID string,

@@ -118,7 +118,7 @@ func findBaseVersionIDForStagingUpdate(db *gorm.DB, canvas *models.Canvas, userI
 	if len(stagedFiles) > 0 {
 		baseVersionID := stagedFiles[0].BaseVersionID
 		if baseVersionID != liveVersion.ID {
-			return nil, grpcerrors.FailedPrecondition(nil, "stale staging cannot be committed")
+			return nil, grpcerrors.FailedPrecondition(nil, "stale staging cannot be updated")
 		}
 
 		return &baseVersionID, nil

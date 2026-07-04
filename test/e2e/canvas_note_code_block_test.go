@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
