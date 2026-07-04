@@ -41,7 +41,8 @@ export const SecretPickerFieldRenderer = ({
           const name = secret.metadata?.name ?? "";
           return name ? { value: name, label: name } : null;
         })
-        .filter((option): option is { value: string; label: string } => option !== null),
+        .filter((option): option is { value: string; label: string } => option !== null)
+        .sort((a, b) => a.label.localeCompare(b.label)),
     [secrets],
   );
 
