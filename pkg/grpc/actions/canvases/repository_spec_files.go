@@ -138,7 +138,7 @@ func loadRepositorySpecVersionForRead(
 
 	var version *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		resolvedVersionID, resolveErr := resolveConsoleVersionID(tx, canvas, strings.TrimSpace(versionID))
+		resolvedVersionID, resolveErr := resolveLiveCanvasVersionID(tx, canvas, versionID)
 		if resolveErr != nil {
 			return resolveErr
 		}
@@ -149,10 +149,6 @@ func loadRepositorySpecVersionForRead(
 				return grpcerrors.NotFound(loadErr, "version not found")
 			}
 			return loadErr
-		}
-
-		if accessErr := ensureConsoleVersionReadable(ctx, tx, canvas, v); accessErr != nil {
-			return accessErr
 		}
 
 		version = v

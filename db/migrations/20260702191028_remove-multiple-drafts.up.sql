@@ -30,9 +30,6 @@ ALTER TABLE workflow_staged_files
     ADD COLUMN user_id uuid NOT NULL REFERENCES users(id),
     ADD COLUMN workflow_id uuid NOT NULL REFERENCES workflows(id) ON DELETE CASCADE;
 
---
--- TODO: verify if this constraint update makes sense
---
 ALTER TABLE workflow_staged_files
     ADD CONSTRAINT workflow_staged_files_workflow_user_path_key UNIQUE (workflow_id, user_id, path);
 

@@ -3,7 +3,6 @@ package canvases
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -56,7 +55,7 @@ func UpdateConsole(
 
 	var newVersion *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		resolvedVersionID, resolveErr := resolveConsoleVersionID(tx, canvas, strings.TrimSpace(versionID))
+		resolvedVersionID, resolveErr := resolveLiveCanvasVersionID(tx, canvas, versionID)
 		if resolveErr != nil {
 			return resolveErr
 		}
