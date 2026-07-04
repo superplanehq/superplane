@@ -139,6 +139,3 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
 
   return { resyncStagedEditorState };
 }
-
-/** @deprecated Use useCanvasStagingResync */
-export const useCanvasDraftResync = useCanvasStagingResync;

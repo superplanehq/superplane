@@ -22,6 +22,20 @@ async function invalidatePostCommitCaches(
   ]);
 }
 
+async function removeStaleVersionQueriesAfterCommit(
+  queryClient: QueryClient,
+  canvasId: string,
+  previousVersionId: string,
+  committedVersionId: string,
+): Promise<void> {
+  if (!previousVersionId || previousVersionId === committedVersionId) {
+    return;
+  }
+
+  await cancelCanvasVersionQueries(queryClient, canvasId, previousVersionId);
+  removeCanvasVersionScopedQueries(queryClient, canvasId, previousVersionId);
+}
+
 export async function executeCommitStaging({
   organizationId,
   canvasId,
@@ -82,11 +96,7 @@ export async function executeCommitStaging({
   setDraftCanvasSpec(null);
 
   if (organizationId && canvasId && committedVersionId) {
-    if (previousVersionId && previousVersionId !== committedVersionId) {
-      await cancelCanvasVersionQueries(queryClient, canvasId, previousVersionId);
-      removeCanvasVersionScopedQueries(queryClient, canvasId, previousVersionId);
-    }
-
+    await removeStaleVersionQueriesAfterCommit(queryClient, canvasId, previousVersionId, committedVersionId);
     await invalidatePostCommitCaches(queryClient, organizationId, canvasId);
   }
 
