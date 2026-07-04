@@ -52,4 +52,3 @@ describe("approvalMapper.subtitle", () => {
     expect(approvalMapper.subtitle(ctx)).toBe("1/1 approved");
   });
 });
-
