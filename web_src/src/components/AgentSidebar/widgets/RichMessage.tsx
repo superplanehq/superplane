@@ -126,7 +126,7 @@ function SegmentRenderer({
     case "error":
       return <BannerWidget variant="error" content={segment.content} />;
     case "draft-actions":
-      // Rendered externally as DraftActionsBar, not inline
+      // Rendered externally as StagingActionsBar, not inline
       return null;
   }
 }

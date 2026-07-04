@@ -5,7 +5,6 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 
 export type RefreshLatestLiveCanvasDataOptions = {
   liveVersionId?: string;
-  skipDraftBranchRefetch?: boolean;
 };
 
 export function useRefreshLatestLiveCanvasData(
@@ -36,16 +35,11 @@ export function useRefreshLatestLiveCanvasData(
           queryKey: canvasKeys.versionHistory(canvasId),
           refetchType: "all",
         }),
+        queryClient.invalidateQueries({
+          queryKey: canvasKeys.canvasStaging(canvasId),
+          refetchType: "all",
+        }),
       ];
-
-      if (!options?.skipDraftBranchRefetch) {
-        invalidations.push(
-          queryClient.invalidateQueries({
-            queryKey: canvasKeys.draftBranches(canvasId),
-            refetchType: "all",
-          }),
-        );
-      }
 
       if (liveVersionId) {
         invalidations.push(
@@ -57,8 +51,6 @@ export function useRefreshLatestLiveCanvasData(
         );
       }
 
-      // Live view reads console.yaml via the version-less "live" cache key while
-      // edit mode uses the draft version id; refresh both after publish/exit.
       invalidations.push(
         queryClient.invalidateQueries({
           queryKey: canvasKeys.console(canvasId, undefined),

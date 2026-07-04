@@ -63,7 +63,7 @@ func (t *AppAgentTool) Name() string {
 }
 
 func (t *AppAgentTool) Description() string {
-	return "Inspect access, read the current SuperPlane app, create drafts, update draft canvas/Console state, manage app repository files, list connected integrations, list integration resources, and read runtime data. This is the only way to reach the app; there is no command line or HTTP API to call. The tool is bound to the current agent session's canvas and rejects attempts to access any other canvas. It never publishes drafts. Use patch_draft for graph edits, Console updates, or auto-layout without sending full canvas YAML; patch_draft and file write actions require the exact version_id returned by read, create_draft, or the previous draft update."
+	return "Inspect access, read the current SuperPlane app (including effective staged edits), stage canvas/Console/repository file changes, list connected integrations, list integration resources, and read runtime data. This is the only way to reach the app; there is no command line or HTTP API to call. The tool is bound to the current agent session's canvas and rejects attempts to access any other canvas. It never commits staging. Use patch_staging for graph edits, Console updates, or auto-layout without sending full canvas YAML."
 }
 
 func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
@@ -73,27 +73,19 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			"action": {
 				Type:        "string",
 				Enum:        t.actions.Names(),
-				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, create_draft when read returns live/no version_id or when intentionally creating another draft branch, write_file/delete_file to stage normal file changes, commit_files to commit staged draft file changes, patch_draft to apply graph edits, Console updates, or auto-layout without sending full canvas YAML, list_integrations for connected integration IDs, and list_resources for integration-backed resource values.",
+				Description: "Operation to run. Use access to inspect token-backed API capabilities, read for current effective staged YAML, read_runtime for memory/runs/events/executions/queues, list_files/read_file for app repository files and AGENTS.md context, write_file/delete_file to stage normal file changes, patch_staging to apply graph edits, Console updates, or auto-layout without sending full canvas YAML, list_integrations for connected integration IDs, and list_resources for integration-backed resource values.",
 			},
 			"canvas_id": {
 				Type:        "string",
 				Description: "Optional safety check. If provided, it must match the current session canvas_id from the preamble.",
 			},
-			"use_draft": {
-				Type:        "boolean",
-				Description: "For read. Defaults to true: return the current user's draft when exactly one exists, otherwise live. If multiple owned drafts exist, pass version_id or set use_draft=false.",
-			},
 			"version_id": {
 				Type:        "string",
-				Description: "For read, read_file, write_file, delete_file, commit_files, and patch_draft. Draft version ID returned by read, create_draft, or a previous patch_draft. Required for patch_draft and file write/commit actions. If read returns source live with no version_id, call create_draft before updating. For read/read_file, use it to select a specific draft when multiple owned drafts exist. The backend validates that it belongs to the current user and canvas and is still a registered draft branch.",
+				Description: "Optional live version ID returned by read or a previous staging action. When provided, it must match the canvas live version. Most staging actions work without it.",
 			},
 			"draft_version_id": {
 				Type:        "string",
-				Description: "Alias for version_id for read, read_file, write_file, delete_file, commit_files, and patch_draft. Use only one of version_id or draft_version_id.",
-			},
-			"display_name": {
-				Type:        "string",
-				Description: "For create_draft. Optional user-facing draft display name. If omitted, the backend assigns the next Draft #N name.",
+				Description: "Alias for version_id. Use only one of version_id or draft_version_id.",
 			},
 			"include_console": {
 				Type:        "boolean",
@@ -121,7 +113,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"path": {
 				Type:        "string",
-				Description: "For read_file, write_file, and delete_file. Repository-relative app file path, such as AGENTS.md, README.md, or scripts/runner.py. Paths under .superplane and unsafe paths are rejected. Use patch_draft for canvas.yaml and console.yaml.",
+				Description: "For read_file, write_file, and delete_file. Repository-relative app file path, such as AGENTS.md, README.md, or scripts/runner.py. Paths under .superplane and unsafe paths are rejected. Use patch_staging for canvas.yaml and console.yaml.",
 			},
 			"paths": {
 				Type:        "array",
@@ -130,11 +122,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"content": {
 				Type:        "string",
-				Description: "For write_file. Complete file content to stage on the selected draft version.",
-			},
-			"message": {
-				Type:        "string",
-				Description: "For commit_files. Optional commit message for staged repository file changes; defaults to Update files.",
+				Description: "For write_file. Complete file content to stage.",
 			},
 			"query": {
 				Type:        "string",
@@ -142,12 +130,12 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			},
 			"console_yaml": {
 				Type:        "string",
-				Description: "For patch_draft. Complete canonical console.yaml content to stage alongside graph patch operations or by itself.",
+				Description: "For patch_staging. Complete canonical console.yaml content to stage alongside graph patch operations or by itself.",
 			},
 			"patch_operations": patchOperationsSchema(),
 			"auto_layout": {
 				Type:        "object",
-				Description: "Optional patch_draft auto-layout settings. If omitted for graph patch operations, the backend applies horizontal connected-component layout seeded by affected nodes and edge endpoints. Pass scope full_canvas to re-layout the whole graph, or connected_component with node_ids to choose seeds. Passing auto_layout without patch_operations applies layout only.",
+				Description: "Optional patch_staging auto-layout settings. If omitted for graph patch operations, the backend applies horizontal connected-component layout seeded by affected nodes and edge endpoints. Pass scope full_canvas to re-layout the whole graph, or connected_component with node_ids to choose seeds. Passing auto_layout without patch_operations applies layout only.",
 				Properties: map[string]agents.CustomToolInputSchema{
 					"scope": {
 						Type: "string",
@@ -210,7 +198,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 func patchOperationsSchema() agents.CustomToolInputSchema {
 	return agents.CustomToolInputSchema{
 		Type:        "array",
-		Description: "For patch_draft. Ordered graph edits applied to the selected draft without sending full canvas YAML. Supported op values: add_node, update_node, delete_node, add_edge, delete_edge. Aliases replace_node/remove_node/remove_edge are accepted. update_node can change name, configuration, position, and is_collapsed; use delete_node plus add_node to change component/integration.",
+		Description: "For patch_staging. Ordered graph edits applied without sending full canvas YAML. Supported op values: add_node, update_node, delete_node, add_edge, delete_edge. Aliases replace_node/remove_node/remove_edge are accepted. update_node can change name, configuration, position, and is_collapsed; use delete_node plus add_node to change component/integration.",
 		Items: &agents.CustomToolInputSchema{
 			Type: "object",
 			Properties: map[string]agents.CustomToolInputSchema{

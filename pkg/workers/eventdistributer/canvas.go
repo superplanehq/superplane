@@ -12,8 +12,6 @@ import (
 
 const (
 	CanvasUpdatedEvent        = "canvas_updated"
-	CanvasVersionUpdatedEvent = "canvas_version_updated"
-	CanvasVersionDeletedEvent = "canvas_version_deleted"
 	CanvasStagingUpdatedEvent = "staging_updated"
 	CanvasDeletedEvent        = "canvas_deleted"
 	CanvasMemoryUpdatedEvent  = "memory_updated"
@@ -23,6 +21,7 @@ type CanvasStatePayload struct {
 	ID        string `json:"id"`
 	CanvasID  string `json:"canvasId,omitempty"`
 	VersionID string `json:"versionId,omitempty"`
+	UserID    string `json:"userId,omitempty"`
 }
 
 type CanvasStateWebsocketEvent struct {
@@ -42,46 +41,34 @@ func HandleCanvasMemoryUpdated(messageBody []byte, wsHub *ws.Hub) error {
 	return handleCanvasState(messageBody, wsHub, CanvasMemoryUpdatedEvent)
 }
 
-func HandleCanvasVersionUpdated(messageBody []byte, wsHub *ws.Hub) error {
-	return handleCanvasVersion(messageBody, wsHub, CanvasVersionUpdatedEvent)
-}
-
-func HandleCanvasVersionDeleted(messageBody []byte, wsHub *ws.Hub) error {
-	return handleCanvasVersion(messageBody, wsHub, CanvasVersionDeletedEvent)
-}
-
 func HandleCanvasStagingUpdated(messageBody []byte, wsHub *ws.Hub) error {
-	return handleCanvasVersion(messageBody, wsHub, CanvasStagingUpdatedEvent)
-}
-
-func handleCanvasVersion(messageBody []byte, wsHub *ws.Hub, eventName string) error {
-	pbMsg := &pb.CanvasVersionMessage{}
+	pbMsg := &pb.CanvasStagingMessage{}
 	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
-		return fmt.Errorf("failed to unmarshal %s message: %w", eventName, err)
+		return fmt.Errorf("failed to unmarshal %s message: %w", CanvasStagingUpdatedEvent, err)
 	}
 
 	if pbMsg.CanvasId == "" {
-		return fmt.Errorf("missing canvas id in %s message", eventName)
+		return fmt.Errorf("missing canvas id in %s message", CanvasStagingUpdatedEvent)
 	}
 
-	if pbMsg.VersionId == "" {
-		return fmt.Errorf("missing version id in %s message", eventName)
+	if pbMsg.UserId == "" {
+		return fmt.Errorf("missing user id in %s message", CanvasStagingUpdatedEvent)
 	}
 
 	wsEvent, err := json.Marshal(CanvasStateWebsocketEvent{
-		Event: eventName,
+		Event: CanvasStagingUpdatedEvent,
 		Payload: CanvasStatePayload{
-			ID:        pbMsg.CanvasId,
-			CanvasID:  pbMsg.CanvasId,
-			VersionID: pbMsg.VersionId,
+			ID:       pbMsg.CanvasId,
+			CanvasID: pbMsg.CanvasId,
+			UserID:   pbMsg.UserId,
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal %s websocket event: %w", eventName, err)
+		return fmt.Errorf("failed to marshal %s websocket event: %w", CanvasStagingUpdatedEvent, err)
 	}
 
 	wsHub.BroadcastToWorkflow(pbMsg.CanvasId, wsEvent)
-	log.Debugf("Broadcasted %s event to workflow %s", eventName, pbMsg.CanvasId)
+	log.Debugf("Broadcasted %s event to workflow %s for user %s", CanvasStagingUpdatedEvent, pbMsg.CanvasId, pbMsg.UserId)
 
 	return nil
 }

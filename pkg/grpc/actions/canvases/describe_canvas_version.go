@@ -13,7 +13,7 @@ import (
 )
 
 func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID string, versionID string) (*pb.DescribeCanvasVersionResponse, error) {
-	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	_, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
@@ -41,29 +41,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 		return nil, grpcerrors.Internal(err, "failed to load version")
 	}
 
-	userUUID := uuid.MustParse(userID)
-	if version.State == models.CanvasVersionStatePublished {
-		return &pb.DescribeCanvasVersionResponse{
-			Version: SerializeCanvasVersionMetadata(version, organizationID, nil),
-		}, nil
-	}
-
-	canAccess := false
-	if models.IsUserOwnedDraftVersion(version, userUUID) && models.IsRegisteredDraftVersion(version) {
-		canAccess = true
-	}
-
-	if !canAccess {
-		return nil, grpcerrors.PermissionDenied(nil, "version is not visible in current flow")
-	}
-
-	state, _, err := stagingSummaryForVersion(version.ID)
-	if err != nil {
-		return nil, err
-	}
-
 	return &pb.DescribeCanvasVersionResponse{
-		Version:        SerializeCanvasVersionMetadata(version, organizationID, nil),
-		StagingSummary: state,
+		Version: SerializeCanvasVersionMetadata(version, organizationID, nil),
 	}, nil
 }
