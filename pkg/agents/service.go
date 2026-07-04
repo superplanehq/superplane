@@ -548,8 +548,7 @@ func (s *Service) buildPreamble(session *models.AgentSession, mode Mode) string 
 		session.CanvasID.String(),
 	)
 	canvasSnapshot := buildCanvasSnapshot(session)
-	draftStatus := getDraftStatus(session.CanvasID)
-	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus
+	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode)
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -623,116 +622,6 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 	h.Write(userID[:])
 	h.Write(canvasID[:])
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
-}
-
-func getDraftStatus(canvasID uuid.UUID) string {
-	_ = canvasID
-	return "[Edit Status]\nEdits are staged per user. Use superplane_app actions to stage changes; the user reviews and commits or discards them in the UI. There are no separate draft branches."
-}
-
-func buildCanvasSnapshot(session *models.AgentSession) string {
-	canvas, err := models.FindCanvas(session.OrganizationID, session.CanvasID)
-	if err != nil {
-		log.WithError(err).Warn("failed to load canvas for agent snapshot")
-		return "[Canvas Snapshot]\nUnable to load current canvas snapshot."
-	}
-
-	var builder strings.Builder
-	builder.WriteString("[Canvas Snapshot]\n")
-	builder.WriteString(fmt.Sprintf("canvas_id: %s\n", canvas.ID.String()))
-	builder.WriteString(fmt.Sprintf("name: %s\n", canvas.Name))
-
-	if canvas.LiveVersionID != nil {
-		builder.WriteString(fmt.Sprintf("live_version_id: %s\n", canvas.LiveVersionID.String()))
-	}
-
-	draft, draftErr := ownedDraftVersion(session.CanvasID, session.UserID)
-	if draftErr != nil {
-		log.WithError(draftErr).Warn("failed to load owned draft for agent snapshot")
-	}
-
-	snapshotSource, snapshotAvailable := appendDraftSnapshotStatus(&builder, draft, draftErr)
-	if !snapshotAvailable {
-		return strings.TrimRight(builder.String(), "\n")
-	}
-
-	version, err := selectedVersion(canvas, draft, snapshotSource)
-	if err != nil {
-		log.WithError(err).Warn("failed to load canvas version for agent snapshot")
-		builder.WriteString("snapshot_source: unavailable\n")
-		builder.WriteString("nodes: unavailable\n")
-		return strings.TrimRight(builder.String(), "\n")
-	}
-
-	if version == nil {
-		builder.WriteString(fmt.Sprintf("snapshot_source: %s\n", snapshotSource))
-		builder.WriteString("nodes: unavailable\n")
-		return strings.TrimRight(builder.String(), "\n")
-	}
-
-	builder.WriteString(fmt.Sprintf("snapshot_source: %s\n", snapshotSource))
-	builder.WriteString(fmt.Sprintf("node_count: %d\n", len(version.Nodes)))
-	builder.WriteString(fmt.Sprintf("edge_count: %d\n", len(version.Edges)))
-
-	nodes := summarizeNodes(version.Nodes, 12)
-	if len(nodes) == 0 {
-		builder.WriteString("node_summaries: []\n")
-		return strings.TrimRight(builder.String(), "\n")
-	}
-
-	builder.WriteString("node_summaries:\n")
-	for _, node := range nodes {
-		component := node.Component
-		if component == "" {
-			component = "unknown"
-		}
-		name := node.Name
-		if name == "" {
-			name = node.ID
-		}
-		line := fmt.Sprintf("  - id=%s name=%q type=%s component=%s", node.ID, name, node.Type, component)
-		if node.Issue != "" {
-			line += fmt.Sprintf(" issue=%q", node.Issue)
-		}
-		builder.WriteString(line + "\n")
-	}
-
-	if len(version.Nodes) > len(nodes) {
-		builder.WriteString(fmt.Sprintf("  - ... %d more nodes omitted\n", len(version.Nodes)-len(nodes)))
-	}
-
-	return strings.TrimRight(builder.String(), "\n")
-}
-
-func appendDraftSnapshotStatus(builder *strings.Builder, draft *models.CanvasVersion, err error) (string, bool) {
-	if err != nil {
-		builder.WriteString("owned_draft: unavailable\n")
-		builder.WriteString("snapshot_source: unavailable\n")
-		builder.WriteString("nodes: unavailable\n")
-		return "", false
-	}
-
-	if draft == nil {
-		builder.WriteString("owned_staging: none\n")
-		return "live", true
-	}
-
-	builder.WriteString(fmt.Sprintf("owned_draft_version_id: %s\n", draft.ID.String()))
-	return "live", true
-}
-
-const noActiveDraftStatus = "[Edit Status]\nChanges are committed directly to the main branch. Stage edits, then commit with a message."
-
-func draftCreatedAt(draft models.CanvasVersion) string {
-	if draft.CreatedAt == nil {
-		return "unknown"
-	}
-
-	return draft.CreatedAt.UTC().Format(time.RFC3339)
-}
-
-func wasRecentlyPublished(publishedAt *time.Time) bool {
-	return publishedAt != nil && time.Since(*publishedAt) < 10*time.Minute
 }
 
 func sessionTitle(organizationID, canvasID uuid.UUID) string {

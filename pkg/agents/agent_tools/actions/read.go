@@ -30,17 +30,12 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 		return readResult{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
-	userID, err := uuid.Parse(session.UserID)
-	if err != nil {
-		return readResult{}, fmt.Errorf("invalid session user id: %w", err)
-	}
-
 	canvas, err := models.FindCanvas(uuid.MustParse(session.OrganizationID), canvasID)
 	if err != nil {
 		return readResult{}, fmt.Errorf("load canvas: %w", err)
 	}
 
-	liveVersion, err := resolveTargetDraftVersion(canvasID, userID, input)
+	liveVersion, err := resolveLiveCanvasVersion(canvasID, input)
 	if err != nil {
 		return readResult{}, fmt.Errorf("load live version: %w", err)
 	}

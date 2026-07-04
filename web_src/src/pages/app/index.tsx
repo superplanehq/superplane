@@ -1086,7 +1086,6 @@ export function AppPage() {
       }
     },
     [
-      liveCanvasVersionId,
       registerIgnoredCanvasUpdatedEcho,
       saveMatchesCurrentCanvas,
       syncCurrentCanvasWithSavedVersion,

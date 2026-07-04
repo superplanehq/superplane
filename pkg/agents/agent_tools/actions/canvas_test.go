@@ -127,19 +127,19 @@ func TestResolvePatchDraftAutoLayout_DefaultsLayoutOnlyUpdatesToFullCanvas(t *te
 	assert.Empty(t, layout.NodeIds)
 }
 
-func TestResolveTargetDraftVersion_ResolvesLiveVersion(t *testing.T) {
+func TestResolveLiveCanvasVersion_ResolvesLiveVersion(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	liveVersion := requireLiveVersion(t, canvas.ID)
 
-	resolved, err := resolveTargetDraftVersion(canvas.ID, r.User, Input{Action: "patch_staging"})
+	resolved, err := resolveLiveCanvasVersion(canvas.ID, Input{Action: "patch_staging"})
 	require.NoError(t, err)
 	require.NotNil(t, resolved)
 	assert.Equal(t, liveVersion.ID, resolved.ID)
 
-	resolved, err = resolveTargetDraftVersion(canvas.ID, r.User, Input{
+	resolved, err = resolveLiveCanvasVersion(canvas.ID, Input{
 		Action:    "patch_staging",
 		VersionID: liveVersion.ID.String(),
 	})
@@ -148,24 +148,12 @@ func TestResolveTargetDraftVersion_ResolvesLiveVersion(t *testing.T) {
 	assert.Equal(t, liveVersion.ID, resolved.ID)
 
 	wrongVersionID := uuid.New()
-	_, err = resolveTargetDraftVersion(canvas.ID, r.User, Input{
+	_, err = resolveLiveCanvasVersion(canvas.ID, Input{
 		Action:    "patch_staging",
 		VersionID: wrongVersionID.String(),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "is not the current live version")
-}
-
-func TestPatchDraftAction_ReturnsInvalidUserIDError(t *testing.T) {
-	_, err := (patchStagingAction{}).Execute(context.Background(), agents.AgentSessionContext{
-		SessionID:      "session-1",
-		OrganizationID: uuid.NewString(),
-		UserID:         "not-a-uuid",
-		CanvasID:       uuid.NewString(),
-	}, Input{Action: "patch_staging"})
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid session user id")
 }
 
 func requireDraftChangeset(t *testing.T, operations []PatchOperation) *changesets.CanvasChangeset {

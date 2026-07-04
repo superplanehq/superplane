@@ -186,7 +186,7 @@ func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionC
 		return fileStageResult{}, err
 	}
 
-	draft, err := resolveFileDraftVersion(session, input)
+	liveVersion, err := resolveFileLiveVersion(session, input)
 	if err != nil {
 		return fileStageResult{}, err
 	}
@@ -204,7 +204,7 @@ func (writeFileAction) Execute(ctx context.Context, session agents.AgentSessionC
 	return fileStageResult{
 		Action:         writeFileActionName,
 		CanvasID:       session.CanvasID,
-		VersionID:      draft.ID.String(),
+		VersionID:      liveVersion.ID.String(),
 		Path:           path,
 		StagingSummary: serializeStagingSummary(state),
 	}, nil
@@ -222,7 +222,7 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 		return fileStageResult{}, err
 	}
 
-	draft, err := resolveFileDraftVersion(session, input)
+	liveVersion, err := resolveFileLiveVersion(session, input)
 	if err != nil {
 		return fileStageResult{}, err
 	}
@@ -240,7 +240,7 @@ func (deleteFileAction) Execute(ctx context.Context, session agents.AgentSession
 	return fileStageResult{
 		Action:         deleteFileActionName,
 		CanvasID:       session.CanvasID,
-		VersionID:      draft.ID.String(),
+		VersionID:      liveVersion.ID.String(),
 		Path:           path,
 		Deleted:        true,
 		StagingSummary: serializeStagingSummary(state),
@@ -284,32 +284,19 @@ func requestedWritableFilePath(rawPath string) (string, error) {
 }
 
 func requestedReadableFileVersionID(session agents.AgentSessionContext, input Input) (string, error) {
-	canvasID, err := uuid.Parse(session.CanvasID)
-	if err != nil {
-		return "", err
-	}
-	userID, err := uuid.Parse(session.UserID)
-	if err != nil {
-		return "", err
-	}
-
-	liveVersion, err := resolveTargetDraftVersion(canvasID, userID, input)
+	liveVersion, err := resolveFileLiveVersion(session, input)
 	if err != nil {
 		return "", err
 	}
 	return liveVersion.ID.String(), nil
 }
 
-func resolveFileDraftVersion(session agents.AgentSessionContext, input Input) (*models.CanvasVersion, error) {
+func resolveFileLiveVersion(session agents.AgentSessionContext, input Input) (*models.CanvasVersion, error) {
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid session canvas id: %w", err)
 	}
-	userID, err := uuid.Parse(session.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid session user id: %w", err)
-	}
-	return resolveTargetDraftVersion(canvasID, userID, input)
+	return resolveLiveCanvasVersion(canvasID, input)
 }
 
 func parseSessionIDs(session agents.AgentSessionContext) (uuid.UUID, uuid.UUID, error) {

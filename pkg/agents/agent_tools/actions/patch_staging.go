@@ -92,12 +92,7 @@ func resolvePatchStagingTarget(session agents.AgentSessionContext, input Input) 
 		return patchStagingTarget{}, fmt.Errorf("invalid session organization id: %w", err)
 	}
 
-	userID, err := uuid.Parse(session.UserID)
-	if err != nil {
-		return patchStagingTarget{}, fmt.Errorf("invalid session user id: %w", err)
-	}
-
-	draft, err := resolveTargetDraftVersion(canvasID, userID, input)
+	liveVersion, err := resolveLiveCanvasVersion(canvasID, input)
 	if err != nil {
 		return patchStagingTarget{}, fmt.Errorf("resolve live version: %w", err)
 	}
@@ -119,7 +114,7 @@ func resolvePatchStagingTarget(session agents.AgentSessionContext, input Input) 
 
 	return patchStagingTarget{
 		organizationID:  organizationID,
-		draft:           draft,
+		draft:           liveVersion,
 		changeset:       changeset,
 		consoleYAML:     input.ConsoleYAML,
 		autoLayoutInput: input.AutoLayout,
@@ -472,6 +467,30 @@ func defaultPatchStagingAutoLayoutNodeIDs(
 	}
 	sort.Strings(nodeIDs)
 	return nodeIDs
+}
+
+func resolveToolAutoLayoutInput(input *AutoLayoutInput) *pb.CanvasAutoLayout {
+	if input == nil {
+		return nil
+	}
+
+	layout := &pb.CanvasAutoLayout{
+		Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
+		NodeIds:   append([]string(nil), input.NodeIDs...),
+	}
+
+	switch strings.TrimSpace(input.Scope) {
+	case "full_canvas", "full-canvas":
+		layout.Scope = pb.CanvasAutoLayout_SCOPE_FULL_CANVAS
+	case "connected_component", "connected-component":
+		layout.Scope = pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT
+	default:
+		if len(layout.NodeIds) > 0 {
+			layout.Scope = pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT
+		}
+	}
+
+	return layout
 }
 
 func serializePatchedDraftYAML(canvas *models.Canvas, version *models.CanvasVersion, canvasID string) (string, error) {
