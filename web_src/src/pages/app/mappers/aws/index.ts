@@ -42,7 +42,7 @@ import { createAlarmMapper } from "./ec2/create_alarm";
 import { deleteAlarmMapper } from "./ec2/delete_alarm";
 import { updateAlarmMapper } from "./ec2/update_alarm";
 import { createImageMapper } from "./ec2/create_image";
-import { createInstanceMapper } from "./ec2/create_instance";
+import { CREATE_INSTANCE_STATE_REGISTRY, createInstanceMapper } from "./ec2/create_instance";
 import { deleteInstanceMapper } from "./ec2/delete_instance";
 import { getAlarmMapper } from "./ec2/get_alarm";
 import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
@@ -193,7 +193,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.createAlarm": buildActionStateRegistry("created"),
   "ec2.deleteAlarm": buildActionStateRegistry("deleted"),
   "ec2.createImage": buildActionStateRegistry("created"),
-  "ec2.createInstance": buildActionStateRegistry("created"),
+  "ec2.createInstance": CREATE_INSTANCE_STATE_REGISTRY,
   "ec2.deregisterImage": buildActionStateRegistry("deregistered"),
   "ec2.deleteInstance": buildActionStateRegistry("deleted"),
   "ec2.disableImage": buildActionStateRegistry("disabled"),

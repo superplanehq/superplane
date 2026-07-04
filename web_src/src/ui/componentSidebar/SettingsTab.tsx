@@ -493,7 +493,7 @@ export function SettingsTab({
 
   return (
     <div
-      className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`}
+      className={`p-4 overflow-y-auto overflow-x-hidden ${showManualSaveFooter ? "pb-20" : "pb-24"}`}
       style={{ maxHeight: "80vh" }}
       onBlurCapture={(event) => {
         if (configurationSaveMode !== "auto") {
