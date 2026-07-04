@@ -46,8 +46,7 @@ func TestCanvasAuthorizationRulesSeparateStagingAndLiveActions(t *testing.T) {
 		{route: HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/canvases/{canvas_id}/staging"}, action: "read"},
 		{route: HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{canvas_id}/staging"}, action: "update_version"},
 		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{canvas_id}/staging"}, action: "update_version"},
-		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/staging/commit"}, action: "update_version"},
-		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/repository/commits"}, action: "update_version"},
+		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/staging/commit"}, action: "update"},
 		{route: HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{id}"}, action: "update"},
 		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{id}"}, action: "delete"},
 	}

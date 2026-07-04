@@ -286,26 +286,6 @@ func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.L
 	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId)
 }
 
-func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CommitCanvasRepositoryFiles(
-		ctx,
-		s.gitProvider,
-		s.usageService,
-		s.encryptor,
-		s.registry,
-		organizationID,
-		req.CanvasId,
-		req.GetVersionId(),
-		req.ExpectedHeadSha,
-		req.Message,
-		req.Operations,
-		req.AutoLayout,
-		s.webhookBaseURL,
-		s.authService,
-	)
-}
-
 func (s *CanvasService) PutCanvasStaging(ctx context.Context, req *pb.PutCanvasStagingRequest) (*pb.PutCanvasStagingResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	state, err := canvases.PutCanvasStaging(ctx, organizationID, req.CanvasId, req.Operations)

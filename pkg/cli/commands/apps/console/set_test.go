@@ -2,7 +2,6 @@ package console
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -40,10 +39,6 @@ func writeSampleConsoleYAML(t *testing.T) string {
 	return path
 }
 
-func repositoryCommitsPath(canvasID string) string {
-	return "/api/v1/canvases/" + canvasID + "/repository/commits"
-}
-
 func stagingPath(canvasID string) string {
 	return "/api/v1/canvases/" + canvasID + "/staging"
 }
@@ -76,33 +71,6 @@ func expectCommitStaging(versionID string) requestExpectation {
 		handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"` + versionID + `"}}}`))
-		},
-	}
-}
-
-func expectCommitConsoleYAML(expectedVersionID string) requestExpectation {
-	return requestExpectation{
-		method: http.MethodPost,
-		path:   repositoryCommitsPath(testCanvasID),
-		handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			var parsed map[string]any
-			require.NoError(t, json.Unmarshal(body, &parsed))
-			require.Equal(t, expectedVersionID, parsed["versionId"])
-			operations, ok := parsed["operations"].([]any)
-			require.True(t, ok)
-			require.NotEmpty(t, operations)
-			first, ok := operations[0].(map[string]any)
-			require.True(t, ok)
-			encoded, ok := first["content"].(string)
-			require.True(t, ok)
-			decoded, err := base64.StdEncoding.DecodeString(encoded)
-			require.NoError(t, err)
-			require.Contains(t, string(decoded), "notes")
-
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{}`))
 		},
 	}
 }

@@ -793,6 +793,7 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	assert.Contains(t, accessible, "GET /api/v1/canvases/{canvas_id}/runs")
 	assert.Equal(t, []string{canvasID}, accessible["GET /api/v1/canvases/{canvas_id}/runs"].Resources)
 	assert.Contains(t, accessible, "PUT /api/v1/canvases/{canvas_id}/staging")
+	assert.Contains(t, unavailable, "POST /api/v1/canvases/{canvas_id}/staging/commit")
 	assert.Contains(t, unavailable, "GET /api/v1/canvases")
 	assert.Contains(t, unavailable, "POST /api/v1/canvases")
 

@@ -300,7 +300,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/staging/commit"}: {
 			Resource:           "canvases",
-			Action:             "update_version",
+			Action:             "update",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
@@ -398,12 +398,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/memory/namespaces"}: {
 			Resource:           "canvases",
 			Action:             "update",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
-		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/repository/commits"}: {
-			Resource:           "canvases",
-			Action:             "update_version",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},

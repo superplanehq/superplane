@@ -3,13 +3,14 @@ package canvas
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/cli/layout"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"gopkg.in/yaml.v3"
 )
 
 type updateCommand struct {
@@ -48,6 +49,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if c.file != nil {
 		filePath = *c.file
 	}
+	if strings.TrimSpace(filePath) == "" {
+		return fmt.Errorf("canvas file is required")
+	}
 
 	autoLayoutValue := ""
 	if c.autoLayout != nil {
@@ -57,26 +61,47 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	if c.autoLayoutScope != nil {
 		autoLayoutScopeValue = strings.TrimSpace(*c.autoLayoutScope)
 	}
-	_, _ = autoLayoutValue, autoLayoutScopeValue
 	autoLayoutNodeIDs := []string{}
 	if c.autoLayoutNodes != nil {
 		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
 	}
-	_ = autoLayoutNodeIDs
 
 	commitMessage, err := common.RequireCommitMessage(messageValue(c.message))
 	if err != nil {
 		return fmt.Errorf("%w; use \"superplane apps staging update\" and \"superplane apps staging commit\" to stage changes first", err)
 	}
 
-	canvasID, _, err := resolveCanvasForFileUpdate(filePath)
+	resource, err := models.ParseCanvasResourceFromFile(filePath, "update")
 	if err != nil {
 		return err
 	}
+	if resource.Metadata == nil || strings.TrimSpace(resource.Metadata.GetId()) == "" {
+		return fmt.Errorf("canvas metadata.id is required in the YAML file")
+	}
+	canvasID := strings.TrimSpace(resource.Metadata.GetId())
 
-	yamlBytes, err := os.ReadFile(filePath)
+	autoLayout, err := layout.ResolveUpdateAutoLayout(
+		layout.HasFlags(ctx),
+		resource.AutoLayout,
+		autoLayoutValue,
+		autoLayoutScopeValue,
+		autoLayoutNodeIDs,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to read canvas yaml: %w", err)
+		return err
+	}
+	if autoLayout != nil {
+		if resource.Spec == nil {
+			return fmt.Errorf("canvas spec is required when auto-layout is enabled")
+		}
+		if err := layout.ApplyToCanvasSpec(resource.Spec, autoLayout); err != nil {
+			return fmt.Errorf("apply auto-layout: %w", err)
+		}
+	}
+
+	yamlBytes, err := yaml.Marshal(resource)
+	if err != nil {
+		return fmt.Errorf("marshal canvas yaml: %w", err)
 	}
 
 	if err := common.StageRepositorySpecFile(

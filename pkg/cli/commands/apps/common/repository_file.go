@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 const (
@@ -79,67 +77,4 @@ func FetchRepositoryFile(ctx core.CommandContext, canvasID, path, versionID stri
 	}
 
 	return body, nil
-}
-
-func CommitRepositoryFiles(
-	ctx core.CommandContext,
-	canvasID string,
-	versionID string,
-	expectedHeadSHA string,
-	message string,
-	operations []openapi_client.CanvasesCanvasRepositoryFileOperation,
-	autoLayout *openapi_client.CanvasesCanvasAutoLayout,
-	includeAutoLayout bool,
-) (*openapi_client.CanvasesCommitCanvasRepositoryFilesResponse, error) {
-	body := openapi_client.NewCanvasesCommitCanvasRepositoryFilesBody()
-	if trimmedVersionID := strings.TrimSpace(versionID); trimmedVersionID != "" {
-		body.SetVersionId(trimmedVersionID)
-	}
-	if trimmedHead := strings.TrimSpace(expectedHeadSHA); trimmedHead != "" {
-		body.SetExpectedHeadSha(trimmedHead)
-	}
-	if trimmedMessage := strings.TrimSpace(message); trimmedMessage != "" {
-		body.SetMessage(trimmedMessage)
-	}
-	body.SetOperations(operations)
-	if includeAutoLayout {
-		if autoLayout != nil {
-			body.SetAutoLayout(*autoLayout)
-		} else {
-			body.SetAutoLayout(openapi_client.CanvasesCanvasAutoLayout{})
-		}
-	}
-
-	response, _, err := ctx.API.CanvasRepositoryAPI.
-		CanvasesCommitCanvasRepositoryFiles(ctx.Context, canvasID).
-		Body(*body).
-		Execute()
-	return response, err
-}
-
-func CommitRepositorySpecFile(
-	ctx core.CommandContext,
-	canvasID string,
-	versionID string,
-	path string,
-	content []byte,
-	message string,
-	autoLayout *openapi_client.CanvasesCanvasAutoLayout,
-	includeAutoLayout bool,
-) error {
-	operation := openapi_client.NewCanvasesCanvasRepositoryFileOperation()
-	operation.SetPath(path)
-	operation.SetContent(base64.StdEncoding.EncodeToString(content))
-
-	_, err := CommitRepositoryFiles(
-		ctx,
-		canvasID,
-		versionID,
-		"",
-		message,
-		[]openapi_client.CanvasesCanvasRepositoryFileOperation{*operation},
-		autoLayout,
-		includeAutoLayout,
-	)
-	return err
 }

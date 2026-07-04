@@ -164,43 +164,8 @@ func loadRepositorySpecVersionForRead(
 	return canvas, version, nil
 }
 
-// ApplyRepositorySpecFileOperations parses canvas.yaml/console.yaml content into
-// the draft version row. It is the validated write path shared by the
-// staging-commit flow (CommitCanvasStaging) and the direct-commit flow
-// (CommitCanvasRepositoryFiles). When autoLayout is set it lays out canvas.yaml
-// during the write; when discardStaging is set it drops any staged edits for the
-// version in the same transaction as the version-row write.
-func ApplyRepositorySpecFileOperations(
-	ctx context.Context,
-	usageService usage.Service,
-	encryptor crypto.Encryptor,
-	registry *registry.Registry,
-	organizationID string,
-	canvasID string,
-	versionID string,
-	webhookBaseURL string,
-	authService authorization.Authorization,
-	autoLayout *pb.CanvasAutoLayout,
-	discardStaging bool,
-	operations []*pb.CanvasRepositoryFileOperation,
-) error {
-	return applyRepositorySpecFileOperations(
-		ctx,
-		usageService,
-		encryptor,
-		registry,
-		organizationID,
-		canvasID,
-		versionID,
-		webhookBaseURL,
-		authService,
-		autoLayout,
-		discardStaging,
-		operations,
-		false,
-	)
-}
-
+// ApplyRepositorySpecFileOperationsToCommitTarget parses canvas.yaml/console.yaml
+// content into a new commit version row during staging commit.
 func ApplyRepositorySpecFileOperationsToCommitTarget(
 	ctx context.Context,
 	usageService usage.Service,
@@ -321,33 +286,4 @@ func ParseAndValidateCanvasYAML(registry *registry.Registry, organizationID, tex
 func ValidateConsoleYAML(text string) error {
 	_, _, err := consolePanelsLayoutFromYAMLText(text)
 	return err
-}
-
-func resolveCommitCanvasAutoLayout(hasAutoLayout bool, autoLayout *pb.CanvasAutoLayout) *pb.CanvasAutoLayout {
-	if !hasAutoLayout {
-		return nil
-	}
-	if autoLayout == nil {
-		return nil
-	}
-	if autoLayout.Algorithm == pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED &&
-		autoLayout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED &&
-		len(autoLayout.NodeIds) == 0 {
-		return nil
-	}
-	return autoLayout
-}
-
-func splitRepositoryFileOperations(operations []*pb.CanvasRepositoryFileOperation) (specOps []*pb.CanvasRepositoryFileOperation, gitOps []*pb.CanvasRepositoryFileOperation) {
-	for _, operation := range operations {
-		if operation == nil {
-			continue
-		}
-		if IsRepositorySpecFilePath(operation.GetPath()) {
-			specOps = append(specOps, operation)
-			continue
-		}
-		gitOps = append(gitOps, operation)
-	}
-	return specOps, gitOps
 }

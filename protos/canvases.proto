@@ -95,18 +95,6 @@ service Canvases {
     };
   }
 
-  rpc CommitCanvasRepositoryFiles(CommitCanvasRepositoryFilesRequest) returns (CommitCanvasRepositoryFilesResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/repository/commits"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Commit canvas repository files";
-      description: "Commits file additions, updates, and deletions directly to a canvas, discarding any existing draft staging for the target version in the same transaction";
-      tags: "CanvasRepository";
-    };
-  }
-
   rpc PutCanvasStaging(PutCanvasStagingRequest) returns (PutCanvasStagingResponse) {
     option (google.api.http) = {
       put: "/api/v1/canvases/{canvas_id}/staging"
@@ -468,21 +456,6 @@ message CanvasRepositoryFileOperation {
   string path = 1;
   bytes content = 2;
   bool delete = 3;
-}
-
-message CommitCanvasRepositoryFilesRequest {
-  string canvas_id = 1;
-  string expected_head_sha = 2;
-  string message = 3;
-  repeated CanvasRepositoryFileOperation operations = 4;
-  // Draft version to update when committing canvas.yaml or console.yaml.
-  optional string version_id = 5;
-  // When set, applies auto-layout while processing canvas.yaml updates.
-  optional CanvasAutoLayout auto_layout = 6;
-}
-
-message CommitCanvasRepositoryFilesResponse {
-  string commit_sha = 1;
 }
 
 message PutCanvasStagingRequest {

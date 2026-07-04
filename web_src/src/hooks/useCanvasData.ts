@@ -43,7 +43,6 @@ import type {
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   CanvasesCanvasRepositoryFileOperation,
-  CanvasesListCanvasRepositoryFilesResponse,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { registerLocalStagingWrite } from "../lib/canvasStagingEcho";
@@ -1668,62 +1667,6 @@ export const useCanvasRepositoryFile = (
   });
 };
 
-export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: {
-      message: string;
-      operations: CanvasesCanvasRepositoryFileOperation[];
-      expectedHeadSha?: string;
-      versionId?: string;
-    }) => {
-      if (!input.versionId) {
-        throw new Error("version id is required");
-      }
-
-      await stageSpecOperations(canvasId, input.operations);
-      return undefined;
-    },
-    onSuccess: (_data, input) => {
-      queryClient.setQueryData<CanvasesListCanvasRepositoryFilesResponse | undefined>(
-        canvasKeys.repositoryFiles(canvasId),
-        (current) => {
-          const paths = new Set(
-            (current?.files || []).map((file) => file.path).filter((path): path is string => !!path),
-          );
-
-          for (const operation of input.operations) {
-            const path = operation.path;
-            if (!path) continue;
-
-            if (operation.delete) {
-              paths.delete(path);
-              continue;
-            }
-
-            paths.add(path);
-          }
-
-          return {
-            ...current,
-            files: Array.from(paths)
-              .sort((left, right) => left.localeCompare(right))
-              .map((path) => ({ path })),
-          };
-        },
-      );
-      queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
-      queryClient.invalidateQueries({ queryKey: [...canvasKeys.repository(canvasId), "file"] });
-      if (input.versionId) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, input.versionId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, input.versionId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
-      }
-    },
-  });
-};
-
 // useStageCanvasSpecFiles writes canvas.yaml/console.yaml edits to staging (no commit).
 export const useStageCanvasSpecFiles = (canvasId: string) => {
   return useMutation({
@@ -1853,4 +1796,3 @@ export const useDiscardRepositoryFilePaths = (canvasId: string, versionId: strin
 
 export type CanvasRepositoryFilesQueryResult = ReturnType<typeof useCanvasRepositoryFiles>;
 export type CanvasRepositoryFileQueryResult = ReturnType<typeof useCanvasRepositoryFile>;
-export type CommitCanvasRepositoryFilesMutationResult = ReturnType<typeof useCommitCanvasRepositoryFiles>;

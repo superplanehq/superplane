@@ -48,13 +48,21 @@ func (s *CanvasSteps) EnterEditMode() {
 }
 
 func (s *CanvasSteps) sessionUserID() uuid.UUID {
-	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	return s.UserIDForEmail(s.session.Account.Email)
+}
+
+// UserIDForEmail resolves the organization user id for an account email.
+func (s *CanvasSteps) UserIDForEmail(email string) uuid.UUID {
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), email)
 	require.NoError(s.t, err)
 	return user.ID
 }
 
-// CreateNewDraftFromEditMenu is a no-op kept for older E2E tests; multi-draft branches no longer exist.
-func (s *CanvasSteps) CreateNewDraftFromEditMenu() {}
+// LoginAs switches the browser session to another account in the same organization.
+func (s *CanvasSteps) LoginAs(account *models.Account) {
+	s.session.Account = account
+	s.session.Login()
+}
 
 // ExitEditMode leaves edit mode and returns to the live canvas view.
 func (s *CanvasSteps) ExitEditMode() {
@@ -103,9 +111,22 @@ func (s *CanvasSteps) ensureVersionsSidebarOpen() {
 	s.session.Click(q.TestID("canvas-versions-sidebar-toggle"))
 }
 
-// OpenDraftBranchInSidebar is a no-op; version history no longer switches editable branches.
-func (s *CanvasSteps) OpenDraftBranchInSidebar(_ string) {
+// SelectVersionInHistorySidebar selects a commit in the versions sidebar history list.
+func (s *CanvasSteps) SelectVersionInHistorySidebar(versionLabel string) {
+	s.ensureEditMode()
 	s.OpenVersionsSidebar()
+	selector := q.Locator(fmt.Sprintf(`[data-testid="canvas-live-version-row"]:has-text("%s")`, versionLabel))
+	s.waitForVisible(selector, 15*time.Second)
+	s.session.Click(selector)
+	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) waitForVisible(query q.Query, timeout time.Duration) {
+	locator := query.Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := locator.IsVisible()
+		return err == nil && visible
+	}, timeout, 200*time.Millisecond, "%s did not become visible", query.Describe())
 }
 
 // SelectRunInSidebar opens run inspection by selecting a run from the runs sidebar.
@@ -180,9 +201,12 @@ func (s *CanvasSteps) AssertDraftCount(expected int) {
 	require.NotNil(s.t, s.FindCurrentDraft())
 }
 
-// AssertDraftBranchesInSidebar verifies the versions sidebar is visible.
-func (s *CanvasSteps) AssertDraftBranchesInSidebar(_ ...string) {
+// AssertVersionHistoryContains verifies commit labels appear in the versions sidebar.
+func (s *CanvasSteps) AssertVersionHistoryContains(labels ...string) {
 	s.OpenVersionsSidebar()
+	for _, label := range labels {
+		s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="versions-sidebar-scroll"] :text-is("%s")`, label)))
+	}
 }
 
 func (s *CanvasSteps) waitForEnabledEditButton() {
@@ -310,18 +334,54 @@ func (s *CanvasSteps) CommitStaging() {
 
 // AssertNoStaging verifies the current user has no workflow_staged_files rows.
 func (s *CanvasSteps) AssertNoStaging(_ uuid.UUID) {
-	userID := s.sessionUserID()
-	hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
-	require.NoError(s.t, err)
-	require.False(s.t, hasStaging, "expected no staging rows for workflow %s", s.WorkflowID)
+	s.AssertNoStagingForUser(s.sessionUserID())
 }
 
 // AssertHasStaging verifies the current user has workflow_staged_files rows.
 func (s *CanvasSteps) AssertHasStaging(_ uuid.UUID) {
-	userID := s.sessionUserID()
+	s.AssertHasStagingForUser(s.sessionUserID())
+}
+
+// AssertHasStagingForUser verifies a specific user has workflow_staged_files rows.
+func (s *CanvasSteps) AssertHasStagingForUser(userID uuid.UUID) {
 	hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
 	require.NoError(s.t, err)
-	require.True(s.t, hasStaging, "expected staging rows for workflow %s", s.WorkflowID)
+	require.True(s.t, hasStaging, "expected staging rows for user %s on workflow %s", userID, s.WorkflowID)
+}
+
+// AssertNoStagingForUser verifies a specific user has no workflow_staged_files rows.
+func (s *CanvasSteps) AssertNoStagingForUser(userID uuid.UUID) {
+	hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+	require.NoError(s.t, err)
+	require.False(s.t, hasStaging, "expected no staging rows for user %s on workflow %s", userID, s.WorkflowID)
+}
+
+// AssertStagingStaleForUser verifies staged files were created against an older live version.
+func (s *CanvasSteps) AssertStagingStaleForUser(userID uuid.UUID) {
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+	require.NoError(s.t, err)
+
+	rows, err := models.ListStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+	require.NoError(s.t, err)
+	require.NotEmpty(s.t, rows)
+
+	for _, row := range rows {
+		require.NotEqual(s.t, live.ID, row.BaseVersionID, "expected stale staging for user %s", userID)
+	}
+}
+
+// StagingContainsNodeForUser reports whether a user's staged canvas.yaml includes a node name.
+func (s *CanvasSteps) StagingContainsNodeForUser(userID uuid.UUID, nodeName string) bool {
+	rows, err := models.ListStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+	if err != nil {
+		return false
+	}
+	for _, row := range rows {
+		if row.Path == canvasYAMLRepositoryPath && strings.Contains(row.Content, nodeName) {
+			return true
+		}
+	}
+	return false
 }
 
 // FindDraftByDisplayName returns the live version (display names are no longer used).
@@ -368,6 +428,76 @@ func (s *CanvasSteps) AssertLiveCanvasHasNode(nodeName string) {
 			}
 		}
 		return false
+	}, 15*time.Second, 200*time.Millisecond)
+}
+
+// AssertLiveCanvasLacksNode verifies a node is absent from the materialized live canvas.
+func (s *CanvasSteps) AssertLiveCanvasLacksNode(nodeName string) {
+	require.Eventually(s.t, func() bool {
+		nodes, err := models.FindCanvasNodes(s.WorkflowID)
+		if err != nil {
+			return false
+		}
+		for _, node := range nodes {
+			if node.Name == nodeName {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, 200*time.Millisecond)
+}
+
+// LiveVersionID returns the current live workflow_versions row id.
+func (s *CanvasSteps) LiveVersionID() uuid.UUID {
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+	require.NoError(s.t, err)
+	return live.ID
+}
+
+// AssertLiveVersionHasNode verifies a node exists on the live version spec row.
+func (s *CanvasSteps) AssertLiveVersionHasNode(nodeName string) {
+	require.Eventually(s.t, func() bool {
+		live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+		if err != nil {
+			return false
+		}
+		for _, node := range live.Nodes {
+			if node.Name == nodeName {
+				return true
+			}
+		}
+		return false
+	}, 15*time.Second, 200*time.Millisecond)
+}
+
+// AssertLiveVersionLacksNode verifies a node is absent from the live version spec row.
+func (s *CanvasSteps) AssertLiveVersionLacksNode(nodeName string) {
+	require.Eventually(s.t, func() bool {
+		live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+		if err != nil {
+			return false
+		}
+		for _, node := range live.Nodes {
+			if node.Name == nodeName {
+				return false
+			}
+		}
+		return true
+	}, 10*time.Second, 200*time.Millisecond)
+}
+
+// AssertLiveVersionCommitMessage verifies the live version commit message.
+func (s *CanvasSteps) AssertLiveVersionCommitMessage(message string) {
+	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
+	require.NoError(s.t, err)
+	require.Equal(s.t, message, live.CommitMessage)
+}
+
+// AssertVersionCountAtLeast verifies the canvas has at least the expected number of versions.
+func (s *CanvasSteps) AssertVersionCountAtLeast(expected int) {
+	require.Eventually(s.t, func() bool {
+		versions, err := models.ListCanvasVersions(s.WorkflowID)
+		return err == nil && len(versions) >= expected
 	}, 15*time.Second, 200*time.Millisecond)
 }
 
