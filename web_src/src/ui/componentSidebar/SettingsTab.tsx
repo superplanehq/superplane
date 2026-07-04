@@ -54,8 +54,6 @@ interface SettingsTabProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
-  /** When `auto`, changes are debounced and persisted without an explicit Save control. */
-  configurationSaveMode?: "manual" | "auto";
 }
 
 function buildAutosaveSnapshot(
@@ -97,7 +95,6 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
-  configurationSaveMode = "manual",
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
@@ -316,20 +313,11 @@ export function SettingsTab({
     pendingAutosaveSnapshotRef.current = null;
   }, []);
 
-  const queuePendingAutosave = useCallback(
-    (snapshot: string) => {
-      if (configurationSaveMode === "auto") {
-        pendingAutosaveSnapshotRef.current = snapshot;
-      }
-    },
-    [configurationSaveMode],
-  );
+  const queuePendingAutosave = useCallback((snapshot: string) => {
+    pendingAutosaveSnapshotRef.current = snapshot;
+  }, []);
 
   const flushPendingAutosave = useCallback(() => {
-    if (configurationSaveMode !== "auto") {
-      return;
-    }
-
     const pendingSnapshot = pendingAutosaveSnapshotRef.current;
     if (!pendingSnapshot || pendingSnapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
@@ -340,7 +328,7 @@ export function SettingsTab({
     window.setTimeout(() => {
       void handleSaveRef.current();
     }, 0);
-  }, [configurationSaveMode]);
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (isReadOnly) {
@@ -348,14 +336,13 @@ export function SettingsTab({
     }
 
     const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
-    if (configurationSaveMode === "auto" && snapshot === autosaveBaselineSnapshotRef.current) {
+    if (snapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
       return;
     }
 
-    // Always run validation for UI feedback; only gate persistence in manual mode.
-    const isValid = validateNow();
-    if (currentNodeName.trim() === "" || (configurationSaveMode !== "auto" && !isValid)) {
+    validateNow();
+    if (currentNodeName.trim() === "") {
       return;
     }
 
@@ -383,7 +370,6 @@ export function SettingsTab({
     validateNow,
     currentNodeName,
     selectedIntegration,
-    configurationSaveMode,
     nodeConfiguration,
     onSave,
     queuePendingAutosave,
@@ -395,7 +381,7 @@ export function SettingsTab({
   handleSaveRef.current = handleSave;
 
   const requestAutosave = useCallback(() => {
-    if (configurationSaveMode !== "auto" || isReadOnly) {
+    if (isReadOnly) {
       return;
     }
 
@@ -406,21 +392,21 @@ export function SettingsTab({
       autosaveTimerRef.current = null;
       void handleSaveRef.current();
     }, 300);
-  }, [configurationSaveMode, isReadOnly]);
+  }, [isReadOnly]);
 
   // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
   useEffect(() => {
-    if (configurationSaveMode !== "auto") {
-      return;
-    }
     return () => {
+      if (isReadOnly) {
+        return;
+      }
       if (autosaveTimerRef.current !== null) {
         window.clearTimeout(autosaveTimerRef.current);
         autosaveTimerRef.current = null;
       }
       void handleSaveRef.current();
     };
-  }, [configurationSaveMode]);
+  }, [isReadOnly]);
 
   useEffect(() => {
     return () => {
@@ -431,7 +417,7 @@ export function SettingsTab({
   }, []);
 
   useEffect(() => {
-    if (configurationSaveMode !== "auto" || isReadOnly) {
+    if (isReadOnly) {
       return;
     }
     const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
@@ -450,7 +436,7 @@ export function SettingsTab({
     return () => {
       window.clearTimeout(fallbackTimer);
     };
-  }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
 
   const configurationDisplayModel = useMemo(
     () =>
@@ -491,9 +477,6 @@ export function SettingsTab({
       className="p-4 pb-24 overflow-y-auto overflow-x-hidden"
       style={{ maxHeight: "80vh" }}
       onBlurCapture={(event) => {
-        if (configurationSaveMode !== "auto") {
-          return;
-        }
         const target = event.target as HTMLElement | null;
         if (!target) {
           return;
