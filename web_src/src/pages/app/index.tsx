@@ -3516,7 +3516,13 @@ export function AppPage() {
 
   handleRemoteStagingUpdatedRef.current = async () => {
     const targetVersionId = effectiveLiveCanvasVersionId;
-    if (!targetVersionId || targetVersionId !== effectiveLiveCanvasVersionId) {
+    if (!targetVersionId || targetVersionId !== effectiveLiveCanvasVersionId || !canvasId) {
+      return;
+    }
+
+    const stagingSummary = queryClient.getQueryData<{ hasStaging?: boolean }>(canvasKeys.canvasStaging(canvasId));
+    // Commit/discard clears staging in the cache before the websocket echo arrives.
+    if (stagingSummary?.hasStaging === false) {
       return;
     }
 

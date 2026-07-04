@@ -362,6 +362,9 @@ func (s *CanvasSteps) CommitStaging() {
 		hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
 		return err == nil && !hasStaging
 	}, 30*time.Second, 200*time.Millisecond)
+
+	// Commit closes the edit session and returns to the live canvas view.
+	s.waitForEnabledEditButton()
 }
 
 // AssertNoStaging verifies the current user has no workflow_staged_files rows.

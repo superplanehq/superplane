@@ -23,7 +23,7 @@
 - Start API + Vite: `make dev.server` (after `make dev.up`) — UI at http://localhost:8000; use `make dev.server.fg` for foreground logs
 - One-shot backend tests: `make test` (Golang).
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
-- Targeted E2E tests: `make e2e E2E_TEST_PACKAGES=./test/e2e/workflows`
+- Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e` (or `make test.e2e FILE=test/e2e/foo_test.go LINE=19` for one test)
 - For E2E test authoring, see [docs/contributing/e2e-tests.md](docs/contributing/e2e-tests.md)
 - For performance profiling of the dev server, see [docs/contributing/profiling.md](docs/contributing/profiling.md)
 - After updating UI code, always run `make check.build.ui` to verify everything is correct

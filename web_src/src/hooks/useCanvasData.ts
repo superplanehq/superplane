@@ -1688,6 +1688,7 @@ export const useCommitCanvasStaging = (canvasId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (commitMessage: string) => {
+      registerLocalStagingWrite(canvasId);
       const response = await canvasesCommitCanvasStaging(
         withOrganizationHeader({
           path: { canvasId },
