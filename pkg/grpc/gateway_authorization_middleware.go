@@ -8,7 +8,7 @@ import (
 )
 
 func GatewayAuthorizationMiddleware(
-	mux *runtime.ServeMux,
+	muxPtr **runtime.ServeMux,
 	authorizer *authorization.GatewayAuthorizer,
 ) runtime.Middleware {
 	return func(next runtime.HandlerFunc) runtime.HandlerFunc {
@@ -21,6 +21,12 @@ func GatewayAuthorizationMiddleware(
 
 			ctx, err := authorizer.AuthorizeHTTP(r.Context(), r, route, pathParams)
 			if err != nil {
+				mux := *muxPtr
+				if mux == nil {
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+					return
+				}
+
 				_, outboundMarshaler := runtime.MarshalerForRequest(mux, r)
 				runtime.HTTPError(r.Context(), mux, outboundMarshaler, w, r, err)
 				return
