@@ -22,7 +22,8 @@ vi.mock("react-use-websocket", () => ({
 }));
 
 vi.mock("@/stores/nodeExecutionStore", () => ({
-  useNodeExecutionStore: () => nodeExecutionStoreMock,
+  useNodeExecutionStore: (selector?: (state: typeof nodeExecutionStoreMock) => unknown) =>
+    selector ? selector(nodeExecutionStoreMock) : nodeExecutionStoreMock,
 }));
 
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
