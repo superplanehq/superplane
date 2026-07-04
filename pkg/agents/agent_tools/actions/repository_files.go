@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -124,8 +125,10 @@ func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessio
 		return fileReadEntry{Path: path, Content: content, Source: "staging", VersionID: versionID}, nil
 	}
 
+	db := database.DB(ctx)
 	content, found, deleted, err := canvasRepository.ReadStagedRepositoryFile(
 		ctx,
+		db,
 		session.OrganizationID,
 		session.CanvasID,
 		path,

@@ -187,8 +187,7 @@ func requireLiveVersion(t *testing.T, canvasID uuid.UUID) models.CanvasVersion {
 func upsertUserStagingYAML(t *testing.T, canvas *models.Canvas, userID uuid.UUID, content string) {
 	t.Helper()
 	require.NotNil(t, canvas.LiveVersionID)
-	updatedBy := userID
-	_, err := models.UpsertWorkflowStagingPath(database.Conn(), canvas.ID, userID, *canvas.LiveVersionID, canvas.OrganizationID, canvasRepository.CanvasYAMLRepositoryPath, content, &updatedBy)
+	_, err := models.UpsertStagedFile(database.DB(t.Context()), canvas.ID, userID, *canvas.LiveVersionID, canvas.OrganizationID, canvasRepository.CanvasYAMLRepositoryPath, content)
 	require.NoError(t, err)
 }
 
@@ -512,7 +511,7 @@ func TestAppAgentTool_PatchStagingWithLiveVersionIDStagesChanges(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, liveVersion.ID.String(), update.VersionID)
 
-	hasStaging, err := models.HasWorkflowStagingForUser(database.Conn(), canvas.ID, r.User)
+	hasStaging, err := models.HasStagedFilesForUser(database.DB(t.Context()), canvas.ID, r.User)
 	require.NoError(t, err)
 	assert.True(t, hasStaging)
 }
@@ -554,7 +553,7 @@ func TestAppAgentTool_PatchStagingWithoutVersionIDSucceeds(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, liveVersion.ID.String(), update.VersionID)
 
-	hasStaging, err := models.HasWorkflowStagingForUser(database.Conn(), canvas.ID, r.User)
+	hasStaging, err := models.HasStagedFilesForUser(database.DB(t.Context()), canvas.ID, r.User)
 	require.NoError(t, err)
 	assert.True(t, hasStaging)
 }

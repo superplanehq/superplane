@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -192,19 +193,18 @@ func Test__CommitCanvasRepositoryFiles_RejectsDirectSpecCommitAndPreservesStagin
 	liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 	require.NoError(t, err)
 
-	_, err = models.UpsertWorkflowStagingPath(
-		nil,
+	_, err = models.UpsertStagedFile(
+		database.DB(t.Context()),
 		canvas.ID,
 		r.User,
 		liveVersion.ID,
 		r.Organization.ID,
 		ConsoleYAMLRepositoryPath,
 		"stale staged content",
-		&r.User,
 	)
 	require.NoError(t, err)
 
-	hasStaging, err := models.HasWorkflowStagingForUser(nil, canvas.ID, r.User)
+	hasStaging, err := models.HasStagedFilesForUser(database.DB(t.Context()), canvas.ID, r.User)
 	require.NoError(t, err)
 	require.True(t, hasStaging)
 
@@ -238,7 +238,7 @@ spec:
 	assert.Equal(t, codes.FailedPrecondition, code)
 	assert.Contains(t, msg, "direct version updates are not supported")
 
-	hasStaging, err = models.HasWorkflowStagingForUser(nil, canvas.ID, r.User)
+	hasStaging, err = models.HasStagedFilesForUser(database.DB(t.Context()), canvas.ID, r.User)
 	require.NoError(t, err)
 	assert.True(t, hasStaging, "direct spec commit should leave staged changes intact")
 }

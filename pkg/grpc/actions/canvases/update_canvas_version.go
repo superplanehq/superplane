@@ -147,7 +147,7 @@ func UpdateCanvasVersionWithUsage(
 		}
 
 		if discardStaging {
-			return models.DiscardWorkflowStagingForUserInTransaction(tx, canvas.ID, userUUID, nil)
+			return models.DiscardStagedFilesForUser(tx, canvas.ID, userUUID, nil)
 		}
 
 		return nil
@@ -160,8 +160,8 @@ func UpdateCanvasVersionWithUsage(
 		return nil, grpcerrors.Internal(err, "failed to update canvas version")
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
+	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), organizationID).PublishUpdated(); err != nil {
+		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
 
 	return version, nil

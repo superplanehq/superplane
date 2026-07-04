@@ -60,7 +60,7 @@ async function commitUpdatedCanvasVersionYaml(params: {
     spec: params.updatedVersion.spec,
   });
 
-  registerLocalStagingWrite(params.canvasId, params.versionId);
+  registerLocalStagingWrite(params.canvasId);
   await canvasesPutCanvasStaging(
     withOrganizationHeader({
       path: { canvasId: params.canvasId },

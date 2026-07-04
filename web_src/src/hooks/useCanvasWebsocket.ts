@@ -21,23 +21,10 @@ const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "w
 
 type CanvasWebsocketPayload = {
   canvasId: string;
-  versionId?: string;
+  userId?: string;
 };
 
-type RepositoryBranchUpdatedPayload = {
-  canvasId: string;
-  branch?: string;
-  headSha?: string;
-  materializationStatus?: string;
-  materializationError?: string;
-};
-
-type CanvasLifecycleEventName =
-  | "canvas_updated"
-  | "canvas_version_updated"
-  | "canvas_version_deleted"
-  | "canvas_deleted"
-  | "repository_branch_updated";
+type CanvasLifecycleEventName = "canvas_updated" | "canvas_deleted";
 
 type CanvasStagingEventName = "staging_updated";
 
@@ -101,6 +88,7 @@ export function useCanvasWebsocket(
   processRuntimeEvents = true,
   enabled = true,
   onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void,
+  getStagingVersionId?: () => string | undefined,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
   const queryClient = useQueryClient();
@@ -111,17 +99,8 @@ export function useCanvasWebsocket(
 
   const handleCanvasLifecycleEvent = useCallback(
     (eventName: CanvasLifecycleEventName, payload: WebsocketPayload) => {
-      // Canvas structure changed from another actor (e.g. CLI), refresh cache.
-      const canvasMessage = payload as Partial<CanvasWebsocketPayload & RepositoryBranchUpdatedPayload>;
+      const canvasMessage = payload as Partial<CanvasWebsocketPayload>;
       if (!canvasMessage.canvasId || canvasMessage.canvasId !== canvasId) {
-        return;
-      }
-
-      if (eventName === "canvas_version_updated" && !canvasMessage.versionId) {
-        return;
-      }
-
-      if (eventName === "canvas_version_deleted" && !canvasMessage.versionId) {
         return;
       }
 
@@ -138,21 +117,7 @@ export function useCanvasWebsocket(
       }
 
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-
-      if (eventName === "repository_branch_updated") {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-        return;
-      }
-
-      if (eventName === "canvas_version_updated") {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
-        return;
-      }
-
-      if (eventName === "canvas_version_deleted") {
-        return;
-      }
+      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
 
       if (!shouldApplyCanvasUpdate?.()) {
         return;
@@ -232,12 +197,7 @@ export function useCanvasWebsocket(
   const processMessage = useCallback(
     (data: QueuedMessage["data"]) => {
       const payload = data.payload;
-      const isCanvasLifecycleEvent =
-        data.event === "canvas_updated" ||
-        data.event === "canvas_version_updated" ||
-        data.event === "canvas_version_deleted" ||
-        data.event === "canvas_deleted" ||
-        data.event === "repository_branch_updated";
+      const isCanvasLifecycleEvent = data.event === "canvas_updated" || data.event === "canvas_deleted";
       // Staging events fire while editing a draft (not the live version), so they
       // must bypass the runtime-event gate that is disabled outside the live view.
       const isCanvasStagingEvent = data.event === "staging_updated";
@@ -312,16 +272,10 @@ export function useCanvasWebsocket(
           break;
         }
         case "canvas_updated":
-        case "canvas_version_updated":
-        case "canvas_version_deleted":
         case "canvas_deleted":
-        case "repository_branch_updated":
           handleCanvasLifecycleEvent(data.event as CanvasLifecycleEventName, payload);
           break;
         case "staging_updated": {
-          // A draft's staging layer changed in another tab (or this one). Refresh
-          // the staged caches so the diff badge, console and files tabs reflect
-          // the uncommitted changes.
           const stagingMessage = payload as Partial<CanvasWebsocketPayload>;
           if (!stagingMessage.canvasId || stagingMessage.canvasId !== canvasId) {
             break;
@@ -330,8 +284,9 @@ export function useCanvasWebsocket(
           const shouldInvalidateStagingQueries =
             onCanvasStagingEvent?.(stagingMessage as CanvasWebsocketPayload, "staging_updated") !== false;
           if (shouldInvalidateStagingQueries) {
-            if (stagingMessage.versionId) {
-              invalidateStagedCanvasQueries(queryClient, canvasId, stagingMessage.versionId);
+            const stagingVersionId = getStagingVersionId?.();
+            if (stagingVersionId) {
+              invalidateStagedCanvasQueries(queryClient, canvasId, stagingVersionId);
             } else {
               queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
               queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
@@ -367,6 +322,7 @@ export function useCanvasWebsocket(
       patchExecutionInCache,
       invalidateMemoryEntries,
       invalidateRuns,
+      getStagingVersionId,
     ],
   );
 

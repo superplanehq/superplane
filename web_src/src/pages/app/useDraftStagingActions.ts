@@ -46,7 +46,7 @@ type UseDraftStagingActionsOptions = {
   cancelPendingCanvasSaves?: () => void;
   onCanvasDraftRestoredToCommitted?: (version: CanvasesCanvasVersion) => void;
   onCommittedVersionId?: (versionId: string) => void;
-  registerIgnoredCanvasVersionUpdatedEcho?: (versionId?: string) => () => void;
+  registerIgnoredCanvasUpdatedEcho?: () => () => void;
 };
 
 export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
@@ -68,7 +68,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     cancelPendingCanvasSaves,
     onCanvasDraftRestoredToCommitted,
     onCommittedVersionId,
-    registerIgnoredCanvasVersionUpdatedEcho,
+    registerIgnoredCanvasUpdatedEcho,
   } = options;
   const queryClient = useQueryClient();
   const [commitStagingPending, setCommitStagingPending] = useState(false);
@@ -101,7 +101,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
             setStagingResetNonce,
             ensureVersionActionDraftReady,
             flushRepositoryFileStaging,
-            registerIgnoredCanvasVersionUpdatedEcho,
+            registerIgnoredCanvasUpdatedEcho,
             onCommittedVersionId,
           });
           if (committed) {
@@ -124,7 +124,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
       onCommittedVersionId,
       organizationId,
       queryClient,
-      registerIgnoredCanvasVersionUpdatedEcho,
+      registerIgnoredCanvasUpdatedEcho,
       setDraftCanvasSpec,
       setIsPreparingVersionAction,
       setStagingResetNonce,

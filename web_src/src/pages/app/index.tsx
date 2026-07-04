@@ -58,6 +58,7 @@ import { analytics } from "@/lib/analytics";
 import { appPath } from "@/lib/appPaths";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
+import { setCanvasStagingEchoUserId } from "@/lib/canvasStagingEcho";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -262,6 +263,9 @@ export function AppPage() {
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
+  useEffect(() => {
+    setCanvasStagingEchoUserId(currentUserId);
+  }, [currentUserId]);
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
   // True while the user is in an edit session. The session keeps the versions
@@ -634,22 +638,14 @@ export function AppPage() {
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const consoleMutationGenerationRef = useRef(0);
-  const handleRemoteStagingUpdatedRef = useRef<(versionId?: string) => Promise<void>>(async () => {});
+  const handleRemoteStagingUpdatedRef = useRef<() => Promise<void>>(async () => {});
   const enterLiveEditSessionInFlightRef = useRef<Promise<boolean> | null>(null);
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
-  const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
-  const {
-    registerIgnoredCanvasUpdatedEcho,
-    registerIgnoredCanvasVersionUpdatedEcho,
-    consumeIgnoredCanvasUpdatedEcho,
-    consumeIgnoredCanvasVersionUpdatedEcho,
-    consumeIgnoredCreateDraftEcho,
-    resetLifecycleEchoGuards,
-  } = useCanvasEchoReleaseGuards({
-    canvasSaveSessionRef,
-    ignoredCanvasUpdatedEchoReleasesRef,
-    ignoredCanvasVersionUpdatedEchoReleasesRef,
-  });
+  const { registerIgnoredCanvasUpdatedEcho, consumeIgnoredCanvasUpdatedEcho, resetLifecycleEchoGuards } =
+    useCanvasEchoReleaseGuards({
+      canvasSaveSessionRef,
+      ignoredCanvasUpdatedEchoReleasesRef,
+    });
   const setLastSavedWorkflowSnapshot = useCallback((workflow: CanvasesCanvas | null) => {
     if (!workflow) {
       lastSavedWorkflowSignatureRef.current = "";
@@ -972,7 +968,6 @@ export function AppPage() {
     stagingResetNonce,
     draftSpecToRender,
     canvas,
-    registerIgnoredCanvasVersionUpdatedEcho,
     getConsoleMutationGeneration: () => consoleMutationGenerationRef.current,
   });
 
@@ -1056,8 +1051,6 @@ export function AppPage() {
         return;
       }
 
-      const expectedVersionId = request.savingVersionId || liveCanvasVersionId || undefined;
-      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(expectedVersionId);
       const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
 
       try {
@@ -1089,14 +1082,12 @@ export function AppPage() {
         });
       } catch (error) {
         releaseCanvasUpdatedEcho();
-        releaseCanvasVersionUpdatedEcho();
         request.reject(error);
       }
     },
     [
       liveCanvasVersionId,
       registerIgnoredCanvasUpdatedEcho,
-      registerIgnoredCanvasVersionUpdatedEcho,
       saveMatchesCurrentCanvas,
       syncCurrentCanvasWithSavedVersion,
       updateCanvasVersionMutation,
@@ -1697,18 +1688,16 @@ export function AppPage() {
   const { handleCanvasLifecycleEvent, shouldApplyCanvasUpdate, handleCanvasStagingEvent } =
     useCanvasLifecycleEventHandlers({
       canvasId,
+      currentUserId,
       activeCanvasVersionId,
-      isEditing,
       editSessionActive,
       hasLocalSaveActivity,
       isViewingLiveVersion,
       canvasDeletedRemotely,
       consumeIgnoredCanvasUpdatedEcho,
-      consumeIgnoredCreateDraftEcho,
-      consumeIgnoredCanvasVersionUpdatedEcho,
       resyncDraftToCommitted,
-      onRemoteStagingUpdated: (versionId) => {
-        void handleRemoteStagingUpdatedRef.current(versionId);
+      onRemoteStagingUpdated: () => {
+        void handleRemoteStagingUpdatedRef.current();
       },
       setCanvasDeletedRemotely,
       setRemoteCanvasUpdatePending,
@@ -1725,6 +1714,7 @@ export function AppPage() {
     isViewingLiveVersion,
     true,
     handleCanvasStagingEvent,
+    () => activeCanvasVersionId || effectiveLiveCanvasVersionId || undefined,
   );
 
   const rawLogNodes = canvasNodes;
@@ -3270,7 +3260,7 @@ export function AppPage() {
       cancelPendingCanvasSaves,
       onCanvasDraftRestoredToCommitted: handleCanvasDraftRestoredToCommitted,
       onCommittedVersionId: handleCommittedVersionId,
-      registerIgnoredCanvasVersionUpdatedEcho,
+      registerIgnoredCanvasUpdatedEcho,
     },
   );
 
@@ -3316,7 +3306,7 @@ export function AppPage() {
           setStagingResetNonce,
           ensureVersionActionDraftReady,
           flushRepositoryFileStaging,
-          registerIgnoredCanvasVersionUpdatedEcho,
+          registerIgnoredCanvasUpdatedEcho,
           onCommittedVersionId: handleCommittedVersionId,
         });
       } catch (error) {
@@ -3334,7 +3324,7 @@ export function AppPage() {
       ensureVersionActionDraftReady,
       flushRepositoryFileStaging,
       handleCommittedVersionId,
-      registerIgnoredCanvasVersionUpdatedEcho,
+      registerIgnoredCanvasUpdatedEcho,
     ],
   );
 
@@ -3525,8 +3515,8 @@ export function AppPage() {
     resyncDraftToStaged,
   ]);
 
-  handleRemoteStagingUpdatedRef.current = async (versionId?: string) => {
-    const targetVersionId = versionId || effectiveLiveCanvasVersionId;
+  handleRemoteStagingUpdatedRef.current = async () => {
+    const targetVersionId = effectiveLiveCanvasVersionId;
     if (!targetVersionId || targetVersionId !== effectiveLiveCanvasVersionId) {
       return;
     }
@@ -4284,7 +4274,7 @@ export function AppPage() {
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunInspectionMode ? runsViewportRef : viewportRef}
-          fitViewContentKey={`${canvasId}:${resolveFitViewVersionId({ liveCanvasVersionId, activeCanvasVersionId, isViewingDraftVersion, draftSpec: draftSpecToRender, selectedVersion: selectedCanvasVersion })}`}
+          fitViewContentKey={`${canvasId}:${resolveFitViewVersionId({ liveCanvasVersionId, activeCanvasVersionId, isViewingDraftVersion: isEditing, draftSpec: draftSpecToRender, selectedVersion: selectedCanvasVersion })}`}
           lastFittedContentKeyRef={lastFittedContentKeyRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           fitAllFocusNodeIds={

@@ -14,7 +14,6 @@ type UseAppDraftStagingDataOptions = {
   stagingResetNonce: number;
   draftSpecToRender: CanvasesCanvas["spec"] | null | undefined;
   canvas: CanvasesCanvas | null | undefined;
-  registerIgnoredCanvasVersionUpdatedEcho: (savingVersionId?: string) => () => void;
   getConsoleMutationGeneration: () => number;
 };
 
@@ -27,7 +26,6 @@ export function useAppDraftStagingData({
   stagingResetNonce,
   draftSpecToRender,
   canvas,
-  registerIgnoredCanvasVersionUpdatedEcho,
   getConsoleMutationGeneration,
 }: UseAppDraftStagingDataOptions) {
   const canvasStagingQuery = useCanvasStaging(canvasId, hasEditableVersion);
@@ -51,7 +49,6 @@ export function useAppDraftStagingData({
     suppressUnpublishedDraftDiscard: true,
     enabled: true,
     stageActiveConsole: hasEditableVersion,
-    registerIgnoredCanvasVersionUpdatedEcho,
     getConsoleMutationGeneration,
   });
   const { consoleQuery, updateConsoleMutation, draftChangeIndicators } = canvasConsoleVersionDiff;

@@ -13,6 +13,7 @@ const {
   canvasesDeleteCanvasStaging,
   canvasesDescribeCanvasVersion,
   canvasesListCanvasVersions,
+  canvasesGetCanvasStaging,
 } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
   canvasesListRuns: vi.fn(),
@@ -22,6 +23,7 @@ const {
   canvasesDeleteCanvasStaging: vi.fn(),
   canvasesDescribeCanvasVersion: vi.fn(),
   canvasesListCanvasVersions: vi.fn(),
+  canvasesGetCanvasStaging: vi.fn(),
 }));
 
 vi.mock("../api-client/sdk.gen", async (importOriginal) => {
@@ -36,6 +38,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     canvasesDeleteCanvasStaging,
     canvasesDescribeCanvasVersion,
     canvasesListCanvasVersions,
+    canvasesGetCanvasStaging,
   };
 });
 
@@ -385,9 +388,8 @@ describe("useUpdateCanvasConsole", () => {
     vi.unstubAllGlobals();
   });
 
-  it("registers a canvas version websocket echo before saving dashboard changes", async () => {
+  it("stages dashboard changes through the canvas staging API", async () => {
     const queryClient = createQueryClient();
-    const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => vi.fn());
     canvasesPutCanvasStaging.mockResolvedValue({ data: {} });
     canvasesCommitCanvasStaging.mockResolvedValue({ data: {} });
     canvasesDeleteCanvasStaging.mockResolvedValue({
@@ -396,48 +398,36 @@ describe("useUpdateCanvasConsole", () => {
     canvasesDescribeCanvasVersion.mockResolvedValue({
       data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
     });
+    canvasesGetCanvasStaging.mockResolvedValue({
+      data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
+    });
     mockConsoleRepositoryFileFetch(emptyConsoleYaml);
 
-    const { result } = renderHook(
-      () =>
-        useUpdateCanvasConsole("canvas-1", "version-1", {
-          registerIgnoredCanvasVersionUpdatedEcho,
-        }),
-      { wrapper: createWrapper(queryClient) },
-    );
+    const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
+      wrapper: createWrapper(queryClient),
+    });
 
     await result.current.mutateAsync({ panels: [], layout: [] });
 
-    expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
     expect(canvasesDeleteCanvasStaging).toHaveBeenCalledOnce();
     expect(canvasesDeleteCanvasStaging).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { canvasId: "canvas-1" },
-        body: { paths: ["console.yaml"] },
+        query: { paths: ["console.yaml"] },
       }),
     );
-    // Console edits stage only; committing into the version row is an explicit action.
     expect(canvasesCommitCanvasStaging).not.toHaveBeenCalled();
   });
 
-  it("releases the ignored canvas version echo when dashboard save fails", async () => {
+  it("surfaces dashboard save failures", async () => {
     const queryClient = createQueryClient();
-    const releaseCanvasVersionUpdatedEcho = vi.fn();
-    const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => releaseCanvasVersionUpdatedEcho);
     canvasesPutCanvasStaging.mockRejectedValue(new Error("request failed"));
 
-    const { result } = renderHook(
-      () =>
-        useUpdateCanvasConsole("canvas-1", "version-1", {
-          registerIgnoredCanvasVersionUpdatedEcho,
-        }),
-      { wrapper: createWrapper(queryClient) },
-    );
+    const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
+      wrapper: createWrapper(queryClient),
+    });
 
     await expect(result.current.mutateAsync({ panels: [], layout: [] })).rejects.toThrow("request failed");
-
-    expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
-    expect(releaseCanvasVersionUpdatedEcho).toHaveBeenCalledOnce();
   });
 
   it("optimistically updates the dashboard cache while console changes are saving", async () => {

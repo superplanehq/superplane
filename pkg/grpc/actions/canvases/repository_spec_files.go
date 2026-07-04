@@ -4,19 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
-	"sort"
-	"strings"
 )
 
 const (
@@ -88,6 +89,7 @@ func readRepositorySpecFile(
 	path string,
 	stage bool,
 ) (string, error) {
+	db := database.DB(ctx)
 	canvas, version, err := loadRepositorySpecVersionForRead(ctx, organizationID, canvasID, versionID)
 	if err != nil {
 		return "", err
@@ -99,7 +101,7 @@ func readRepositorySpecFile(
 	}
 
 	if stage {
-		return ReadStagedRepositorySpecFile(ctx, organizationID, canvasID, version, normalized)
+		return ReadStagedRepositorySpecFile(ctx, db, organizationID, canvasID, version, normalized)
 	}
 
 	switch normalized {

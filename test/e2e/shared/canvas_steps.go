@@ -228,7 +228,7 @@ func (s *CanvasSteps) waitForEnabledExitEditButton() {
 func (s *CanvasSteps) WaitForStaging(_ uuid.UUID) {
 	userID := s.sessionUserID()
 	require.Eventually(s.t, func() bool {
-		hasStaging, err := models.HasWorkflowStagingForUser(database.Conn(), s.WorkflowID, userID)
+		hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
 		return err == nil && hasStaging
 	}, 15*time.Second, 200*time.Millisecond)
 }
@@ -247,7 +247,7 @@ const canvasYAMLRepositoryPath = "canvas.yaml"
 // otherwise from the live version row.
 func (s *CanvasSteps) DraftEffectiveSpec() ([]models.Node, []models.Edge) {
 	userID := s.sessionUserID()
-	rows, err := models.ListWorkflowStagingForUser(database.Conn(), s.WorkflowID, userID)
+	rows, err := models.ListStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
 	require.NoError(s.t, err)
 
 	for _, row := range rows {
@@ -303,7 +303,7 @@ func (s *CanvasSteps) CommitStaging() {
 
 	userID := s.sessionUserID()
 	require.Eventually(s.t, func() bool {
-		hasStaging, err := models.HasWorkflowStagingForUser(database.Conn(), s.WorkflowID, userID)
+		hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
 		return err == nil && !hasStaging
 	}, 30*time.Second, 200*time.Millisecond)
 }
@@ -311,7 +311,7 @@ func (s *CanvasSteps) CommitStaging() {
 // AssertNoStaging verifies the current user has no workflow_staged_files rows.
 func (s *CanvasSteps) AssertNoStaging(_ uuid.UUID) {
 	userID := s.sessionUserID()
-	hasStaging, err := models.HasWorkflowStagingForUser(database.Conn(), s.WorkflowID, userID)
+	hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
 	require.NoError(s.t, err)
 	require.False(s.t, hasStaging, "expected no staging rows for workflow %s", s.WorkflowID)
 }
@@ -319,7 +319,7 @@ func (s *CanvasSteps) AssertNoStaging(_ uuid.UUID) {
 // AssertHasStaging verifies the current user has workflow_staged_files rows.
 func (s *CanvasSteps) AssertHasStaging(_ uuid.UUID) {
 	userID := s.sessionUserID()
-	hasStaging, err := models.HasWorkflowStagingForUser(database.Conn(), s.WorkflowID, userID)
+	hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
 	require.NoError(s.t, err)
 	require.True(s.t, hasStaging, "expected staging rows for workflow %s", s.WorkflowID)
 }
@@ -789,7 +789,7 @@ func (s *CanvasSteps) nodeIDFromCanvasDOM(nodeName string) string {
 }
 
 func (s *CanvasSteps) userStagingYAMLContainsNodeName(nodeName string) bool {
-	rows, err := models.ListWorkflowStagingForUser(database.Conn(), s.WorkflowID, s.sessionUserID())
+	rows, err := models.ListStagedFilesForUser(database.DB(s.t.Context()), s.WorkflowID, s.sessionUserID())
 	if err != nil {
 		return false
 	}

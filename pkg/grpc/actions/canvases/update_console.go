@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
@@ -81,7 +81,7 @@ func UpdateConsole(
 		newVersion = v
 
 		if discardStaging {
-			return models.DiscardWorkflowStagingForUserInTransaction(tx, canvas.ID, userUUID, nil)
+			return models.DiscardStagedFilesForUser(tx, canvas.ID, userUUID, nil)
 		}
 
 		return nil
@@ -95,8 +95,8 @@ func UpdateConsole(
 		return nil, grpcerrors.Internal(err, "failed to update console")
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), newVersion.ID.String()).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas version update RabbitMQ message: %v", err)
+	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), organizationID).PublishUpdated(); err != nil {
+		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
 
 	return newVersion, nil

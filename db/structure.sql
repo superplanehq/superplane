@@ -641,12 +641,11 @@ CREATE TABLE public.workflow_runs (
 
 CREATE TABLE public.workflow_staged_files (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    version_id uuid NOT NULL,
+    base_version_id uuid NOT NULL,
     organization_id uuid NOT NULL,
     path text NOT NULL,
     content text DEFAULT ''::text NOT NULL,
     deleted boolean DEFAULT false NOT NULL,
-    updated_by uuid,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     user_id uuid NOT NULL,
     workflow_id uuid NOT NULL
@@ -1515,13 +1514,6 @@ CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btre
 
 
 --
--- Name: idx_workflow_staged_files_version_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_staged_files_version_id ON public.workflow_staged_files USING btree (version_id);
-
-
---
 -- Name: idx_workflow_staged_files_workflow_user; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1976,14 +1968,6 @@ ALTER TABLE ONLY public.workflow_staged_files
 
 
 --
--- Name: workflow_staged_files workflow_staged_files_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staged_files_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
-
-
---
 -- Name: workflow_staged_files workflow_staged_files_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1996,7 +1980,7 @@ ALTER TABLE ONLY public.workflow_staged_files
 --
 
 ALTER TABLE ONLY public.workflow_staged_files
-    ADD CONSTRAINT workflow_staged_files_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_staged_files_version_id_fkey FOREIGN KEY (base_version_id) REFERENCES public.workflow_versions(id) ON DELETE CASCADE;
 
 
 --

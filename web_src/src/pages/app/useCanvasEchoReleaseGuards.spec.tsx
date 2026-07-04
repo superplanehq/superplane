@@ -7,13 +7,11 @@ import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 function renderEchoGuards() {
   const canvasSaveSessionRef = { current: 1 };
   const ignoredCanvasUpdatedEchoReleasesRef = { current: [] as CanvasEchoRelease[] };
-  const ignoredCanvasVersionUpdatedEchoReleasesRef = { current: new Map<string, CanvasEchoRelease[]>() };
 
   const hook = renderHook(() =>
     useCanvasEchoReleaseGuards({
       canvasSaveSessionRef,
       ignoredCanvasUpdatedEchoReleasesRef,
-      ignoredCanvasVersionUpdatedEchoReleasesRef,
     }),
   );
 
@@ -21,66 +19,21 @@ function renderEchoGuards() {
     ...hook,
     canvasSaveSessionRef,
     ignoredCanvasUpdatedEchoReleasesRef,
-    ignoredCanvasVersionUpdatedEchoReleasesRef,
   };
 }
 
 describe("useCanvasEchoReleaseGuards", () => {
-  it("consumes a registered canvas_version_updated echo for the matching version", () => {
+  it("consumes a registered canvas_updated echo once", () => {
     vi.useFakeTimers();
 
     const { result } = renderEchoGuards();
 
     act(() => {
-      result.current.registerIgnoredCanvasVersionUpdatedEcho("draft-version-1");
+      result.current.registerIgnoredCanvasUpdatedEcho();
     });
 
-    expect(result.current.consumeIgnoredCanvasVersionUpdatedEcho("draft-version-1")).toBe(true);
-    expect(result.current.consumeIgnoredCanvasVersionUpdatedEcho("draft-version-1")).toBe(false);
-
-    vi.useRealTimers();
-  });
-
-  it("consumes a create-draft echo only for the armed version", () => {
-    vi.useFakeTimers();
-
-    const { result } = renderEchoGuards();
-
-    let release: (() => void) | undefined;
-    act(() => {
-      release = result.current.registerIgnoredCreateDraftEcho("canvas-1");
-      result.current.armIgnoredCreateDraftEcho("canvas-1", "draft-version-1", release!);
-    });
-
-    expect(result.current.consumeIgnoredCreateDraftEcho("canvas-1", "other-version")).toBe(false);
-    expect(result.current.consumeIgnoredCreateDraftEcho("canvas-1", "draft-version-1")).toBe(true);
-    expect(result.current.consumeIgnoredCreateDraftEcho("canvas-1", "draft-version-1")).toBe(false);
-
-    vi.useRealTimers();
-  });
-
-  it("clears both create-draft and version echoes when both were registered for one create", () => {
-    vi.useFakeTimers();
-
-    const { result } = renderEchoGuards();
-
-    let release: (() => void) | undefined;
-    act(() => {
-      release = result.current.registerIgnoredCreateDraftEcho("canvas-1");
-      result.current.armIgnoredCreateDraftEcho("canvas-1", "draft-version-1", release!);
-      result.current.registerIgnoredCanvasVersionUpdatedEcho("draft-version-1");
-    });
-
-    let consumedCreateDraftEcho = false;
-    let consumedVersionEcho = false;
-    act(() => {
-      consumedCreateDraftEcho = result.current.consumeIgnoredCreateDraftEcho("canvas-1", "draft-version-1");
-      consumedVersionEcho = result.current.consumeIgnoredCanvasVersionUpdatedEcho("draft-version-1");
-    });
-
-    expect(consumedCreateDraftEcho).toBe(true);
-    expect(consumedVersionEcho).toBe(true);
-    expect(result.current.consumeIgnoredCanvasVersionUpdatedEcho("draft-version-1")).toBe(false);
+    expect(result.current.consumeIgnoredCanvasUpdatedEcho()).toBe(true);
+    expect(result.current.consumeIgnoredCanvasUpdatedEcho()).toBe(false);
 
     vi.useRealTimers();
   });

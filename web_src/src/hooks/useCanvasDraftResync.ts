@@ -87,11 +87,9 @@ export function useCanvasDraftResync(options: UseCanvasDraftResyncOptions): Canv
     ],
   );
 
-  // A remote `canvas_version_updated` (e.g. a CLI `apps canvas update`) commits
-  // canvas.yaml into the version row and discards the draft's staging. Refresh
-  // the committed/staged caches and clear the staging indicators so the UI does
-  // not keep showing stale "uncommitted changes" for content that no longer has
-  // any staging on the server.
+  // A remote `canvas_updated` (e.g. a CLI commit) updates the live canvas and
+  // clears staging. Refresh the committed/staged caches and clear the staging
+  // indicators so the UI does not keep showing stale "uncommitted changes".
   const resyncDraftToCommitted = useCallback(
     async (versionId: string) => {
       if (!organizationId || !canvasId) {

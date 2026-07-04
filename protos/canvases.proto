@@ -536,8 +536,8 @@ message DescribeCanvasVersionResponse {
 // StagingSummary reports the uncommitted spec edits held in workflow_staged_files for the current user.
 message StagingSummary {
   bool has_staging = 1;
-  repeated string staged_paths = 2;
-  optional string base_version_id = 3;
+  string base_version_id = 2;
+  repeated string staged_paths = 3;
   bool stale = 4;
 }
 
@@ -958,22 +958,10 @@ message CanvasVersionMessage {
   google.protobuf.Timestamp timestamp = 3;
 }
 
-enum MaterializationStatus {
-  MATERIALIZATION_STATUS_UNSPECIFIED = 0;
-  MATERIALIZATION_STATUS_PENDING = 1;
-  MATERIALIZATION_STATUS_READY = 2;
-  MATERIALIZATION_STATUS_ERROR = 3;
-  MATERIALIZATION_STATUS_DELETED = 4;
-}
-
-message RepositoryBranchUpdatedMessage {
+message CanvasStagingMessage {
   string canvas_id = 1;
-  string branch = 2;
-  string head_sha = 3;
-  MaterializationStatus materialization_status = 4;
-  string materialization_error = 5;
-  google.protobuf.Timestamp timestamp = 6;
-  string pushed_by_user_id = 7;
+  string user_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
 }
 
 message Console {

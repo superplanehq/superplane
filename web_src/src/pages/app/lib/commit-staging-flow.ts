@@ -22,7 +22,7 @@ export async function executeCommitStaging({
   setStagingResetNonce,
   ensureVersionActionDraftReady,
   flushRepositoryFileStaging,
-  registerIgnoredCanvasVersionUpdatedEcho,
+  registerIgnoredCanvasUpdatedEcho,
   onCommittedVersionId,
 }: {
   organizationId?: string;
@@ -37,7 +37,7 @@ export async function executeCommitStaging({
   setStagingResetNonce: Dispatch<SetStateAction<number>>;
   ensureVersionActionDraftReady: (errorMessage: string) => Promise<boolean>;
   flushRepositoryFileStaging?: () => Promise<void>;
-  registerIgnoredCanvasVersionUpdatedEcho?: (versionId?: string) => () => void;
+  registerIgnoredCanvasUpdatedEcho?: () => () => void;
   onCommittedVersionId?: (versionId: string) => void;
 }): Promise<boolean> {
   await flushRepositoryFileStaging?.();
@@ -47,13 +47,13 @@ export async function executeCommitStaging({
   }
 
   consoleMutationGenerationRef.current += 1;
-  const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho?.(activeCanvasVersionId);
+  const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho?.();
   let committedVersionId = activeCanvasVersionId;
   try {
     const response = await commitCanvasStagingMutation.mutateAsync(commitMessage);
     committedVersionId = response?.version?.metadata?.id || activeCanvasVersionId;
   } catch (error) {
-    releaseCanvasVersionUpdatedEcho?.();
+    releaseCanvasUpdatedEcho?.();
     throw error;
   }
 
