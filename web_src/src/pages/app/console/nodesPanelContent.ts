@@ -9,6 +9,8 @@
  * `pkg/models/canvas_dashboard_yml.go`.
  */
 
+import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
+
 /**
  * One entry in a {@link NodesPanelContent} list. The minimum required field
  * is `node` (canvas node id or name); the optional `label` overrides the
@@ -26,6 +28,12 @@ export interface NodesPanelNode {
   showRun?: boolean;
   /** Optional override for the trigger template name (for nodes with multiple triggers). */
   triggerName?: string;
+  /**
+   * When true, clicking Run always opens the confirm dialog — even for
+   * templates with no input fields. When false (default), a parameter-less
+   * template fires immediately; templates with input fields always prompt.
+   */
+  promptConfirmation?: boolean;
 }
 
 export interface NodesPanelContent {
@@ -66,22 +74,12 @@ function validateNodesEntry(raw: unknown, index: number): string | null {
   if (typeof entry.node !== "string" || entry.node.trim() === "") {
     return `content.nodes[${index}].node must be a non-empty string (canvas node id or name).`;
   }
-  if (entry.label !== undefined && entry.label !== null && typeof entry.label !== "string") {
-    return `content.nodes[${index}].label must be a string.`;
-  }
-  if (entry.description !== undefined && entry.description !== null && typeof entry.description !== "string") {
-    return `content.nodes[${index}].description must be a string.`;
-  }
-  if (entry.showRun !== undefined && typeof entry.showRun !== "boolean") {
-    return `content.nodes[${index}].showRun must be a boolean.`;
-  }
-  if (entry.triggerName !== undefined && entry.triggerName !== null && typeof entry.triggerName !== "string") {
-    return `content.nodes[${index}].triggerName must be a string.`;
-  }
-  return null;
-}
-
-function asObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
+  const prefix = `content.nodes[${index}]`;
+  return (
+    optionalStringError(`${prefix}.label`, entry.label) ??
+    optionalStringError(`${prefix}.description`, entry.description) ??
+    optionalBooleanError(`${prefix}.showRun`, entry.showRun) ??
+    optionalStringError(`${prefix}.triggerName`, entry.triggerName) ??
+    optionalBooleanError(`${prefix}.promptConfirmation`, entry.promptConfirmation)
+  );
 }

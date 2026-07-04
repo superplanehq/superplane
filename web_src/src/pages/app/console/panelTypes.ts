@@ -28,9 +28,14 @@ import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent
 import { validateNumberDataSource } from "./numberDataSourceValidation";
 import { validateNumberMetrics } from "./numberMetricsValidation";
 import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
+import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
+
+// Re-export the shared object narrow so downstream validators
+// (e.g. `chartRenderValidation.ts`) keep their existing import path.
+export { asObject };
 
 /** All panel kinds the dashboard currently understands. */
 export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number"] as const;
@@ -118,6 +123,12 @@ export interface NodePanelContent {
   showRun?: boolean;
   /** Optional override for the trigger template name (for nodes with multiple triggers). */
   triggerName?: string;
+  /**
+   * When true, clicking Run always opens the confirm dialog — even for
+   * templates with no input fields. When false (default), a parameter-less
+   * template fires immediately; templates with input fields always prompt.
+   */
+  promptConfirmation?: boolean;
 }
 
 export interface TablePanelContent {
@@ -313,11 +324,6 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
   }
 }
 
-export function asObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
-}
-
 function validateNodeContent(content: unknown): string | null {
   const obj = asObject(content);
   if (!obj) return "content must be an object.";
@@ -327,19 +333,13 @@ function validateNodeContent(content: unknown): string | null {
   if (typeof obj.node !== "string") {
     return "content.node must be a string (canvas node id or name).";
   }
-  if (obj.title !== undefined && obj.title !== null && typeof obj.title !== "string") {
-    return "content.title must be a string.";
-  }
-  if (obj.label !== undefined && obj.label !== null && typeof obj.label !== "string") {
-    return "content.label must be a string.";
-  }
-  if (obj.showRun !== undefined && typeof obj.showRun !== "boolean") {
-    return "content.showRun must be a boolean.";
-  }
-  if (obj.triggerName !== undefined && obj.triggerName !== null && typeof obj.triggerName !== "string") {
-    return "content.triggerName must be a string.";
-  }
-  return null;
+  return (
+    optionalStringError("content.title", obj.title) ??
+    optionalStringError("content.label", obj.label) ??
+    optionalBooleanError("content.showRun", obj.showRun) ??
+    optionalStringError("content.triggerName", obj.triggerName) ??
+    optionalBooleanError("content.promptConfirmation", obj.promptConfirmation)
+  );
 }
 
 export function validateDataSource(value: unknown): string | null {

@@ -23,6 +23,17 @@ export function getAgentSetupState({
   return null;
 }
 
+const SESSION_BUSY_CODE = 9; // gRPC FAILED_PRECONDITION — e.g. reset while the turn is still streaming.
+
+// True when the server rejected a request because the agent session is busy, so
+// callers can show the intentional "wait" notice instead of a raw error.
+export function isSessionBusyError(error: unknown): boolean {
+  return getErrorStatusCandidates(error).some((status) => {
+    if (!status || typeof status !== "object") return false;
+    return (status as { code?: unknown }).code === SESSION_BUSY_CODE;
+  });
+}
+
 function isAgentsDisabledError(error: unknown): boolean {
   return getErrorStatusCandidates(error).some(isAgentsDisabledStatus);
 }
