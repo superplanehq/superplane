@@ -11,7 +11,7 @@ import { SelectionWrapper } from "../selectionWrapper";
 import type { ComponentActionsProps } from "../types/componentActions";
 import { PayloadTooltip } from "./PayloadTooltip";
 import { SpecsTooltip } from "./SpecsTooltip";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 
 interface EventSectionDisplayProps {
   section: EventSection;
@@ -82,7 +82,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
           </span>
         ) : (
           <span className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50">
-            <TimeAgo date={section.receivedAt!} />
+            <Timestamp date={section.receivedAt} display="relative" relativeStyle="abbreviated" />
           </span>
         )}
       </div>

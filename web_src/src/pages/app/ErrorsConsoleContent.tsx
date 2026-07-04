@@ -5,7 +5,7 @@ import type {
   CanvasesCanvasRun,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { findNode, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/app/lib/canvas-runs";
@@ -115,7 +115,11 @@ function ErrorItemRow({
         <AcknowledgeButton executionId={item.execution.id} onAcknowledgeErrors={onAcknowledgeErrors} />
       )}
       <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
-        {item.execution.createdAt ? <TimeAgo date={item.execution.createdAt} /> : ""}
+        {item.execution.createdAt ? (
+          <Timestamp date={item.execution.createdAt} display="relative" relativeStyle="abbreviated" />
+        ) : (
+          ""
+        )}
       </span>
     </div>
   );

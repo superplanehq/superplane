@@ -1,5 +1,5 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 import { cn } from "@/lib/utils";
 import { useCallback } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -66,7 +66,13 @@ export function VersionRow({
       ) : null}
       <span className="max-w-[40%] shrink-0 truncate text-[11px] text-slate-500">{ownerName}</span>
       {timestamp ? (
-        <TimeAgo date={timestamp} includeAgo={false} className="shrink-0 text-xs tabular-nums text-slate-500" />
+        <Timestamp
+          date={timestamp}
+          display="relative"
+          relativeStyle="abbreviated"
+          includeAgo={false}
+          className="shrink-0 text-xs tabular-nums text-slate-500"
+        />
       ) : null}
     </div>
   );
