@@ -76,6 +76,12 @@ var exampleOutputCreateLoadBalancerBytes []byte
 //go:embed example_output_delete_load_balancer.json
 var exampleOutputDeleteLoadBalancerBytes []byte
 
+//go:embed example_output_update_alarm.json
+var exampleOutputUpdateAlarmBytes []byte
+
+//go:embed example_output_delete_alarm.json
+var exampleOutputDeleteAlarmBytes []byte
+
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
 
@@ -144,6 +150,12 @@ var exampleOutputCreateLoadBalancer map[string]any
 
 var exampleOutputDeleteLoadBalancerOnce sync.Once
 var exampleOutputDeleteLoadBalancer map[string]any
+
+var exampleOutputUpdateAlarmOnce sync.Once
+var exampleOutputUpdateAlarm map[string]any
+
+var exampleOutputDeleteAlarmOnce sync.Once
+var exampleOutputDeleteAlarm map[string]any
 
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
@@ -298,5 +310,21 @@ func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
 		&exampleOutputDeleteLoadBalancerOnce,
 		exampleOutputDeleteLoadBalancerBytes,
 		&exampleOutputDeleteLoadBalancer,
+	)
+}
+
+func (c *UpdateAlarm) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputUpdateAlarmOnce,
+		exampleOutputUpdateAlarmBytes,
+		&exampleOutputUpdateAlarm,
+	)
+}
+
+func (c *DeleteAlarm) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputDeleteAlarmOnce,
+		exampleOutputDeleteAlarmBytes,
+		&exampleOutputDeleteAlarm,
 	)
 }

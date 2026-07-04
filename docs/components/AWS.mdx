@@ -39,6 +39,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
   <LinkCard title="EC2 • Create Instance" href="#ec2-•-create-instance" description="Launch a new EC2 instance and wait for it to reach running state" />
   <LinkCard title="EC2 • Create Load Balancer" href="#ec2-•-create-load-balancer" description="Create an Application, Network, or Gateway Load Balancer and wait for it to become active" />
+  <LinkCard title="EC2 • Delete Alarm" href="#ec2-•-delete-alarm" description="Delete a CloudWatch metric alarm for an EC2 instance" />
   <LinkCard title="EC2 • Delete Instance" href="#ec2-•-delete-instance" description="Terminate an EC2 instance and wait for termination" />
   <LinkCard title="EC2 • Delete Load Balancer" href="#ec2-•-delete-load-balancer" description="Delete an Elastic Load Balancer and wait for deletion to complete" />
   <LinkCard title="EC2 • Deregister Image" href="#ec2-•-deregister-image" description="Deregister an EC2 AMI image" />
@@ -53,6 +54,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="EC2 • Manage Elastic IP" href="#ec2-•-manage-elastic-ip" description="Associate or disassociate an Elastic IP address with an EC2 instance" />
   <LinkCard title="EC2 • Manage Instance Power" href="#ec2-•-manage-instance-power" description="Perform power operations on an EC2 instance" />
   <LinkCard title="EC2 • Release Elastic IP" href="#ec2-•-release-elastic-ip" description="Release an Elastic IP address back to the AWS address pool" />
+  <LinkCard title="EC2 • Update Alarm" href="#ec2-•-update-alarm" description="Update an existing CloudWatch metric alarm for an EC2 instance" />
   <LinkCard title="EC2 • Update Instance" href="#ec2-•-update-instance" description="Resize an EC2 instance or update its security groups" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
@@ -1472,6 +1474,44 @@ Emits load balancer details on the default output channel, including:
 }
 ```
 
+<a id="ec2-•-delete-alarm"></a>
+
+## EC2 • Delete Alarm
+
+**Component key:** `aws.ec2.deleteAlarm`
+
+The Delete Alarm component removes a CloudWatch metric alarm.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary alarms created by automation workflows
+- **Decommissioning**: Delete monitoring for instances being retired
+- **Rollback**: Undo alarm creation steps in failed provisioning runs
+
+### Configuration
+
+- **Region**: AWS region where the alarm resides
+- **Alarm**: CloudWatch alarm to delete (`ec2.alarm` resource picker)
+
+### Output
+
+Emits a deletion confirmation on the default output channel:
+- `alarmName`, `deleted`, `region`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmName": "cpuUsage",
+    "deleted": true,
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-06-03T16:38:01.123456789Z",
+  "type": "aws.ec2.alarm.deleted"
+}
+```
+
 <a id="ec2-•-delete-instance"></a>
 
 ## EC2 • Delete Instance
@@ -2083,6 +2123,70 @@ Emits a release confirmation on the default output channel:
   },
   "timestamp": "2026-05-21T12:02:00Z",
   "type": "aws.ec2.elastic-ip.released"
+}
+```
+
+<a id="ec2-•-update-alarm"></a>
+
+## EC2 • Update Alarm
+
+**Component key:** `aws.ec2.updateAlarm`
+
+The Update Alarm component modifies an existing CloudWatch metric alarm scoped to an EC2 instance.
+
+### Use Cases
+
+- **Threshold tuning**: Raise or lower alert thresholds without recreating the alarm
+- **Operational changes**: Adjust evaluation periods or comparison operators as workloads change
+- **Notification updates**: Add or change SNS topics and EC2 automation actions when an alarm fires
+
+### Configuration
+
+- **Region**: AWS region where the alarm resides
+- **Alarm**: CloudWatch alarm to update (`ec2.alarm` resource picker)
+- **Threshold** *(toggleable)*: New threshold and comparison operator (both must be set together)
+- **Statistic** *(toggleable)*: Aggregation function (Average, Sum, Min, Max, SampleCount)
+- **Period** *(toggleable)*: Evaluation window in seconds
+- **Evaluation Periods** *(toggleable)*: Consecutive breaching periods required before ALARM
+- **Alarm Description** *(toggleable)*: Free-text description
+- **Treat Missing Data** *(toggleable)*: Missing data handling (missing, ignore, breaching, notBreaching)
+- **Alarm Action** *(toggleable)*: EC2 automation action when the alarm enters ALARM state
+- **SNS Topic (on alarm)** *(toggleable)*: SNS topic ARN to notify when the alarm enters ALARM state
+
+At least one toggleable property must be enabled. Unspecified properties keep their current values.
+
+### Output
+
+Emits the updated alarm details on the default output channel (same fields as Get Alarm).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alarmArn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:cpuUsage",
+    "alarmDescription": "Cpu alarm",
+    "alarmName": "cpuUsage",
+    "comparisonOperator": "GreaterThanThreshold",
+    "dimensions": [
+      {
+        "name": "InstanceId",
+        "value": "i-1234567890abcdef0"
+      }
+    ],
+    "evaluationPeriods": 1,
+    "metricName": "CPUUtilization",
+    "namespace": "AWS/EC2",
+    "period": 120,
+    "region": "us-east-1",
+    "stateReason": "Threshold Crossed: 1 datapoint (85.3) was greater than the threshold (80.0).",
+    "stateValue": "ALARM",
+    "statistic": "Average",
+    "threshold": 90,
+    "treatMissingData": "ignore"
+  },
+  "timestamp": "2026-06-03T16:37:20.636935245Z",
+  "type": "aws.ec2.alarm"
 }
 ```
 
