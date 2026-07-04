@@ -310,6 +310,50 @@ export const rendererExamples: RendererExample[] = [
     allowExpressions: true,
   },
   {
+    id: "list-accordion",
+    storyName: "AccordionListField",
+    category: "Structured Content",
+    source: "Basic field type",
+    goType: "FieldTypeList",
+    docsDescription:
+      "Use `accordion` when list items are complex enough to benefit from a collapsed summary view with a per-item sub-form.",
+    field: baseField({
+      name: "headersAccordion",
+      label: "Headers (accordion)",
+      type: "list",
+      description: "A list renderer example with `accordion: true` enabled.",
+      typeOptions: {
+        list: {
+          itemLabel: "Header",
+          accordion: true,
+          reorderable: true,
+          itemDefinition: {
+            type: "object",
+            schema: [
+              {
+                name: "key",
+                label: "Key",
+                type: "string",
+                required: true,
+              },
+              {
+                name: "value",
+                label: "Value",
+                type: "string",
+                required: true,
+              },
+            ],
+          },
+        },
+      },
+    }),
+    initialValue: [
+      { key: "X-Environment", value: "production" },
+      { key: "X-Request-Source", value: "storybook" },
+    ],
+    allowExpressions: true,
+  },
+  {
     id: "object",
     storyName: "ObjectField",
     category: "Structured Content",

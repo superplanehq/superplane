@@ -208,6 +208,7 @@ export const BooleanField = createExampleStory("boolean");
 export const SelectField = createExampleStory("select");
 export const MultiSelectField = createExampleStory("multi-select");
 export const ListField = createExampleStory("list");
+export const AccordionListField = createExampleStory("list-accordion");
 export const ObjectField = createExampleStory("object");
 export const TimeField = createExampleStory("time");
 export const DateField = createExampleStory("date");
