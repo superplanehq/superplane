@@ -209,8 +209,6 @@ export interface CanvasPageProps {
   onDiscardStaleStaging?: () => void;
   discardStaleStagingPending?: boolean;
   headerMode?: "default" | "version-live" | "console" | "memory" | "files";
-  /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
-  configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1131,18 +1129,15 @@ function CanvasPage(props: CanvasPageProps) {
     onOpen: handleBuildingBlocksShortcutOpen,
   });
 
+  const onNodeConfigurationSave = props.onNodeConfigurationSave;
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
-      if (!editingNodeData?.nodeId || !props.onNodeConfigurationSave) {
+      if (!editingNodeData?.nodeId || !onNodeConfigurationSave) {
         return;
       }
-      const result = props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
-      if (props.configurationSaveMode !== "auto") {
-        state.componentSidebar.close();
-      }
-      return result;
+      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
     },
-    [editingNodeData?.nodeId, props, state.componentSidebar],
+    [editingNodeData?.nodeId, onNodeConfigurationSave],
   );
 
   const canvasNodesForToggle = state.nodes;
@@ -1273,7 +1268,6 @@ function CanvasPage(props: CanvasPageProps) {
         onSidebarClose={handleSidebarClose}
         editingNodeData={editingNodeData}
         onSaveConfiguration={handleSaveConfiguration}
-        configurationSaveMode={props.configurationSaveMode}
         currentTab={currentTab}
         onTabChange={setCurrentTab}
         canvasMode={props.isEditing ? "edit" : "live"}
@@ -1299,7 +1293,6 @@ function CanvasPage(props: CanvasPageProps) {
       props.canCreateIntegrations,
       props.canReadIntegrations,
       props.canUpdateIntegrations,
-      props.configurationSaveMode,
       props.fetchRunIdForSidebarEvent,
       props.getAllHistoryEvents,
       props.getAllQueueEvents,
@@ -1604,7 +1597,6 @@ function Sidebar({
   onSidebarClose,
   editingNodeData,
   onSaveConfiguration,
-  configurationSaveMode = "manual",
   currentTab,
   onTabChange,
   canvasMode,
@@ -1652,7 +1644,6 @@ function Sidebar({
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
-  configurationSaveMode?: "manual" | "auto";
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   canvasMode: "live" | "edit";
@@ -1793,7 +1784,6 @@ function Sidebar({
       nodeConfigurationFields={editingNodeData?.configurationFields ?? []}
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
-      configurationSaveMode={configurationSaveMode}
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
