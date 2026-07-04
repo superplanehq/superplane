@@ -1,6 +1,7 @@
 import { memo, useRef } from "react";
-import { ArrowUp, ImagePlus, Loader2, Square } from "lucide-react";
+import { ArrowUp, ImagePlus, Loader2, RotateCcw, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AgentMode } from "./agentMode";
 import { ALLOWED_IMAGE_TYPES } from "./useImageAttachments";
 import { ModeToggle } from "./ModeToggle";
@@ -9,6 +10,8 @@ interface ComposerToolbarProps {
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   modeDisabled?: boolean;
+  onClearChat: () => void;
+  clearing: boolean;
   sending: boolean;
   stopping?: boolean;
   statusLabel: string;
@@ -61,10 +64,38 @@ function AttachImageButton({
   );
 }
 
+function ClearChatButton({ onClearChat, clearing }: { onClearChat: () => void; clearing: boolean }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          onClick={onClearChat}
+          disabled={clearing}
+          aria-label="Clear chat"
+          data-testid="agent-clear-chat-button"
+        >
+          {clearing ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <RotateCcw className="size-3.5" aria-hidden />
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Clear chat</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export const ComposerToolbar = memo(function ComposerToolbar({
   agentMode,
   onModeSwitch,
   modeDisabled,
+  onClearChat,
+  clearing,
   sending,
   stopping,
   statusLabel,
@@ -79,6 +110,7 @@ export const ComposerToolbar = memo(function ComposerToolbar({
       <div className="flex min-w-0 items-center gap-1">
         <AttachImageButton canAttach={canAttach} onAddFiles={onAddFiles} />
         <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
+        <ClearChatButton onClearChat={onClearChat} clearing={clearing} />
       </div>
       <div className="flex min-w-0 shrink-0 items-center gap-2">
         <span className="truncate text-xs text-muted-foreground">{statusLabel}</span>

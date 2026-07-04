@@ -13,6 +13,7 @@ import (
 
 type stubService struct {
 	ensureSession func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error)
+	resetSession  func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error)
 	getSession    func(uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error)
 	listMessages  func(uuid.UUID, uuid.UUID, int) ([]models.AgentSessionMessage, error)
 	sendMessage   func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, string) (*models.AgentSessionMessage, error)
@@ -22,6 +23,9 @@ type stubService struct {
 
 func (s *stubService) EnsureSession(ctx context.Context, o, u, c uuid.UUID) (*models.AgentSession, error) {
 	return s.ensureSession(ctx, o, u, c)
+}
+func (s *stubService) ResetSession(ctx context.Context, o, u, c uuid.UUID) (*models.AgentSession, error) {
+	return s.resetSession(ctx, o, u, c)
 }
 func (s *stubService) GetSession(o, u, id uuid.UUID) (*models.AgentSession, error) {
 	return s.getSession(o, u, id)
