@@ -1,19 +1,19 @@
 {
-  "maxAllowedTotalIssues": 613,
+  "maxAllowedTotalIssues": 604,
   "maxAllowedByRule": {
-    "complexity": 217,
+    "complexity": 213,
     "@typescript-eslint/no-explicit-any": 153,
     "@typescript-eslint/no-non-null-asserted-optional-chain": 79,
-    "max-lines-per-function": 69,
-    "max-statements": 66,
+    "max-lines-per-function": 68,
+    "max-statements": 62,
     "max-lines": 15,
     "max-depth": 6,
     "max-params": 5,
     "no-eslint-disable-next-line": 3
   },
   "maxAllowedMetricMaximumByRule": {
-    "max-lines": 4001,
-    "complexity": 236
+    "max-lines": 3804,
+    "complexity": 221
   },
-  "updatedAt": "2026-07-02T14:02:14.307Z"
+  "updatedAt": "2026-07-04T20:13:15.423Z"
 }
