@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type OrganizationInviteLink struct {
@@ -17,10 +17,10 @@ type OrganizationInviteLink struct {
 	UpdatedAt      time.Time
 }
 
-func FindInviteLinkByOrganizationID(db *gorm.DB, organizationID string) (*OrganizationInviteLink, error) {
+func FindInviteLinkByOrganizationID(tx *gorm.DB, organizationID string) (*OrganizationInviteLink, error) {
 	var inviteLink OrganizationInviteLink
 
-	err := db.
+	err := tx.
 		Where("organization_id = ?", organizationID).
 		First(&inviteLink).
 		Error
@@ -28,11 +28,7 @@ func FindInviteLinkByOrganizationID(db *gorm.DB, organizationID string) (*Organi
 	return &inviteLink, err
 }
 
-func FindInviteLinkByToken(token string) (*OrganizationInviteLink, error) {
-	return FindInviteLinkByTokenInTransaction(database.Conn(), token)
-}
-
-func FindInviteLinkByTokenInTransaction(tx *gorm.DB, token string) (*OrganizationInviteLink, error) {
+func FindInviteLinkByToken(tx *gorm.DB, token string) (*OrganizationInviteLink, error) {
 	var inviteLink OrganizationInviteLink
 
 	tokenUUID, err := uuid.Parse(token)
@@ -48,11 +44,7 @@ func FindInviteLinkByTokenInTransaction(tx *gorm.DB, token string) (*Organizatio
 	return &inviteLink, err
 }
 
-func CreateInviteLink(organizationID uuid.UUID) (*OrganizationInviteLink, error) {
-	return CreateInviteLinkInTransaction(database.Conn(), organizationID)
-}
-
-func CreateInviteLinkInTransaction(tx *gorm.DB, organizationID uuid.UUID) (*OrganizationInviteLink, error) {
+func CreateInviteLink(tx *gorm.DB, organizationID uuid.UUID) (*OrganizationInviteLink, error) {
 	inviteLink := &OrganizationInviteLink{
 		OrganizationID: organizationID,
 		Token:          uuid.New(),
@@ -67,6 +59,25 @@ func CreateInviteLinkInTransaction(tx *gorm.DB, organizationID uuid.UUID) (*Orga
 	return inviteLink, nil
 }
 
-func SaveInviteLink(inviteLink *OrganizationInviteLink) error {
-	return database.Conn().Save(inviteLink).Error
+func FindOrCreateInviteLink(tx *gorm.DB, organizationID uuid.UUID) (*OrganizationInviteLink, error) {
+	seed := &OrganizationInviteLink{
+		OrganizationID: organizationID,
+		Token:          uuid.New(),
+		Enabled:        true,
+	}
+
+	// This avoids the "read then insert" race under concurrent first-time requests.
+	// Postgres will serialize conflicts on the unique index, so the losing insert blocks and then no-ops.
+	if err := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "organization_id"}},
+		DoNothing: true,
+	}).Create(seed).Error; err != nil {
+		return nil, err
+	}
+
+	return FindInviteLinkByOrganizationID(tx, organizationID.String())
+}
+
+func SaveInviteLink(tx *gorm.DB, inviteLink *OrganizationInviteLink) error {
+	return tx.Save(inviteLink).Error
 }
