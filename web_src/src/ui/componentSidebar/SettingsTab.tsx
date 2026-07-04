@@ -7,7 +7,6 @@ import type {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -55,7 +54,7 @@ interface SettingsTabProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
-  /** Canvas uses debounced autosave without a footer Save; Custom Component Builder keeps explicit Save. */
+  /** When `auto`, changes are debounced and persisted without an explicit Save control. */
   configurationSaveMode?: "manual" | "auto";
 }
 
@@ -102,7 +101,6 @@ export function SettingsTab({
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
-  const showManualSaveFooter = configurationSaveMode !== "auto" && !isReadOnly;
   const allowIntegrations = canReadIntegrations ?? true;
   const allowCreateIntegrations = canCreateIntegrations ?? true;
   const allowUpdateIntegrations = canUpdateIntegrations ?? true;
@@ -111,7 +109,6 @@ export function SettingsTab({
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
-  const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
@@ -374,13 +371,11 @@ export function SettingsTab({
     }
 
     savingRef.current = true;
-    setIsSaving(true);
     try {
       await result;
       updateAutosaveBaseline(snapshot);
     } finally {
       savingRef.current = false;
-      setIsSaving(false);
       flushPendingAutosave();
     }
   }, [
@@ -493,7 +488,7 @@ export function SettingsTab({
 
   return (
     <div
-      className={`p-4 overflow-y-auto overflow-x-hidden ${showManualSaveFooter ? "pb-20" : "pb-24"}`}
+      className="p-4 pb-24 overflow-y-auto overflow-x-hidden"
       style={{ maxHeight: "80vh" }}
       onBlurCapture={(event) => {
         if (configurationSaveMode !== "auto") {
@@ -799,20 +794,6 @@ export function SettingsTab({
           </div>
         )}
       </div>
-
-      {showManualSaveFooter ? (
-        <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <LoadingButton
-            data-testid="save-node-button"
-            variant="default"
-            onClick={handleSave}
-            loading={isSaving}
-            loadingText="Saving..."
-          >
-            Save
-          </LoadingButton>
-        </div>
-      ) : null}
     </div>
   );
 }
