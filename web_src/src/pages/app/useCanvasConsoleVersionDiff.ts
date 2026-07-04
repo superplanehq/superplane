@@ -65,7 +65,7 @@ export function useCanvasConsoleVersionDiff({
     draftDiffVersionId || undefined,
     enabled && !!draftDiffVersionId,
   );
-  const liveConsoleQuery = useCanvasConsole(canvasId, versionIds.live || undefined, enabled && !!versionIds.live);
+  const liveConsoleQuery = useCanvasConsole(canvasId, undefined, enabled && (!!versionIds.live || !versionIds.active));
   const hasDraftConsoleDiffVersusLive = useMemo(
     () => !!draftDiffVersionId && hasDraftVersusLiveConsoleDiff(liveConsoleQuery.data, draftConsoleQuery.data),
     [draftDiffVersionId, liveConsoleQuery.data, draftConsoleQuery.data],

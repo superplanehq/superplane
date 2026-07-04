@@ -119,9 +119,6 @@ export function useCanvasWebsocket(
         return;
       }
 
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(canvasId) });
-
       if (!shouldApplyCanvasUpdate?.()) {
         return;
       }
