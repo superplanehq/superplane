@@ -65,17 +65,42 @@ func (s *CanvasSteps) ExitEditMode() {
 	s.session.Sleep(500)
 }
 
-// OpenVersionsSidebar reveals the versions sidebar while edit mode is active.
+// OpenVersionsSidebar reveals the versions sidebar from the current canvas mode.
+// If the header toggle is not available yet, it enters edit mode first.
 func (s *CanvasSteps) OpenVersionsSidebar() {
-	sidebar := q.TestID("canvas-versions-sidebar").Run(s.session)
-	if visible, _ := sidebar.IsVisible(); visible {
-		s.session.Sleep(300)
+	toggle := q.TestID("canvas-versions-sidebar-toggle").Run(s.session)
+	if visible, _ := toggle.IsVisible(); !visible {
+		s.EnterEditMode()
+	}
+
+	s.ensureVersionsSidebarOpen()
+	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
+	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) ensureEditMode() {
+	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
+	if visible, _ := exitEditButton.IsVisible(); visible {
 		return
 	}
 
 	s.EnterEditMode()
-	s.session.AssertVisible(q.TestID("canvas-versions-sidebar"))
-	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) ensureVersionsSidebarOpen() {
+	toggle := q.TestID("canvas-versions-sidebar-toggle").Run(s.session)
+	require.NoError(s.t, toggle.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(15000),
+	}))
+
+	pressed, err := toggle.GetAttribute("aria-pressed", pw.LocatorGetAttributeOptions{Timeout: pw.Float(15000)})
+	require.NoError(s.t, err)
+	if pressed == "true" {
+		return
+	}
+
+	s.session.Click(q.TestID("canvas-versions-sidebar-toggle"))
 }
 
 // OpenDraftBranchInSidebar is a no-op; version history no longer switches editable branches.

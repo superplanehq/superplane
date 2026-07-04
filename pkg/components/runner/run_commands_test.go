@@ -463,7 +463,7 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 	err := (&Runner{}).Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"commands":     "echo hi",
-			"machine_type": "aws-arm64-1",
+			"machine_type": MachineTypeE1LargeARM64,
 		},
 		HTTP:           httpContext,
 		Webhook:        &contexts.NodeWebhookContext{},
@@ -478,7 +478,7 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
-	assert.Equal(t, "aws-arm64-1", req.FleetID)
+	assert.Equal(t, MachineTypeE1LargeARM64, req.FleetID)
 }
 
 func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
