@@ -7,7 +7,7 @@ import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
-const { sendMutation, chatState, chatRefetch } = vi.hoisted(() => {
+const { sendMutation, resetMutation, chatState, chatRefetch } = vi.hoisted(() => {
   const state = {
     hasChat: true,
     isError: false,
@@ -20,6 +20,10 @@ const { sendMutation, chatState, chatRefetch } = vi.hoisted(() => {
 
   return {
     sendMutation: {
+      isPending: false,
+      mutateAsync: vi.fn(),
+    },
+    resetMutation: {
       isPending: false,
       mutateAsync: vi.fn(),
     },
@@ -70,6 +74,7 @@ vi.mock("@/hooks/useAgentChats", () => ({
     fetchNextPage: vi.fn(async () => undefined),
   }),
   useSendAgentChatMessage: () => sendMutation,
+  useResetCanvasAgentChat: () => resetMutation,
   useInterruptAgentChat: () => ({ isPending: false, mutate: vi.fn() }),
   useDefineAgentOutcome: () => ({ mutateAsync: vi.fn() }),
 }));
@@ -125,6 +130,9 @@ describe("CanvasToolSidebar", () => {
     sendMutation.isPending = false;
     sendMutation.mutateAsync.mockReset();
     sendMutation.mutateAsync.mockResolvedValue(null);
+    resetMutation.isPending = false;
+    resetMutation.mutateAsync.mockReset();
+    resetMutation.mutateAsync.mockResolvedValue(null);
     sessionStorage.clear();
   });
 
@@ -199,6 +207,16 @@ describe("CanvasToolSidebar", () => {
 
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(chatRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the chat when the header reset button is clicked", async () => {
+    const user = userEvent.setup();
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+
+    await user.click(await screen.findByTestId("agent-clear-chat-button"));
+
+    expect(resetMutation.mutateAsync).toHaveBeenCalledTimes(1);
   });
 
   it("allows retrying a failed session", async () => {

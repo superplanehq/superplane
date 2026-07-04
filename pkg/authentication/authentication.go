@@ -376,7 +376,7 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if inviteToken != "" {
-		inviteLink, err := models.FindInviteLinkByToken(inviteToken)
+		inviteLink, err := models.FindInviteLinkByToken(database.DB(r.Context()), inviteToken)
 		if err != nil || !inviteLink.Enabled {
 			http.Error(w, "invite link not found or disabled", http.StatusForbidden)
 			return
@@ -941,7 +941,7 @@ func allowSignupFromInvite(r *http.Request) bool {
 		return false
 	}
 
-	inviteLink, err := models.FindInviteLinkByToken(inviteToken)
+	inviteLink, err := models.FindInviteLinkByToken(database.DB(r.Context()), inviteToken)
 	if err != nil || !inviteLink.Enabled {
 		return false
 	}

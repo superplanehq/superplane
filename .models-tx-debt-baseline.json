@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 171,
-  "maxAllowedDatabaseConnCalls": 196,
+  "maxAllowedInTransactionDefinitions": 169,
+  "maxAllowedDatabaseConnCalls": 193,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -141,8 +141,6 @@
     "pkg/models/organization.go:ListOrganizationsPendingUsageLimitsRefreshInTransaction",
     "pkg/models/organization.go:EnableExperimentalFeatureInTransaction",
     "pkg/models/organization.go:DisableExperimentalFeatureInTransaction",
-    "pkg/models/organization_invite_link.go:FindInviteLinkByTokenInTransaction",
-    "pkg/models/organization_invite_link.go:CreateInviteLinkInTransaction",
     "pkg/models/repository.go:FindRepositoryInTransaction",
     "pkg/models/repository.go:CreatePendingRepositoryInTransaction",
     "pkg/models/repository_seed_file.go:CreateRepositorySeedFilesInTransaction",
@@ -315,9 +313,6 @@
     "pkg/models/organization.go:ListOrganizationsPendingUsageLimitsRefresh:database.Conn()#1",
     "pkg/models/organization.go:EnableExperimentalFeature:database.Conn()#1",
     "pkg/models/organization.go:DisableExperimentalFeature:database.Conn()#1",
-    "pkg/models/organization_invite_link.go:FindInviteLinkByToken:database.Conn()#1",
-    "pkg/models/organization_invite_link.go:CreateInviteLink:database.Conn()#1",
-    "pkg/models/organization_invite_link.go:SaveInviteLink:database.Conn()#1",
     "pkg/models/repository.go:FindRepository:database.Conn()#1",
     "pkg/models/repository.go:FindRepositoryUnscoped:database.Conn()#1",
     "pkg/models/repository.go:CreatePendingRepository:database.Conn()#1",
@@ -372,5 +367,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-07-04T17:57:20Z"
+  "updatedAt": "2026-07-04T18:12:12Z"
 }
