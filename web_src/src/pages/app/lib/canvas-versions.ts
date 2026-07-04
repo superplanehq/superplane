@@ -27,23 +27,42 @@ export function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): 
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+function formatLegacyVersionLabel(version?: CanvasesCanvasVersion | null): string | undefined {
+  const raw = version?.metadata?.createdAt;
+  if (!raw) {
+    return undefined;
+  }
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  const formatted = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return `Update from ${formatted}`;
+}
+
 export function formatVersionLabel(version?: CanvasesCanvasVersion | null): string {
   const message = version?.metadata?.commitMessage?.trim();
   if (message) {
     return message;
   }
 
-  return "Commit";
+  return formatLegacyVersionLabel(version) ?? "Untitled update";
 }
 
 export function formatVersionLabelWithTimestamp(version?: CanvasesCanvasVersion | null): string {
-  const label = formatVersionLabel(version);
-  const timestamp = formatVersionTimestamp(version);
-  if (!timestamp) {
-    return label;
+  const message = version?.metadata?.commitMessage?.trim();
+  if (message) {
+    const timestamp = formatVersionTimestamp(version);
+    if (!timestamp) {
+      return message;
+    }
+
+    return `${message} · ${timestamp}`;
   }
 
-  return `${label} · ${timestamp}`;
+  return formatLegacyVersionLabel(version) ?? "Untitled update";
 }
 
 export function versionSortValue(raw?: string): number {

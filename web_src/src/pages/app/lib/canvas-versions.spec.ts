@@ -40,8 +40,18 @@ describe("formatVersionLabel", () => {
     expect(formatVersionLabel({ metadata: { commitMessage: "Fix webhook retry" } })).toBe("Fix webhook retry");
   });
 
-  it("falls back to a generic label when commit message is missing", () => {
-    expect(formatVersionLabel({ metadata: {} })).toBe("Commit");
+  it("falls back to a timestamp-based label when commit message is missing", () => {
+    const createdAt = "2026-05-18T12:00:00.000Z";
+    const expectedTimestamp = new Date(createdAt).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    expect(formatVersionLabel({ metadata: { createdAt } })).toBe(`Update from ${expectedTimestamp}`);
+  });
+
+  it("falls back to an untitled label when commit message and createdAt are missing", () => {
+    expect(formatVersionLabel({ metadata: {} })).toBe("Untitled update");
   });
 });
 
@@ -65,6 +75,16 @@ describe("formatVersionLabelWithTimestamp", () => {
 
   it("returns only the label when no valid timestamp exists", () => {
     expect(formatVersionLabelWithTimestamp({ metadata: { commitMessage: "Initial setup" } })).toBe("Initial setup");
+  });
+
+  it("uses a legacy timestamp label without duplicating the timestamp suffix", () => {
+    const createdAt = "2026-05-18T12:00:00.000Z";
+    const expectedTimestamp = new Date(createdAt).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    expect(formatVersionLabelWithTimestamp({ metadata: { createdAt } })).toBe(`Update from ${expectedTimestamp}`);
   });
 });
 
