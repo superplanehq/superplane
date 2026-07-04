@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldPreserveDraftSpec } from "./draft-canvas-sync";
+import { shouldApplyPreservedDraftSpec, shouldPreserveDraftSpec } from "./draft-canvas-sync";
 
 describe("shouldPreserveDraftSpec", () => {
   const liveVersionSpec = {
@@ -67,5 +67,28 @@ describe("shouldPreserveDraftSpec", () => {
         liveVersionSpec,
       }),
     ).toBe(false);
+  });
+});
+
+describe("shouldApplyPreservedDraftSpec", () => {
+  const committedSpec = {
+    nodes: [{ id: "live-node" }],
+    edges: [],
+  };
+  const stagedSpec = {
+    nodes: [{ id: "staged-node" }],
+    edges: [],
+  };
+
+  it("uses preserved draft spec when no staged version has loaded yet", () => {
+    expect(shouldApplyPreservedDraftSpec(committedSpec, null)).toBe(true);
+  });
+
+  it("replaces stale committed cache once staged content arrives", () => {
+    expect(shouldApplyPreservedDraftSpec(committedSpec, stagedSpec)).toBe(false);
+  });
+
+  it("keeps preserved draft spec when it already matches the staged version", () => {
+    expect(shouldApplyPreservedDraftSpec(stagedSpec, stagedSpec)).toBe(true);
   });
 });

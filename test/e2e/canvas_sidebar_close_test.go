@@ -2,10 +2,6 @@ package e2e
 
 import (
 	"testing"
-	"time"
-
-	pw "github.com/playwright-community/playwright-go"
-	"github.com/stretchr/testify/require"
 
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -46,25 +42,7 @@ func (s *sidebarCloseSteps) givenCanvas(name string) {
 }
 
 func (s *sidebarCloseSteps) enterEditMode() {
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
-
-	for {
-		disabled, err := editButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-
-		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.Locator(`header button:has-text("Publish")`))
+	s.canvas.EnterEditMode()
 }
 
 func (s *sidebarCloseSteps) openBuildingBlocksSidebar() {
@@ -80,20 +58,5 @@ func (s *sidebarCloseSteps) assertSidebarHidden() {
 }
 
 func (s *sidebarCloseSteps) exitEditMode() {
-	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		disabled, err := exitEditButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-		if time.Now().After(deadline) {
-			s.t.Fatalf("exit edit button did not become enabled")
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-	require.NoError(s.t, exitEditButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.TestID("canvas-edit-button"))
-	s.session.Sleep(500)
+	s.canvas.ExitEditMode()
 }

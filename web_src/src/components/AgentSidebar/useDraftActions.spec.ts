@@ -16,15 +16,17 @@ function message(overrides: Partial<AgentMessage>): AgentMessage {
   };
 }
 
-function draftActionsContent(versionId: string): string {
-  return ["Draft ready", "", ":::draft-actions", `versionId: ${versionId}`, "message: Draft ready", ":::"].join("\n");
+function stagingActionsContent(canvasId: string): string {
+  return ["Staging ready", "", ":::staging-actions", `canvasId: ${canvasId}`, "message: Staging ready", ":::"].join(
+    "\n",
+  );
 }
 
-function mockDraftVersion(state = "STATE_DRAFT") {
+function mockCanvasStaging(hasStaging: boolean) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => {
-      return new Response(JSON.stringify({ version: { metadata: { state } } }), {
+      return new Response(JSON.stringify({ stagingSummary: { hasStaging } }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
@@ -37,13 +39,13 @@ describe("useDraftActions", () => {
     vi.unstubAllGlobals();
   });
 
-  it("keeps the latest draft action visible after a follow-up user message", async () => {
-    mockDraftVersion();
+  it("keeps the latest staging action visible after a follow-up user message", async () => {
+    mockCanvasStaging(true);
 
     const { result } = renderHook(() =>
       useDraftActions({
         messages: [
-          message({ id: "assistant-1", role: "assistant", content: draftActionsContent("draft-1") }),
+          message({ id: "assistant-1", role: "assistant", content: stagingActionsContent("canvas-1") }),
           message({ id: "user-1", role: "user", content: "Make one more change" }),
         ],
         canvasId: "canvas-1",
@@ -51,15 +53,15 @@ describe("useDraftActions", () => {
       }),
     );
 
-    await waitFor(() => expect(result.current.latestDraft?.versionId).toBe("draft-1"));
+    await waitFor(() => expect(result.current.latestDraft?.canvasId).toBe("canvas-1"));
   });
 
-  it("hides draft actions when the version is no longer a draft", async () => {
-    mockDraftVersion("STATE_PUBLISHED");
+  it("hides staging actions when staging no longer exists", async () => {
+    mockCanvasStaging(false);
 
     const { result } = renderHook(() =>
       useDraftActions({
-        messages: [message({ id: "assistant-1", role: "assistant", content: draftActionsContent("draft-1") })],
+        messages: [message({ id: "assistant-1", role: "assistant", content: stagingActionsContent("canvas-1") })],
         canvasId: "canvas-1",
         organizationId: "org-1",
       }),
