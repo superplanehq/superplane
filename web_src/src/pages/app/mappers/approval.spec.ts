@@ -5,10 +5,12 @@ import type { ExecutionInfo, SubtitleContext } from "./types";
 const DEFAULT_NODE = { id: "n1", name: "Approval Node", componentName: "approval", isCollapsed: false };
 
 function makeExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
+  const now = new Date().toISOString();
+
   return {
     id: "e1",
-    createdAt: undefined,
-    updatedAt: undefined,
+    createdAt: now,
+    updatedAt: now,
     state: "STATE_FINISHED",
     result: "RESULT_PASSED",
     resultReason: "RESULT_REASON_OK",
