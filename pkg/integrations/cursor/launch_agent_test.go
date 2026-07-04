@@ -341,6 +341,17 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 						}
 					}`)),
 				},
+				// On success the merged component also fetches the conversation.
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"id": "agent-123",
+						"messages": [
+							{"id": "msg_1", "type": "user_message", "text": "Fix the bug"},
+							{"id": "msg_2", "type": "assistant_message", "text": "Fixed the bug in login.go"}
+						]
+					}`)),
+				},
 			},
 		}
 		integrationCtx := &contexts.IntegrationContext{
@@ -385,8 +396,9 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		status, _, err := c.HandleWebhook(webhookCtx)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, status)
-		require.Len(t, httpContext.Requests, 1)
+		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://api.cursor.com/v0/agents/agent-123", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://api.cursor.com/v0/agents/agent-123/conversation", httpContext.Requests[1].URL.String())
 
 		updatedMetadata := metadataCtx.Metadata.(LaunchAgentExecutionMetadata)
 		assert.Equal(t, "Fixed the bug", updatedMetadata.Agent.Summary)
@@ -398,6 +410,12 @@ func Test__LaunchAgent__HandleWebhook(t *testing.T) {
 		assert.Equal(t, "https://github.com/org/repo/pull/42", payloadData.PrURL)
 		assert.Equal(t, "Fixed the bug", payloadData.Summary)
 		assert.Equal(t, "cursor/agent-abc123", payloadData.BranchName)
+
+		// The conversation is merged into the single component's output.
+		require.Len(t, payloadData.Messages, 2)
+		require.NotNil(t, payloadData.LastMessage)
+		assert.Equal(t, "assistant_message", payloadData.LastMessage.Type)
+		assert.Equal(t, "Fixed the bug in login.go", payloadData.LastMessage.Text)
 	})
 
 	t.Run("missing agent ID -> bad request", func(t *testing.T) {
