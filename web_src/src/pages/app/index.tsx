@@ -5,6 +5,7 @@ import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, startTransition, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   CanvasesCanvas,
@@ -45,7 +46,7 @@ import {
   useWidgets,
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
-import { useCanvasDraftResync } from "@/hooks/useCanvasDraftResync";
+import { useCanvasStagingResync } from "@/hooks/useCanvasStagingResync";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { buildAutocompleteExampleObj } from "./buildAutocompleteExampleObj";
@@ -141,7 +142,6 @@ import {
   prepareSidebarData,
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
-import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
@@ -272,6 +272,8 @@ export function AppPage() {
   // sidebar visible even when previewing the current/old version (not editing a
   // draft), and ends only when the user explicitly exits.
   const [editSessionActive, setEditSessionActive] = useState(false);
+  const editSessionActiveRef = useRef(false);
+  const activeCanvasVersionIdRef = useRef<string>("");
   // Distinguishes "user deliberately selected Current version from the sidebar"
   // (session stays open) from "landed back on live because the draft was
   // published/discarded" (session must close). Both states look identical in
@@ -630,8 +632,7 @@ export function AppPage() {
   // drafts, but `canvasRef` only catches up a render later; auto-save must not
   // persist the previous draft's graph onto the newly-active draft while they
   // disagree.
-  const canvasContentVersionIdRef = useRef<string>(activeCanvasVersionId);
-  const activeCanvasVersionIdRef = useRef<string>(activeCanvasVersionId);
+  const canvasContentVersionIdRef = useRef<string>("");
   const draftCanvasSpecsRef = useRef<Map<string, CanvasesCanvas["spec"] | null>>(new Map());
   const queuedCanvasSaveRef = useRef<QueuedCanvasSaveRequest | null>(null);
   const isDrainingCanvasSaveQueueRef = useRef(false);
@@ -667,6 +668,10 @@ export function AppPage() {
   useEffect(() => {
     activeCanvasVersionIdRef.current = activeCanvasVersionId;
   }, [activeCanvasVersionId]);
+
+  useEffect(() => {
+    editSessionActiveRef.current = editSessionActive;
+  }, [editSessionActive]);
 
   const applyLocalWorkflowUpdate = useCallback(
     (updatedWorkflow: CanvasesCanvas) => {
@@ -1672,7 +1677,7 @@ export function AppPage() {
     [canvas, availableIntegrations, organizationId],
   );
 
-  const { resyncDraftToCommitted, resyncDraftToStaged } = useCanvasDraftResync({
+  const { resyncStagedEditorState } = useCanvasStagingResync({
     organizationId,
     canvasId,
     activeCanvasVersionIdRef,
@@ -1688,13 +1693,11 @@ export function AppPage() {
     useCanvasLifecycleEventHandlers({
       canvasId,
       currentUserId,
-      activeCanvasVersionId,
-      editSessionActive,
+      editSessionActiveRef,
       hasLocalSaveActivity,
       isViewingLiveVersion,
       canvasDeletedRemotely,
       consumeIgnoredCanvasUpdatedEcho,
-      resyncDraftToCommitted,
       onRemoteStagingUpdated: () => {
         void handleRemoteStagingUpdatedRef.current();
       },
@@ -3198,12 +3201,6 @@ export function AppPage() {
     ],
   );
 
-  const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(
-    organizationId,
-    canvasId,
-    effectiveLiveCanvasVersionId,
-  );
-
   const cancelPendingCanvasSaves = useCallback(() => {
     canvasSaveSessionRef.current += 1;
     clearQueuedCanvasSave();
@@ -3220,24 +3217,26 @@ export function AppPage() {
   );
 
   const handleCommittedVersionId = useCallback(
-    (versionId: string) => {
-      setEditSessionActive(false);
-      previewingCurrentVersionRef.current = false;
-      activeCanvasVersionIdRef.current = "";
-      setActiveCanvasVersion(null);
-      setDraftCanvasSpec(null);
-      draftCanvasSpecsRef.current.clear();
+    (_versionId: string) => {
+      flushSync(() => {
+        setEditSessionActive(false);
+        setActiveCanvasVersion(null);
+        setDraftCanvasSpec(null);
+        draftCanvasSpecsRef.current.clear();
 
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.delete("version");
-        next.delete("branch");
-        return clearComponentSidebarSearchParams(next);
+        setSearchParams((current) => {
+          const next = new URLSearchParams(current);
+          next.delete("version");
+          next.delete("branch");
+          return clearComponentSidebarSearchParams(next);
+        });
       });
 
-      void refreshLatestLiveCanvasData({ liveVersionId: versionId });
+      editSessionActiveRef.current = false;
+      previewingCurrentVersionRef.current = false;
+      activeCanvasVersionIdRef.current = "";
     },
-    [refreshLatestLiveCanvasData, setSearchParams],
+    [setSearchParams],
   );
 
   const { handleCommitStaging, handleResetStaging, commitStagingPending, resetStagingPending } = useDraftStagingActions(
@@ -3358,6 +3357,8 @@ export function AppPage() {
 
       if (!isCurrentLive) {
         void queryClient.cancelQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+        void queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionID) });
+        void queryClient.invalidateQueries({ queryKey: canvasKeys.versionStagedDetail(canvasId, versionID) });
       }
 
       activeCanvasVersionIdRef.current = versionID;
@@ -3494,7 +3495,7 @@ export function AppPage() {
       setEditSessionActive(true);
       previewingCurrentVersionRef.current = true;
       handleUseVersion(effectiveLiveCanvasVersionId);
-      await resyncDraftToStaged(effectiveLiveCanvasVersionId, { bumpResetNonce: false });
+      await resyncStagedEditorState(effectiveLiveCanvasVersionId, { bumpResetNonce: false });
       return true;
     })();
 
@@ -3511,7 +3512,7 @@ export function AppPage() {
     effectiveLiveCanvasVersionId,
     selectableVersionsById,
     handleUseVersion,
-    resyncDraftToStaged,
+    resyncStagedEditorState,
   ]);
 
   handleRemoteStagingUpdatedRef.current = async () => {
@@ -3527,7 +3528,7 @@ export function AppPage() {
     }
 
     if (editSessionActive && isViewingCurrentLiveVersion) {
-      await resyncDraftToStaged(targetVersionId, { bumpResetNonce: false });
+      await resyncStagedEditorState(targetVersionId, { bumpResetNonce: false });
       return;
     }
 
@@ -3542,7 +3543,7 @@ export function AppPage() {
     }
 
     if (editSessionActive && isViewingCurrentLiveVersion) {
-      await resyncDraftToStaged(effectiveLiveCanvasVersionId, { bumpResetNonce: false });
+      await resyncStagedEditorState(effectiveLiveCanvasVersionId, { bumpResetNonce: false });
       return true;
     }
 
@@ -3552,7 +3553,7 @@ export function AppPage() {
     effectiveLiveCanvasVersionId,
     enterLiveEditSession,
     isViewingCurrentLiveVersion,
-    resyncDraftToStaged,
+    resyncStagedEditorState,
   ]);
 
   const handleToggleEditMode = useCallback(async () => {

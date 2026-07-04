@@ -1,6 +1,7 @@
 import {
   canvasesDescribeCanvasVersion,
   canvasesGetCanvasStaging,
+  canvasesListCanvasVersions,
   type CanvasesCanvasVersion,
   type CanvasesStagingSummary,
 } from "@/api-client";
@@ -97,16 +98,55 @@ export async function fetchCanvasVersionWithSpec(
   versionId: string,
   stage = false,
 ): Promise<CanvasesCanvasVersion | undefined> {
-  const [describeResponse, canvasYaml] = await Promise.all([
-    canvasesDescribeCanvasVersion(
+  const describeResponse = await canvasesDescribeCanvasVersion(
+    withOrganizationHeader({
+      path: { canvasId, versionId },
+    }),
+  );
+
+  try {
+    const canvasYaml = await fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, versionId, stage);
+    return canvasVersionWithSpecFromYaml(describeResponse.data?.version, canvasYaml);
+  } catch (error) {
+    if (stage) {
+      throw error;
+    }
+
+    // Committed yaml reads are live-version-only. Historical versions keep their
+    // graph on the version row returned by the list API.
+    const listResponse = await canvasesListCanvasVersions(
       withOrganizationHeader({
-        path: { canvasId, versionId },
+        path: { canvasId },
+        query: { limit: 50 },
+      }),
+    );
+    const listVersion = listResponse.data?.versions?.find((item) => item.metadata?.id === versionId);
+    if (listVersion?.spec) {
+      return listVersion;
+    }
+
+    throw error;
+  }
+}
+
+// fetchLiveCommittedCanvasVersionWithSpec loads the current live version's
+// committed canvas.yaml without pinning a version_id on the repository read.
+// After a remote commit the previously-active version id is stale, but the live
+// file endpoint still resolves to the new live version automatically.
+export async function fetchLiveCommittedCanvasVersionWithSpec(
+  canvasId: string,
+): Promise<CanvasesCanvasVersion | undefined> {
+  const [listResponse, canvasYaml] = await Promise.all([
+    canvasesListCanvasVersions(
+      withOrganizationHeader({
+        path: { canvasId },
+        query: { limit: 1 },
       }),
     ),
-    fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, versionId, stage),
+    fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH),
   ]);
 
-  return canvasVersionWithSpecFromYaml(describeResponse.data?.version, canvasYaml);
+  return canvasVersionWithSpecFromYaml(listResponse.data?.versions?.[0], canvasYaml);
 }
 
 export type ConsoleSpecData = {
