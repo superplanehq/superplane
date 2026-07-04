@@ -6,10 +6,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	"gorm.io/gorm"
 )
 
 func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName, name string) (*pb.UpdateSecretNameResponse, error) {
@@ -37,28 +39,29 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 	}
 
 	oldName := secret.Name
-	updated, err := secret.UpdateName(name)
-	if err != nil {
-		if errors.Is(err, models.ErrNameAlreadyUsed) {
-			return nil, grpcerrors.InvalidArgument(err, "invalid secret name")
-		}
-		return nil, grpcerrors.Internal(err, "failed to update secret name")
-	}
-
+	var reEncrypted []byte
 	if len(secret.Data) > 0 {
 		plainData, err := decryptSecretData(ctx, encryptor, models.Secret{Name: oldName, Data: secret.Data})
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "failed to decrypt secret data for re-encryption")
 		}
-		reEncrypted, err := encryptSecretData(ctx, encryptor, name, plainData)
+		reEncrypted, err = encryptSecretData(ctx, encryptor, name, plainData)
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "failed to re-encrypt secret data with new name")
 		}
-		updated, err = updated.UpdateData(reEncrypted)
-		if err != nil {
-			return nil, grpcerrors.Internal(err, "failed to persist re-encrypted secret data")
+	}
+
+	var updated *models.Secret
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		updated, txErr = secret.UpdateNameAndData(tx, name, reEncrypted)
+		return txErr
+	})
+	if err != nil {
+		if errors.Is(err, models.ErrNameAlreadyUsed) {
+			return nil, grpcerrors.InvalidArgument(err, "invalid secret name")
 		}
-		updated.Data = reEncrypted
+		return nil, grpcerrors.Internal(err, "failed to update secret name")
 	}
 
 	s, err := serializeSecret(ctx, encryptor, *updated)

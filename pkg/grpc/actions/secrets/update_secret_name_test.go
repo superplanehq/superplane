@@ -86,13 +86,27 @@ func Test__UpdateSecretName(t *testing.T) {
 	t.Run("name already used", func(t *testing.T) {
 		existingName := support.RandomName("secret")
 		otherName := support.RandomName("secret")
-		createEncryptedSecret(t, existingName, map[string]string{"key": "value"})
-		createEncryptedSecret(t, otherName, map[string]string{"key": "value"})
+		existingData := map[string]string{"key": "existing"}
+		otherData := map[string]string{"key": "other"}
+		createEncryptedSecret(t, existingName, existingData)
+		createEncryptedSecret(t, otherName, otherData)
 
-		_, err := UpdateSecretName(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), otherName, existingName)
+		secretBefore, err := models.FindSecretByName(models.DomainTypeOrganization, r.Organization.ID, otherName)
+		require.NoError(t, err)
+
+		_, err = UpdateSecretName(context.Background(), encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), otherName, existingName)
 		code, msg, ok := grpcerrors.HandlerStatus(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
 		assert.Equal(t, "invalid secret name", msg)
+
+		secretAfter, err := models.FindSecretByName(models.DomainTypeOrganization, r.Organization.ID, otherName)
+		require.NoError(t, err)
+		assert.Equal(t, secretBefore.Name, secretAfter.Name)
+		assert.Equal(t, secretBefore.Data, secretAfter.Data)
+
+		decrypted, err := decryptSecretData(context.Background(), encryptor, *secretAfter)
+		require.NoError(t, err)
+		assert.Equal(t, otherData, decrypted)
 	})
 }
