@@ -102,7 +102,10 @@ export function useCanvasWebsocket(
   enabled = true,
   onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void,
 ): void {
-  const nodeExecutionStore = useNodeExecutionStore();
+  const updateNodeEvent = useNodeExecutionStore((state) => state.updateNodeEvent);
+  const updateNodeExecution = useNodeExecutionStore((state) => state.updateNodeExecution);
+  const addNodeQueueItem = useNodeExecutionStore((state) => state.addNodeQueueItem);
+  const removeNodeQueueItem = useNodeExecutionStore((state) => state.removeNodeQueueItem);
   const queryClient = useQueryClient();
 
   // Queue for messages per nodeId
@@ -254,7 +257,7 @@ export function useCanvasWebsocket(
         case "workflow_event_created":
           if (payload && "nodeId" in payload && payload.nodeId) {
             const workflowEvent = payload as CanvasesCanvasEvent;
-            nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
+            updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
             if (workflowEvent.root) {
               invalidateRuns();
             }
@@ -269,7 +272,7 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const execution = payload as CanvasesCanvasNodeExecution;
             if (execution.nodeId) {
-              nodeExecutionStore.updateNodeExecution(execution.nodeId, execution);
+              updateNodeExecution(execution.nodeId, execution);
 
               if (!patchExecutionInCache(execution)) {
                 invalidateRuns();
@@ -288,7 +291,7 @@ export function useCanvasWebsocket(
         case "queue_item_created":
           if (payload && "nodeId" in payload && payload.nodeId) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
-            nodeExecutionStore.addNodeQueueItem(queueItem.nodeId!, queueItem);
+            addNodeQueueItem(queueItem.nodeId!, queueItem);
             invalidateRuns();
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
@@ -297,7 +300,7 @@ export function useCanvasWebsocket(
         case "queue_item_consumed":
           if (payload && "nodeId" in payload && payload.nodeId && "id" in payload && payload.id) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
-            nodeExecutionStore.removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
+            removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
@@ -350,7 +353,10 @@ export function useCanvasWebsocket(
       }
     },
     [
-      nodeExecutionStore,
+      updateNodeEvent,
+      updateNodeExecution,
+      addNodeQueueItem,
+      removeNodeQueueItem,
       queryClient,
       canvasId,
       onNodeEvent,
