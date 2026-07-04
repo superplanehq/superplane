@@ -65,12 +65,44 @@ func (s *CanvasSteps) LoginAs(account *models.Account) {
 }
 
 // ExitEditMode leaves edit mode and returns to the live canvas view.
+// Commit already ends the edit session in the UI; this is a no-op when live view is active.
 func (s *CanvasSteps) ExitEditMode() {
+	if s.isOnLiveView() {
+		return
+	}
+
+	require.Eventually(s.t, func() bool {
+		if s.isOnLiveView() {
+			return true
+		}
+		exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
+		visible, visibleErr := exitEditButton.IsVisible()
+		if visibleErr != nil || !visible {
+			return false
+		}
+		disabled, err := exitEditButton.IsDisabled()
+		return err == nil && !disabled
+	}, 30*time.Second, 200*time.Millisecond)
+
+	if s.isOnLiveView() {
+		return
+	}
+
 	s.waitForEnabledExitEditButton()
 	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
 	require.NoError(s.t, exitEditButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.waitForEnabledEditButton()
 	s.session.Sleep(500)
+}
+
+func (s *CanvasSteps) isOnLiveView() bool {
+	editButton := q.TestID("canvas-edit-button").Run(s.session)
+	visible, err := editButton.IsVisible()
+	if err != nil || !visible {
+		return false
+	}
+	disabled, err := editButton.IsDisabled()
+	return err == nil && !disabled
 }
 
 // OpenVersionsSidebar reveals the versions sidebar from the current canvas mode.

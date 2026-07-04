@@ -18,10 +18,10 @@ func TestCanvasMultiUserStaging(t *testing.T) {
 		steps := &canvasMultiUserStagingSteps{t: t}
 		steps.start()
 
+		steps.givenACanvas()
 		ownerAccount := steps.session.Account
 		ownerUserID := steps.userIDForAccount(ownerAccount.Email)
 
-		steps.givenACanvas()
 		steps.whenUserStagesNode(ownerAccount, "AlphaNode")
 		steps.whenUserExitsEditMode()
 

@@ -146,6 +146,7 @@ func applyLayoutPositions(
 
 // ResolveUpdateAutoLayout picks the auto-layout settings for canvas update.
 // Flags take precedence; otherwise a file-level autoLayout field is used.
+// When neither is set, horizontal full-canvas layout is applied (same as create).
 func ResolveUpdateAutoLayout(
 	hasFlags bool,
 	fileAutoLayout *openapi_client.CanvasesCanvasAutoLayout,
@@ -162,5 +163,6 @@ func ResolveUpdateAutoLayout(
 	if fileAutoLayout != nil {
 		return fileAutoLayout, nil
 	}
-	return nil, nil
+	defaultLayout := DefaultAutoLayout()
+	return &defaultLayout, nil
 }

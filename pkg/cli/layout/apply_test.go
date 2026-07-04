@@ -53,3 +53,18 @@ func TestResolveUpdateAutoLayoutRejectsFlagsWithFileAutoLayout(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "autoLayout")
 }
+
+func TestResolveUpdateAutoLayoutDefaultsToFullCanvasHorizontal(t *testing.T) {
+	autoLayout, err := ResolveUpdateAutoLayout(false, nil, "", "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, autoLayout)
+	require.Equal(t, openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL, autoLayout.GetAlgorithm())
+	require.Equal(t, openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS, autoLayout.GetScope())
+	require.Empty(t, autoLayout.GetNodeIds())
+}
+
+func TestResolveUpdateAutoLayoutDisableViaFlags(t *testing.T) {
+	autoLayout, err := ResolveUpdateAutoLayout(true, nil, "disable", "", nil)
+	require.NoError(t, err)
+	require.Nil(t, autoLayout)
+}
