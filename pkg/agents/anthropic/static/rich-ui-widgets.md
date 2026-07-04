@@ -50,18 +50,20 @@ Second question?
 ```
 Categories with `##` headings. Criteria should be functional requirements, not implementation details.
 
-## Draft Actions
+## Staging Actions
 
-**When to use:** After successfully creating or updating a canvas/console draft. Renders Publish/Discard/See in Editor buttons. Print in the chat response, not as a file.
+**When to use:** After successfully staging canvas, console, or repository file edits. Renders Commit/Discard/See changes buttons. Print in the chat response, not as a file.
 
 ```
-:::draft-actions
-versionId: <uuid>
-message: Draft ready — added health check nodes
+:::staging-actions
+canvasId: <session-canvas-id>
+message: Added health check nodes
 :::
 ```
 
-`versionId` is the same value as the draft id (`version_id`) returned by `superplane_app` action `patch_draft` — a draft's id *is* a version id. Use it as the `versionId` in this block.
+`message` is the commit message shown in the UI — describe the app change only (no "Staging ready" prefix).
+
+`canvasId` must match the current session canvas ID from the preamble.
 ## Chart
 
 **When to use:** Showing run history, metrics, analytics, or any numerical data the user asks about.

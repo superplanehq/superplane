@@ -4,19 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
-	"sort"
-	"strings"
 )
 
 const (
@@ -88,6 +89,7 @@ func readRepositorySpecFile(
 	path string,
 	stage bool,
 ) (string, error) {
+	db := database.DB(ctx)
 	canvas, version, err := loadRepositorySpecVersionForRead(ctx, organizationID, canvasID, versionID)
 	if err != nil {
 		return "", err
@@ -99,19 +101,7 @@ func readRepositorySpecFile(
 	}
 
 	if stage {
-		if version.State != models.CanvasVersionStateDraft {
-			stage = false
-		} else if err := ensureStagedReadAllowed(ctx, version); err != nil {
-			return "", err
-		}
-	}
-
-	if stage {
-		_, rows, stagingErr := stagingSummaryForVersion(version.ID)
-		if stagingErr != nil {
-			return "", stagingErr
-		}
-		return effectiveSpecYAML(canvas, version, organizationID, rows, normalized)
+		return ReadStagedRepositorySpecFile(ctx, db, organizationID, canvasID, version, normalized)
 	}
 
 	switch normalized {
@@ -148,7 +138,7 @@ func loadRepositorySpecVersionForRead(
 
 	var version *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		resolvedVersionID, resolveErr := resolveConsoleVersionID(tx, canvas, strings.TrimSpace(versionID))
+		resolvedVersionID, resolveErr := resolveLiveCanvasVersionID(tx, canvas, versionID)
 		if resolveErr != nil {
 			return resolveErr
 		}
@@ -159,10 +149,6 @@ func loadRepositorySpecVersionForRead(
 				return grpcerrors.NotFound(loadErr, "version not found")
 			}
 			return loadErr
-		}
-
-		if accessErr := ensureConsoleVersionReadable(ctx, tx, canvas, v); accessErr != nil {
-			return accessErr
 		}
 
 		version = v
@@ -178,13 +164,39 @@ func loadRepositorySpecVersionForRead(
 	return canvas, version, nil
 }
 
-// ApplyRepositorySpecFileOperations parses canvas.yaml/console.yaml content into
-// the draft version row. It is the validated write path shared by the
-// staging-commit flow (CommitCanvasStaging) and the direct-commit flow
-// (CommitCanvasRepositoryFiles). When autoLayout is set it lays out canvas.yaml
-// during the write; when discardStaging is set it drops any staged edits for the
-// version in the same transaction as the version-row write.
-func ApplyRepositorySpecFileOperations(
+// ApplyRepositorySpecFileOperationsToCommitTarget parses canvas.yaml/console.yaml
+// content into a new commit version row during staging commit.
+func ApplyRepositorySpecFileOperationsToCommitTarget(
+	ctx context.Context,
+	usageService usage.Service,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	webhookBaseURL string,
+	authService authorization.Authorization,
+	autoLayout *pb.CanvasAutoLayout,
+	operations []*pb.CanvasRepositoryFileOperation,
+) error {
+	return applyRepositorySpecFileOperations(
+		ctx,
+		usageService,
+		encryptor,
+		registry,
+		organizationID,
+		canvasID,
+		versionID,
+		webhookBaseURL,
+		authService,
+		autoLayout,
+		false,
+		operations,
+		true,
+	)
+}
+
+func applyRepositorySpecFileOperations(
 	ctx context.Context,
 	usageService usage.Service,
 	encryptor crypto.Encryptor,
@@ -197,6 +209,7 @@ func ApplyRepositorySpecFileOperations(
 	autoLayout *pb.CanvasAutoLayout,
 	discardStaging bool,
 	operations []*pb.CanvasRepositoryFileOperation,
+	commitTarget bool,
 ) error {
 	if strings.TrimSpace(versionID) == "" {
 		return grpcerrors.InvalidArgument(nil, "version_id is required for canvas.yaml and console.yaml updates")
@@ -233,6 +246,7 @@ func ApplyRepositorySpecFileOperations(
 				webhookBaseURL,
 				authService,
 				discardStaging,
+				commitTarget,
 			)
 			if err != nil {
 				return err
@@ -243,7 +257,7 @@ func ApplyRepositorySpecFileOperations(
 				return err
 			}
 
-			_, err = UpdateConsole(ctx, organizationID, canvasID, versionID, panels, layout, discardStaging)
+			_, err = UpdateConsole(ctx, organizationID, canvasID, versionID, panels, layout, discardStaging, commitTarget)
 			if err != nil {
 				return err
 			}
@@ -272,33 +286,4 @@ func ParseAndValidateCanvasYAML(registry *registry.Registry, organizationID, tex
 func ValidateConsoleYAML(text string) error {
 	_, _, err := consolePanelsLayoutFromYAMLText(text)
 	return err
-}
-
-func resolveCommitCanvasAutoLayout(hasAutoLayout bool, autoLayout *pb.CanvasAutoLayout) *pb.CanvasAutoLayout {
-	if !hasAutoLayout {
-		return nil
-	}
-	if autoLayout == nil {
-		return nil
-	}
-	if autoLayout.Algorithm == pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED &&
-		autoLayout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED &&
-		len(autoLayout.NodeIds) == 0 {
-		return nil
-	}
-	return autoLayout
-}
-
-func splitRepositoryFileOperations(operations []*pb.CanvasRepositoryFileOperation) (specOps []*pb.CanvasRepositoryFileOperation, gitOps []*pb.CanvasRepositoryFileOperation) {
-	for _, operation := range operations {
-		if operation == nil {
-			continue
-		}
-		if IsRepositorySpecFilePath(operation.GetPath()) {
-			specOps = append(specOps, operation)
-			continue
-		}
-		gitOps = append(gitOps, operation)
-	}
-	return specOps, gitOps
 }

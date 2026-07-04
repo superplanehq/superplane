@@ -17,17 +17,16 @@ var ErrCanvasNameAlreadyExists = errors.New("canvas name already exists")
 const canvasNameUniqueConstraint = "workflows_organization_id_name_key"
 
 type Canvas struct {
-	ID                     uuid.UUID
-	OrganizationID         uuid.UUID
-	LiveVersionID          *uuid.UUID
-	CanvasFolderID         *uuid.UUID `gorm:"column:folder_id"`
-	Name                   string
-	Description            string
-	CreatedBy              *uuid.UUID
-	NextDraftDisplayNumber int `gorm:"column:next_draft_display_number;not null;default:1"`
-	CreatedAt              *time.Time
-	UpdatedAt              *time.Time
-	DeletedAt              gorm.DeletedAt `gorm:"index"`
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	LiveVersionID  *uuid.UUID
+	CanvasFolderID *uuid.UUID `gorm:"column:folder_id"`
+	Name           string
+	Description    string
+	CreatedBy      *uuid.UUID
+	CreatedAt      *time.Time
+	UpdatedAt      *time.Time
+	DeletedAt      gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) TableName() string {
@@ -329,6 +328,7 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 			"workflows.live_version_id",
 			"workflows.folder_id",
 			"workflows.name",
+			"workflows.description",
 			"workflows.created_by",
 			"workflows.created_at",
 			"workflows.updated_at",

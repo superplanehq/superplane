@@ -2,42 +2,36 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { consumeLocalStagingWrite } from "@/lib/canvasStagingEcho";
-import { canvasKeys, pruneDeletedDraftBranchFromCache } from "@/hooks/useCanvasData";
+import { canvasKeys } from "@/hooks/useCanvasData";
 
 import { processCanvasLifecycleEvent } from "./lib/canvas-version-lifecycle";
 
 type UseCanvasLifecycleEventHandlersOptions = {
   canvasId?: string;
+  currentUserId?: string;
   activeCanvasVersionId: string;
-  isEditing: boolean;
   editSessionActive: boolean;
-  isCreatingDraftBranch: boolean;
   hasLocalSaveActivity: boolean;
   isViewingLiveVersion: boolean;
   canvasDeletedRemotely: boolean;
   consumeIgnoredCanvasUpdatedEcho: () => boolean;
-  consumeIgnoredCreateDraftEcho: (targetCanvasId?: string, eventVersionId?: string) => boolean;
-  consumeIgnoredCanvasVersionUpdatedEcho: (versionId?: string) => boolean;
   resyncDraftToCommitted: (versionId: string) => Promise<void>;
-  resyncDraftToStaged: (versionId: string) => Promise<void>;
+  onRemoteStagingUpdated?: () => void;
   setCanvasDeletedRemotely: (value: boolean) => void;
   setRemoteCanvasUpdatePending: (value: boolean) => void;
 };
 
 export function useCanvasLifecycleEventHandlers({
   canvasId,
+  currentUserId,
   activeCanvasVersionId,
-  isEditing,
   editSessionActive,
-  isCreatingDraftBranch,
   hasLocalSaveActivity,
   isViewingLiveVersion,
   canvasDeletedRemotely,
   consumeIgnoredCanvasUpdatedEcho,
-  consumeIgnoredCreateDraftEcho,
-  consumeIgnoredCanvasVersionUpdatedEcho,
   resyncDraftToCommitted,
-  resyncDraftToStaged,
+  onRemoteStagingUpdated,
   setCanvasDeletedRemotely,
   setRemoteCanvasUpdatePending,
 }: UseCanvasLifecycleEventHandlersOptions) {
@@ -46,7 +40,9 @@ export function useCanvasLifecycleEventHandlers({
   const invalidateCanvasVersionData = useCallback(
     (targetCanvasId: string, targetVersionId?: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleAll(targetCanvasId) });
       if (targetVersionId) {
         queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(targetCanvasId, targetVersionId) });
       }
@@ -54,33 +50,17 @@ export function useCanvasLifecycleEventHandlers({
     [queryClient],
   );
 
-  const pruneDeletedCanvasVersion = useCallback(
-    (targetVersionId: string) => {
-      if (!canvasId) {
-        return;
-      }
-
-      void pruneDeletedDraftBranchFromCache(queryClient, canvasId, targetVersionId);
-    },
-    [canvasId, queryClient],
-  );
-
   const handleCanvasLifecycleEvent = useCallback(
-    (payload: { canvasId: string; versionId?: string }, eventName: string) =>
+    (payload: { canvasId: string }, eventName: string) =>
       processCanvasLifecycleEvent({
         payload,
         eventName,
         canvasId,
         activeCanvasVersionId,
-        isEditing,
         editSessionActive,
-        isCreatingDraftBranch,
         hasLocalSaveActivity,
         consumeIgnoredCanvasUpdatedEcho,
-        consumeIgnoredCreateDraftEcho,
-        consumeIgnoredCanvasVersionUpdatedEcho,
         invalidateCanvasVersionData,
-        pruneDeletedCanvasVersion,
         resyncDraftToCommitted: (versionId) => {
           void resyncDraftToCommitted(versionId);
         },
@@ -91,14 +71,9 @@ export function useCanvasLifecycleEventHandlers({
       activeCanvasVersionId,
       canvasId,
       consumeIgnoredCanvasUpdatedEcho,
-      consumeIgnoredCreateDraftEcho,
-      consumeIgnoredCanvasVersionUpdatedEcho,
       editSessionActive,
-      isCreatingDraftBranch,
       hasLocalSaveActivity,
       invalidateCanvasVersionData,
-      isEditing,
-      pruneDeletedCanvasVersion,
       resyncDraftToCommitted,
       setCanvasDeletedRemotely,
       setRemoteCanvasUpdatePending,
@@ -111,24 +86,31 @@ export function useCanvasLifecycleEventHandlers({
   );
 
   const handleCanvasStagingEvent = useCallback(
-    (payload: { canvasId: string; versionId?: string }) => {
-      if (!payload.versionId) {
+    (payload: { canvasId: string; userId?: string }) => {
+      if (payload.userId && currentUserId && payload.userId !== currentUserId) {
         return false;
       }
 
-      if (consumeLocalStagingWrite(canvasId, payload.versionId)) {
+      if (consumeLocalStagingWrite(canvasId, payload.userId)) {
         return false;
       }
 
-      if (payload.versionId === activeCanvasVersionId && hasLocalSaveActivity) {
+      if (activeCanvasVersionId && hasLocalSaveActivity) {
         setRemoteCanvasUpdatePending(true);
         return true;
       }
 
-      void resyncDraftToStaged(payload.versionId);
+      onRemoteStagingUpdated?.();
       return true;
     },
-    [activeCanvasVersionId, canvasId, hasLocalSaveActivity, resyncDraftToStaged, setRemoteCanvasUpdatePending],
+    [
+      activeCanvasVersionId,
+      canvasId,
+      currentUserId,
+      hasLocalSaveActivity,
+      onRemoteStagingUpdated,
+      setRemoteCanvasUpdatePending,
+    ],
   );
 
   return {
