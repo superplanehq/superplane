@@ -117,7 +117,7 @@ export function buildStepStatusTimeline(
 
   const entries: StepStatusEntry[] = [
     { key: "triggered", label: "Triggered", dotClassName: "bg-violet-400", timestamp: new Date(start).toISOString() },
-    { key: "queued", label: "Queued", dotClassName: "bg-slate-400", timestamp: at(0.1) },
+    { key: "queued", label: "Queued", dotClassName: "bg-orange-400", timestamp: at(0.1) },
   ];
 
   const isWaiting = WAITING_STATUS_STATES.has(getExecutionEventState(node, execution));
