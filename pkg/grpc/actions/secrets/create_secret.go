@@ -13,7 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
-	"github.com/superplanehq/superplane/pkg/secrets"
+	secretstore "github.com/superplanehq/superplane/pkg/secrets"
 )
 
 func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID string, spec *pb.Secret) (*pb.CreateSecretResponse, error) {
@@ -65,7 +65,7 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType st
 func protoToSecretProvider(provider pb.Secret_Provider) string {
 	switch provider {
 	case pb.Secret_PROVIDER_LOCAL:
-		return secrets.ProviderLocal
+		return secretstore.ProviderLocal
 	default:
 		return ""
 	}
@@ -73,7 +73,7 @@ func protoToSecretProvider(provider pb.Secret_Provider) string {
 
 func secretProviderToProto(provider string) pb.Secret_Provider {
 	switch provider {
-	case secrets.ProviderLocal:
+	case secretstore.ProviderLocal:
 		return pb.Secret_PROVIDER_LOCAL
 	default:
 		return pb.Secret_PROVIDER_UNKNOWN
@@ -109,26 +109,10 @@ func prepareSecretData(ctx context.Context, encryptor crypto.Encryptor, secret *
 
 // decryptSecretData decrypts a secret's stored data and returns the key-value map.
 func decryptSecretData(ctx context.Context, encryptor crypto.Encryptor, secret models.Secret) (map[string]string, error) {
-	data, err := encryptor.Decrypt(ctx, secret.Data, []byte(secret.Name))
-	if err != nil {
-		return nil, err
-	}
-	var values map[string]string
-	if len(data) == 0 {
-		return make(map[string]string), nil
-	}
-	err = json.Unmarshal(data, &values)
-	if err != nil {
-		return nil, err
-	}
-	return values, nil
+	return secretstore.DecryptLocalData(ctx, encryptor, secret)
 }
 
 // encryptSecretData marshals the key-value map and encrypts it for storage.
 func encryptSecretData(ctx context.Context, encryptor crypto.Encryptor, secretName string, data map[string]string) ([]byte, error) {
-	raw, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	return encryptor.Encrypt(ctx, raw, []byte(secretName))
+	return secretstore.EncryptLocalData(ctx, encryptor, models.Secret{Name: secretName}, data)
 }

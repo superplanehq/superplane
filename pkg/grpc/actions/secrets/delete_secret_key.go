@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	secretstore "github.com/superplanehq/superplane/pkg/secrets"
 )
 
 func DeleteSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName, keyName string) (*pb.DeleteSecretKeyResponse, error) {
@@ -40,7 +41,7 @@ func DeleteSecretKey(ctx context.Context, encryptor crypto.Encryptor, domainType
 		return nil, grpcerrors.InvalidArgument(nil, "secret must have at least one key")
 	}
 
-	encrypted, err := encryptSecretData(ctx, encryptor, secret.Name, data)
+	encrypted, err := secretstore.EncryptLocalData(ctx, encryptor, *secret, data)
 	if err != nil {
 		return nil, err
 	}

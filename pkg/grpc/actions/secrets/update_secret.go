@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	secretstore "github.com/superplanehq/superplane/pkg/secrets"
 )
 
 func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName string, spec *pb.Secret) (*pb.UpdateSecretResponse, error) {
@@ -40,7 +41,11 @@ func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, d
 		return nil, grpcerrors.InvalidArgument(nil, "cannot update provider")
 	}
 
-	data, err := prepareSecretData(ctx, encryptor, spec)
+	if spec.Spec.Local == nil || spec.Spec.Local.Data == nil {
+		return nil, grpcerrors.InvalidArgument(nil, "missing data")
+	}
+
+	data, err := secretstore.EncryptLocalData(ctx, encryptor, *secret, spec.Spec.Local.Data)
 	if err != nil {
 		return nil, err
 	}

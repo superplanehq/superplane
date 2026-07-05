@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	secretstore "github.com/superplanehq/superplane/pkg/secrets"
 	"gorm.io/gorm"
 )
 
@@ -38,14 +39,13 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 		return &pb.UpdateSecretNameResponse{Secret: s}, nil
 	}
 
-	oldName := secret.Name
 	var reEncrypted []byte
 	if len(secret.Data) > 0 {
-		plainData, err := decryptSecretData(ctx, encryptor, models.Secret{Name: oldName, Data: secret.Data})
+		plainData, err := decryptSecretData(ctx, encryptor, *secret)
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "failed to decrypt secret data for re-encryption")
 		}
-		reEncrypted, err = encryptSecretData(ctx, encryptor, name, plainData)
+		reEncrypted, err = secretstore.EncryptLocalData(ctx, encryptor, *secret, plainData)
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "failed to re-encrypt secret data with new name")
 		}
