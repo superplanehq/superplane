@@ -62,9 +62,8 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, grpcerrors.Internal(err, "failed to generate token")
 	}
 
-	db := database.DB(ctx)
 	var sa *models.User
-	err = db.Transaction(func(tx *gorm.DB) error {
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		var txErr error
 		sa, txErr = models.CreateServiceAccount(tx, orgUUID, req.Name, description, createdByUUID)
 		if txErr != nil {
@@ -86,6 +85,7 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, grpcerrors.Internal(err, "failed to create service account")
 	}
 
+	db := database.DB(ctx)
 	creator, err := creatorUserForServiceAccount(db, orgID, sa)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to create service account")

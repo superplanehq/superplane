@@ -26,8 +26,7 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 		return nil, grpcerrors.InvalidArgument(nil, "id is required")
 	}
 
-	db := database.DB(ctx)
-	user, err := models.FindActiveUserByIDInTransaction(db, orgID, req.Id)
+	user, err := models.FindActiveUserByID(orgID, req.Id)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "service account not found")
 	}
@@ -45,11 +44,12 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 	}
 
 	user.UpdatedAt = time.Now()
-	err = db.Save(user).Error
+	err = database.Conn().Save(user).Error
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to update service account")
 	}
 
+	db := database.DB(ctx)
 	creator, err := creatorUserForServiceAccount(db, orgID, user)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to update service account")
