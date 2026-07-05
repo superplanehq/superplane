@@ -8,7 +8,7 @@ import { LiveCanvasSidebarRow } from "@/components/CanvasToolSidebar/LiveCanvasS
 import { RunsTabListView } from "@/components/CanvasToolSidebar/RunsTabListView";
 import { useRunFilters } from "@/components/CanvasToolSidebar/useRunFilters";
 import { cn } from "@/lib/utils";
-import { RunPanel, type RunDetailContext, type RunDisplayMode } from "./RunPanel";
+import { RunPanel, type RunDisplayMode } from "./RunPanel";
 import { shortId } from "./runPresentation";
 import { RunCanvas } from "./storybooks/RunCanvas";
 import {
@@ -87,12 +87,10 @@ function RunInspectionRightPanelPlayground({
   initialRunId = null,
   initialNodeId = null,
   initialDisplayMode = "split",
-  context = "inspection",
 }: {
   initialRunId?: string | null;
   initialNodeId?: string | null;
   initialDisplayMode?: RunDisplayMode;
-  context?: RunDetailContext;
 }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(initialRunId);
   const [expandedNodeId, setExpandedNodeId] = useState<string | null>(initialNodeId);
@@ -158,7 +156,6 @@ function RunInspectionRightPanelPlayground({
             canvasId={RUNS_STORY_CANVAS_ID}
             run={selectedRun}
             workflowNodes={mockWorkflowNodes}
-            context={context}
             expandedNodeId={expandedNodeId}
             onToggleNode={toggleNode}
             onExpandNode={expandNode}
@@ -232,10 +229,4 @@ export const FullPage: Story = {
 
 export const Minimized: Story = {
   render: () => <RunInspectionRightPanelPlayground initialRunId="run-passed" initialDisplayMode="min" />,
-};
-
-export const LiveNodeInspector: Story = {
-  render: () => (
-    <RunInspectionRightPanelPlayground initialRunId="run-passed" initialNodeId={DEPLOY_NODE_ID} context="live" />
-  ),
 };

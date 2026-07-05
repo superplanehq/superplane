@@ -27,7 +27,6 @@ import { ErrorBanner, IdentityHeader, StepToolbar } from "./runDetailParts";
 import { buildNodeMap, buildRunPresentation } from "./runPresentation";
 import { findErrorExecutions, getRunStepSummary, getStepActivity, type RunStepFilter } from "./runSummary";
 
-export type RunDetailContext = "live" | "inspection";
 export type RunDisplayMode = "full" | "split" | "min";
 export type { StepDetailMode };
 
@@ -87,13 +86,12 @@ export interface RunPanelProps {
   run: CanvasesCanvasRun | null;
   workflowNodes: ComponentsNode[];
   componentIconMap?: Record<string, string>;
-  context?: RunDetailContext;
   expandedNodeId: string | null;
   onToggleNode: (nodeId: string) => void;
   /** Expand a specific step (used by "jump to failed"); falls back to onToggleNode. */
   onExpandNode?: (nodeId: string) => void;
   onClose: () => void;
-  /** Tooltip for the close button; defaults from context. */
+  /** Tooltip for the close button; defaults to "Back to live canvas". */
   closeLabel?: string;
   displayMode?: RunDisplayMode;
   onSetDisplayMode?: (mode: RunDisplayMode) => void;
@@ -237,7 +235,6 @@ function RunActionsMenu({
 
 function ChromeRow({
   run,
-  context,
   displayMode,
   onSetDisplayMode,
   onPrevRun,
@@ -250,7 +247,6 @@ function ChromeRow({
   closeLabel,
 }: {
   run: CanvasesCanvasRun | null;
-  context: RunDetailContext;
   displayMode: RunDisplayMode;
   onSetDisplayMode?: (mode: RunDisplayMode) => void;
   onPrevRun?: () => void;
@@ -262,7 +258,7 @@ function ChromeRow({
   onClose: () => void;
   closeLabel: string;
 }) {
-  const showNav = context === "inspection" && (Boolean(onPrevRun) || Boolean(onNextRun));
+  const showNav = Boolean(onPrevRun) || Boolean(onNextRun);
 
   return (
     <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-950/10 px-2 py-1.5">
@@ -534,7 +530,6 @@ export function RunPanel({
   run,
   workflowNodes,
   componentIconMap = {},
-  context = "inspection",
   expandedNodeId,
   onToggleNode,
   onExpandNode,
@@ -555,13 +550,12 @@ export function RunPanel({
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
   const presentation = useMemo(() => (run ? buildRunPresentation(run, nodeMap) : null), [run, nodeMap]);
 
-  const resolvedCloseLabel = closeLabel ?? (context === "inspection" ? "Back to live canvas" : "Close");
+  const resolvedCloseLabel = closeLabel ?? "Back to live canvas";
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
       <ChromeRow
         run={run}
-        context={context}
         displayMode={displayMode}
         onSetDisplayMode={onSetDisplayMode}
         onPrevRun={onPrevRun}

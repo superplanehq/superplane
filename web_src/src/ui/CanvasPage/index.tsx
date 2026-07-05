@@ -341,8 +341,6 @@ export interface CanvasPageProps {
   runNodeDetailRun?: CanvasesCanvasRun | null;
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
-  /** Live mode: the latest run the currently selected live node participated in (drives the unified Runs tab). */
-  liveSelectedNodeRun?: CanvasesCanvasRun | null;
   /** Count of currently running runs, shown as an animated badge on the runs-sidebar toggle. */
   runningRunsCount?: number;
   onRunNodeDetailClose?: () => void;
@@ -1225,16 +1223,6 @@ function CanvasPage(props: CanvasPageProps) {
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
 
-  // On the live canvas the inspector only exists while a node is selected;
-  // clicking empty canvas clears the selection and closes the panel entirely
-  // (no "select a component" placeholder).
-  const liveBottomInspectorOpen = Boolean(
-    !props.isRunInspectionMode &&
-      !props.isEditing &&
-      state.componentSidebar.isOpen &&
-      !!state.componentSidebar.selectedNodeId,
-  );
-
   // The run's step accordion now lives in a right-side panel that opens as soon
   // as a run is selected (a node does not need to be picked yet). The expanded
   // step, if any, is driven by runNodeDetailNodeId.
@@ -1252,18 +1240,10 @@ function CanvasPage(props: CanvasPageProps) {
     setRunInspectionPanelCollapsed(false);
   }, [props.runNodeDetailRun?.id, props.runNodeDetailNodeId]);
 
-  const liveSelectedNodeId = state.componentSidebar.selectedNodeId;
-  const [liveExpandedNodeId, setLiveExpandedNodeId] = useState<string | null>(null);
-
-  // A newly selected live node starts with its own step expanded in the run panel.
-  useEffect(() => {
-    setLiveExpandedNodeId(null);
-  }, [liveSelectedNodeId]);
-
   // The run panel is a flex sibling that pushes/shrinks the canvas. It can
   // expand to a full-width page (canvas hidden). The chosen size is persisted so
   // it survives closing/reopening the panel and page reloads.
-  const anyRunPanelOpen = liveBottomInspectorOpen || runInspectionPanelOpen;
+  const anyRunPanelOpen = runInspectionPanelOpen;
   const [runPanelSize, setRunPanelSize] = useState<RunDisplayMode>(loadRunPanelSize);
   const isRunPanelFull = runPanelSize === "full" && anyRunPanelOpen;
   const runPanelWidthClass = runPanelSize === "full" ? "w-full" : runPanelSize === "min" ? "w-1/3" : "w-1/2";
@@ -1592,44 +1572,6 @@ function CanvasPage(props: CanvasPageProps) {
         </div>
       </div>
 
-      {liveBottomInspectorOpen ? (
-        <div
-          className={cn(
-            "flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-l border-slate-950/10 bg-white",
-            runPanelWidthClass,
-          )}
-          data-testid="live-node-detail-panel"
-        >
-          <div className="flex min-h-0 flex-1 flex-col">
-            <RunPanel
-              canvasId={props.runNodeDetailCanvasId ?? ""}
-              run={props.liveSelectedNodeRun ?? null}
-              workflowNodes={props.workflowNodes ?? []}
-              componentIconMap={props.runsComponentIconMap}
-              context="live"
-              expandedNodeId={liveExpandedNodeId ?? liveSelectedNodeId}
-              onToggleNode={(nodeId) =>
-                setLiveExpandedNodeId((prev) => ((prev ?? liveSelectedNodeId) === nodeId ? null : nodeId))
-              }
-              onExpandNode={(nodeId) => setLiveExpandedNodeId(nodeId)}
-              onClose={handleSidebarClose}
-              displayMode={runPanelSize}
-              onSetDisplayMode={setRunPanelSize}
-              onOpenInRunView={
-                props.onSelectRunFromSidebarEvent && props.liveSelectedNodeRun?.id
-                  ? () => {
-                      const runId = props.liveSelectedNodeRun?.id;
-                      if (!runId) return;
-                      const nodeId = liveExpandedNodeId ?? liveSelectedNodeId ?? undefined;
-                      props.onSelectRunFromSidebarEvent?.(runId, nodeId ? { nodeId } : undefined);
-                    }
-                  : undefined
-              }
-            />
-          </div>
-        </div>
-      ) : null}
-
       {runInspectionPanelOpen ? (
         <div
           className={cn(
@@ -1644,7 +1586,6 @@ function CanvasPage(props: CanvasPageProps) {
               run={props.runNodeDetailRun!}
               workflowNodes={props.workflowNodes ?? []}
               componentIconMap={props.runsComponentIconMap}
-              context="inspection"
               expandedNodeId={props.runNodeDetailNodeId ?? null}
               onToggleNode={(nodeId) => {
                 if (nodeId === props.runNodeDetailNodeId) {

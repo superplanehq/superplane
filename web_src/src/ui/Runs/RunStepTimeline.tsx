@@ -237,8 +237,6 @@ function TimelineItem({
 
 /** First timeline item: where the step's input came from (previous step chain / trigger event). */
 function InputItem({
-  isTrigger,
-  chipLabel,
   moreCount,
   payload,
   timestamp,
@@ -246,8 +244,6 @@ function InputItem({
   nodeIcon,
   onOpenChain,
 }: {
-  isTrigger: boolean;
-  chipLabel: string;
   moreCount: number;
   payload: unknown;
   timestamp: string | null;
@@ -265,17 +261,6 @@ function InputItem({
       header={
         <>
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Input</span>
-          <button
-            type="button"
-            onClick={onOpenChain}
-            disabled={!onOpenChain}
-            title={isTrigger ? "Triggering event" : "Open input chain"}
-            className="flex min-w-0 items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-700 disabled:cursor-default disabled:hover:bg-slate-100 disabled:hover:text-slate-600"
-          >
-            <Braces className="h-3 w-3 shrink-0 text-slate-400" />
-            <span className="max-w-[10rem] truncate">{chipLabel}</span>
-            {moreCount > 0 ? <span className="shrink-0 text-slate-500">+{moreCount} more</span> : null}
-          </button>
           {canShowPayload ? (
             <HeaderIconButton
               label="Show input payload"
@@ -283,6 +268,16 @@ function InputItem({
               active={open}
               onClick={toggleOpen}
             />
+          ) : null}
+          {moreCount > 0 && onOpenChain ? (
+            <button
+              type="button"
+              onClick={onOpenChain}
+              title="Open input chain"
+              className="flex shrink-0 items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-700"
+            >
+              +{moreCount} more
+            </button>
           ) : null}
         </>
       }
@@ -484,12 +479,7 @@ export function RunStepTimeline({
 
   const chain = useMemo(() => buildExecutionChain(executions, triggerNodeId), [executions, triggerNodeId]);
   const currentIndex = chain.indexOf(nodeId);
-  const previousNode = useMemo(() => {
-    const previousNodeId = currentIndex > 0 ? chain[currentIndex - 1] : null;
-    return previousNodeId ? workflowNodes.find((node) => node.id === previousNodeId) : null;
-  }, [chain, currentIndex, workflowNodes]);
 
-  const inputChipLabel = isTrigger ? presentation.nodeName : previousNode?.name || "Trigger";
   const inputMoreCount = isTrigger ? 0 : Math.max(0, currentIndex - 1);
   const inputPayload = isTrigger ? run.rootEvent?.data : execution?.rootEvent?.data;
   const inputTimestamp = formatEventTimestamp(
@@ -521,6 +511,32 @@ export function RunStepTimeline({
   );
 
   const [chainModalOpen, setChainModalOpen] = useState(false);
+  const previousStep = useMemo<InputChainStep | null>(() => {
+    if (isTrigger || currentIndex <= 0) return null;
+    const previousNodeId = chain[currentIndex - 1];
+    const node = workflowNodes.find((item) => item.id === previousNodeId);
+    const stepExecution = executions.find((item) => item.nodeId === previousNodeId);
+    const payload =
+      previousNodeId === triggerNodeId
+        ? run.rootEvent?.data
+        : stepExecution
+          ? (extractExecutionPayload(stepExecution) ?? stepExecution.rootEvent?.data)
+          : undefined;
+    return {
+      nodeId: previousNodeId,
+      name: node?.name || previousNodeId,
+      icon: (
+        <RunNodeIcon
+          iconSrc={getHeaderIconSrc(node?.component)}
+          iconSlug={node?.component ? componentIconMap[node.component] : undefined}
+          alt={node?.name || previousNodeId}
+          size={RUN_NODE_ICON_SIZE}
+          className="h-3.5 w-3.5"
+        />
+      ),
+      payload,
+    };
+  }, [isTrigger, chain, currentIndex, workflowNodes, executions, triggerNodeId, run.rootEvent?.data, componentIconMap]);
   const inputChainSteps = useMemo<InputChainStep[]>(() => {
     if (currentIndex <= 0) return [];
     return chain
@@ -555,13 +571,11 @@ export function RunStepTimeline({
   return (
     <div className="bg-slate-50 px-3 py-3">
       <InputItem
-        isTrigger={isTrigger}
-        chipLabel={inputChipLabel}
         moreCount={inputMoreCount}
-        payload={inputPayload}
+        payload={previousStep?.payload ?? inputPayload}
         timestamp={inputTimestamp}
-        nodeName={presentation.nodeName}
-        nodeIcon={actionMarker}
+        nodeName={previousStep?.name ?? presentation.nodeName}
+        nodeIcon={previousStep?.icon ?? actionMarker}
         onOpenChain={inputChainSteps.length > 0 ? () => setChainModalOpen(true) : undefined}
       />
       {inputChainSteps.length > 0 ? (

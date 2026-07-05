@@ -3794,26 +3794,25 @@ export function AppPage() {
     infiniteRunsPages: infiniteRunsQuery.data?.pages,
   });
 
-  // Unified inspector: when a live node is selected, resolve the latest run it
-  // participated in so the inspector's Runs tab can show that run's steps. Runs
-  // from the list already carry their per-node executions (and the trigger node
-  // via rootEvent), so we can match directly without loading per-node activity.
-  const liveInspectorNodeId =
-    liveSidebarRunLookupEnabled && searchParams.get("sidebar") === "1" ? searchParams.get("node") : null;
-  const liveSelectedNodeRun = useMemo(() => {
-    if (!liveInspectorNodeId) return null;
-    let latest: CanvasesCanvasRun | null = null;
-    for (const run of runsData.runs) {
-      const participates =
-        run.rootEvent?.nodeId === liveInspectorNodeId ||
-        (run.executions ?? []).some((execution) => execution.nodeId === liveInspectorNodeId);
-      if (!participates) continue;
-      if (!latest || (run.createdAt ?? "") > (latest.createdAt ?? "")) {
-        latest = run;
+  // Clicking a node on the live canvas selects that node's latest run and enters
+  // run inspection, identical to picking the run in the runs sidebar. Runs from
+  // the list already carry their per-node executions (and the trigger node via
+  // rootEvent), so we can match directly without loading per-node activity.
+  const findLatestRunForNode = useCallback(
+    (nodeId: string) => {
+      let latest: CanvasesCanvasRun | null = null;
+      for (const run of runsData.runs) {
+        const participates =
+          run.rootEvent?.nodeId === nodeId || (run.executions ?? []).some((execution) => execution.nodeId === nodeId);
+        if (!participates) continue;
+        if (!latest || (run.createdAt ?? "") > (latest.createdAt ?? "")) {
+          latest = run;
+        }
       }
-    }
-    return latest;
-  }, [liveInspectorNodeId, runsData.runs]);
+      return latest;
+    },
+    [runsData.runs],
+  );
 
   const handleSelectRunFromSidebarEvent = useCallback(
     (runId: string, options?: { nodeId?: string }) => {
@@ -3840,6 +3839,15 @@ export function AppPage() {
       );
     },
     [clearDismissedRunDetail, exitEditableVersionForRunInspection, searchParams, setRunDetailNodeId, setSearchParams],
+  );
+
+  const handleLiveCanvasNodeClick = useCallback(
+    (nodeId: string) => {
+      const run = findLatestRunForNode(nodeId);
+      if (!run?.id) return; // node has no run yet: do nothing
+      handleSelectRunFromSidebarEvent(run.id, { nodeId });
+    },
+    [findLatestRunForNode, handleSelectRunFromSidebarEvent],
   );
 
   const handleLogRunExecutionSelect = useCallback(
@@ -4572,7 +4580,6 @@ export function AppPage() {
           runNodeDetailRun={isRunInspectionMode ? selectedRun : null}
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
-          liveSelectedNodeRun={liveSelectedNodeRun}
           runningRunsCount={runningRunsCount}
           onRunNodeDetailClose={() => handleRunNodeDetailSelection(null)}
           onExitRunInspection={handleExitRunInspectionToLiveCanvas}
@@ -4644,7 +4651,13 @@ export function AppPage() {
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && showLiveActivity ? handleAcknowledgeErrors : undefined}
-          onNodeClick={isRunInspectionMode ? handleRunCanvasNodeClick : undefined}
+          onNodeClick={
+            isRunInspectionMode
+              ? handleRunCanvasNodeClick
+              : liveSidebarRunLookupEnabled
+                ? handleLiveCanvasNodeClick
+                : undefined
+          }
           toolSidebarRunsContent={toolSidebarRunsContent}
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
