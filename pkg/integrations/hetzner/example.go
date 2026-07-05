@@ -34,9 +34,6 @@ var exampleOutputDeleteBucketBytes []byte
 //go:embed example_output_upload_object.json
 var exampleOutputUploadObjectBytes []byte
 
-//go:embed example_output_download_object.json
-var exampleOutputDownloadObjectBytes []byte
-
 //go:embed example_output_delete_object.json
 var exampleOutputDeleteObjectBytes []byte
 
@@ -73,9 +70,6 @@ var (
 
 	exampleOutputUploadObjectOnce sync.Once
 	exampleOutputUploadObjectData map[string]any
-
-	exampleOutputDownloadObjectOnce sync.Once
-	exampleOutputDownloadObjectData map[string]any
 
 	exampleOutputDeleteObjectOnce sync.Once
 	exampleOutputDeleteObjectData map[string]any
@@ -121,10 +115,6 @@ func exampleOutputDeleteBucket() map[string]any {
 
 func exampleOutputUploadObject() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUploadObjectOnce, exampleOutputUploadObjectBytes, &exampleOutputUploadObjectData)
-}
-
-func exampleOutputDownloadObject() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDownloadObjectOnce, exampleOutputDownloadObjectBytes, &exampleOutputDownloadObjectData)
 }
 
 func exampleOutputDeleteObject() map[string]any {

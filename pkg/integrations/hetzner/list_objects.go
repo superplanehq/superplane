@@ -14,6 +14,12 @@ const ListObjectsPayloadType = "hetzner.objects.listed"
 
 const defaultMaxKeys = 100
 
+// maxAllowedKeys bounds how many objects a single call can list. Each item is
+// emitted whole into the event payload, which the platform caps at 512KB; S3
+// keys can be up to 1024 bytes, so this keeps the worst case (all max-length
+// keys) comfortably under that limit.
+const maxAllowedKeys = 400
+
 type ListObjects struct{}
 
 type ListObjectsSpec struct {
@@ -96,11 +102,11 @@ func (c *ListObjects) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
 			Default:     defaultMaxKeys,
-			Description: "Maximum number of objects to return (default: 100)",
+			Description: "Maximum number of objects to return (default: 100, max: 400)",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(1),
-					Max: intPtr(1000),
+					Max: intPtr(maxAllowedKeys),
 				},
 			},
 		},
@@ -135,6 +141,9 @@ func (c *ListObjects) Execute(ctx core.ExecutionContext) error {
 	maxKeys := spec.MaxKeys
 	if maxKeys <= 0 {
 		maxKeys = defaultMaxKeys
+	}
+	if maxKeys > maxAllowedKeys {
+		maxKeys = maxAllowedKeys
 	}
 
 	s3, err := NewHetznerS3Client(ctx.HTTP, ctx.Integration)

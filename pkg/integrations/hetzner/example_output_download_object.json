@@ -1,7 +1,0 @@
-{
-  "bucket": "my-artifacts",
-  "key": "config/settings.json",
-  "content": "{\"env\":\"production\",\"replicas\":3}",
-  "contentType": "application/json",
-  "size": 34
-}

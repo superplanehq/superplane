@@ -51,3 +51,38 @@ func TestListObjects_Execute_EmitsTruncatedFlag(t *testing.T) {
 	data := executionState.Payloads[0].(map[string]any)["data"].(map[string]any)
 	require.Equal(t, true, data["truncated"])
 }
+
+func TestListObjects_Execute_ClampsMaxKeysToAllowedLimit(t *testing.T) {
+	xmlBody := `<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult>
+  <IsTruncated>false</IsTruncated>
+</ListBucketResult>`
+
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(xmlBody)),
+			},
+		},
+	}
+	integration := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"s3AccessKeyId":     "AKIAEXAMPLE",
+			"s3SecretAccessKey": "secret",
+			"s3Region":          "fsn1",
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{}
+
+	component := &ListObjects{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration:  map[string]any{"bucket": "my-bucket", "maxKeys": 100000},
+		HTTP:           httpCtx,
+		Integration:    integration,
+		ExecutionState: executionState,
+	})
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 1)
+	require.Equal(t, "400", httpCtx.Requests[0].URL.Query().Get("max-keys"))
+}

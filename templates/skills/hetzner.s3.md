@@ -62,23 +62,6 @@ Upload content to an object in a Hetzner Object Storage bucket.
 
 ---
 
-## hetzner.downloadObject
-
-Download an object from a Hetzner Object Storage bucket.
-
-### When to use
-- Fetch a config file stored in object storage during a deployment workflow
-- Retrieve a previously uploaded artifact for inspection or processing in a later workflow node
-
-### Expected inputs
-- `Bucket`: Source bucket (dropdown or expression)
-- `Key`: Object key to download (supports expressions)
-
-### Output
-- `bucket`, `key`, `content` (string), `contentType`, `size` (bytes)
-
----
-
 ## hetzner.deleteObject
 
 Delete a specific object from a Hetzner Object Storage bucket.
@@ -108,10 +91,10 @@ List objects in a Hetzner Object Storage bucket, with optional prefix filtering.
 ### Expected inputs
 - `Bucket`: Bucket to list (dropdown or expression)
 - `Prefix` (optional): Filter by key prefix (e.g. `releases/`)
-- `Max Keys` (optional): Max objects to return (default: 100, max: 1000)
+- `Max Keys` (optional): Max objects to return (default: 100, max: 400)
 
 ### Output
-- `bucket`, `prefix`, `count`
+- `bucket`, `prefix`, `count`, `truncated` (true if more objects exist beyond `maxKeys`)
 - `objects`: array of `{ key, size, lastModified, etag }`
 
 ---

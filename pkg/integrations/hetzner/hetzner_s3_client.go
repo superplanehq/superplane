@@ -23,11 +23,6 @@ const s3Service = "s3"
 // emptyBodyHash is the SHA-256 hash of an empty body, used when there is no request body.
 const emptyBodyHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
-// maxObjectDownloadSize caps how much of an object body GetObject will buffer
-// into memory. Objects are emitted whole into the event payload, so an
-// unbounded read risks OOM-killing the process on large objects.
-const maxObjectDownloadSize = 5 * 1024 * 1024 // 5MB
-
 type HetznerS3Client struct {
 	accessKeyID     string
 	secretAccessKey string
@@ -224,39 +219,6 @@ func (c *HetznerS3Client) PutObject(bucket, key, contentType string, body []byte
 		return "", c.parseS3Error(resp)
 	}
 	return resp.Header.Get("ETag"), nil
-}
-
-type S3Object struct {
-	Body        []byte
-	ContentType string
-	Size        int64
-}
-
-func (c *HetznerS3Client) GetObject(bucket, key string) (*S3Object, error) {
-	resp, err := c.doRequest(http.MethodGet, bucket, key, nil, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.parseS3Error(resp)
-	}
-	if resp.ContentLength > maxObjectDownloadSize {
-		return nil, fmt.Errorf("object exceeds maximum download size of %d bytes", maxObjectDownloadSize)
-	}
-	// Read one byte beyond the max to detect overflow without rejecting an exact-limit object.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxObjectDownloadSize+1))
-	if err != nil {
-		return nil, fmt.Errorf("read object body: %w", err)
-	}
-	if len(body) > maxObjectDownloadSize {
-		return nil, fmt.Errorf("object exceeds maximum download size of %d bytes", maxObjectDownloadSize)
-	}
-	return &S3Object{
-		Body:        body,
-		ContentType: resp.Header.Get("Content-Type"),
-		Size:        resp.ContentLength,
-	}, nil
 }
 
 func (c *HetznerS3Client) DeleteObject(bucket, key string) error {

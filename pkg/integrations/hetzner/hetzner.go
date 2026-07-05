@@ -102,7 +102,6 @@ func (h *Hetzner) Actions() []core.Action {
 		&CreateBucket{},
 		&DeleteBucket{},
 		&UploadObject{},
-		&DownloadObject{},
 		&DeleteObject{},
 		&ListObjects{},
 		&PresignedURL{},

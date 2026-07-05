@@ -1,7 +1,6 @@
 package hetzner
 
 import (
-	"bytes"
 	"io"
 	"net/http"
 	"strings"
@@ -23,58 +22,6 @@ func newTestS3Client(t *testing.T, httpCtx *contexts.HTTPContext) *HetznerS3Clie
 	client, err := NewHetznerS3Client(httpCtx, integration)
 	require.NoError(t, err)
 	return client
-}
-
-func TestHetznerS3Client_GetObject_AllowsExactMaxSize(t *testing.T) {
-	body := bytes.Repeat([]byte("a"), maxObjectDownloadSize)
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{
-				StatusCode:    http.StatusOK,
-				ContentLength: int64(len(body)),
-				Header:        http.Header{"Content-Type": []string{"text/plain"}},
-				Body:          io.NopCloser(bytes.NewReader(body)),
-			},
-		},
-	}
-	client := newTestS3Client(t, httpCtx)
-
-	obj, err := client.GetObject("my-bucket", "my-key")
-	require.NoError(t, err)
-	require.Len(t, obj.Body, maxObjectDownloadSize)
-}
-
-func TestHetznerS3Client_GetObject_RejectsOverMaxSizeContentLength(t *testing.T) {
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{
-				StatusCode:    http.StatusOK,
-				ContentLength: maxObjectDownloadSize + 1,
-				Body:          io.NopCloser(bytes.NewReader(bytes.Repeat([]byte("a"), maxObjectDownloadSize+1))),
-			},
-		},
-	}
-	client := newTestS3Client(t, httpCtx)
-
-	_, err := client.GetObject("my-bucket", "my-key")
-	require.ErrorContains(t, err, "exceeds maximum download size")
-}
-
-func TestHetznerS3Client_GetObject_RejectsOverMaxSizeUnknownContentLength(t *testing.T) {
-	body := bytes.Repeat([]byte("a"), maxObjectDownloadSize+1)
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{
-				StatusCode:    http.StatusOK,
-				ContentLength: -1,
-				Body:          io.NopCloser(bytes.NewReader(body)),
-			},
-		},
-	}
-	client := newTestS3Client(t, httpCtx)
-
-	_, err := client.GetObject("my-bucket", "my-key")
-	require.ErrorContains(t, err, "exceeds maximum download size")
 }
 
 func TestHetznerS3Client_ListObjects_SurfacesTruncatedFlag(t *testing.T) {
