@@ -1,0 +1,9 @@
+{
+  "type": "hetzner.bucket.created",
+  "data": {
+    "bucket": "my-artifacts",
+    "region": "fsn1",
+    "endpoint": "https://fsn1.your-objectstorage.com/my-artifacts"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
