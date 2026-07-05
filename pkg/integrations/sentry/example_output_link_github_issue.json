@@ -1,0 +1,11 @@
+{
+  "data": {
+    "id": 5,
+    "key": "42",
+    "url": "https://github.com/example-org/example-repo/issues/42",
+    "integrationId": 123456,
+    "displayName": "example-org/example-repo#42"
+  },
+  "timestamp": "2026-07-05T15:00:00.000000Z",
+  "type": "sentry.externalIssue"
+}
