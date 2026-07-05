@@ -82,6 +82,21 @@ var exampleOutputUpdateAlarmBytes []byte
 //go:embed example_output_delete_alarm.json
 var exampleOutputDeleteAlarmBytes []byte
 
+//go:embed example_output_run_instance.json
+var exampleOutputRunInstanceBytes []byte
+
+//go:embed example_output_start_instance.json
+var exampleOutputStartInstanceBytes []byte
+
+//go:embed example_output_stop_instance.json
+var exampleOutputStopInstanceBytes []byte
+
+//go:embed example_output_reboot_instance.json
+var exampleOutputRebootInstanceBytes []byte
+
+//go:embed example_output_get_instance_status.json
+var exampleOutputGetInstanceStatusBytes []byte
+
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
 
@@ -156,6 +171,21 @@ var exampleOutputUpdateAlarm map[string]any
 
 var exampleOutputDeleteAlarmOnce sync.Once
 var exampleOutputDeleteAlarm map[string]any
+
+var exampleOutputRunInstanceOnce sync.Once
+var exampleOutputRunInstance map[string]any
+
+var exampleOutputStartInstanceOnce sync.Once
+var exampleOutputStartInstance map[string]any
+
+var exampleOutputStopInstanceOnce sync.Once
+var exampleOutputStopInstance map[string]any
+
+var exampleOutputRebootInstanceOnce sync.Once
+var exampleOutputRebootInstance map[string]any
+
+var exampleOutputGetInstanceStatusOnce sync.Once
+var exampleOutputGetInstanceStatus map[string]any
 
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
@@ -327,4 +357,24 @@ func (c *DeleteAlarm) ExampleOutput() map[string]any {
 		exampleOutputDeleteAlarmBytes,
 		&exampleOutputDeleteAlarm,
 	)
+}
+
+func (c *RunInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputRunInstanceOnce, exampleOutputRunInstanceBytes, &exampleOutputRunInstance)
+}
+
+func (c *StartInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputStartInstanceOnce, exampleOutputStartInstanceBytes, &exampleOutputStartInstance)
+}
+
+func (c *StopInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputStopInstanceOnce, exampleOutputStopInstanceBytes, &exampleOutputStopInstance)
+}
+
+func (c *RebootInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputRebootInstanceOnce, exampleOutputRebootInstanceBytes, &exampleOutputRebootInstance)
+}
+
+func (c *GetInstanceStatus) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetInstanceStatusOnce, exampleOutputGetInstanceStatusBytes, &exampleOutputGetInstanceStatus)
 }

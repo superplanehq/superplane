@@ -3284,3 +3284,221 @@ func (c *Client) ListTargetGroups() ([]TargetGroup, error) {
 
 	return targetGroups, nil
 }
+
+// RunInstanceInput holds the parameters for launching a single EC2 instance.
+type RunInstanceInput struct {
+	ImageID          string
+	InstanceType     string
+	KeyName          string
+	SubnetID         string
+	SecurityGroupIDs []string
+	UserData         string
+}
+
+type RunInstanceOutput struct {
+	RequestID    string `json:"requestId" mapstructure:"requestId"`
+	InstanceID   string `json:"instanceId" mapstructure:"instanceId"`
+	InstanceType string `json:"instanceType" mapstructure:"instanceType"`
+	State        string `json:"state" mapstructure:"state"`
+	Region       string `json:"region" mapstructure:"region"`
+}
+
+type StartInstanceOutput struct {
+	RequestID     string `json:"requestId" mapstructure:"requestId"`
+	InstanceID    string `json:"instanceId" mapstructure:"instanceId"`
+	CurrentState  string `json:"currentState" mapstructure:"currentState"`
+	PreviousState string `json:"previousState" mapstructure:"previousState"`
+	Region        string `json:"region" mapstructure:"region"`
+}
+
+type StopInstanceOutput struct {
+	RequestID     string `json:"requestId" mapstructure:"requestId"`
+	InstanceID    string `json:"instanceId" mapstructure:"instanceId"`
+	CurrentState  string `json:"currentState" mapstructure:"currentState"`
+	PreviousState string `json:"previousState" mapstructure:"previousState"`
+	Region        string `json:"region" mapstructure:"region"`
+}
+
+type RebootInstanceOutput struct {
+	RequestID  string `json:"requestId" mapstructure:"requestId"`
+	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
+	Region     string `json:"region" mapstructure:"region"`
+}
+
+// InstanceStatusCheck is the output of GetInstanceStatusCheck.
+// It includes lifecycle state, health checks, and availability zone.
+type InstanceStatusCheck struct {
+	RequestID        string `json:"requestId" mapstructure:"requestId"`
+	InstanceID       string `json:"instanceId" mapstructure:"instanceId"`
+	AvailabilityZone string `json:"availabilityZone" mapstructure:"availabilityZone"`
+	InstanceState    string `json:"instanceState" mapstructure:"instanceState"`
+	SystemStatus     string `json:"systemStatus" mapstructure:"systemStatus"`
+	InstanceCheck    string `json:"instanceCheck" mapstructure:"instanceCheck"`
+	Region           string `json:"region" mapstructure:"region"`
+}
+
+func (c *Client) RunInstance(input RunInstanceInput) (*RunInstanceOutput, error) {
+	params := url.Values{}
+	params.Set("ImageId", strings.TrimSpace(input.ImageID))
+	params.Set("InstanceType", strings.TrimSpace(input.InstanceType))
+	params.Set("MinCount", "1")
+	params.Set("MaxCount", "1")
+
+	if v := strings.TrimSpace(input.KeyName); v != "" {
+		params.Set("KeyName", v)
+	}
+	if v := strings.TrimSpace(input.SubnetID); v != "" {
+		params.Set("SubnetId", v)
+	}
+	for i, sg := range input.SecurityGroupIDs {
+		if v := strings.TrimSpace(sg); v != "" {
+			params.Set(fmt.Sprintf("SecurityGroupId.%d", i+1), v)
+		}
+	}
+	if v := strings.TrimSpace(input.UserData); v != "" {
+		params.Set("UserData", base64.StdEncoding.EncodeToString([]byte(v)))
+	}
+
+	response := runInstancesResponse{}
+	if err := c.postForm("RunInstances", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Instances) == 0 {
+		return nil, fmt.Errorf("RunInstances response did not include any instances")
+	}
+
+	inst := response.Instances[0]
+	return &RunInstanceOutput{
+		RequestID:    response.RequestID,
+		InstanceID:   inst.InstanceID,
+		InstanceType: inst.InstanceType,
+		State:        inst.State.Name,
+		Region:       c.region,
+	}, nil
+}
+
+func (c *Client) StartInstance(instanceID string) (*StartInstanceOutput, error) {
+	params := url.Values{}
+	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
+
+	response := instanceStateChangeResponse{}
+	if err := c.postForm("StartInstances", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Items) == 0 {
+		return nil, fmt.Errorf("StartInstances response did not include any instance state changes")
+	}
+
+	item := response.Items[0]
+	return &StartInstanceOutput{
+		RequestID:     response.RequestID,
+		InstanceID:    item.InstanceID,
+		CurrentState:  item.CurrentState.Name,
+		PreviousState: item.PreviousState.Name,
+		Region:        c.region,
+	}, nil
+}
+
+func (c *Client) StopInstance(instanceID string) (*StopInstanceOutput, error) {
+	params := url.Values{}
+	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
+
+	response := instanceStateChangeResponse{}
+	if err := c.postForm("StopInstances", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Items) == 0 {
+		return nil, fmt.Errorf("StopInstances response did not include any instance state changes")
+	}
+
+	item := response.Items[0]
+	return &StopInstanceOutput{
+		RequestID:     response.RequestID,
+		InstanceID:    item.InstanceID,
+		CurrentState:  item.CurrentState.Name,
+		PreviousState: item.PreviousState.Name,
+		Region:        c.region,
+	}, nil
+}
+
+func (c *Client) RebootInstance(instanceID string) (*RebootInstanceOutput, error) {
+	params := url.Values{}
+	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
+
+	response := rebootInstanceResponse{}
+	if err := c.postForm("RebootInstances", params, &response); err != nil {
+		return nil, err
+	}
+
+	if !response.Return {
+		return nil, fmt.Errorf("RebootInstances returned unsuccessful response")
+	}
+
+	return &RebootInstanceOutput{
+		RequestID:  response.RequestID,
+		InstanceID: strings.TrimSpace(instanceID),
+		Region:     c.region,
+	}, nil
+}
+
+func (c *Client) GetInstanceStatusCheck(instanceID string) (*InstanceStatusCheck, error) {
+	params := url.Values{}
+	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
+	params.Set("IncludeAllInstances", "true")
+
+	response := instanceStatusCheckResponse{}
+	if err := c.postForm("DescribeInstanceStatus", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Items) == 0 {
+		return nil, fmt.Errorf("instance not found: %s", instanceID)
+	}
+
+	item := response.Items[0]
+	return &InstanceStatusCheck{
+		RequestID:        response.RequestID,
+		InstanceID:       item.InstanceID,
+		AvailabilityZone: item.AvailabilityZone,
+		InstanceState:    item.InstanceState.Name,
+		SystemStatus:     item.SystemStatus.Status,
+		InstanceCheck:    item.InstanceStatus.Status,
+		Region:           c.region,
+	}, nil
+}
+
+type rebootInstanceResponse struct {
+	RequestID string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+type instanceStateChangeResponse struct {
+	RequestID string              `xml:"requestId"`
+	Items     []xmlInstanceChange `xml:"instancesSet>item"`
+}
+
+type xmlInstanceChange struct {
+	InstanceID    string   `xml:"instanceId"`
+	CurrentState  xmlState `xml:"currentState"`
+	PreviousState xmlState `xml:"previousState"`
+}
+
+type instanceStatusCheckResponse struct {
+	RequestID string                  `xml:"requestId"`
+	Items     []xmlInstanceStatusItem `xml:"instanceStatusSet>item"`
+}
+
+type xmlInstanceStatusItem struct {
+	InstanceID       string              `xml:"instanceId"`
+	AvailabilityZone string              `xml:"availabilityZone"`
+	InstanceState    xmlState            `xml:"instanceState"`
+	SystemStatus     xmlStatusCheckResult `xml:"systemStatus"`
+	InstanceStatus   xmlStatusCheckResult `xml:"instanceStatus"`
+}
+
+type xmlStatusCheckResult struct {
+	Status string `xml:"status"`
+}
