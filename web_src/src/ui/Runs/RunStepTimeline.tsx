@@ -1,5 +1,6 @@
 import {
   AlignLeft,
+  ArrowUp,
   Braces,
   Check,
   CircleHelp,
@@ -11,7 +12,7 @@ import {
   SquareArrowRight,
   TriangleAlert,
 } from "lucide-react";
-import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
@@ -98,21 +99,25 @@ function InputChainModal({
                 </HoverCardContent>
               </HoverCard>
             </div>
-            {steps.map((step) => (
-              <button
-                key={step.nodeId}
-                type="button"
-                onClick={() => setSelectedNodeId(step.nodeId)}
-                className={cn(
-                  "flex items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] transition-colors",
-                  selected?.nodeId === step.nodeId
-                    ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200"
-                    : "text-slate-600 hover:bg-slate-100",
-                )}
-              >
-                {step.icon}
-                <span className="min-w-0 truncate">{step.name}</span>
-              </button>
+            {steps.map((step, index) => (
+              <Fragment key={step.nodeId}>
+                {index > 0 ? (
+                  <ArrowUp aria-hidden className="mx-auto my-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setSelectedNodeId(step.nodeId)}
+                  className={cn(
+                    "flex items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] transition-colors",
+                    selected?.nodeId === step.nodeId
+                      ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200"
+                      : "text-slate-600 hover:bg-slate-100",
+                  )}
+                >
+                  {step.icon}
+                  <span className="min-w-0 truncate">{step.name}</span>
+                </button>
+              </Fragment>
             ))}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
@@ -226,7 +231,7 @@ function TimelineItem({
         <div className="flex min-h-6 items-center gap-1.5">
           {header}
           {timestamp ? (
-            <span className="ml-auto shrink-0 pl-2 text-[11px] tabular-nums text-slate-400">{timestamp}</span>
+            <span className="ml-auto shrink-0 pl-2 text-[11px] tabular-nums text-slate-600">{timestamp}</span>
           ) : null}
         </div>
         {children ? <div className="mt-2">{children}</div> : null}
@@ -299,7 +304,7 @@ function StatusChangeSubTimeline({ entries }: { entries: StepStatusEntry[] }) {
         <li key={entry.key} className="flex items-center gap-2 text-[12px]">
           <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", entry.dotClassName)} />
           <span className="capitalize text-slate-700">{entry.label}</span>
-          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-slate-400">
+          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-slate-600">
             {formatRelativeOffset(startMs, new Date(entry.timestamp).getTime())}
           </span>
         </li>
@@ -348,7 +353,7 @@ function ActionItem({
           <span className="flex items-center gap-1.5 rounded-full bg-slate-100 px-2 py-0.5">
             <span className={cn("h-2 w-2 shrink-0 rounded-full", badge.badgeColor)} />
             <span className="text-[11px] font-medium capitalize text-slate-700">{badge.label || "Action"}</span>
-            {elapsed ? <span className="text-[11px] tabular-nums text-slate-400">{elapsed}</span> : null}
+            {elapsed ? <span className="text-[11px] tabular-nums text-slate-600">{elapsed}</span> : null}
           </span>
           {hasStatusTimeline ? (
             <HeaderIconButton

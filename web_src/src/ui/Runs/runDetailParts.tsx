@@ -128,7 +128,7 @@ export function IdentityHeader({
         </h1>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-gray-500">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-gray-600">
           {metaItems.map((item, index) => (
             <span key={item.key} className="inline-flex items-center gap-x-1.5">
               {index > 0 ? <span className="text-gray-300">&middot;</span> : null}

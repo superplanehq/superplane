@@ -392,7 +392,7 @@ export function AccordionRow({
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800">{nodeName}</span>
       {showStepAction ? <StepActionMenu isApproval={isApproval} /> : null}
       <HeaderIconButton label="Send to agent" icon={<Sparkles className="h-3.5 w-3.5" />} />
-      {meta ? <span className="shrink-0 text-[11px] tabular-nums text-gray-400">{meta}</span> : null}
+      {meta ? <span className="shrink-0 text-[11px] tabular-nums text-gray-600">{meta}</span> : null}
       {badge ? <StatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}
     </div>
   );

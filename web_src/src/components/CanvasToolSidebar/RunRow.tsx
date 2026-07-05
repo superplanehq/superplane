@@ -89,14 +89,14 @@ export function RunRow({
       </span>
       {duration ? (
         <span
-          className="pointer-events-none relative shrink-0 text-[11px] tabular-nums text-gray-400"
+          className="pointer-events-none relative shrink-0 text-[11px] tabular-nums text-gray-600"
           title="Run duration"
         >
           {duration}
         </span>
       ) : null}
       {run.createdAt ? (
-        <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-500">
+        <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-600">
           <TimeAgo date={run.createdAt} />
         </span>
       ) : null}
