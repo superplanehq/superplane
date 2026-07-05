@@ -142,6 +142,13 @@ func (c *PresignedURL) Setup(ctx core.SetupContext) error {
 	if strings.TrimSpace(readStringFromAny(spec.Key)) == "" {
 		return fmt.Errorf("key is required")
 	}
+	method := strings.ToUpper(strings.TrimSpace(spec.Method))
+	if method == "" {
+		return fmt.Errorf("method is required")
+	}
+	if method != "GET" && method != "PUT" {
+		return fmt.Errorf("method must be GET or PUT")
+	}
 	return nil
 }
 
@@ -165,6 +172,9 @@ func (c *PresignedURL) Execute(ctx core.ExecutionContext) error {
 	method := strings.ToUpper(strings.TrimSpace(spec.Method))
 	if method == "" {
 		method = "GET"
+	}
+	if method != "GET" && method != "PUT" {
+		return fmt.Errorf("method must be GET or PUT")
 	}
 	expiresIn := spec.ExpiresIn
 	if expiresIn <= 0 {
@@ -190,8 +200,13 @@ func (c *PresignedURL) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PresignedURLPayloadType, []any{payload})
 }
 
-func (c *PresignedURL) Actions() []core.Action                  { return nil }
-func (c *PresignedURL) HandleAction(_ core.ActionContext) error { return nil }
+func (c *PresignedURL) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *PresignedURL) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}
 func (c *PresignedURL) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

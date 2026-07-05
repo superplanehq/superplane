@@ -120,6 +120,9 @@ func (c *UploadObject) Setup(ctx core.SetupContext) error {
 	if strings.TrimSpace(readStringFromAny(spec.Key)) == "" {
 		return fmt.Errorf("key is required")
 	}
+	if spec.Content == nil || spec.Content == "" {
+		return fmt.Errorf("content is required")
+	}
 	return nil
 }
 
@@ -181,8 +184,13 @@ func serializeContent(content any) ([]byte, error) {
 	return json.Marshal(content)
 }
 
-func (c *UploadObject) Actions() []core.Action                  { return nil }
-func (c *UploadObject) HandleAction(_ core.ActionContext) error { return nil }
+func (c *UploadObject) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *UploadObject) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}
 func (c *UploadObject) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

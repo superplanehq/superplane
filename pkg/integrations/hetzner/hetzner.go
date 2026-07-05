@@ -17,10 +17,10 @@ func init() {
 type Hetzner struct{}
 
 type Configuration struct {
-	APIToken      string `json:"apiToken" mapstructure:"apiToken"`
-	S3AccessKeyId string `json:"s3AccessKeyId" mapstructure:"s3AccessKeyId"`
-	S3SecretKey   string `json:"s3SecretAccessKey" mapstructure:"s3SecretAccessKey"`
-	S3Region      string `json:"s3Region" mapstructure:"s3Region"`
+	APIToken          string `json:"apiToken" mapstructure:"apiToken"`
+	S3AccessKeyId     string `json:"s3AccessKeyId" mapstructure:"s3AccessKeyId"`
+	S3SecretAccessKey string `json:"s3SecretAccessKey" mapstructure:"s3SecretAccessKey"`
+	S3Region          string `json:"s3Region" mapstructure:"s3Region"`
 }
 
 func (h *Hetzner) Name() string {
@@ -135,7 +135,7 @@ func (h *Hetzner) Sync(ctx core.SyncContext) error {
 
 	// Verify S3 credentials if any are provided — all three must be set together.
 	hasS3Key := strings.TrimSpace(config.S3AccessKeyId) != ""
-	hasS3Secret := strings.TrimSpace(config.S3SecretKey) != ""
+	hasS3Secret := strings.TrimSpace(config.S3SecretAccessKey) != ""
 	hasS3Region := strings.TrimSpace(config.S3Region) != ""
 	if hasS3Key || hasS3Secret || hasS3Region {
 		if !hasS3Key || !hasS3Secret || !hasS3Region {

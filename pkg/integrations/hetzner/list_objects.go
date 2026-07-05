@@ -49,7 +49,7 @@ S3 credentials (Access Key ID, Secret Access Key, and Region) must be configured
 
 ## Output
 
-Emits the bucket, prefix, an array of objects (each with key, size, lastModified, etag), and count on the default channel.
+Emits the bucket, prefix, an array of objects (each with key, size, lastModified, etag), count, and a truncated flag on the default channel. When truncated is true, more objects exist beyond maxKeys; narrow the prefix or increase Max Keys to see them.
 `
 }
 
@@ -141,13 +141,13 @@ func (c *ListObjects) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	items, err := s3.ListObjects(bucket, prefix, maxKeys)
+	result, err := s3.ListObjects(bucket, prefix, maxKeys)
 	if err != nil {
 		return fmt.Errorf("list objects: %w", err)
 	}
 
-	objects := make([]map[string]any, 0, len(items))
-	for _, item := range items {
+	objects := make([]map[string]any, 0, len(result.Items))
+	for _, item := range result.Items {
 		objects = append(objects, map[string]any{
 			"key":          item.Key,
 			"size":         item.Size,
@@ -157,18 +157,24 @@ func (c *ListObjects) Execute(ctx core.ExecutionContext) error {
 	}
 
 	payload := map[string]any{
-		"bucket":  bucket,
-		"prefix":  prefix,
-		"objects": objects,
-		"count":   len(objects),
+		"bucket":    bucket,
+		"prefix":    prefix,
+		"objects":   objects,
+		"count":     len(objects),
+		"truncated": result.Truncated,
 	}
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, ListObjectsPayloadType, []any{payload})
 }
 
 func intPtr(v int) *int { return &v }
 
-func (c *ListObjects) Actions() []core.Action                  { return nil }
-func (c *ListObjects) HandleAction(_ core.ActionContext) error { return nil }
+func (c *ListObjects) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *ListObjects) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}
 func (c *ListObjects) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

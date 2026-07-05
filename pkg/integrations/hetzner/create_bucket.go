@@ -116,8 +116,13 @@ func (c *CreateBucket) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBucketPayloadType, []any{payload})
 }
 
-func (c *CreateBucket) Actions() []core.Action                  { return nil }
-func (c *CreateBucket) HandleAction(_ core.ActionContext) error { return nil }
+func (c *CreateBucket) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateBucket) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}
 func (c *CreateBucket) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

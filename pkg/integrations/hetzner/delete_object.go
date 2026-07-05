@@ -16,7 +16,8 @@ type DeleteObject struct{}
 
 type DeleteObjectSpec struct {
 	Bucket string `json:"bucket" mapstructure:"bucket"`
-	Key    any    `json:"key" mapstructure:"key"`}
+	Key    any    `json:"key" mapstructure:"key"`
+}
 
 func (c *DeleteObject) Name() string {
 	return "hetzner.deleteObject"
@@ -132,8 +133,13 @@ func (c *DeleteObject) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteObjectPayloadType, []any{payload})
 }
 
-func (c *DeleteObject) Actions() []core.Action                  { return nil }
-func (c *DeleteObject) HandleAction(_ core.ActionContext) error { return nil }
+func (c *DeleteObject) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteObject) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}
 func (c *DeleteObject) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

@@ -118,8 +118,13 @@ func (c *DeleteBucket) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteBucketPayloadType, []any{payload})
 }
 
-func (c *DeleteBucket) Actions() []core.Action                  { return nil }
-func (c *DeleteBucket) HandleAction(_ core.ActionContext) error { return nil }
+func (c *DeleteBucket) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DeleteBucket) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}
 func (c *DeleteBucket) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

@@ -23,6 +23,11 @@ const s3Service = "s3"
 // emptyBodyHash is the SHA-256 hash of an empty body, used when there is no request body.
 const emptyBodyHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
+// maxObjectDownloadSize caps how much of an object body GetObject will buffer
+// into memory. Objects are emitted whole into the event payload, so an
+// unbounded read risks OOM-killing the process on large objects.
+const maxObjectDownloadSize = 5 * 1024 * 1024 // 5MB
+
 type HetznerS3Client struct {
 	accessKeyID     string
 	secretAccessKey string
@@ -236,9 +241,16 @@ func (c *HetznerS3Client) GetObject(bucket, key string) (*S3Object, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.parseS3Error(resp)
 	}
-	body, err := io.ReadAll(resp.Body)
+	if resp.ContentLength > maxObjectDownloadSize {
+		return nil, fmt.Errorf("object exceeds maximum download size of %d bytes", maxObjectDownloadSize)
+	}
+	// Read one byte beyond the max to detect overflow without rejecting an exact-limit object.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxObjectDownloadSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("read object body: %w", err)
+	}
+	if len(body) > maxObjectDownloadSize {
+		return nil, fmt.Errorf("object exceeds maximum download size of %d bytes", maxObjectDownloadSize)
 	}
 	return &S3Object{
 		Body:        body,
@@ -266,7 +278,12 @@ type S3ListItem struct {
 	ETag         string `xml:"ETag"`
 }
 
-func (c *HetznerS3Client) ListObjects(bucket, prefix string, maxKeys int) ([]S3ListItem, error) {
+type S3ListResult struct {
+	Items     []S3ListItem
+	Truncated bool
+}
+
+func (c *HetznerS3Client) ListObjects(bucket, prefix string, maxKeys int) (*S3ListResult, error) {
 	q := url.Values{}
 	q.Set("list-type", "2")
 	if prefix != "" {
@@ -284,11 +301,12 @@ func (c *HetznerS3Client) ListObjects(bucket, prefix string, maxKeys int) ([]S3L
 		return nil, c.parseS3Error(resp)
 	}
 	var out struct {
-		XMLName  xml.Name     `xml:"ListBucketResult"`
-		Contents []S3ListItem `xml:"Contents"`
+		XMLName     xml.Name     `xml:"ListBucketResult"`
+		Contents    []S3ListItem `xml:"Contents"`
+		IsTruncated bool         `xml:"IsTruncated"`
 	}
 	if err := xml.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, fmt.Errorf("decode list objects response: %w", err)
 	}
-	return out.Contents, nil
+	return &S3ListResult{Items: out.Contents, Truncated: out.IsTruncated}, nil
 }

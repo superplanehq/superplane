@@ -16,7 +16,8 @@ type DownloadObject struct{}
 
 type DownloadObjectSpec struct {
 	Bucket string `json:"bucket" mapstructure:"bucket"`
-	Key    any    `json:"key" mapstructure:"key"`}
+	Key    any    `json:"key" mapstructure:"key"`
+}
 
 func (c *DownloadObject) Name() string {
 	return "hetzner.downloadObject"
@@ -45,6 +46,8 @@ S3 credentials (Access Key ID, Secret Access Key, and Region) must be configured
 ## Output
 
 Emits the bucket, key, content as a string, content type, and size in bytes on the default channel.
+
+Objects larger than 5MB are rejected, since the entire content is buffered in memory and emitted into the event payload.
 `
 }
 
@@ -139,8 +142,13 @@ func (c *DownloadObject) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DownloadObjectPayloadType, []any{payload})
 }
 
-func (c *DownloadObject) Actions() []core.Action                  { return nil }
-func (c *DownloadObject) HandleAction(_ core.ActionContext) error { return nil }
+func (c *DownloadObject) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *DownloadObject) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}
 func (c *DownloadObject) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
