@@ -2,10 +2,12 @@ package serviceaccounts
 
 import (
 	"context"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
@@ -26,7 +28,8 @@ func DeleteServiceAccount(ctx context.Context, req *pb.DeleteServiceAccountReque
 		return nil, grpcerrors.InvalidArgument(nil, "id is required")
 	}
 
-	user, err := models.FindActiveUserByID(orgID, req.Id)
+	db := database.DB(ctx)
+	user, err := models.FindActiveUserByIDInTransaction(db, orgID, req.Id)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "service account not found")
 	}
@@ -48,7 +51,13 @@ func DeleteServiceAccount(ctx context.Context, req *pb.DeleteServiceAccountReque
 		}
 	}
 
-	err = user.Delete()
+	now := time.Now()
+	err = db.Unscoped().
+		Model(user).
+		Update("deleted_at", now).
+		Update("updated_at", now).
+		Update("token_hash", nil).
+		Error
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to delete service account")
 	}

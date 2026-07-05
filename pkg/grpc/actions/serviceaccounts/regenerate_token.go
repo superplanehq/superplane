@@ -2,9 +2,11 @@ package serviceaccounts
 
 import (
 	"context"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
@@ -25,7 +27,8 @@ func RegenerateServiceAccountToken(ctx context.Context, req *pb.RegenerateServic
 		return nil, grpcerrors.InvalidArgument(nil, "id is required")
 	}
 
-	user, err := models.FindActiveUserByID(orgID, req.Id)
+	db := database.DB(ctx)
+	user, err := models.FindActiveUserByIDInTransaction(db, orgID, req.Id)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "service account not found")
 	}
@@ -39,7 +42,9 @@ func RegenerateServiceAccountToken(ctx context.Context, req *pb.RegenerateServic
 		return nil, grpcerrors.Internal(err, "failed to generate new token")
 	}
 
-	err = user.UpdateTokenHash(crypto.HashToken(plainToken))
+	user.UpdatedAt = time.Now()
+	user.TokenHash = crypto.HashToken(plainToken)
+	err = db.Save(user).Error
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to update token")
 	}

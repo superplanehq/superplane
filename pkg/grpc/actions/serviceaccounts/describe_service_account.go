@@ -25,7 +25,8 @@ func DescribeServiceAccount(ctx context.Context, req *pb.DescribeServiceAccountR
 		return nil, grpcerrors.InvalidArgument(nil, "id is required")
 	}
 
-	user, err := models.FindActiveUserByID(orgID, req.Id)
+	db := database.DB(ctx)
+	user, err := models.FindActiveUserByIDInTransaction(db, orgID, req.Id)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "service account not found")
 	}
@@ -34,7 +35,6 @@ func DescribeServiceAccount(ctx context.Context, req *pb.DescribeServiceAccountR
 		return nil, grpcerrors.NotFound(err, "service account not found")
 	}
 
-	db := database.DB(ctx)
 	creator, err := creatorUserForServiceAccount(db, orgID, user)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to describe service account")
