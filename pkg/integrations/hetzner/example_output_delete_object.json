@@ -1,4 +1,8 @@
 {
-  "bucket": "my-artifacts",
-  "key": "releases/v1.0.0/app.tar.gz"
+  "type": "hetzner.object.deleted",
+  "data": {
+    "bucket": "my-artifacts",
+    "key": "releases/v1.0.0/app.tar.gz"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
 }

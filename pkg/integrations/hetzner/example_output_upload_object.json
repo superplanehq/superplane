@@ -1,6 +1,10 @@
 {
-  "bucket": "my-artifacts",
-  "key": "releases/v1.2.3/app.tar.gz",
-  "size": 4096000,
-  "etag": "\"d41d8cd98f00b204e9800998ecf8427e\""
+  "type": "hetzner.object.uploaded",
+  "data": {
+    "bucket": "my-artifacts",
+    "key": "releases/v1.2.3/app.tar.gz",
+    "size": 4096000,
+    "etag": "\"d41d8cd98f00b204e9800998ecf8427e\""
+  },
+  "timestamp": "2024-03-15T10:30:00Z"
 }

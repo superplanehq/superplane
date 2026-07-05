@@ -1,3 +1,7 @@
 {
-  "bucket": "my-artifacts"
+  "type": "hetzner.bucket.deleted",
+  "data": {
+    "bucket": "my-artifacts"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
 }
