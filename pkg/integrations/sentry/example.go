@@ -67,6 +67,12 @@ var exampleOutputCreateDeployBytes []byte
 var exampleOutputCreateDeployOnce sync.Once
 var exampleOutputCreateDeploy map[string]any
 
+//go:embed example_output_link_github_issue.json
+var exampleOutputLinkGitHubIssueBytes []byte
+
+var exampleOutputLinkGitHubIssueOnce sync.Once
+var exampleOutputLinkGitHubIssue map[string]any
+
 func (t *OnIssue) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
 }
@@ -128,5 +134,13 @@ func (c *CreateDeploy) ExampleOutput() map[string]any {
 		&exampleOutputCreateDeployOnce,
 		exampleOutputCreateDeployBytes,
 		&exampleOutputCreateDeploy,
+	)
+}
+
+func (c *LinkGitHubIssue) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputLinkGitHubIssueOnce,
+		exampleOutputLinkGitHubIssueBytes,
+		&exampleOutputLinkGitHubIssue,
 	)
 }
