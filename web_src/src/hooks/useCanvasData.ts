@@ -264,6 +264,16 @@ export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "slate", "orange
 export type CanvasFolderColor = (typeof CANVAS_FOLDER_COLORS)[number];
 export const DEFAULT_CANVAS_FOLDER_COLOR: CanvasFolderColor = "blue";
 
+export function normalizeCanvasFolderColor(value?: string): CanvasFolderColor {
+  if (value === "yellow") {
+    return "slate";
+  }
+
+  return CANVAS_FOLDER_COLORS.includes(value as CanvasFolderColor)
+    ? (value as CanvasFolderColor)
+    : DEFAULT_CANVAS_FOLDER_COLOR;
+}
+
 export const triggerKeys = {
   all: ["triggers"] as const,
   lists: () => [...triggerKeys.all, "list"] as const,

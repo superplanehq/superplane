@@ -385,8 +385,8 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
         disabled={!canExpand}
         className={cn(
           "flex w-full items-center gap-1.5 text-left",
-          running ? "text-slate-700" : "text-slate-600",
-          canExpand && "cursor-pointer hover:text-slate-900",
+          running ? "text-slate-700 dark:text-gray-300" : "text-slate-600 dark:text-gray-400",
+          canExpand && "cursor-pointer hover:text-slate-900 dark:hover:text-gray-200",
         )}
       >
         <span className="shrink-0 text-[10px]">{running ? "▶" : "✓"}</span>
@@ -410,7 +410,10 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
 
 function ThinkingRow() {
   return (
-    <div className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-slate-500" data-testid="agent-thinking">
+    <div
+      className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-slate-500 dark:text-gray-400"
+      data-testid="agent-thinking"
+    >
       <Loader2 className="size-4 shrink-0 animate-spin" />
       <span>Thinking…</span>
     </div>

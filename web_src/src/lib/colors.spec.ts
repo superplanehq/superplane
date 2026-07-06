@@ -17,6 +17,7 @@ describe("colors", () => {
   it("adds dark mode classes for legacy icon colors", () => {
     expect(resolveNodeIconColorClass("text-gray-800")).toBe("text-gray-800 dark:text-gray-400");
     expect(resolveNodeIconColorClass("text-green-700")).toBe("text-green-700 dark:text-green-400");
+    expect(resolveNodeIconColorClass("text-green-500")).toBe("text-green-500 dark:text-green-300");
   });
 
   it("preserves icon colors that already include dark mode classes", () => {
