@@ -9,7 +9,6 @@ import type {
 import Editor from "@monaco-editor/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useEventExecutions } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
@@ -363,51 +362,51 @@ function pickWireframeScenario(component: string): TimelineEvent[] {
   return approvalEvents;
 }
 
+type StepActionTone = "approve" | "danger" | "neutral";
+type StepAction = { label: string; tone: StepActionTone };
+
 /**
- * Per-step action affordance shown only on in-flight (running / waiting) steps: a
- * single "Action" button whose hover card lists the contextual actions — an
- * approval step offers Approve / Reject / Cancel, any other in-flight step offers Stop.
+ * The inline action buttons a step row exposes, driven by whether it's the trigger and
+ * the step's activity/component:
+ * - trigger and terminal steps (done / error) → "Rerun"
+ * - running / waiting steps → "Stop"
+ * - an in-flight approval additionally offers "Approve" / "Reject"
  */
-function StepActionMenu({ isApproval }: { isApproval: boolean }) {
-  const actions: { label: string; tone: "approve" | "danger" | "default" }[] = isApproval
-    ? [
+function getStepActions(
+  isTrigger: boolean,
+  activity: ReturnType<typeof getStepActivity>,
+  isApproval: boolean,
+): StepAction[] {
+  if (isTrigger) return [{ label: "Rerun", tone: "neutral" }];
+
+  if (activity === "running" || activity === "waiting") {
+    if (isApproval) {
+      return [
         { label: "Approve", tone: "approve" },
         { label: "Reject", tone: "danger" },
-        { label: "Cancel", tone: "default" },
-      ]
-    : [{ label: "Stop", tone: "danger" }];
+        { label: "Stop", tone: "danger" },
+      ];
+    }
+    return [{ label: "Stop", tone: "danger" }];
+  }
 
+  return [{ label: "Rerun", tone: "neutral" }];
+}
+
+function StepActionButton({ label, tone }: StepAction) {
   return (
-    <HoverCard openDelay={80} closeDelay={100}>
-      <HoverCardTrigger asChild>
-        <button
-          type="button"
-          onClick={(event) => event.stopPropagation()}
-          className="shrink-0 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-800 data-[state=open]:bg-slate-100 data-[state=open]:text-slate-800"
-        >
-          Action
-        </button>
-      </HoverCardTrigger>
-      <HoverCardContent align="end" side="bottom" sideOffset={4} className="w-40 p-1">
-        <div className="flex flex-col">
-          {actions.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              onClick={(event) => event.stopPropagation()}
-              className={cn(
-                "rounded px-2 py-1.5 text-left text-[13px] transition-colors",
-                action.tone === "approve" && "text-emerald-700 hover:bg-emerald-50",
-                action.tone === "danger" && "text-red-600 hover:bg-red-50",
-                action.tone === "default" && "text-slate-600 hover:bg-slate-50",
-              )}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      </HoverCardContent>
-    </HoverCard>
+    <button
+      type="button"
+      onClick={(event) => event.stopPropagation()}
+      className={cn(
+        "shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium transition-colors",
+        tone === "approve" && "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50",
+        tone === "danger" && "border-red-200 bg-white text-red-600 hover:bg-red-50",
+        tone === "neutral" && "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800",
+      )}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -446,11 +445,9 @@ export function AccordionRow({
   // Triggers have no duration; instead show when their event was received.
   const meta = isTrigger ? formatEventTimestamp(triggerTimestamp) : execution ? formatStepDuration(execution) : null;
 
-  // Only in-flight steps (running / waiting) expose an inline action; the run as a
-  // whole is stopped/rerun from the run header, not per step.
   const activity = !isTrigger && execution ? getStepActivity(workflowNode, execution) : "done";
-  const showStepAction = activity === "running" || activity === "waiting";
   const isApproval = workflowNode?.component === "approval";
+  const stepActions = getStepActions(isTrigger, activity, isApproval);
 
   return (
     <div
@@ -482,7 +479,9 @@ export function AccordionRow({
         className={cn("h-3.5 w-3.5 shrink-0", isExpanded ? "text-gray-800" : "text-gray-500")}
       />
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800">{nodeName}</span>
-      {showStepAction ? <StepActionMenu isApproval={isApproval} /> : null}
+      {stepActions.map((action) => (
+        <StepActionButton key={action.label} label={action.label} tone={action.tone} />
+      ))}
       <HeaderIconButton label="Send to agent" icon={<Sparkles className="h-3.5 w-3.5" />} />
       {meta ? <span className="shrink-0 text-[11px] tabular-nums text-gray-600">{meta}</span> : null}
       {badge ? <StatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}

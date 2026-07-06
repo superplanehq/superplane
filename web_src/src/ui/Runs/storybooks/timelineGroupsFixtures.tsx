@@ -1,6 +1,6 @@
 import { Bot, CheckSquare, Database, GitPullRequest, Terminal } from "lucide-react";
 import { formatEventTimestamp } from "../runSummary";
-import type { TimelineEvent } from "./timelineGroupsModel";
+import { InputChainMoreChip, type TimelineEvent } from "./timelineGroupsModel";
 
 /**
  * Mocked data for the flat timeline-events wireframe. Values are inspired by the real
@@ -51,15 +51,7 @@ const githubIcon = <GitPullRequest className="h-3.5 w-3.5" />;
 const memoryIcon = <Database className="h-3.5 w-3.5" />;
 
 function moreChip(count: number) {
-  return (
-    <button
-      type="button"
-      title="Open input chain"
-      className="flex shrink-0 items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-700"
-    >
-      +{count} more
-    </button>
-  );
+  return <InputChainMoreChip count={count} />;
 }
 
 export const approvalEvents: TimelineEvent[] = [

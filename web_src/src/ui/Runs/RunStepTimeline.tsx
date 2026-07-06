@@ -26,7 +26,7 @@ function hasData(value: unknown): boolean {
   return !!value && typeof value === "object" && Object.keys(value as object).length > 0;
 }
 
-interface InputChainStep {
+export interface InputChainStep {
   nodeId: string;
   name: string;
   icon: ReactNode;
@@ -38,7 +38,7 @@ interface InputChainStep {
  * the preceding steps (most recent on top), with the selected step's payload shown
  * in a read-only Monaco editor.
  */
-function InputChainModal({
+export function InputChainModal({
   open,
   onOpenChange,
   steps,

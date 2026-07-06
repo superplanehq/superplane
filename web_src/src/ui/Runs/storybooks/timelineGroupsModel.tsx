@@ -1,9 +1,16 @@
 import JsonView from "@uiw/react-json-view";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, GitBranch, Terminal, Webhook } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { RunNodeDetailDetailsView } from "../RunNodeDetailDetailsView";
-import { CardMarker, EventRail, EventStatusPill, PayloadEventCard } from "../RunStepTimeline";
+import {
+  CardMarker,
+  EventRail,
+  EventStatusPill,
+  InputChainModal,
+  PayloadEventCard,
+  type InputChainStep,
+} from "../RunStepTimeline";
 import { DetailBox, ErrorDetailBox, HeaderIconButton } from "../RunStepAccordion";
 
 /**
@@ -79,6 +86,49 @@ export type TimelineCardEvent =
 export type TimelineEvent =
   | { type: "card"; id: string; card: TimelineCardEvent }
   | { type: "line"; id: string; line: TimelineLine };
+
+/** Mocked upstream steps shown by the input-chain modal in the wireframe. Most recent first. */
+const MOCK_INPUT_CHAIN: InputChainStep[] = [
+  {
+    nodeId: "build-and-test",
+    name: "build-and-test",
+    icon: <Terminal className="h-3.5 w-3.5" />,
+    payload: { status: "passed", tests_passed: 42, duration_seconds: 52 },
+  },
+  {
+    nodeId: "checkout-code",
+    name: "checkout-code",
+    icon: <GitBranch className="h-3.5 w-3.5" />,
+    payload: { ref: "main", sha: "9f3c1a2", trigger: "push" },
+  },
+  {
+    nodeId: "on-push",
+    name: "on-push",
+    icon: <Webhook className="h-3.5 w-3.5" />,
+    payload: { repository: "acme/store", pusher: "ci-bot", branch: "main" },
+  },
+];
+
+/** The "+X more" chip on an Input card; opens the input-chain modal (wireframe, mocked steps). */
+export function InputChainMoreChip({ count, steps = MOCK_INPUT_CHAIN }: { count: number; steps?: InputChainStep[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        title="Open input chain"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen(true);
+        }}
+        className="flex shrink-0 items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-700"
+      >
+        +{count} more
+      </button>
+      <InputChainModal open={open} onOpenChange={setOpen} steps={steps} />
+    </>
+  );
+}
 
 /** Rail marker for a small line event: a colored dot centered in the rail column. */
 function DotMarker({ className }: { className: string }) {
