@@ -7,6 +7,7 @@ interface FilesOverlayLayerProps {
   isFilesMode: boolean;
   isEditing?: boolean;
   canvasId?: string;
+  organizationId?: string;
   versionId?: string;
   canWrite?: boolean;
   files: AppFile[];
@@ -22,6 +23,7 @@ export function FilesOverlayLayer({
   isFilesMode,
   isEditing = false,
   canvasId,
+  organizationId,
   versionId,
   canWrite = false,
   files,
@@ -37,6 +39,7 @@ export function FilesOverlayLayer({
   return (
     <FilesView
       canvasId={canvasId}
+      organizationId={organizationId}
       versionId={versionId}
       isEditing={isEditing}
       canWrite={canWrite}
