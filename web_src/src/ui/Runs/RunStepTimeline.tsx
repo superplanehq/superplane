@@ -1,16 +1,5 @@
 import JsonView from "@uiw/react-json-view";
-import {
-  AlignLeft,
-  ArrowUp,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  CircleHelp,
-  Copy,
-  Maximize2,
-  SlidersHorizontal,
-  Sparkles,
-} from "lucide-react";
+import { ArrowUp, Check, ChevronDown, ChevronRight, CircleHelp, Copy, Maximize2, Sparkles } from "lucide-react";
 import { Fragment, useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import type {
   CanvasesCanvasNodeExecution,
@@ -23,15 +12,14 @@ import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
 import { RUN_NODE_ICON_SIZE, RunNodeIcon } from "./RunNodeIcon";
-import { DetailBox, ErrorDetailBox, HeaderIconButton, JsonDetailBox, PayloadMonaco } from "./RunStepAccordion";
+import { DetailBox, ErrorDetailBox, HeaderIconButton, PayloadMonaco } from "./RunStepAccordion";
 import {
   buildExecutionChain,
   buildStepStatusTimeline,
   extractExecutionPayload,
   isErrorValue,
-  type StepStatusEntry,
 } from "./runNodeDetailModel";
-import { formatEventTimestamp, formatRelativeOffset, formatStepElapsed } from "./runSummary";
+import { formatEventTimestamp, formatStepElapsed } from "./runSummary";
 import { useRunNodeDetailPresentation } from "./useRunNodeDetailPresentation";
 
 function hasData(value: unknown): boolean {
@@ -149,11 +137,11 @@ function InputChainModal({
 
 /**
  * The expand/collapse preference for each timeline panel is a single global
- * setting persisted to local storage, so toggling e.g. "summary" open stays
- * open across every step the user inspects. Backed by a tiny module-level store
+ * setting persisted to local storage, so toggling e.g. the runtime "config" open
+ * stays open across every step the user inspects. Backed by a tiny module-level store
  * so all mounted timeline items stay in sync.
  */
-type TimelineToggleKey = "summary" | "config";
+type TimelineToggleKey = "config";
 type ToggleState = Partial<Record<TimelineToggleKey, boolean>>;
 const TOGGLE_STORAGE_KEY = "superplane.runStepTimeline.panelToggles";
 
@@ -213,15 +201,6 @@ function CardMarker({ children }: { children: ReactNode }) {
   );
 }
 
-/** Rail-column marker for a small status row: a colored dot. */
-function DotMarker({ className }: { className: string }) {
-  return (
-    <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-      <span className={cn("h-2.5 w-2.5 rounded-full", className)} />
-    </span>
-  );
-}
-
 /** One entry hanging off the shared vertical rail: a marker column plus the row/card content. */
 function EventRail({ marker, isLast, children }: { marker: ReactNode; isLast?: boolean; children: ReactNode }) {
   return (
@@ -261,44 +240,11 @@ function EventStatusPill({
 }
 
 /**
- * A small inline lifecycle event (Queued, Running, Waiting) on the rail. While a step is
- * still in flight, the last such row (Running/Waiting) also hosts the Summary / Runtime
- * Config toggles (`trailing`) and their toggled bodies (`children`).
- */
-function StatusEventRow({
-  entry,
-  startMs,
-  isLast,
-  trailing,
-  children,
-}: {
-  entry: StepStatusEntry;
-  startMs: number;
-  isLast?: boolean;
-  trailing?: ReactNode;
-  children?: ReactNode;
-}) {
-  return (
-    <EventRail marker={<DotMarker className={entry.dotClassName} />} isLast={isLast}>
-      <div className="flex min-h-6 items-center gap-2">
-        <span className="text-[12px] capitalize text-slate-700">{entry.label}</span>
-        <div className="ml-auto flex shrink-0 items-center gap-0.5">
-          {trailing}
-          <span className="pl-1 text-[11px] tabular-nums text-slate-600">
-            {formatRelativeOffset(startMs, new Date(entry.timestamp).getTime())}
-          </span>
-        </div>
-      </div>
-      {children ? <div className="mt-2 flex flex-col gap-2">{children}</div> : null}
-    </EventRail>
-  );
-}
-
-/**
- * A GitHub-comment-style card for a payload event (input received / output emitted).
- * The header merges a lifecycle status (Triggered / terminal outcome) with the source
- * name, meta (elapsed / timestamp) and actions. The JSON body is expanded by default and
- * collapsible locally (not persisted); "Expand" opens the full Monaco modal.
+ * A GitHub-comment-style card for a timeline event. The header leads with the lifecycle
+ * status pill, then an optional label (kicker) and the source name, meta (elapsed /
+ * timestamp) and actions. With a payload, the JSON body is expanded by default and
+ * collapsible ("Expand" opens the full Monaco modal); without one it renders as a clean
+ * header-only "title box" for lifecycle-only events like Queued.
  */
 function PayloadEventCard({
   kicker,
@@ -307,26 +253,37 @@ function PayloadEventCard({
   sourceTrailing,
   meta,
   headerExtras,
+  open: openProp,
+  onToggleOpen,
   payload,
   modalNodeName,
   modalNodeIcon,
 }: {
-  kicker: string;
+  /** Optional uppercase label (INPUT / OUTPUT / RUNTIME CONFIG); omitted for lifecycle-only cards. */
+  kicker?: string;
   status: { dotClassName: string; label: string };
   sourceName: string;
   /** Rendered immediately to the right of the source name (e.g. the input-chain "+X more"). */
   sourceTrailing?: ReactNode;
   meta?: string | null;
   headerExtras?: ReactNode;
+  /** When provided, the expand arrow is controlled by the parent (e.g. to co-toggle a sibling Summary box). */
+  open?: boolean;
+  onToggleOpen?: () => void;
   payload: unknown;
   modalNodeName: string;
   modalNodeIcon: ReactNode;
 }) {
-  const [open, setOpen] = useState(true);
+  const [openInternal, setOpenInternal] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [modalCopied, setModalCopied] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openInternal;
+  const toggleOpen = () => (onToggleOpen ? onToggleOpen() : setOpenInternal((value) => !value));
   const canShowPayload = hasData(payload);
+  // When controlled, the parent has a sibling box (Summary) to co-reveal, so keep the arrow.
+  const canExpand = canShowPayload || controlled;
   const payloadString = useMemo(() => JSON.stringify(payload ?? {}, null, 2), [payload]);
 
   const copyPayload = (mark: (value: boolean) => void) => {
@@ -338,33 +295,37 @@ function PayloadEventCard({
   return (
     <div className="overflow-hidden rounded border border-slate-200 bg-white">
       <div className="flex items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
-        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{kicker}</span>
         <EventStatusPill dotClassName={status.dotClassName} label={status.label} />
+        {kicker ? (
+          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{kicker}</span>
+        ) : null}
         <span className="min-w-0 truncate text-[12px] font-medium text-slate-600">{sourceName}</span>
         {sourceTrailing}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {meta ? <span className="pr-1 text-[11px] tabular-nums text-slate-600">{meta}</span> : null}
           {headerExtras}
-          <HeaderIconButton label="Send to AI" icon={<Sparkles className="h-3.5 w-3.5" />} />
           {canShowPayload ? (
             <>
+              <HeaderIconButton label="Send to AI" icon={<Sparkles className="h-3.5 w-3.5" />} />
               <HeaderIconButton
                 label={copied ? "Copied" : "Copy"}
                 icon={copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
                 onClick={() => copyPayload(setCopied)}
               />
               <HeaderIconButton
-                label="Expand"
+                label="Open fullscreen"
                 icon={<Maximize2 className="h-3.5 w-3.5" />}
                 onClick={() => setModalOpen(true)}
               />
-              <HeaderIconButton
-                label={open ? "Collapse payload" : "Show payload"}
-                icon={open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                active={open}
-                onClick={() => setOpen((value) => !value)}
-              />
             </>
+          ) : null}
+          {canExpand ? (
+            <HeaderIconButton
+              label={open ? "Collapse" : "Expand"}
+              icon={open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              active={open}
+              onClick={toggleOpen}
+            />
           ) : null}
         </div>
       </div>
@@ -410,8 +371,9 @@ function PayloadEventCard({
 
 /**
  * The final event in the feed: the output emitted (payload card) or, when the step
- * errored, a red error card - either way merged with the terminal status. Hosts the
- * persisted Summary / Runtime Config toggles.
+ * errored, a red error card - either way merged with the terminal status. The finished
+ * step's Summary is shown before the output payload, both revealed by the card's
+ * single expand arrow.
  */
 function TerminalEventCard({
   isError,
@@ -422,8 +384,7 @@ function TerminalEventCard({
   sourceName,
   meta,
   payload,
-  toggles,
-  bodies,
+  summaryBody,
   nodeName,
   marker,
 }: {
@@ -435,43 +396,45 @@ function TerminalEventCard({
   sourceName: string;
   meta?: string | null;
   payload: unknown;
-  /** Summary / Runtime Config toggle chips shown in the card header. */
-  toggles?: ReactNode;
-  /** Toggled Summary / Runtime Config bodies shown below the card. */
-  bodies?: ReactNode;
+  /** The finished step's Summary, shown above the output payload under the expand arrow. */
+  summaryBody?: ReactNode;
   nodeName: string;
   marker: ReactNode;
 }) {
+  // Summary (Status box) and the output payload are two sibling boxes co-toggled by the
+  // output card's single expand arrow.
+  const [open, setOpen] = useState(true);
   return (
     <EventRail marker={<CardMarker>{marker}</CardMarker>} isLast>
-      <div className="flex flex-col gap-2">
-        {isError ? (
-          <>
-            <div className="flex items-center gap-1.5">
-              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Output</span>
-              <EventStatusPill dotClassName="bg-red-500" label={status.label || "Errored"} tone="error" />
-              <span className="min-w-0 truncate text-[12px] font-medium text-slate-600">{sourceName}</span>
-              <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                {meta ? <span className="pr-1 text-[11px] tabular-nums text-slate-600">{meta}</span> : null}
-                {toggles}
-              </div>
+      {isError ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            <EventStatusPill dotClassName="bg-red-500" label={status.label || "Errored"} tone="error" />
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Output</span>
+            <span className="min-w-0 truncate text-[12px] font-medium text-slate-600">{sourceName}</span>
+            <div className="ml-auto flex shrink-0 items-center gap-0.5">
+              {meta ? <span className="pr-1 text-[11px] tabular-nums text-slate-600">{meta}</span> : null}
             </div>
-            <ErrorDetailBox message={errorMessage} reason={errorReason} metadata={errorMetadata} />
-          </>
-        ) : (
+          </div>
+          {summaryBody}
+          <ErrorDetailBox message={errorMessage} reason={errorReason} metadata={errorMetadata} />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {open ? summaryBody : null}
           <PayloadEventCard
             kicker="Output"
             status={status}
             sourceName={sourceName}
             meta={meta}
-            headerExtras={toggles}
+            open={open}
+            onToggleOpen={() => setOpen((value) => !value)}
             payload={payload}
             modalNodeName={nodeName}
             modalNodeIcon={marker}
           />
-        )}
-        {bodies}
-      </div>
+        </div>
+      )}
     </EventRail>
   );
 }
@@ -484,9 +447,11 @@ function joinMeta(...parts: (string | null | undefined)[]): string | null {
 
 /**
  * The expanded content of a run step, rendered as a GitHub-issue-style event feed on a
- * shared vertical rail: an input card (merging the "Triggered" status), the middle
- * lifecycle statuses as small rows (Queued, Running/Waiting), and a terminal
- * output/error card (merging the final outcome). Triggers show only the input card.
+ * shared vertical rail where every event is a card: an input card (merging the
+ * "Triggered" status), header-only cards for the middle lifecycle statuses (Queued) plus
+ * a Running/Waiting card that hosts the runtime config, and a terminal output/error card
+ * (merging the final outcome and the finished step's Summary/Status box). Triggers show
+ * only the input card.
  */
 export function RunStepTimeline({
   run,
@@ -523,8 +488,7 @@ export function RunStepTimeline({
     return Object.fromEntries(Object.entries(details).filter(([key]) => key !== "Error"));
   }, [presentation.tabData?.details, isError]);
 
-  const [showSummary, toggleSummary] = useTimelineToggle("summary", true);
-  const [showConfig, toggleConfig] = useTimelineToggle("config", false);
+  const [showConfig, toggleConfig] = useTimelineToggle("config", true);
 
   const actionMarker = (
     <RunNodeIcon
@@ -601,14 +565,13 @@ export function RunStepTimeline({
   }, [chain, currentIndex, workflowNodes, executions, triggerNodeId, run.rootEvent?.data, componentIconMap]);
 
   // Feed shape: the "Triggered" status is folded into the input card and the terminal
-  // outcome into the output/error card, so only the middle statuses render as rows.
+  // outcome into the output/error card, so only the middle statuses render as their own cards.
   const finished = execution?.state === "STATE_FINISHED";
   const showTerminalCard = !isTrigger && !!execution && finished;
   const middleEntries = useMemo(
     () => (statusTimeline.length ? statusTimeline.slice(1, finished ? -1 : undefined) : []),
     [statusTimeline, finished],
   );
-  const startMs = statusTimeline.length ? new Date(statusTimeline[0].timestamp).getTime() : Date.now();
   const hasMiddle = middleEntries.length > 0;
 
   const inputSourceName = previousStep?.name ?? presentation.nodeName;
@@ -617,54 +580,24 @@ export function RunStepTimeline({
     ? { dotClassName: presentation.headerEventBadge.badgeColor, label: presentation.headerEventBadge.label }
     : { dotClassName: "bg-slate-400", label: "Done" };
 
-  // Summary + runtime config follow the step's progress: while it is running/waiting they
-  // hang off the in-flight status row, and once finished they move to the terminal card.
+  // Runtime config is hosted on the Running/Waiting card and stays there even after the
+  // step finishes. The Summary (Status box) belongs to the finished step and is shown
+  // before the output payload under the terminal card's arrow.
   const config = presentation.tabData?.configuration;
-  const hasSummary = Object.keys(summaryDetails).length > 0;
   const canShowConfig = hasData(config);
-  const detailToggles =
-    hasSummary || canShowConfig ? (
-      <>
-        {hasSummary ? (
-          <HeaderIconButton
-            label="Show summary"
-            icon={<AlignLeft className="h-3.5 w-3.5" />}
-            active={showSummary}
-            onClick={toggleSummary}
-          />
-        ) : null}
-        {canShowConfig ? (
-          <HeaderIconButton
-            label="Show runtime config"
-            icon={<SlidersHorizontal className="h-3.5 w-3.5" />}
-            active={showConfig}
-            onClick={toggleConfig}
-          />
-        ) : null}
-      </>
-    ) : null;
-  const detailBodies =
-    (showSummary && hasSummary) || (showConfig && canShowConfig) ? (
-      <>
-        {showSummary && hasSummary ? (
-          <DetailBox title="Summary">
-            <RunNodeDetailDetailsView
-              details={summaryDetails}
-              statusBadge={presentation.headerEventBadge}
-              relativeTime={presentation.createdAt}
-            />
-          </DetailBox>
-        ) : null}
-        {showConfig && canShowConfig ? (
-          <JsonDetailBox
-            title="Runtime Config"
-            value={config}
-            nodeName={presentation.nodeName}
-            nodeIcon={actionMarker}
-          />
-        ) : null}
-      </>
-    ) : null;
+  // The Summary box always shows Status / Relative time, so render it for any finished
+  // step that has a status badge (not only when there are extra detail fields).
+  const hasSummary =
+    Object.keys(summaryDetails).length > 0 || !!presentation.headerEventBadge || !!presentation.createdAt;
+  const summaryBody = hasSummary ? (
+    <DetailBox title="Summary">
+      <RunNodeDetailDetailsView
+        details={summaryDetails}
+        statusBadge={presentation.headerEventBadge}
+        relativeTime={presentation.createdAt}
+      />
+    </DetailBox>
+  ) : null;
 
   return (
     <div className="bg-slate-50 px-3 py-3">
@@ -696,19 +629,26 @@ export function RunStepTimeline({
       ) : null}
 
       {middleEntries.map((entry, index) => {
-        // Until the step finishes, the last in-flight row (Running/Waiting) hosts the
-        // Summary / Runtime Config toggles and bodies; once finished they move to the card.
-        const hostsDetails = index === middleEntries.length - 1 && !showTerminalCard;
+        const isRunning = entry.key === "running" || entry.key === "waiting";
+        const isLast = index === middleEntries.length - 1 && !showTerminalCard;
         return (
-          <StatusEventRow
-            key={entry.key}
-            entry={entry}
-            startMs={startMs}
-            isLast={index === middleEntries.length - 1 && !showTerminalCard}
-            trailing={hostsDetails ? detailToggles : undefined}
-          >
-            {hostsDetails ? detailBodies : null}
-          </StatusEventRow>
+          <EventRail key={entry.key} marker={<CardMarker>{actionMarker}</CardMarker>} isLast={isLast}>
+            <PayloadEventCard
+              status={{ dotClassName: entry.dotClassName, label: entry.label }}
+              kicker={isRunning ? "Runtime Config" : undefined}
+              sourceName={presentation.nodeName}
+              meta={
+                isRunning
+                  ? joinMeta(execution ? formatStepElapsed(execution) : null, formatEventTimestamp(entry.timestamp))
+                  : formatEventTimestamp(entry.timestamp)
+              }
+              open={isRunning && canShowConfig ? showConfig : undefined}
+              onToggleOpen={isRunning && canShowConfig ? toggleConfig : undefined}
+              payload={isRunning ? config : undefined}
+              modalNodeName={presentation.nodeName}
+              modalNodeIcon={actionMarker}
+            />
+          </EventRail>
         );
       })}
 
@@ -725,8 +665,7 @@ export function RunStepTimeline({
             formatEventTimestamp(execution.updatedAt ?? execution.createdAt),
           )}
           payload={presentation.tabData?.payload}
-          toggles={detailToggles}
-          bodies={detailBodies}
+          summaryBody={summaryBody}
           nodeName={presentation.nodeName}
           marker={actionMarker}
         />

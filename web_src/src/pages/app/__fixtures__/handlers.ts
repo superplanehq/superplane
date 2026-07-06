@@ -84,6 +84,75 @@ if (secondErrorStep) {
   secondErrorStep.resultMessage = "Step failed: exited with code 1";
 }
 
+// --- Run Bash runner demo fixtures --------------------------------------
+// A Run Bash runner node is injected into the live canvas (see the canvas
+// injection further below) and a matching runner step is added to a few runs
+// so the run step list shows a runner step too. The constants and the run-step
+// injection must run *before* executionsByEventId is built, because that loop
+// copies each run's executions into new arrays.
+const RUNNER_NODE_ID = "runner-bash-demo";
+const RUNNER_EXECUTION_ID = "exec-runner-bash-demo";
+const RUNNER_TASK_ID = "task-runner-bash-demo";
+const RUNNER_STREAM_PATH = "/api/mock/runner-live-logs/stream";
+
+const RUNNER_LOG_NDJSON = [
+  { type: "cmd_start", index: 0, text: "npm ci", started_at: Date.now() - 9000 },
+  { type: "line", text: "npm warn deprecated inflight@1.0.6: This module is not supported" },
+  { type: "line", text: "added 428 packages, and audited 429 packages in 6s" },
+  { type: "line", text: "found 0 vulnerabilities" },
+  { type: "cmd_end", index: 0, status: "passed", duration_ms: 6234 },
+  { type: "cmd_start", index: 1, text: "npm run test", started_at: Date.now() - 1800 },
+  { type: "line", text: "> superplane@0.0.0 test" },
+  { type: "line", text: "FAIL src/components/widget.test.ts" },
+  { type: "line", text: "  \u25cf renders the widget \u203a shows the title" },
+  { type: "line", text: "    expect(received).toBe(expected)" },
+  { type: "line", text: '    Expected: "Hello"  Received: "Hi"' },
+  { type: "cmd_end", index: 1, status: "failed", duration_ms: 1187 },
+]
+  .map((record) => `${JSON.stringify(record)}\n`)
+  .join("");
+
+// Append a finished Run Bash step to a handful of runs so it shows up in the
+// run inspection step list (not just as a live canvas node).
+const RUNNER_STEP_RUN_INDEXES = [0, 4, 8];
+const runsForRunnerStep = (fixture.runs as { runs?: FixtureRun[] }).runs ?? [];
+for (const index of RUNNER_STEP_RUN_INDEXES) {
+  const run = runsForRunnerStep[index];
+  const steps = run?.executions;
+  if (!steps || steps.some((step) => step.nodeId === RUNNER_NODE_ID)) {
+    continue;
+  }
+  const previous = steps[steps.length - 1];
+  const previousTime =
+    (previous?.updatedAt as string | undefined) ??
+    (previous?.createdAt as string | undefined) ??
+    run?.createdAt ??
+    new Date().toISOString();
+  const stepTime = new Date(new Date(previousTime).getTime() + 1500).toISOString();
+  steps.push({
+    id: `${RUNNER_EXECUTION_ID}-${index}`,
+    nodeId: RUNNER_NODE_ID,
+    previousExecutionId: previous?.id,
+    state: "STATE_FINISHED",
+    result: "RESULT_PASSED",
+    resultReason: "RESULT_REASON_OK",
+    resultMessage: "",
+    createdAt: stepTime,
+    updatedAt: stepTime,
+    outputs: {
+      passed: [
+        {
+          data: { exit_code: 0, status: "passed", task_id: RUNNER_TASK_ID },
+          timestamp: stepTime,
+          type: "runnerBash.finished",
+        },
+      ],
+    },
+    metadata: { runner_broker_task_id: RUNNER_TASK_ID },
+    configuration: { commands: ["npm ci", "npm run test"] },
+  } as FixtureExecution);
+}
+
 const executionsByEventId = new Map<string, FixtureExecution[]>();
 for (const run of (fixture.runs as { runs?: FixtureRun[] }).runs ?? []) {
   const eventId = run.rootEvent?.id;
@@ -97,6 +166,76 @@ for (const run of (fixture.runs as { runs?: FixtureRun[] }).runs ?? []) {
       ...exec,
     })),
   );
+}
+
+// Inject the Run Bash runner node (with a finished execution) into the live
+// canvas so its on-node "View logs" control renders (runnerMapper ->
+// RunnerLiveLogDialog). Runner nodes stream logs from a task-broker session; the
+// mock session + NDJSON stream are served by the fetch routes below so the log
+// modal can be designed against realistic data. The live canvas builds node
+// executions from `canvas.status.lastExecutions` (nodeExecutionStore.initializeFromWorkflow).
+type FixtureNode = { id?: string; position?: { x: number; y: number } } & Record<string, unknown>;
+type FixtureEdge = Record<string, unknown>;
+type CanvasSpec = { nodes?: FixtureNode[]; edges?: FixtureEdge[] };
+type CanvasStatus = { lastExecutions?: FixtureExecution[]; lastEvents?: unknown[] };
+
+const canvasInner = (fixture.canvas as { canvas?: { spec?: CanvasSpec; status?: CanvasStatus } }).canvas;
+const canvasSpec = canvasInner?.spec;
+const canvasStatus = canvasInner?.status;
+const nowIso = new Date().toISOString();
+
+if (canvasSpec?.nodes && !canvasSpec.nodes.some((node) => node.id === RUNNER_NODE_ID)) {
+  canvasSpec.nodes.push({
+    id: RUNNER_NODE_ID,
+    name: "Run bash",
+    type: "TYPE_ACTION",
+    component: "runnerBash",
+    configuration: {
+      commands: ["npm ci", "npm run test"],
+      execution_mode: "docker",
+      docker_image_preset: "node:20",
+      machine_type: "e1-tiny-amd64",
+      execution_timeout_seconds: 3600,
+    },
+    position: { x: 1344, y: 1680 },
+    isCollapsed: false,
+  });
+  canvasSpec.edges?.push({ sourceId: "agent-succeeded", targetId: RUNNER_NODE_ID, channel: "true" });
+}
+
+if (canvasStatus?.lastExecutions && !canvasStatus.lastExecutions.some((exec) => exec.nodeId === RUNNER_NODE_ID)) {
+  canvasStatus.lastExecutions.push({
+    id: RUNNER_EXECUTION_ID,
+    canvasId: fixture.canvasId,
+    nodeId: RUNNER_NODE_ID,
+    state: "STATE_FINISHED",
+    result: "RESULT_PASSED",
+    resultReason: "RESULT_REASON_OK",
+    resultMessage: "",
+    outputs: {
+      passed: [
+        {
+          data: { exit_code: 0, status: "passed", task_id: RUNNER_TASK_ID },
+          timestamp: nowIso,
+          type: "runnerBash.finished",
+        },
+      ],
+    },
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    metadata: { runner_broker_task_id: RUNNER_TASK_ID },
+    configuration: { commands: ["npm ci", "npm run test"] },
+    rootEvent: {
+      id: "event-runner-bash-demo",
+      canvasId: fixture.canvasId,
+      nodeId: "on-pull-request",
+      channel: "default",
+      data: {},
+      createdAt: nowIso,
+      root: true,
+    },
+    cancelledBy: null,
+  } as FixtureExecution);
 }
 
 export const canvasAppIds = {
@@ -176,6 +315,19 @@ const routes: Array<{ pattern: RegExp; resolve: (match: RegExpExecArray, url: UR
       return { json: executions ? { executions } : fixture.executions };
     },
   },
+  // Runner live logs: a short-lived session pointing at a mock NDJSON stream, so
+  // the runner "View logs" modal (RunnerLiveLogDialog) renders realistic logs.
+  {
+    pattern: re(`${CANVAS}/node-executions/([^/]+)/runner-live-logs/session`),
+    resolve: () => ({
+      json: {
+        stream_url: RUNNER_STREAM_PATH,
+        token: "mock-token",
+        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      },
+    }),
+  },
+  { pattern: re(RUNNER_STREAM_PATH), resolve: () => ({ text: RUNNER_LOG_NDJSON }) },
   { pattern: re(`${CANVAS}/memory`), resolve: () => ({ json: { memory: [] } }) },
   // Repository files (canvas.yaml / console.yaml) return raw text; empty content
   // means "no console dashboard configured".
