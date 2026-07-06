@@ -14,7 +14,7 @@ import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 
-type GetDailyUsageDataPayload = {
+type GetDailyUsagePayload = {
   period?: { startDate?: string; endDate?: string };
   messages?: {
     inputTokens?: number;
@@ -27,12 +27,12 @@ type GetDailyUsageDataPayload = {
   };
 };
 
-type GetDailyUsageDataConfiguration = {
+type GetDailyUsageConfiguration = {
   startDate?: string;
   endDate?: string;
 };
 
-function formatPeriod(period: GetDailyUsageDataPayload["period"]): string | undefined {
+function formatPeriod(period: GetDailyUsagePayload["period"]): string | undefined {
   if (!period?.startDate && !period?.endDate) return undefined;
   return `${period?.startDate ?? "?"} – ${period?.endDate ?? "?"}`;
 }
@@ -42,7 +42,7 @@ function formatMessageTokens(inputTokens?: number, outputTokens?: number): strin
   return `${(inputTokens ?? 0).toLocaleString()} in / ${(outputTokens ?? 0).toLocaleString()} out`;
 }
 
-// Mirrors the backend default in resolveDateRange (get_daily_usage_data.go):
+// Mirrors the backend default in resolveDateRange (get_daily_usage.go):
 // the last 7 days, ending today, in UTC.
 function defaultDateRange(): { startDate: string; endDate: string } {
   const endDate = new Date();
@@ -56,7 +56,7 @@ function defaultDateRange(): { startDate: string; endDate: string } {
 }
 
 function dateRangeMetadata(node: NodeInfo): MetadataItem[] {
-  const config = node.configuration as GetDailyUsageDataConfiguration | undefined;
+  const config = node.configuration as GetDailyUsageConfiguration | undefined;
   const defaults = defaultDateRange();
   const startDate = config?.startDate || defaults.startDate;
   const endDate = config?.endDate || defaults.endDate;
@@ -85,7 +85,7 @@ function detailEntry(label: string, value: string | undefined): [string, string]
 // The five metrics most relevant to a usage/cost review at a glance: the
 // covered period, Claude Code sessions, Messages API token usage, pull
 // requests opened, and estimated spend.
-function usageDetailFields(data: GetDailyUsageDataPayload | undefined): Record<string, string> {
+function usageDetailFields(data: GetDailyUsagePayload | undefined): Record<string, string> {
   const entries = [
     detailEntry("Period", formatPeriod(data?.period)),
     detailEntry("Sessions", formatCount(data?.claudeCode?.sessions)),
@@ -97,7 +97,7 @@ function usageDetailFields(data: GetDailyUsageDataPayload | undefined): Record<s
   return Object.fromEntries(entries.filter((entry): entry is [string, string] => entry != null));
 }
 
-export const getDailyUsageDataMapper: ComponentBaseMapper = {
+export const getDailyUsageMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "claude";
@@ -111,9 +111,9 @@ export const getDailyUsageDataMapper: ComponentBaseMapper = {
         context.node.name ||
         context.componentDefinition?.label ||
         context.componentDefinition?.name ||
-        "Get Daily Usage Data",
+        "Get Daily Usage",
       eventSections: lastExecution
-        ? getDailyUsageDataEventSections(context.nodes, lastExecution, componentName)
+        ? getDailyUsageEventSections(context.nodes, lastExecution, componentName)
         : undefined,
       metadata: dateRangeMetadata(context.node),
       includeEmptyState: !lastExecution,
@@ -123,7 +123,7 @@ export const getDailyUsageDataMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const data = outputs?.default?.[0]?.data as GetDailyUsageDataPayload | undefined;
+    const data = outputs?.default?.[0]?.data as GetDailyUsagePayload | undefined;
 
     return {
       "Executed At": executedAt(context.execution),
@@ -137,7 +137,7 @@ export const getDailyUsageDataMapper: ComponentBaseMapper = {
   },
 };
 
-function getDailyUsageDataEventSections(
+function getDailyUsageEventSections(
   nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,

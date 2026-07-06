@@ -12,13 +12,13 @@ import (
 )
 
 const (
-	GetDailyUsageDataPayloadType = "claude.getDailyUsageData.result"
-	maxUsageReportRangeDays      = 31
+	GetDailyUsagePayloadType = "claude.getDailyUsage.result"
+	maxUsageReportRangeDays  = 31
 )
 
-type GetDailyUsageData struct{}
+type GetDailyUsage struct{}
 
-type GetDailyUsageDataSpec struct {
+type GetDailyUsageSpec struct {
 	StartDate string `json:"startDate" mapstructure:"startDate"`
 	EndDate   string `json:"endDate" mapstructure:"endDate"`
 }
@@ -94,27 +94,27 @@ type DailyUsage struct {
 	CodeEstimatedCostUsd float64 `json:"codeEstimatedCostUsd"`
 }
 
-type GetDailyUsageDataOutput struct {
+type GetDailyUsageOutput struct {
 	Period     Period            `json:"period"`
 	Messages   MessagesSummary   `json:"messages"`
 	ClaudeCode ClaudeCodeSummary `json:"claudeCode"`
 	Daily      []DailyUsage      `json:"daily"`
 }
 
-func (c *GetDailyUsageData) Name() string {
-	return "claude.getDailyUsageData"
+func (c *GetDailyUsage) Name() string {
+	return "claude.getDailyUsage"
 }
 
-func (c *GetDailyUsageData) Label() string {
-	return "Get Daily Usage Data"
+func (c *GetDailyUsage) Label() string {
+	return "Get Daily Usage"
 }
 
-func (c *GetDailyUsageData) Description() string {
+func (c *GetDailyUsage) Description() string {
 	return "Fetches daily Messages and Claude Code usage metrics from Anthropic's Admin API."
 }
 
-func (c *GetDailyUsageData) Documentation() string {
-	return `The Get Daily Usage Data component fetches usage metrics from Anthropic's Admin API,
+func (c *GetDailyUsage) Documentation() string {
+	return `The Get Daily Usage component fetches usage metrics from Anthropic's Admin API,
 combining raw API/SDK token usage with Claude Code productivity metrics.
 
 ## Use Cases
@@ -151,17 +151,17 @@ combining raw API/SDK token usage with Claude Code productivity metrics.
   request per day in the range`
 }
 
-func (c *GetDailyUsageData) Icon() string {
+func (c *GetDailyUsage) Icon() string {
 	return "bar-chart"
 }
 
-func (c *GetDailyUsageData) Color() string {
+func (c *GetDailyUsage) Color() string {
 	return "#D97757"
 }
 
-func (c *GetDailyUsageData) ExampleOutput() map[string]any {
+func (c *GetDailyUsage) ExampleOutput() map[string]any {
 	return map[string]any{
-		"data": GetDailyUsageDataOutput{
+		"data": GetDailyUsageOutput{
 			Period: Period{StartDate: "2026-06-26", EndDate: "2026-07-03"},
 			Messages: MessagesSummary{
 				InputTokens:         1250000,
@@ -194,15 +194,15 @@ func (c *GetDailyUsageData) ExampleOutput() map[string]any {
 			},
 		},
 		"timestamp": "2026-07-03T19:29:35.841265352Z",
-		"type":      GetDailyUsageDataPayloadType,
+		"type":      GetDailyUsagePayloadType,
 	}
 }
 
-func (c *GetDailyUsageData) OutputChannels(config any) []core.OutputChannel {
+func (c *GetDailyUsage) OutputChannels(config any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *GetDailyUsageData) Configuration() []configuration.Field {
+func (c *GetDailyUsage) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "startDate",
@@ -221,16 +221,16 @@ func (c *GetDailyUsageData) Configuration() []configuration.Field {
 	}
 }
 
-func (c *GetDailyUsageData) Setup(ctx core.SetupContext) error {
+func (c *GetDailyUsage) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *GetDailyUsageData) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *GetDailyUsage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *GetDailyUsageData) Execute(ctx core.ExecutionContext) error {
-	spec := GetDailyUsageDataSpec{}
+func (c *GetDailyUsage) Execute(ctx core.ExecutionContext) error {
+	spec := GetDailyUsageSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -274,7 +274,7 @@ func (c *GetDailyUsageData) Execute(ctx core.ExecutionContext) error {
 	messagesSummary, messagesDaily := aggregateMessages(messageBuckets)
 	codeSummary, codeDaily := aggregateClaudeCode(codeRecords)
 
-	output := GetDailyUsageDataOutput{
+	output := GetDailyUsageOutput{
 		Period: Period{
 			StartDate: startDate.Format("2006-01-02"),
 			EndDate:   endDate.Format("2006-01-02"),
@@ -286,30 +286,30 @@ func (c *GetDailyUsageData) Execute(ctx core.ExecutionContext) error {
 
 	ctx.Logger.Infof("Retrieved usage data: %d message buckets, %d claude code records", len(messageBuckets), len(codeRecords))
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, GetDailyUsageDataPayloadType, []any{output})
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, GetDailyUsagePayloadType, []any{output})
 }
 
-func (c *GetDailyUsageData) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (c *GetDailyUsage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
 
-func (c *GetDailyUsageData) Cancel(ctx core.ExecutionContext) error {
+func (c *GetDailyUsage) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (c *GetDailyUsageData) Cleanup(ctx core.SetupContext) error {
+func (c *GetDailyUsage) Cleanup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (c *GetDailyUsageData) Hooks() []core.Hook {
+func (c *GetDailyUsage) Hooks() []core.Hook {
 	return []core.Hook{}
 }
 
-func (c *GetDailyUsageData) HandleHook(ctx core.ActionHookContext) error {
+func (c *GetDailyUsage) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
-func resolveDateRange(spec GetDailyUsageDataSpec) (time.Time, time.Time, error) {
+func resolveDateRange(spec GetDailyUsageSpec) (time.Time, time.Time, error) {
 	now := time.Now().UTC()
 	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
@@ -444,10 +444,13 @@ func applyActor(byActor map[string]*ActorSummary, actor ClaudeCodeActor, m Claud
 	if name == "" {
 		name = "unknown"
 	}
-	a, ok := byActor[name]
+	// Key by type+name: a user email and an API key name could otherwise collide
+	// and get merged into the same rollup.
+	key := actor.Type + ":" + name
+	a, ok := byActor[key]
 	if !ok {
 		a = &ActorSummary{Actor: name, Type: actor.Type}
-		byActor[name] = a
+		byActor[key] = a
 	}
 	a.Sessions += m.NumSessions
 	a.LinesAdded += m.LinesOfCode.Added

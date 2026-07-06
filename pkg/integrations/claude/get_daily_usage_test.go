@@ -14,8 +14,8 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__GetDailyUsageData__Execute(t *testing.T) {
-	c := &GetDailyUsageData{}
+func Test__GetDailyUsage__Execute(t *testing.T) {
+	c := &GetDailyUsage{}
 
 	messagesResponse := `{
 		"data": [
@@ -103,11 +103,11 @@ func Test__GetDailyUsageData__Execute(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[1].URL.String(), "/organizations/usage_report/claude_code")
 
 		assert.Equal(t, core.DefaultOutputChannel.Name, executionStateCtx.Channel)
-		assert.Equal(t, GetDailyUsageDataPayloadType, executionStateCtx.Type)
+		assert.Equal(t, GetDailyUsagePayloadType, executionStateCtx.Type)
 
 		require.Len(t, executionStateCtx.Payloads, 1)
 		wrapped := executionStateCtx.Payloads[0].(map[string]any)
-		output := wrapped["data"].(GetDailyUsageDataOutput)
+		output := wrapped["data"].(GetDailyUsageOutput)
 
 		assert.Equal(t, "2024-03-18", output.Period.StartDate)
 		assert.Equal(t, "2024-03-18", output.Period.EndDate)
@@ -232,4 +232,32 @@ func Test__GetDailyUsageData__Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "admin API key is not configured")
 	})
+}
+
+func TestAggregateClaudeCode_DistinguishesActorsBySameNameDifferentType(t *testing.T) {
+	records := []ClaudeCodeUsageRecord{
+		{
+			Actor:       ClaudeCodeActor{Type: "user_actor", EmailAddress: "shared-name"},
+			CoreMetrics: ClaudeCodeCoreMetrics{NumSessions: 3},
+		},
+		{
+			Actor:       ClaudeCodeActor{Type: "api_actor", APIKeyName: "shared-name"},
+			CoreMetrics: ClaudeCodeCoreMetrics{NumSessions: 7},
+		},
+	}
+
+	summary, _ := aggregateClaudeCode(records)
+
+	require.Len(t, summary.ByActor, 2, "actors with the same display name but different types must not be merged")
+
+	byType := map[string]ActorSummary{}
+	for _, actor := range summary.ByActor {
+		byType[actor.Type] = actor
+	}
+
+	require.Contains(t, byType, "user_actor")
+	require.Contains(t, byType, "api_actor")
+	assert.Equal(t, int64(3), byType["user_actor"].Sessions)
+	assert.Equal(t, int64(7), byType["api_actor"].Sessions)
+	assert.Equal(t, int64(10), summary.Sessions)
 }
