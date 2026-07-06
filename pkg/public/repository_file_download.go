@@ -84,7 +84,11 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 
 		defer reader.Close()
 		setInlineFileHeaders(w, path, "application/octet-stream")
-		io.Copy(w, reader)
+		if _, err := io.Copy(w, reader); err != nil {
+			log.Errorf("Failed to copy file: %v", err)
+			http.Error(w, "Failed to copy file", http.StatusInternalServerError)
+			return
+		}
 		return
 
 	//
@@ -106,7 +110,11 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 
 		defer reader.Close()
 		setInlineFileHeaders(w, path, "application/octet-stream")
-		io.Copy(w, reader)
+		if _, err := io.Copy(w, reader); err != nil {
+			log.Errorf("Failed to copy file: %v", err)
+			http.Error(w, "Failed to copy file", http.StatusInternalServerError)
+			return
+		}
 		return
 
 	//
@@ -127,7 +135,11 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 
 		defer reader.Close()
 		setInlineFileHeaders(w, path, "application/octet-stream")
-		io.Copy(w, reader)
+		if _, err := io.Copy(w, reader); err != nil {
+			log.Errorf("Failed to copy file: %v", err)
+			http.Error(w, "Failed to copy file", http.StatusInternalServerError)
+			return
+		}
 		return
 	}
 }

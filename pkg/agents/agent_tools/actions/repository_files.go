@@ -84,12 +84,12 @@ func (a readFileAction) Execute(ctx context.Context, session agents.AgentSession
 
 	orgID, err := uuid.Parse(session.OrganizationID)
 	if err != nil {
-		return fileReadEntry{}, fmt.Errorf("invalid session organization id: %w", err)
+		return fileReadResult{}, fmt.Errorf("invalid session organization id: %w", err)
 	}
 
 	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
-		return fileReadEntry{}, fmt.Errorf("invalid session canvas id: %w", err)
+		return fileReadResult{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
 	paths, err := requestedFilePaths(input)

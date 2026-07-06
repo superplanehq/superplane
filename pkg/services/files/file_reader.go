@@ -47,8 +47,6 @@ func (r *AppFileReader) Read(ctx context.Context, path string) (reader io.ReadCl
 	ctx, done := telemetry.Span(ctx, "reader.read")
 	defer done(&err)
 
-	path = NormalizePath(path)
-
 	//
 	// Read from staging first.
 	//
@@ -76,6 +74,8 @@ func (r *AppFileReader) ReadFromVersion(ctx context.Context, path string, versio
 	if err != nil {
 		return nil, fmt.Errorf("failed to find canvas version: %w", err)
 	}
+
+	path = NormalizePath(path)
 
 	//
 	// Spec files (canvas.yaml, console.yaml) are not yet written to git,
@@ -129,6 +129,7 @@ func (r *AppFileReader) ReadFromStaging(ctx context.Context, path string) (reade
 	ctx, done := telemetry.Span(ctx, "reader.from_staging")
 	defer done(&err)
 
+	path = NormalizePath(path)
 	file, err := models.FindStagedFileForUser(r.db, r.app.ID, r.userID, path)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -136,6 +137,10 @@ func (r *AppFileReader) ReadFromStaging(ctx context.Context, path string) (reade
 		}
 
 		return nil, fmt.Errorf("failed to find staged file: %w", err)
+	}
+
+	if file.Deleted {
+		return nil, ErrFileNotFound
 	}
 
 	return io.NopCloser(strings.NewReader(file.Content)), nil
@@ -150,5 +155,5 @@ func (r *AppFileReader) readFromGit(ctx context.Context, path string) (reader io
 		return nil, fmt.Errorf("failed to find repository: %w", err)
 	}
 
-	return r.git.GetFile(ctx, repository.RepoID, path, "main")
+	return r.git.GetFile(ctx, repository.RepoID, path, "")
 }
