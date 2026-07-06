@@ -56,7 +56,7 @@ interface KeyValueRowProps {
 function KeyValueRow({ pair, onChange, onRemove, disabled }: KeyValueRowProps) {
   return (
     <div className="flex gap-2 items-start">
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <Input
           type="text"
           value={pair.name}
@@ -71,7 +71,7 @@ function KeyValueRow({ pair, onChange, onRemove, disabled }: KeyValueRowProps) {
           onChange={(e) => onChange({ value: e.target.value })}
           placeholder="Value"
           rows={3}
-          className="font-mono text-sm"
+          className="font-mono text-sm wrap-anywhere"
           disabled={disabled}
           data-testid="secrets-create-value"
         />
