@@ -14,7 +14,7 @@ export function ImageAttachmentPreviews({ images, onRemove }: ImageAttachmentPre
       {images.map((image) => (
         <div
           key={image.id}
-          className="group relative size-14 overflow-hidden rounded-md border border-slate-200 bg-slate-50"
+          className="group relative size-14 overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-gray-700 dark:bg-gray-900"
         >
           <img src={image.dataUrl} alt={image.name} className="size-full object-cover" />
           <button

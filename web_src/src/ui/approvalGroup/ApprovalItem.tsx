@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { Check, Circle, MessageCircle, Paperclip, X } from "lucide-react";
 import { Button } from "../button";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -110,7 +111,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           </Button>
           <LoadingButton
             variant="default"
-            className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+            className={cn("h-7 py-1 px-2", appDarkModeClasses.primaryAction)}
             loading={isApproving}
             loadingText="Approving..."
             onClick={async (e) => {
@@ -195,7 +196,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <LoadingButton
                   variant="default"
                   size="default"
-                  className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+                  className={cn("h-7 py-1 px-2", appDarkModeClasses.primaryAction)}
                   loading={isRejecting}
                   loadingText="Rejecting..."
                   onClick={async (e) => {
@@ -254,7 +255,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 </Button>
                 <LoadingButton
                   variant="default"
-                  className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+                  className={cn("h-7 py-1 px-2", appDarkModeClasses.primaryAction)}
                   loading={isApproving}
                   loadingText="Approving..."
                   onClick={async (e) => {

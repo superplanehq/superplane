@@ -8,6 +8,7 @@ import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { isUsagePageForced } from "@/lib/env";
 import { EmptyState } from "@/ui/emptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { settingsCardClassName, settingsInnerMetricCardClassName } from "./settingsPageStyles";
 
 interface UsageProps {
   organizationId: string;
@@ -41,7 +42,7 @@ export function Usage({ organizationId }: UsageProps) {
   if (isUsageLoading) {
     return (
       <div className="pt-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+        <div className={settingsCardClassName}>
           <p className="text-sm text-gray-500 dark:text-gray-400">Loading usage...</p>
         </div>
       </div>
@@ -63,7 +64,7 @@ export function Usage({ organizationId }: UsageProps) {
   if (!data) {
     return (
       <div className="pt-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+        <div className={settingsCardClassName}>
           <EmptyState
             icon={Gauge}
             title="Usage data unavailable"
@@ -88,15 +89,21 @@ function UsageContent({ data, isPreviewMode }: { data: OrganizationsDescribeUsag
 
   return (
     <div className="pt-6 space-y-6">
-      <Alert>
-        <Gauge className="h-4 w-4" />
-        <AlertTitle>{isPreviewMode ? "Usage preview mode" : "Usage tracking active"}</AlertTitle>
-        <AlertDescription>
-          {isPreviewMode
-            ? "Showing the organization usage page in local development without configured usage tracking."
-            : data.statusMessage || "Organization usage is being tracked for this organization."}
-        </AlertDescription>
-      </Alert>
+      <div className={settingsCardClassName}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              {isPreviewMode ? "Usage preview mode" : "Usage tracking active"}
+            </p>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {isPreviewMode
+                ? "Showing the organization usage page in local development without configured usage tracking."
+                : data.statusMessage || "Organization usage is being tracked for this organization."}
+            </p>
+          </div>
+          <Gauge className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" />
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <UsageMetricCard
@@ -115,16 +122,13 @@ function UsageContent({ data, isPreviewMode }: { data: OrganizationsDescribeUsag
         />
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+      <div className={settingsCardClassName}>
         <div className="mb-4">
           <h2 className="text-base font-medium text-gray-900 dark:text-white">Limits</h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {usageCards.map((card) => (
-            <div
-              key={card.label}
-              className="rounded-lg border border-gray-200 bg-slate-50 px-4 py-3 dark:border-gray-700 dark:bg-slate-900"
-            >
+            <div key={card.label} className={settingsInnerMetricCardClassName}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">{card.label}</p>
@@ -155,7 +159,7 @@ function UsageMetricCard({
   icon: LucideIcon;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+    <div className={settingsCardClassName}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-gray-900 dark:text-white">{title}</p>
@@ -166,7 +170,10 @@ function UsageMetricCard({
       <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
       {progress !== null && (
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-          <div className="h-full rounded-full bg-sky-500 transition-[width]" style={{ width: `${progress}%` }} />
+          <div
+            className="h-full rounded-full bg-sky-500 transition-[width] dark:bg-indigo-300"
+            style={{ width: `${progress}%` }}
+          />
         </div>
       )}
     </div>

@@ -6,6 +6,10 @@ vi.mock("@monaco-editor/react", () => ({
   default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
 }));
 
+vi.mock("@/contexts/useTheme", () => ({
+  useTheme: () => ({ preference: "light", resolvedTheme: "light", setPreference: () => undefined }),
+}));
+
 describe("RubricWidget", () => {
   it("renders markdown for criteria in the inline preview", () => {
     render(<RubricWidget title="Test Plan" criteria={[{ text: "Use **bold** and `code` correctly" }]} />);

@@ -51,7 +51,7 @@ function DraftDiffBadge({
       {showDiffAction ? (
         <button
           type="button"
-          className="mt-1 flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 opacity-0 outline outline-1 outline-slate-950/15 transition hover:bg-slate-50 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-sky-200 group-hover/block:opacity-100"
+          className="mt-1 flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 opacity-0 outline outline-1 outline-slate-950/15 transition hover:bg-slate-50 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-sky-200 group-hover/block:opacity-100 dark:bg-gray-900 dark:text-gray-400 dark:outline-gray-700/50 dark:hover:bg-gray-800 dark:focus:ring-sky-800"
           onClick={(event) => {
             event.stopPropagation();
             onShowDiff();

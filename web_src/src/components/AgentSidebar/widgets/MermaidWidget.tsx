@@ -66,16 +66,18 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
   if (error) {
     return (
-      <div className="my-4 border border-red-200 bg-red-50 rounded-lg p-2">
-        <p className="text-xs text-red-600 font-medium">Diagram error</p>
-        <pre className="text-xs text-red-500 mt-1 whitespace-pre-wrap">{content.trim()}</pre>
+      <div className="my-4 rounded-lg border border-red-200 bg-red-50 p-2 dark:border-red-900/60 dark:bg-red-950/40">
+        <p className="text-xs font-medium text-red-600 dark:text-red-300">Diagram error</p>
+        <pre className="mt-1 whitespace-pre-wrap text-xs text-red-500 dark:text-red-300">{content.trim()}</pre>
       </div>
     );
   }
 
   if (!svg) {
     return (
-      <div className="my-4 flex items-center justify-center py-4 text-xs text-slate-400">Rendering diagram...</div>
+      <div className="my-4 flex items-center justify-center py-4 text-xs text-slate-400 dark:text-gray-500">
+        Rendering diagram...
+      </div>
     );
   }
 
@@ -84,7 +86,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
       <div
         ref={containerRef}
         onClick={() => setExpanded(true)}
-        className="my-4 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-3 overflow-x-auto cursor-pointer hover:border-slate-300 transition-colors [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
+        className="my-4 w-full min-w-0 cursor-pointer overflow-x-auto rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
       >
         <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: svg }} />
       </div>
@@ -144,26 +146,26 @@ function MermaidPanZoom({ svg }: { svg: string }) {
   }, []);
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      <div className="flex items-center gap-2 mb-2 text-xs text-slate-500">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-2 flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400">
         <button
           type="button"
           onClick={() => setScale((s) => Math.min(s * 1.2, 5))}
-          className="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer"
+          className="cursor-pointer rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 dark:border-gray-700 dark:hover:bg-gray-800"
         >
           Zoom +
         </button>
         <button
           type="button"
           onClick={() => setScale((s) => Math.max(s * 0.8, 0.2))}
-          className="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer"
+          className="cursor-pointer rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 dark:border-gray-700 dark:hover:bg-gray-800"
         >
           Zoom −
         </button>
         <button
           type="button"
           onClick={resetView}
-          className="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer"
+          className="cursor-pointer rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 dark:border-gray-700 dark:hover:bg-gray-800"
         >
           Reset
         </button>
@@ -171,7 +173,7 @@ function MermaidPanZoom({ svg }: { svg: string }) {
       </div>
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50/50 cursor-grab active:cursor-grabbing"
+        className="min-h-0 flex-1 cursor-grab overflow-hidden rounded-lg border border-slate-200 bg-slate-50/50 active:cursor-grabbing dark:border-gray-700 dark:bg-gray-900"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -179,7 +181,7 @@ function MermaidPanZoom({ svg }: { svg: string }) {
         onMouseLeave={handleMouseUp}
       >
         <div
-          className="w-full h-full flex items-center justify-center"
+          className="flex h-full w-full items-center justify-center"
           style={{
             transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
             transformOrigin: "center center",

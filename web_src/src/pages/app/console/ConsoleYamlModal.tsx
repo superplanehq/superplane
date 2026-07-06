@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { useTheme } from "@/contexts/useTheme";
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
 import { consoleToYaml, consoleYamlFilename, parseConsoleYaml } from "./consoleYaml";
@@ -48,9 +49,14 @@ export function ConsoleYamlModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="large" className="flex max-h-[90vh] w-[90vw] h-full flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-b border-slate-200 px-4 py-3">
-          <DialogTitle className="flex items-center gap-2 text-sm font-mono text-slate-600">{filename}</DialogTitle>
+      <DialogContent
+        size="large"
+        className="flex max-h-[90vh] w-[90vw] h-full flex-col gap-0 overflow-hidden p-0 dark:border-gray-600 dark:bg-gray-900"
+      >
+        <DialogHeader className="border-b border-slate-200 px-4 py-3 dark:border-gray-600">
+          <DialogTitle className="flex items-center gap-2 text-sm font-mono text-slate-600 dark:text-gray-400">
+            {filename}
+          </DialogTitle>
           <DialogDescription className="sr-only">
             View, copy, download, or import the console as a YAML file. Imports replace every panel and layout entry.
           </DialogDescription>
@@ -227,6 +233,9 @@ function ConsoleYamlEditor({
   readOnly: boolean;
   onChange: (value: string | undefined) => void;
 }) {
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+
   return (
     <div className="flex-1 min-h-0">
       <Editor
@@ -234,7 +243,7 @@ function ConsoleYamlEditor({
         language="yaml"
         value={text}
         onChange={onChange}
-        theme="vs"
+        theme={monacoTheme}
         options={editorOptions(readOnly)}
       />
     </div>
@@ -274,8 +283,8 @@ function ConsoleYamlToolbar({
   onDownload: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
-      <span className="text-xs text-slate-500">
+    <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 dark:border-gray-600 dark:bg-gray-900">
+      <span className="text-xs text-slate-500 dark:text-gray-400">
         {isDirty ? "Editor has unsaved YAML edits" : "Showing live console YAML"}
       </span>
       <div className="flex items-center gap-2">
@@ -318,7 +327,7 @@ function ConsoleYamlError({ message }: { message: string | null }) {
 
   return (
     <div
-      className="flex items-start gap-2 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700"
+      className="flex items-start gap-2 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400"
       data-testid="console-yaml-error"
     >
       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -341,7 +350,7 @@ function ConsoleYamlFooter({
   onApply: () => void;
 }) {
   return (
-    <DialogFooter className="border-t border-slate-200 px-4 py-3">
+    <DialogFooter className="border-t border-slate-200 px-4 py-3 dark:border-gray-600">
       <Button variant="outline" onClick={onClose}>
         Close
       </Button>
@@ -367,7 +376,7 @@ function ReplaceConsoleDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="dark:border-gray-600 dark:bg-gray-900">
         <DialogHeader>
           <DialogTitle>Replace console?</DialogTitle>
           <DialogDescription>

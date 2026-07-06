@@ -77,12 +77,14 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-      <div className="text-[13px] font-semibold text-slate-800" data-testid="node-panel-name">
+      <div className="text-[13px] font-semibold text-slate-800 dark:text-gray-100" data-testid="node-panel-name">
         {displayName}
       </div>
       {content.showRun && isTrigger ? <NodePanelRunControl content={content} resolved={resolved} /> : null}
       {!resolved && content.node ? (
-        <p className="text-[13px] text-amber-600">Node {JSON.stringify(content.node)} not found in this canvas.</p>
+        <p className="text-[13px] text-amber-600 dark:text-amber-400">
+          Node {JSON.stringify(content.node)} not found in this canvas.
+        </p>
       ) : null}
     </div>
   );
@@ -145,7 +147,7 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Title (optional)</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Title (optional)</Label>
         <Input
           value={value.title ?? ""}
           onChange={(e) => onChange({ ...value, title: e.target.value })}
@@ -153,7 +155,7 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Node</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Node</Label>
         <Select value={value.node} onValueChange={(v) => onChange({ ...value, node: v })}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select a node" />
@@ -174,7 +176,7 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
         </Select>
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Label (optional)</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Label (optional)</Label>
         <Input
           value={value.label ?? ""}
           onChange={(e) => onChange({ ...value, label: e.target.value || undefined })}
@@ -188,16 +190,18 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
               id={showRunId}
               checked={Boolean(value.showRun)}
               onCheckedChange={(checked) => onChange({ ...value, showRun: checked === true })}
-              className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+              className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600 dark:border-gray-600"
             />
-            <Label htmlFor={showRunId} className="text-xs text-slate-700">
+            <Label htmlFor={showRunId} className="text-xs text-slate-700 dark:text-gray-300">
               Show a manual "Run" button (requires run permission).
             </Label>
           </div>
           {value.showRun ? (
             <>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Trigger template (optional)</Label>
+                <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">
+                  Trigger template (optional)
+                </Label>
                 <Input
                   value={value.triggerName ?? ""}
                   onChange={(e) => onChange({ ...value, triggerName: e.target.value || undefined })}
@@ -211,7 +215,7 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
                   onCheckedChange={(checked) => onChange({ ...value, promptConfirmation: checked === true })}
                   className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
                 />
-                <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700">
+                <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700 dark:text-gray-300">
                   Prompt confirmation before running (templates with input fields always prompt).
                 </Label>
               </div>
@@ -219,7 +223,7 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
           ) : null}
         </>
       ) : value.node && resolved ? (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-gray-400">
           Only trigger nodes can be run from the console. Pick the trigger that starts your flow.
         </p>
       ) : null}

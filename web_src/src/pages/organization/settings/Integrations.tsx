@@ -27,6 +27,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { analytics } from "@/lib/analytics";
 import { isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
 import { posthog, isPostHogEnabled } from "@/posthog";
+import { cn } from "@/lib/utils";
+import {
+  settingsEmptyStateIconClassName,
+  settingsEmptyStateTitleClassName,
+  settingsModalClassName,
+  settingsPanelClassName,
+} from "./settingsPageStyles";
 
 const INTEGRATION_SURVEY_NAME = "Integration Survey";
 
@@ -272,9 +279,9 @@ export function Integrations({ organizationId }: IntegrationsProps) {
         ) : null}
       </div>
       {filteredIntegrationCatalog.length === 0 ? (
-        <div className="text-center py-12">
-          <Plug className="w-6 h-6 text-gray-800 mx-auto mb-2" />
-          <p className="text-sm text-gray-800">
+        <div className="py-12 text-center">
+          <Plug className={cn("mx-auto mb-2 h-6 w-6", settingsEmptyStateIconClassName)} />
+          <p className={settingsEmptyStateTitleClassName}>
             {integrationCatalog.length === 0 ? "No integrations available." : "No integrations match your filter."}
           </p>
           {isIntegrationSurveyActive ? (
@@ -296,7 +303,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
             const connectedCount = item.instances.length;
 
             return (
-              <div key={item.providerName} className="bg-white border border-gray-300 dark:border-gray-700 rounded-md">
+              <div key={item.providerName} className={settingsPanelClassName}>
                 <div className="p-4 flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 flex h-8 w-8 items-center justify-center">
@@ -351,7 +358,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                       return (
                         <div
                           key={integration.metadata?.id}
-                          className={`flex items-center gap-2 py-1.5 border-t border-gray-200 dark:border-gray-700 ${index === 0 ? "mt-1" : ""}`}
+                          className={`flex items-center gap-2 py-1.5 border-t border-gray-200 dark:border-gray-700/70 ${index === 0 ? "mt-1" : ""}`}
                         >
                           <Plug
                             className={`w-4 h-4 shrink-0 ${
@@ -363,13 +370,14 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                             }`}
                           />
                           <span
-                            className={`inline-flex w-16 items-center justify-start rounded text-xs font-medium ${
+                            className={cn(
+                              "inline-flex w-16 items-center justify-start rounded text-xs font-medium",
                               integration.status?.state === "ready"
-                                ? "bg-white text-green-500"
+                                ? "bg-white text-green-500 dark:bg-green-300 dark:text-green-950"
                                 : integration.status?.state === "error"
-                                  ? "bg-white text-red-500"
-                                  : "bg-white text-amber-600"
-                            }`}
+                                  ? "bg-white text-red-500 dark:bg-red-300 dark:text-red-950"
+                                  : "bg-white text-amber-600 dark:bg-amber-300 dark:text-amber-950",
+                            )}
                           >
                             {statusLabel}
                           </span>
@@ -434,7 +442,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
           const integrationTypeName = selectedIntegration.name;
           return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <div className={cn(settingsModalClassName, "max-h-[80vh] max-w-2xl overflow-y-auto")}>
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -462,7 +470,7 @@ export function Integrations({ organizationId }: IntegrationsProps) {
                     <div>
                       <Label className="text-gray-800 dark:text-gray-100 mb-2">
                         Integration Name
-                        <span className="text-gray-800 ml-1">*</span>
+                        <span className="ml-1 text-gray-800 dark:text-gray-100">*</span>
                       </Label>
                       <Input
                         type="text"

@@ -62,7 +62,7 @@ export function RunRow({
       className={cn(
         RUNS_SIDEBAR_ROW_CLASS,
         "group relative w-full transition-colors",
-        isSelected ? "bg-sky-100" : "hover:bg-gray-50",
+        isSelected ? "bg-sky-100 dark:bg-gray-800" : "hover:bg-gray-50 dark:hover:bg-gray-800",
       )}
     >
       <Link
@@ -82,7 +82,10 @@ export function RunRow({
           iconSlug={iconSlug}
           alt={triggerName}
           size={RUN_NODE_ICON_SIZE}
-          className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-gray-800" : "text-gray-500")}
+          className={cn(
+            "h-3.5 w-3.5 shrink-0",
+            isSelected ? "text-gray-800 dark:text-gray-100" : "text-gray-500 dark:text-gray-400",
+          )}
         />
         <span
           aria-label={RUN_STATUS_META[status].label}
@@ -92,7 +95,9 @@ export function RunRow({
         <span
           className={cn(
             "max-w-[35%] shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
-            isSelected ? "bg-sky-200 text-sky-800" : "bg-slate-100 text-slate-600",
+            isSelected
+              ? "bg-sky-200 text-sky-800 dark:bg-gray-700 dark:text-gray-200"
+              : "bg-slate-100 text-slate-600 dark:bg-gray-800 dark:text-gray-400",
           )}
         >
           {triggerName}
@@ -100,7 +105,9 @@ export function RunRow({
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-xs",
-            isSelected ? "font-semibold text-sky-900" : "font-medium text-gray-800",
+            isSelected
+              ? "font-semibold text-sky-900 dark:text-gray-100"
+              : "font-medium text-gray-800 dark:text-gray-100",
           )}
         >
           {title}
@@ -109,7 +116,7 @@ export function RunRow({
       <button
         type="button"
         title="Copy link to run"
-        className="relative z-10 hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
+        className="relative z-10 hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
         onClick={(event) => {
           event.stopPropagation();
           void (async () => {
@@ -127,7 +134,7 @@ export function RunRow({
       </button>
       {run.createdAt ? (
         <span
-          className="relative z-10 shrink-0 text-xs tabular-nums text-gray-500"
+          className="relative z-10 shrink-0 text-xs tabular-nums text-gray-500 dark:text-gray-400"
           onClick={handleTimestampClick}
           onAuxClick={handleTimestampClick}
         >
