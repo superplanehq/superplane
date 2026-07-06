@@ -1,6 +1,8 @@
+import type { QueryClient } from "@tanstack/react-query";
 import type { MutableRefObject } from "react";
 
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
+import { canvasKeys } from "@/hooks/useCanvasData";
 
 import { clearComponentSidebarSearchParams } from "../viewState";
 
@@ -24,7 +26,7 @@ export function shouldReadStagedCanvasVersion({
 }
 
 type LiveEditSessionDraftRefs = {
-  draftCanvasSpecsRef: MutableRefObject<Map<string, CanvasesCanvas["spec"]>>;
+  draftCanvasSpecsRef: MutableRefObject<Map<string, CanvasesCanvas["spec"] | null>>;
   activeCanvasVersionIdRef: MutableRefObject<string>;
   previewingCurrentVersionRef: MutableRefObject<boolean>;
 };
@@ -54,4 +56,29 @@ export function clearLiveEditSessionSearchParams(current: URLSearchParams): URLS
   next.delete("version");
   next.delete("branch");
   return clearComponentSidebarSearchParams(next);
+}
+
+export function resetCommittedLiveCanvasDetail({
+  queryClient,
+  organizationId,
+  canvasId,
+  liveCanvasVersion,
+}: {
+  queryClient: QueryClient;
+  organizationId: string;
+  canvasId: string;
+  liveCanvasVersion?: CanvasesCanvasVersion | null;
+}): void {
+  const committedSpec = liveCanvasVersion?.spec;
+  if (!committedSpec) {
+    return;
+  }
+
+  queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+    if (!current) {
+      return current;
+    }
+
+    return { ...current, spec: committedSpec };
+  });
 }

@@ -88,11 +88,16 @@ import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
-import { shouldApplyPreservedDraftSpec, shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
+import {
+  shouldApplyPreservedDraftSpec,
+  shouldPreserveDraftSpec,
+  shouldSkipDraftSpecSyncFromLoadedVersion,
+} from "./lib/draft-canvas-sync";
 import { resolveCanvasForView, syncLoadedVersionToCanvasDetail } from "./lib/resolve-canvas-for-view";
 import {
   clearLiveEditSessionDraftState,
   clearLiveEditSessionSearchParams,
+  resetCommittedLiveCanvasDetail,
   shouldReadStagedCanvasVersion,
 } from "./lib/live-edit-session";
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
@@ -417,6 +422,10 @@ export function AppPage() {
     const preservedDraftSpec = draftCanvasSpecsRef.current.get(activeCanvasVersionId);
     const nextDraftSpec = selectedCanvasVersion?.spec ?? null;
 
+    if (shouldSkipDraftSpecSyncFromLoadedVersion(draftCanvasSpec, nextDraftSpec)) {
+      return;
+    }
+
     if (shouldApplyPreservedDraftSpec(preservedDraftSpec, nextDraftSpec)) {
       setDraftCanvasSpec(preservedDraftSpec);
       return;
@@ -437,6 +446,7 @@ export function AppPage() {
     loadedCanvasVersionFetching,
     selectedCanvasVersion?.metadata?.id,
     selectedCanvasVersion?.spec,
+    draftCanvasSpec,
   ]);
   useEffect(() => {
     if (!isEditing || !activeCanvasVersionId || !liveCanvas?.spec) {
@@ -696,9 +706,7 @@ export function AppPage() {
         return;
       }
 
-      if (!isEditing) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-      }
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (!isEditing || !activeCanvasVersionId || !updatedWorkflow.spec) {
         return;
@@ -711,7 +719,13 @@ export function AppPage() {
       );
       queryClient.setQueryData<CanvasesCanvasVersion | undefined>(
         canvasKeys.versionStagedDetail(canvasId, activeCanvasVersionId),
-        (current) => (current ? { ...current, spec: updatedWorkflow.spec } : current),
+        (current) =>
+          current
+            ? { ...current, spec: updatedWorkflow.spec }
+            : {
+                metadata: { id: activeCanvasVersionId },
+                spec: updatedWorkflow.spec,
+              },
       );
     },
     [organizationId, canvasId, queryClient, isEditing, activeCanvasVersionId],
@@ -3580,6 +3594,14 @@ export function AppPage() {
     }
 
     if (editSessionActive) {
+      if (organizationId && canvasId) {
+        resetCommittedLiveCanvasDetail({
+          queryClient,
+          organizationId,
+          canvasId,
+          liveCanvasVersion,
+        });
+      }
       clearLiveEditSessionDraftState({
         setEditSessionActive,
         setActiveCanvasVersion,
@@ -3613,6 +3635,7 @@ export function AppPage() {
     enterLiveEditSession,
     refreshLatestLiveCanvasData,
     setSearchParams,
+    queryClient,
   ]);
 
   const exitEditableVersionForRunInspection = useCallback(() => {
