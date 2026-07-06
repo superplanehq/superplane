@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -20,9 +22,11 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -82,8 +86,11 @@ func CommitCanvasStaging(
 		return nil, grpcerrors.FailedPrecondition(nil, "stale staging cannot be committed")
 	}
 
+	//
+	// Commit to git first.
+	// If something goes wrong, we will revert the git commit.
+	//
 	specOps, gitOps := stagedCommitOperations(stagedFiles)
-
 	var gitRevertOps []gitprovider.FileOperation
 	if len(gitOps) > 0 {
 		var snapshotErr error
@@ -105,71 +112,38 @@ func CommitCanvasStaging(
 		}
 	}
 
-	var nextVersionID string
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		liveVersion, liveErr := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
-		if liveErr != nil {
-			return liveErr
-		}
+	var newLiveVersion *models.CanvasVersion
+	err = db.Transaction(func(tx *gorm.DB) error {
 
-		nextVersion, createErr := models.CreateCommitVersionFromLiveInTransaction(
-			tx,
-			liveVersion,
-			userID,
-			commitMessage,
-		)
-		if createErr != nil {
-			return createErr
-		}
-
-		nextVersionID = nextVersion.ID.String()
-		return nil
-	})
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create commit version")
-	}
-
-	if len(specOps) > 0 {
-		if err := ApplyRepositorySpecFileOperationsToCommitTarget(
+		//
+		// Create the new version, starting from the specs from the live version,
+		// and applying the spec operations on it.
+		//
+		nextVersion, err := CreateNewCanvasVersionFromLive(
 			ctx,
+			tx,
 			usageService,
 			encryptor,
 			registry,
 			organizationID,
-			canvasID,
-			nextVersionID,
+			canvas,
+			liveVersion,
 			webhookBaseURL,
 			authService,
-			nil,
 			specOps,
-		); err != nil {
-			if len(gitRevertOps) > 0 {
-				if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userID.String(), gitRevertOps); revertErr != nil {
-					log.Errorf("failed to revert git commit after spec apply failure for canvas %s: %v", canvasID, revertErr)
-				}
-			}
-			return nil, err
-		}
-	}
+			userID,
+			commitMessage,
+		)
 
-	var committedVersion *models.CanvasVersion
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		liveVersion, liveErr := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
-		if liveErr != nil {
-			return liveErr
+		if err != nil {
+			log.Errorf("failed to create new canvas version from live: %v", err)
+			return err
 		}
 
-		nextVersionUUID, parseErr := uuid.Parse(nextVersionID)
-		if parseErr != nil {
-			return parseErr
-		}
-
-		nextVersion, findErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, nextVersionUUID)
-		if findErr != nil {
-			return findErr
-		}
-
-		if publishErr := publishCanvasVersionInTransaction(
+		//
+		// Make the new version live.
+		//
+		err = publishCanvasVersionInTransaction(
 			ctx,
 			tx,
 			liveVersion,
@@ -182,26 +156,38 @@ func CommitCanvasStaging(
 				WebhookBaseURL: webhookBaseURL,
 				GitProvider:    gitProvider,
 			},
-		); publishErr != nil {
-			if len(gitRevertOps) > 0 {
-				if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userID.String(), gitRevertOps); revertErr != nil {
-					log.Errorf("failed to revert git commit after publish failure for canvas %s: %v", canvasID, revertErr)
-				}
-			}
-			return publishErr
+		)
+
+		if err != nil {
+			return err
 		}
 
-		if discardErr := models.DiscardStagedFilesForUser(tx, canvas.ID, userID, nil); discardErr != nil {
-			return discardErr
+		//
+		// Remove staged files for user.
+		//
+		err = models.DiscardStagedFilesForUser(tx, canvas.ID, userID, nil)
+		if err != nil {
+			return err
 		}
 
-		committedVersion = nextVersion
+		newLiveVersion = nextVersion
 		return nil
 	})
+
+	//
+	// If anything goes wrong here, we might need to revert the git commit.
+	//
 	if err != nil {
+		if len(gitRevertOps) > 0 {
+			if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userID.String(), gitRevertOps); revertErr != nil {
+				log.Errorf("failed to revert git commit after spec apply failure for canvas %s: %v", canvasID, revertErr)
+			}
+		}
+
 		if grpcerrors.Code(err) != codes.Unknown {
 			return nil, err
 		}
+
 		return nil, grpcerrors.Internal(err, "failed to commit staging")
 	}
 
@@ -213,10 +199,10 @@ func CommitCanvasStaging(
 		log.Errorf("failed to publish canvas staging updated RabbitMQ message: %v", err)
 	}
 
-	ownersByID, _ := ownersByIDForCanvasVersions(ctx, organizationID, []models.CanvasVersion{*committedVersion})
+	ownersByID, _ := ownersByIDForCanvasVersions(ctx, organizationID, []models.CanvasVersion{*newLiveVersion})
 
 	return &pb.CommitCanvasStagingResponse{
-		Version:        SerializeCanvasVersionMetadata(committedVersion, organizationID, ownersByID),
+		Version:        SerializeCanvasVersionMetadata(newLiveVersion, organizationID, ownersByID),
 		StagingSummary: buildStagingSummary(canvas, []models.WorkflowStagedFile{}),
 	}, nil
 }
@@ -416,4 +402,117 @@ func resolvedStagingCommitMessage(messages ...string) string {
 		}
 	}
 	return "Update files"
+}
+
+func CreateNewCanvasVersionFromLive(
+	ctx context.Context,
+	tx *gorm.DB,
+	usageService usage.Service,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	organizationID string,
+	canvas *models.Canvas,
+	liveVersion *models.CanvasVersion,
+	webhookBaseURL string,
+	authService authorization.Authorization,
+	operations []*pb.CanvasRepositoryFileOperation,
+	userID uuid.UUID,
+	commitMessage string,
+) (*models.CanvasVersion, error) {
+
+	//
+	// Start new version with the live version's nodes, edges, console panels, and console layout.
+	//
+	now := time.Now()
+	newVersion := models.CanvasVersion{
+		ID:            uuid.New(),
+		WorkflowID:    canvas.ID,
+		OwnerID:       &userID,
+		CommitMessage: strings.TrimSpace(commitMessage),
+		Nodes:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Nodes)),
+		Edges:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Edges)),
+		ConsolePanels: datatypes.NewJSONType(slices.Clone(liveVersion.ConsolePanels.Data())),
+		ConsoleLayout: datatypes.NewJSONType(slices.Clone(liveVersion.ConsoleLayout.Data())),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+
+	//
+	// Update it with the operations.
+	//
+	for _, operation := range operations {
+		if operation == nil {
+			continue
+		}
+
+		if operation.GetDelete() {
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
+		}
+
+		normalized := normalizeRepositoryFilePath(operation.GetPath())
+		content := string(operation.GetContent())
+
+		switch normalized {
+		case CanvasYAMLRepositoryPath:
+			pbCanvas, err := canvasFromYAMLText(content)
+			if err != nil {
+				return nil, err
+			}
+
+			nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+			if err != nil {
+				return nil, err
+			}
+
+			err = usage.EnsureOrganizationWithinLimits(
+				ctx,
+				usageService,
+				organizationID,
+				&usagepb.OrganizationState{},
+				&usagepb.CanvasState{
+					Nodes: int32(len(nodes)),
+				},
+			)
+
+			if err != nil {
+				return nil, err
+			}
+
+			newNodes := injectMetadataIntoNodes(liveVersion.Nodes, nodes)
+			newVersion.Nodes = datatypes.NewJSONSlice(slices.Clone(newNodes))
+			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(edges))
+		case ConsoleYAMLRepositoryPath:
+			panels, layout, err := consolePanelsLayoutFromYAMLText(content)
+			if err != nil {
+				return nil, err
+			}
+
+			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(panels))
+			newVersion.ConsoleLayout = datatypes.NewJSONType(slices.Clone(layout))
+		default:
+			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", operation.GetPath()))
+		}
+	}
+
+	err := tx.Create(&newVersion).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &newVersion, nil
+}
+
+func injectMetadataIntoNodes(versionNodes []models.Node, proposedNodes []models.Node) []models.Node {
+	result := make([]models.Node, len(proposedNodes))
+	copy(result, proposedNodes)
+
+	for i, proposedNode := range result {
+		for _, versionNode := range versionNodes {
+			if proposedNode.ID == versionNode.ID {
+				result[i].Metadata = versionNode.Metadata
+			}
+		}
+	}
+
+	return result
 }
