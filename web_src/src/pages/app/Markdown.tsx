@@ -1,9 +1,16 @@
+import { Children, isValidElement } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import { defaultUrlTransform } from "react-markdown";
+import type { ExtraProps } from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
+import { MarkdownCode } from "@/components/AgentSidebar/widgets/MarkdownCode";
+import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
+import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -45,13 +52,20 @@ const MARKDOWN_SANITIZE_SCHEMA = {
   tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
   attributes: {
     ...(defaultSchema.attributes ?? {}),
+    a: [...(defaultSchema.attributes?.a ?? []), "title"],
     details: [...(defaultSchema.attributes?.details ?? []), "open"],
+  },
+  protocols: {
+    ...(defaultSchema.protocols ?? {}),
+    href: [...(defaultSchema.protocols?.href ?? []), "node"],
   },
 };
 
 interface MarkdownContentProps {
   content: string;
   className?: string;
+  canvasId?: string;
+  organizationId?: string;
   "data-testid"?: string;
 }
 
@@ -65,7 +79,13 @@ interface MarkdownContentProps {
  * so file viewers render exactly what's on disk (e.g. an indented code block
  * at the very start of a file stays an indented code block).
  */
-export function MarkdownContent({ content, className, "data-testid": dataTestId }: MarkdownContentProps) {
+export function MarkdownContent({
+  content,
+  className,
+  canvasId,
+  organizationId,
+  "data-testid": dataTestId,
+}: MarkdownContentProps) {
   const normalized = content.replace(/\r\n/g, "\n");
   if (!normalized.trim()) return null;
   return (
@@ -73,9 +93,99 @@ export function MarkdownContent({ content, className, "data-testid": dataTestId 
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
+        urlTransform={(url) => (isNodeLink(url) ? url : defaultUrlTransform(url))}
+        components={{
+          a: ({ children, href, node: _node, ...props }) => (
+            <MarkdownLink href={href} canvasId={canvasId} organizationId={organizationId} {...props}>
+              {children}
+            </MarkdownLink>
+          ),
+          code: MarkdownCodeWithDiagrams,
+          pre: MarkdownPre,
+        }}
       >
         {normalized}
       </ReactMarkdown>
     </div>
   );
+}
+
+type MarkdownNode = NonNullable<ExtraProps["node"]>;
+type MarkdownElementChild = Extract<MarkdownNode["children"][number], { type: "element" }>;
+
+function MarkdownPre({ children, node, ...props }: ComponentProps<"pre"> & ExtraProps) {
+  if (hasLanguageCodeNode(node) || hasLanguageCodeChild(children)) {
+    return <>{children}</>;
+  }
+
+  return <pre {...props}>{children}</pre>;
+}
+
+function MarkdownCodeWithDiagrams({
+  className,
+  children,
+  ...props
+}: ComponentProps<"code"> & { children?: ReactNode }) {
+  const language = /language-(\w+)/.exec(className || "")?.[1];
+  const code = String(children).replace(/\n$/, "");
+
+  if (language === "mermaid") {
+    return <MermaidWidget content={code} />;
+  }
+
+  return (
+    <MarkdownCode className={className} {...props}>
+      {children}
+    </MarkdownCode>
+  );
+}
+
+function MarkdownLink({
+  href,
+  children,
+  canvasId,
+  organizationId,
+  ...props
+}: ComponentProps<"a"> & { canvasId?: string; organizationId?: string }) {
+  const nodeMatch = href?.match(/^node:(.+)$/);
+  if (nodeMatch && canvasId && organizationId) {
+    const label = typeof children === "string" ? children : undefined;
+    return (
+      <NodeChipFromLink nodeId={nodeMatch[1]} rawLabel={label} canvasId={canvasId} organizationId={organizationId} />
+    );
+  }
+
+  return (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  );
+}
+
+function isNodeLink(url: string): boolean {
+  return url.startsWith("node:");
+}
+
+function hasLanguageCodeChild(children: ReactNode): boolean {
+  const child = Children.toArray(children)[0];
+  return isValidElement<{ className?: string }>(child) && /^language-\w+/.test(child.props.className || "");
+}
+
+function hasLanguageCodeNode(node?: ExtraProps["node"]): boolean {
+  const codeNode = node?.children?.find(
+    (child): child is MarkdownElementChild => child.type === "element" && child.tagName === "code",
+  );
+  return getClassNames(codeNode?.properties?.className).some((className) => /^language-\w+$/.test(className));
+}
+
+function getClassNames(className: unknown): string[] {
+  if (typeof className === "string") {
+    return className.split(/\s+/).filter(Boolean);
+  }
+
+  if (Array.isArray(className)) {
+    return className.filter((name): name is string => typeof name === "string");
+  }
+
+  return [];
 }
