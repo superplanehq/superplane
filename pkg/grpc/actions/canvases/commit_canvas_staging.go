@@ -22,6 +22,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
@@ -129,7 +130,6 @@ func CommitCanvasStaging(
 			liveVersion,
 			webhookBaseURL,
 			authService,
-			nil,
 			specOps,
 			userID,
 			commitMessage,
@@ -415,7 +415,6 @@ func CreateNewCanvasVersionFromLive(
 	liveVersion *models.CanvasVersion,
 	webhookBaseURL string,
 	authService authorization.Authorization,
-	autoLayout *pb.CanvasAutoLayout,
 	operations []*pb.CanvasRepositoryFileOperation,
 	userID uuid.UUID,
 	commitMessage string,
@@ -461,6 +460,20 @@ func CreateNewCanvasVersionFromLive(
 			}
 
 			nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+			if err != nil {
+				return nil, err
+			}
+
+			err = usage.EnsureOrganizationWithinLimits(
+				ctx,
+				usageService,
+				organizationID,
+				&usagepb.OrganizationState{},
+				&usagepb.CanvasState{
+					Nodes: int32(len(nodes)),
+				},
+			)
+
 			if err != nil {
 				return nil, err
 			}
