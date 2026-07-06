@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func setupLiveCanvasStaging(t *testing.T) (*support.ResourceRegistry, context.Context, string, string) {
+func setupLiveCanvasStaging(t *testing.T) (*support.ResourceRegistry, context.Context, *models.Canvas, *models.CanvasVersion) {
 	t.Helper()
 
 	r := support.Setup(t)
@@ -26,7 +26,7 @@ func setupLiveCanvasStaging(t *testing.T) (*support.ResourceRegistry, context.Co
 	liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 	require.NoError(t, err)
 
-	return r, ctx, canvas.ID.String(), liveVersion.ID.String()
+	return r, ctx, canvas, liveVersion
 }
 
 func structFromAnyMap(t *testing.T, value map[string]any) *structpb.Struct {
