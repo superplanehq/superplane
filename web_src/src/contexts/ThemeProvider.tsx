@@ -5,6 +5,8 @@ import {
   persistThemePreference,
   readStoredThemePreference,
   resolveTheme,
+  isThemePreference,
+  THEME_PREFERENCE_STORAGE_KEY,
   type ResolvedTheme,
   type ThemePreference,
 } from "@/lib/themePreference";
@@ -38,6 +40,19 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (!isThemePreferenceStorageEvent(event)) {
+        return;
+      }
+
+      setPreferenceState(isThemePreference(event.newValue) ? event.newValue : "system");
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
   const setPreference = useCallback((nextPreference: ThemePreference) => {
     setPreferenceState(nextPreference);
     persistThemePreference(nextPreference);
@@ -53,4 +68,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+function isThemePreferenceStorageEvent(event: StorageEvent): boolean {
+  if (event.storageArea && event.storageArea !== window.localStorage) {
+    return false;
+  }
+
+  return event.key === THEME_PREFERENCE_STORAGE_KEY || event.key === null;
 }

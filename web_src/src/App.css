@@ -228,7 +228,7 @@
 @source inline("duration-{75,100,150,200,300,500,700,1000}");
 @source inline("ease-{linear,in,out,in-out}");
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *):not(:where(.dark-mode-disabled, .dark-mode-disabled *)));
 
 
 @theme inline {

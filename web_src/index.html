@@ -22,9 +22,9 @@
         var prefersDark =
           preference === "dark" ||
           (preference === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.style.colorScheme = prefersDark ? "dark" : "light";
         if (prefersDark) {
           document.documentElement.classList.add("dark");
-          document.documentElement.style.colorScheme = "dark";
         }
       })();
     </script>

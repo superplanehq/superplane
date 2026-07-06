@@ -59,12 +59,16 @@ describe("themePreference", () => {
   });
 
   it("reads system prefers dark from matchMedia", () => {
-    vi.spyOn(window, "matchMedia").mockReturnValue({
-      matches: true,
-      media: "(prefers-color-scheme: dark)",
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    } as unknown as MediaQueryList);
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockReturnValue({
+        matches: true,
+        media: "(prefers-color-scheme: dark)",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      } as unknown as MediaQueryList),
+    });
 
     expect(getSystemPrefersDark()).toBe(true);
   });
