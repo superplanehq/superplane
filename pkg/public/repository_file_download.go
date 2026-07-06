@@ -3,6 +3,7 @@ package public
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -66,81 +67,28 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	appFileReader := files.NewAppFileReader(db, s.gitProvider, canvas, user.ID)
-	version := strings.TrimSpace(r.URL.Query().Get("version_id"))
-	stage := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("stage")), "true")
-
-	switch {
-
-	//
-	// If version_id is provided, we read the file for a specific version.
-	//
-	case version != "":
-		reader, err := appFileReader.ReadFromVersion(ctx, path, version)
-		if err != nil {
-			http.Error(w, "Failed to read file from version", http.StatusInternalServerError)
+	reader, err := s.findFileReader(ctx, db, r, user, canvas, path)
+	if err != nil {
+		if errors.Is(err, files.ErrFileNotFound) || errors.Is(err, files.ErrFileDeleted) {
+			http.Error(w, "File not found", http.StatusNotFound)
 			return
 		}
 
-		defer reader.Close()
-		setInlineFileHeaders(w, path, "application/octet-stream")
-		if _, err := io.Copy(w, reader); err != nil {
-			log.Errorf("Failed to copy file: %v", err)
-			http.Error(w, "Failed to copy file", http.StatusInternalServerError)
-			return
-		}
+		http.Error(w, "Failed to read file", http.StatusInternalServerError)
 		return
+	}
 
-	//
-	// If stage=true is provided, we read the file from the user's staging area,
-	// if it's there, or from the live version if it's not.
-	// NOTE: still not sure about this behavior.
-	//
-	case stage:
-		reader, err := appFileReader.Read(ctx, path)
-		if err != nil {
-			if errors.Is(err, files.ErrFileNotFound) {
-				http.Error(w, "File not found", http.StatusNotFound)
-				return
-			}
+	defer reader.Close()
 
-			http.Error(w, "Failed to read file", http.StatusInternalServerError)
-			return
-		}
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("inline", map[string]string{
+		"filename": filepath.Base(path),
+	}))
 
-		defer reader.Close()
-		setInlineFileHeaders(w, path, "application/octet-stream")
-		if _, err := io.Copy(w, reader); err != nil {
-			log.Errorf("Failed to copy file: %v", err)
-			http.Error(w, "Failed to copy file", http.StatusInternalServerError)
-			return
-		}
-		return
-
-	//
-	// Otherwise, we read from the live version.
-	//
-	default:
-		version, err := models.FindCanvasVersionInTransaction(db, canvas.ID, *canvas.LiveVersionID)
-		if err != nil {
-			http.Error(w, "Version not found", http.StatusNotFound)
-			return
-		}
-
-		reader, err := appFileReader.ReadFromVersion(ctx, path, version.ID.String())
-		if err != nil {
-			http.Error(w, "Failed to read file from version", http.StatusInternalServerError)
-			return
-		}
-
-		defer reader.Close()
-		setInlineFileHeaders(w, path, "application/octet-stream")
-		if _, err := io.Copy(w, reader); err != nil {
-			log.Errorf("Failed to copy file: %v", err)
-			http.Error(w, "Failed to copy file", http.StatusInternalServerError)
-			return
-		}
-		return
+	if _, err := io.Copy(w, reader); err != nil {
+		log.Errorf("Failed to copy file: %v", err)
+		http.Error(w, "Failed to copy file", http.StatusInternalServerError)
 	}
 }
 
@@ -156,17 +104,54 @@ func (s *Server) checkRepositoryReadPermission(ctx context.Context, user *models
 	)
 }
 
+func (s *Server) findFileReader(ctx context.Context, db *gorm.DB, r *http.Request, user *models.User, canvas *models.Canvas, path string) (reader io.ReadCloser, err error) {
+	ctx, done := telemetry.Span(ctx, "repository.find_canvas")
+	defer done(&err)
+
+	version := strings.TrimSpace(r.URL.Query().Get("version_id"))
+	stage := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("stage")), "true")
+	appFileReader := files.NewAppFileReader(db, s.gitProvider, canvas, user.ID)
+
+	switch {
+
+	//
+	// If version_id is provided, we read the file for a specific version.
+	//
+	case version != "":
+		versionID, err := uuid.Parse(version)
+		if err != nil {
+			return nil, files.ErrFileNotFound
+		}
+
+		return appFileReader.ReadFromVersion(ctx, path, versionID)
+
+	//
+	// If stage=true is provided, we read the file from the user's staging area,
+	// if it's there, or from the live version if it's not.
+	//
+	case stage:
+		return appFileReader.Read(ctx, path)
+
+	//
+	// Otherwise, we read from the live version.
+	//
+	default:
+		version, err := models.FindCanvasVersionInTransaction(db, canvas.ID, *canvas.LiveVersionID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, files.ErrFileNotFound
+			}
+
+			return nil, fmt.Errorf("failed to find canvas version: %w", err)
+		}
+
+		return appFileReader.ReadFromVersion(ctx, path, version.ID)
+	}
+}
+
 func (s *Server) findRepositoryCanvas(ctx context.Context, db *gorm.DB, user *models.User, canvasID uuid.UUID) (canvas *models.Canvas, err error) {
 	ctx, done := telemetry.Span(ctx, "repository.find_canvas")
 	defer done(&err)
 
 	return models.FindCanvasInTransaction(db, user.OrganizationID, canvasID)
-}
-
-func setInlineFileHeaders(w http.ResponseWriter, path, contentType string) {
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("inline", map[string]string{
-		"filename": filepath.Base(path),
-	}))
 }

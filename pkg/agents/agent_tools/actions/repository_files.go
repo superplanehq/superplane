@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -166,11 +167,19 @@ func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessio
 		return fileReadEntry{Path: path, Content: string(content), Source: "staging", VersionID: versionID}, nil
 	}
 
-	content, err := a.readCommittedGitFile(ctx, session, path)
-	if err != nil {
-		return fileReadEntry{}, err
+	if errors.Is(err, files.ErrFileDeleted) {
+		return fileReadEntry{}, fmt.Errorf("file staged for deletion: %w", err)
 	}
-	return fileReadEntry{Path: path, Content: content, Source: "live"}, nil
+
+	if errors.Is(err, files.ErrFileNotFound) {
+		content, err := a.readCommittedGitFile(ctx, session, path)
+		if err != nil {
+			return fileReadEntry{}, err
+		}
+		return fileReadEntry{Path: path, Content: content, Source: "live"}, nil
+	}
+
+	return fileReadEntry{}, err
 }
 
 func (a readFileAction) readCommittedGitFile(ctx context.Context, session agents.AgentSessionContext, path string) (string, error) {

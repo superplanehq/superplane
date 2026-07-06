@@ -23,6 +23,7 @@ const (
 )
 
 var ErrFileNotFound = errors.New("file not found")
+var ErrFileDeleted = errors.New("file deleted")
 
 func NormalizePath(path string) string {
 	return strings.TrimLeft(strings.TrimSpace(strings.ReplaceAll(path, "\\", "/")), "/")
@@ -55,23 +56,26 @@ func (r *AppFileReader) Read(ctx context.Context, path string) (reader io.ReadCl
 		return reader, nil
 	}
 
+	if errors.Is(err, ErrFileDeleted) {
+		return nil, ErrFileDeleted
+	}
+
 	//
 	// Otherwise, read from live version.
 	//
-	return r.ReadFromVersion(ctx, path, r.app.LiveVersionID.String())
+	return r.ReadFromVersion(ctx, path, *r.app.LiveVersionID)
 }
 
-func (r *AppFileReader) ReadFromVersion(ctx context.Context, path string, version string) (reader io.ReadCloser, err error) {
+func (r *AppFileReader) ReadFromVersion(ctx context.Context, path string, versionID uuid.UUID) (reader io.ReadCloser, err error) {
 	ctx, done := telemetry.Span(ctx, "reader.for_version")
 	defer done(&err)
 
-	versionID, err := uuid.Parse(version)
-	if err != nil {
-		return nil, fmt.Errorf("invalid version ID: %w", err)
-	}
-
 	v, err := models.FindCanvasVersionInTransaction(r.db, r.app.ID, versionID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFileNotFound
+		}
+
 		return nil, fmt.Errorf("failed to find canvas version: %w", err)
 	}
 
@@ -140,7 +144,7 @@ func (r *AppFileReader) ReadFromStaging(ctx context.Context, path string) (reade
 	}
 
 	if file.Deleted {
-		return nil, ErrFileNotFound
+		return nil, ErrFileDeleted
 	}
 
 	return io.NopCloser(strings.NewReader(file.Content)), nil
@@ -152,6 +156,10 @@ func (r *AppFileReader) readFromGit(ctx context.Context, path string) (reader io
 
 	repository, err := models.FindRepository(r.app.OrganizationID, r.app.ID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFileNotFound
+		}
+
 		return nil, fmt.Errorf("failed to find repository: %w", err)
 	}
 
