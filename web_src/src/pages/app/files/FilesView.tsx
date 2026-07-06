@@ -13,6 +13,7 @@ const DiffDialog = lazy(() => import("./DiffDialog").then((module) => ({ default
 
 export function FilesView({
   canvasId,
+  organizationId,
   versionId,
   isEditing,
   canWrite,
@@ -25,6 +26,7 @@ export function FilesView({
   onFlushRepositoryFileStagingReady,
 }: {
   canvasId?: string;
+  organizationId?: string;
   versionId?: string;
   isEditing: boolean;
   canWrite: boolean;
@@ -95,6 +97,8 @@ export function FilesView({
         <FileEditor
           path={editor.selectedPath}
           content={editor.selectedContent}
+          canvasId={canvasId}
+          organizationId={organizationId}
           deleted={editor.selectedIsDeleted}
           language={editor.selectedGeneratedFile?.language}
           loading={editor.editorLoading}
