@@ -1,6 +1,10 @@
 import { Heading } from "@/components/Heading/heading";
 import type { ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "react-router-dom";
+import { Pin, Star } from "lucide-react";
+import type { ReactNode } from "react";
 import { appPath } from "@/lib/appPaths";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
@@ -23,6 +27,8 @@ interface CanvasCardsGridProps {
   canvasFolders: CanvasFolderData[];
   organizationId: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
+  onTogglePin: (canvasId: string, pinned: boolean) => void;
+  onToggleStar: (canvasId: string, starred: boolean) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -33,6 +39,8 @@ export function CanvasCardsGrid({
   canvasFolders,
   organizationId,
   onEditCanvas,
+  onTogglePin,
+  onToggleStar,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -46,6 +54,8 @@ export function CanvasCardsGrid({
           canvasFolders={canvasFolders}
           organizationId={organizationId}
           onEdit={onEditCanvas}
+          onTogglePin={onTogglePin}
+          onToggleStar={onToggleStar}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
@@ -60,6 +70,8 @@ interface CanvasCardProps {
   canvasFolders: CanvasFolderData[];
   organizationId: string;
   onEdit: (canvas: CanvasCardData) => void;
+  onTogglePin: (canvasId: string, pinned: boolean) => void;
+  onToggleStar: (canvasId: string, starred: boolean) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -70,6 +82,8 @@ function CanvasCard({
   canvasFolders,
   organizationId,
   onEdit,
+  onTogglePin,
+  onToggleStar,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -98,7 +112,25 @@ function CanvasCard({
                 <span className="truncate">{canvas.name}</span>
               </Heading>
             </div>
-            <div className="pointer-events-auto">
+            <div className="pointer-events-auto flex items-center gap-1">
+              <CanvasPreferenceButton
+                active={Boolean(canvas.isPinned)}
+                activeLabel={`Unpin app ${canvas.name}`}
+                inactiveLabel={`Pin app ${canvas.name}`}
+                activeTooltip="Unpin"
+                inactiveTooltip="Pin"
+                onClick={() => onTogglePin(canvas.id, !canvas.isPinned)}
+                icon={<Pin size={15} className={cn(canvas.isPinned && "fill-current")} aria-hidden />}
+              />
+              <CanvasPreferenceButton
+                active={Boolean(canvas.isStarred)}
+                activeLabel={`Unstar app ${canvas.name}`}
+                inactiveLabel={`Star app ${canvas.name}`}
+                activeTooltip="Unstar"
+                inactiveTooltip="Star"
+                onClick={() => onToggleStar(canvas.id, !canvas.isStarred)}
+                icon={<Star size={15} className={cn(canvas.isStarred && "fill-current")} aria-hidden />}
+              />
               <CanvasActionsMenu
                 canvas={canvas}
                 canvasFolders={canvasFolders}
@@ -125,6 +157,52 @@ function CanvasCard({
         </div>
       </div>
     </div>
+  );
+}
+
+interface CanvasPreferenceButtonProps {
+  active: boolean;
+  activeLabel: string;
+  inactiveLabel: string;
+  activeTooltip: string;
+  inactiveTooltip: string;
+  icon: ReactNode;
+  onClick: () => void;
+}
+
+function CanvasPreferenceButton({
+  active,
+  activeLabel,
+  inactiveLabel,
+  activeTooltip,
+  inactiveTooltip,
+  icon,
+  onClick,
+}: CanvasPreferenceButtonProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={active ? activeLabel : inactiveLabel}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onClick();
+          }}
+          className={cn(
+            "rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-800 dark:hover:bg-gray-700 dark:hover:text-white",
+            active &&
+              "bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+          )}
+        >
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{active ? activeTooltip : inactiveTooltip}</TooltipContent>
+    </Tooltip>
   );
 }
 

@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -320,6 +321,40 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 		currentNode.IsCollapsed = *node.IsCollapsed
 	}
 
+	if node.Block != "" {
+		existingImplementation := nodeImplementationName(currentNode)
+		if existingImplementation != "" && existingImplementation != strings.TrimSpace(node.Block) {
+			return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", currentNode.ID)
+		}
+
+		nodeType, nodeRef, err := p.findBlock(node)
+		if err != nil {
+			return fmt.Errorf("failed to find block: %v", err)
+		}
+
+		if nodeType != currentNode.Type {
+			return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", currentNode.ID)
+		}
+
+		currentNode.Type = nodeType
+		currentNode.Ref = *nodeRef
+
+		if existingImplementation == "" {
+			integrationID, err := p.validateIntegration(node)
+			if err != nil {
+				errorMessage := err.Error()
+				currentNode.ErrorMessage = &errorMessage
+				if node.Configuration != nil {
+					currentNode.Configuration = node.Configuration.AsMap()
+				}
+				p.nodes[nodeID] = currentNode
+				return nil
+			}
+
+			currentNode.IntegrationID = integrationID
+		}
+	}
+
 	//
 	// From here on out, we don't return errors,
 	// we save the error message alongside the new invalid configuration.
@@ -327,26 +362,30 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 	// node will be in an error state.
 	//
 
-	if node.Configuration != nil {
+	if node.Configuration != nil || node.Block != "" {
 		schema, err := p.findConfigurationSchemaForNode(currentNode.Type, currentNode.Ref)
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = node.Configuration.AsMap()
+			if node.Configuration != nil {
+				currentNode.Configuration = node.Configuration.AsMap()
+			}
 			p.nodes[nodeID] = currentNode
 			return nil
 		}
 
-		err = configuration.ValidateConfiguration(schema, node.Configuration.AsMap())
+		if node.Configuration != nil {
+			currentNode.Configuration = node.Configuration.AsMap()
+		}
+
+		err = configuration.ValidateConfiguration(schema, currentNode.Configuration)
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = node.Configuration.AsMap()
 			p.nodes[nodeID] = currentNode
 			return nil
 		}
 
-		currentNode.Configuration = node.Configuration.AsMap()
 		currentNode.ErrorMessage = nil
 	}
 

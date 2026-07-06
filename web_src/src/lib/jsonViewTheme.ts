@@ -3,14 +3,20 @@ import type { CSSProperties } from "react";
 const JSON_VIEW_FONT_FAMILY =
   'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace';
 
-export const lightJsonViewStyle: CSSProperties = {
+type CssCustomProperties = {
+  [key: `--${string}`]: string | number | undefined;
+};
+
+type JsonViewStyle = CSSProperties & CssCustomProperties;
+
+export const lightJsonViewStyle: JsonViewStyle = {
   fontSize: "12px",
   fontFamily: JSON_VIEW_FONT_FAMILY,
   backgroundColor: "#ffffff",
   color: "#24292e",
 };
 
-export const darkJsonViewStyle: CSSProperties = {
+export const darkJsonViewStyle: JsonViewStyle = {
   ...lightJsonViewStyle,
   backgroundColor: "#27272a",
   color: "#e5e7eb",

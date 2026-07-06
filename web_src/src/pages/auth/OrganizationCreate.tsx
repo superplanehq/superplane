@@ -61,7 +61,7 @@ const OrganizationCreate: React.FC = () => {
     <div className={cn("min-h-screen bg-slate-100", appDarkModeClasses.surface)}>
       <div className="flex items-center p-6">
         <Link
-          to="/"
+          to="/?select=true"
           className="rounded px-2 py-1 text-sm font-medium text-gray-500 hover:bg-gray-950/5 dark:text-gray-400 dark:hover:bg-white/5"
         >
           ← Back to Organizations

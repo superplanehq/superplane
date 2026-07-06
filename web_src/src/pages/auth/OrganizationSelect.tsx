@@ -12,6 +12,7 @@ import {
   createActionIconClassName,
   createActionIconDisabledClassName,
 } from "@/lib/createActionStyles";
+import { pickAutoRedirectOrganization, readLastVisitedOrganization } from "@/lib/lastVisitedOrganization";
 import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/useAccount";
@@ -45,7 +46,6 @@ const formatCount = (count: number, noun: string) => {
   const nounToUse = safeCount === 1 ? noun : pluralOverrides[noun] || `${noun}s`;
   return `${safeCount} ${nounToUse}`;
 };
-
 const OrganizationSelect: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationCreationStatus, setOrganizationCreationStatus] = useState<OrganizationCreationStatus | null>(null);
@@ -72,7 +72,20 @@ const OrganizationSelect: React.FC = () => {
       ]);
 
       if (orgsResponseResult.status === "fulfilled" && orgsResponseResult.value.ok) {
-        const organizations = await orgsResponseResult.value.json();
+        const organizations = (await orgsResponseResult.value.json()) as Organization[];
+
+        const explicitSelection = new URLSearchParams(location.search).has("select");
+        if (!explicitSelection) {
+          const redirectOrganizationId = pickAutoRedirectOrganization(
+            organizations,
+            readLastVisitedOrganization(account.id),
+          );
+          if (redirectOrganizationId) {
+            navigate(`/${redirectOrganizationId}`, { replace: true });
+            return;
+          }
+        }
+
         setOrganizations(organizations);
       } else {
         setError("Failed to load organizations");
@@ -90,7 +103,7 @@ const OrganizationSelect: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [account]);
+  }, [account, location.search, navigate]);
 
   useEffect(() => {
     if (accountLoading) {

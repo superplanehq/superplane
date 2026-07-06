@@ -70,7 +70,7 @@ export function buildRootActions({
       label: "Change Organization",
       description: "Return to organization picker",
       icon: ArrowRightLeft,
-      onSelect: () => goTo("/"),
+      onSelect: () => goTo("/?select=true"),
       keywords: ["switch", "organization", "workspace"],
     },
     {

@@ -8,14 +8,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/datatypes"
 )
 
 func Test__ListCanvases__ReturnsEmptyListWhenNoCanvasesExist(t *testing.T) {
 	r := support.Setup(t)
 
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Canvases)
@@ -64,7 +66,7 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Len(t, response.Canvases, 2)
@@ -85,6 +87,63 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	}
 
 	assert.True(t, sort.StringsAreSorted(canvasNames), "canvases should be sorted by name in ascending order")
+}
+
+func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
+	r := support.Setup(t)
+
+	pinnedCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	starredCanvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{},
+		[]models.Edge{},
+	)
+
+	otherUser := support.CreateUser(t, r, r.Organization.ID)
+	_, err := UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), otherUser.ID.String(), &pb.UpdateCanvasPreferenceRequest{
+		CanvasId: pinnedCanvas.ID.String(),
+		Starred:  proto.Bool(true),
+	})
+	require.NoError(t, err)
+
+	_, err = UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
+		CanvasId: pinnedCanvas.ID.String(),
+		Pinned:   proto.Bool(true),
+	})
+	require.NoError(t, err)
+
+	_, err = UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
+		CanvasId: starredCanvas.ID.String(),
+		Starred:  proto.Bool(true),
+	})
+	require.NoError(t, err)
+
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	require.NoError(t, err)
+	require.Len(t, response.Canvases, 2)
+
+	pinnedSummary := findCanvasSummary(response.Canvases, pinnedCanvas.ID.String())
+	require.NotNil(t, pinnedSummary)
+	assert.True(t, pinnedSummary.Pinned)
+	assert.False(t, pinnedSummary.Starred)
+	assert.NotNil(t, pinnedSummary.PinnedAt)
+	assert.Nil(t, pinnedSummary.StarredAt)
+
+	starredSummary := findCanvasSummary(response.Canvases, starredCanvas.ID.String())
+	require.NotNil(t, starredSummary)
+	assert.False(t, starredSummary.Pinned)
+	assert.True(t, starredSummary.Starred)
+	assert.Nil(t, starredSummary.PinnedAt)
+	assert.NotNil(t, starredSummary.StarredAt)
 }
 
 func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.T) {
@@ -134,7 +193,7 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	//
 	// List canvases for original organization
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -180,7 +239,7 @@ func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
@@ -226,7 +285,7 @@ func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
@@ -245,4 +304,14 @@ func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	assert.NotNil(t, listedCanvas.CreatedBy.Id)
 	assert.NotNil(t, listedCanvas.CreatedBy.Name)
 	assert.NotNil(t, listedCanvas.FolderId)
+}
+
+func findCanvasSummary(canvases []*pb.CanvasSummary, canvasID string) *pb.CanvasSummary {
+	for _, canvas := range canvases {
+		if canvas.Id == canvasID {
+			return canvas
+		}
+	}
+
+	return nil
 }

@@ -73,7 +73,19 @@ service Canvases {
     };
   }
 
-   rpc GetCanvasRepository(GetCanvasRepositoryRequest) returns (GetCanvasRepositoryResponse) {
+  rpc UpdateCanvasPreference(UpdateCanvasPreferenceRequest) returns (UpdateCanvasPreferenceResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{canvas_id}/preference"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas preference";
+      description: "Updates the current user's canvas preference";
+      tags: "Canvas";
+    };
+  }
+
+  rpc GetCanvasRepository(GetCanvasRepositoryRequest) returns (GetCanvasRepositoryResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/repository"
     };
@@ -383,6 +395,16 @@ message UpdateCanvasResponse {
   Canvas canvas = 1;
 }
 
+message UpdateCanvasPreferenceRequest {
+  string canvas_id = 1;
+  optional bool pinned = 2;
+  optional bool starred = 3;
+}
+
+message UpdateCanvasPreferenceResponse {
+  CanvasPreference preference = 1;
+}
+
 message CreateCanvasRequest {
   Canvas canvas = 1;
   CanvasAutoLayout auto_layout = 2;
@@ -550,6 +572,18 @@ message CanvasSummary {
   string folder_id = 8;
   repeated Node nodes = 9;
   repeated Components.Edge edges = 10;
+  bool pinned = 11;
+  bool starred = 12;
+  google.protobuf.Timestamp pinned_at = 13;
+  google.protobuf.Timestamp starred_at = 14;
+}
+
+message CanvasPreference {
+  string canvas_id = 1;
+  bool pinned = 2;
+  bool starred = 3;
+  google.protobuf.Timestamp pinned_at = 4;
+  google.protobuf.Timestamp starred_at = 5;
 }
 
 message Canvas {

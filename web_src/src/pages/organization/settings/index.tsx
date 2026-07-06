@@ -206,7 +206,7 @@ export function OrganizationSettings() {
       Icon: Key,
       permission: { resource: "secrets", action: "read" },
     },
-    { id: "change-org", label: "Change Organization", href: "/", Icon: ArrowRightLeft },
+    { id: "change-org", label: "Change Organization", href: "/?select=true", Icon: ArrowRightLeft },
   ];
 
   if (usageEnabled) {

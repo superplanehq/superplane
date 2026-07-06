@@ -26,6 +26,8 @@ interface CanvasFolderSectionProps {
   canvasFolders: CanvasFolderData[];
   organizationId: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
+  onTogglePin: (canvasId: string, pinned: boolean) => void;
+  onToggleStar: (canvasId: string, starred: boolean) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -153,6 +155,8 @@ export function CanvasFolderSection({
   canvasFolders,
   organizationId,
   onEditCanvas,
+  onTogglePin,
+  onToggleStar,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -256,13 +260,15 @@ export function CanvasFolderSection({
           canvasFolders={canvasFolders}
           organizationId={organizationId}
           onEditCanvas={onEditCanvas}
+          onTogglePin={onTogglePin}
+          onToggleStar={onToggleStar}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
         />
-      ) : (
+      ) : folder.canvasIds.length === 0 ? (
         <EmptyCanvasFolder backgroundColor={folder.backgroundColor} />
-      )}
+      ) : null}
     </section>
   );
 }
