@@ -261,13 +261,7 @@ func TestAppAgentTool_PatchStagingStagesSmallGraphEdits(t *testing.T) {
 	assert.True(t, staging.GetHasStaging())
 	assert.Contains(t, staging.GetStagedPaths(), canvasRepository.CanvasYAMLRepositoryPath)
 
-	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
-		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		update.VersionID,
-		canvasRepository.CanvasYAMLRepositoryPath,
-	)
+	staged, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, &liveVersion, canvasRepository.CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
 	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
@@ -327,13 +321,7 @@ func TestAppAgentTool_PatchStagingAddsIntegrationBackedNode(t *testing.T) {
 	require.True(t, ok)
 	assert.Empty(t, update.NodeIssues)
 
-	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
-		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		update.VersionID,
-		canvasRepository.CanvasYAMLRepositoryPath,
-	)
+	staged, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, &liveVersion, canvasRepository.CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
 	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
@@ -351,13 +339,7 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	liveVersion := requireLiveVersion(t, canvas.ID)
-	consoleYAML, err := canvasRepository.ReadRepositorySpecFile(
-		context.Background(),
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		"",
-		canvasRepository.ConsoleYAMLRepositoryPath,
-	)
+	consoleYAML, err := canvasRepository.ReadRepositorySpecFile(context.Background(), canvas, &liveVersion, canvasRepository.ConsoleYAMLRepositoryPath)
 	require.NoError(t, err)
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -398,9 +380,8 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 	// read path the `read` action now uses.
 	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
 		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		update.VersionID,
+		canvas,
+		&liveVersion,
 		canvasRepository.ConsoleYAMLRepositoryPath,
 	)
 	require.NoError(t, err)
