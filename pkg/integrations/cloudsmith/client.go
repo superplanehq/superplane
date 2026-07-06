@@ -930,7 +930,9 @@ func resolveOrganizationMetadata(ctx core.SetupContext, org string) error {
 
 	var existing VulnerabilityPolicyNodeMetadata
 	if decodeErr := mapstructure.Decode(ctx.Metadata.Get(), &existing); decodeErr == nil &&
-		existing.OrganizationSlug == org && existing.OrganizationName != "" {
+		existing.OrganizationSlug == org &&
+		existing.OrganizationName != "" &&
+		existing.OrganizationName != org {
 		return nil
 	}
 
@@ -974,7 +976,8 @@ func resolvePolicyMetadata(ctx core.SetupContext, org, policySlugPerm string) er
 	if decodeErr := mapstructure.Decode(ctx.Metadata.Get(), &existing); decodeErr == nil &&
 		existing.OrganizationSlug == org &&
 		existing.PolicyID == policySlugPerm &&
-		existing.PolicyName != "" {
+		existing.PolicyName != "" &&
+		(policyIsExpr || existing.PolicyName != policySlugPerm) {
 		return nil
 	}
 
