@@ -155,7 +155,7 @@ func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessio
 	}
 
 	db := database.DB(ctx)
-	fileReader := files.NewAppFileReader(db, canvas, userID)
+	fileReader := files.NewAppFileReader(db, a.gitProvider, canvas, userID)
 	reader, err := fileReader.ReadFromStaging(ctx, path)
 	if err == nil {
 		defer reader.Close()

@@ -93,7 +93,7 @@ func Test__CommitCanvasStaging__StageArbitraryRepositoryFileCommitsToGit(t *test
 	})
 	require.NoError(t, err)
 
-	fileReader := files.NewAppFileReader(database.DB(ctx), canvas, r.User)
+	fileReader := files.NewAppFileReader(database.DB(ctx), r.GitProvider, canvas, r.User)
 	reader, err := fileReader.ReadFromStaging(ctx, "README.md")
 	require.NoError(t, err)
 	content, err := io.ReadAll(reader)

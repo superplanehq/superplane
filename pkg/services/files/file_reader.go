@@ -39,8 +39,8 @@ func IsSpecFilePath(path string) bool {
 	return path == CanvasYAMLPath || path == ConsoleYAMLPath
 }
 
-func NewAppFileReader(db *gorm.DB, canvas *models.Canvas, userID uuid.UUID) *AppFileReader {
-	return &AppFileReader{db: db, app: canvas, userID: userID}
+func NewAppFileReader(db *gorm.DB, git git.Provider, canvas *models.Canvas, userID uuid.UUID) *AppFileReader {
+	return &AppFileReader{db: db, git: git, app: canvas, userID: userID}
 }
 
 func (r *AppFileReader) Read(ctx context.Context, path string) (reader io.ReadCloser, err error) {

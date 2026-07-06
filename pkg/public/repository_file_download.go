@@ -66,7 +66,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	appFileReader := files.NewAppFileReader(db, canvas, user.ID)
+	appFileReader := files.NewAppFileReader(db, s.gitProvider, canvas, user.ID)
 	version := strings.TrimSpace(r.URL.Query().Get("version_id"))
 	stage := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("stage")), "true")
 
