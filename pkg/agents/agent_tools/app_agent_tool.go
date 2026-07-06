@@ -198,7 +198,7 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 func patchOperationsSchema() agents.CustomToolInputSchema {
 	return agents.CustomToolInputSchema{
 		Type:        "array",
-		Description: "For patch_staging. Ordered graph edits applied without sending full canvas YAML. Supported op values: add_node, update_node, delete_node, add_edge, delete_edge. Aliases replace_node/remove_node/remove_edge are accepted. update_node can change name, configuration, position, and is_collapsed; use delete_node plus add_node to change component/integration.",
+		Description: "For patch_staging. Ordered graph edits applied without sending full canvas YAML. Supported op values: add_node, update_node, delete_node, add_edge, delete_edge. Aliases replace_node/remove_node/remove_edge are accepted. update_node can change name, configuration, position, and is_collapsed; it can assign the first component to a placeholder node that has no component yet. Use delete_node plus add_node for all other component/integration replacements.",
 		Items: &agents.CustomToolInputSchema{
 			Type: "object",
 			Properties: map[string]agents.CustomToolInputSchema{
