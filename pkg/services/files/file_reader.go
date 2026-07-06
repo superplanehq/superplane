@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/services/files/yaml"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
@@ -98,7 +99,7 @@ func (r *AppFileReader) readSpecFromVersion(ctx context.Context, path string, ve
 	var content string
 	switch path {
 	case CanvasYAMLPath:
-		raw, err := models.CanvasVersionToCanvasYAML(r.app.Name, version)
+		raw, err := yaml.CanvasVersionToCanvasYAML(r.app.Name, version)
 		if err != nil {
 			return nil, err
 		}
