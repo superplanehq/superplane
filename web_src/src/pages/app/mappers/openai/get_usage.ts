@@ -96,10 +96,12 @@ function totalCost(buckets: UsageBucket[] | undefined): string {
   // into a single misleading number.
   const totals = new Map<string, number>();
   eachResult(buckets, (result) => {
-    const amount = result["amount"] as { value?: number; currency?: string } | undefined;
-    if (typeof amount?.value !== "number") return;
-    const currency = amount.currency || "usd";
-    totals.set(currency, (totals.get(currency) ?? 0) + amount.value);
+    const amount = result["amount"] as { value?: number | string; currency?: string } | undefined;
+    // Monetary values may arrive as decimal strings, so coerce before summing.
+    const value = typeof amount?.value === "number" ? amount.value : Number(amount?.value);
+    if (!Number.isFinite(value)) return;
+    const currency = amount?.currency || "usd";
+    totals.set(currency, (totals.get(currency) ?? 0) + value);
   });
 
   if (totals.size === 0) {
