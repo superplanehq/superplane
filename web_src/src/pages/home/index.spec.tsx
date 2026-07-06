@@ -161,6 +161,7 @@ function renderHome() {
 describe("HomePage canvas folders", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mutationMocks.createCanvasFolder.mockResolvedValue({ data: { folder: { metadata: { id: "new-folder" } } } });
     mutationMocks.updateCanvasFolder.mockResolvedValue({});
     mutationMocks.moveCanvasFolder.mockResolvedValue({});
@@ -234,6 +235,67 @@ describe("HomePage canvas folders", () => {
     expect(zulu.compareDocumentPosition(alpha) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(zulu.compareDocumentPosition(aFreeCanvas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(aFreeCanvas.compareDocumentPosition(zFreeCanvas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows pinned canvases in a dedicated section", async () => {
+    const user = userEvent.setup();
+    useCanvases.mockReturnValue({
+      data: [makeCanvas("z-free", "Z Free Canvas"), makeCanvas("a-free", "A Free Canvas")],
+      isLoading: false,
+      error: null,
+    });
+    useCanvasFolders.mockReturnValue({ data: [], isLoading: false, error: null });
+
+    renderHome();
+    await user.click(screen.getByLabelText("Pin app Z Free Canvas"));
+
+    expect(screen.getByRole("heading", { name: "Pinned" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Unpin app Z Free Canvas")).toBeInTheDocument();
+    expect(
+      screen.getByText("Z Free Canvas").compareDocumentPosition(screen.getByText("A Free Canvas")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("hides folders that only have pinned canvases", async () => {
+    const user = userEvent.setup();
+    useCanvases.mockReturnValue({
+      data: [makeCanvas("foldered", "Foldered Canvas", "folder-1")],
+      isLoading: false,
+      error: null,
+    });
+    useCanvasFolders.mockReturnValue({
+      data: [makeFolder("folder-1", "Deployments", "blue", ["foldered"])],
+      isLoading: false,
+      error: null,
+    });
+
+    renderHome();
+    expect(screen.getByText("Deployments")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Pin app Foldered Canvas"));
+
+    expect(screen.getByRole("heading", { name: "Pinned" })).toBeInTheDocument();
+    expect(screen.queryByText("Deployments")).not.toBeInTheDocument();
+  });
+
+  it("orders starred canvases before regular canvases", async () => {
+    const user = userEvent.setup();
+    useCanvases.mockReturnValue({
+      data: [makeCanvas("z-free", "Z Free Canvas"), makeCanvas("a-free", "A Free Canvas")],
+      isLoading: false,
+      error: null,
+    });
+    useCanvasFolders.mockReturnValue({ data: [], isLoading: false, error: null });
+
+    renderHome();
+    await user.click(screen.getByLabelText("Star app Z Free Canvas"));
+
+    expect(screen.getByLabelText("Unstar app Z Free Canvas")).toBeInTheDocument();
+    expect(
+      screen.getByText("Z Free Canvas").compareDocumentPosition(screen.getByText("A Free Canvas")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("moves a folder up from the folder menu", async () => {
