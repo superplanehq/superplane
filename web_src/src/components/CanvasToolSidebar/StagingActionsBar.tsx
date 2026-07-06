@@ -86,7 +86,7 @@ export function StagingActionsBar({
   if (!latestStaging) return null;
 
   return (
-    <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2">
+    <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-gray-800/70 dark:bg-gray-900">
       <div className="mx-auto w-full max-w-[800px]">
         <DraftActionsWidget
           versionId={latestStaging.versionId}

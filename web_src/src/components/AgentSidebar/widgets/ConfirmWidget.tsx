@@ -10,10 +10,10 @@ interface ConfirmWidgetProps {
 
 export function ConfirmWidget({ message, yes, no, onAction }: ConfirmWidgetProps) {
   return (
-    <div className="my-4 border border-amber-200 bg-amber-50 rounded-lg p-3">
-      <div className="flex items-start gap-2 mb-3">
-        <AlertTriangle className="size-4 text-amber-600 shrink-0 mt-0.5" />
-        <p className="text-sm text-amber-900">{message}</p>
+    <div className="my-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/40">
+      <div className="mb-3 flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <p className="text-sm text-amber-900 dark:text-amber-100">{message}</p>
       </div>
       <div className="flex gap-2">
         <Button size="sm" variant="destructive" className="text-xs" onClick={() => onAction?.(yes)}>

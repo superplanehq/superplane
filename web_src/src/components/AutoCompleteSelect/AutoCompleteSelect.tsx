@@ -198,7 +198,7 @@ export function AutoCompleteSelect({
           ref={refs.setFloating}
           style={floatingStyles}
           role="listbox"
-          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none"
+          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-600 focus:outline-none"
         >
           <div ref={listRef}>
             {filteredOptions.length === 0 ? (
@@ -209,7 +209,7 @@ export function AutoCompleteSelect({
               Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
                 <div key={groupName}>
                   {Object.keys(groupedOptions).length > 1 && (
-                    <div className="px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                    <div className="px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-600">
                       {groupName}
                     </div>
                   )}

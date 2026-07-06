@@ -1,7 +1,8 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { act, render as testingLibraryRender, screen, waitFor } from "@testing-library/react";
+import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 const { fitViewMock, getNodesMock, getViewportMock, reactFlowPropsRef, setViewportMock } = vi.hoisted(() => ({
   fitViewMock: vi.fn().mockResolvedValue(true),
@@ -94,6 +95,10 @@ vi.mock("./Header", () => ({
 }));
 
 import { CanvasPage } from "./index";
+
+function render(ui: ReactElement) {
+  return testingLibraryRender(ui, { wrapper: ThemeProvider });
+}
 
 describe("CanvasPage run inspection", () => {
   beforeEach(() => {

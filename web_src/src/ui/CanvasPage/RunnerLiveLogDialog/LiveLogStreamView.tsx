@@ -14,7 +14,7 @@ export function LiveLogStreamView({ execution }: { execution: ExecutionInfo }) {
   const showError = Boolean(error) && !executionInFlight;
 
   return (
-    <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto bg-slate-50">
+    <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto bg-slate-50 dark:bg-gray-900">
       {showError ? <ErrorMessage /> : null}
       {waitingForLogs ? <WaitingForLogsMessage /> : null}
       {!showError && !waitingForLogs && !hasAnyLogs ? <NoLogsMessage /> : null}
@@ -57,7 +57,7 @@ function CommandSectionView({
   isLast: boolean;
 }) {
   return (
-    <div className="border-b border-slate-200">
+    <div className="border-b border-slate-200 dark:border-gray-800">
       <CommandSectionHeader section={section} onToggle={onToggle} isLast={isLast} />
       <CommandSectionContent section={section} />
     </div>
@@ -83,13 +83,13 @@ function CommandSectionHeader({
       type="button"
       className={cn(
         "flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-2 font-mono text-left text-xs",
-        isLast && "sticky top-0 z-10 border-b border-slate-200 bg-slate-50",
+        isLast && "sticky top-0 z-10 border-b border-slate-200 bg-slate-50 dark:border-gray-800 dark:bg-gray-900",
       )}
       onClick={() => onToggle(section.index)}
     >
       <div className="flex items-center gap-2">
         <span>{isCollapsed ? openChevron : closedChevron}</span>
-        <span className="font-medium text-gray-900">{section.text}</span>
+        <span className="font-medium text-gray-900 dark:text-gray-100">{section.text}</span>
       </div>
 
       <div className="flex items-center gap-2">
@@ -106,7 +106,7 @@ function CommandSectionContent({ section }: { section: CommandSection }) {
   }
 
   return (
-    <pre className="px-4 py-2 text-left font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-800 bg-white border-t border-slate-200">
+    <pre className="px-4 py-2 text-left font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-800 bg-white border-t border-slate-200 dark:text-gray-200 dark:bg-gray-900 dark:border-gray-800">
       {section.lines.filter((line) => line.trim() !== "").join("\n")}
     </pre>
   );

@@ -54,7 +54,7 @@ export function NumberPanelCompositeSourcesEditor({
   };
 
   return (
-    <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50/40 p-3">
+    <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50/40 p-3 dark:border-gray-800/70 dark:bg-gray-900">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-slate-600">Combine</Label>
@@ -130,7 +130,7 @@ function MemorySourceRow({
   const fieldListId = fields.length > 0 ? `number-source-fields-${canvasId ?? ""}-${sourceRowId}` : undefined;
 
   return (
-    <div className="space-y-2 rounded-md border border-slate-200 bg-white p-2">
+    <div className="space-y-2 rounded-md border border-slate-200 bg-white p-2 dark:border-gray-800/70 dark:bg-gray-900">
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
           <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Namespace</Label>

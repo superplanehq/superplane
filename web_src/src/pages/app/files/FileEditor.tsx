@@ -27,12 +27,14 @@ export function FileEditor({
   onChange: (value: string) => void;
 }) {
   if (!path) {
-    return <div className="min-h-0 flex-1 bg-white" />;
+    return <div className="min-h-0 flex-1 bg-white dark:bg-gray-900" />;
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500">Loading file...</div>
+      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500 dark:text-gray-400">
+        Loading file...
+      </div>
     );
   }
 
@@ -42,7 +44,7 @@ export function FileEditor({
 
   if (deleted) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500">
+      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500 dark:text-gray-400">
         File marked for deletion
       </div>
     );
@@ -53,7 +55,7 @@ export function FileEditor({
 
   if (disabled && isMarkdown) {
     return (
-      <div className="min-h-0 flex-1 overflow-auto bg-white p-6">
+      <div className="min-h-0 flex-1 overflow-auto bg-white p-6 dark:bg-gray-900">
         <MarkdownContent content={content} data-testid="file-markdown-preview" />
       </div>
     );
@@ -62,7 +64,9 @@ export function FileEditor({
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500">Loading editor...</div>
+        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500 dark:text-gray-400">
+          Loading editor...
+        </div>
       }
     >
       <FileMonacoEditor path={path} content={content} language={language} readOnly={disabled} onChange={onChange} />

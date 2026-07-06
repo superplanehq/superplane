@@ -56,7 +56,7 @@ export function NumberPanelMetricsEditor({
   };
 
   return (
-    <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50/40 p-3">
+    <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50/40 p-3 dark:border-gray-800/70 dark:bg-gray-900">
       <div className="flex items-center justify-between">
         <Label className="text-xs font-medium text-slate-600">Numbers</Label>
         <Button type="button" size="sm" variant="outline" onClick={addMetric} data-testid="number-add-metric">
@@ -96,7 +96,10 @@ function MetricRow({
   const metric = normalizeMetric(rawMetric);
   const updateRender = (patch: Partial<WidgetNumberRender>) => onChange({ render: { ...metric.render, ...patch } });
   return (
-    <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3" data-testid={`number-metric-${index}`}>
+    <div
+      className="space-y-2 rounded-md border border-slate-200 bg-white p-3 dark:border-gray-800/70 dark:bg-gray-900"
+      data-testid={`number-metric-${index}`}
+    >
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Number {index + 1}</span>
         {onRemove ? (
