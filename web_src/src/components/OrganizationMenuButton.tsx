@@ -153,7 +153,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
       Icon: Key,
       permission: { resource: "secrets", action: "read" },
     },
-    { label: "Change Organization", href: "/", Icon: ArrowRightLeft },
+    { label: "Change Organization", href: "/?select=true", Icon: ArrowRightLeft },
   ];
 
   const handleSignOut = () => {
