@@ -26,9 +26,9 @@ vi.mock("@/components/AgentSidebar/widgets/NodeChip", () => ({
 
 vi.mock("@/components/AgentSidebar/widgets/MarkdownCode", () => ({
   MarkdownCode: ({ children, className }: { children?: string; className?: string }) => (
-    <code className={className} data-testid="markdown-code">
+    <div data-language={className?.replace("language-", "")} data-testid="markdown-code">
       {children}
-    </code>
+    </div>
   ),
 }));
 
@@ -37,6 +37,7 @@ describe("MarkdownContent", () => {
     render(<MarkdownContent content={"```mermaid\ngraph TD\n  A-->B\n```"} />);
 
     expect(screen.getByTestId("mermaid-diagram").textContent).toContain("graph TD\n  A-->B");
+    expect(screen.getByTestId("mermaid-diagram").closest("pre")).not.toBeInTheDocument();
     expect(screen.queryByTestId("markdown-code")).not.toBeInTheDocument();
   });
 
@@ -64,7 +65,7 @@ describe("MarkdownContent", () => {
     render(<MarkdownContent content={"```yaml\nname: deploy\n```"} />);
 
     expect(screen.getByTestId("markdown-code")).toHaveTextContent("name: deploy");
-    expect(screen.getByTestId("markdown-code")).toHaveClass("language-yaml");
+    expect(screen.getByTestId("markdown-code")).toHaveAttribute("data-language", "yaml");
     expect(screen.getByTestId("markdown-code").closest("pre")).not.toBeInTheDocument();
   });
 

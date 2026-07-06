@@ -1,5 +1,6 @@
 import { Children, isValidElement } from "react";
 import type { ComponentProps, ReactNode } from "react";
+import type { Element } from "hast";
 import ReactMarkdown from "react-markdown";
 import { defaultUrlTransform } from "react-markdown";
 import rehypeRaw from "rehype-raw";
@@ -109,8 +110,8 @@ export function MarkdownContent({
   );
 }
 
-function MarkdownPre({ children, ...props }: ComponentProps<"pre">) {
-  if (hasLanguageCodeChild(children)) {
+function MarkdownPre({ children, node, ...props }: ComponentProps<"pre"> & { node?: Element }) {
+  if (hasLanguageCodeNode(node) || hasLanguageCodeChild(children)) {
     return <>{children}</>;
   }
 
@@ -165,4 +166,23 @@ function isNodeLink(url: string): boolean {
 function hasLanguageCodeChild(children: ReactNode): boolean {
   const child = Children.toArray(children)[0];
   return isValidElement<{ className?: string }>(child) && /^language-\w+/.test(child.props.className || "");
+}
+
+function hasLanguageCodeNode(node?: Element): boolean {
+  const codeNode = node?.children?.find(
+    (child): child is Element => child.type === "element" && child.tagName === "code",
+  );
+  return getClassNames(codeNode?.properties?.className).some((className) => /^language-\w+$/.test(className));
+}
+
+function getClassNames(className: unknown): string[] {
+  if (typeof className === "string") {
+    return className.split(/\s+/).filter(Boolean);
+  }
+
+  if (Array.isArray(className)) {
+    return className.filter((name): name is string => typeof name === "string");
+  }
+
+  return [];
 }
