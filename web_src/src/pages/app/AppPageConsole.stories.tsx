@@ -16,6 +16,13 @@ import type { CanvasAppFixture } from "./__fixtures__/handlers";
  * console UI against realistic layouts without needing network access or a
  * running backend.
  *
+ * PII was scrubbed from the captures: every email is remapped to a
+ * deterministic `user-<n>@example.com`, every UUID (org, canvas, runs,
+ * events, users) is remapped to a deterministic fake derived from its hash
+ * (preserving referential integrity between fields), and GitHub avatar URLs
+ * point at the public octocat. Contributor display names are kept because
+ * the dashboards render them and they are public on this repository.
+ *
  * The harness itself (fetch override, memory router, React Query wiring) is
  * shared with the graph-view stories in `AppPage.stories.tsx` — see
  * `__fixtures__/AppPageHarness.tsx` for the rationale.
