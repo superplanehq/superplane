@@ -51,6 +51,7 @@ const MARKDOWN_SANITIZE_SCHEMA = {
   tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
   attributes: {
     ...(defaultSchema.attributes ?? {}),
+    a: [...(defaultSchema.attributes?.a ?? []), "title"],
     details: [...(defaultSchema.attributes?.details ?? []), "open"],
   },
   protocols: {
@@ -93,8 +94,8 @@ export function MarkdownContent({
         rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
         urlTransform={(url) => (isNodeLink(url) ? url : defaultUrlTransform(url))}
         components={{
-          a: ({ children, href }) => (
-            <MarkdownLink href={href} canvasId={canvasId} organizationId={organizationId}>
+          a: ({ children, href, node: _node, ...props }) => (
+            <MarkdownLink href={href} canvasId={canvasId} organizationId={organizationId} {...props}>
               {children}
             </MarkdownLink>
           ),
@@ -140,6 +141,7 @@ function MarkdownLink({
   children,
   canvasId,
   organizationId,
+  ...props
 }: ComponentProps<"a"> & { canvasId?: string; organizationId?: string }) {
   const nodeMatch = href?.match(/^node:(.+)$/);
   if (nodeMatch && canvasId && organizationId) {
@@ -150,7 +152,7 @@ function MarkdownLink({
   }
 
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer">
+    <a href={href} {...props}>
       {children}
     </a>
   );

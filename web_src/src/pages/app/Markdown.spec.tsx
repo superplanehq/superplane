@@ -52,6 +52,14 @@ describe("MarkdownContent", () => {
     expect(screen.getByTestId("node-chip")).toHaveTextContent("Deploy:deploy-node:canvas-1:org-1");
   });
 
+  it("keeps regular markdown links on native anchors", () => {
+    render(<MarkdownContent content={'Open [docs](../docs "Local docs").'} />);
+
+    expect(screen.getByRole("link", { name: "docs" })).toHaveAttribute("href", "../docs");
+    expect(screen.getByRole("link", { name: "docs" })).toHaveAttribute("title", "Local docs");
+    expect(screen.getByRole("link", { name: "docs" })).not.toHaveAttribute("target");
+  });
+
   it("keeps regular fenced code blocks as code", () => {
     render(<MarkdownContent content={"```yaml\nname: deploy\n```"} />);
 
