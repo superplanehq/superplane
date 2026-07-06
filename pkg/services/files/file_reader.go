@@ -98,16 +98,12 @@ func (r *AppFileReader) readSpecFromVersion(ctx context.Context, path string, ve
 	var content string
 	switch path {
 	case CanvasYAMLPath:
-		// TODO: address this
-		// content, err = yaml.CanvasResourceYAML(
-		// 	canvases.SerializeCanvasVersion(version, r.app.OrganizationID.String(), nil),
-		// 	r.app.ID.String(),
-		// 	r.app.Name,
-		// 	r.app.Description,
-		// )
-		// if err != nil {
-		// 	return nil, err
-		// }
+		raw, err := models.CanvasVersionToCanvasYAML(r.app.Name, version)
+		if err != nil {
+			return nil, err
+		}
+
+		content = string(raw)
 	default:
 		raw, err := models.CanvasVersionToConsoleYML(r.app.Name, version)
 		if err != nil {

@@ -1,13 +1,17 @@
 package models
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gopkg.in/yaml.v3"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -389,4 +393,65 @@ func SaveCanvasVersionInTransaction(tx *gorm.DB, version *CanvasVersion) error {
 		return errors.New("version is required")
 	}
 	return tx.Save(version).Error
+}
+
+const (
+	CanvasKind       = "Canvas"
+	CanvasAPIVersion = "v1"
+)
+
+type CanvasYAML struct {
+	APIVersion string             `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string             `json:"kind" yaml:"kind"`
+	Metadata   CanvasYAMLMetadata `json:"metadata" yaml:"metadata"`
+	Spec       CanvasYAMLSpec     `json:"spec" yaml:"spec"`
+}
+
+type CanvasYAMLMetadata struct {
+	CanvasID string `json:"canvasId,omitempty" yaml:"canvasId,omitempty"`
+	Name     string `json:"name,omitempty" yaml:"name,omitempty"`
+}
+
+type CanvasYAMLSpec struct {
+	Nodes []Node `json:"nodes" yaml:"nodes"`
+	Edges []Edge `json:"edges" yaml:"edges"`
+}
+
+func CanvasVersionToCanvasYAML(canvasName string, canvasVersion *CanvasVersion) ([]byte, error) {
+	if canvasVersion == nil {
+		return nil, errors.New("canvas version is required")
+	}
+
+	resource := CanvasYAML{
+		APIVersion: DashboardAPIVersion,
+		Kind:       ConsoleKind,
+		Metadata: CanvasYAMLMetadata{
+			Name: canvasName,
+		},
+		Spec: CanvasYAMLSpec{
+			Nodes: canvasVersion.Nodes,
+			Edges: canvasVersion.Edges,
+		},
+	}
+
+	jsonBytes, err := json.Marshal(resource)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize dashboard: %w", err)
+	}
+
+	var generic any
+	if err := json.Unmarshal(jsonBytes, &generic); err != nil {
+		return nil, fmt.Errorf("failed to serialize dashboard: %w", err)
+	}
+
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(generic); err != nil {
+		return nil, fmt.Errorf("failed to encode dashboard yaml: %w", err)
+	}
+	if err := encoder.Close(); err != nil {
+		return nil, fmt.Errorf("failed to encode dashboard yaml: %w", err)
+	}
+	return buf.Bytes(), nil
 }
