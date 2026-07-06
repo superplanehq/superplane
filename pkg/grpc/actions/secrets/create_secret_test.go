@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
@@ -71,6 +72,39 @@ func Test__CreateSecret(t *testing.T) {
 		assert.Equal(t, protos.Secret_PROVIDER_LOCAL, response.Secret.Spec.Provider)
 		require.NotNil(t, response.Secret.Spec.Local)
 		require.Equal(t, map[string]string{"test": "***"}, response.Secret.Spec.Local.Data)
+	})
+
+	t.Run("local data is encrypted with secret ID", func(t *testing.T) {
+		aesEncryptor := crypto.NewAESGCMEncryptor([]byte("1234567890abcdefghijklmnopqrstuv"))
+		secret := &protos.Secret{
+			Metadata: &protos.Secret_Metadata{
+				Name: support.RandomName("secret"),
+			},
+			Spec: &protos.Secret_Spec{
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{
+						"token": "secret",
+					},
+				},
+			},
+		}
+
+		response, err := CreateSecret(ctx, aesEncryptor, models.DomainTypeOrganization, r.Organization.ID.String(), secret)
+		require.NoError(t, err)
+
+		stored, err := models.FindSecretByID(models.DomainTypeOrganization, r.Organization.ID, response.Secret.Metadata.Id)
+		require.NoError(t, err)
+
+		raw, err := aesEncryptor.Decrypt(context.Background(), stored.Data, []byte(stored.ID.String()))
+		require.NoError(t, err)
+
+		var decrypted map[string]string
+		require.NoError(t, json.Unmarshal(raw, &decrypted))
+		assert.Equal(t, map[string]string{"token": "secret"}, decrypted)
+
+		_, err = aesEncryptor.Decrypt(context.Background(), stored.Data, []byte(stored.Name))
+		require.Error(t, err)
 	})
 
 	t.Run("name already used", func(t *testing.T) {

@@ -41,13 +41,15 @@ func UpdateSecretName(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 
 	var reEncrypted []byte
 	if len(secret.Data) > 0 {
-		plainData, err := decryptSecretData(ctx, encryptor, *secret)
+		plainData, usedLegacyFallback, err := secretstore.DecryptLocalDataWithFallback(ctx, encryptor, *secret)
 		if err != nil {
 			return nil, grpcerrors.Internal(err, "failed to decrypt secret data for re-encryption")
 		}
-		reEncrypted, err = secretstore.EncryptLocalData(ctx, encryptor, *secret, plainData)
-		if err != nil {
-			return nil, grpcerrors.Internal(err, "failed to re-encrypt secret data with new name")
+		if usedLegacyFallback {
+			reEncrypted, err = secretstore.EncryptLocalData(ctx, encryptor, *secret, plainData)
+			if err != nil {
+				return nil, grpcerrors.Internal(err, "failed to re-encrypt secret data with secret ID")
+			}
 		}
 	}
 

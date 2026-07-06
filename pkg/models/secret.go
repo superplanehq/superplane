@@ -123,9 +123,14 @@ func FindSecretByIDInTransaction(tx *gorm.DB, domainType string, domainID uuid.U
 }
 
 func CreateSecret(name, provider, requesterID, domainType string, domainID uuid.UUID, data []byte) (*Secret, error) {
+	return CreateSecretWithID(uuid.Nil, name, provider, requesterID, domainType, domainID, data)
+}
+
+func CreateSecretWithID(id uuid.UUID, name, provider, requesterID, domainType string, domainID uuid.UUID, data []byte) (*Secret, error) {
 	now := time.Now()
 
 	secret := Secret{
+		ID:         id,
 		Name:       name,
 		DomainType: domainType,
 		DomainID:   domainID,
@@ -134,6 +139,10 @@ func CreateSecret(name, provider, requesterID, domainType string, domainID uuid.
 		UpdatedAt:  &now,
 		Provider:   provider,
 		Data:       data,
+	}
+
+	if id == uuid.Nil {
+		secret.ID = uuid.New()
 	}
 
 	err := database.Conn().

@@ -43,4 +43,19 @@ func TestLocalDataEncryption(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, data, decrypted)
 	})
+
+	t.Run("returns both ID and legacy decrypt failures", func(t *testing.T) {
+		secret := models.Secret{ID: uuid.New(), Name: "broken-secret"}
+		raw, err := json.Marshal(data)
+		require.NoError(t, err)
+
+		encrypted, err := encryptor.Encrypt(context.Background(), raw, []byte("wrong-associated-data"))
+		require.NoError(t, err)
+		secret.Data = encrypted
+
+		_, err = DecryptLocalDataRaw(context.Background(), encryptor, secret)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "secret ID associated data")
+		require.Contains(t, err.Error(), "legacy name associated data")
+	})
 }

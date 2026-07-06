@@ -2,7 +2,6 @@ package secrets
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -39,12 +38,21 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType st
 		return nil, grpcerrors.InvalidArgument(nil, "invalid provider")
 	}
 
-	data, err := prepareSecretData(ctx, encryptor, spec)
+	localData, err := prepareSecretData(spec)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, "invalid secret configuration")
 	}
 
-	secret, err := models.CreateSecret(spec.Metadata.Name, provider, userID, domainType, uuid.MustParse(domainID), data)
+	secretID := uuid.New()
+	data, err := secretstore.EncryptLocalData(ctx, encryptor, models.Secret{
+		ID:   secretID,
+		Name: spec.Metadata.Name,
+	}, localData)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid secret configuration")
+	}
+
+	secret, err := models.CreateSecretWithID(secretID, spec.Metadata.Name, provider, userID, domainType, uuid.MustParse(domainID), data)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, grpcerrors.InvalidArgument(err, "name already used")
@@ -80,7 +88,7 @@ func secretProviderToProto(provider string) pb.Secret_Provider {
 	}
 }
 
-func prepareSecretData(ctx context.Context, encryptor crypto.Encryptor, secret *pb.Secret) ([]byte, error) {
+func prepareSecretData(secret *pb.Secret) (map[string]string, error) {
 	if secret.Spec == nil {
 		return nil, fmt.Errorf("missing secret spec")
 	}
@@ -90,17 +98,7 @@ func prepareSecretData(ctx context.Context, encryptor crypto.Encryptor, secret *
 			return nil, fmt.Errorf("missing data")
 		}
 
-		data, err := json.Marshal(secret.Spec.Local.Data)
-		if err != nil {
-			return nil, err
-		}
-
-		encrypted, err := encryptor.Encrypt(ctx, data, []byte(secret.Metadata.Name))
-		if err != nil {
-			return nil, err
-		}
-
-		return encrypted, nil
+		return secret.Spec.Local.Data, nil
 
 	default:
 		return nil, fmt.Errorf("provider not supported")
@@ -110,9 +108,4 @@ func prepareSecretData(ctx context.Context, encryptor crypto.Encryptor, secret *
 // decryptSecretData decrypts a secret's stored data and returns the key-value map.
 func decryptSecretData(ctx context.Context, encryptor crypto.Encryptor, secret models.Secret) (map[string]string, error) {
 	return secretstore.DecryptLocalData(ctx, encryptor, secret)
-}
-
-// encryptSecretData marshals the key-value map and encrypts it for storage.
-func encryptSecretData(ctx context.Context, encryptor crypto.Encryptor, secretName string, data map[string]string) ([]byte, error) {
-	return secretstore.EncryptLocalData(ctx, encryptor, models.Secret{Name: secretName}, data)
 }
