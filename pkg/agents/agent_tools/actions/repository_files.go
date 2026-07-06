@@ -14,8 +14,7 @@ import (
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/superplanehq/superplane/pkg/services/files"
 )
 
 const (
@@ -83,6 +82,16 @@ func (a readFileAction) Execute(ctx context.Context, session agents.AgentSession
 		return fileReadResult{}, fmt.Errorf("git provider is not configured")
 	}
 
+	orgID, err := uuid.Parse(session.OrganizationID)
+	if err != nil {
+		return fileReadEntry{}, fmt.Errorf("invalid session organization id: %w", err)
+	}
+
+	canvasID, err := uuid.Parse(session.CanvasID)
+	if err != nil {
+		return fileReadEntry{}, fmt.Errorf("invalid session canvas id: %w", err)
+	}
+
 	paths, err := requestedFilePaths(input)
 	if err != nil {
 		return fileReadResult{}, err
@@ -100,7 +109,7 @@ func (a readFileAction) Execute(ctx context.Context, session agents.AgentSession
 	}
 
 	for _, path := range paths {
-		entry, readErr := a.readPath(ctx, session, versionID, path)
+		entry, readErr := a.readPath(ctx, session, orgID, canvasID, versionID, path)
 		if readErr != nil {
 			result.Errors = append(result.Errors, fileReadError{Path: path, Error: readErr.Error()})
 			continue
@@ -115,35 +124,49 @@ func (a readFileAction) Execute(ctx context.Context, session agents.AgentSession
 	return result, nil
 }
 
-func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessionContext, versionID, path string) (fileReadEntry, error) {
+func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessionContext, orgID uuid.UUID, canvasID uuid.UUID, versionID string, path string) (fileReadEntry, error) {
+	userID, err := uuid.Parse(session.UserID)
+	if err != nil {
+		return fileReadEntry{}, fmt.Errorf("invalid user id: %w", err)
+	}
+
+	canvas, err := models.FindCanvas(orgID, canvasID)
+	if err != nil {
+		return fileReadEntry{}, fmt.Errorf("find canvas: %w", err)
+	}
+
 	if canvasRepository.IsRepositorySpecFilePath(path) {
-		content, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, session.OrganizationID, session.CanvasID, versionID, path)
+		versionID, err := uuid.Parse(versionID)
+		if err != nil {
+			return fileReadEntry{}, fmt.Errorf("invalid version id: %w", err)
+		}
+
+		version, err := models.FindCanvasVersion(canvas.ID, versionID)
+		if err != nil {
+			return fileReadEntry{}, fmt.Errorf("find canvas version: %w", err)
+		}
+
+		content, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, version, path)
 		if err != nil {
 			return fileReadEntry{}, err
 		}
 
-		return fileReadEntry{Path: path, Content: content, Source: "staging", VersionID: versionID}, nil
+		return fileReadEntry{Path: path, Content: content, Source: "staging", VersionID: versionID.String()}, nil
 	}
 
 	db := database.DB(ctx)
-	content, found, deleted, err := canvasRepository.ReadStagedRepositoryFile(
-		ctx,
-		db,
-		session.OrganizationID,
-		session.CanvasID,
-		path,
-	)
-	if err != nil {
-		return fileReadEntry{}, err
-	}
-	if deleted {
-		return fileReadEntry{}, status.Errorf(codes.NotFound, "file %q is staged for deletion", path)
-	}
-	if found {
-		return fileReadEntry{Path: path, Content: content, Source: "staging", VersionID: versionID}, nil
+	fileReader := files.NewAppFileReader(db, a.gitProvider, canvas, userID)
+	reader, err := fileReader.ReadFromStaging(ctx, path)
+	if err == nil {
+		defer reader.Close()
+		content, err := io.ReadAll(reader)
+		if err != nil {
+			return fileReadEntry{}, err
+		}
+		return fileReadEntry{Path: path, Content: string(content), Source: "staging", VersionID: versionID}, nil
 	}
 
-	content, err = a.readCommittedGitFile(ctx, session, path)
+	content, err := a.readCommittedGitFile(ctx, session, path)
 	if err != nil {
 		return fileReadEntry{}, err
 	}

@@ -42,32 +42,31 @@ func Test__ListCanvasVersionsPaginated(t *testing.T) {
 
 	t.Run("lists committed versions newest first", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		canvasID := canvas.ID.String()
 		orgID := r.Organization.ID.String()
 
 		liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 		require.NoError(t, err)
 
-		baseline, err := ReadRepositorySpecFile(ctx, orgID, canvasID, liveVersion.ID.String(), CanvasYAMLRepositoryPath)
+		baseline, err := ReadRepositorySpecFile(ctx, canvas, liveVersion, CanvasYAMLRepositoryPath)
 		require.NoError(t, err)
 
-		_, err = PutCanvasStaging(ctx, orgID, canvasID, []*pb.CanvasRepositoryFileOperation{
+		_, err = PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# first commit\n")},
 		})
 		require.NoError(t, err)
 
-		firstCommit, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, "First", "", r.AuthService)
+		firstCommit, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvas.ID.String(), "First", "", r.AuthService)
 		require.NoError(t, err)
 
-		_, err = PutCanvasStaging(ctx, orgID, canvasID, []*pb.CanvasRepositoryFileOperation{
+		_, err = PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
 			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# second commit\n")},
 		})
 		require.NoError(t, err)
 
-		secondCommit, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvasID, "Second", "", r.AuthService)
+		secondCommit, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvas.ID.String(), "Second", "", r.AuthService)
 		require.NoError(t, err)
 
-		response, err := ListCanvasVersionsPaginated(ctx, orgID, canvasID, 0, nil)
+		response, err := ListCanvasVersionsPaginated(ctx, orgID, canvas.ID.String(), 0, nil)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(response.GetVersions()), 2)
 		assert.Equal(t, secondCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[0].GetMetadata().GetId())
