@@ -156,9 +156,9 @@ function Content({
   return (
     <div className="space-y-6">
       {pinnedCanvases.length > 0 ? (
-        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-white`}>
-          <div className="mb-4 flex items-center gap-2 text-gray-800">
-            <Pin size={16} className="text-blue-600" aria-hidden />
+        <section className={cn(CANVAS_FOLDER_SECTION_SHELL_CLASS, "bg-white dark:bg-white/5")}>
+          <div className="mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+            <Pin size={16} className="text-blue-600 dark:text-blue-400" aria-hidden />
             <Heading level={3} className="mb-0 !text-base font-medium">
               Pinned
             </Heading>
