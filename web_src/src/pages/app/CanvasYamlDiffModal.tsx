@@ -3,6 +3,7 @@ import { FileCode, XIcon } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { CANVAS_YAML_DIFF_OPTIONS } from "./canvasYamlDiffOptions";
 
 export type CanvasYamlDiffModalProps = {
   open: boolean;
@@ -104,35 +105,7 @@ export function CanvasYamlDiffModal({
                 newFile={newFile}
                 disableWorkerPool
                 renderCustomHeader={renderDiffHeader}
-                options={{
-                  theme: "github-light",
-                  diffStyle: "split",
-                  diffIndicators: "classic",
-                  hunkSeparators: "line-info",
-                  lineDiffType: "word",
-                  overflow: "wrap",
-                  stickyHeader: true,
-                  tokenizeMaxLineLength: 1_000,
-                  unsafeCSS: `
-                    :host {
-                      display: block;
-                      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-                      font-size: 12px;
-                      line-height: 18px;
-                    }
-
-                    [data-diffs-header] {
-                      border-bottom: 1px solid rgb(226 232 240);
-                      background: rgb(255 255 255);
-                      z-index: 5;
-                    }
-
-                    [data-diffs-header="custom"] {
-                      display: block;
-                      padding: 0;
-                    }
-                  `,
-                }}
+                options={CANVAS_YAML_DIFF_OPTIONS}
               />
             </div>
           </div>
