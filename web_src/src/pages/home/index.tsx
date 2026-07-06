@@ -1,7 +1,8 @@
 import { usePermissions } from "@/contexts/usePermissions";
+import { useUpdateCanvasPreference } from "@/hooks/useCanvasData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { Palette } from "lucide-react";
+import { Palette, Pin } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { Heading } from "../../components/Heading/heading";
@@ -12,6 +13,7 @@ import { CanvasFolderSection } from "./CanvasFolderSection";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { EditAppModal } from "./EditAppModal";
 import { HomePageShell } from "./HomePageShell";
+import { applyCanvasAppPreferences } from "./canvasAppPreferencePresentation";
 import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 import { useEditApp } from "./useEditApp";
@@ -38,6 +40,8 @@ export function HomePage() {
     organizationId,
     searchQuery,
   );
+  const updateCanvasPreference = useUpdateCanvasPreference(organizationId || "");
+  const preferredFilteredCanvases = applyCanvasAppPreferences(filteredCanvases);
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
@@ -76,10 +80,13 @@ export function HomePage() {
         ) : (
           <Content
             filteredCanvases={filteredCanvases}
+            preferredFilteredCanvases={preferredFilteredCanvases}
             canvasFolders={canvasFolders}
             organizationId={organizationId}
             searchQuery={searchQuery}
             onEditCanvas={openEdit}
+            onTogglePin={(canvasId, pinned) => updateCanvasPreference.mutate({ canvasId, pinned })}
+            onToggleStar={(canvasId, starred) => updateCanvasPreference.mutate({ canvasId, starred })}
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
@@ -101,35 +108,74 @@ export function HomePage() {
 
 function Content({
   filteredCanvases,
+  preferredFilteredCanvases,
   canvasFolders,
   organizationId,
   searchQuery,
   onEditCanvas,
+  onTogglePin,
+  onToggleStar,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
 }: {
   filteredCanvases: CanvasCardData[];
+  preferredFilteredCanvases: CanvasCardData[];
   canvasFolders: CanvasFolderData[];
   organizationId: string;
   searchQuery: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
+  onTogglePin: (canvasId: string, pinned: boolean) => void;
+  onToggleStar: (canvasId: string, starred: boolean) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }) {
-  const folderedLayout = buildFolderedLayout(filteredCanvases, canvasFolders, Boolean(searchQuery));
+  const pinnedCanvases = preferredFilteredCanvases.filter((canvas) => canvas.isPinned);
+  const unpinnedCanvases = preferredFilteredCanvases.filter((canvas) => !canvas.isPinned);
+  const folderedLayout = buildFolderedLayout(
+    unpinnedCanvases,
+    preferredFilteredCanvases,
+    canvasFolders,
+    Boolean(searchQuery),
+  );
 
   if (filteredCanvases.length === 0 && (searchQuery || canvasFolders.length === 0)) {
     return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
   }
 
-  if (folderedLayout.visibleFolders.length === 0 && folderedLayout.unfiledCanvases.length === 0) {
+  if (
+    pinnedCanvases.length === 0 &&
+    folderedLayout.visibleFolders.length === 0 &&
+    folderedLayout.unfiledCanvases.length === 0
+  ) {
     return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
   }
 
   return (
     <div className="space-y-6">
+      {pinnedCanvases.length > 0 ? (
+        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-white`}>
+          <div className="mb-4 flex items-center gap-2 text-gray-800">
+            <Pin size={16} className="text-blue-600" aria-hidden />
+            <Heading level={3} className="mb-0 !text-base font-medium">
+              Pinned
+            </Heading>
+          </div>
+          <CanvasCardsGrid
+            canvases={pinnedCanvases}
+            canvasFolders={canvasFolders}
+            organizationId={organizationId}
+            onEditCanvas={onEditCanvas}
+            onTogglePin={onTogglePin}
+            onToggleStar={onToggleStar}
+            canUpdateCanvases={canUpdateCanvases}
+            canDeleteCanvases={canDeleteCanvases}
+            permissionsLoading={permissionsLoading}
+          />
+        </section>
+      ) : null}
+
       {folderedLayout.visibleFolders.map((folder) => (
         <CanvasFolderSection
           key={folder.id}
@@ -138,6 +184,8 @@ function Content({
           canvasFolders={canvasFolders}
           organizationId={organizationId}
           onEditCanvas={onEditCanvas}
+          onTogglePin={onTogglePin}
+          onToggleStar={onToggleStar}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
@@ -155,6 +203,8 @@ function Content({
             canvasFolders={canvasFolders}
             organizationId={organizationId}
             onEditCanvas={onEditCanvas}
+            onTogglePin={onTogglePin}
+            onToggleStar={onToggleStar}
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
@@ -172,19 +222,22 @@ interface FolderedCanvasLayout {
 }
 
 function buildFolderedLayout(
-  filteredCanvases: CanvasCardData[],
+  sectionCanvases: CanvasCardData[],
+  matchingCanvases: CanvasCardData[],
   canvasFolders: CanvasFolderData[],
   hasSearchQuery: boolean,
 ): FolderedCanvasLayout {
   const folderIDs = new Set(canvasFolders.map((folder) => folder.id));
   const canvasesByFolderID = new Map<string, CanvasCardData[]>();
+  const matchingCanvasCountsByFolderID = new Map<string, number>();
   const unfiledCanvases: CanvasCardData[] = [];
 
   for (const folder of canvasFolders) {
     canvasesByFolderID.set(folder.id, []);
+    matchingCanvasCountsByFolderID.set(folder.id, 0);
   }
 
-  for (const canvas of filteredCanvases) {
+  for (const canvas of sectionCanvases) {
     if (canvas.canvasFolderId && folderIDs.has(canvas.canvasFolderId)) {
       canvasesByFolderID.get(canvas.canvasFolderId)?.push(canvas);
       continue;
@@ -193,9 +246,30 @@ function buildFolderedLayout(
     unfiledCanvases.push(canvas);
   }
 
-  const visibleFolders = hasSearchQuery
-    ? canvasFolders.filter((folder) => (canvasesByFolderID.get(folder.id) || []).length > 0)
-    : canvasFolders;
+  for (const canvas of matchingCanvases) {
+    if (!canvas.canvasFolderId || !folderIDs.has(canvas.canvasFolderId)) {
+      continue;
+    }
+
+    matchingCanvasCountsByFolderID.set(
+      canvas.canvasFolderId,
+      (matchingCanvasCountsByFolderID.get(canvas.canvasFolderId) || 0) + 1,
+    );
+  }
+
+  const visibleFolders = canvasFolders.filter((folder) => {
+    const visibleCanvasCount = (canvasesByFolderID.get(folder.id) || []).length;
+    const matchingCanvasCount = matchingCanvasCountsByFolderID.get(folder.id) || 0;
+    if (visibleCanvasCount > 0 || matchingCanvasCount > 0) {
+      return true;
+    }
+
+    if (hasSearchQuery) {
+      return false;
+    }
+
+    return true;
+  });
 
   return { canvasesByFolderID, unfiledCanvases, visibleFolders };
 }
