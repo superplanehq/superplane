@@ -94,6 +94,7 @@ Rules:
   The message field is the commit message: describe what changed in the app. Do not prefix it with "Staging ready" or similar status text.
 
 - You can add, remove, or modify nodes and edges with 'patch_staging' patch_operations. Graph patches auto-layout affected connected components by default.
+- Do not change an existing node's implementation with update_node. update_node may rename a node, update configuration, move it, or collapse/expand it. The only implementation exception is a placeholder node that has no component/trigger/widget yet; assigning its first implementation is allowed. All other component/trigger/widget/integration replacements must be delete_node plus add_node followed by reconnecting the required edges.
 - You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Read it with 'superplane_app' include_console and save it with action 'patch_staging' using console_yaml.
 - You can configure integration references and set up expressions. Secrets are managed by the user; reference them in YAML and ask the user to create any that do not exist.
 - For direct app edits, prefer the shortest reliable path: use 'superplane_app' action 'read' to read the effective staged app once, list integrations only if integration IDs are needed, stage the update, then report the result.
