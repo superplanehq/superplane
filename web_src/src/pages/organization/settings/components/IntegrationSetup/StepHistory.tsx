@@ -65,7 +65,7 @@ export function StepHistory({ previousSteps, currentStep, onDiscard, discardDisa
       )}
 
       {onDiscard ? (
-        <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div className="mt-5 border-t border-gray-200 pt-4 dark:border-gray-600">
           <div className="flex justify-center">
             <Button
               type="button"

@@ -47,11 +47,33 @@ export const getColorClass = (color?: string): string => {
     case "white":
       return "text-white dark:text-white";
     case "black":
-      return "text-black dark:text-black";
+      return "text-gray-900 dark:text-gray-300";
     default:
       return "text-gray-500 dark:text-gray-400";
   }
 };
+
+/** Ensures canvas node header icons remain visible in dark mode. */
+export function resolveNodeIconColorClass(iconColor?: string): string {
+  const trimmed = iconColor?.trim();
+  if (!trimmed) {
+    return getColorClass("gray");
+  }
+
+  if (/\bdark:/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const match = /^text-([a-z]+)-(\d+)$/.exec(trimmed);
+  if (match) {
+    const [, color, shade] = match;
+    const shadeNum = Number(shade);
+    const darkShade = shadeNum >= 600 ? 400 : 300;
+    return `${trimmed} dark:text-${color}-${darkShade}`;
+  }
+
+  return `${trimmed} dark:text-gray-300`;
+}
 
 export const getBackgroundColorClass = (color?: string): string => {
   switch (color) {

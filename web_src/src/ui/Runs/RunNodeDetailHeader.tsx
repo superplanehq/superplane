@@ -23,7 +23,7 @@ export function RunNodeDetailHeader({
   onNavigateNode,
 }: RunNodeDetailHeaderProps) {
   return (
-    <div className="flex h-9 shrink-0 items-stretch justify-between border-b border-slate-200 pl-3">
+    <div className="flex h-9 shrink-0 items-stretch justify-between border-b border-slate-200 pl-3 dark:border-gray-800/70">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="flex min-w-0 items-center gap-1.5">
           <RunNodeIcon
@@ -31,9 +31,9 @@ export function RunNodeDetailHeader({
             iconSlug={workflowNode?.component ? componentIconMap[workflowNode.component] : undefined}
             alt={nodeName}
             size={RUN_NODE_ICON_SIZE}
-            className="h-3.5 w-3.5 shrink-0 text-gray-800"
+            className="h-3.5 w-3.5 shrink-0 text-gray-800 dark:text-gray-100"
           />
-          <h3 className="truncate text-[13px] font-medium text-gray-900">{nodeName}</h3>
+          <h3 className="truncate text-[13px] font-medium text-gray-900 dark:text-gray-100">{nodeName}</h3>
         </div>
       </div>
       <div className="flex shrink-0 items-stretch">
@@ -63,7 +63,7 @@ export function RunNodeDetailHeader({
             </Button>
           </div>
         ) : null}
-        <div aria-hidden className="w-px self-stretch bg-slate-200" />
+        <div aria-hidden className="w-px self-stretch bg-slate-200 dark:bg-gray-800/50" />
         <div className="flex items-center px-1">
           <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
             <X className="h-3.5 w-3.5" />

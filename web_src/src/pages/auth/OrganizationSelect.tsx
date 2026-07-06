@@ -5,6 +5,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import {
+  createActionCardClassName,
+  createActionCardDisabledClassName,
+  createActionIconClassName,
+  createActionIconDisabledClassName,
+} from "@/lib/createActionStyles";
 import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/useAccount";
@@ -113,25 +120,29 @@ const OrganizationSelect: React.FC = () => {
 
   const listRowMinHeight = "min-h-[58px]";
 
-  const createOrganizationEnabledClasses = cn(
-    "relative flex w-full flex-row items-center gap-4 rounded-md border border-dashed border-green-500 bg-green-50 px-4 py-3 transition-colors dark:border-green-500 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50 cursor-pointer",
+  const pageShellClassName = cn("min-h-screen flex flex-col bg-slate-100", appDarkModeClasses.surface);
+
+  const pageHeaderClassName = cn(
+    "flex h-12 items-center border-b bg-white px-4",
+    appDarkModeClasses.sidebarEdge,
+    appDarkModeClasses.surface,
+  );
+
+  const organizationRowClassName = cn(
+    "flex items-center justify-between gap-4 rounded-md bg-white px-4 py-3 shadow-sm transition-colors cursor-pointer hover:shadow-md",
+    appDarkModeClasses.modalEdge,
+    appDarkModeClasses.surfaceRaised,
+    "dark:hover:bg-gray-800/90",
     listRowMinHeight,
   );
 
-  const createOrganizationDisabledClasses = cn(
-    "relative flex w-full flex-row items-center gap-4 rounded-md border border-dashed border-slate-300 bg-slate-200/70 px-4 py-3 text-slate-500 cursor-not-allowed dark:border-slate-600 dark:bg-slate-800/50",
-    listRowMinHeight,
-  );
+  const createOrganizationEnabledClasses = cn(createActionCardClassName, "cursor-pointer", listRowMinHeight);
+
+  const createOrganizationDisabledClasses = cn(createActionCardDisabledClassName, listRowMinHeight);
 
   const createOrganizationInner = (
     <>
-      <span
-        className={
-          createOrganizationDisabled
-            ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-400 text-white dark:bg-slate-500"
-            : "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white"
-        }
-      >
+      <span className={createOrganizationDisabled ? createActionIconDisabledClassName : createActionIconClassName}>
         <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
       </span>
       <Heading
@@ -145,13 +156,13 @@ const OrganizationSelect: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100">
-        <div className="px-4 py-2 bg-white border-b border-slate-200">
+      <div className={pageShellClassName}>
+        <header className={pageHeaderClassName}>
           <OrganizationMenuButton />
-        </div>
+        </header>
         <div className="p-8 flex justify-center">
           <div className="w-full max-w-[640px] flex flex-col items-center justify-center gap-4 py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
             <Text className="text-gray-500 dark:text-gray-400">Loading...</Text>
           </div>
         </div>
@@ -160,15 +171,15 @@ const OrganizationSelect: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="px-4 py-2 bg-white border-b border-slate-200">
+    <div className={pageShellClassName}>
+      <header className={pageHeaderClassName}>
         <OrganizationMenuButton />
-      </div>
+      </header>
       <div className="p-8 flex justify-center">
         <div className="w-full max-w-[640px] mx-auto">
           <div className="flex flex-col items-start mb-6">
             <div className="w-full text-left">
-              <Text className="font-medium text-gray-800 block">
+              <Text className="font-medium text-gray-800 block dark:text-gray-100">
                 Hey there{account?.name ? `, ${account.name}` : ""}!
               </Text>
               {organizations.length > 0 && (
@@ -181,14 +192,16 @@ const OrganizationSelect: React.FC = () => {
 
           {error && (
             <div className="mb-6 p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <Text className="text-red-700 text-sm">{error}</Text>
+              <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
             </div>
           )}
 
           {organizations.length === 0 && (
             <div className="text-left py-2 mb-4 space-y-1">
-              <Text className="font-medium text-gray-800 block">You're not a member of any organizations yet.</Text>
-              <Text className="font-medium text-gray-800 block">
+              <Text className="font-medium text-gray-800 block dark:text-gray-100">
+                You're not a member of any organizations yet.
+              </Text>
+              <Text className="font-medium text-gray-800 block dark:text-gray-300">
                 {createOrganizationDisabled
                   ? "This account has reached its organization limit."
                   : "Create a new organization to get started!"}
@@ -199,16 +212,10 @@ const OrganizationSelect: React.FC = () => {
           <ul className="flex flex-col gap-3 list-none p-0 m-0">
             {organizations.map((org) => (
               <li key={org.id}>
-                <Link
-                  to={`/${org.id}`}
-                  className={cn(
-                    "flex items-center justify-between gap-4 rounded-md bg-white dark:bg-gray-900 px-4 py-3 shadow-sm outline outline-slate-950/10 hover:outline-slate-950/20 hover:shadow-md transition-colors cursor-pointer",
-                    listRowMinHeight,
-                  )}
-                >
+                <Link to={`/${org.id}`} className={organizationRowClassName}>
                   <div className="flex items-center gap-4 min-w-0">
                     <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-medium text-white"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-medium text-white dark:bg-gray-300 dark:text-gray-950"
                       aria-hidden
                     >
                       {organizationInitial(org.name)}

@@ -179,7 +179,7 @@ function ChatConversation({
       />
 
       {outcomeState ? (
-        <div className="border-t border-slate-200 px-3 py-2">
+        <div className="border-t border-slate-200 px-3 py-2 dark:border-gray-800/70">
           <div className="mx-auto w-full max-w-[800px]">
             <OutcomeProgressWidget state={outcomeState} onDismiss={() => setOutcomeState(null)} />
           </div>

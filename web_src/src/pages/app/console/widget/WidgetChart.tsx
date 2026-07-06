@@ -25,6 +25,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { useTheme } from "@/contexts/useTheme";
 
 import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
 import { resolveChartColor } from "./chartColors";
@@ -74,6 +75,8 @@ interface ChartSeries extends WidgetChartSeries {
  * percentages render consistently in the tooltip.
  */
 export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const filtered = useMemo(() => applyFilters(rows, render.filters), [rows, render.filters]);
   const sorted = useMemo(() => applySort(filtered, render.sort), [filtered, render.sort]);
   const seriesField = render.seriesField?.trim();
@@ -91,10 +94,10 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
         return {
           ...s,
           key,
-          color: resolveChartColor(key, idx),
+          color: resolveChartColor(key, idx, isDark),
         };
       }),
-    [render.series],
+    [render.series, isDark],
   );
   const pivotedSeries = useMemo<ChartSeries[]>(() => {
     if (!seriesField) return [];
@@ -103,9 +106,9 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
       ...valueSeries,
       key,
       label: key,
-      color: resolveChartColor(key, idx),
+      color: resolveChartColor(key, idx, isDark),
     }));
-  }, [seriesField, sorted, valueSeries]);
+  }, [seriesField, sorted, valueSeries, isDark]);
   const series = seriesField ? pivotedSeries : configuredSeries;
   const data = useMemo(() => {
     const built = buildChartData(
@@ -121,7 +124,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <Loader2 className="size-4 animate-spin text-slate-400" />
+        <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
       </div>
     );
   }
@@ -131,10 +134,12 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-1 p-3" data-testid="widget-chart">
-      {render.title ? <div className="text-xs font-medium text-slate-600">{render.title}</div> : null}
+      {render.title ? (
+        <div className="text-xs font-medium text-slate-600 dark:text-gray-400">{render.title}</div>
+      ) : null}
       <div className="min-h-0 flex-1">
         {render.type === "donut" ? (
-          <DonutChartView data={data} series={series[0]} legendMode={render.legend ?? "auto"} />
+          <DonutChartView data={data} series={series[0]} legendMode={render.legend ?? "auto"} isDark={isDark} />
         ) : (
           <CartesianChartView
             type={render.type}
@@ -365,10 +370,12 @@ function DonutChartView({
   data,
   series,
   legendMode,
+  isDark,
 }: {
   data: Array<Record<string, unknown>>;
   series: ChartSeries | undefined;
   legendMode: WidgetChartLegendMode;
+  isDark: boolean;
 }) {
   const seriesKey = series?.key ?? "";
   const sliceData = useMemo(() => {
@@ -378,10 +385,10 @@ function DonutChartView({
       return {
         x,
         value: Number(row[seriesKey]) || 0,
-        color: resolveChartColor(x, idx),
+        color: resolveChartColor(x, idx, isDark),
       };
     });
-  }, [data, seriesKey]);
+  }, [data, seriesKey, isDark]);
 
   const total = useMemo(() => sliceData.reduce((acc, slice) => acc + slice.value, 0), [sliceData]);
 
@@ -438,7 +445,7 @@ function DonutChartView({
           innerRadius="55%"
           outerRadius="85%"
           paddingAngle={1}
-          stroke="#fff"
+          stroke={isDark ? "#111827" : "#fff"}
           strokeWidth={1.5}
         >
           {sliceData.map((slice, idx) => (

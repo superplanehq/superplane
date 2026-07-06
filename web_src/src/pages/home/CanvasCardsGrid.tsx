@@ -2,6 +2,8 @@ import { Heading } from "@/components/Heading/heading";
 import type { ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 import { Link } from "react-router-dom";
 import { appPath } from "@/lib/appPaths";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { cn } from "@/lib/utils";
 import { CanvasActionsMenu } from "./CanvasActionsMenu";
 import { CanvasCardDescription } from "./CanvasCardDescription";
 import type { CanvasCardData, CanvasFolderData } from "./types";
@@ -77,7 +79,13 @@ function CanvasCard({
   const previewEdges = canvas.edges || [];
 
   return (
-    <div className="relative flex min-h-40 h-full flex-col bg-white dark:bg-gray-800 rounded-md outline outline-gray-950/15 hover:shadow-md transition-shadow cursor-pointer">
+    <div
+      className={cn(
+        "relative flex min-h-40 h-full flex-col rounded-md bg-white shadow-sm transition-[box-shadow,outline-color] cursor-pointer hover:shadow-md",
+        "outline outline-1 -outline-offset-1 outline-slate-950/10 hover:outline-slate-950/15 dark:outline-gray-600/25 dark:hover:outline-gray-600/40",
+        appDarkModeClasses.surfaceRaised,
+      )}
+    >
       <Link to={canvasHref} aria-label={`Open canvas ${canvas.name}`} className="absolute inset-0 rounded-md" />
       <div className="pointer-events-none relative flex flex-1 flex-col">
         <div className="p-3 pb-0">
@@ -85,7 +93,7 @@ function CanvasCard({
             <div className="flex flex-col flex-1 min-w-0">
               <Heading
                 level={3}
-                className="mb-0 line-clamp-2 !text-base font-medium text-gray-800 transition-colors !leading-6"
+                className="mb-0 line-clamp-2 !text-base font-medium text-gray-800 transition-colors !leading-6 dark:text-white"
               >
                 <span className="truncate">{canvas.name}</span>
               </Heading>
@@ -110,7 +118,7 @@ function CanvasCard({
           <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
         </div>
 
-        <div className="border-t border-gray-950/10 px-3 pb-3 pt-3 dark:border-white/10">
+        <div className="border-t border-gray-950/10 px-3 pb-3 pt-3 dark:border-gray-700/70">
           <p className="text-left text-[11px] leading-none text-gray-500 dark:text-gray-400">
             Created by {canvas.createdBy.name}, on {canvas.createdAt}
           </p>
@@ -190,7 +198,7 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
               height={nodeHeight}
               rx={8}
               ry={8}
-              fill="#1f2937"
+              fill="currentColor"
               opacity={1}
             />
           );

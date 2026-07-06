@@ -260,7 +260,7 @@ export interface ConsoleLayoutItem {
   minH?: number;
 }
 
-export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "yellow", "slate", "orange"] as const;
+export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "slate", "orange"] as const;
 export type CanvasFolderColor = (typeof CANVAS_FOLDER_COLORS)[number];
 export const DEFAULT_CANVAS_FOLDER_COLOR: CanvasFolderColor = "blue";
 

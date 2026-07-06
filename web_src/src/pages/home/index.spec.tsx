@@ -93,7 +93,7 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 vi.mock("@/hooks/useCanvasData", () => ({
-  CANVAS_FOLDER_COLORS: ["blue", "green", "purple", "yellow", "slate", "orange"],
+  CANVAS_FOLDER_COLORS: ["blue", "green", "purple", "slate", "orange"],
   DEFAULT_CANVAS_FOLDER_COLOR: "blue",
   canvasKeys: {
     detail: (organizationId: string, canvasId: string) => ["canvases", "detail", organizationId, canvasId],
@@ -270,7 +270,7 @@ describe("HomePage canvas folders", () => {
     renderHome();
     await user.click(screen.getByLabelText("Folder actions"));
     await user.hover(screen.getByText("Background"));
-    fireEvent.click(await screen.findByLabelText("purple folder color"));
+    fireEvent.click(await screen.findByLabelText("violet folder color"));
 
     await waitFor(() => {
       expect(mutationMocks.updateCanvasFolder).toHaveBeenCalledWith({
