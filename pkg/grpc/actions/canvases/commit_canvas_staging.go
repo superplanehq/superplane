@@ -478,7 +478,8 @@ func CreateNewCanvasVersionFromLive(
 				return nil, err
 			}
 
-			newVersion.Nodes = datatypes.NewJSONSlice(slices.Clone(nodes))
+			newNodes := injectMetadataIntoNodes(liveVersion.Nodes, nodes)
+			newVersion.Nodes = datatypes.NewJSONSlice(slices.Clone(newNodes))
 			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(edges))
 		case ConsoleYAMLRepositoryPath:
 			panels, layout, err := consolePanelsLayoutFromYAMLText(content)
@@ -499,4 +500,19 @@ func CreateNewCanvasVersionFromLive(
 	}
 
 	return &newVersion, nil
+}
+
+func injectMetadataIntoNodes(versionNodes []models.Node, proposedNodes []models.Node) []models.Node {
+	result := make([]models.Node, len(proposedNodes))
+	copy(result, proposedNodes)
+
+	for i, proposedNode := range result {
+		for _, versionNode := range versionNodes {
+			if proposedNode.ID == versionNode.ID {
+				result[i].Metadata = versionNode.Metadata
+			}
+		}
+	}
+
+	return result
 }
