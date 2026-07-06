@@ -1,8 +1,9 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { appPath, appSettingsPath } from "./lib/appPaths";
+import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -139,6 +140,15 @@ function PageObservabilityScope() {
 }
 
 function OrganizationScope() {
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const { account } = useAccount();
+
+  useEffect(() => {
+    if (account?.id && organizationId) {
+      recordLastVisitedOrganization(account.id, organizationId);
+    }
+  }, [account?.id, organizationId]);
+
   return (
     <PermissionsProvider>
       <Outlet />

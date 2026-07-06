@@ -58,7 +58,7 @@ const OrganizationCreate: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-100">
       <div className="p-6 flex items-center">
-        <Link to="/" className="text-sm font-medium text-gray-500 px-2 py-1 hover:bg-gray-950/5 rounded">
+        <Link to="/?select=true" className="text-sm font-medium text-gray-500 px-2 py-1 hover:bg-gray-950/5 rounded">
           ← Back to Organizations
         </Link>
       </div>
