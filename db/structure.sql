@@ -230,7 +230,7 @@ CREATE TABLE public.canvas_folders (
     sort_order bigint NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    CONSTRAINT canvas_folders_background_color_check CHECK (((background_color)::text = ANY ((ARRAY['blue'::character varying, 'green'::character varying, 'purple'::character varying, 'yellow'::character varying, 'slate'::character varying, 'orange'::character varying])::text[])))
+    CONSTRAINT canvas_folders_background_color_check CHECK (((background_color)::text = ANY ((ARRAY['blue'::character varying, 'green'::character varying, 'purple'::character varying, 'slate'::character varying, 'orange'::character varying])::text[])))
 );
 
 
