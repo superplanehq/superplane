@@ -1,9 +1,14 @@
+import type { ComponentProps, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import { defaultUrlTransform } from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
+import { MarkdownCode } from "@/components/AgentSidebar/widgets/MarkdownCode";
+import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
+import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -47,11 +52,17 @@ const MARKDOWN_SANITIZE_SCHEMA = {
     ...(defaultSchema.attributes ?? {}),
     details: [...(defaultSchema.attributes?.details ?? []), "open"],
   },
+  protocols: {
+    ...(defaultSchema.protocols ?? {}),
+    href: [...(defaultSchema.protocols?.href ?? []), "node"],
+  },
 };
 
 interface MarkdownContentProps {
   content: string;
   className?: string;
+  canvasId?: string;
+  organizationId?: string;
   "data-testid"?: string;
 }
 
@@ -65,7 +76,13 @@ interface MarkdownContentProps {
  * so file viewers render exactly what's on disk (e.g. an indented code block
  * at the very start of a file stays an indented code block).
  */
-export function MarkdownContent({ content, className, "data-testid": dataTestId }: MarkdownContentProps) {
+export function MarkdownContent({
+  content,
+  className,
+  canvasId,
+  organizationId,
+  "data-testid": dataTestId,
+}: MarkdownContentProps) {
   const normalized = content.replace(/\r\n/g, "\n");
   if (!normalized.trim()) return null;
   return (
@@ -73,9 +90,63 @@ export function MarkdownContent({ content, className, "data-testid": dataTestId 
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
+        urlTransform={(url) => (isNodeLink(url) ? url : defaultUrlTransform(url))}
+        components={{
+          a: ({ children, href }) => (
+            <MarkdownLink href={href} canvasId={canvasId} organizationId={organizationId}>
+              {children}
+            </MarkdownLink>
+          ),
+          code: MarkdownCodeWithDiagrams,
+          pre: ({ children }) => <>{children}</>,
+        }}
       >
         {normalized}
       </ReactMarkdown>
     </div>
   );
+}
+
+function MarkdownCodeWithDiagrams({
+  className,
+  children,
+  ...props
+}: ComponentProps<"code"> & { children?: ReactNode }) {
+  const language = /language-(\w+)/.exec(className || "")?.[1];
+  const code = String(children).replace(/\n$/, "");
+
+  if (language === "mermaid") {
+    return <MermaidWidget content={code} />;
+  }
+
+  return (
+    <MarkdownCode className={className} {...props}>
+      {children}
+    </MarkdownCode>
+  );
+}
+
+function MarkdownLink({
+  href,
+  children,
+  canvasId,
+  organizationId,
+}: ComponentProps<"a"> & { canvasId?: string; organizationId?: string }) {
+  const nodeMatch = href?.match(/^node:(.+)$/);
+  if (nodeMatch && canvasId && organizationId) {
+    const label = typeof children === "string" ? children : undefined;
+    return (
+      <NodeChipFromLink nodeId={nodeMatch[1]} rawLabel={label} canvasId={canvasId} organizationId={organizationId} />
+    );
+  }
+
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
+}
+
+function isNodeLink(url: string): boolean {
+  return url.startsWith("node:");
 }
