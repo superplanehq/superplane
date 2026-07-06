@@ -4238,6 +4238,7 @@ export function AppPage() {
           files={{
             isEditing,
             canvasId: canvasId || undefined,
+            organizationId,
             versionId: activeCanvasVersionId || undefined,
             canWrite: canActOnCanvas,
             files: appFiles,
