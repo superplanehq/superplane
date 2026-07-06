@@ -1,14 +1,17 @@
-import { Bot, ChevronRight, Loader2, Terminal } from "lucide-react";
+import { Bot, ChevronRight, ExternalLink, Loader2, Maximize2, Terminal } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { isSystemNotification } from "@/components/AgentSidebar/systemMessages";
 import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { AgentMessage } from "./types";
 import type { MessageGroup } from "./agentMessageGroups";
 
 const STICKY_USER_MESSAGE_MAX_CHARS = 240;
 const STICKY_USER_MESSAGE_MAX_LINES = 4;
+type MessageImage = NonNullable<AgentMessage["images"]>[number];
 
 export const ConversationTranscript = memo(function ConversationTranscript({
   error,
@@ -216,22 +219,63 @@ const MessageRow = memo(function MessageRow({
 });
 
 function MessageImages({ images }: { images: AgentMessage["images"] }) {
+  const [selectedImage, setSelectedImage] = useState<MessageImage | null>(null);
+
   if (!images || images.length === 0) return null;
 
   return (
-    <div className="mb-1.5 flex flex-wrap gap-1.5" data-testid="agent-message-images">
-      {images.map((image, index) => (
-        <a
-          key={index}
-          href={image.url}
-          target="_blank"
-          rel="noreferrer"
-          className="block overflow-hidden rounded-md border border-slate-200 dark:border-gray-700"
-        >
-          <img src={image.url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
-        </a>
-      ))}
-    </div>
+    <>
+      <div className="mb-1.5 flex flex-wrap gap-1.5" data-testid="agent-message-images">
+        {images.map((image, index) => (
+          <button
+            key={index}
+            type="button"
+            onClick={() => setSelectedImage(image)}
+            className="group relative block cursor-zoom-in overflow-hidden rounded-md border border-slate-200 dark:border-gray-700"
+            aria-label="Open attachment"
+          >
+            <img src={image.url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
+            <span className="absolute right-1 bottom-1 rounded bg-slate-950/70 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+              <Maximize2 className="size-3" aria-hidden />
+            </span>
+          </button>
+        ))}
+      </div>
+      <ImageLightbox image={selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)} />
+    </>
+  );
+}
+
+function ImageLightbox({ image, onOpenChange }: { image: MessageImage | null; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={!!image} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="large"
+        className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[1400px] grid-rows-none flex-col gap-3 overflow-hidden p-3 sm:max-h-[calc(100dvh-4rem)] sm:w-[calc(100vw-4rem)] sm:p-4"
+      >
+        <DialogTitle className="sr-only">Image attachment</DialogTitle>
+        <DialogDescription className="sr-only">Expanded image attachment from the agent session.</DialogDescription>
+        {image ? (
+          <>
+            <div className="min-h-0 flex-1 overflow-auto rounded-md bg-slate-950/5 dark:bg-black/30">
+              <img
+                src={image.url}
+                alt="attachment"
+                className="mx-auto h-auto max-h-[calc(100dvh-7rem)] max-w-full object-contain sm:max-h-[calc(100dvh-9rem)]"
+              />
+            </div>
+            <div className="flex shrink-0 justify-end">
+              <Button asChild variant="outline" size="sm">
+                <a href={image.url} target="_blank" rel="noreferrer">
+                  <ExternalLink className="size-3.5" />
+                  Open original
+                </a>
+              </Button>
+            </div>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
