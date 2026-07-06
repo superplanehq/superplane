@@ -105,7 +105,7 @@ func (s *Server) checkRepositoryReadPermission(ctx context.Context, user *models
 }
 
 func (s *Server) findFileReader(ctx context.Context, db *gorm.DB, r *http.Request, user *models.User, canvas *models.Canvas, path string) (reader io.ReadCloser, err error) {
-	ctx, done := telemetry.Span(ctx, "repository.find_canvas")
+	ctx, done := telemetry.Span(ctx, "repository.find_reader")
 	defer done(&err)
 
 	version := strings.TrimSpace(r.URL.Query().Get("version_id"))

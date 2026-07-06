@@ -60,10 +60,11 @@ func (r *AppFileReader) Read(ctx context.Context, path string) (reader io.ReadCl
 		return nil, ErrFileDeleted
 	}
 
-	//
-	// Otherwise, read from live version.
-	//
-	return r.ReadFromVersion(ctx, path, *r.app.LiveVersionID)
+	if errors.Is(err, ErrFileNotFound) {
+		return r.ReadFromVersion(ctx, path, *r.app.LiveVersionID)
+	}
+
+	return nil, err
 }
 
 func (r *AppFileReader) ReadFromVersion(ctx context.Context, path string, versionID uuid.UUID) (reader io.ReadCloser, err error) {

@@ -109,8 +109,18 @@ func (a readFileAction) Execute(ctx context.Context, session agents.AgentSession
 		Files:    make([]fileReadEntry, 0, len(paths)),
 	}
 
+	userID, err := uuid.Parse(session.UserID)
+	if err != nil {
+		return fileReadEntry{}, fmt.Errorf("invalid user id: %w", err)
+	}
+
+	canvas, err := models.FindCanvas(orgID, canvasID)
+	if err != nil {
+		return fileReadEntry{}, fmt.Errorf("find canvas: %w", err)
+	}
+
 	for _, path := range paths {
-		entry, readErr := a.readPath(ctx, session, orgID, canvasID, versionID, path)
+		entry, readErr := a.readPath(ctx, session, canvas, userID, versionID, path)
 		if readErr != nil {
 			result.Errors = append(result.Errors, fileReadError{Path: path, Error: readErr.Error()})
 			continue
@@ -125,17 +135,7 @@ func (a readFileAction) Execute(ctx context.Context, session agents.AgentSession
 	return result, nil
 }
 
-func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessionContext, orgID uuid.UUID, canvasID uuid.UUID, versionID string, path string) (fileReadEntry, error) {
-	userID, err := uuid.Parse(session.UserID)
-	if err != nil {
-		return fileReadEntry{}, fmt.Errorf("invalid user id: %w", err)
-	}
-
-	canvas, err := models.FindCanvas(orgID, canvasID)
-	if err != nil {
-		return fileReadEntry{}, fmt.Errorf("find canvas: %w", err)
-	}
-
+func (a readFileAction) readPath(ctx context.Context, session agents.AgentSessionContext, canvas *models.Canvas, userID uuid.UUID, versionID string, path string) (fileReadEntry, error) {
 	if canvasRepository.IsRepositorySpecFilePath(path) {
 		versionID, err := uuid.Parse(versionID)
 		if err != nil {
