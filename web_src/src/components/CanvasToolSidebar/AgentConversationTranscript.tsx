@@ -226,7 +226,7 @@ function MessageImages({ images }: { images: AgentMessage["images"] }) {
           href={image.url}
           target="_blank"
           rel="noreferrer"
-          className="block overflow-hidden rounded-md border border-slate-200"
+          className="block overflow-hidden rounded-md border border-slate-200 dark:border-gray-700"
         >
           <img src={image.url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
         </a>
@@ -261,7 +261,7 @@ function SubagentCard({ messages }: { messages: AgentMessage[] }) {
       <button
         type="button"
         onClick={toggleExpanded}
-        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900"
+        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900 dark:text-gray-300 dark:hover:text-gray-100"
       >
         <Bot className="size-4 shrink-0" />
         <span>{agentName}</span>
@@ -295,10 +295,12 @@ function SubagentStatus({ isRunning }: { isRunning: boolean }) {
 function SubagentDetails({ question, response }: { question: string; response: string }) {
   return (
     <div className="mt-2 space-y-2 pl-6">
-      {question ? <p className="text-xs italic text-slate-500">"{truncateQuestion(question)}"</p> : null}
+      {question ? (
+        <p className="text-xs italic text-slate-500 dark:text-gray-400">"{truncateQuestion(question)}"</p>
+      ) : null}
       {response ? (
         <div className="max-h-60 overflow-y-auto">
-          <p className="whitespace-pre-wrap text-xs text-slate-700">{response}</p>
+          <p className="whitespace-pre-wrap text-xs text-slate-700 dark:text-gray-300">{response}</p>
         </div>
       ) : null}
     </div>
@@ -346,11 +348,13 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
         onClick={() => setExpanded((current) => !current)}
         className="group flex cursor-pointer items-center gap-2"
       >
-        <Terminal className="size-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-        <span className="text-slate-500 group-hover:text-slate-800">{label}</span>
+        <Terminal className="size-4 shrink-0 text-slate-500 group-hover:text-slate-800 dark:text-gray-400 dark:group-hover:text-gray-200" />
+        <span className="text-slate-500 group-hover:text-slate-800 dark:text-gray-400 dark:group-hover:text-gray-200">
+          {label}
+        </span>
         <ChevronRight
           className={cn(
-            "size-3 text-slate-500 transition-transform group-hover:text-slate-800",
+            "size-3 text-slate-500 transition-transform group-hover:text-slate-800 dark:text-gray-400 dark:group-hover:text-gray-200",
             expanded && "rotate-90",
           )}
         />

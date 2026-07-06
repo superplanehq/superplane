@@ -76,7 +76,7 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
       onClick={handleClick}
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
-        "border bg-white",
+        "border bg-white dark:bg-gray-800",
         "text-xs font-medium",
         "transition-all cursor-pointer align-middle",
         toneClassName(tone),
@@ -88,7 +88,9 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
       {tone === "connected" && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
       {tone === "pending" && <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
       {tone === "error" && <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}
-      {isVendorOnly && <span className="text-[10px] leading-none text-slate-400 font-bold shrink-0">+</span>}
+      {isVendorOnly && (
+        <span className="shrink-0 text-[10px] font-bold leading-none text-slate-400 dark:text-gray-500">+</span>
+      )}
     </button>
   );
 }
@@ -143,13 +145,13 @@ function integrationTone(state: string): "connected" | "pending" | "error" | "de
 function toneClassName(tone: "connected" | "pending" | "error" | "default"): string {
   switch (tone) {
     case "connected":
-      return "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300";
+      return "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/50 dark:hover:border-emerald-800";
     case "pending":
-      return "border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300";
+      return "border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300 dark:border-amber-900/60 dark:text-amber-300 dark:hover:bg-amber-950/50 dark:hover:border-amber-800";
     case "error":
-      return "border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300";
+      return "border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/50 dark:hover:border-red-800";
     default:
-      return "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300";
+      return "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:border-gray-600";
   }
 }
 

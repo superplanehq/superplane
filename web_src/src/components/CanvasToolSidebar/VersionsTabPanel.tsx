@@ -69,7 +69,7 @@ export function VersionsTabPanel({
         <section>
           <VersionsSectionHeader label="History" />
           {hasNoVersions ? (
-            <p className="px-3 py-2 text-xs text-slate-600">No commit history yet.</p>
+            <p className="px-3 py-2 text-xs text-slate-600 dark:text-gray-400">No commit history yet.</p>
           ) : (
             <VersionRowList items={liveItems} onUseVersion={onUseVersion} />
           )}
@@ -129,7 +129,9 @@ function VersionsNotices({
   return (
     <>
       {!canUpdateCanvas && !canvasDeletedRemotely ? (
-        <p className="px-3 py-2 text-xs text-slate-600">You do not have permission to edit this canvas.</p>
+        <p className="px-3 py-2 text-xs text-slate-600 dark:text-gray-400">
+          You do not have permission to edit this canvas.
+        </p>
       ) : null}
       {canvasDeletedRemotely ? (
         <p className="px-3 py-2 text-xs text-red-700">This canvas was deleted from another session.</p>
