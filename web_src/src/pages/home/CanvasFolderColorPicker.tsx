@@ -28,10 +28,12 @@ export function CanvasFolderColorPicker({
           type="button"
           aria-label={`${FOLDER_COLOR_OPTIONS[color].label} folder color`}
           className={cn(
-            "flex items-center justify-center rounded-full border border-slate-950/15 text-white",
+            "flex items-center justify-center rounded-full border border-slate-950/15 dark:border-gray-700/70",
             sizeClassName,
             FOLDER_COLOR_OPTIONS[color].swatchClass,
-            selectedColor === color && "ring-2 ring-gray-900 ring-offset-1",
+            FOLDER_COLOR_OPTIONS[color].swatchForegroundClass,
+            selectedColor === color &&
+              "ring-2 ring-gray-900 ring-offset-1 dark:ring-gray-300 dark:ring-offset-gray-900",
           )}
           onClick={() => onColorChange(color)}
           disabled={isColorDisabled?.(color) ?? false}

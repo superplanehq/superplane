@@ -40,7 +40,7 @@ export function CanvasToolbar({ searchQuery, setSearchQuery }: CanvasToolbarProp
 
       <div className="min-w-0 w-full sm:ml-auto sm:w-80">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={16} />
           <Input
             placeholder="Filter apps..."
             value={searchQuery}

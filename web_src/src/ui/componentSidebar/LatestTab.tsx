@@ -36,7 +36,7 @@ interface LatestTabProps {
 
 function SectionHeader({ label }: { label: string }) {
   return (
-    <h2 className="flex h-9 shrink-0 items-center border-b border-b-slate-950/10 px-3 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+    <h2 className="flex h-9 shrink-0 items-center border-b border-b-slate-950/10 px-3 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:border-gray-800/70 dark:text-gray-400">
       {label}
     </h2>
   );
@@ -91,7 +91,7 @@ export const LatestTab = ({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <SectionHeader label="Latest" />
         {latestEvents.length === 0 ? (
-          <div className="px-3 py-4 text-center text-xs text-gray-500">No events found</div>
+          <div className="px-3 py-4 text-center text-xs text-gray-500 dark:text-gray-400">No events found</div>
         ) : (
           <>
             {compactLatestEvents.map((event) => (
@@ -113,7 +113,7 @@ export const LatestTab = ({
                 onClick={handleSeeFullHistory}
                 className={cn(
                   RUNS_SIDEBAR_ROW_CLASS,
-                  "w-full text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800",
+                  "w-full text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
                 )}
               >
                 <TextAlignStart className="h-3.5 w-3.5 shrink-0" />
@@ -126,7 +126,7 @@ export const LatestTab = ({
           <>
             <SectionHeader label="Queued" />
             {nextInQueueEvents.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-gray-500">Queue is empty</div>
+              <div className="px-3 py-4 text-center text-xs text-gray-500 dark:text-gray-400">Queue is empty</div>
             ) : (
               <>
                 {compactQueueEvents.map((event) => (
@@ -148,7 +148,7 @@ export const LatestTab = ({
                     onClick={handleSeeQueue}
                     className={cn(
                       RUNS_SIDEBAR_ROW_CLASS,
-                      "w-full text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800",
+                      "w-full text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
                     )}
                   >
                     <TextAlignStart className="h-3.5 w-3.5 shrink-0" />

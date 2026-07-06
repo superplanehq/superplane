@@ -16,11 +16,11 @@ const modeConfig = {
 
 function indicatorClasses(mode: AgentMode): string {
   if (mode === "builder") return "border-0 bg-[var(--purple)]";
-  return "bg-slate-500 border-transparent";
+  return "bg-slate-500 border-transparent dark:bg-gray-500";
 }
 
 function labelColor(key: AgentMode, isActive: boolean): string {
-  if (!isActive) return "text-slate-600 hover:text-slate-700";
+  if (!isActive) return "text-slate-600 hover:text-slate-700 dark:text-gray-300 dark:hover:text-gray-100";
   if (key === "builder") return "text-white";
   return "text-white";
 }
@@ -77,7 +77,7 @@ export function ModeToggle({
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex items-center rounded-full bg-slate-200"
+      className="relative inline-flex items-center rounded-full bg-slate-200 dark:bg-gray-700"
       data-testid="agent-mode-toggle"
     >
       <div

@@ -290,7 +290,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                   className="flex items-start gap-2"
                 >
                   {renderDragHandle(index)}
-                  <div className="relative min-w-0 flex-1 rounded-md border border-gray-300 dark:border-gray-700">
+                  <div className="relative min-w-0 flex-1 rounded-md border border-gray-300 dark:border-gray-600">
                     <AccordionPrimitive.Header
                       className={cn(
                         "relative z-10 flex h-11 shrink-0",
@@ -349,7 +349,9 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
             {renderDragHandle(index)}
             <div className="flex-1">
               {itemDefinition?.type === "object" && itemDefinition.schema ? (
-                <div className="rounded-md bg-slate-100 p-4 space-y-4">{renderObjectItemFields(item, index)}</div>
+                <div className="rounded-md bg-slate-100 p-4 space-y-4 dark:bg-gray-800">
+                  {renderObjectItemFields(item, index)}
+                </div>
               ) : (
                 renderListItemBody(item, index)
               )}
