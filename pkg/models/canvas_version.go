@@ -199,36 +199,6 @@ func FindLatestCanvasVersionInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*C
 	return &version, nil
 }
 
-func CreateCommitVersionFromLiveInTransaction(
-	tx *gorm.DB,
-	liveVersion *CanvasVersion,
-	userID uuid.UUID,
-	commitMessage string,
-) (*CanvasVersion, error) {
-	if liveVersion == nil {
-		return nil, gorm.ErrInvalidData
-	}
-
-	now := time.Now()
-	version := CanvasVersion{
-		ID:            uuid.New(),
-		WorkflowID:    liveVersion.WorkflowID,
-		OwnerID:       &userID,
-		CommitMessage: strings.TrimSpace(commitMessage),
-		Nodes:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Nodes)),
-		Edges:         datatypes.NewJSONSlice(slices.Clone(liveVersion.Edges)),
-		CreatedAt:     &now,
-		UpdatedAt:     &now,
-	}
-	copyVersionConsoleFields(liveVersion, &version)
-
-	if err := tx.Create(&version).Error; err != nil {
-		return nil, err
-	}
-
-	return &version, nil
-}
-
 func CreateCommitVersionWithSpecInTransaction(
 	tx *gorm.DB,
 	canvasID uuid.UUID,
