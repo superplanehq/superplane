@@ -24,6 +24,8 @@ import {
   mapTriggerEventsToSidebarEvents,
 } from "./utils";
 
+export const NO_INCOMING_CONNECTIONS_WARNING = "This node has no incoming connections and will never be triggered.";
+
 export function getNodeAnalyticsProps(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
@@ -46,6 +48,14 @@ export function getCanvasLogNodesSignature(nodes: ComponentsNode[]): string {
       warningMessage: node.warningMessage,
     })),
   );
+}
+
+export function prepareCanvasLogNodes(
+  nodes: ComponentsNode[],
+  edges: ComponentsEdge[],
+  components: ActionsAction[],
+): ComponentsNode[] {
+  return withDerivedNodeWarnings(nodes, edges, components);
 }
 
 // Merge a run's lightweight execution ref with the matching full execution (preferred from the
@@ -86,7 +96,7 @@ export function prepareData(
   const currentUser = buildUserInfo(user);
   const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
   const workflowEdges = workflow?.spec?.edges || [];
-  const workflowNodes = workflow?.spec?.nodes || [];
+  const workflowNodes = withDerivedNodeWarnings(workflow?.spec?.nodes || [], workflowEdges, components);
   const nodes =
     workflowNodes
       ?.map((node) => {
@@ -112,6 +122,82 @@ export function prepareData(
       })) || [];
 
   return { nodes, edges };
+}
+
+export function withDerivedNodeWarnings(
+  nodes: ComponentsNode[],
+  edges: ComponentsEdge[],
+  components: ActionsAction[],
+): ComponentsNode[] {
+  const nodesById = nodesByDefinedId(nodes);
+  const componentsByName = componentsByDefinedName(components);
+
+  return nodes.map((node) => {
+    if (
+      node.type !== "TYPE_ACTION" ||
+      node.warningMessage ||
+      hasValidIncomingConnection(node, edges, nodesById, componentsByName)
+    ) {
+      return node;
+    }
+
+    return {
+      ...node,
+      warningMessage: NO_INCOMING_CONNECTIONS_WARNING,
+    };
+  });
+}
+
+function hasValidIncomingConnection(
+  node: ComponentsNode,
+  edges: ComponentsEdge[],
+  nodesById: Map<string, ComponentsNode>,
+  componentsByName: Map<string, ActionsAction>,
+): boolean {
+  return edges.some((edge) => {
+    if (!node.id || edge.targetId !== node.id || !edge.sourceId) {
+      return false;
+    }
+
+    const sourceNode = nodesById.get(edge.sourceId);
+    if (!sourceNode) {
+      return false;
+    }
+
+    return getSourceOutputChannels(sourceNode, componentsByName).has(edge.channel || "default");
+  });
+}
+
+function getSourceOutputChannels(node: ComponentsNode, componentsByName: Map<string, ActionsAction>): Set<string> {
+  if (node.type !== "TYPE_ACTION") {
+    return new Set(["default"]);
+  }
+
+  const outputChannels = componentsByName
+    .get(node.component || "")
+    ?.outputChannels?.map((channel) => channel.name)
+    .filter((name): name is string => !!name);
+  return new Set(outputChannels?.length ? outputChannels : ["default"]);
+}
+
+function nodesByDefinedId(nodes: ComponentsNode[]): Map<string, ComponentsNode> {
+  const nodesById = new Map<string, ComponentsNode>();
+  for (const node of nodes) {
+    if (node.id) {
+      nodesById.set(node.id, node);
+    }
+  }
+  return nodesById;
+}
+
+function componentsByDefinedName(components: ActionsAction[]): Map<string, ActionsAction> {
+  const componentsByName = new Map<string, ActionsAction>();
+  for (const component of components) {
+    if (component.name) {
+      componentsByName.set(component.name, component);
+    }
+  }
+  return componentsByName;
 }
 
 export function prepareNode(
