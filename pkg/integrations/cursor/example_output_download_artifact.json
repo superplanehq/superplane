@@ -1,0 +1,10 @@
+{
+  "data": {
+    "agentId": "bc-00000000-0000-0000-0000-000000000001",
+    "path": "artifacts/screenshot.png",
+    "url": "https://cloud-agent-artifacts.s3.us-east-1.amazonaws.com/artifacts/screenshot.png?X-Amz-Expires=900",
+    "expiresAt": "2026-04-13T19:00:00.000Z"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cursor.downloadArtifact.result"
+}

@@ -2,6 +2,7 @@ package cursor
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -47,7 +48,7 @@ func (i *Cursor) Configuration() []configuration.Field {
 			Label:       "Cloud Agent API Key",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Required for launching AI Agents.",
+			Description: "Required for launching AI Agents and downloading agent artifacts.",
 			Required:    false,
 		},
 		{
@@ -96,6 +97,7 @@ func (i *Cursor) Actions() []core.Action {
 	return []core.Action{
 		&LaunchAgent{},
 		&GetDailyUsageData{},
+		&DownloadArtifact{},
 	}
 }
 
@@ -130,6 +132,62 @@ func (i *Cursor) ListResources(resourceType string, ctx core.ListResourcesContex
 				Type: "model",
 				ID:   model,
 				Name: model,
+			})
+		}
+
+		return resources, nil
+	}
+
+	if resourceType == "agent" {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+
+		agents, err := client.ListAgents(100)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(agents))
+		for _, agent := range agents {
+			name := agent.Name
+			if name == "" {
+				name = agent.ID
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: "agent",
+				ID:   agent.ID,
+				Name: name,
+			})
+		}
+
+		return resources, nil
+	}
+
+	if resourceType == "artifact" {
+		agentID := ctx.Parameters["agent"]
+		if agentID == "" || strings.Contains(agentID, "{{") {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+
+		artifacts, err := client.ListArtifacts(agentID)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(artifacts))
+		for _, artifact := range artifacts {
+			resources = append(resources, core.IntegrationResource{
+				Type: "artifact",
+				ID:   artifact.Path,
+				Name: artifact.Path,
 			})
 		}
 
