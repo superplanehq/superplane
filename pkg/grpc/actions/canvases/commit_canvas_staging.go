@@ -76,14 +76,8 @@ func CommitCanvasStaging(
 	// Verify if staged files are for the live version.
 	// Staged files for stale versions cannot be committed.
 	//
-	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to load live version")
-	}
-
-	baseVersionID := findStagingBaseVersionID(stagedFiles)
-	if baseVersionID != liveVersion.ID {
-		return nil, grpcerrors.FailedPrecondition(nil, "stale staging cannot be committed")
+	if err := ensureNotStaleStaging(db, canvas, stagedFiles); err != nil {
+		return nil, err
 	}
 
 	//
@@ -114,22 +108,27 @@ func CommitCanvasStaging(
 
 	var newLiveVersion *models.CanvasVersion
 	err = db.Transaction(func(tx *gorm.DB) error {
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+		if err != nil {
+			return grpcerrors.Internal(err, "failed to load live version")
+		}
+
+		if err := ensureNotStaleStaging(tx, canvas, stagedFiles); err != nil {
+			return err
+		}
 
 		//
 		// Create the new version, starting from the specs from the live version,
 		// and applying the spec operations on it.
 		//
-		nextVersion, err := CreateNewCanvasVersionFromLive(
+		nextVersion, err := createNewCanvasVersionFromLive(
 			ctx,
 			tx,
 			usageService,
-			encryptor,
 			registry,
 			organizationID,
 			canvas,
 			liveVersion,
-			webhookBaseURL,
-			authService,
 			specOps,
 			userID,
 			commitMessage,
@@ -404,17 +403,14 @@ func resolvedStagingCommitMessage(messages ...string) string {
 	return "Update files"
 }
 
-func CreateNewCanvasVersionFromLive(
+func createNewCanvasVersionFromLive(
 	ctx context.Context,
 	tx *gorm.DB,
 	usageService usage.Service,
-	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	organizationID string,
 	canvas *models.Canvas,
 	liveVersion *models.CanvasVersion,
-	webhookBaseURL string,
-	authService authorization.Authorization,
 	operations []*pb.CanvasRepositoryFileOperation,
 	userID uuid.UUID,
 	commitMessage string,
@@ -515,4 +511,18 @@ func injectMetadataIntoNodes(versionNodes []models.Node, proposedNodes []models.
 	}
 
 	return result
+}
+
+func ensureNotStaleStaging(db *gorm.DB, canvas *models.Canvas, stagedFiles []models.WorkflowStagedFile) error {
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	if err != nil {
+		return grpcerrors.Internal(err, "failed to load live version")
+	}
+
+	baseVersionID := findStagingBaseVersionID(stagedFiles)
+	if baseVersionID != liveVersion.ID {
+		return grpcerrors.FailedPrecondition(nil, "stale staging cannot be committed")
+	}
+
+	return nil
 }
