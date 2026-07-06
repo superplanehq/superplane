@@ -193,7 +193,7 @@ function useTimelineToggle(key: TimelineToggleKey, defaultOpen: boolean): [boole
 }
 
 /** Rail-column marker for a big event card: the source node icon in a ringed circle. */
-function CardMarker({ children }: { children: ReactNode }) {
+export function CardMarker({ children }: { children: ReactNode }) {
   return (
     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200">
       {children}
@@ -202,7 +202,7 @@ function CardMarker({ children }: { children: ReactNode }) {
 }
 
 /** One entry hanging off the shared vertical rail: a marker column plus the row/card content. */
-function EventRail({ marker, isLast, children }: { marker: ReactNode; isLast?: boolean; children: ReactNode }) {
+export function EventRail({ marker, isLast, children }: { marker: ReactNode; isLast?: boolean; children: ReactNode }) {
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
@@ -215,7 +215,7 @@ function EventRail({ marker, isLast, children }: { marker: ReactNode; isLast?: b
 }
 
 /** Merged status pill (colored dot + label) shown at the start of a card header. */
-function EventStatusPill({
+export function EventStatusPill({
   dotClassName,
   label,
   tone = "default",
@@ -246,7 +246,7 @@ function EventStatusPill({
  * collapsible ("Expand" opens the full Monaco modal); without one it renders as a clean
  * header-only "title box" for lifecycle-only events like Queued.
  */
-function PayloadEventCard({
+export function PayloadEventCard({
   kicker,
   status,
   sourceName,

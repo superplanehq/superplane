@@ -8,7 +8,6 @@ import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { formatRunDuration } from "@/ui/Runs/runSummary";
 import { Link, useParams } from "react-router-dom";
 import { isNormalClick } from "@/lib/linkHelpers";
-import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 interface RunRowProps {
   run: CanvasesCanvasRun;
@@ -36,13 +35,14 @@ export function RunRow({
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
   const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?run=${run.id}`) : "#";
   const duration = formatRunDuration(run);
+  const statusMeta = RUN_STATUS_META[status];
+  const StatusIcon = statusMeta.icon;
 
   return (
     <div
       data-testid="runs-sidebar-row"
       className={cn(
-        RUNS_SIDEBAR_ROW_CLASS,
-        "group relative w-full transition-colors",
+        "group relative flex w-full min-w-0 shrink-0 flex-col gap-1 border-b border-b-slate-950/10 px-3 py-2 transition-colors",
         isSelected ? "bg-sky-100" : "hover:bg-gray-50",
       )}
     >
@@ -57,27 +57,9 @@ export function RunRow({
         className="absolute inset-0 z-0"
         aria-label={title}
       />
-      <span className="pointer-events-none relative z-0 flex min-w-0 flex-1 items-center gap-1.5">
-        <RunNodeIcon
-          iconSrc={iconSrc}
-          iconSlug={iconSlug}
-          alt={triggerName}
-          size={RUN_NODE_ICON_SIZE}
-          className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-gray-800" : "text-gray-500")}
-        />
-        <span
-          aria-label={RUN_STATUS_META[status].label}
-          title={RUN_STATUS_META[status].label}
-          className={cn("inline-block h-2 w-2 shrink-0 rounded-full", RUN_STATUS_META[status].dotClassName)}
-        />
-        <span
-          className={cn(
-            "max-w-[35%] shrink-0 truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
-            isSelected ? "bg-sky-200 text-sky-800" : "bg-slate-100 text-slate-600",
-          )}
-        >
-          {triggerName}
-        </span>
+
+      {/* Top line: run title + status */}
+      <span className="pointer-events-none relative z-0 flex min-w-0 items-center gap-1.5">
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-xs",
@@ -86,20 +68,35 @@ export function RunRow({
         >
           {title}
         </span>
-      </span>
-      {duration ? (
         <span
-          className="pointer-events-none relative shrink-0 text-[11px] tabular-nums text-gray-600"
-          title="Run duration"
+          aria-label={statusMeta.label}
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset",
+            statusMeta.badgeClassName,
+          )}
         >
-          {duration}
+          <StatusIcon className="h-3 w-3" aria-hidden />
+          {statusMeta.label}
         </span>
-      ) : null}
-      {run.createdAt ? (
-        <span className="pointer-events-none relative shrink-0 text-xs tabular-nums text-gray-600">
-          <TimeAgo date={run.createdAt} />
+      </span>
+
+      {/* Second line: what triggered the run + timing */}
+      <span className="pointer-events-none relative z-0 flex min-w-0 items-center gap-1.5 text-[11px] text-gray-500">
+        <RunNodeIcon
+          iconSrc={iconSrc}
+          iconSlug={iconSlug}
+          alt={triggerName}
+          size={RUN_NODE_ICON_SIZE}
+          className="h-3.5 w-3.5 shrink-0 text-gray-400"
+        />
+        <span className="min-w-0 truncate" title={triggerName}>
+          {triggerName}
         </span>
-      ) : null}
+        <span className="ml-auto flex shrink-0 items-center gap-2 tabular-nums text-gray-500">
+          {duration ? <span title="Run duration">{duration}</span> : null}
+          {run.createdAt ? <TimeAgo date={run.createdAt} /> : null}
+        </span>
+      </span>
     </div>
   );
 }

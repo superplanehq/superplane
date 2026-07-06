@@ -15,7 +15,14 @@ import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RUN_NODE_ICON_SIZE, RunNodeIcon } from "./RunNodeIcon";
 import { RunStepConfigView } from "./RunStepConfigView";
-import { RunStepTimeline } from "./RunStepTimeline";
+import {
+  approvalEvents,
+  cursorAgentEvents,
+  githubEvents,
+  memoryEvents,
+  runBashEvents,
+} from "./storybooks/timelineGroupsFixtures";
+import { EventTimeline, type TimelineEvent } from "./storybooks/timelineGroupsModel";
 import { buildExecutionChain, eventBadgeForExecution, eventBadgeForTriggeredTrigger } from "./runNodeDetailModel";
 import { formatEventTimestamp, formatStepDuration, getStepActivity } from "./runSummary";
 
@@ -260,15 +267,100 @@ export function AccordionNodeDetail({
     return <RunStepConfigView nodeId={nodeId} workflowNodes={workflowNodes} componentIconMap={componentIconMap} />;
   }
 
+  // WIREFRAME PREVIEW (never merged to production): render the flat timeline-events
+  // design with mocked data instead of the real RunStepTimeline, so it can be reviewed
+  // inside the live-canvas run inspection panel. The scenario shape is picked by
+  // component type, but the *outcome* follows the node's real execution result: steps
+  // that errored render an error terminal instead of the mocked Output/Summary cards.
+  // `run` stays in the props contract but is unused by the mocked wireframe.
+  void run;
+  const component = (workflowNodes.find((node) => node.id === nodeId)?.component ?? "").toLowerCase();
+  const execution = executions.find((item) => item.nodeId === nodeId);
+  const base = pickWireframeScenario(component);
+  const wireframeEvents = executionErrored(execution) ? applyErrorTerminal(base, execution) : base;
+  return <EventTimeline events={wireframeEvents} />;
+}
+
+/** Whether a step's real execution resolved as an error (matching the app's own definition). */
+function executionErrored(execution?: CanvasesCanvasNodeExecution): boolean {
+  if (!execution) return false;
   return (
-    <RunStepTimeline
-      run={run}
-      nodeId={nodeId}
-      workflowNodes={workflowNodes}
-      componentIconMap={componentIconMap}
-      executions={executions}
-    />
+    execution.resultReason === "RESULT_REASON_ERROR" ||
+    (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED")
   );
+}
+
+/**
+ * Rewrites a scenario's tail so an errored step reads as a failure: the mocked terminal
+ * Output/Summary cards become an error card ("Error - Output not emitted", carrying the
+ * real message/reason), and the last running activity stops showing a success. A network
+ * line flips to a red error status/response; a plain success line (e.g. "exit 0",
+ * "Stored key …") is dropped so the error card speaks instead. Input/queue/config stay.
+ */
+function applyErrorTerminal(events: TimelineEvent[], execution?: CanvasesCanvasNodeExecution): TimelineEvent[] {
+  const message = execution?.resultMessage || "The step errored and did not emit an output.";
+  const withoutTerminal = events.filter(
+    (event) => !(event.type === "card" && (event.id === "output" || event.id === "summary" || event.id === "error")),
+  );
+
+  const lastActivity = lastActivityIndex(withoutTerminal);
+  const rewritten = withoutTerminal.flatMap((event, index) => {
+    if (index !== lastActivity) return [event];
+    if (event.type === "line" && event.line.request) {
+      return [
+        {
+          ...event,
+          line: {
+            ...event.line,
+            dotClassName: "bg-red-500",
+            request: {
+              ...event.line.request,
+              status: 500,
+              statusText: "Internal Server Error",
+              responseBody: { error: message },
+            },
+          },
+        } satisfies TimelineEvent,
+      ];
+    }
+    // A non-network success line (exit 0 / stored / etc.) would misrepresent the error, so drop it.
+    return [];
+  });
+
+  return [
+    ...rewritten,
+    {
+      type: "card",
+      id: "error",
+      card: {
+        kind: "error",
+        message,
+        reason: execution?.resultReason || "RESULT_REASON_ERROR",
+      },
+    },
+  ];
+}
+
+/**
+ * Index of the last "running result" activity in a scenario — the last network/line event
+ * or logs card, ignoring lifecycle markers (queue enter/exit, waiting) and payload cards.
+ */
+function lastActivityIndex(events: TimelineEvent[]): number {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type === "line" && !["q-enter", "q-exit", "waiting"].includes(event.id)) return index;
+    if (event.type === "card" && event.card.kind === "logs") return index;
+  }
+  return -1;
+}
+
+/** Maps a node's component to the mocked wireframe scenario shape (successful path). */
+function pickWireframeScenario(component: string): TimelineEvent[] {
+  if (component.includes("bash") || component.includes("runner")) return runBashEvents;
+  if (component.includes("agent") || component.includes("cursor")) return cursorAgentEvents;
+  if (component.includes("memory")) return memoryEvents;
+  if (component.includes("github")) return githubEvents;
+  return approvalEvents;
 }
 
 /**
