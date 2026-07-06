@@ -141,7 +141,7 @@ function DotMarker({ className }: { className: string }) {
 
 /** A terminal-styled logs card (static output for the wireframe). */
 function LogsCard({ card }: { card: Extract<TimelineCardEvent, { kind: "logs" }> }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <div className="overflow-hidden rounded border border-slate-200 bg-white">
       <div className="flex items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
@@ -167,20 +167,28 @@ function LogsCard({ card }: { card: Extract<TimelineCardEvent, { kind: "logs" }>
   );
 }
 
+/** Payload card that starts collapsed (header only); the parent-controlled open state defers expansion to a click. */
+function CollapsedPayloadCard({ card }: { card: Extract<TimelineCardEvent, { kind: "payload" }> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <PayloadEventCard
+      kicker={card.kicker}
+      status={card.status}
+      sourceName={card.sourceName}
+      sourceTrailing={card.sourceTrailing}
+      meta={card.meta}
+      open={open}
+      onToggleOpen={() => setOpen((value) => !value)}
+      payload={card.payload}
+      modalNodeName={card.nodeName}
+      modalNodeIcon={card.nodeIcon}
+    />
+  );
+}
+
 function CardEventView({ card }: { card: TimelineCardEvent }) {
   if (card.kind === "payload") {
-    return (
-      <PayloadEventCard
-        kicker={card.kicker}
-        status={card.status}
-        sourceName={card.sourceName}
-        sourceTrailing={card.sourceTrailing}
-        meta={card.meta}
-        payload={card.payload}
-        modalNodeName={card.nodeName}
-        modalNodeIcon={card.nodeIcon}
-      />
-    );
+    return <CollapsedPayloadCard card={card} />;
   }
   if (card.kind === "summary") {
     return (
@@ -372,9 +380,66 @@ function LineEventRow({ line }: { line: TimelineLine }) {
   );
 }
 
+/**
+ * Lucide `square-arrow-right-enter` / `square-arrow-right-exit` (added after our installed
+ * lucide-react version), inlined here for the wireframe to mark Input (triggered) and
+ * Output (finished) events without upgrading the shared dependency.
+ */
+function SquareArrowRightEnterIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="m10 16 4-4-4-4" />
+      <path d="M3 12h11" />
+      <path d="M3 8V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3" />
+    </svg>
+  );
+}
+
+function SquareArrowRightExitIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M10 12h11" />
+      <path d="m17 16 4-4-4-4" />
+      <path d="M21 6.344V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-1.344" />
+    </svg>
+  );
+}
+
 /** Rail marker for a card event: an icon (payload) or a status dot (summary/logs) in a ring. */
 function cardMarker(card: TimelineCardEvent): ReactNode {
-  if (card.kind === "payload") return <CardMarker>{card.nodeIcon}</CardMarker>;
+  if (card.kind === "payload") {
+    // Input (triggered) and Output (finished) events read as enter/exit arrows; other
+    // payload cards (e.g. Runtime Config) keep the component icon.
+    const icon =
+      card.kicker === "Input" ? (
+        <SquareArrowRightEnterIcon className="h-3.5 w-3.5" />
+      ) : card.kicker === "Output" ? (
+        <SquareArrowRightExitIcon className="h-3.5 w-3.5" />
+      ) : (
+        card.nodeIcon
+      );
+    return <CardMarker>{icon}</CardMarker>;
+  }
   if (card.kind === "error") {
     return (
       <CardMarker>
@@ -406,14 +471,19 @@ function EventRow({ event, isLast }: { event: TimelineEvent; isLast?: boolean })
   );
 }
 
+/** Line-event ids for queue lifecycle transitions, which we don't surface in the timeline. */
+const QUEUE_LINE_IDS = new Set(["q-enter", "q-exit"]);
+
 export function EventTimeline({ events }: { events: TimelineEvent[] }) {
+  // Queueing (enter/exit queue) is noise for this view, so it's dropped from the feed.
+  const visible = events.filter((event) => !(event.type === "line" && QUEUE_LINE_IDS.has(event.id)));
   // The run summary is pinned to the top (before the timeline), not left as a terminal
   // feed item; everything else renders as the flat event feed below it.
-  const summary = events.find(
+  const summary = visible.find(
     (event): event is Extract<TimelineEvent, { type: "card" }> =>
       event.type === "card" && event.card.kind === "summary",
   );
-  const feed = summary ? events.filter((event) => event !== summary) : events;
+  const feed = summary ? visible.filter((event) => event !== summary) : visible;
 
   return (
     <div className="bg-slate-50 px-3 py-3">
