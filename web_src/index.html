@@ -10,6 +10,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 
     <script>
+      (function () {
+        var storageKey = "superplane-theme";
+        var preference = "system";
+        try {
+          var stored = localStorage.getItem(storageKey);
+          if (stored === "light" || stored === "dark" || stored === "system") {
+            preference = stored;
+          }
+        } catch (e) {}
+        var prefersDark =
+          preference === "dark" ||
+          (preference === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.style.colorScheme = prefersDark ? "dark" : "light";
+        if (prefersDark) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+
+    <script>
       window.SUPERPLANE_SENTRY_DSN = "{{ .SentryDSN }}";
       window.SUPERPLANE_SENTRY_ENVIRONMENT = "{{ .SentryEnvironment }}";
       window.SUPERPLANE_POSTHOG_KEY = "{{ .PostHogKey }}";

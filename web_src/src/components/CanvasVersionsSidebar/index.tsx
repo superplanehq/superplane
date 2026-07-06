@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { useVersionsSidebarWidth } from "./useVersionsSidebarWidth";
 
 export interface CanvasVersionsSidebarProps {
@@ -18,7 +19,10 @@ export function CanvasVersionsSidebar({ isOpen, children }: CanvasVersionsSideba
     <aside
       ref={sidebarRef}
       data-testid="canvas-versions-sidebar"
-      className="relative z-21 flex h-full min-w-0 shrink-0 flex-col overflow-hidden border-r border-border bg-white"
+      className={cn(
+        "relative z-21 flex h-full min-w-0 shrink-0 flex-col overflow-hidden border-r bg-white dark:bg-gray-900",
+        appDarkModeClasses.sidebarEdge,
+      )}
       style={{ width, maxWidth: width }}
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
@@ -31,8 +35,8 @@ export function CanvasVersionsSidebar({ isOpen, children }: CanvasVersionsSideba
         <div
           aria-hidden
           className={cn(
-            "pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50",
-            isResizing && "bg-slate-950/50",
+            "pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-500/50",
+            isResizing && "bg-slate-950/50 dark:bg-gray-500/50",
           )}
         />
       </div>

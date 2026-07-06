@@ -96,8 +96,15 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 vi.mock("@/hooks/useCanvasData", () => ({
-  CANVAS_FOLDER_COLORS: ["blue", "green", "purple", "yellow", "slate", "orange"],
+  CANVAS_FOLDER_COLORS: ["blue", "green", "purple", "slate", "orange"],
   DEFAULT_CANVAS_FOLDER_COLOR: "blue",
+  normalizeCanvasFolderColor: (value?: string) => {
+    if (value === "yellow") {
+      return "slate";
+    }
+
+    return ["blue", "green", "purple", "slate", "orange"].includes(value || "") ? value : "blue";
+  },
   canvasKeys: {
     detail: (organizationId: string, canvasId: string) => ["canvases", "detail", organizationId, canvasId],
     list: (organizationId: string) => ["canvases", "list", organizationId],
@@ -295,6 +302,7 @@ describe("HomePage canvas folders", () => {
 
     const pinnedSection = screen.getByRole("heading", { name: "Pinned" }).closest("section")!;
     const deploymentsSection = screen.getByText("Deployments").closest("section")!;
+    expect(pinnedSection).toHaveClass("dark:bg-white/5");
     expect(within(pinnedSection).getByText("Z Free Canvas")).toBeInTheDocument();
     expect(within(deploymentsSection).getByText("Z Free Canvas")).toBeInTheDocument();
     expect(
@@ -346,7 +354,7 @@ describe("HomePage canvas folders", () => {
     renderHome();
     await user.click(screen.getByLabelText("Folder actions"));
     await user.hover(screen.getByText("Background"));
-    fireEvent.click(await screen.findByLabelText("purple folder color"));
+    fireEvent.click(await screen.findByLabelText("violet folder color"));
 
     await waitFor(() => {
       expect(mutationMocks.updateCanvasFolder).toHaveBeenCalledWith({

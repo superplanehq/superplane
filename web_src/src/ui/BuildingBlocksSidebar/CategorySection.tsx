@@ -57,7 +57,7 @@ function renderCategoryIcon(
     return <img src={categoryIconSrc} alt={categoryName} className="size-4" />;
   }
   if (CategoryIcon) {
-    return <CategoryIcon size={14} className="text-gray-500" />;
+    return <CategoryIcon size={14} className="text-gray-500 dark:text-gray-400" />;
   }
   return null;
 }
@@ -91,7 +91,7 @@ const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProp
         {appIconSrc ? (
           <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
         ) : (
-          <IconComponent size={14} className="text-gray-500" />
+          <IconComponent size={14} className="text-gray-500 dark:text-gray-400" />
         )}
       </ItemMedia>
 
@@ -170,7 +170,7 @@ export function CategorySection({
         <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
           <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
           {renderCategoryIcon(categoryIconSrc, category.name, CategoryIcon)}
-          <span className="text-[13px] text-gray-800 font-medium pl-1">{category.name}</span>
+          <span className="text-[13px] text-gray-800 font-medium pl-1 dark:text-gray-100">{category.name}</span>
         </span>
         {showIntegrationSetupStatus && (
           <span className="relative z-10 shrink-0 bg-white dark:bg-gray-900 pl-3">

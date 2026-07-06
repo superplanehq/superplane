@@ -2116,7 +2116,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260706145437	f
+20260706145438	f
 \.
 
 

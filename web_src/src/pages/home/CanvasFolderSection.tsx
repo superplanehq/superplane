@@ -17,7 +17,7 @@ import {
 } from "react";
 import { CanvasFolderActionsMenu } from "./CanvasFolderActionsMenu";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
-import { FOLDER_COLOR_OPTIONS, CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
+import { FOLDER_COLOR_OPTIONS, CANVAS_FOLDER_SECTION_SHELL_CLASS, folderColorStyles } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 
 interface CanvasFolderSectionProps {
@@ -81,6 +81,8 @@ function CanvasFolderTitle({
   isSubmittingRenameRef,
   ignoreBlurUntilRef,
 }: CanvasFolderTitleProps) {
+  const colorStyles = folderColorStyles(folder.backgroundColor);
+
   const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -96,7 +98,7 @@ function CanvasFolderTitle({
 
   if (!canUpdateCanvases) {
     return (
-      <Heading level={3} className="mb-0 truncate !text-base font-medium text-white">
+      <Heading level={3} className={cn("mb-0 truncate !text-base font-medium", colorStyles.foregroundClass)}>
         {folder.title}
       </Heading>
     );
@@ -122,7 +124,7 @@ function CanvasFolderTitle({
         aria-label="Folder name"
         maxLength={128}
         disabled={isPending}
-        className="h-6 max-w-[320px] border-white/50 bg-white/5 px-1 text-base font-medium text-white shadow-none placeholder:text-white/60 focus-visible:border-white/60"
+        className={cn("h-6 max-w-[320px] px-1 text-base font-medium shadow-none", colorStyles.renameInputClass)}
       />
     );
   }
@@ -133,10 +135,13 @@ function CanvasFolderTitle({
         <button
           type="button"
           onClick={onStartRenaming}
-          className="flex h-6 max-w-xl items-center rounded-md border border-transparent px-1 text-left transition hover:border-white/25 hover:bg-white/5"
+          className={cn(
+            "flex h-6 max-w-xl items-center rounded-md border border-transparent px-1 text-left transition",
+            colorStyles.headerInteractiveClass,
+          )}
           aria-label={`Rename folder ${folder.title}`}
         >
-          <span className="truncate text-base font-medium text-white">{folder.title}</span>
+          <span className={cn("truncate text-base font-medium", colorStyles.foregroundClass)}>{folder.title}</span>
         </button>
       </TooltipTrigger>
       <TooltipContent>Rename</TooltipContent>
@@ -262,16 +267,23 @@ export function CanvasFolderSection({
           permissionsLoading={permissionsLoading}
         />
       ) : folder.canvasIds.length === 0 ? (
-        <EmptyCanvasFolder />
+        <EmptyCanvasFolder backgroundColor={folder.backgroundColor} />
       ) : null}
     </section>
   );
 }
 
-function EmptyCanvasFolder() {
+function EmptyCanvasFolder({ backgroundColor }: { backgroundColor: CanvasFolderData["backgroundColor"] }) {
+  const colorStyles = folderColorStyles(backgroundColor);
+
   return (
-    <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-md px-4 py-8 text-center text-[13px] font-medium text-white/80">
-      <FolderOpen size={18} className="text-white/80" />
+    <div
+      className={cn(
+        "flex min-h-40 flex-col items-center justify-center gap-2 rounded-md px-4 py-8 text-center text-[13px] font-medium",
+        colorStyles.foregroundMutedClass,
+      )}
+    >
+      <FolderOpen size={18} className={colorStyles.foregroundMutedClass} />
       <span>No canvases in this folder</span>
     </div>
   );

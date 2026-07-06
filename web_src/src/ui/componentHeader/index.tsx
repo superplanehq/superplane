@@ -1,4 +1,5 @@
 import { cn, resolveIcon } from "@/lib/utils";
+import { resolveNodeIconColorClass } from "@/lib/colors";
 import React from "react";
 import { toTestId } from "../../lib/testID";
 import type { ComponentActionsProps } from "../types/componentActions";
@@ -32,7 +33,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
       data-view-mode={isCompactView ? "compact" : "expanded"}
       className={
         "canvas-node-drag-handle text-left text-lg w-full px-2 py-1.5 flex items-center flex-col rounded-t-md items-center relative" +
-        (isCompactView || mergeWithMutedBodyBelow ? "" : " border-b border-slate-950/20")
+        (isCompactView || mergeWithMutedBodyBelow ? "" : " border-b border-slate-950/20 dark:border-gray-600/70")
       }
     >
       <div className="flex w-full items-center justify-between">
@@ -45,7 +46,12 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
                 className={cn("h-4 w-4 shrink-0 object-contain", mergeWithMutedBodyBelow && "opacity-70")}
               />
             ) : (
-              <Icon size={16} className={mergeWithMutedBodyBelow ? "text-slate-500 dark:text-slate-400" : iconColor} />
+              <Icon
+                size={16}
+                className={
+                  mergeWithMutedBodyBelow ? "text-slate-500 dark:text-slate-400" : resolveNodeIconColorClass(iconColor)
+                }
+              />
             )}
           </div>
           <h2 className={cn("text-sm font-semibold", mergeWithMutedBodyBelow && "text-slate-500 dark:text-slate-400")}>

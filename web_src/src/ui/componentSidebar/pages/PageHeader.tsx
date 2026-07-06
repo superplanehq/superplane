@@ -19,7 +19,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ onBackToOverview, compac
         onClick={onBackToOverview}
         className={cn(
           RUNS_SIDEBAR_ROW_CLASS,
-          "w-full shrink-0 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800",
+          "w-full shrink-0 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
         )}
       >
         <ArrowLeft className="h-3.5 w-3.5 shrink-0" />

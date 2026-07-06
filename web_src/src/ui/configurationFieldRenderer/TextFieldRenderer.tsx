@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Textarea } from "@/components/ui/textarea";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { toTestId } from "@/lib/testID";
+import { useTheme } from "@/contexts/useTheme";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
@@ -114,6 +115,8 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
 }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
     autocompleteExampleObj,
     languageId: language,
@@ -135,7 +138,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
   return (
     <>
       <div className="flex flex-col gap-2 relative">
-        <div className="border rounded-md border-gray-300 dark:border-gray-700 p-1" style={{ height: "200px" }}>
+        <div className="border rounded-md border-gray-300 dark:border-gray-600 p-1" style={{ height: "200px" }}>
           <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
             <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
               <button onClick={copyToClipboard} className="p-1 rounded text-gray-500 hover:text-gray-800">
@@ -154,7 +157,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
             value={editorValue}
             onChange={handleEditorChange}
             onMount={handleEditorMount}
-            theme="vs"
+            theme={monacoTheme}
             options={CODE_EDITOR_OPTIONS}
           />
         </div>
@@ -167,7 +170,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
           className="flex flex-col gap-0 overflow-hidden p-0"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 pr-12 dark:border-gray-700">
+          <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 pr-12 dark:border-gray-600">
             <DialogTitle>{field.label || field.name}</DialogTitle>
             <DialogDescription className="sr-only">
               Expanded text editor for {field.label || field.name}.
@@ -192,7 +195,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
               value={editorValue}
               onChange={handleEditorChange}
               onMount={handleEditorMount}
-              theme="vs"
+              theme={monacoTheme}
               options={{
                 ...CODE_EDITOR_OPTIONS,
                 automaticLayout: true,

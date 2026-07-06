@@ -24,7 +24,9 @@ export function RunsToolbar({
 }: RunsToolbarProps) {
   return (
     <div className={cn(RUNS_SIDEBAR_ROW_CLASS, "justify-between pr-1.5")}>
-      <span className="min-w-0 truncate text-[11px] font-medium uppercase tracking-wide text-gray-500">Runs</span>
+      <span className="min-w-0 truncate text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        Runs
+      </span>
       <RunFiltersPopover
         selectedStatuses={selectedStatuses}
         selectedTriggerIds={selectedTriggerIds}

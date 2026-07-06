@@ -34,9 +34,10 @@ const FILES_TAB = "files";
 const BASE_TAB_CLASSES =
   "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50";
 
-const ACTIVE_CLASSES = "bg-background text-foreground shadow-sm";
-const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground";
-const EDITING_ACTIVE_CLASSES = "rounded-full bg-white text-slate-900 shadow-sm";
+const ACTIVE_CLASSES = "bg-slate-300 text-slate-950 shadow-sm dark:bg-gray-400 dark:text-gray-950 dark:shadow-none";
+const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground dark:text-gray-400 dark:hover:text-gray-100";
+const EDITING_ACTIVE_CLASSES =
+  "rounded-full bg-white text-slate-900 shadow-sm dark:bg-gray-700 dark:text-gray-100 dark:shadow-none";
 
 const MODE_TO_TAB: Record<string, string> = {
   console: CONSOLE_TAB,
@@ -58,16 +59,18 @@ function modeToTab(mode: string): string {
 
 /** Edit-mode nav background tinted to match the draft status badges. */
 function editingNavClassName(tone: DraftEditTabTone): string {
-  if (tone === "uncommitted") return "bg-orange-50";
-  if (tone === "ready") return "bg-blue-50";
-  return "bg-slate-100";
+  if (tone === "uncommitted") return "bg-orange-50 dark:bg-gray-800";
+  if (tone === "ready") return "bg-blue-50 dark:bg-gray-800";
+  return "bg-slate-100 dark:bg-gray-800";
 }
 
-/** Edit-mode inactive tab text tinted to match the draft status badges. */
+/** Edit-mode inactive tab text — light tints match draft badges; dark mode stays gray. */
 function editingInactiveClassName(tone: DraftEditTabTone): string {
-  if (tone === "uncommitted") return "bg-transparent text-orange-800/80 hover:text-orange-900 transition-none";
-  if (tone === "ready") return "bg-transparent text-blue-800/80 hover:text-blue-900 transition-none";
-  return "bg-transparent text-slate-600 hover:text-slate-900 transition-none";
+  if (tone === "uncommitted")
+    return "bg-transparent text-orange-800/80 hover:text-orange-900 transition-none dark:text-gray-400 dark:hover:text-gray-100";
+  if (tone === "ready")
+    return "bg-transparent text-blue-800/80 hover:text-blue-900 transition-none dark:text-gray-400 dark:hover:text-gray-100";
+  return "bg-transparent text-slate-600 hover:text-slate-900 transition-none dark:text-gray-400 dark:hover:text-gray-100";
 }
 
 function tabClasses(selected: string, value: string, editing: boolean, tone: DraftEditTabTone) {
@@ -110,7 +113,7 @@ export function CanvasModeToggle({
       aria-label="Canvas view"
       className={cn(
         "inline-flex h-7 min-h-7 items-center justify-center gap-0 rounded-full p-1",
-        editing ? editingNavClassName(editTabTone) : "bg-slate-100",
+        editing ? editingNavClassName(editTabTone) : "bg-slate-100 dark:bg-gray-800",
       )}
     >
       <Link
