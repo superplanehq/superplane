@@ -165,35 +165,45 @@ export function HtmlPanelEditor({
           onToggleCollapsed={toggleVariablesCollapsed}
         />
       </div>
-      <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5 dark:border-gray-800 dark:bg-gray-800/50">
-        {saveError ? (
-          <span
-            className="text-[11px] text-red-600 dark:text-red-400"
-            role="alert"
-            data-testid="console-html-save-error"
-          >
-            {saveError}
-          </span>
-        ) : (
-          <span className="text-[11px] text-slate-500 dark:text-gray-400">
-            <kbd className="rounded border border-slate-200 bg-white px-1 font-mono dark:border-gray-600 dark:bg-gray-900">
-              Esc
-            </kbd>{" "}
-            cancel &middot;{" "}
-            <kbd className="rounded border border-slate-200 bg-white px-1 font-mono dark:border-gray-600 dark:bg-gray-900">
-              Cmd+Enter
-            </kbd>{" "}
-            save
-          </span>
-        )}
-        <div className="flex items-center gap-1">
-          <Button type="button" size="sm" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="button" size="sm" onClick={onCommit} data-testid="console-html-save">
-            Save
-          </Button>
-        </div>
+      <HtmlEditorFooter saveError={saveError} onCancel={onCancel} onCommit={onCommit} />
+    </div>
+  );
+}
+
+function HtmlEditorFooter({
+  saveError,
+  onCancel,
+  onCommit,
+}: {
+  saveError?: string | null;
+  onCancel: () => void;
+  onCommit: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5 dark:border-gray-800 dark:bg-gray-800/50">
+      {saveError ? (
+        <span className="text-[11px] text-red-600 dark:text-red-400" role="alert" data-testid="console-html-save-error">
+          {saveError}
+        </span>
+      ) : (
+        <span className="text-[11px] text-slate-500 dark:text-gray-400">
+          <kbd className="rounded border border-slate-200 bg-white px-1 font-mono dark:border-gray-600 dark:bg-gray-900">
+            Esc
+          </kbd>{" "}
+          cancel &middot;{" "}
+          <kbd className="rounded border border-slate-200 bg-white px-1 font-mono dark:border-gray-600 dark:bg-gray-900">
+            Cmd+Enter
+          </kbd>{" "}
+          save
+        </span>
+      )}
+      <div className="flex items-center gap-1">
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="button" size="sm" onClick={onCommit} data-testid="console-html-save">
+          Save
+        </Button>
       </div>
     </div>
   );

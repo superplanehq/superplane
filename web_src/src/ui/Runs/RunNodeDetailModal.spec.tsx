@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { RunNodeDetailModal } from "./RunNodeDetailModal";
 
 vi.mock("@uiw/react-json-view", () => ({
@@ -69,6 +70,7 @@ describe("RunNodeDetailModal", () => {
         workflowNodes={workflowNodes}
         onClose={vi.fn()}
       />,
+      { wrapper: ThemeProvider },
     );
 
     const link = screen.getByRole("link", { name: "https://semaphore.example/workflows/123" });
