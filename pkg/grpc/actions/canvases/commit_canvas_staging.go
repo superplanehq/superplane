@@ -112,7 +112,7 @@ func CommitCanvasStaging(
 	}
 
 	var newLiveVersion *models.CanvasVersion
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 
 		//
 		// Create the new version, starting from the specs from the live version,
@@ -120,7 +120,7 @@ func CommitCanvasStaging(
 		//
 		nextVersion, err := CreateNewCanvasVersionFromLive(
 			ctx,
-			db,
+			tx,
 			usageService,
 			encryptor,
 			registry,
@@ -143,7 +143,7 @@ func CommitCanvasStaging(
 		//
 		// Make the new version live.
 		//
-		publishErr := publishCanvasVersionInTransaction(
+		err = publishCanvasVersionInTransaction(
 			ctx,
 			tx,
 			liveVersion,
@@ -158,17 +158,16 @@ func CommitCanvasStaging(
 			},
 		)
 
-		if publishErr != nil {
-			if len(gitRevertOps) > 0 {
-				if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userID.String(), gitRevertOps); revertErr != nil {
-					log.Errorf("failed to revert git commit after publish failure for canvas %s: %v", canvasID, revertErr)
-				}
-			}
-			return publishErr
+		if err != nil {
+			return err
 		}
 
-		if discardErr := models.DiscardStagedFilesForUser(tx, canvas.ID, userID, nil); discardErr != nil {
-			return discardErr
+		//
+		// Remove staged files for user.
+		//
+		err = models.DiscardStagedFilesForUser(tx, canvas.ID, userID, nil)
+		if err != nil {
+			return err
 		}
 
 		newLiveVersion = nextVersion
@@ -188,6 +187,7 @@ func CommitCanvasStaging(
 		if grpcerrors.Code(err) != codes.Unknown {
 			return nil, err
 		}
+
 		return nil, grpcerrors.Internal(err, "failed to commit staging")
 	}
 
