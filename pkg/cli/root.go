@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	apps "github.com/superplanehq/superplane/pkg/cli/commands/apps"
-	drafts "github.com/superplanehq/superplane/pkg/cli/commands/apps/drafts"
 	executions "github.com/superplanehq/superplane/pkg/cli/commands/executions"
 	groups "github.com/superplanehq/superplane/pkg/cli/commands/groups"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
@@ -60,7 +59,6 @@ func init() {
 
 	options := defaultBindOptions()
 	RootCmd.AddCommand(apps.NewCommand(options))
-	RootCmd.AddCommand(drafts.NewCommand(options))
 	RootCmd.AddCommand(executions.NewCommand(options))
 	RootCmd.AddCommand(runs.NewCommand(options))
 	RootCmd.AddCommand(groups.NewCommand(options))

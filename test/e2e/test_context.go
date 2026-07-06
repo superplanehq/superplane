@@ -243,11 +243,6 @@ func (s *TestContext) NewSession(t *testing.T) *session.TestSession {
 	p.OnResponse(func(resp pw.Response) {
 		if status := resp.Status(); status >= 400 {
 			t.Logf("[Browser Logs] %d %s", status, resp.URL())
-			if strings.Contains(resp.URL(), "/repository/commits") {
-				if body, err := resp.Text(); err == nil && body != "" {
-					t.Logf("[Browser Logs] response body: %s", body)
-				}
-			}
 		}
 	})
 

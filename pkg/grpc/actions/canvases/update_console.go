@@ -3,14 +3,13 @@ package canvases
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
@@ -24,6 +23,7 @@ func UpdateConsole(
 	modelPanels []models.ConsolePanel,
 	modelLayout []models.ConsoleLayoutItem,
 	discardStaging bool,
+	commitTarget bool,
 ) (*models.CanvasVersion, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
@@ -55,7 +55,7 @@ func UpdateConsole(
 
 	var newVersion *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		resolvedVersionID, resolveErr := resolveConsoleVersionID(tx, canvas, strings.TrimSpace(versionID))
+		resolvedVersionID, resolveErr := resolveLiveCanvasVersionID(tx, canvas, versionID)
 		if resolveErr != nil {
 			return resolveErr
 		}
@@ -68,7 +68,7 @@ func UpdateConsole(
 			return loadErr
 		}
 
-		if err := ensureVersionIsOwnedRegisteredDraft(userUUID, version); err != nil {
+		if err := ensureVersionIsEditable(userUUID, canvas, version, commitTarget); err != nil {
 			return err
 		}
 
@@ -80,7 +80,7 @@ func UpdateConsole(
 		newVersion = v
 
 		if discardStaging {
-			return models.DiscardWorkflowStagingInTransaction(tx, version.ID, nil)
+			return models.DiscardStagedFilesForUser(tx, canvas.ID, userUUID, nil)
 		}
 
 		return nil
@@ -94,8 +94,8 @@ func UpdateConsole(
 		return nil, grpcerrors.Internal(err, "failed to update console")
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), newVersion.ID.String()).PublishVersionUpdated(); err != nil {
-		log.Errorf("failed to publish canvas version update RabbitMQ message: %v", err)
+	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), organizationID).PublishUpdated(); err != nil {
+		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
 
 	return newVersion, nil

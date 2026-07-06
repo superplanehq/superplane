@@ -23,11 +23,20 @@ type groupResource struct {
 	Spec       *openapi_client.GroupsGroupSpec     `json:"spec,omitempty"`
 }
 
-func parseGroupFile(path string) (*groupResource, error) {
-	// #nosec
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read resource file: %w", err)
+func parseGroupInput(path string, stdin io.Reader) (*groupResource, error) {
+	var data []byte
+	var err error
+	if path == "-" {
+		data, err = io.ReadAll(stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read from stdin: %w", err)
+		}
+	} else {
+		// #nosec
+		data, err = os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read resource file: %w", err)
+		}
 	}
 
 	apiVersion, kind, err := core.ParseYamlResourceHeaders(data)

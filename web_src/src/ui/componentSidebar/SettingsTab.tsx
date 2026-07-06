@@ -7,7 +7,6 @@ import type {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -55,8 +54,6 @@ interface SettingsTabProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
-  /** Canvas uses debounced autosave without a footer Save; Custom Component Builder keeps explicit Save. */
-  configurationSaveMode?: "manual" | "auto";
 }
 
 function buildAutosaveSnapshot(
@@ -98,11 +95,9 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
-  configurationSaveMode = "manual",
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
-  const showManualSaveFooter = configurationSaveMode !== "auto" && !isReadOnly;
   const allowIntegrations = canReadIntegrations ?? true;
   const allowCreateIntegrations = canCreateIntegrations ?? true;
   const allowUpdateIntegrations = canUpdateIntegrations ?? true;
@@ -111,7 +106,6 @@ export function SettingsTab({
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
-  const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
@@ -319,20 +313,11 @@ export function SettingsTab({
     pendingAutosaveSnapshotRef.current = null;
   }, []);
 
-  const queuePendingAutosave = useCallback(
-    (snapshot: string) => {
-      if (configurationSaveMode === "auto") {
-        pendingAutosaveSnapshotRef.current = snapshot;
-      }
-    },
-    [configurationSaveMode],
-  );
+  const queuePendingAutosave = useCallback((snapshot: string) => {
+    pendingAutosaveSnapshotRef.current = snapshot;
+  }, []);
 
   const flushPendingAutosave = useCallback(() => {
-    if (configurationSaveMode !== "auto") {
-      return;
-    }
-
     const pendingSnapshot = pendingAutosaveSnapshotRef.current;
     if (!pendingSnapshot || pendingSnapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
@@ -343,7 +328,7 @@ export function SettingsTab({
     window.setTimeout(() => {
       void handleSaveRef.current();
     }, 0);
-  }, [configurationSaveMode]);
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (isReadOnly) {
@@ -351,14 +336,13 @@ export function SettingsTab({
     }
 
     const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
-    if (configurationSaveMode === "auto" && snapshot === autosaveBaselineSnapshotRef.current) {
+    if (snapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
       return;
     }
 
-    // Always run validation for UI feedback; only gate persistence in manual mode.
-    const isValid = validateNow();
-    if (currentNodeName.trim() === "" || (configurationSaveMode !== "auto" && !isValid)) {
+    validateNow();
+    if (currentNodeName.trim() === "") {
       return;
     }
 
@@ -374,13 +358,11 @@ export function SettingsTab({
     }
 
     savingRef.current = true;
-    setIsSaving(true);
     try {
       await result;
       updateAutosaveBaseline(snapshot);
     } finally {
       savingRef.current = false;
-      setIsSaving(false);
       flushPendingAutosave();
     }
   }, [
@@ -388,7 +370,6 @@ export function SettingsTab({
     validateNow,
     currentNodeName,
     selectedIntegration,
-    configurationSaveMode,
     nodeConfiguration,
     onSave,
     queuePendingAutosave,
@@ -400,7 +381,7 @@ export function SettingsTab({
   handleSaveRef.current = handleSave;
 
   const requestAutosave = useCallback(() => {
-    if (configurationSaveMode !== "auto" || isReadOnly) {
+    if (isReadOnly) {
       return;
     }
 
@@ -411,21 +392,21 @@ export function SettingsTab({
       autosaveTimerRef.current = null;
       void handleSaveRef.current();
     }, 300);
-  }, [configurationSaveMode, isReadOnly]);
+  }, [isReadOnly]);
 
   // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
   useEffect(() => {
-    if (configurationSaveMode !== "auto") {
-      return;
-    }
     return () => {
+      if (isReadOnly) {
+        return;
+      }
       if (autosaveTimerRef.current !== null) {
         window.clearTimeout(autosaveTimerRef.current);
         autosaveTimerRef.current = null;
       }
       void handleSaveRef.current();
     };
-  }, [configurationSaveMode]);
+  }, [isReadOnly]);
 
   useEffect(() => {
     return () => {
@@ -436,7 +417,7 @@ export function SettingsTab({
   }, []);
 
   useEffect(() => {
-    if (configurationSaveMode !== "auto" || isReadOnly) {
+    if (isReadOnly) {
       return;
     }
     const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
@@ -455,7 +436,7 @@ export function SettingsTab({
     return () => {
       window.clearTimeout(fallbackTimer);
     };
-  }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
 
   const configurationDisplayModel = useMemo(
     () =>
@@ -493,12 +474,9 @@ export function SettingsTab({
 
   return (
     <div
-      className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`}
+      className="p-4 pb-24 overflow-y-auto overflow-x-hidden"
       style={{ maxHeight: "80vh" }}
       onBlurCapture={(event) => {
-        if (configurationSaveMode !== "auto") {
-          return;
-        }
         const target = event.target as HTMLElement | null;
         if (!target) {
           return;
@@ -799,20 +777,6 @@ export function SettingsTab({
           </div>
         )}
       </div>
-
-      {showManualSaveFooter ? (
-        <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <LoadingButton
-            data-testid="save-node-button"
-            variant="default"
-            onClick={handleSave}
-            loading={isSaving}
-            loadingText="Saving..."
-          >
-            Save
-          </LoadingButton>
-        </div>
-      ) : null}
     </div>
   );
 }

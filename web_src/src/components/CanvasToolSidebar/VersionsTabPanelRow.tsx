@@ -1,9 +1,9 @@
 import type { CanvasesCanvasVersion } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
+import { Timestamp } from "@/components/Timestamp";
 import { cn } from "@/lib/utils";
 import { useCallback } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { formatVersionLabel, formatVersionTimestamp } from "@/pages/app/lib/canvas-versions";
+import { formatVersionLabel } from "@/pages/app/lib/canvas-versions";
 import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
 
 export function VersionRow({
@@ -66,7 +66,13 @@ export function VersionRow({
       ) : null}
       <span className="max-w-[40%] shrink-0 truncate text-[11px] text-slate-500">{ownerName}</span>
       {timestamp ? (
-        <TimeAgo date={timestamp} includeAgo={false} className="shrink-0 text-xs tabular-nums text-slate-500" />
+        <Timestamp
+          date={timestamp}
+          display="relative"
+          relativeStyle="abbreviated"
+          includeAgo={false}
+          className="shrink-0 text-xs tabular-nums text-slate-500"
+        />
       ) : null}
     </div>
   );
@@ -76,8 +82,8 @@ function deriveVersionRowFields(version: CanvasesCanvasVersion, isFirstCanvasVer
   return {
     versionID: version.metadata?.id ?? "",
     ownerName: version.metadata?.owner?.name || "Unknown owner",
-    versionLabel: isFirstCanvasVersion ? "v1" : formatVersionTimestamp(version) || formatVersionLabel(version),
-    timestamp: version.metadata?.publishedAt || version.metadata?.updatedAt || version.metadata?.createdAt,
+    versionLabel: isFirstCanvasVersion ? "v1" : formatVersionLabel(version),
+    timestamp: version.metadata?.updatedAt || version.metadata?.createdAt,
   };
 }
 

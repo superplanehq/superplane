@@ -26,6 +26,38 @@ type SecretData struct {
 	Local map[string]string `json:"local"`
 }
 
+func (s *Secret) UpdateNameAndData(tx *gorm.DB, name string, data []byte) (*Secret, error) {
+	now := time.Now()
+	updates := map[string]any{
+		"name":       name,
+		"updated_at": &now,
+	}
+	if data != nil {
+		updates["data"] = data
+	}
+
+	err := tx.
+		Model(s).
+		Clauses(clause.Returning{}).
+		Where("id = ?", s.ID).
+		Updates(updates).
+		Error
+
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return nil, ErrNameAlreadyUsed
+		}
+		return nil, err
+	}
+
+	s.Name = name
+	if data != nil {
+		s.Data = data
+	}
+	s.UpdatedAt = &now
+	return s, nil
+}
+
 func (s *Secret) UpdateData(data []byte) (*Secret, error) {
 	now := time.Now()
 
@@ -41,29 +73,6 @@ func (s *Secret) UpdateData(data []byte) (*Secret, error) {
 		return nil, err
 	}
 
-	return s, nil
-}
-
-func (s *Secret) UpdateName(name string) (*Secret, error) {
-	now := time.Now()
-
-	err := database.Conn().
-		Model(s).
-		Clauses(clause.Returning{}).
-		Where("id = ?", s.ID).
-		Update("name", name).
-		Update("updated_at", &now).
-		Error
-
-	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return nil, ErrNameAlreadyUsed
-		}
-		return nil, err
-	}
-
-	s.Name = name
-	s.UpdatedAt = &now
 	return s, nil
 }
 

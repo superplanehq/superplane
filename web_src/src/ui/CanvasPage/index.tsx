@@ -195,17 +195,20 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  /** True when the active draft has uncommitted staged spec edits. Shows the Commit/Reset controls. */
+  /** True when the active edit session has uncommitted staged spec edits (shows Commit/Reset). */
   hasStagingChanges?: boolean;
-  /** Commits staged canvas.yaml/console.yaml edits into the draft version row. */
+  /** Staging is based on an outdated main-branch commit; only discard is allowed. */
+  stagingStale?: boolean;
+  /** Commits staged canvas.yaml/console.yaml edits into the main branch. */
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
   resetStagingPending?: boolean;
-  /** Discards staged edits, reverting to the last committed draft. */
+  /** Discards staged edits, reverting to the last commit. */
   onResetStaging?: () => void;
+  /** Discard stale staging after main moved forward. */
+  onDiscardStaleStaging?: () => void;
+  discardStaleStagingPending?: boolean;
   headerMode?: "default" | "version-live" | "console" | "memory" | "files";
-  /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
-  configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -311,6 +314,12 @@ export interface CanvasPageProps {
   isEditSessionActive?: boolean;
   /** Active canvas version id (draft when editing); drives agent build mode. */
   activeCanvasVersionId: string;
+  /** Live canvas version id; used by the agent staging bar to enter edit mode. */
+  liveCanvasVersionId?: string;
+  /** Enter edit mode when the agent finishes staging changes. */
+  onAgentStagingReady?: () => boolean | Promise<boolean>;
+  /** Commit staged agent changes from the agent sidebar bar. */
+  onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
@@ -795,8 +804,13 @@ function CanvasPage(props: CanvasPageProps) {
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
+    liveCanvasVersionId: props.liveCanvasVersionId,
+    headerMode: props.headerMode,
+    isRunInspectionMode: props.isRunInspectionMode,
+    onAgentStagingReady: props.onAgentStagingReady,
+    onAgentStagingCommit: props.onAgentStagingCommit,
   });
-  const runsSidebarBaseState = useCanvasRunsSidebarState();
+  const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
   const showRunsSidebar = isCanvasWorkflowTab(props.headerMode) && props.toolSidebarRunsContent != null;
   const runsSidebarState = {
     ...runsSidebarBaseState,
@@ -804,7 +818,7 @@ function CanvasPage(props: CanvasPageProps) {
   };
   const isRunsSidebarOpen = showRunsSidebar && runsSidebarBaseState.isRunsSidebarOpen;
 
-  const versionsSidebarBaseState = useCanvasVersionsSidebarState();
+  const versionsSidebarBaseState = useCanvasVersionsSidebarState(props.canvasId);
   // Versions content is only produced during an edit session; within that session
   // the sidebar can be shown/hidden with the header toggle.
   const versionsContentAvailable = props.toolSidebarVersionsContent != null;
@@ -814,16 +828,6 @@ function CanvasPage(props: CanvasPageProps) {
     showVersionsSidebarToggle,
   };
   const isVersionsSidebarOpen = versionsContentAvailable && versionsSidebarBaseState.isVersionsSidebarOpen;
-
-  // The collapse state is intentionally not persisted: the versions sidebar always
-  // starts expanded whenever the user (re)enters an edit session.
-  const isEditSessionActive = props.isEditSessionActive;
-  const { openVersionsSidebar } = versionsSidebarBaseState;
-  useEffect(() => {
-    if (isEditSessionActive) {
-      openVersionsSidebar();
-    }
-  }, [isEditSessionActive, openVersionsSidebar]);
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
@@ -1125,18 +1129,15 @@ function CanvasPage(props: CanvasPageProps) {
     onOpen: handleBuildingBlocksShortcutOpen,
   });
 
+  const onNodeConfigurationSave = props.onNodeConfigurationSave;
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
-      if (!editingNodeData?.nodeId || !props.onNodeConfigurationSave) {
+      if (!editingNodeData?.nodeId || !onNodeConfigurationSave) {
         return;
       }
-      const result = props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
-      if (props.configurationSaveMode !== "auto") {
-        state.componentSidebar.close();
-      }
-      return result;
+      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
     },
-    [editingNodeData?.nodeId, props, state.componentSidebar],
+    [editingNodeData?.nodeId, onNodeConfigurationSave],
   );
 
   const canvasNodesForToggle = state.nodes;
@@ -1267,7 +1268,6 @@ function CanvasPage(props: CanvasPageProps) {
         onSidebarClose={handleSidebarClose}
         editingNodeData={editingNodeData}
         onSaveConfiguration={handleSaveConfiguration}
-        configurationSaveMode={props.configurationSaveMode}
         currentTab={currentTab}
         onTabChange={setCurrentTab}
         canvasMode={props.isEditing ? "edit" : "live"}
@@ -1293,7 +1293,6 @@ function CanvasPage(props: CanvasPageProps) {
       props.canCreateIntegrations,
       props.canReadIntegrations,
       props.canUpdateIntegrations,
-      props.configurationSaveMode,
       props.fetchRunIdForSidebarEvent,
       props.getAllHistoryEvents,
       props.getAllQueueEvents,
@@ -1356,10 +1355,13 @@ function CanvasPage(props: CanvasPageProps) {
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           hasStagingChanges={props.hasStagingChanges}
+          stagingStale={props.stagingStale}
           onCommitStaging={props.onCommitStaging}
           commitStagingPending={props.commitStagingPending}
           resetStagingPending={props.resetStagingPending}
           onResetStaging={props.onResetStaging}
+          onDiscardStaleStaging={props.onDiscardStaleStaging}
+          discardStaleStagingPending={props.discardStaleStagingPending}
           headerMode={props.headerMode}
           isEditing={props.isEditing}
           isEditSessionActive={props.isEditSessionActive}
@@ -1595,7 +1597,6 @@ function Sidebar({
   onSidebarClose,
   editingNodeData,
   onSaveConfiguration,
-  configurationSaveMode = "manual",
   currentTab,
   onTabChange,
   canvasMode,
@@ -1643,7 +1644,6 @@ function Sidebar({
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
-  configurationSaveMode?: "manual" | "auto";
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   canvasMode: "live" | "edit";
@@ -1784,7 +1784,6 @@ function Sidebar({
       nodeConfigurationFields={editingNodeData?.configurationFields ?? []}
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
-      configurationSaveMode={configurationSaveMode}
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
@@ -1836,10 +1835,13 @@ function CanvasContentHeader({
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   hasStagingChanges,
+  stagingStale,
   onCommitStaging,
   commitStagingPending,
   resetStagingPending,
   onResetStaging,
+  onDiscardStaleStaging,
+  discardStaleStagingPending,
   headerMode,
   isEditing,
   isEditSessionActive,
@@ -1898,10 +1900,13 @@ function CanvasContentHeader({
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   hasStagingChanges?: boolean;
+  stagingStale?: boolean;
   onCommitStaging?: () => void;
   commitStagingPending?: boolean;
   resetStagingPending?: boolean;
   onResetStaging?: () => void;
+  onDiscardStaleStaging?: () => void;
+  discardStaleStagingPending?: boolean;
   headerMode?: CanvasPageProps["headerMode"];
   isEditing?: boolean;
   isEditSessionActive?: boolean;
@@ -1952,10 +1957,13 @@ function CanvasContentHeader({
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       hasStagingChanges={hasStagingChanges}
+      stagingStale={stagingStale}
       onCommitStaging={onCommitStaging}
       commitStagingPending={commitStagingPending}
       resetStagingPending={resetStagingPending}
       onResetStaging={onResetStaging}
+      onDiscardStaleStaging={onDiscardStaleStaging}
+      discardStaleStagingPending={discardStaleStagingPending}
       mode={headerMode}
       isEditing={isEditing}
       isEditSessionActive={isEditSessionActive}

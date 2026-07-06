@@ -4,15 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 
-import {
-  refreshCachesAfterCommit,
-  syncCommittedCanvasDraftState,
-  syncCommittedConsoleCaches,
-} from "./sync-committed-canvas-draft";
-import { fetchCanvasVersionWithSpec } from "./repository-spec-files";
+import { syncCommittedCanvasDraftState, syncCommittedConsoleCaches } from "./sync-committed-canvas-draft";
+import { fetchCanvasVersionWithSpec, fetchLiveCommittedCanvasVersionWithSpec } from "./repository-spec-files";
 
 vi.mock("./repository-spec-files", () => ({
   fetchCanvasVersionWithSpec: vi.fn(),
+  fetchLiveCommittedCanvasVersionWithSpec: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
@@ -76,6 +73,57 @@ describe("syncCommittedCanvasDraftState", () => {
       spec: committedVersion.spec,
     });
   });
+
+  it("prepends a new committed version when the version list cache is empty", async () => {
+    const committedVersion: CanvasesCanvasVersion = {
+      metadata: { id: "version-2" },
+      spec: { nodes: [], edges: [] },
+    };
+    vi.mocked(fetchCanvasVersionWithSpec).mockResolvedValue(committedVersion);
+
+    const setQueryData = vi.fn();
+    const queryClient = { setQueryData } as unknown as QueryClient;
+
+    await syncCommittedCanvasDraftState({
+      queryClient,
+      organizationId: "org-1",
+      canvasId: "canvas-1",
+      versionId: "version-2",
+    });
+
+    const updateVersionList = setQueryData.mock.calls.find(
+      ([key]) => JSON.stringify(key) === JSON.stringify(canvasKeys.versionList("canvas-1")),
+    )?.[1] as (current: CanvasesCanvasVersion[] | undefined) => CanvasesCanvasVersion[] | undefined;
+
+    expect(updateVersionList(undefined)).toEqual([committedVersion]);
+  });
+
+  it("loads the live committed version when the requested version id is stale", async () => {
+    const committedVersion: CanvasesCanvasVersion = {
+      metadata: { id: "live-version-2" },
+      spec: {
+        nodes: [{ id: "node-1", name: "Trigger", type: "TYPE_TRIGGER" }],
+        edges: [],
+      },
+    };
+    vi.mocked(fetchLiveCommittedCanvasVersionWithSpec).mockResolvedValue(committedVersion);
+
+    const setQueryData = vi.fn();
+    const queryClient = { setQueryData } as unknown as QueryClient;
+
+    const result = await syncCommittedCanvasDraftState({
+      queryClient,
+      organizationId: "org-1",
+      canvasId: "canvas-1",
+      versionId: "stale-version-1",
+      resolveLiveVersion: true,
+    });
+
+    expect(result).toEqual(committedVersion);
+    expect(fetchLiveCommittedCanvasVersionWithSpec).toHaveBeenCalledWith("canvas-1");
+    expect(fetchCanvasVersionWithSpec).not.toHaveBeenCalled();
+    expect(setQueryData).toHaveBeenCalledWith(canvasKeys.versionDetail("canvas-1", "live-version-2"), committedVersion);
+  });
 });
 
 describe("syncCommittedConsoleCaches", () => {
@@ -100,31 +148,5 @@ describe("syncCommittedConsoleCaches", () => {
       queryKey: canvasKeys.consoleStaged("canvas-1", "version-1"),
     });
     expect(setQueryData).not.toHaveBeenCalled();
-  });
-});
-
-describe("refreshCachesAfterCommit", () => {
-  it("invalidates draft caches when post-commit sync fails", async () => {
-    vi.mocked(fetchCanvasVersionWithSpec).mockRejectedValue(new Error("network error"));
-
-    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
-    const queryClient = { setQueryData: vi.fn(), invalidateQueries } as unknown as QueryClient;
-
-    await expect(
-      refreshCachesAfterCommit({
-        queryClient,
-        organizationId: "org-1",
-        canvasId: "canvas-1",
-        versionId: "version-1",
-      }),
-    ).resolves.toBeUndefined();
-
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: canvasKeys.versionDetail("canvas-1", "version-1"),
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: canvasKeys.consoleStaged("canvas-1", "version-1"),
-    });
-    expect(fetchCanvasConsoleData).not.toHaveBeenCalled();
   });
 });

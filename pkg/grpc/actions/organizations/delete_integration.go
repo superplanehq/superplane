@@ -55,6 +55,9 @@ func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.Delete
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.DeleteIntegrationResponse{}, nil
 }

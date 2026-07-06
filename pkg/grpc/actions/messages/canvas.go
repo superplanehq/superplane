@@ -8,8 +8,6 @@ import (
 const (
 	CanvasCreatedRoutingKey        = "canvas-created"
 	CanvasUpdatedRoutingKey        = "canvas-updated"
-	CanvasVersionUpdatedRoutingKey = "canvas-version-updated"
-	CanvasVersionDeletedRoutingKey = "canvas-version-deleted"
 	CanvasStagingUpdatedRoutingKey = "canvas-staging-updated"
 	CanvasDeletedRoutingKey        = "canvas-deleted"
 	CanvasMemoryUpdatedRoutingKey  = "canvas-memory-updated"
@@ -19,8 +17,8 @@ type CanvasMessage struct {
 	message *pb.CanvasMessage
 }
 
-type CanvasVersionMessage struct {
-	message *pb.CanvasVersionMessage
+type CanvasStagingMessage struct {
+	message *pb.CanvasStagingMessage
 }
 
 func NewCanvasCreatedMessage(canvasID string, organizationID string) CanvasMessage {
@@ -66,22 +64,18 @@ func NewCanvasMemoryUpdatedMessage(canvasID string) CanvasMessage {
 	}
 }
 
-func newCanvasVersionMessage(canvasID string, versionID string) CanvasVersionMessage {
-	return CanvasVersionMessage{
-		message: &pb.CanvasVersionMessage{
+func NewCanvasStagingMessage(canvasID string, userID string) CanvasStagingMessage {
+	return CanvasStagingMessage{
+		message: &pb.CanvasStagingMessage{
 			CanvasId:  canvasID,
-			VersionId: versionID,
+			UserId:    userID,
 			Timestamp: timestamppb.Now(),
 		},
 	}
 }
 
-func NewCanvasVersionUpdatedMessage(canvasID string, versionID string) CanvasVersionMessage {
-	return newCanvasVersionMessage(canvasID, versionID)
-}
-
-func PublishVersionDeleted(canvasID string, versionID string) error {
-	return Publish(CanvasExchange, CanvasVersionDeletedRoutingKey, toBytes(newCanvasVersionMessage(canvasID, versionID).message))
+func (m CanvasStagingMessage) Publish() error {
+	return Publish(CanvasExchange, CanvasStagingUpdatedRoutingKey, toBytes(m.message))
 }
 
 func (m CanvasMessage) PublishCreated() error {
@@ -98,12 +92,4 @@ func (m CanvasMessage) PublishDeleted() error {
 
 func (m CanvasMessage) PublishMemoryUpdated() error {
 	return Publish(CanvasExchange, CanvasMemoryUpdatedRoutingKey, toBytes(m.message))
-}
-
-func (m CanvasVersionMessage) PublishVersionUpdated() error {
-	return Publish(CanvasExchange, CanvasVersionUpdatedRoutingKey, toBytes(m.message))
-}
-
-func (m CanvasVersionMessage) PublishStagingUpdated() error {
-	return Publish(CanvasExchange, CanvasStagingUpdatedRoutingKey, toBytes(m.message))
 }

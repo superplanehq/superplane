@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Run Claude Agent" href="#run-claude-agent" description="Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated." />
+  <LinkCard title="Run Code Agent" href="#run-code-agent" description="Runs an autonomous Claude coding agent against a repository in Anthropic's managed sandbox and opens (or updates) a pull request." />
   <LinkCard title="Text Prompt" href="#text-prompt" description="Generate a response using Anthropic's Claude models via the Messages API" />
 </CardGrid>
 
@@ -56,6 +57,44 @@ Emits a finished payload with **session** status, **session id**, and the final 
   },
   "timestamp": "2026-04-26T12:00:00Z",
   "type": "claude.runAgent.finished"
+}
+```
+
+<a id="run-code-agent"></a>
+
+## Run Code Agent
+
+**Component key:** `claude.runCodeAgent`
+
+The **Run Code Agent** component runs an autonomous Claude coding agent using [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview). You pick a repository (or an existing pull request) and describe a task; the component provisions a network-enabled sandbox with a scoped GitHub token, and the agent clones the repo, does the work, commits, pushes, and opens or updates a pull request — entirely on its own.
+
+### Prerequisites
+
+- A **Claude API key** on the integration.
+- A **GitHub token** (stored as a SuperPlane secret) with permission to read the repo and open pull requests.
+
+### Modes
+
+- **Repository** — start new work: the agent branches from the base branch, implements the task, and opens a PR.
+- **Pull request** — update an existing PR: the agent checks out the PR's branch, applies the task, and pushes to it. Only same-repository pull requests are supported; PRs opened from forks are rejected.
+
+### Output
+
+Emits the final **status**, the **pull request URL**, the working **branch**, and a **summary** so downstream steps can branch or post the result.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "branch": "claude/agent-1a2b3c4d5e6f",
+    "lastMessage": "Done. PR_URL=https://github.com/owner/repo/pull/42",
+    "prUrl": "https://github.com/owner/repo/pull/42",
+    "sessionId": "sess_01ExampleCodeSession",
+    "status": "idle"
+  },
+  "timestamp": "2026-07-02T12:00:00Z",
+  "type": "claude.runCodeAgent"
 }
 ```
 

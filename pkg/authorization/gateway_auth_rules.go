@@ -24,7 +24,7 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
-		{Method: "DELETE", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}"}: {
+		{Method: "DELETE", Pattern: "/api/v1/canvases/{canvas_id}/staging"}: {
 			Resource:           "canvases",
 			Action:             "update_version",
 			DomainType:         models.DomainTypeOrganization,
@@ -168,6 +168,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
+		{Method: "GET", Pattern: "/api/v1/canvases/{canvas_id}/staging"}: {
+			Resource:           "canvases",
+			Action:             "read",
+			DomainType:         models.DomainTypeOrganization,
+			ResourcePathParams: []string{CanvasIDPathParam},
+		},
 		{Method: "GET", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}"}: {
 			Resource:           "canvases",
 			Action:             "read",
@@ -292,9 +298,15 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
-		{Method: "PATCH", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/publish"}: {
+		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/staging/commit"}: {
 			Resource:           "canvases",
-			Action:             "publish",
+			Action:             "update",
+			DomainType:         models.DomainTypeOrganization,
+			ResourcePathParams: []string{CanvasIDPathParam},
+		},
+		{Method: "PUT", Pattern: "/api/v1/canvases/{canvas_id}/staging"}: {
+			Resource:           "canvases",
+			Action:             "update_version",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
@@ -343,6 +355,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "POST", Pattern: "/api/v1/agents/canvases/{canvas_id}/chat/reset"}: {
+			Resource:                     "agents",
+			Action:                       "create",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+		},
 		{Method: "POST", Pattern: "/api/v1/agents/chats/{chat_id}/interrupt"}: {
 			Resource:                     "agents",
 			Action:                       "create",
@@ -383,12 +401,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
-		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/repository/commits"}: {
-			Resource:           "canvases",
-			Action:             "update_version",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
 		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/triggers/{node_id}/events/{event_id}/reemit"}: {
 			Resource:           "canvases",
 			Action:             "update",
@@ -398,30 +410,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/triggers/{node_id}/hooks/{hook_name}"}: {
 			Resource:           "canvases",
 			Action:             "update",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
-		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/versions"}: {
-			Resource:           "canvases",
-			Action:             "update_version",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
-		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/commit"}: {
-			Resource:           "canvases",
-			Action:             "update_version",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
-		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/discard"}: {
-			Resource:           "canvases",
-			Action:             "update_version",
-			DomainType:         models.DomainTypeOrganization,
-			ResourcePathParams: []string{CanvasIDPathParam},
-		},
-		{Method: "POST", Pattern: "/api/v1/canvases/{canvas_id}/versions/{version_id}/staging/files"}: {
-			Resource:           "canvases",
-			Action:             "update_version",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},

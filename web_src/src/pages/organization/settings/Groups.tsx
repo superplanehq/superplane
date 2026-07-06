@@ -1,4 +1,4 @@
-import { formatRelativeTime } from "@/lib/timezone";
+import { Timestamp } from "@/components/Timestamp";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -247,9 +247,12 @@ export function Groups({ organizationId }: GroupsProps) {
                     </TableCell>
 
                     <TableCell>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {formatRelativeTime(group.metadata?.createdAt)}
-                      </span>
+                      <Timestamp
+                        date={group.metadata?.createdAt}
+                        display="relative"
+                        className="text-sm text-gray-500 dark:text-gray-400"
+                        fallback={<span className="text-sm text-gray-500 dark:text-gray-400">N/A</span>}
+                      />
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-500 dark:text-gray-400">

@@ -147,7 +147,6 @@ interface ComponentSidebarProps {
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
-  configurationSaveMode?: "manual" | "auto";
 
   workflowNodes?: ComponentsNode[];
   readOnly?: boolean;
@@ -209,7 +208,6 @@ export const ComponentSidebar = ({
   canCreateIntegrations,
   canUpdateIntegrations,
   autocompleteExampleObj,
-  configurationSaveMode = "manual",
   componentDescription,
   componentExamplePayload,
   componentPayloadLabel,
@@ -722,7 +720,6 @@ export const ComponentSidebar = ({
                     autocompleteExampleObj={resolvedAutocompleteExampleObj}
                     onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                     onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
-                    configurationSaveMode={configurationSaveMode}
                   />
                 </TabsContent>
               )}
