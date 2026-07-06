@@ -2,6 +2,15 @@
   --sp-handle-border: #c9d5e1;
   --sp-handle-border-hover: #94a3b8;
   --sp-handle-highlight-border: #a1aec0;
+  --xy-edge-stroke: var(--sp-handle-border);
+  --xy-edge-stroke-selected: var(--sp-handle-highlight-border);
+  --xy-edge-stroke-width: 3;
+}
+
+.dark .sp-canvas {
+  --sp-handle-border: #374151;
+  --sp-handle-border-hover: #4b5563;
+  --sp-handle-highlight-border: #6b7280;
 }
 
 .sp-canvas .react-flow__node {
@@ -61,6 +70,25 @@
   transition: stroke 0.2s ease-in-out;
 }
 
+.sp-canvas .react-flow__edge-path {
+  stroke: var(--xy-edge-stroke) !important;
+  stroke-width: var(--xy-edge-stroke-width) !important;
+}
+
+.sp-canvas .react-flow__edge.selected .react-flow__edge-path,
+.sp-canvas .react-flow__edge.hovered .react-flow__edge-path {
+  stroke: var(--xy-edge-stroke-selected) !important;
+}
+
+.sp-canvas .react-flow__edge.sp-edge-draft-added .react-flow__edge-path {
+  stroke: #22c55e !important;
+}
+
+.sp-canvas .react-flow__edge.sp-edge-draft-removed .react-flow__edge-path {
+  stroke: #f87171 !important;
+  stroke-dasharray: 8 4 !important;
+}
+
 .sp-canvas.sp-canvas-live .react-flow__edge,
 .sp-canvas.sp-canvas-live .react-flow__edge * {
   cursor: default !important;
@@ -71,7 +99,7 @@
 }
 
 .sp-canvas .react-flow__connectionline path {
-  stroke: #A1AEC0 !important;
+  stroke: var(--sp-handle-border) !important;
   stroke-width: 3 !important;
   stroke-dasharray: 8 4 !important;
 }

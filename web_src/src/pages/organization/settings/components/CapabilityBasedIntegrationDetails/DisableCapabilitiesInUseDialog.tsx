@@ -94,7 +94,7 @@ export function DisableCapabilitiesInUseDialog({
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 You are disabling capabilities that are in use on at least one canvas:
               </p>
-              <div className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
+              <div className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-600">
                 <div className="overflow-x-auto">
                   <table className="w-full table-auto divide-y divide-gray-200 dark:divide-gray-800">
                     <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-gray-900">

@@ -187,15 +187,15 @@ const MessageRow = memo(function MessageRow({
         // Compact user bubbles stick to the top of the scrollable transcript so the current prompt
         // remains visible while a long agent reply scrolls past. Long prompts must scroll normally;
         // otherwise the sticky bubble can cover the active Thinking or command rows.
-        shouldStickUserMessage && "sticky top-0 z-10 bg-white",
+        shouldStickUserMessage && "sticky top-0 z-10 bg-white dark:bg-gray-900",
       )}
     >
       <div
         className={cn(
           "min-w-0 break-words text-sm",
           isUser
-            ? "max-w-[85%] rounded-lg bg-slate-100 px-3 py-1.5 whitespace-pre-wrap text-slate-900"
-            : "w-full max-w-[720px] text-slate-900",
+            ? "max-w-[85%] rounded-lg bg-slate-100 px-3 py-1.5 whitespace-pre-wrap text-slate-900 dark:bg-gray-800 dark:text-gray-100"
+            : "w-full max-w-[720px] text-slate-900 dark:text-gray-100",
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
@@ -209,7 +209,7 @@ const MessageRow = memo(function MessageRow({
         />
       </div>
       {message.createdAt ? (
-        <span className="mt-0.5 text-[10px] text-slate-500">{formatTime(message.createdAt)}</span>
+        <span className="mt-0.5 text-[10px] text-slate-500 dark:text-gray-400">{formatTime(message.createdAt)}</span>
       ) : null}
     </div>
   );
@@ -385,19 +385,21 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
         disabled={!canExpand}
         className={cn(
           "flex w-full items-center gap-1.5 text-left",
-          running ? "text-slate-700" : "text-slate-600",
-          canExpand && "cursor-pointer hover:text-slate-900",
+          running ? "text-slate-700 dark:text-gray-300" : "text-slate-600 dark:text-gray-400",
+          canExpand && "cursor-pointer hover:text-slate-900 dark:hover:text-gray-200",
         )}
       >
         <span className="shrink-0 text-[10px]">{running ? "▶" : "✓"}</span>
         <span className="truncate">{running ? "Running..." : preview}</span>
       </button>
       {expanded && command ? (
-        <div className="mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">bash</span>
+        <div className="mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-800/70 dark:bg-gray-900">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 dark:border-gray-800/70 dark:bg-gray-900">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-gray-400">
+              bash
+            </span>
           </div>
-          <pre className="max-h-[200px] overflow-auto break-words whitespace-pre-wrap p-3 font-mono text-xs text-slate-700">
+          <pre className="max-h-[200px] overflow-auto break-words whitespace-pre-wrap p-3 font-mono text-xs text-slate-700 dark:text-gray-300">
             {command}
           </pre>
         </div>
@@ -408,7 +410,10 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
 
 function ThinkingRow() {
   return (
-    <div className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-slate-500" data-testid="agent-thinking">
+    <div
+      className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-slate-500 dark:text-gray-400"
+      data-testid="agent-thinking"
+    >
       <Loader2 className="size-4 shrink-0 animate-spin" />
       <span>Thinking…</span>
     </div>

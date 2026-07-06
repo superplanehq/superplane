@@ -21,27 +21,27 @@ type AnnotationColor = "yellow" | "blue" | "green" | "purple";
 const NOTE_COLORS: Record<AnnotationColor, { label: string; container: string; background: string; dot: string }> = {
   yellow: {
     label: "Yellow",
-    container: "bg-yellow-100",
-    background: "bg-yellow-100",
-    dot: "bg-yellow-200 border-yellow-500",
+    container: "bg-yellow-100 dark:bg-yellow-900 dark:outline dark:outline-1 dark:outline-yellow-950/80",
+    background: "bg-yellow-100 dark:bg-yellow-900",
+    dot: "bg-yellow-200 border-yellow-500 dark:bg-yellow-800 dark:border-yellow-500",
   },
   blue: {
     label: "Sky",
-    container: "bg-sky-100",
-    background: "bg-sky-100",
-    dot: "bg-sky-200 border-sky-500",
+    container: "bg-sky-100 dark:bg-sky-900 dark:outline dark:outline-1 dark:outline-sky-950/80",
+    background: "bg-sky-100 dark:bg-sky-900",
+    dot: "bg-sky-200 border-sky-500 dark:bg-sky-800 dark:border-sky-500",
   },
   green: {
     label: "Green",
-    container: "bg-green-100",
-    background: "bg-green-100",
-    dot: "bg-green-200 border-green-500",
+    container: "bg-green-100 dark:bg-green-900 dark:outline dark:outline-1 dark:outline-green-950/80",
+    background: "bg-green-100 dark:bg-green-900",
+    dot: "bg-green-200 border-green-500 dark:bg-green-800 dark:border-green-500",
   },
   purple: {
     label: "Purple",
-    container: "bg-purple-100",
-    background: "bg-purple-100",
-    dot: "bg-purple-200 border-purple-500",
+    container: "bg-purple-100 dark:bg-purple-900 dark:outline dark:outline-1 dark:outline-purple-950/80",
+    background: "bg-purple-100 dark:bg-purple-900",
+    dot: "bg-purple-200 border-purple-500 dark:bg-purple-800 dark:border-purple-500",
   },
 };
 
@@ -202,7 +202,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   );
 
   // Shared text styling for both modes
-  const textStyles = "text-sm leading-normal text-gray-800";
+  const textStyles = "text-sm leading-normal text-gray-800 dark:text-white/80";
   const showNoteActions = canvasMode === "edit" && !hideActionsButton;
   const isNoteEditable = canvasMode === "edit";
 
@@ -249,24 +249,39 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
           className={cn(
             "group relative flex flex-col rounded-md outline",
             getDraftDiffOutlineClassName(draftDiffStatus),
-            dimBodyBelowHeader ? "bg-slate-200" : colorStyles.container,
+            dimBodyBelowHeader ? "bg-slate-200 dark:bg-gray-700" : colorStyles.container,
           )}
         >
           <div
             className={cn(
               "canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab",
-              dimBodyBelowHeader ? "bg-slate-200" : colorStyles.background,
+              dimBodyBelowHeader ? "bg-slate-200 dark:bg-gray-700" : colorStyles.background,
             )}
           >
             <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
-              <span className={cn("h-px w-full", dimBodyBelowHeader ? "bg-slate-400/30" : "bg-black/15")} />
-              <span className={cn("h-px w-full", dimBodyBelowHeader ? "bg-slate-400/30" : "bg-black/15")} />
-              <span className={cn("h-px w-full", dimBodyBelowHeader ? "bg-slate-400/30" : "bg-black/15")} />
+              <span
+                className={cn(
+                  "h-px w-full",
+                  dimBodyBelowHeader ? "bg-slate-400/30 dark:bg-gray-600/40" : "bg-black/15 dark:bg-white/12",
+                )}
+              />
+              <span
+                className={cn(
+                  "h-px w-full",
+                  dimBodyBelowHeader ? "bg-slate-400/30 dark:bg-gray-600/40" : "bg-black/15 dark:bg-white/12",
+                )}
+              />
+              <span
+                className={cn(
+                  "h-px w-full",
+                  dimBodyBelowHeader ? "bg-slate-400/30 dark:bg-gray-600/40" : "bg-black/15 dark:bg-white/12",
+                )}
+              />
             </div>
           </div>
 
           {dimBodyBelowHeader ? (
-            <div className="flex-1 min-h-24 shrink-0 bg-slate-200 rounded-b-md" aria-hidden />
+            <div className="flex-1 min-h-24 shrink-0 bg-slate-200 rounded-b-md dark:bg-gray-700" aria-hidden />
           ) : (
             <>
               {showNoteActions && (
@@ -307,7 +322,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                           event.stopPropagation();
                           onDelete();
                         }}
-                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
                         aria-label="Delete note"
                       >
                         <Trash2 size={16} />
@@ -354,12 +369,12 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                       className={cn(
                         "nodrag h-full w-full resize-none bg-transparent outline-none",
                         textStyles,
-                        "placeholder:text-black/50",
+                        "placeholder:text-black/50 dark:placeholder:text-white/45",
                       )}
                       placeholder="Start typing..."
                       aria-label={`${title} note`}
                     />
-                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/5 text-[10px] text-black/40 pointer-events-none select-none">
+                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/5 text-[10px] text-black/40 pointer-events-none select-none dark:bg-black/20 dark:text-white/50">
                       Markdown supported
                     </span>
                   </>
@@ -421,7 +436,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                               target="_blank"
                               rel="noopener noreferrer"
                               href={href}
-                              className="underline text-blue-600"
+                              className="underline text-blue-600 dark:text-blue-400"
                             >
                               {children}
                             </a>
@@ -433,7 +448,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                         {annotationText}
                       </ReactMarkdown>
                     ) : (
-                      <span className="text-black/50">
+                      <span className="text-black/50 dark:text-white/45">
                         {isNoteEditable ? "Double click to add and edit notes..." : "No notes"}
                       </span>
                     )}
@@ -459,7 +474,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                       viewBox="0 0 12 12"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
-                      className="opacity-30"
+                      className="opacity-30 text-gray-900 dark:text-gray-400 dark:opacity-50"
                     >
                       <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
                       <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />

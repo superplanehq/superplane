@@ -13,6 +13,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { showErrorToast } from "@/lib/toast";
+import { settingsErrorClassName, settingsRowActionClassName, settingsTableCardClassName } from "./settingsPageStyles";
 
 interface RolesProps {
   organizationId: string;
@@ -97,12 +98,12 @@ export function Roles({ organizationId }: RolesProps) {
   return (
     <div className="space-y-6 pt-6">
       {error && (
-        <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
+        <div className={settingsErrorClassName}>
           <p>{error instanceof Error ? error.message : "Failed to fetch roles"}</p>
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className={settingsTableCardClassName}>
         <div className="px-6 pt-6 pb-4 flex items-center justify-start">
           <PermissionTooltip
             allowed={canCreateRoles || permissionsLoading}
@@ -143,7 +144,7 @@ export function Roles({ organizationId }: RolesProps) {
                           <div className="flex justify-end">
                             {isDefault ? (
                               <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-700 dark:text-gray-400 px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">
+                                <span className="rounded bg-gray-200 px-2 py-1 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200">
                                   Default Role
                                 </span>
                                 <TooltipProvider delayDuration={200}>
@@ -151,7 +152,7 @@ export function Roles({ organizationId }: RolesProps) {
                                     <TooltipTrigger asChild>
                                       <Link
                                         to={roleHref(role)}
-                                        className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+                                        className={settingsRowActionClassName}
                                         aria-label="View role"
                                       >
                                         <Icon name="eye" size="sm" />
@@ -184,7 +185,7 @@ export function Roles({ organizationId }: RolesProps) {
                                         <button
                                           type="button"
                                           onClick={() => handleDeleteRole(role)}
-                                          className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
+                                          className={settingsRowActionClassName}
                                           aria-label="Delete role"
                                           disabled={deleteRoleMutation.isPending || !canDeleteRoles}
                                         >
@@ -217,17 +218,13 @@ export function Roles({ organizationId }: RolesProps) {
 function EditRoleButton({ canUpdate, href }: { canUpdate: boolean; href: string }) {
   if (canUpdate) {
     return (
-      <Link
-        to={href}
-        className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-gray-800"
-        aria-label="Edit role"
-      >
+      <Link to={href} className={settingsRowActionClassName} aria-label="Edit role">
         <Icon name="edit" size="sm" />
       </Link>
     );
   }
   return (
-    <span className="p-1 rounded-sm text-gray-400 cursor-not-allowed" aria-label="Edit role">
+    <span className="cursor-not-allowed rounded-sm p-1 text-gray-400 dark:text-gray-500" aria-label="Edit role">
       <Icon name="edit" size="sm" />
     </span>
   );

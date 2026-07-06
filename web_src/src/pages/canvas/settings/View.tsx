@@ -47,7 +47,7 @@ export function SettingsView({ initialValues, canUpdateCanvas, isSaving, onSave,
             type="button"
             variant="ghost"
             size="sm"
-            className="-ml-2 gap-1 px-2 text-slate-600 hover:bg-slate-950/5 hover:text-slate-900"
+            className="-ml-2 gap-1 px-2 text-slate-600 hover:bg-slate-950/5 hover:text-slate-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
             onClick={onBackToCanvas}
           >
             <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
@@ -73,7 +73,9 @@ export function SettingsView({ initialValues, canUpdateCanvas, isSaving, onSave,
             Save Changes
           </LoadingButton>
           {saveMessage ? (
-            <span className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+            <span
+              className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+            >
               {saveMessage}
             </span>
           ) : null}

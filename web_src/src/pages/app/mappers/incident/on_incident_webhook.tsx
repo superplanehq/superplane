@@ -22,7 +22,7 @@ export const onIncidentCustomFieldRenderer: CustomFieldRenderer = {
 
     if (webhookConfigured) {
       return (
-        <div className="border-t-1 border-gray-200 dark:border-gray-700 pt-4">
+        <div className="border-t-1 border-gray-200 dark:border-gray-600 pt-4">
           <div className="text-xs text-gray-600 dark:text-gray-400 rounded-md border border-gray-200 dark:border-gray-600 px-3 py-2.5 bg-gray-50 dark:bg-gray-800/50">
             <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">incident.io webhook is configured</p>
             <p>
@@ -36,7 +36,7 @@ export const onIncidentCustomFieldRenderer: CustomFieldRenderer = {
 
     const webhookUrl = metadata?.webhookUrl || "URL will appear here after you save the canvas.";
     return (
-      <div className="border-t-1 border-gray-200 dark:border-gray-700 pt-4">
+      <div className="border-t-1 border-gray-200 dark:border-gray-600 pt-4">
         <div className="space-y-3">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">incident.io Webhook Setup</span>
           <div className="text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 rounded-md space-y-2">

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 
 export interface ResizableBottomPaneProps {
@@ -85,7 +86,10 @@ export function ResizableBottomPane({
 
   return (
     <aside
-      className="relative z-20 flex min-h-0 shrink-0 flex-col border-t border-border bg-white"
+      className={cn(
+        "relative z-20 flex min-h-0 shrink-0 flex-col border-t bg-white dark:bg-gray-900",
+        appDarkModeClasses.sidebarEdge,
+      )}
       data-testid={testId}
       style={{ height: paneHeight, minHeight, maxHeight }}
     >
@@ -99,8 +103,8 @@ export function ResizableBottomPane({
           aria-hidden
           data-testid={`${resizeHandleTestId}-line`}
           className={cn(
-            "pointer-events-none absolute left-0 right-0 top-[calc(50%-1px)] h-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50",
-            isResizing && "bg-slate-950/50",
+            "pointer-events-none absolute left-0 right-0 top-[calc(50%-1px)] h-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-600/50",
+            isResizing && "bg-slate-950/50 dark:bg-gray-600/50",
           )}
         />
       </div>
