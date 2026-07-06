@@ -467,6 +467,21 @@ CREATE TABLE public.secrets (
 
 
 --
+-- Name: user_canvas_preferences; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_canvas_preferences (
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    pinned_at timestamp without time zone,
+    starred_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1017,6 +1032,14 @@ ALTER TABLE ONLY public.role_metadata
 
 
 --
+-- Name: user_canvas_preferences user_canvas_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_canvas_preferences
+    ADD CONSTRAINT user_canvas_preferences_pkey PRIMARY KEY (organization_id, user_id, canvas_id);
+
+
+--
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1350,6 +1373,20 @@ CREATE INDEX idx_repository_seed_files_repository_id ON public.repository_seed_f
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_user_canvas_preferences_user_pinned; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_canvas_preferences_user_pinned ON public.user_canvas_preferences USING btree (organization_id, user_id, pinned_at DESC) WHERE (pinned_at IS NOT NULL);
+
+
+--
+-- Name: idx_user_canvas_preferences_user_starred; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_canvas_preferences_user_starred ON public.user_canvas_preferences USING btree (organization_id, user_id, starred_at DESC) WHERE (starred_at IS NOT NULL);
 
 
 --
@@ -1768,6 +1805,30 @@ ALTER TABLE ONLY public.repository_seed_files
 
 
 --
+-- Name: user_canvas_preferences user_canvas_preferences_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_canvas_preferences
+    ADD CONSTRAINT user_canvas_preferences_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_canvas_preferences user_canvas_preferences_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_canvas_preferences
+    ADD CONSTRAINT user_canvas_preferences_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_canvas_preferences user_canvas_preferences_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_canvas_preferences
+    ADD CONSTRAINT user_canvas_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2055,7 +2116,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260702191028	f
+20260706145437	f
 \.
 
 
