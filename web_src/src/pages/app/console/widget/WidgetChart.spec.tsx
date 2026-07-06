@@ -3,6 +3,8 @@ import type * as Recharts from "recharts";
 import { render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
+import { ThemeProvider } from "@/contexts/ThemeProvider";
+
 vi.mock("recharts", async () => {
   const actual = (await vi.importActual("recharts")) as typeof Recharts;
   return {
@@ -49,7 +51,9 @@ const ROWS = [
 ];
 
 function renderChart(render_: WidgetChartRender, options: { rows?: unknown[]; isLoading?: boolean } = {}) {
-  return render(<WidgetChart render={render_} rows={options.rows ?? ROWS} isLoading={options.isLoading ?? false} />);
+  return render(<WidgetChart render={render_} rows={options.rows ?? ROWS} isLoading={options.isLoading ?? false} />, {
+    wrapper: ThemeProvider,
+  });
 }
 
 describe("WidgetChart states", () => {

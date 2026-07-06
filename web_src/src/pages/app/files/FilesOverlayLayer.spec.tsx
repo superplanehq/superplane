@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { useSidebarLayoutStore } from "@/stores/sidebarLayoutStore";
 
 import { FilesOverlayLayer } from "./FilesOverlayLayer";
@@ -20,9 +21,11 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false 
 
 function Wrapper({ children }: { children: ReactNode }) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{children}</MemoryRouter>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>{children}</MemoryRouter>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

@@ -11,6 +11,7 @@ import "./App.css";
 import AuthGuard from "./components/AuthGuard";
 import { GlobalCommandPalette } from "./components/GlobalCommandPalette";
 import { AccountProvider } from "./contexts/AccountProvider";
+import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
@@ -63,12 +64,14 @@ const withAuthAndPermission = (Component: React.ComponentType, resource: string,
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AccountProvider>
-        <TooltipProvider delayDuration={150}>
-          <AppRouter />
-        </TooltipProvider>
-        <Toaster position="bottom-center" closeButton />
-      </AccountProvider>
+      <ThemeProvider>
+        <AccountProvider>
+          <TooltipProvider delayDuration={150}>
+            <AppRouter />
+          </TooltipProvider>
+          <Toaster position="bottom-center" closeButton />
+        </AccountProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

@@ -1,7 +1,9 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+/* eslint-disable max-lines */
+import { act, fireEvent, render as testingLibraryRender, screen, waitFor } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type { BlockData } from "./Block";
 
 const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.hoisted(() => ({
@@ -93,6 +95,10 @@ vi.mock("./Header", () => ({
 }));
 
 import { CanvasNodeErrorBoundary, CanvasPage } from "./index";
+
+function render(ui: ReactElement) {
+  return testingLibraryRender(ui, { wrapper: ThemeProvider });
+}
 
 function ThrowingNode(): ReactElement {
   throw new Error("render failed");

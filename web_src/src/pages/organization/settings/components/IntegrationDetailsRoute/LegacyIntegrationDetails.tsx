@@ -351,7 +351,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                     <button
                       key={group.canvasId}
                       onClick={() => window.open(appPath(organizationId, group.canvasId), "_blank")}
-                      className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                      className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
                     >
                       <div className="flex-1">
                         <p className="text-sm font-medium text-gray-800 dark:text-gray-100">

@@ -439,7 +439,7 @@ export const waitCustomFieldRenderer: CustomFieldRenderer = {
         <div className="space-y-3">
           <div>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}:</span>
-            <div className="text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-gray-200 dark:border-gray-700 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md">
+            <div className="text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-gray-200 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md">
               {content}
             </div>
           </div>

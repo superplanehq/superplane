@@ -18,6 +18,8 @@ import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 import { useEditApp } from "./useEditApp";
 import { useHomePageCanvasList } from "./useHomePageCanvasList";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { cn } from "@/lib/utils";
 
 export function HomePage() {
   usePageTitle(["Home"]);
@@ -74,7 +76,7 @@ export function HomePage() {
         </div>
 
         {canvasError ? (
-          <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
+          <div className="rounded border border-red-300 bg-white px-4 py-2 text-red-500 dark:border-red-800 dark:bg-gray-800 dark:text-red-400">
             <Text>{canvasError}</Text>
           </div>
         ) : (
@@ -154,9 +156,9 @@ function Content({
   return (
     <div className="space-y-6">
       {pinnedCanvases.length > 0 ? (
-        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-white`}>
-          <div className="mb-4 flex items-center gap-2 text-gray-800">
-            <Pin size={16} className="text-blue-600" aria-hidden />
+        <section className={cn(CANVAS_FOLDER_SECTION_SHELL_CLASS, "bg-white dark:bg-white/5")}>
+          <div className="mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+            <Pin size={16} className="text-blue-600 dark:text-blue-400" aria-hidden />
             <Heading level={3} className="mb-0 !text-base font-medium">
               Pinned
             </Heading>
@@ -196,7 +198,7 @@ function Content({
       ))}
 
       {folderedLayout.unfiledCanvases.length > 0 ? (
-        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-slate-950/5`}>
+        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-slate-950/5 dark:bg-white/5`}>
           <CanvasCardsGrid
             canvases={folderedLayout.unfiledCanvases}
             canvasFolders={canvasFolders}
@@ -304,17 +306,17 @@ function CanvasesEmptyState() {
 
 function LoadingView() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600"></div>
-      <p className="ml-3 text-gray-500">Loading...</p>
+    <div className={cn("min-h-screen flex items-center justify-center bg-slate-100", appDarkModeClasses.surface)}>
+      <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600 dark:border-blue-400"></div>
+      <p className="ml-3 text-gray-500 dark:text-gray-400">Loading...</p>
     </div>
   );
 }
 
 function ErrorView() {
   return (
-    <div className="text-center py-8">
-      <p className="text-gray-500">Unable to load user information</p>
+    <div className={cn("py-8 text-center bg-slate-100 min-h-screen", appDarkModeClasses.surface)}>
+      <p className="text-gray-500 dark:text-gray-400">Unable to load user information</p>
     </div>
   );
 }

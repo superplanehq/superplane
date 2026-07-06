@@ -1,9 +1,12 @@
-import { resolveIcon } from "@/lib/utils";
+import { cn, resolveIcon } from "@/lib/utils";
 import React from "react";
 
 import { getIntegrationIconSrc } from "./integrationIconMaps";
 
 const DEFAULT_ICON_SIZE = 16;
+
+/** Monochrome SVG logos that need inversion on dark surfaces. */
+const INTEGRATION_LOGO_INVERT_IN_DARK = new Set(["github"]);
 
 interface IntegrationIconProps {
   integrationName: string | undefined;
@@ -25,9 +28,15 @@ export function IntegrationIcon({
 }: IntegrationIconProps): React.ReactElement {
   const logoSrc = getIntegrationIconSrc(integrationName);
   if (logoSrc) {
+    const invertInDark = INTEGRATION_LOGO_INVERT_IN_DARK.has(integrationName?.toLowerCase() ?? "");
+
     return (
-      <span className={`inline-block flex-shrink-0 ${className}`}>
-        <img src={logoSrc} alt="" className="h-full w-full object-contain" />
+      <span className={cn("inline-block flex-shrink-0", className)}>
+        <img
+          src={logoSrc}
+          alt=""
+          className={cn("h-full w-full object-contain", invertInDark && "dark:brightness-0 dark:invert")}
+        />
       </span>
     );
   }

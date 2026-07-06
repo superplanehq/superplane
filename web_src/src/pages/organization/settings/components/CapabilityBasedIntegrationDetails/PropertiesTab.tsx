@@ -258,7 +258,7 @@ export function PropertiesTab({
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+    <div className="space-y-4 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-600 dark:bg-gray-900">
       {integrationProperties.map((property) => (
         <IntegrationPropertyRow
           key={property.name}

@@ -1,11 +1,8 @@
 import React from "react";
 import { Handle, Position } from "@xyflow/react";
-import {
-  APPEND_CONNECTOR_COLOR,
-  AppendHandlePreview,
-  AppendSourceHandle,
-  type AppendFromNodeHandler,
-} from "./appendHandle";
+import { CANVAS_CONNECTOR_COLOR } from "@/lib/canvasEdgeColors";
+import { nodeCanvasChannelLabelClassName } from "@/lib/nodeCanvasSections";
+import { AppendHandlePreview, AppendSourceHandle, type AppendFromNodeHandler } from "./appendHandle";
 import { isAlreadyConnectedToNode } from "./connectionState";
 import { HANDLE_STYLE } from "./handleStyle";
 import type { BlockConnectionState, BlockEdgeState } from "./types";
@@ -150,7 +147,7 @@ function MultiRightHandleLines({ layout, channels }: { layout: MultiRightHandleL
         y1={layout.svgCenterY}
         x2={layout.trunkLength}
         y2={layout.svgCenterY}
-        stroke={APPEND_CONNECTOR_COLOR}
+        stroke={CANVAS_CONNECTOR_COLOR}
         strokeWidth={3}
       />
 
@@ -163,10 +160,10 @@ function MultiRightHandleLines({ layout, channels }: { layout: MultiRightHandleL
               y1={layout.svgCenterY}
               x2={layout.branchEndX}
               y2={y}
-              stroke={APPEND_CONNECTOR_COLOR}
+              stroke={CANVAS_CONNECTOR_COLOR}
               strokeWidth={3}
             />
-            <line x1={layout.branchEndX} y1={y} x2={lineEndX} y2={y} stroke={APPEND_CONNECTOR_COLOR} strokeWidth={3} />
+            <line x1={layout.branchEndX} y1={y} x2={lineEndX} y2={y} stroke={CANVAS_CONNECTOR_COLOR} strokeWidth={3} />
           </g>
         );
       })}
@@ -196,12 +193,11 @@ function MultiRightChannelControl({
   return (
     <React.Fragment>
       <span
-        className="text-xs font-medium whitespace-nowrap absolute bg-slate-100"
+        className={nodeCanvasChannelLabelClassName}
         style={{
           left: layout.labelStartX,
           top: `calc(50% + ${offsetY}px)`,
           transform: "translateY(-50%)",
-          color: "#8B9AAC",
           lineHeight: `${layout.handleSize}px`,
           paddingLeft: CHANNEL_LABEL_PADDING_X,
           paddingRight: CHANNEL_LABEL_PADDING_X,

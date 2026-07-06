@@ -34,7 +34,7 @@ export function PreCreateIntegrationSetup({
             className="h-9 w-72 max-w-full"
           />
         </div>
-        <div className="flex gap-3 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm leading-relaxed text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
+        <div className="flex gap-3 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm leading-relaxed text-gray-600 dark:border-gray-600 dark:bg-gray-900/60 dark:text-gray-400">
           <Info className="mt-0.5 size-4 shrink-0 text-gray-500 dark:text-gray-500" aria-hidden />
           <p className="min-w-0">
             You can connect the same integration provider more than once - for accessing different environments,

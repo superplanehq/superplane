@@ -13,6 +13,10 @@ vi.mock("@monaco-editor/react", () => ({
   },
 }));
 
+vi.mock("@/contexts/useTheme", () => ({
+  useTheme: () => ({ preference: "light", resolvedTheme: "light", setPreference: () => undefined }),
+}));
+
 describe("CodeBlockWidget", () => {
   it("applies width constraints so it cannot stretch a narrow parent", () => {
     const { container } = render(<CodeBlockWidget code="echo hello" language="bash" />);

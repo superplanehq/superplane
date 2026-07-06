@@ -54,7 +54,7 @@ const STATUS_PILL_CLASS: Record<string, string> = {
 const STATUS_PILL_BASE_CLASS = "inline-flex rounded-full border-none px-2 py-0.5 text-[11px] font-medium";
 
 const BADGE_PILL_CLASS =
-  "inline-flex rounded-full bg-transparent px-2 py-0.5 text-[11px] font-medium text-slate-700 outline outline-1 -outline-offset-1 outline-slate-950/15";
+  "inline-flex rounded-full bg-transparent px-2 py-0.5 text-[11px] font-medium text-slate-700 outline outline-1 -outline-offset-1 outline-slate-950/15 dark:text-gray-300 dark:outline-gray-600";
 
 const ACTION_ICONS = {
   play: Play,
@@ -139,7 +139,7 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
     // dead-ending on the empty message.
     return (
       <div data-testid="widget-table-empty-wrap">
-        <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-empty">
+        <div className="p-4 text-center text-xs text-slate-500 dark:text-gray-400" data-testid="widget-table-empty">
           {render.emptyMessage ?? "No data to display."}
         </div>
         {hasMore && onLoadMore ? (
@@ -192,13 +192,13 @@ function WidgetTableGrid({
             {render.columns.map((col, i) => (
               <th
                 key={`${col.field}-${i}`}
-                className="border-b border-slate-200 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+                className="border-b border-slate-200 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-gray-600 dark:text-gray-400"
               >
                 {col.label ?? col.field}
               </th>
             ))}
             {hasActions ? (
-              <th className="border-b border-slate-200 px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <th className="border-b border-slate-200 px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-gray-600 dark:text-gray-400">
                 Actions
               </th>
             ) : null}
@@ -213,11 +213,11 @@ function WidgetTableGrid({
                 key={rowKey}
                 data-row-tone={toneClass ? "true" : undefined}
                 className={cn(
-                  "border-b border-black/10 last:border-0",
+                  "border-b border-black/10 last:border-0 dark:border-gray-800",
                   // Drop the default hover wash when a tone is applied so the
                   // tint isn't overridden — the row already has a deliberate
                   // background and a hover bg would mask it.
-                  toneClass ? toneClass : "hover:bg-slate-50/60",
+                  toneClass ? toneClass : "hover:bg-slate-50/60 dark:hover:bg-gray-800/60",
                 )}
               >
                 {render.columns.map((col, ci) => (
@@ -249,7 +249,7 @@ function WidgetTableGrid({
 function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolean; onLoadMore: () => void }) {
   return (
     <div
-      className="flex items-center justify-center border-t border-slate-100 bg-slate-50/60 px-3 py-2"
+      className="flex items-center justify-center border-t border-slate-100 bg-slate-50/60 px-3 py-2 dark:border-gray-800 dark:bg-gray-800/60"
       data-testid="widget-table-load-more"
     >
       <Button
@@ -271,7 +271,7 @@ function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolea
 function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Record<string, unknown> }) {
   const visible = evaluateRowShow(col.show, row);
   if (!visible) {
-    return <td className="px-3 py-1.5 text-slate-300">—</td>;
+    return <td className="px-3 py-1.5 text-slate-300 dark:text-gray-600">—</td>;
   }
   const value = resolveCellValue(col.field, row);
   const formatted = formatValue(value, col.format);
@@ -296,7 +296,7 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
   if (col.format === "relative") {
     const title = formatAbsoluteTitle(value);
     return (
-      <td className="px-3 py-1.5 text-slate-700" title={title}>
+      <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300" title={title}>
         {formatted}
       </td>
     );
@@ -309,7 +309,7 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sky-600 no-underline hover:!underline underline-offset-2 decoration-current"
+          className="text-sky-600 no-underline hover:!underline underline-offset-2 decoration-current dark:text-gray-300 dark:hover:text-gray-100"
         >
           {formatted || href}
         </a>
@@ -319,11 +319,13 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
   if (col.format === "code") {
     return (
       <td className="px-3 py-1.5">
-        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[13px] text-slate-800">{formatted}</code>
+        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[13px] text-slate-800 dark:bg-gray-800 dark:text-gray-100">
+          {formatted}
+        </code>
       </td>
     );
   }
-  return <td className="px-3 py-1.5 text-slate-700">{formatted}</td>;
+  return <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300">{formatted}</td>;
 }
 
 function formatAbsoluteTitle(value: unknown): string | undefined {
@@ -534,7 +536,10 @@ function RowActionButton({
         {label}
       </Button>
       {error ? (
-        <span className="max-w-48 text-right text-[10px] text-red-600" data-testid={`${testId}-error`}>
+        <span
+          className="max-w-48 text-right text-[10px] text-red-600 dark:text-red-400"
+          data-testid={`${testId}-error`}
+        >
           {error}
         </span>
       ) : null}
@@ -560,7 +565,7 @@ function RowActionButton({
 function WidgetSpinner() {
   return (
     <div className="flex h-full items-center justify-center p-4">
-      <Loader2 className="size-4 animate-spin text-slate-400" />
+      <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
     </div>
   );
 }

@@ -44,7 +44,7 @@ export function DataSourceExecutionsFields({
   return (
     <>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Node (optional)</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Node (optional)</Label>
         <Select
           value={value.node ?? "__all__"}
           onValueChange={(v) =>
@@ -93,7 +93,7 @@ function LimitField({
   const placeholder = loadAllWhenBlank ? "On demand" : defaultPlaceholder;
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Limit</Label>
+      <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Limit</Label>
       <Input
         type="number"
         min={1}
@@ -103,7 +103,7 @@ function LimitField({
         data-testid="data-source-limit"
       />
       {loadAllWhenBlank ? (
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[11px] text-slate-500 dark:text-gray-400">
           Leave blank to load rows on demand — scroll or use the "Load more" button to reveal more. Very long histories
           are capped for performance; set a number to fix how many rows are fetched.
         </p>
@@ -130,7 +130,7 @@ export function DataSourceMemoryFields({
   return (
     <>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Namespace</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Namespace</Label>
         <Input
           list={namespaces.length > 0 && namespaceListId ? namespaceListId : undefined}
           value={value.namespace}
@@ -147,7 +147,7 @@ export function DataSourceMemoryFields({
         ) : null}
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Field path (optional)</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Field path (optional)</Label>
         <Input
           list={fields.length > 0 && fieldPathListId ? fieldPathListId : undefined}
           value={value.fieldPath ?? ""}

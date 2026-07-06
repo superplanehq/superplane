@@ -20,14 +20,14 @@ function DiffBadgeSegments({ diffCounts }: Pick<DiffSummaryHoverCardProps, "diff
   const { added, updated, removed } = diffCounts;
   return (
     <>
-      {added > 0 && <span className="tabular-nums text-emerald-600">+{added}</span>}
-      {updated > 0 && <span className="tabular-nums text-sky-600">±{updated}</span>}
-      {removed > 0 && <span className="tabular-nums text-red-600">-{removed}</span>}
+      {added > 0 && <span className="tabular-nums text-emerald-600 dark:text-emerald-400">+{added}</span>}
+      {updated > 0 && <span className="tabular-nums text-sky-600 dark:text-sky-400">±{updated}</span>}
+      {removed > 0 && <span className="tabular-nums text-red-600 dark:text-red-400">-{removed}</span>}
     </>
   );
 }
 
-const diffMenuLabelClassName = "text-[13px] font-normal text-gray-800";
+const diffMenuLabelClassName = "text-[13px] font-normal text-gray-800 dark:text-gray-100";
 
 export function DiffSummaryHoverCard({
   diffCounts,
@@ -44,7 +44,7 @@ export function DiffSummaryHoverCard({
       <HoverCardTrigger asChild>
         <button
           type="button"
-          className="flex h-7 cursor-default items-center gap-0.5 rounded-full border border-slate-950/15 bg-white px-2.5 py-1 text-[13px] font-medium transition-colors hover:bg-slate-50"
+          className="flex h-7 cursor-default items-center gap-0.5 rounded-full border border-slate-950/15 bg-white px-2.5 py-1 text-[13px] font-medium transition-colors hover:bg-slate-50 dark:border-gray-600/70 dark:bg-gray-800 dark:hover:bg-gray-700"
         >
           <DiffBadgeSegments diffCounts={diffCounts} />
         </button>
@@ -90,14 +90,14 @@ export function DiffSummaryHoverCard({
           )}
         </div>
         {onShowDiff && (
-          <div className="border-t border-slate-950/15 p-2">
+          <div className="border-t border-slate-950/15 p-2 dark:border-gray-800/70">
             <button
               type="button"
               onClick={onShowDiff}
-              className="flex w-full items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-slate-50"
+              className="flex w-full items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-slate-50 dark:hover:bg-gray-800"
               data-testid="canvas-show-diff-button"
             >
-              <Eye className="h-4 w-4 shrink-0 text-gray-800" />
+              <Eye className="h-4 w-4 shrink-0 text-gray-800 dark:text-gray-100" />
               <span className={diffMenuLabelClassName}>See Full Diff</span>
             </button>
           </div>
