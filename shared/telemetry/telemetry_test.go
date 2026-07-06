@@ -38,8 +38,8 @@ func TestInitDisabledWhenMetricsExporterNone(t *testing.T) {
 }
 
 func TestFleetAttr(t *testing.T) {
-	attr := FleetAttr("aws-standard-1")
-	if attr.Key != "fleet_id" || attr.Value.AsString() != "aws-standard-1" {
+	attr := FleetAttr("e1-tiny-amd64")
+	if attr.Key != "fleet_id" || attr.Value.AsString() != "e1-tiny-amd64" {
 		t.Fatalf("FleetAttr: got %v", attr)
 	}
 }
