@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -549,6 +550,62 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.Equal(t, existingError, *updatedVersionNode.ErrorMessage)
 	})
 
+	t.Run("update node resets webhook when component changes", func(t *testing.T) {
+		r := support.Setup(t)
+
+		now := time.Now()
+		staleWebhookID := uuid.New()
+		require.NoError(t, database.Conn().Create(&models.Webhook{
+			ID:        staleWebhookID,
+			State:     models.WebhookStateReady,
+			Secret:    []byte("secret"),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}).Error)
+
+		existingNode := componentCanvasNode("node-a", "Node A", "runnerBash", runnerConfiguration())
+		existingNode.WebhookID = &staleWebhookID
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{existingNode},
+			nil,
+		)
+
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			"Test commit",
+			[]models.Node{
+				componentNode("node-a", "Node A", "runnerPython", runnerConfiguration()),
+			},
+			nil,
+		)
+		require.NoError(t, err)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, err)
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		activeNode := findCanvasNode(t, activeNodes, "node-a")
+		require.NotNil(t, activeNode.WebhookID)
+		require.NotEqual(t, staleWebhookID, *activeNode.WebhookID)
+		require.Equal(t, models.CanvasNodeStateReady, activeNode.State)
+
+		staleWebhookNodes, err := models.FindWebhookNodesInTransaction(database.Conn(), staleWebhookID)
+		require.NoError(t, err)
+		require.Empty(t, staleWebhookNodes)
+	})
+
 	t.Run("add node with conflicting id rewrites id in db and published version", func(t *testing.T) {
 		r := support.Setup(t)
 
@@ -823,6 +880,14 @@ func componentNode(nodeID string, name string, component string, configuration m
 		Configuration: configuration,
 		Metadata:      map[string]any{},
 		Position:      models.Position{X: 10, Y: 20},
+	}
+}
+
+func runnerConfiguration() map[string]any {
+	return map[string]any{
+		"machine_type":   "e1-large-amd64",
+		"execution_mode": "host",
+		"script":         "echo hello",
 	}
 }
 

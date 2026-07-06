@@ -320,6 +320,7 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	// Update the node with the new values.
 	//
 	now := time.Now()
+	implementationChanged := nodeImplementationChanged(existingNode, updatedNode)
 	existingNode.Name = updatedNode.Name
 	existingNode.Type = updatedNode.Type
 	existingNode.Ref = datatypes.NewJSONType(updatedNode.Ref)
@@ -328,6 +329,9 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
 	existingNode.AppInstallationID = appInstallationID
 	existingNode.UpdatedAt = &now
+	if implementationChanged {
+		existingNode.WebhookID = nil
+	}
 
 	//
 	// If node is already in error state, no need to run Setup() for it.
@@ -390,6 +394,17 @@ func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) (*uuid.UUID, er
 	}
 
 	return &id, nil
+}
+
+func nodeImplementationChanged(existingNode models.CanvasNode, updatedNode models.Node) bool {
+	return existingNode.Type != updatedNode.Type || models.NodeTypeName(nodeFromCanvasNode(existingNode)) != models.NodeTypeName(updatedNode)
+}
+
+func nodeFromCanvasNode(node models.CanvasNode) models.Node {
+	return models.Node{
+		Type: node.Type,
+		Ref:  node.Ref.Data(),
+	}
 }
 
 func (p *CanvasPublisher) setupNode(ctx context.Context, node *models.CanvasNode) error {
