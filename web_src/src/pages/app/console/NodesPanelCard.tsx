@@ -75,7 +75,7 @@ function NodesPanelBody({ content }: { content: NodesPanelContent }) {
     );
   }
   return (
-    <ul className="flex h-full flex-col divide-y divide-slate-100" data-testid="nodes-panel-list">
+    <ul className="flex h-full flex-col divide-y divide-slate-100 dark:divide-gray-800" data-testid="nodes-panel-list">
       {content.nodes.map((entry, idx) => (
         <NodesPanelRow key={`${entry.node}-${idx}`} entry={entry} />
       ))}
@@ -92,16 +92,19 @@ function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
   return (
     <li className="flex items-center gap-3 px-3 py-2" data-testid="nodes-panel-row">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium text-slate-800" data-testid="nodes-panel-row-name">
+        <div
+          className="truncate text-[13px] font-medium text-slate-800 dark:text-gray-100"
+          data-testid="nodes-panel-row-name"
+        >
           {displayName}
         </div>
         {entry.description ? (
-          <p className="truncate text-[13px] text-slate-500" title={entry.description}>
+          <p className="truncate text-[13px] text-slate-500 dark:text-gray-400" title={entry.description}>
             {entry.description}
           </p>
         ) : null}
         {!resolved ? (
-          <p className="truncate text-[13px] text-amber-600">
+          <p className="truncate text-[13px] text-amber-600 dark:text-amber-400">
             Node {JSON.stringify(entry.node)} not found in this canvas.
           </p>
         ) : null}
@@ -180,7 +183,7 @@ function NodesPanelForm({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Title (optional)</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Title (optional)</Label>
         <Input
           value={value.title ?? ""}
           onChange={(e) => onChange({ ...value, title: e.target.value })}
@@ -189,14 +192,14 @@ function NodesPanelForm({
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-medium text-slate-600">Nodes</Label>
+          <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Nodes</Label>
           <Button type="button" size="sm" variant="outline" onClick={addEntry} data-testid="nodes-panel-add-entry">
             <Plus className="mr-1 h-3.5 w-3.5" />
             Add node
           </Button>
         </div>
         {value.nodes.length === 0 ? (
-          <p className="rounded border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-500">
+          <p className="rounded border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-500 dark:border-gray-600 dark:text-gray-400">
             No nodes yet. Add one to display it in this panel.
           </p>
         ) : (
@@ -233,10 +236,10 @@ function NodesPanelEntryRow({
   const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
 
   return (
-    <div className="space-y-2 rounded border border-slate-200 p-2.5">
+    <div className="space-y-2 rounded border border-slate-200 p-2.5 dark:border-gray-600">
       <div className="grid grid-cols-12 gap-2">
         <div className="col-span-6 space-y-1.5">
-          <Label className="text-[11px] font-medium text-slate-600">Node</Label>
+          <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Node</Label>
           <Select value={entry.node || "__none__"} onValueChange={(v) => onChange({ node: v === "__none__" ? "" : v })}>
             <SelectTrigger className="h-8">
               <SelectValue placeholder="Select a node" />
@@ -252,7 +255,7 @@ function NodesPanelEntryRow({
           </Select>
         </div>
         <div className="col-span-5 space-y-1.5">
-          <Label className="text-[11px] font-medium text-slate-600">Label (optional)</Label>
+          <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Label (optional)</Label>
           <Input
             value={entry.label ?? ""}
             onChange={(e) => onChange({ label: e.target.value || undefined })}
@@ -275,7 +278,7 @@ function NodesPanelEntryRow({
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label className="text-[11px] font-medium text-slate-600">Description (optional)</Label>
+        <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Description (optional)</Label>
         <Textarea
           value={entry.description ?? ""}
           onChange={(e) => onChange({ description: e.target.value || undefined })}
@@ -291,16 +294,18 @@ function NodesPanelEntryRow({
               id={showRunId}
               checked={Boolean(entry.showRun)}
               onCheckedChange={(checked) => onChange({ showRun: checked === true })}
-              className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
+              className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600 dark:border-gray-600"
             />
-            <Label htmlFor={showRunId} className="text-xs text-slate-700">
+            <Label htmlFor={showRunId} className="text-xs text-slate-700 dark:text-gray-300">
               Show a manual "Run" button (requires run permission).
             </Label>
           </div>
           {entry.showRun ? (
             <>
               <div className="space-y-1.5">
-                <Label className="text-[11px] font-medium text-slate-600">Trigger template (optional)</Label>
+                <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">
+                  Trigger template (optional)
+                </Label>
                 <Input
                   value={entry.triggerName ?? ""}
                   onChange={(e) => onChange({ triggerName: e.target.value || undefined })}
@@ -315,7 +320,7 @@ function NodesPanelEntryRow({
                   onCheckedChange={(checked) => onChange({ promptConfirmation: checked === true })}
                   className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
                 />
-                <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700">
+                <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700 dark:text-gray-300">
                   Prompt confirmation before running (templates with input fields always prompt).
                 </Label>
               </div>
@@ -323,7 +328,7 @@ function NodesPanelEntryRow({
           ) : null}
         </>
       ) : entry.node && resolved ? (
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[11px] text-slate-500 dark:text-gray-400">
           Only trigger nodes can be run from the console. Pick the trigger that starts your flow.
         </p>
       ) : null}

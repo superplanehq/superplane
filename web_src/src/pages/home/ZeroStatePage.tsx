@@ -2,10 +2,25 @@ import { Button } from "@/components/ui/button";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { ArrowRight, Eye, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { AppDetailModal, IntegrationIcons, LeadIcon, type AppEntry } from "./AppDetailModal";
+import { AppDetailModal, LeadIcon, type AppEntry } from "./AppDetailModal";
 import { APP_CATALOG } from "./appCatalog";
+import { cn } from "@/lib/utils";
+import {
+  createActionCardClassName,
+  createActionCardDisabledClassName,
+  createActionIconClassName,
+  createActionIconDisabledClassName,
+} from "@/lib/createActionStyles";
 import { useCreateApp } from "./useCreateApp";
 import { InstallProgressPanel } from "./InstallProgressPanel";
+import {
+  homeCardTitleClassName,
+  homeDividerLabelClassName,
+  homeDividerLineClassName,
+  homeListCardClassName,
+  homePageSubtitleClassName,
+  homePageTitleClassName,
+} from "./homePageStyles";
 
 export function ZeroStatePage() {
   const { createApp, isSaving } = useCreateApp();
@@ -64,20 +79,18 @@ export function ZeroStatePage() {
       )}
       <div className="mx-auto w-full max-w-3xl px-8 py-16">
         <div className="mb-10 text-center">
-          <h1 className="text-xl font-medium text-slate-900">Create New App</h1>
-          <p className="mt-2 text-sm font-medium text-gray-500">
-            Create a blank app or pick one from the catalog below.
-          </p>
+          <h1 className={homePageTitleClassName}>Create New App</h1>
+          <p className={homePageSubtitleClassName}>Create a blank app or pick one from the catalog below.</p>
         </div>
 
         <BlankAppButton busy={busy} onCreate={handleBlankCreate} />
 
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-slate-950/10" />
+            <span className={homeDividerLineClassName} />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-slate-100 px-3 text-sm font-medium text-gray-500">or begin with a starter app</span>
+            <span className={homeDividerLabelClassName}>or begin with a starter app</span>
           </div>
         </div>
 
@@ -106,13 +119,13 @@ function BlankAppButton({ busy, onCreate }: { busy: boolean; onCreate: () => voi
       type="button"
       disabled={busy}
       onClick={onCreate}
-      className="flex min-h-[58px] w-full items-center gap-4 rounded-md bg-white px-4 py-3 text-left outline outline-slate-950/10 transition-colors hover:outline-slate-950/20 disabled:opacity-50 dark:bg-gray-900"
+      className={cn("min-h-[58px] text-left", busy ? createActionCardDisabledClassName : createActionCardClassName)}
     >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white">
+      <span className={busy ? createActionIconDisabledClassName : createActionIconClassName}>
         <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-      </div>
+      </span>
       <div>
-        <p className="text-base font-medium text-slate-900">Start from scratch</p>
+        <p className={homeCardTitleClassName}>Start from scratch</p>
       </div>
     </button>
   );
@@ -135,18 +148,14 @@ function AppListItem({
 }) {
   return (
     <>
-      <div
-        onClick={() => onSelect(app)}
-        className="cursor-pointer rounded-md bg-white px-4 py-3 outline outline-slate-950/10 transition-colors hover:outline-slate-950/20 dark:bg-gray-900"
-      >
+      <div onClick={() => onSelect(app)} className={cn("cursor-pointer px-4 py-3", homeListCardClassName)}>
         <div className="flex min-h-[34px] items-center justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-4">
             <div className="shrink-0">
               <LeadIcon icon={app.icon} integrations={app.integrations} size="lg" />
             </div>
             <div className="flex min-w-0 items-center gap-2">
-              <p className="text-base font-medium text-slate-900">{app.title}</p>
-              <IntegrationIcons integrations={app.integrations} />
+              <p className={homeCardTitleClassName}>{app.title}</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -163,7 +172,7 @@ function AppListItem({
               <Eye className="h-4 w-4" />
             </Button>
             <Button
-              className="shrink-0"
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onInstall(app);
@@ -171,7 +180,7 @@ function AppListItem({
               disabled={busy}
             >
               Install
-              <ArrowRight className="ml-1 h-4 w-4 text-gray-400" />
+              <ArrowRight />
             </Button>
           </div>
         </div>

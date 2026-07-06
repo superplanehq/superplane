@@ -173,7 +173,7 @@ export function Select({
           ref={refs.setFloating}
           style={floatingStyles}
           role="listbox"
-          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 focus:outline-none"
+          className="z-50 max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-600 focus:outline-none"
         >
           <div ref={listRef}>
             {options.length === 0 ? (

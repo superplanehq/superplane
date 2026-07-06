@@ -53,7 +53,7 @@ export function UsageTab({ organizationId, workflowGroups }: UsageTabProps) {
           <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
             This integration is currently used in the following canvases:
           </p>
-          <div className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
+          <div className="overflow-hidden rounded-md border border-gray-300 dark:border-gray-600">
             <div className="overflow-x-auto">
               <table className="table-fixed w-full min-w-[520px] divide-y divide-gray-200 dark:divide-gray-800">
                 <colgroup>
