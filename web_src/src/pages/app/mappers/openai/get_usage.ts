@@ -92,14 +92,21 @@ function sumField(buckets: UsageBucket[] | undefined, field: string): number {
 }
 
 function totalCost(buckets: UsageBucket[] | undefined): string {
-  let total = 0;
-  let currency = "usd";
+  // Totals are kept per currency so mixed-currency results are not summed
+  // into a single misleading number.
+  const totals = new Map<string, number>();
   eachResult(buckets, (result) => {
     const amount = result["amount"] as { value?: number; currency?: string } | undefined;
-    if (typeof amount?.value === "number") total += amount.value;
-    if (amount?.currency) currency = amount.currency;
+    if (typeof amount?.value !== "number") return;
+    const currency = amount.currency || "usd";
+    totals.set(currency, (totals.get(currency) ?? 0) + amount.value);
   });
-  return `${total.toFixed(2)} ${currency.toUpperCase()}`;
+
+  if (totals.size === 0) {
+    return "0.00 USD";
+  }
+
+  return [...totals.entries()].map(([currency, value]) => `${value.toFixed(2)} ${currency.toUpperCase()}`).join(", ");
 }
 
 function usageTotals(usageType: string, buckets: UsageBucket[] | undefined): Record<string, string> {

@@ -175,8 +175,14 @@ func (c *Client) GetUsage(path string, params url.Values) ([]UsageBucket, error)
 		}
 
 		buckets = append(buckets, page.Data...)
-		if !page.HasMore || page.NextPage == "" {
+		if !page.HasMore {
 			return buckets, nil
+		}
+
+		// has_more without a cursor would silently truncate (or loop on the same
+		// page), so treat it as an API contract violation.
+		if page.NextPage == "" {
+			return nil, fmt.Errorf("usage response reported more pages without a pagination cursor")
 		}
 
 		params.Set("page", page.NextPage)

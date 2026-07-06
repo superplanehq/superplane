@@ -250,6 +250,39 @@ func Test__GetUsage__Execute(t *testing.T) {
 		assert.Equal(t, "page_2", httpContext.Requests[1].URL.Query().Get("page"))
 	})
 
+	t.Run("has_more without a cursor -> error instead of truncated data", func(t *testing.T) {
+		inconsistentPage := strings.Replace(usagePageBody, `"has_more": false`, `"has_more": true`, 1)
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(inconsistentPage)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiKey":   "test-key",
+				"adminKey": "test-admin-key",
+			},
+		}
+
+		execCtx := core.ExecutionContext{
+			ID:             uuid.New(),
+			Configuration:  map[string]any{},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Logger:         logrus.NewEntry(logrus.New()),
+		}
+
+		err := c.Execute(execCtx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "without a pagination cursor")
+	})
+
 	t.Run("exceeding the page cap -> error instead of truncated data", func(t *testing.T) {
 		morePage := strings.Replace(usagePageBody, `"has_more": false`, `"has_more": true`, 1)
 		morePage = strings.Replace(morePage, `"next_page": ""`, `"next_page": "page_next"`, 1)
