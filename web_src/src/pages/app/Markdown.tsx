@@ -1,8 +1,8 @@
 import { Children, isValidElement } from "react";
 import type { ComponentProps, ReactNode } from "react";
-import type { Element } from "hast";
 import ReactMarkdown from "react-markdown";
 import { defaultUrlTransform } from "react-markdown";
+import type { ExtraProps } from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
@@ -110,7 +110,10 @@ export function MarkdownContent({
   );
 }
 
-function MarkdownPre({ children, node, ...props }: ComponentProps<"pre"> & { node?: Element }) {
+type MarkdownNode = NonNullable<ExtraProps["node"]>;
+type MarkdownElementChild = Extract<MarkdownNode["children"][number], { type: "element" }>;
+
+function MarkdownPre({ children, node, ...props }: ComponentProps<"pre"> & ExtraProps) {
   if (hasLanguageCodeNode(node) || hasLanguageCodeChild(children)) {
     return <>{children}</>;
   }
@@ -168,9 +171,9 @@ function hasLanguageCodeChild(children: ReactNode): boolean {
   return isValidElement<{ className?: string }>(child) && /^language-\w+/.test(child.props.className || "");
 }
 
-function hasLanguageCodeNode(node?: Element): boolean {
+function hasLanguageCodeNode(node?: ExtraProps["node"]): boolean {
   const codeNode = node?.children?.find(
-    (child): child is Element => child.type === "element" && child.tagName === "code",
+    (child): child is MarkdownElementChild => child.type === "element" && child.tagName === "code",
   );
   return getClassNames(codeNode?.properties?.className).some((className) => /^language-\w+$/.test(className));
 }
