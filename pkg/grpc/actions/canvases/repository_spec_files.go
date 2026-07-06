@@ -2,18 +2,13 @@ package canvases
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"gorm.io/gorm"
 )
 
 const (
@@ -30,134 +25,33 @@ func normalizeRepositoryFilePath(path string) string {
 	return strings.TrimLeft(strings.TrimSpace(strings.ReplaceAll(path, "\\", "/")), "/")
 }
 
-func AppendRepositorySpecFilePaths(paths []string) []string {
-	merged := make([]string, 0, len(paths)+2)
-	seen := make(map[string]struct{}, len(paths)+2)
-
-	for _, specPath := range []string{CanvasYAMLRepositoryPath, ConsoleYAMLRepositoryPath} {
-		merged = append(merged, specPath)
-		seen[specPath] = struct{}{}
-	}
-
-	for _, path := range paths {
-		normalized := normalizeRepositoryFilePath(path)
-		if normalized == "" {
-			continue
-		}
-		if _, ok := seen[normalized]; ok {
-			continue
-		}
-		seen[normalized] = struct{}{}
-		merged = append(merged, normalized)
-	}
-
-	sort.Strings(merged)
-	return merged
-}
-
-func ReadRepositorySpecFile(
-	ctx context.Context,
-	organizationID string,
-	canvasID string,
-	versionID string,
-	path string,
-) (string, error) {
-	return readRepositorySpecFile(ctx, organizationID, canvasID, versionID, path, false)
+func ReadRepositorySpecFile(ctx context.Context, canvas *models.Canvas, version *models.CanvasVersion, path string) (string, error) {
+	return readRepositorySpecFile(ctx, canvas, version, path, false)
 }
 
 // ReadRepositorySpecFileStaged returns the effective draft content for a spec
 // path: staged content when present, the materialized version row otherwise.
-func ReadRepositorySpecFileStaged(
-	ctx context.Context,
-	organizationID string,
-	canvasID string,
-	versionID string,
-	path string,
-) (string, error) {
-	return readRepositorySpecFile(ctx, organizationID, canvasID, versionID, path, true)
+func ReadRepositorySpecFileStaged(ctx context.Context, canvas *models.Canvas, version *models.CanvasVersion, path string) (string, error) {
+	return readRepositorySpecFile(ctx, canvas, version, path, true)
 }
 
-func readRepositorySpecFile(
-	ctx context.Context,
-	organizationID string,
-	canvasID string,
-	versionID string,
-	path string,
-	stage bool,
-) (string, error) {
+func readRepositorySpecFile(ctx context.Context, canvas *models.Canvas, version *models.CanvasVersion, path string, stage bool) (string, error) {
 	db := database.DB(ctx)
-	canvas, version, err := loadRepositorySpecVersionForRead(ctx, organizationID, canvasID, versionID)
-	if err != nil {
-		return "", err
-	}
-
 	normalized := normalizeRepositoryFilePath(path)
 	if normalized != CanvasYAMLRepositoryPath && normalized != ConsoleYAMLRepositoryPath {
 		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", path))
 	}
 
 	if stage {
-		return ReadStagedRepositorySpecFile(ctx, db, organizationID, canvasID, version, normalized)
+		return ReadStagedRepositorySpecFile(ctx, db, canvas.OrganizationID.String(), canvas.ID.String(), version, normalized)
 	}
 
 	switch normalized {
 	case CanvasYAMLRepositoryPath:
-		return canvasYAMLFromVersion(canvas, version, organizationID)
+		return canvasYAMLFromVersion(canvas, version, canvas.OrganizationID.String())
 	default:
 		return consoleYAMLFromVersion(canvas, version)
 	}
-}
-
-func loadRepositorySpecVersionForRead(
-	ctx context.Context,
-	organizationID string,
-	canvasID string,
-	versionID string,
-) (*models.Canvas, *models.CanvasVersion, error) {
-	orgUUID, err := uuid.Parse(organizationID)
-	if err != nil {
-		return nil, nil, grpcerrors.InvalidArgument(nil, "invalid organization_id")
-	}
-
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, nil, grpcerrors.InvalidArgument(nil, "invalid canvas_id")
-	}
-
-	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, grpcerrors.NotFound(err, "canvas not found")
-		}
-		return nil, nil, grpcerrors.Internal(err, "failed to load canvas")
-	}
-
-	var version *models.CanvasVersion
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		resolvedVersionID, resolveErr := resolveLiveCanvasVersionID(tx, canvas, versionID)
-		if resolveErr != nil {
-			return resolveErr
-		}
-
-		v, loadErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, resolvedVersionID)
-		if loadErr != nil {
-			if errors.Is(loadErr, gorm.ErrRecordNotFound) {
-				return grpcerrors.NotFound(loadErr, "version not found")
-			}
-			return loadErr
-		}
-
-		version = v
-		return nil
-	})
-	if err != nil {
-		if grpcerrors.Code(err) != codes.Unknown {
-			return nil, nil, err
-		}
-		return nil, nil, grpcerrors.Internal(err, "failed to load version")
-	}
-
-	return canvas, version, nil
 }
 
 // ParseAndValidateCanvasYAML parses canvas.yaml text and runs the same registry
