@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  NO_INCOMING_CONNECTIONS_WARNING,
   clearRunDetailNodeSearchParams,
   isValidRunId,
   shouldClearRunDetailNode,
   shouldClearStaleRunUrl,
+  withDerivedNodeWarnings,
 } from "./workflowPageHelpers";
+import { makeComponentsNode, makeEdge } from "@/test/factories";
+import type { ActionsAction } from "@/api-client";
 
 const validRunId = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -131,5 +135,55 @@ describe("workflowPageHelpers run inspection", () => {
 
     expect(unchanged.get("sidebar")).toBe("1");
     expect(unchanged.get("node")).toBe("node-b");
+  });
+});
+
+describe("withDerivedNodeWarnings", () => {
+  const componentDefinitions = [
+    {
+      name: "source",
+      outputChannels: [{ name: "success" }],
+    },
+    {
+      name: "target",
+      outputChannels: [{ name: "default" }],
+    },
+  ] as ActionsAction[];
+
+  it("warns action nodes without valid incoming connections", () => {
+    const source = makeComponentsNode({ id: "source", component: "source" });
+    const target = makeComponentsNode({ id: "target", component: "target" });
+
+    const [preparedSource, preparedTarget] = withDerivedNodeWarnings(
+      [source, target],
+      [makeEdge({ sourceId: "source", targetId: "target", channel: "default" })],
+      componentDefinitions,
+    );
+
+    expect(preparedSource.warningMessage).toBe(NO_INCOMING_CONNECTIONS_WARNING);
+    expect(preparedTarget.warningMessage).toBe(NO_INCOMING_CONNECTIONS_WARNING);
+  });
+
+  it("does not warn action nodes with valid incoming connections", () => {
+    const source = makeComponentsNode({ id: "source", component: "source" });
+    const target = makeComponentsNode({ id: "target", component: "target" });
+
+    const prepared = withDerivedNodeWarnings(
+      [source, target],
+      [makeEdge({ sourceId: "source", targetId: "target", channel: "success" })],
+      componentDefinitions,
+    );
+
+    expect(prepared.find((node) => node.id === "target")?.warningMessage).toBeUndefined();
+  });
+
+  it("does not warn trigger nodes or replace existing warnings", () => {
+    const trigger = makeComponentsNode({ id: "trigger", type: "TYPE_TRIGGER" });
+    const target = makeComponentsNode({ id: "target", component: "target", warningMessage: "Existing warning" });
+
+    const prepared = withDerivedNodeWarnings([trigger, target], [], componentDefinitions);
+
+    expect(prepared.find((node) => node.id === "trigger")?.warningMessage).toBeUndefined();
+    expect(prepared.find((node) => node.id === "target")?.warningMessage).toBe("Existing warning");
   });
 });
