@@ -145,7 +145,7 @@ func (c *Client) VerifyAdmin() error {
 	params := url.Values{}
 	params.Set("start_time", fmt.Sprintf("%d", time.Now().AddDate(0, 0, -1).Unix()))
 	params.Set("limit", "1")
-	_, err := c.execRequestWithKey(http.MethodGet, c.BaseURL+"/organization/usage/completions?"+params.Encode(), nil, c.AdminKey)
+	_, err := c.execRequestWithKey(http.MethodGet, defaultBaseURL+"/organization/usage/completions?"+params.Encode(), nil, c.AdminKey)
 	return err
 }
 
@@ -154,7 +154,9 @@ const maxUsagePages = 12
 
 // GetUsage fetches all buckets for an org Usage/Costs API path (e.g.
 // "/organization/usage/completions"), following the next_page cursor.
-// Requires the admin API key.
+// Requires the admin API key. Organization usage endpoints only exist on the
+// OpenAI platform API, so requests always target the default base URL even
+// when a custom baseURL is configured for model endpoints.
 func (c *Client) GetUsage(path string, params url.Values) ([]UsageBucket, error) {
 	if c.AdminKey == "" {
 		return nil, fmt.Errorf("admin API key is not configured")
@@ -162,7 +164,7 @@ func (c *Client) GetUsage(path string, params url.Values) ([]UsageBucket, error)
 
 	buckets := []UsageBucket{}
 	for range maxUsagePages {
-		responseBody, err := c.execRequestWithKey(http.MethodGet, c.BaseURL+path+"?"+params.Encode(), nil, c.AdminKey)
+		responseBody, err := c.execRequestWithKey(http.MethodGet, defaultBaseURL+path+"?"+params.Encode(), nil, c.AdminKey)
 		if err != nil {
 			return nil, err
 		}

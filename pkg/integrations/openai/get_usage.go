@@ -114,7 +114,8 @@ For costs, each result carries the amount value and currency per line item.
 ## Notes
 
 - Requires an organization admin API key (sk-admin-...) configured in the integration
-- Admin keys are created by organization owners at platform.openai.com/settings/organization/admin-keys`
+- Admin keys are created by organization owners at platform.openai.com/settings/organization/admin-keys
+- Usage data is always fetched from the OpenAI platform API; a custom Base URL configured for model endpoints does not apply`
 }
 
 func (c *GetUsage) Icon() string {

@@ -120,9 +120,11 @@ func (o *OpenAI) Sync(ctx core.SyncContext) error {
 		return err
 	}
 
+	// The admin key is optional and only used for usage data, so a failed
+	// verification must not block model components from becoming ready.
 	if config.AdminKey != "" {
-		if err := client.VerifyAdmin(); err != nil {
-			return fmt.Errorf("admin key verification failed: %w", err)
+		if err := client.VerifyAdmin(); err != nil && ctx.Logger != nil {
+			ctx.Logger.Warnf("admin key verification failed: %v", err)
 		}
 	}
 
