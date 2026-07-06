@@ -150,14 +150,14 @@ import {
   getNodeAnalyticsProps,
   isCanvasLoadNotFoundError,
   isValidRunId,
+  prepareCanvasLogNodes,
   prepareData,
   prepareSidebarData,
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
-const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
-const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
+const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
 
 function updateCanvasDetailForSelectedVersion({
   queryClient,
@@ -1347,8 +1347,8 @@ export function AppPage() {
     () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
     [triggers, components, availableIntegrations],
   );
-  const canvasNodes = canvas?.spec?.nodes ?? EMPTY_CANVAS_NODES;
-  const canvasEdges = canvas?.spec?.edges ?? EMPTY_CANVAS_EDGES;
+  const canvasNodes = canvas?.spec?.nodes ?? EMPTY_CANVAS_SPEC_ITEMS;
+  const canvasEdges = canvas?.spec?.edges ?? EMPTY_CANVAS_SPEC_ITEMS;
   const canvasNodesById = useMemo(() => {
     const nodesById = new Map<string, ComponentsNode>();
     canvasNodes.forEach((node) => {
@@ -1745,15 +1745,13 @@ export function AppPage() {
     handleCanvasStagingEvent,
     () => activeCanvasVersionId || effectiveLiveCanvasVersionId || undefined,
   );
-
-  const rawLogNodes = canvasNodes;
+  const rawLogNodes = prepareCanvasLogNodes(canvasNodes, canvasEdges, allComponents);
   const logNodesSignature = useMemo(() => getCanvasLogNodesSignature(rawLogNodes), [rawLogNodes]);
   const logNodesRef = useRef<{ signature: string; nodes: ComponentsNode[] }>({ signature: "", nodes: [] });
   const logNodes = useMemo(() => {
     if (logNodesRef.current.signature === logNodesSignature) {
       return logNodesRef.current.nodes;
     }
-
     logNodesRef.current = { signature: logNodesSignature, nodes: rawLogNodes };
     return rawLogNodes;
   }, [rawLogNodes, logNodesSignature]);
@@ -1769,7 +1767,6 @@ export function AppPage() {
       return aTime - bTime;
     });
   }, [handleLogNodeSelect, canvas?.metadata?.updatedAt, logNodes]);
-
   const nodeHistoryQuery = useNodeHistory({
     canvasId: canvasId || "",
     nodeId: currentHistoryNode?.nodeId || "",

@@ -1,14 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   NO_INCOMING_CONNECTIONS_WARNING,
   clearRunDetailNodeSearchParams,
   isValidRunId,
+  prepareCanvasLogNodes,
   shouldClearRunDetailNode,
   shouldClearStaleRunUrl,
   withDerivedNodeWarnings,
 } from "./workflowPageHelpers";
 import { makeComponentsNode, makeEdge } from "@/test/factories";
 import type { ActionsAction } from "@/api-client";
+import { mapCanvasNodesToLogEntries } from "./utils";
 
 const validRunId = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -185,5 +187,38 @@ describe("withDerivedNodeWarnings", () => {
 
     expect(prepared.find((node) => node.id === "trigger")?.warningMessage).toBeUndefined();
     expect(prepared.find((node) => node.id === "target")?.warningMessage).toBe("Existing warning");
+  });
+});
+
+describe("prepareCanvasLogNodes", () => {
+  it("includes derived connectivity warnings in canvas log entries", () => {
+    const source = makeComponentsNode({ id: "source", name: "Source", component: "source" });
+    const target = makeComponentsNode({ id: "target", name: "Target", component: "target" });
+    const logNodes = prepareCanvasLogNodes(
+      [source, target],
+      [makeEdge({ sourceId: "source", targetId: "target", channel: "default" })],
+      [
+        {
+          name: "source",
+          outputChannels: [{ name: "success" }],
+        },
+        {
+          name: "target",
+          outputChannels: [{ name: "default" }],
+        },
+      ] as ActionsAction[],
+    );
+
+    const entries = mapCanvasNodesToLogEntries({
+      nodes: logNodes,
+      workflowUpdatedAt: "2026-07-06T16:00:00Z",
+      onNodeSelect: vi.fn(),
+    });
+
+    expect(entries).toHaveLength(2);
+    expect(entries.map((entry) => entry.searchText)).toEqual([
+      `Source source ${NO_INCOMING_CONNECTIONS_WARNING}`,
+      `Target target ${NO_INCOMING_CONNECTIONS_WARNING}`,
+    ]);
   });
 });

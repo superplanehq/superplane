@@ -50,6 +50,14 @@ export function getCanvasLogNodesSignature(nodes: ComponentsNode[]): string {
   );
 }
 
+export function prepareCanvasLogNodes(
+  nodes: ComponentsNode[],
+  edges: ComponentsEdge[],
+  components: ActionsAction[],
+): ComponentsNode[] {
+  return withDerivedNodeWarnings(nodes, edges, components);
+}
+
 // Merge a run's lightweight execution ref with the matching full execution (preferred from the
 // prefetched event-executions query, falling back to the live store), so mappers receive metadata
 // (approval records) and outputs (wait/timegate "pushed through" detection).
