@@ -26,6 +26,7 @@ const {
   useMoveCanvasFolder,
   useDeleteCanvasFolder,
   useUpdateCanvasFolderMembership,
+  useUpdateCanvasPreference,
 } = vi.hoisted(() => ({
   useCanvases: vi.fn(),
   useCanvasFolders: vi.fn(),
@@ -36,6 +37,7 @@ const {
   useMoveCanvasFolder: vi.fn(),
   useDeleteCanvasFolder: vi.fn(),
   useUpdateCanvasFolderMembership: vi.fn(),
+  useUpdateCanvasPreference: vi.fn(),
 }));
 
 const mutationMocks = vi.hoisted(() => ({
@@ -48,6 +50,7 @@ const mutationMocks = vi.hoisted(() => ({
   moveCanvasFolder: vi.fn(),
   deleteCanvasFolder: vi.fn(),
   updateCanvasFolderMembership: vi.fn(),
+  updateCanvasPreference: vi.fn(),
 }));
 
 vi.mock("@/components/OrganizationMenuButton", () => ({
@@ -97,6 +100,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
   DEFAULT_CANVAS_FOLDER_COLOR: "blue",
   canvasKeys: {
     detail: (organizationId: string, canvasId: string) => ["canvases", "detail", organizationId, canvasId],
+    list: (organizationId: string) => ["canvases", "list", organizationId],
   },
   useCanvases,
   useCanvasFolders,
@@ -107,12 +111,18 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useMoveCanvasFolder,
   useDeleteCanvasFolder,
   useUpdateCanvasFolderMembership,
+  useUpdateCanvasPreference,
 }));
 
 import { HomePage } from "./index";
 import { NewAppPage } from "./NewAppPage";
 
-function makeCanvas(id: string, name: string, canvasFolderId?: string): CanvasesCanvasSummary {
+function makeCanvas(
+  id: string,
+  name: string,
+  canvasFolderId?: string,
+  overrides: Partial<CanvasesCanvasSummary> = {},
+): CanvasesCanvasSummary {
   return {
     id,
     name,
@@ -121,6 +131,7 @@ function makeCanvas(id: string, name: string, canvasFolderId?: string): Canvases
     createdBy: { name: "Ada Lovelace" },
     nodes: [],
     edges: [],
+    ...overrides,
   } as CanvasesCanvasSummary;
 }
 
@@ -161,6 +172,7 @@ function renderHome() {
 describe("HomePage canvas folders", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mutationMocks.createCanvasFolder.mockResolvedValue({ data: { folder: { metadata: { id: "new-folder" } } } });
     mutationMocks.updateCanvasFolder.mockResolvedValue({});
     mutationMocks.moveCanvasFolder.mockResolvedValue({});
@@ -183,6 +195,10 @@ describe("HomePage canvas folders", () => {
     useDeleteCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.deleteCanvasFolder, isPending: false });
     useUpdateCanvasFolderMembership.mockReturnValue({
       mutateAsync: mutationMocks.updateCanvasFolderMembership,
+      isPending: false,
+    });
+    useUpdateCanvasPreference.mockReturnValue({
+      mutate: mutationMocks.updateCanvasPreference,
       isPending: false,
     });
   });
@@ -234,6 +250,51 @@ describe("HomePage canvas folders", () => {
     expect(zulu.compareDocumentPosition(alpha) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(zulu.compareDocumentPosition(aFreeCanvas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(aFreeCanvas.compareDocumentPosition(zFreeCanvas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("orders preferred canvases and requests preference updates", async () => {
+    const user = userEvent.setup();
+    useCanvases.mockReturnValue({
+      data: [
+        makeCanvas("z-free", "Z Free Canvas", undefined, {
+          folderId: "folder-1",
+          pinned: true,
+          pinnedAt: "2026-05-06T00:00:00Z",
+        }),
+        makeCanvas("starred", "Starred Canvas", undefined, {
+          starred: true,
+          starredAt: "2026-05-06T00:00:00Z",
+        }),
+        makeCanvas("a-free", "A Free Canvas"),
+      ],
+      isLoading: false,
+      error: null,
+    });
+    useCanvasFolders.mockReturnValue({
+      data: [makeFolder("folder-1", "Deployments", "blue", ["z-free"])],
+      isLoading: false,
+      error: null,
+    });
+
+    renderHome();
+
+    expect(screen.getByRole("heading", { name: "Pinned" })).toBeInTheDocument();
+    expect(screen.getByText("Deployments")).toBeInTheDocument();
+    expect(screen.queryByText("No canvases in this folder")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Unpin app Z Free Canvas")).toBeInTheDocument();
+    expect(
+      screen.getByText("Z Free Canvas").compareDocumentPosition(screen.getByText("A Free Canvas")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Starred Canvas").compareDocumentPosition(screen.getByText("A Free Canvas")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(screen.getByLabelText("Unpin app Z Free Canvas"));
+    await user.click(screen.getByLabelText("Unstar app Starred Canvas"));
+    expect(mutationMocks.updateCanvasPreference).toHaveBeenCalledWith({ canvasId: "z-free", pinned: false });
+    expect(mutationMocks.updateCanvasPreference).toHaveBeenCalledWith({ canvasId: "starred", starred: false });
   });
 
   it("moves a folder up from the folder menu", async () => {

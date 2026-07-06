@@ -469,6 +469,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
 		},
+		{Method: "PUT", Pattern: "/api/v1/canvases/{canvas_id}/preference"}: {
+			Resource:           "canvases",
+			Action:             "read",
+			DomainType:         models.DomainTypeOrganization,
+			ResourcePathParams: []string{CanvasIDPathParam},
+		},
 		{Method: "PUT", Pattern: "/api/v1/canvases/{id}"}: {
 			Resource:           "canvases",
 			Action:             "update",
