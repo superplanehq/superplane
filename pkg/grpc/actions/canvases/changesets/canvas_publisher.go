@@ -287,16 +287,21 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error {
 	updatedNode := p.finalNodes[change.Node.ID]
 
-	//
-	// Widgets are not saved as workflow_nodes records in the database.
-	//
 	if updatedNode.Type == models.NodeTypeWidget {
+		if _, exists := p.allNodes[updatedNode.ID]; exists {
+			return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", updatedNode.ID)
+		}
+
 		return nil
 	}
 
 	existingNode, exists := p.allNodes[updatedNode.ID]
 	if !exists {
 		return fmt.Errorf("node %s not found", updatedNode.ID)
+	}
+
+	if nodeImplementationChanged(existingNode, updatedNode) {
+		return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", updatedNode.ID)
 	}
 
 	appInstallationID, err := p.getNodeIntegrationID(updatedNode)
@@ -390,6 +395,17 @@ func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) (*uuid.UUID, er
 	}
 
 	return &id, nil
+}
+
+func nodeImplementationChanged(existingNode models.CanvasNode, updatedNode models.Node) bool {
+	return existingNode.Type != updatedNode.Type || models.NodeTypeName(nodeFromCanvasNode(existingNode)) != models.NodeTypeName(updatedNode)
+}
+
+func nodeFromCanvasNode(node models.CanvasNode) models.Node {
+	return models.Node{
+		Type: node.Type,
+		Ref:  node.Ref.Data(),
+	}
 }
 
 func (p *CanvasPublisher) setupNode(ctx context.Context, node *models.CanvasNode) error {
