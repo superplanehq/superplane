@@ -17,7 +17,6 @@ const (
 	CanvasFolderColorBlue   = "blue"
 	CanvasFolderColorGreen  = "green"
 	CanvasFolderColorPurple = "purple"
-	CanvasFolderColorYellow = "yellow"
 	CanvasFolderColorSlate  = "slate"
 	CanvasFolderColorOrange = "orange"
 
@@ -38,7 +37,6 @@ var CanvasFolderBackgroundColors = []string{
 	CanvasFolderColorBlue,
 	CanvasFolderColorGreen,
 	CanvasFolderColorPurple,
-	CanvasFolderColorYellow,
 	CanvasFolderColorSlate,
 	CanvasFolderColorOrange,
 }

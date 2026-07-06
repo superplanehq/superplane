@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { getDraftDiffEdgeStyle } from "@/lib/draftDiff";
+import { DARK_BASE_BG_HEX } from "@/lib/darkThemeSurfaces";
 import { cn } from "@/lib/utils";
 import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Search, Trash2, CircleAlert } from "lucide-react";
 import {
@@ -76,6 +77,7 @@ import {
   RUN_CANVAS_FIT_VIEW_OPTIONS,
 } from "@/ui/CanvasPage/canvasFitOptions";
 import { Sentry } from "@/sentry";
+import { useTheme } from "@/contexts/useTheme";
 import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
@@ -413,7 +415,7 @@ function ComponentSidebarLoadingSkeleton({ layout = "sidebar" }: { layout?: "sid
 
   if (layout === "bottom") {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white dark:bg-gray-900">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
           <p className="text-sm text-gray-500">Loading events...</p>
@@ -424,7 +426,7 @@ function ComponentSidebarLoadingSkeleton({ layout = "sidebar" }: { layout?: "sid
 
   return (
     <div
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-900"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       <div className="flex items-center justify-center h-full">
@@ -1442,8 +1444,8 @@ function CanvasPage(props: CanvasPageProps) {
           <div className="relative min-h-0 flex-1">
             {props.runCanvasLoading && props.isRunInspectionMode ? (
               <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
-                <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm">
-                  <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm dark:bg-gray-900/80">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-500 dark:text-gray-400" />
                 </div>
               </div>
             ) : null}
@@ -1468,7 +1470,11 @@ function CanvasPage(props: CanvasPageProps) {
               </div>
             ) : null}
             {props.headerMode === "files" ? (
-              <div className="absolute inset-0 bg-slate-50" data-testid="canvas-files-backdrop" aria-hidden />
+              <div
+                className="absolute inset-0 bg-slate-50 dark:bg-gray-900"
+                data-testid="canvas-files-backdrop"
+                aria-hidden
+              />
             ) : (
               <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
                 <CanvasContent
@@ -2170,6 +2176,10 @@ function CanvasContent({
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
   const { zoom } = useViewport();
+  const { resolvedTheme } = useTheme();
+  const flowColorMode = resolvedTheme === "dark" ? "dark" : "light";
+  const flowBgColor = resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9";
+  const flowDotColor = resolvedTheme === "dark" ? "#374151" : "#cbd5e1";
   const isReadOnly = readOnly ?? false;
   // The content-key driven re-fit only applies when viewing the live/version
   // canvas. Run inspection keeps its own dedicated fit/viewport handling, and
@@ -3141,7 +3151,7 @@ function CanvasContent({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 px-0 text-slate-600 hover:text-slate-900"
+              className="h-7 w-7 px-0 text-slate-600 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
               onClick={handleToggleAutoLayoutOnUpdate}
               disabled={isAutoLayoutToggleDisabled}
               aria-pressed={isAutoLayoutOnUpdateEnabled}
@@ -3208,6 +3218,7 @@ function CanvasContent({
       <div className="h-full">
         <div className="h-full w-full">
           <ReactFlow
+            colorMode={flowColorMode}
             nodes={culledNodes}
             edges={culledEdges}
             nodeTypes={nodeTypes}
@@ -3248,7 +3259,7 @@ function CanvasContent({
             style={reactFlowStyle}
             className="h-full w-full"
           >
-            <Background gap={8} size={2} bgColor="#F1F5F9" color="#cbd5e1" />
+            <Background gap={8} size={2} bgColor={flowBgColor} color={flowDotColor} />
             <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"
@@ -3277,7 +3288,7 @@ function CanvasContent({
                   {zoomSliderContent}
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex h-7 items-center gap-1 rounded-md p-0.5">
+                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex h-7 items-center gap-1 rounded-md p-0.5 dark:bg-gray-800 dark:text-gray-100 dark:outline-gray-600/70 [&_[data-slot=button]]:dark:hover:bg-gray-700">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -3290,11 +3301,17 @@ function CanvasContent({
                           onClick={() => handleLogButtonClick("errors")}
                         >
                           <CircleX
-                            className={unacknowledgedErrorCount > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"}
+                            className={
+                              unacknowledgedErrorCount > 0
+                                ? "h-3 w-3 text-red-500"
+                                : "h-3 w-3 text-gray-800 dark:text-gray-100"
+                            }
                           />
                           <span
                             className={
-                              unacknowledgedErrorCount > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"
+                              unacknowledgedErrorCount > 0
+                                ? "tabular-nums text-red-500"
+                                : "tabular-nums text-gray-800 dark:text-gray-100"
                             }
                           >
                             {unacknowledgedErrorCount}
@@ -3312,11 +3329,17 @@ function CanvasContent({
                           onClick={() => handleLogButtonClick("warnings")}
                         >
                           <CircleAlert
-                            className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
+                            className={
+                              logCounts.warning > 0
+                                ? "h-3 w-3 text-orange-500 dark:text-orange-300"
+                                : "h-3 w-3 text-gray-800 dark:text-gray-100"
+                            }
                           />
                           <span
                             className={
-                              logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"
+                              logCounts.warning > 0
+                                ? "tabular-nums text-orange-500 dark:text-orange-300"
+                                : "tabular-nums text-gray-800 dark:text-gray-100"
                             }
                           >
                             {logCounts.warning}

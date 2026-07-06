@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import type React from "react";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 
 const sizes = {
   xs: "sm:max-w-xs",
@@ -31,12 +32,13 @@ export function Dialog({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center">
-      <div className="fixed inset-0 bg-gray-950/20 dark:bg-gray-950/50" onClick={onClose} />
+      <div className="fixed inset-0 bg-gray-950/20 dark:bg-gray-900/50" onClick={onClose} />
       <div
         className={clsx(
           className,
           sizes[size],
           "relative w-full min-w-0 rounded-2xl bg-white p-8 shadow-lg dark:bg-gray-900",
+          appDarkModeClasses.modalEdge,
           "overflow-y-auto max-h-[100vh]",
         )}
         {...props}

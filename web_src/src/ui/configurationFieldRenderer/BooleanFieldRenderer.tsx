@@ -25,7 +25,7 @@ export const BooleanFieldRenderer: React.FC<FieldRendererProps & { labeled?: boo
         <div className="flex w-9 shrink-0 items-center justify-end">
           <Checkbox id={inputId} checked={checked} onCheckedChange={(next) => onChange(next === true)} />
         </div>
-        <span className="text-sm text-gray-600">{valueLabel}</span>
+        <span className="text-sm text-gray-600 dark:text-gray-400">{valueLabel}</span>
       </label>
     );
   }

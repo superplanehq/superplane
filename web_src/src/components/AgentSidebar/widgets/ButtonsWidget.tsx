@@ -8,22 +8,22 @@ interface ButtonsWidgetProps {
 
 export function ButtonsWidget({ prompt, items, onAction }: ButtonsWidgetProps) {
   return (
-    <div className="my-4 rounded-lg border border-slate-200 bg-white overflow-hidden">
+    <div className="my-4 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
       {prompt && (
-        <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
-          <p className="text-xs font-medium text-slate-900">{prompt}</p>
+        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/60">
+          <p className="text-xs font-medium text-slate-900 dark:text-gray-100">{prompt}</p>
         </div>
       )}
-      <div className="p-2 flex flex-col gap-1.5 overflow-x-auto">
+      <div className="flex flex-col gap-1.5 overflow-x-auto p-2">
         {items.map((item, i) => (
           <Button
             key={item}
             variant="ghost"
             size="sm"
-            className="justify-start text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 h-auto py-2 px-3 text-left whitespace-normal"
+            className="h-auto justify-start whitespace-normal px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
             onClick={() => onAction?.(item)}
           >
-            <span className="inline-flex items-center justify-center size-5 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold mr-2 shrink-0">
+            <span className="mr-2 inline-flex size-5 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-semibold text-slate-700 dark:bg-gray-700 dark:text-gray-200">
               {String.fromCharCode(65 + i)}
             </span>
             {item}

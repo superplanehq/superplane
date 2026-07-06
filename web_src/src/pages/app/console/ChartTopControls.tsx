@@ -47,7 +47,7 @@ export function ChartTopControls({
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Chart type</Label>
+          <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Chart type</Label>
           <Select
             value={value.render.type}
             onValueChange={(v) => onChange({ ...value, render: { ...value.render, type: v as WidgetChartKind } })}
@@ -65,7 +65,7 @@ export function ChartTopControls({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">X-axis field</Label>
+          <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">X-axis field</Label>
           <Input
             list={fieldListId}
             value={value.render.xField}
@@ -75,7 +75,7 @@ export function ChartTopControls({
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Legend</Label>
+          <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Legend</Label>
           <Select
             value={value.render.legend ?? "auto"}
             onValueChange={(v) =>
@@ -98,7 +98,7 @@ export function ChartTopControls({
       <ChartAxisFormatRow value={value} onChange={onChange} />
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5 col-span-2">
-          <Label className="text-xs font-medium text-slate-600">Stack by field (optional)</Label>
+          <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Stack by field (optional)</Label>
           <Input
             list={fieldListId}
             value={seriesField}
@@ -106,7 +106,7 @@ export function ChartTopControls({
             placeholder="e.g. service (pivots rows into one series per value)"
             data-testid="chart-series-field"
           />
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-slate-500 dark:text-gray-400">
             When set, the value comes from the first series&apos; field, summed per (X, Stack) bucket.
           </p>
         </div>
@@ -153,7 +153,7 @@ function ChartAxisFormatRow({
         onValueChange={(v) => updateAxisFormat("xFormat", v)}
       />
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Y-axis label</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Y-axis label</Label>
         <Input
           value={value.render.yLabel ?? ""}
           onChange={(e) => updateYLabel(e.target.value)}
@@ -187,7 +187,7 @@ function AxisFormatSelect({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">{label}</Label>
+      <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">{label}</Label>
       <Select value={value ?? NONE_VALUE} onValueChange={onValueChange}>
         <SelectTrigger className="w-full" data-testid={testId}>
           <SelectValue />
@@ -243,7 +243,7 @@ function ChartSortRow({
   return (
     <div className="grid grid-cols-3 gap-3">
       <div className="space-y-1.5 col-span-2">
-        <Label className="text-xs font-medium text-slate-600">Sort by (optional)</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Sort by (optional)</Label>
         <Input
           list={fieldListId}
           value={sortField}
@@ -253,7 +253,7 @@ function ChartSortRow({
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Order</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Order</Label>
         <Select value={sortOrder} onValueChange={(v) => updateOrder(v as WidgetSortOrder)} disabled={!hasSortField}>
           <SelectTrigger className="w-full" data-testid="chart-sort-order">
             <SelectValue />

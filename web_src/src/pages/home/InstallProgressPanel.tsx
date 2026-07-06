@@ -13,6 +13,13 @@ import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegr
 import { useInstallPreviewData } from "./useInstallPreviewData";
 import { useInstallAction } from "./useInstallAction";
 import type { InstallParam } from "../install/types";
+import { cn } from "@/lib/utils";
+import {
+  homeInstallPanelClassName,
+  homePanelTitleClassName,
+  homeSectionDividerClassName,
+  homeTagClassName,
+} from "./homePageStyles";
 
 function allIntegrationsSelected(integrations: string[], selections: IntegrationSelections): boolean {
   return integrations.length === 0 || integrations.every((name) => selections[name]);
@@ -93,17 +100,17 @@ export function InstallProgressPanel({
   const canSkip = readyToInstall;
 
   return (
-    <div className="mt-4 rounded-lg bg-white p-5 outline outline-slate-950/10 animate-in slide-in-from-top-2 dark:bg-gray-900">
+    <div className={homeInstallPanelClassName}>
       <AppInfoHeader app={app} integrations={integrations} />
 
       {onCanvasNameChange && (
-        <div className="mb-5 border-t border-slate-100 pt-4">
+        <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
           <AppNameSection value={canvasName ?? ""} onChange={onCanvasNameChange} />
         </div>
       )}
 
       {hasIntegrations && (
-        <div className="mb-5 border-t border-slate-100 pt-4">
+        <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
           <IntegrationsSection
             integrations={integrations}
             organizationId={organizationId ?? ""}
@@ -116,7 +123,7 @@ export function InstallProgressPanel({
       <PreviewStatus loading={preview.previewLoading} error={preview.previewError} />
 
       {!preview.previewLoading && hasParams && (
-        <div className="mb-5 border-t border-slate-100 pt-4">
+        <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
           <ParamsSection
             params={preview.installParams}
             values={preview.paramValues}
@@ -146,8 +153,8 @@ export function InstallProgressPanel({
 function PreviewStatus({ loading, error }: { loading: boolean; error: string | null }) {
   if (loading) {
     return (
-      <div className="mb-5 border-t border-slate-100 pt-4">
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+      <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
+        <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-gray-500">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Loading configuration...
         </div>
@@ -156,8 +163,8 @@ function PreviewStatus({ loading, error }: { loading: boolean; error: string | n
   }
   if (error) {
     return (
-      <div className="mb-5 border-t border-slate-100 pt-4">
-        <p className="text-xs text-red-600">{error}</p>
+      <div className={cn("mb-5 pt-4", homeSectionDividerClassName)}>
+        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
       </div>
     );
   }
@@ -203,7 +210,7 @@ function InstallActions({
   onClose: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
+    <div className={cn("flex items-center gap-2 pt-4", homeSectionDividerClassName)}>
       <InstallButton isInstalling={isInstalling} disabled={!canInstall} onClick={onInstall} />
       <Button variant="outline" size="sm" onClick={onSkip} disabled={!canSkip}>
         Just take me there
@@ -220,11 +227,11 @@ function AppInfoHeader({ app, integrations }: { app: AppEntry; integrations: str
     <div className="mb-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-slate-900">{app.title}</h3>
+          <h3 className={homePanelTitleClassName}>{app.title}</h3>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <IntegrationIcons integrations={integrations} />
             {app.tags.map((tag) => (
-              <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+              <span key={tag} className={homeTagClassName}>
                 {tag}
               </span>
             ))}
@@ -234,13 +241,15 @@ function AppInfoHeader({ app, integrations }: { app: AppEntry; integrations: str
           href={`https://${app.repo}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 shrink-0"
+          className="flex shrink-0 items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300"
         >
           <ExternalLink className="h-3 w-3" />
           GitHub
         </a>
       </div>
-      {app.description && <p className="mt-2 text-xs leading-relaxed text-slate-600">{app.description}</p>}
+      {app.description && (
+        <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-gray-400">{app.description}</p>
+      )}
       {app.requirements.length > 0 && <RequirementsList requirements={app.requirements} />}
     </div>
   );
@@ -268,8 +277,8 @@ function RequirementsList({ requirements }: { requirements: string[] }) {
   return (
     <ul className="mt-2 space-y-0.5">
       {requirements.map((req) => (
-        <li key={req} className="flex items-start gap-1.5 text-xs text-slate-500">
-          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+        <li key={req} className="flex items-start gap-1.5 text-xs text-slate-500 dark:text-gray-400">
+          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300 dark:bg-gray-600" />
           {req}
         </li>
       ))}
@@ -292,7 +301,7 @@ function ParamsSection({
 }) {
   return (
     <>
-      <p className="text-xs font-semibold text-slate-700 mb-3">Configuration</p>
+      <p className="mb-3 text-xs font-semibold text-slate-700 dark:text-gray-300">Configuration</p>
       <div className="space-y-3">
         {params.map((param) => (
           <div key={param.name} className="space-y-1">
@@ -333,7 +342,7 @@ function ParamsSection({
                 onChange={(e) => onChange((prev) => ({ ...prev, [param.name]: e.target.value }))}
               />
             )}
-            {param.description && <p className="text-[10px] text-slate-400">{param.description}</p>}
+            {param.description && <p className="text-[10px] text-slate-400 dark:text-gray-500">{param.description}</p>}
           </div>
         ))}
       </div>

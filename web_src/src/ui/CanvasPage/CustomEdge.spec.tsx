@@ -24,26 +24,28 @@ vi.mock("@xyflow/react", () => ({
 
 import { CustomEdge } from "./CustomEdge";
 
+function renderEdge(ui: ReactNode) {
+  return render(<svg>{ui}</svg>);
+}
+
 describe("CustomEdge", () => {
   it("does not show the delete icon or delete on pointer down in live mode", () => {
     const onDelete = vi.fn();
 
-    render(
-      <svg>
-        <CustomEdge
-          id="edge-1"
-          source="node-a"
-          target="node-b"
-          sourceX={0}
-          sourceY={0}
-          targetX={10}
-          targetY={10}
-          sourcePosition={"right" as never}
-          targetPosition={"left" as never}
-          selected={false}
-          data={{ isHovered: true, canDelete: false, onDelete }}
-        />
-      </svg>,
+    renderEdge(
+      <CustomEdge
+        id="edge-1"
+        source="node-a"
+        target="node-b"
+        sourceX={0}
+        sourceY={0}
+        targetX={10}
+        targetY={10}
+        sourcePosition={"right" as never}
+        targetPosition={"left" as never}
+        selected={false}
+        data={{ isHovered: true, canDelete: false, onDelete }}
+      />,
     );
 
     expect(screen.queryByTestId("edge-delete-icon")).not.toBeInTheDocument();
@@ -54,22 +56,20 @@ describe("CustomEdge", () => {
   it("shows the delete icon and deletes the edge in edit mode", () => {
     const onDelete = vi.fn();
 
-    render(
-      <svg>
-        <CustomEdge
-          id="edge-1"
-          source="node-a"
-          target="node-b"
-          sourceX={0}
-          sourceY={0}
-          targetX={10}
-          targetY={10}
-          sourcePosition={"right" as never}
-          targetPosition={"left" as never}
-          selected={false}
-          data={{ isHovered: true, canDelete: true, onDelete }}
-        />
-      </svg>,
+    renderEdge(
+      <CustomEdge
+        id="edge-1"
+        source="node-a"
+        target="node-b"
+        sourceX={0}
+        sourceY={0}
+        targetX={10}
+        targetY={10}
+        sourcePosition={"right" as never}
+        targetPosition={"left" as never}
+        selected={false}
+        data={{ isHovered: true, canDelete: true, onDelete }}
+      />,
     );
 
     expect(screen.getByTestId("edge-delete-icon")).toBeInTheDocument();

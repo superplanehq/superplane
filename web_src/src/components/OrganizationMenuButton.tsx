@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { posthog } from "@/posthog";
+import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
 
 interface OrganizationMenuButtonProps {
   organizationId?: string;
@@ -171,7 +172,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
               <button
                 type="button"
                 onClick={handleMenuButtonClick}
-                className="-ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-slate-100 hover:text-gray-900 cursor-pointer"
+                className="-ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-slate-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 cursor-pointer"
                 aria-label="Open organization menu"
                 aria-expanded={isMenuOpen}
                 aria-haspopup="menu"
@@ -182,15 +183,17 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
             <TooltipContent>Open Menu</TooltipContent>
           </Tooltip>
           {isMenuOpen && (
-            <div className="absolute -left-2 top-0 z-50 w-full min-w-[15rem] animate-in fade-in-0 slide-in-from-left-4 rounded-md border border-slate-950/20 bg-white shadow-md duration-200">
+            <div className="absolute -left-2 top-0 z-50 w-[16rem] animate-in fade-in-0 slide-in-from-left-4 rounded-md border border-slate-950/20 bg-white shadow-md duration-200 dark:border-gray-700/70 dark:bg-gray-900">
               {organizationId && (
-                <div className="px-4 py-2 border-b border-gray-300">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 inline px-1 py-0.5 rounded">
+                <div className="border-b border-slate-950/15 px-4 py-2 dark:border-gray-700/70">
+                  <p className="inline rounded bg-gray-800 px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-100 dark:bg-gray-300 dark:text-gray-950">
                     Org
                   </p>
                   <div className="flex items-center gap-3 mt-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-800 truncate text-sm">{organizationName}</p>
+                      <p className="font-semibold text-gray-800 truncate text-sm dark:text-gray-100">
+                        {organizationName}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-2 flex flex-col">
@@ -212,12 +215,15 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                             <button
                               type="button"
                               className={cn(
-                                "group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800",
-                                "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
+                                "group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+                                "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500 dark:hover:bg-transparent dark:hover:text-gray-400",
                               )}
                               disabled
                             >
-                              <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                              <MenuIcon
+                                size={16}
+                                className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-400"
+                              />
                               <span>{link.label}</span>
                               <Lock size={12} className="ml-auto text-gray-400" />
                             </button>
@@ -230,18 +236,24 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                           key={link.label}
                           to={link.href}
                           onClick={() => setIsMenuOpen(false)}
-                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
                         >
-                          <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                          <MenuIcon
+                            size={16}
+                            className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-100"
+                          />
                           <span>{link.label}</span>
                         </Link>
                       ) : (
                         <button
                           key={link.label}
                           type="button"
-                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
                         >
-                          <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                          <MenuIcon
+                            size={16}
+                            className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-100"
+                          />
                           <span>{link.label}</span>
                         </button>
                       );
@@ -250,13 +262,17 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                 </div>
               )}
               <div className="px-4 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white bg-sky-500 inline px-1 py-0.5 rounded">
+                <p className="inline rounded bg-sky-500 px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white dark:bg-sky-300 dark:text-sky-950">
                   You
                 </p>
                 <div className="flex items-center gap-3 mt-2">
                   <div className="min-w-0">
-                    <p className="font-semibold text-gray-800 truncate text-sm">{account?.name || "Loading..."}</p>
-                    <p className="text-[13px] text-gray-500 font-medium truncate">{account?.email || "Loading..."}</p>
+                    <p className="font-semibold text-gray-800 truncate text-sm dark:text-gray-100">
+                      {account?.name || "Loading..."}
+                    </p>
+                    <p className="text-[13px] text-gray-500 font-medium truncate dark:text-gray-400">
+                      {account?.email || "Loading..."}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-2 flex flex-col">
@@ -266,10 +282,13 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                       <Link
                         key={link.label}
                         to={link.href}
-                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
                         onClick={() => setIsMenuOpen(false)}
                       >
-                        <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                        <MenuIcon
+                          size={16}
+                          className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-100"
+                        />
                         <span>{link.label}</span>
                       </Link>
                     ) : (
@@ -277,13 +296,17 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                         key={link.label}
                         type="button"
                         onClick={link.onClick}
-                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
                       >
-                        <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                        <MenuIcon
+                          size={16}
+                          className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-100"
+                        />
                         <span>{link.label}</span>
                       </button>
                     );
                   })}
+                  <ThemePreferenceControl />
                 </div>
               </div>
             </div>
@@ -294,28 +317,30 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
             <Link
               to={logoHref}
               aria-label="Go to canvases"
-              className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
+              className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100 dark:hover:bg-gray-800"
             >
-              <img src={SuperplaneLogo} alt="SuperPlane" className="h-6 w-6" />
+              <img src={SuperplaneLogo} alt="SuperPlane" className="h-6 w-6 dark:brightness-0 dark:invert" />
             </Link>
           </TooltipTrigger>
           <TooltipContent>Homepage</TooltipContent>
         </Tooltip>
         <HoverCard openDelay={100} closeDelay={150}>
           <HoverCardTrigger asChild>
-            <Badge className="cursor-pointer rounded border-transparent bg-blue-500 px-1 py-0 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-blue-600">
+            <Badge className="cursor-pointer rounded border-transparent bg-blue-500 px-1 py-0 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-blue-600 dark:bg-indigo-300 dark:text-indigo-950 dark:hover:bg-indigo-300/90">
               Beta
             </Badge>
           </HoverCardTrigger>
           <HoverCardContent align="start" className="w-72">
-            <p className="text-sm font-semibold text-gray-800">We're just getting started!</p>
-            <p className="mt-1 text-[13px] text-gray-500">SuperPlane is in beta. We'd love your feedback:</p>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">We're just getting started!</p>
+            <p className="mt-1 text-[13px] text-gray-500 dark:text-gray-400">
+              SuperPlane is in beta. We'd love your feedback:
+            </p>
             <div className="mt-3 flex flex-col">
               <a
                 href="https://github.com/superplanehq/superplane/issues/new"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
               >
                 <IntegrationIcon integrationName="github" />
                 <span>Log an issue</span>
@@ -324,16 +349,19 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                 href="https://discord.superplane.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
               >
                 <IntegrationIcon integrationName="discord" />
                 <span>Chat on Discord</span>
               </a>
               <a
                 href="mailto:support@superplane.com"
-                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
               >
-                <Mail size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                <Mail
+                  size={16}
+                  className="text-gray-500 dark:text-gray-400 transition group-hover:text-gray-800 dark:group-hover:text-gray-100"
+                />
                 <span>Send us an email</span>
               </a>
             </div>

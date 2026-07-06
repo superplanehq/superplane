@@ -14,10 +14,12 @@ import {
 } from "@/ui/dropdownMenu";
 import { useDeleteCanvasFolder, useMoveCanvasFolder, type CanvasFolderColor } from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
+import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { ArrowDown, ArrowUp, MoreVertical, Palette, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CanvasFolderColorPicker } from "./CanvasFolderColorPicker";
+import { folderColorStyles } from "./canvasFolderStyles";
 import type { CanvasFolderData } from "./types";
 
 interface CanvasFolderActionsMenuProps {
@@ -175,11 +177,23 @@ function CanvasFolderDeleteDialog({
   );
 }
 
-function DisabledCanvasFolderActionsButton({ allowed }: { allowed: boolean }) {
+function DisabledCanvasFolderActionsButton({
+  allowed,
+  backgroundColor,
+}: {
+  allowed: boolean;
+  backgroundColor: CanvasFolderColor;
+}) {
+  const colorStyles = folderColorStyles(backgroundColor);
+
   return (
     <PermissionTooltip allowed={allowed} message="You don't have permission to update canvases.">
       <button
-        className="rounded p-1 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+        className={cn(
+          "rounded p-1 disabled:cursor-not-allowed disabled:opacity-50",
+          colorStyles.foregroundMutedClass,
+          colorStyles.headerInteractiveClass,
+        )}
         aria-label="Folder actions"
         disabled
       >
@@ -206,6 +220,7 @@ export function CanvasFolderActionsMenu({
   const moveCanvasFolderMutation = useMoveCanvasFolder(organizationId);
   const deleteCanvasFolderMutation = useDeleteCanvasFolder(organizationId);
   const allowed = canUpdateCanvases || permissionsLoading;
+  const colorStyles = folderColorStyles(folder.backgroundColor);
 
   useEffect(() => {
     if (!isMenuOpen && shouldStartRename) {
@@ -269,12 +284,16 @@ export function CanvasFolderActionsMenu({
   return (
     <>
       {!canUpdateCanvases ? (
-        <DisabledCanvasFolderActionsButton allowed={allowed} />
+        <DisabledCanvasFolderActionsButton allowed={allowed} backgroundColor={folder.backgroundColor} />
       ) : (
         <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="rounded p-1 text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className={cn(
+                "rounded p-1 disabled:cursor-not-allowed disabled:opacity-50",
+                colorStyles.foregroundMutedClass,
+                colorStyles.headerInteractiveClass,
+              )}
               aria-label="Folder actions"
               disabled={
                 updateCanvasFolderMutation.isPending ||

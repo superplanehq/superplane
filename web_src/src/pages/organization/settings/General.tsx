@@ -11,6 +11,9 @@ import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/use
 import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { cn } from "@/lib/utils";
+import { settingsCardClassName } from "./settingsPageStyles";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -76,7 +79,7 @@ export function General({ organization }: GeneralProps) {
 
   return (
     <div className="space-y-6 pt-6 text-left">
-      <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+      <Fieldset className={cn("space-y-6", settingsCardClassName)}>
         <Field className="space-y-4">
           <Label
             htmlFor="organization-name-input"
@@ -109,7 +112,9 @@ export function General({ organization }: GeneralProps) {
               </LoadingButton>
             </PermissionTooltip>
             {saveMessage && (
-              <span className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600" : "text-red-600"}`}>
+              <span
+                className={`text-sm ${saveMessage.includes("successfully") ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+              >
                 {saveMessage}
               </span>
             )}
@@ -117,7 +122,7 @@ export function General({ organization }: GeneralProps) {
         </Field>
       </Fieldset>
 
-      <Fieldset className="bg-white border border-gray-300 rounded-lg p-6 space-y-4">
+      <Fieldset className={cn("space-y-4", settingsCardClassName)}>
         {!showDeleteForm ? (
           <PermissionTooltip
             allowed={canDeleteOrg || permissionsLoading}
@@ -129,7 +134,7 @@ export function General({ organization }: GeneralProps) {
                 if (!canDeleteOrg) return;
                 setShowDeleteForm(true);
               }}
-              className="flex items-center gap-2 text-sm text-gray-800 hover:text-red-500"
+              className="flex items-center gap-2 text-sm text-gray-800 hover:text-red-500 dark:text-gray-100 dark:hover:text-red-400"
               disabled={!canDeleteOrg}
             >
               <Trash2 className="h-4 w-4" />
@@ -171,20 +176,19 @@ export function General({ organization }: GeneralProps) {
               >
                 <LoadingButton
                   type="button"
-                  variant="outline"
                   onClick={handleDelete}
                   disabled={
                     deleteConfirmation !== (organization.metadata?.name || "") || !organizationId || !canDeleteOrg
                   }
                   loading={deleteOrganizationMutation.isPending}
                   loadingText="Deleting..."
-                  className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 gap-1"
+                  className={cn(appDarkModeClasses.destructiveSoftAction, "gap-1")}
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete Organization
                 </LoadingButton>
               </PermissionTooltip>
-              {deleteError && <span className="text-sm text-red-600">{deleteError}</span>}
+              {deleteError && <span className="text-sm text-red-600 dark:text-red-400">{deleteError}</span>}
             </div>
           </>
         )}

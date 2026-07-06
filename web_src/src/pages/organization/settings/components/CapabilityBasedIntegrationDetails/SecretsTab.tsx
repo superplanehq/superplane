@@ -21,7 +21,7 @@ export interface SecretsTabProps {
 }
 
 const READONLY_SECRET_INPUT_CLASS =
-  "cursor-default bg-gray-50 opacity-100 dark:bg-gray-950 [&::placeholder]:opacity-70";
+  "cursor-default bg-gray-50 opacity-100 dark:bg-gray-900 [&::placeholder]:opacity-70";
 
 type SecretEditingControlsProps = {
   inputId: string;
@@ -254,7 +254,7 @@ export function SecretsTab({
   return (
     <>
       {integrationSecrets.length > 0 ? (
-        <div className="space-y-4 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+        <div className="space-y-4 rounded-lg border border-gray-300 bg-white p-4 dark:border-gray-600 dark:bg-gray-900">
           {integrationSecrets.map((secret, index) => (
             <IntegrationSecretRow
               key={secret.name?.trim() || `__secret_${index}`}

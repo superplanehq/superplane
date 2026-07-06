@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useTheme } from "@/contexts/useTheme";
 import { MultiFileDiff, Virtualizer } from "@pierre/diffs/react";
 import { useMemo } from "react";
 import type { FileContents } from "@pierre/diffs/react";
@@ -22,6 +23,7 @@ export function DiffDialog({
   open,
   onOpenChange,
 }: DiffDialogProps) {
+  const { resolvedTheme } = useTheme();
   const diffFiles = useMemo(() => {
     const pendingDiffs = changes.map((change) => ({
       path: change.path,
@@ -35,23 +37,25 @@ export function DiffDialog({
   }, [changes, committedContentByPath, loadedContentByPath, stagedFileDiffs]);
   const diffOptions = useMemo(
     () => ({
-      theme: "pierre-light" as const,
-      themeType: "light" as const,
+      theme: resolvedTheme === "dark" ? ("pierre-dark" as const) : ("pierre-light" as const),
+      themeType: resolvedTheme === "dark" ? ("dark" as const) : ("light" as const),
       diffStyle: "split" as const,
       stickyHeader: true,
     }),
-    [],
+    [resolvedTheme],
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="90vw" className="grid grid-rows-[auto_minmax(0,1fr)] gap-4 p-0">
-        <DialogHeader className="border-b border-slate-950/15 px-5 py-4">
+        <DialogHeader className="border-b border-slate-950/15 px-5 py-4 dark:border-gray-800/70">
           <DialogTitle>Diff</DialogTitle>
         </DialogHeader>
         <div className="min-h-0 overflow-hidden">
           {diffFiles.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-slate-500">No changes</div>
+            <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-gray-400">
+              No changes
+            </div>
           ) : (
             <Virtualizer className="h-full overflow-auto" contentClassName="min-w-0">
               <div className="space-y-4 p-4">
@@ -61,7 +65,7 @@ export function DiffDialog({
                     oldFile={oldFile}
                     newFile={newFile}
                     options={diffOptions}
-                    className="overflow-hidden rounded border border-slate-950/15 bg-white"
+                    className="overflow-hidden rounded border border-slate-950/15 bg-white dark:border-gray-800/70 dark:bg-gray-900"
                   />
                 ))}
               </div>

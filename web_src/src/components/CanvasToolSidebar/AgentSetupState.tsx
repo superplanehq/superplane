@@ -15,7 +15,7 @@ export function AgentSetupNotice({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 overflow-y-auto p-3">
         <div className="flex flex-col items-start">
-          <div className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900">
+          <div className="max-w-[85%] break-words rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-900 dark:bg-gray-800 dark:text-gray-100">
             <AgentSetupMessage firstName={firstName} onRetry={onRetry} state={state} />
           </div>
         </div>
@@ -53,7 +53,7 @@ function AgentSetupMessage({
   return (
     <>
       Hi {firstName}! I'm your SuperPlane agent. Give me a moment to set up and I'll help you build.
-      <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+      <div className="mt-2 flex items-center gap-2 text-xs text-slate-400 dark:text-gray-400">
         <Loader2 className="size-3 animate-spin" /> Setting up...
       </div>
     </>
