@@ -57,5 +57,13 @@ describe("MarkdownContent", () => {
 
     expect(screen.getByTestId("markdown-code")).toHaveTextContent("name: deploy");
     expect(screen.getByTestId("markdown-code")).toHaveClass("language-yaml");
+    expect(screen.getByTestId("markdown-code").closest("pre")).not.toBeInTheDocument();
+  });
+
+  it("keeps unlabeled fenced code blocks wrapped as blocks", () => {
+    render(<MarkdownContent content={"```\nraw output\n```"} />);
+
+    expect(screen.getByTestId("markdown-code")).toHaveTextContent("raw output");
+    expect(screen.getByTestId("markdown-code").closest("pre")).toBeInTheDocument();
   });
 });

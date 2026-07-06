@@ -1,3 +1,4 @@
+import { Children, isValidElement } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { defaultUrlTransform } from "react-markdown";
@@ -98,13 +99,21 @@ export function MarkdownContent({
             </MarkdownLink>
           ),
           code: MarkdownCodeWithDiagrams,
-          pre: ({ children }) => <>{children}</>,
+          pre: MarkdownPre,
         }}
       >
         {normalized}
       </ReactMarkdown>
     </div>
   );
+}
+
+function MarkdownPre({ children, ...props }: ComponentProps<"pre">) {
+  if (hasLanguageCodeChild(children)) {
+    return <>{children}</>;
+  }
+
+  return <pre {...props}>{children}</pre>;
 }
 
 function MarkdownCodeWithDiagrams({
@@ -149,4 +158,9 @@ function MarkdownLink({
 
 function isNodeLink(url: string): boolean {
   return url.startsWith("node:");
+}
+
+function hasLanguageCodeChild(children: ReactNode): boolean {
+  const child = Children.toArray(children)[0];
+  return isValidElement<{ className?: string }>(child) && /^language-\w+/.test(child.props.className || "");
 }
