@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	"github.com/superplanehq/superplane/pkg/services/files"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -48,7 +50,7 @@ func (a patchStagingAction) Name() string {
 }
 
 func (a patchStagingAction) Execute(ctx context.Context, session agents.AgentSessionContext, input Input) (any, error) {
-	target, err := resolvePatchStagingTarget(session, input)
+	target, err := resolvePatchStagingTarget(ctx, session, input)
 	if err != nil {
 		return updateResult{}, err
 	}
@@ -64,7 +66,7 @@ func (a patchStagingAction) Execute(ctx context.Context, session agents.AgentSes
 		return updateResult{}, fmt.Errorf("load canvas: %w", err)
 	}
 
-	stagedCanvas, err := a.readStagedDraftCanvas(ctx, session, target.draft)
+	stagedCanvas, err := a.readStagedCanvas(ctx, session, canvas)
 	if err != nil {
 		return updateResult{}, err
 	}
@@ -81,20 +83,26 @@ func (a patchStagingAction) Execute(ctx context.Context, session agents.AgentSes
 	return newPatchStagingResult(session, target.draft, canvas, patched), nil
 }
 
-func resolvePatchStagingTarget(session agents.AgentSessionContext, input Input) (patchStagingTarget, error) {
-	canvasID, err := uuid.Parse(session.CanvasID)
-	if err != nil {
-		return patchStagingTarget{}, fmt.Errorf("invalid session canvas id: %w", err)
-	}
-
+func resolvePatchStagingTarget(ctx context.Context, session agents.AgentSessionContext, input Input) (patchStagingTarget, error) {
 	organizationID, err := uuid.Parse(session.OrganizationID)
 	if err != nil {
 		return patchStagingTarget{}, fmt.Errorf("invalid session organization id: %w", err)
 	}
 
-	liveVersion, err := resolveLiveCanvasVersion(canvasID, input)
+	canvasID, err := uuid.Parse(session.CanvasID)
 	if err != nil {
-		return patchStagingTarget{}, fmt.Errorf("resolve live version: %w", err)
+		return patchStagingTarget{}, fmt.Errorf("invalid session canvas id: %w", err)
+	}
+
+	db := database.DB(ctx)
+	canvas, err := models.FindCanvasInTransaction(db, organizationID, canvasID)
+	if err != nil {
+		return patchStagingTarget{}, fmt.Errorf("load canvas: %w", err)
+	}
+
+	liveVersion, err := models.FindCanvasVersionInTransaction(database.DB(ctx), canvasID, *canvas.LiveVersionID)
+	if err != nil {
+		return patchStagingTarget{}, fmt.Errorf("load live version: %w", err)
 	}
 
 	changeset, err := buildDraftChangeset(input.PatchOperations)
@@ -107,7 +115,7 @@ func resolvePatchStagingTarget(session agents.AgentSessionContext, input Input) 
 		return patchStagingTarget{}, fmt.Errorf("patch_operations, console_yaml, or auto_layout is required for patch_staging")
 	}
 	if consoleYAML != "" {
-		if err := canvasRepository.ValidateConsoleYAML(input.ConsoleYAML); err != nil {
+		if _, _, err := canvasRepository.ParseConsoleYAML(input.ConsoleYAML); err != nil {
 			return patchStagingTarget{}, err
 		}
 	}
@@ -121,19 +129,24 @@ func resolvePatchStagingTarget(session agents.AgentSessionContext, input Input) 
 	}, nil
 }
 
-func (a patchStagingAction) readStagedDraftCanvas(ctx context.Context, session agents.AgentSessionContext, draft *models.CanvasVersion) (stagedDraftCanvas, error) {
-	canvasYAML, err := canvasRepository.ReadRepositorySpecFileStaged(
-		ctx,
-		session.OrganizationID,
-		session.CanvasID,
-		draft.ID.String(),
-		canvasRepository.CanvasYAMLRepositoryPath,
-	)
+func (a patchStagingAction) readStagedCanvas(ctx context.Context, session agents.AgentSessionContext, canvas *models.Canvas) (stagedDraftCanvas, error) {
+	userID, err := uuid.Parse(session.UserID)
+	if err != nil {
+		return stagedDraftCanvas{}, fmt.Errorf("invalid session user id: %w", err)
+	}
+
+	fileReader := files.NewAppFileReader(database.DB(ctx), canvas, userID)
+	reader, err := fileReader.ReadFromStaging(ctx, files.CanvasYAMLPath)
 	if err != nil {
 		return stagedDraftCanvas{}, fmt.Errorf("read staged canvas yaml: %w", err)
 	}
 
-	pbCanvas, err := canvasyaml.ParseCanvasResource([]byte(strings.TrimSpace(canvasYAML)))
+	canvasYAML, err := io.ReadAll(reader)
+	if err != nil {
+		return stagedDraftCanvas{}, fmt.Errorf("read staged canvas yaml: %w", err)
+	}
+
+	pbCanvas, err := canvasyaml.ParseCanvasResource(canvasYAML)
 	if err != nil {
 		return stagedDraftCanvas{}, fmt.Errorf("parse staged canvas yaml: %w", err)
 	}
@@ -187,13 +200,13 @@ func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionCont
 			return fmt.Errorf("serialize patched canvas yaml: %w", err)
 		}
 		operations = append(operations, &pb.CanvasRepositoryFileOperation{
-			Path:    canvasRepository.CanvasYAMLRepositoryPath,
+			Path:    files.CanvasYAMLPath,
 			Content: []byte(patchedYAML),
 		})
 	}
 	if strings.TrimSpace(target.consoleYAML) != "" {
 		operations = append(operations, &pb.CanvasRepositoryFileOperation{
-			Path:    canvasRepository.ConsoleYAMLRepositoryPath,
+			Path:    files.ConsoleYAMLPath,
 			Content: []byte(target.consoleYAML),
 		})
 	}

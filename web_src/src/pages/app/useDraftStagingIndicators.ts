@@ -14,7 +14,7 @@ type CanvasStagingQuery = ReturnType<typeof useCanvasStaging>;
 type ConsoleVersionDiff = ReturnType<typeof useCanvasConsoleVersionDiff>;
 type ConsoleQueryData = ConsoleVersionDiff["consoleQuery"]["data"];
 
-function resolveEditingStagingFlags({
+export function resolveEditingStagingFlags({
   isEditing,
   committedBaselinesReady,
   localHasCanvasStaging,
@@ -46,12 +46,18 @@ function resolveEditingStagingFlags({
     };
   }
 
-  const hasCanvasStagingChanges = committedBaselinesReady ? localHasCanvasStaging : serverHasCanvasStaging;
-  const hasConsoleStagingChanges = committedBaselinesReady ? localHasConsoleStaging : serverHasConsoleStaging;
+  // Local diffs need committed baselines, but they can false-negative right after
+  // entering edit (e.g. consoleQuery still showing the committed cache entry).
+  // Keep server staging flags as a backstop until local state catches up.
+  const hasCanvasStagingChanges = committedBaselinesReady
+    ? localHasCanvasStaging || serverHasCanvasStaging
+    : serverHasCanvasStaging;
+  const hasConsoleStagingChanges = committedBaselinesReady
+    ? localHasConsoleStaging || serverHasConsoleStaging
+    : serverHasConsoleStaging;
   const hasFilesStagingChanges = filesLocalStagingActive ? localHasFilesStaging : serverHasFilesStaging;
-  const hasStagingChanges = committedBaselinesReady
-    ? localHasCanvasStaging || localHasConsoleStaging || hasFilesStagingChanges
-    : serverHasStagingChanges;
+  const hasStagingChanges =
+    hasCanvasStagingChanges || hasConsoleStagingChanges || hasFilesStagingChanges || serverHasStagingChanges;
 
   return { hasCanvasStagingChanges, hasConsoleStagingChanges, hasFilesStagingChanges, hasStagingChanges };
 }

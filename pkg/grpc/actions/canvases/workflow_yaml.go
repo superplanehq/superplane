@@ -1,31 +1,13 @@
 package canvases
 
 import (
+	"strings"
+
 	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"strings"
 )
-
-func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion, organizationID string) (string, error) {
-	name, description := canvasMetadataFromCanvas(canvas)
-	return canvasyaml.CanvasResourceYAML(
-		SerializeCanvasVersion(version, organizationID, nil),
-		canvas.ID.String(),
-		name,
-		description,
-	)
-}
-
-func consoleYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion) (string, error) {
-	canvasName, _ := canvasMetadataFromCanvas(canvas)
-	raw, err := models.CanvasVersionToConsoleYML(canvasName, version)
-	if err != nil {
-		return "", err
-	}
-	return string(raw), nil
-}
 
 func canvasFromYAMLText(text string) (*pb.Canvas, error) {
 	trimmed := strings.TrimSpace(text)
@@ -41,7 +23,7 @@ func canvasFromYAMLText(text string) (*pb.Canvas, error) {
 	return canvas, nil
 }
 
-func consolePanelsLayoutFromYAMLText(text string) ([]models.ConsolePanel, []models.ConsoleLayoutItem, error) {
+func ParseConsoleYAML(text string) ([]models.ConsolePanel, []models.ConsoleLayoutItem, error) {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
 		return nil, nil, grpcerrors.InvalidArgument(nil, "console_yaml is empty")

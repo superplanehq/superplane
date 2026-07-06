@@ -3,11 +3,14 @@ package actions
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/database"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/services/files"
 )
 
 const readActionName = "read"
@@ -30,27 +33,25 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 		return readResult{}, fmt.Errorf("invalid session canvas id: %w", err)
 	}
 
-	canvas, err := models.FindCanvas(uuid.MustParse(session.OrganizationID), canvasID)
+	db := database.DB(ctx)
+	canvas, err := models.FindCanvasInTransaction(db, uuid.MustParse(session.OrganizationID), canvasID)
 	if err != nil {
 		return readResult{}, fmt.Errorf("load canvas: %w", err)
 	}
 
-	liveVersion, err := resolveLiveCanvasVersion(canvasID, input)
+	liveVersion, err := models.FindCanvasVersionInTransaction(db, canvasID, *canvas.LiveVersionID)
 	if err != nil {
 		return readResult{}, fmt.Errorf("load live version: %w", err)
 	}
 
-	versionID := liveVersion.ID.String()
-
 	// Read effective staged content (staged edits when present, live content
 	// otherwise) so the agent observes the same state the UI editor uses.
-	canvasYAML, err := canvasRepository.ReadRepositorySpecFileStaged(
-		ctx,
-		session.OrganizationID,
-		session.CanvasID,
-		versionID,
-		canvasRepository.CanvasYAMLRepositoryPath,
-	)
+	fileReader := files.NewAppFileReader(db, canvas, uuid.MustParse(session.UserID))
+	reader, err := fileReader.Read(ctx, files.CanvasYAMLPath)
+	if err != nil {
+		return readResult{}, fmt.Errorf("read canvas yaml: %w", err)
+	}
+	canvasYAML, err := io.ReadAll(reader)
 	if err != nil {
 		return readResult{}, fmt.Errorf("read canvas yaml: %w", err)
 	}
@@ -59,28 +60,26 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 		Action:            readActionName,
 		CanvasID:          session.CanvasID,
 		Source:            "staging",
-		VersionID:         versionID,
-		Summary:           a.summarize(session.OrganizationID, canvas, liveVersion, canvasYAML),
+		VersionID:         liveVersion.ID.String(),
+		Summary:           a.summarize(session.OrganizationID, canvas, liveVersion, string(canvasYAML)),
 		CanvasYAMLBytes:   len(canvasYAML),
 		CanvasYAMLOmitted: !input.IncludeCanvasYAML,
 	}
 
 	if input.IncludeCanvasYAML {
-		result.CanvasYAML = canvasYAML
+		result.CanvasYAML = string(canvasYAML)
 	}
 
 	if input.IncludeConsole {
-		consoleYAML, consoleErr := canvasRepository.ReadRepositorySpecFileStaged(
-			ctx,
-			session.OrganizationID,
-			session.CanvasID,
-			versionID,
-			canvasRepository.ConsoleYAMLRepositoryPath,
-		)
-		if consoleErr != nil {
-			return readResult{}, fmt.Errorf("read console yaml: %w", consoleErr)
+		reader, err := fileReader.Read(ctx, files.ConsoleYAMLPath)
+		if err != nil {
+			return readResult{}, fmt.Errorf("read console yaml: %w", err)
 		}
-		result.ConsoleYAML = consoleYAML
+		consoleYAML, err := io.ReadAll(reader)
+		if err != nil {
+			return readResult{}, fmt.Errorf("read console yaml: %w", err)
+		}
+		result.ConsoleYAML = string(consoleYAML)
 	}
 
 	if input.IncludeIntegrations {

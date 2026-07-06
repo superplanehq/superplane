@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/services/files"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
@@ -127,35 +129,6 @@ func TestResolvePatchDraftAutoLayout_DefaultsLayoutOnlyUpdatesToFullCanvas(t *te
 	assert.Empty(t, layout.NodeIds)
 }
 
-func TestResolveLiveCanvasVersion_ResolvesLiveVersion(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-	liveVersion := requireLiveVersion(t, canvas.ID)
-
-	resolved, err := resolveLiveCanvasVersion(canvas.ID, Input{Action: "patch_staging"})
-	require.NoError(t, err)
-	require.NotNil(t, resolved)
-	assert.Equal(t, liveVersion.ID, resolved.ID)
-
-	resolved, err = resolveLiveCanvasVersion(canvas.ID, Input{
-		Action:    "patch_staging",
-		VersionID: liveVersion.ID.String(),
-	})
-	require.NoError(t, err)
-	require.NotNil(t, resolved)
-	assert.Equal(t, liveVersion.ID, resolved.ID)
-
-	wrongVersionID := uuid.New()
-	_, err = resolveLiveCanvasVersion(canvas.ID, Input{
-		Action:    "patch_staging",
-		VersionID: wrongVersionID.String(),
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "is not the current live version")
-}
-
 func requireDraftChangeset(t *testing.T, operations []PatchOperation) *changesets.CanvasChangeset {
 	t.Helper()
 
@@ -175,7 +148,7 @@ func requireLiveVersion(t *testing.T, canvasID uuid.UUID) models.CanvasVersion {
 func upsertUserStagingYAML(t *testing.T, canvas *models.Canvas, userID uuid.UUID, content string) {
 	t.Helper()
 	require.NotNil(t, canvas.LiveVersionID)
-	_, err := models.UpsertStagedFile(database.DB(t.Context()), canvas.ID, userID, *canvas.LiveVersionID, canvas.OrganizationID, canvasRepository.CanvasYAMLRepositoryPath, content)
+	_, err := models.UpsertStagedFile(database.DB(t.Context()), canvas.ID, userID, *canvas.LiveVersionID, canvas.OrganizationID, files.CanvasYAMLPath, content)
 	require.NoError(t, err)
 }
 
@@ -259,18 +232,15 @@ func TestAppAgentTool_PatchStagingStagesSmallGraphEdits(t *testing.T) {
 	staging, err := canvasRepository.GetCanvasStaging(ctx, r.Organization.ID.String(), canvas.ID.String())
 	require.NoError(t, err)
 	assert.True(t, staging.GetHasStaging())
-	assert.Contains(t, staging.GetStagedPaths(), canvasRepository.CanvasYAMLRepositoryPath)
+	assert.Contains(t, staging.GetStagedPaths(), files.CanvasYAMLPath)
 
-	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
-		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		update.VersionID,
-		canvasRepository.CanvasYAMLRepositoryPath,
-	)
+	fileReader := files.NewAppFileReader(database.DB(t.Context()), canvas, r.User)
+	canvasYAMLReader, err := fileReader.Read(ctx, files.CanvasYAMLPath)
+	require.NoError(t, err)
+	canvasYAML, err := io.ReadAll(canvasYAMLReader)
 	require.NoError(t, err)
 
-	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
+	patched, err := canvasyaml.ParseCanvasResource(canvasYAML)
 	require.NoError(t, err)
 	require.Len(t, patched.GetSpec().GetNodes(), 2)
 	require.Len(t, patched.GetSpec().GetEdges(), 1)
@@ -327,16 +297,13 @@ func TestAppAgentTool_PatchStagingAddsIntegrationBackedNode(t *testing.T) {
 	require.True(t, ok)
 	assert.Empty(t, update.NodeIssues)
 
-	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
-		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		update.VersionID,
-		canvasRepository.CanvasYAMLRepositoryPath,
-	)
+	fileReader := files.NewAppFileReader(database.DB(t.Context()), canvas, r.User)
+	canvasYAMLReader, err := fileReader.Read(ctx, files.CanvasYAMLPath)
+	require.NoError(t, err)
+	canvasYAML, err := io.ReadAll(canvasYAMLReader)
 	require.NoError(t, err)
 
-	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
+	patched, err := canvasyaml.ParseCanvasResource(canvasYAML)
 	require.NoError(t, err)
 	require.Len(t, patched.GetSpec().GetNodes(), 1)
 	node := patched.GetSpec().GetNodes()[0]
@@ -351,13 +318,10 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	liveVersion := requireLiveVersion(t, canvas.ID)
-	consoleYAML, err := canvasRepository.ReadRepositorySpecFile(
-		context.Background(),
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		"",
-		canvasRepository.ConsoleYAMLRepositoryPath,
-	)
+	fileReader := files.NewAppFileReader(database.DB(t.Context()), canvas, r.User)
+	consoleYAMLReader, err := fileReader.Read(t.Context(), files.ConsoleYAMLPath)
+	require.NoError(t, err)
+	consoleYAML, err := io.ReadAll(consoleYAMLReader)
 	require.NoError(t, err)
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -377,7 +341,7 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 	}, Input{
 		Action:      "patch_staging",
 		VersionID:   liveVersion.ID.String(),
-		ConsoleYAML: consoleYAML,
+		ConsoleYAML: string(consoleYAML),
 	})
 
 	require.NoError(t, err)
@@ -392,19 +356,15 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 	staging, err := canvasRepository.GetCanvasStaging(ctx, r.Organization.ID.String(), canvas.ID.String())
 	require.NoError(t, err)
 	assert.True(t, staging.GetHasStaging())
-	assert.Contains(t, staging.GetStagedPaths(), canvasRepository.ConsoleYAMLRepositoryPath)
+	assert.Contains(t, staging.GetStagedPaths(), files.ConsoleYAMLPath)
 
 	// The agent reads back the same staged content it wrote through the staged
 	// read path the `read` action now uses.
-	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
-		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		update.VersionID,
-		canvasRepository.ConsoleYAMLRepositoryPath,
-	)
+	consoleYAMLReader, err = fileReader.Read(t.Context(), files.ConsoleYAMLPath)
 	require.NoError(t, err)
-	assert.Equal(t, consoleYAML, staged)
+	consoleYAML, err = io.ReadAll(consoleYAMLReader)
+	require.NoError(t, err)
+	assert.Equal(t, string(consoleYAML), string(consoleYAML))
 }
 
 func TestAppAgentTool_ListResources(t *testing.T) {

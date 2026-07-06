@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/services/files"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
@@ -130,7 +131,11 @@ func CommitCanvasStaging(
 	}
 
 	if len(specOps) > 0 {
-		if err := ApplyRepositorySpecFileOperationsToCommitTarget(
+
+		//
+		// TODO: this is horrible code
+		//
+		if err := applyRepositorySpecFileOperations(
 			ctx,
 			usageService,
 			encryptor,
@@ -141,7 +146,9 @@ func CommitCanvasStaging(
 			webhookBaseURL,
 			authService,
 			nil,
+			false,
 			specOps,
+			true,
 		); err != nil {
 			if len(gitRevertOps) > 0 {
 				if revertErr := revertGitFileCommit(ctx, gitProvider, canvas, organizationID, userID.String(), gitRevertOps); revertErr != nil {
@@ -224,7 +231,7 @@ func CommitCanvasStaging(
 func stagedCommitOperations(rows []models.WorkflowStagedFile) (specOps, gitOps []*pb.CanvasRepositoryFileOperation) {
 	specContentByPath := map[string]string{}
 	for _, row := range rows {
-		if IsRepositorySpecFilePath(row.Path) {
+		if files.IsSpecFilePath(row.Path) {
 			if row.Deleted {
 				continue
 			}
@@ -239,7 +246,7 @@ func stagedCommitOperations(rows []models.WorkflowStagedFile) (specOps, gitOps [
 		})
 	}
 
-	for _, path := range []string{CanvasYAMLRepositoryPath, ConsoleYAMLRepositoryPath} {
+	for _, path := range []string{files.CanvasYAMLPath, files.ConsoleYAMLPath} {
 		content, ok := specContentByPath[path]
 		if !ok {
 			continue
@@ -416,4 +423,77 @@ func resolvedStagingCommitMessage(messages ...string) string {
 		}
 	}
 	return "Update files"
+}
+
+func applyRepositorySpecFileOperations(
+	ctx context.Context,
+	usageService usage.Service,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	webhookBaseURL string,
+	authService authorization.Authorization,
+	autoLayout *pb.CanvasAutoLayout,
+	discardStaging bool,
+	operations []*pb.CanvasRepositoryFileOperation,
+	commitTarget bool,
+) error {
+	if strings.TrimSpace(versionID) == "" {
+		return grpcerrors.InvalidArgument(nil, "version_id is required for canvas.yaml and console.yaml updates")
+	}
+
+	for _, operation := range operations {
+		if operation == nil {
+			continue
+		}
+		if operation.GetDelete() {
+			return grpcerrors.InvalidArgument(nil, fmt.Sprintf("%q cannot be deleted", operation.GetPath()))
+		}
+
+		normalized := files.NormalizePath(operation.GetPath())
+		content := string(operation.GetContent())
+
+		switch normalized {
+		case files.CanvasYAMLPath:
+			pbCanvas, err := canvasFromYAMLText(content)
+			if err != nil {
+				return err
+			}
+
+			_, err = UpdateCanvasVersionWithUsage(
+				ctx,
+				usageService,
+				encryptor,
+				registry,
+				organizationID,
+				canvasID,
+				versionID,
+				pbCanvas,
+				autoLayout,
+				webhookBaseURL,
+				authService,
+				discardStaging,
+				commitTarget,
+			)
+			if err != nil {
+				return err
+			}
+		case files.ConsoleYAMLPath:
+			panels, layout, err := ParseConsoleYAML(content)
+			if err != nil {
+				return err
+			}
+
+			_, err = UpdateConsole(ctx, organizationID, canvasID, versionID, panels, layout, discardStaging, commitTarget)
+			if err != nil {
+				return err
+			}
+		default:
+			return grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", operation.GetPath()))
+		}
+	}
+
+	return nil
 }

@@ -17,8 +17,8 @@ type UseStagedFileDiffsOptions = {
  * staging layer rather than in the in-session pending changes. This covers the
  * virtual spec files (canvas.yaml / console.yaml) and, after a page refresh,
  * repository files whose edits were persisted to staging in a prior session.
- * The committed side is the stage=false server read; the effective side
- * overlays the staged edits (stage=true). Only paths that actually differ are
+ * The committed side is the version or live read (stage=false); the effective
+ * side is the staging read (stage=true). Only paths that actually differ are
  * returned.
  */
 export function useStagedFileDiffs({

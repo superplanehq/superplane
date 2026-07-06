@@ -13,14 +13,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func canvasMetadataFromCanvas(canvas *models.Canvas) (name, description string) {
-	if canvas == nil {
-		return "", ""
-	}
-
-	return canvas.Name, canvas.Description
-}
-
 func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
 	var owner *pb.UserRef
 	if version.OwnerID != nil {

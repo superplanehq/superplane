@@ -6,8 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/services/files"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 )
@@ -28,8 +29,8 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		response, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.Len(t, response.Files, 2)
-		assert.Equal(t, CanvasYAMLRepositoryPath, response.Files[0].Path)
-		assert.Equal(t, ConsoleYAMLRepositoryPath, response.Files[1].Path)
+		assert.Equal(t, files.CanvasYAMLPath, response.Files[0].Path)
+		assert.Equal(t, files.ConsoleYAMLPath, response.Files[1].Path)
 	})
 
 	t.Run("list files fails -> error", func(t *testing.T) {
@@ -48,8 +49,8 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, response.Files, 3)
 		assert.Equal(t, "README.md", response.Files[0].Path)
-		assert.Equal(t, CanvasYAMLRepositoryPath, response.Files[1].Path)
-		assert.Equal(t, ConsoleYAMLRepositoryPath, response.Files[2].Path)
+		assert.Equal(t, files.CanvasYAMLPath, response.Files[1].Path)
+		assert.Equal(t, files.ConsoleYAMLPath, response.Files[2].Path)
 	})
 
 	t.Run("canvas from different organization -> not found", func(t *testing.T) {

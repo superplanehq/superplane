@@ -15,6 +15,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/services/files"
 	"gorm.io/gorm"
 )
 
@@ -53,7 +54,7 @@ func PutCanvasStaging(ctx context.Context, organizationID string, canvasID strin
 			continue
 		}
 
-		normalized := normalizeRepositoryFilePath(operation.GetPath())
+		normalized := files.NormalizePath(operation.GetPath())
 		if normalized == "" {
 			return nil, grpcerrors.InvalidArgument(nil, "file path is required")
 		}

@@ -1585,9 +1585,9 @@ async function fetchRepositoryFileContent(
 
 // fetchRepositoryFileContentCached reads raw repository-file content through the
 // React Query cache so callers (the Files diff, committed baselines, selection)
-// reuse and dedupe identical reads. Committed (stage=false) content only changes
-// on publish/commit, so it is cached; staged (stage=true) content changes on
-// every autosave, so it always refetches to stay correct.
+// reuse and dedupe identical reads. Committed content only changes on
+// publish/commit, so it is cached; staged content changes on every autosave,
+// so it always refetches to stay correct.
 export function fetchRepositoryFileContentCached(
   queryClient: QueryClient,
   canvasId: string,

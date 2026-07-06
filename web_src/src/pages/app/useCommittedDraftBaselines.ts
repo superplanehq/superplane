@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
-import { fetchCanvasVersionWithSpec } from "./lib/repository-spec-files";
+import { fetchLiveCommittedCanvasVersionWithSpec } from "./lib/repository-spec-files";
 
 export type CommittedDraftBaselines = {
   canvasSpec?: CanvasesCanvas["spec"];
@@ -42,20 +42,18 @@ export function useCommittedDraftBaselines({
     let cancelled = false;
     setBaselines({ ready: false });
 
-    // Read the committed (stage=false) canvas and console through React Query so
-    // the baselines reuse the cache the rest of the editor already populates.
-    // The console read shares its key/fetcher with the draft console query, so
-    // the two committed console.yaml reads are deduped into a single request.
-    // Commit/discard invalidate these keys, so the nonce bump reloads fresh data.
+    // Read the live committed canvas and console (no stage=true). Staged/effective
+    // reads use ?stage=true, so baselines must use the live endpoint — not
+    // version_id — or local diffs can false-negative after the repository API split.
     void Promise.all([
       queryClient.fetchQuery({
-        queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: () => fetchCanvasVersionWithSpec(canvasId, versionId, false),
+        queryKey: [...canvasKeys.versionDetail(canvasId, versionId), "committed-baseline"] as const,
+        queryFn: () => fetchLiveCommittedCanvasVersionWithSpec(canvasId),
         staleTime: 30_000,
       }),
       queryClient.fetchQuery({
-        queryKey: canvasKeys.console(canvasId, versionId),
-        queryFn: () => fetchCanvasConsoleData(canvasId, versionId, false),
+        queryKey: [...canvasKeys.console(canvasId, versionId), "committed-baseline"] as const,
+        queryFn: () => fetchCanvasConsoleData(canvasId, undefined, false),
         staleTime: 30_000,
       }),
     ]).then(([version, consoleData]) => {

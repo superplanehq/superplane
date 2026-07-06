@@ -3,12 +3,14 @@ package canvases
 import (
 	"context"
 	"errors"
+	"sort"
 
 	"github.com/google/uuid"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/services/files"
 	"gorm.io/gorm"
 )
 
@@ -43,7 +45,7 @@ func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, or
 		return nil, grpcerrors.Internal(err, "failed to load repository")
 	}
 
-	pathStrings := AppendRepositorySpecFilePaths(repositoryPaths)
+	pathStrings := appendRepositorySpecFilePaths(repositoryPaths)
 	paths := make([]*pb.CanvasRepositoryFile, 0, len(pathStrings))
 	for _, path := range pathStrings {
 		paths = append(paths, &pb.CanvasRepositoryFile{
@@ -54,4 +56,29 @@ func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, or
 	return &pb.ListCanvasRepositoryFilesResponse{
 		Files: paths,
 	}, nil
+}
+
+func appendRepositorySpecFilePaths(paths []string) []string {
+	merged := make([]string, 0, len(paths)+2)
+	seen := make(map[string]struct{}, len(paths)+2)
+
+	for _, specPath := range []string{files.CanvasYAMLPath, files.ConsoleYAMLPath} {
+		merged = append(merged, specPath)
+		seen[specPath] = struct{}{}
+	}
+
+	for _, path := range paths {
+		normalized := files.NormalizePath(path)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		merged = append(merged, normalized)
+	}
+
+	sort.Strings(merged)
+	return merged
 }

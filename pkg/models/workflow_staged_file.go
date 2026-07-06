@@ -133,10 +133,14 @@ func HasStagedFilesForUser(db *gorm.DB, workflowID, userID uuid.UUID) (bool, err
 
 func FindStagedFileForUser(db *gorm.DB, workflowID, userID uuid.UUID, path string) (*WorkflowStagedFile, error) {
 	var row WorkflowStagedFile
+
 	err := db.
-		Where("workflow_id = ? AND user_id = ? AND path = ?", workflowID, userID, path).
+		Where("workflow_id = ?", workflowID).
+		Where("user_id = ?", userID).
+		Where("path = ?", path).
 		First(&row).
 		Error
+
 	if err != nil {
 		return nil, err
 	}
