@@ -16,7 +16,7 @@ export function ToolTabsHeader({
 
   return (
     <div
-      className="flex h-10 min-h-10 shrink-0 flex-row items-stretch border-b border-slate-950/15 px-4"
+      className="flex h-10 min-h-10 shrink-0 flex-row items-stretch border-b border-slate-950/15 px-4 dark:border-gray-800/70"
       role="tablist"
       aria-label="Canvas tools"
     >

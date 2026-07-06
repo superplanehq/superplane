@@ -6,19 +6,21 @@ import { PayloadPreview } from "@/ui/BuildingBlocksSidebar/PayloadPreview";
 
 function ConfigTable({ fields, showTopBorder }: { fields: ConfigurationField[]; showTopBorder?: boolean }) {
   return (
-    <div className={cn("w-full px-4 pt-3 pb-3", showTopBorder && "border-t border-slate-950/15")}>
-      <span className="text-[13px] font-medium text-gray-500">Configuration</span>
+    <div
+      className={cn("w-full px-4 pt-3 pb-3", showTopBorder && "border-t border-slate-950/15 dark:border-gray-800/70")}
+    >
+      <span className="text-[13px] font-medium text-gray-500 dark:text-gray-400">Configuration</span>
       <div className="overflow-x-auto mt-2">
         <table className="text-xs w-full border-collapse">
           <thead>
             <tr>
-              <th className="text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 bg-gray-50">
+              <th className="text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800">
                 Field
               </th>
-              <th className="text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 bg-gray-50">
+              <th className="text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800">
                 Type
               </th>
-              <th className="text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 bg-gray-50">
+              <th className="text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800">
                 Description
               </th>
             </tr>
@@ -26,12 +28,16 @@ function ConfigTable({ fields, showTopBorder }: { fields: ConfigurationField[]; 
           <tbody>
             {fields.map((field) => (
               <tr key={field.name}>
-                <td className="py-1.5 px-2 border-b border-gray-100 font-mono text-gray-700">
+                <td className="py-1.5 px-2 border-b border-gray-100 font-mono text-gray-700 dark:border-gray-700/70 dark:text-gray-200">
                   {field.label || field.name}
-                  {field.required && <span className="text-red-400 ml-0.5">*</span>}
+                  {field.required && <span className="text-red-400 ml-0.5 dark:text-red-400">*</span>}
                 </td>
-                <td className="py-1.5 px-2 border-b border-gray-100 text-gray-500">{field.type || "string"}</td>
-                <td className="py-1.5 px-2 border-b border-gray-100 text-gray-500">{field.description || "—"}</td>
+                <td className="py-1.5 px-2 border-b border-gray-100 text-gray-500 dark:border-gray-700/70 dark:text-gray-400">
+                  {field.type || "string"}
+                </td>
+                <td className="py-1.5 px-2 border-b border-gray-100 text-gray-500 dark:border-gray-700/70 dark:text-gray-400">
+                  {field.description || "—"}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -43,7 +49,7 @@ function ConfigTable({ fields, showTopBorder }: { fields: ConfigurationField[]; 
 
 function DocsReferenceSection({ documentationUrl }: { documentationUrl: string }) {
   return (
-    <div className="bg-slate-100 px-4 py-2.5">
+    <div className="bg-slate-100 px-4 py-2.5 dark:bg-gray-800">
       <Button variant="outline" size="xs" asChild>
         <a href={documentationUrl} target="_blank" rel="noopener noreferrer">
           <BookOpen className="size-3" aria-hidden />
@@ -57,9 +63,14 @@ function DocsReferenceSection({ documentationUrl }: { documentationUrl: string }
 
 function DocsDescriptionSection({ description, showBottomBorder }: { description: string; showBottomBorder: boolean }) {
   return (
-    <div className={cn("w-full px-4 pt-3 pb-3", showBottomBorder && "border-b border-slate-950/15")}>
-      <span className="text-[13px] font-medium text-gray-500">Description</span>
-      <p className="text-[13px] text-gray-800 mt-1 leading-relaxed">{description}</p>
+    <div
+      className={cn(
+        "w-full px-4 pt-3 pb-3",
+        showBottomBorder && "border-b border-slate-950/15 dark:border-gray-800/70",
+      )}
+    >
+      <span className="text-[13px] font-medium text-gray-500 dark:text-gray-400">Description</span>
+      <p className="text-[13px] text-gray-800 mt-1 leading-relaxed dark:text-gray-100">{description}</p>
     </div>
   );
 }
@@ -74,7 +85,7 @@ function DocsPayloadSection({
   showBottomBorder: boolean;
 }) {
   return (
-    <div className={cn("w-full px-2 py-2", showBottomBorder && "border-b border-slate-950/15")}>
+    <div className={cn("w-full px-2 py-2", showBottomBorder && "border-b border-slate-950/15 dark:border-gray-800/70")}>
       <div className="px-2">
         <PayloadPreview
           value={examplePayload}
@@ -112,7 +123,7 @@ export function DocsTab({
   if (!hasContent) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-        <p className="text-sm text-gray-500">No documentation available for this component.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">No documentation available for this component.</p>
       </div>
     );
   }

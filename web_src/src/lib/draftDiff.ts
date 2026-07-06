@@ -14,7 +14,7 @@ export const DRAFT_DIFF_EDGE_STROKE = {
 
 export function getDraftDiffOutlineClassName(status?: DraftDiffStatus): string {
   if (!status) {
-    return "outline-1 outline-slate-950/20";
+    return "outline-1 outline-slate-950/20 dark:outline-gray-600/70";
   }
 
   return DRAFT_DIFF_OUTLINE[status];

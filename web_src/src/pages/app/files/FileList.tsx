@@ -1,9 +1,10 @@
 import { Input } from "@/components/ui/input";
+import { useTheme } from "@/contexts/useTheme";
 import { FileTree as TreesFileTree, useFileTree } from "@pierre/trees/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { ContextMenuItem, ContextMenuOpenContext } from "@pierre/trees";
 
-import { repositoryFileTreeStyle } from "./types";
+import { getRepositoryFileTreeStyle } from "./types";
 
 export function FileList({
   paths,
@@ -33,7 +34,7 @@ export function FileList({
   onSelect: (path: string) => void;
 }) {
   if (loading) {
-    return <div className="flex-1 p-4 text-sm text-slate-500">Loading files...</div>;
+    return <div className="flex-1 p-4 text-sm text-slate-500 dark:text-gray-400">Loading files...</div>;
   }
 
   if (errorMessage) {
@@ -41,7 +42,7 @@ export function FileList({
   }
 
   if (paths.length === 0 && newFilePath === null) {
-    return <div className="flex-1 p-4 text-sm text-slate-500">No files</div>;
+    return <div className="flex-1 p-4 text-sm text-slate-500 dark:text-gray-400">No files</div>;
   }
 
   return (
@@ -95,7 +96,7 @@ function NewFileTreeInput({
   };
 
   return (
-    <div className="flex h-7 shrink-0 items-center px-2 text-xs text-slate-700">
+    <div className="flex h-7 shrink-0 items-center px-2 text-xs text-slate-700 dark:text-gray-300">
       <Input
         ref={inputRef}
         value={path}
@@ -114,7 +115,7 @@ function NewFileTreeInput({
             onCancel();
           }
         }}
-        className="h-6 rounded border-slate-300 px-2 text-xs shadow-none focus-visible:ring-1"
+        className="h-6 rounded border-slate-300 px-2 text-xs shadow-none focus-visible:ring-1 dark:border-gray-800/70"
       />
     </div>
   );
@@ -156,6 +157,10 @@ function RepositoryFileTree({
     onDeleteRef.current = onDelete;
   }, [onDelete]);
 
+  const { resolvedTheme } = useTheme();
+  const colorScheme = resolvedTheme === "dark" ? "dark" : "light";
+  const fileTreeStyle = useMemo(() => getRepositoryFileTreeStyle(resolvedTheme), [resolvedTheme]);
+
   const { model } = useFileTree({
     paths,
     density: "compact",
@@ -164,7 +169,7 @@ function RepositoryFileTree({
     initialExpansion: "open",
     initialSelectedPaths: selectedPath ? [selectedPath] : [],
     unsafeCSS: `
-      :host { color-scheme: light; }
+      :host { color-scheme: ${colorScheme}; }
       [data-file-tree-virtualized-scroll='true'] {
         scrollbar-gutter: auto;
         padding-inline-end: 0;
@@ -198,7 +203,7 @@ function RepositoryFileTree({
   return (
     <TreesFileTree
       model={model}
-      className="h-full w-full bg-white text-xs text-slate-700"
+      className="h-full w-full bg-white text-xs text-slate-700 dark:bg-gray-900 dark:text-gray-300"
       renderContextMenu={
         canWrite
           ? (item, context) => (
@@ -211,7 +216,7 @@ function RepositoryFileTree({
             )
           : undefined
       }
-      style={repositoryFileTreeStyle}
+      style={fileTreeStyle}
     />
   );
 }
@@ -232,13 +237,13 @@ function FileTreeContextMenu({
   return (
     <div
       data-file-tree-context-menu-root="true"
-      className="min-w-36 rounded border border-slate-950/15 bg-white p-1 text-xs text-slate-700 shadow-lg"
+      className="min-w-36 rounded border border-slate-950/15 bg-white p-1 text-xs text-slate-700 shadow-lg dark:border-gray-700/70 dark:bg-gray-900 dark:text-gray-300"
       role="menu"
     >
       <button
         type="button"
         role="menuitem"
-        className="flex h-7 w-full items-center rounded px-2 text-left hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+        className="flex h-7 w-full items-center rounded px-2 text-left hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:hover:bg-gray-800 dark:disabled:text-gray-500"
         disabled={!canDelete}
         onClick={() => {
           if (!canDelete) return;

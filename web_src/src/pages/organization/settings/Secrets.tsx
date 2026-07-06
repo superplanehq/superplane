@@ -11,6 +11,13 @@ import { useNavigate } from "react-router-dom";
 import { useSecrets } from "@/hooks/useSecrets";
 import { CreateSecretDialog } from "@/ui/CreateSecretDialog";
 import type { SuperplaneSecretsSecret } from "@/api-client";
+import { cn } from "@/lib/utils";
+import {
+  settingsEmptyStateIconClassName,
+  settingsEmptyStateTitleClassName,
+  settingsTableCardClassName,
+  settingsTableLinkClassName,
+} from "./settingsPageStyles";
 
 interface SecretsProps {
   organizationId: string;
@@ -42,10 +49,10 @@ function CreateSecretButton({ canCreate, permissionsLoading, onClick, className 
 function SecretsEmptyState(props: CreateSecretButtonProps) {
   return (
     <div className="flex min-h-96 flex-col items-center justify-center text-center">
-      <div className="flex justify-center items-center text-gray-800">
+      <div className={cn("flex items-center justify-center", settingsEmptyStateIconClassName)}>
         <Icon name="key" size="xl" />
       </div>
-      <p className="mt-3 text-sm text-gray-800">Create your first secret</p>
+      <p className={settingsEmptyStateTitleClassName}>Create your first secret</p>
       <CreateSecretButton {...props} className="mt-4" />
     </div>
   );
@@ -67,10 +74,10 @@ function SecretsTableRows({
           <TableRow key={secretId} className="last:[&>td]:border-b-0">
             <TableCell>
               <div className="flex items-center gap-2">
-                <Icon name="key" size="sm" className="text-gray-800" />
+                <Icon name="key" size="sm" className="text-gray-800 dark:text-gray-100" />
                 <Link
                   href={getDetailPath(secretId)}
-                  className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
+                  className={settingsTableLinkClassName}
                   data-testid="secrets-secret-link"
                 >
                   {secret.metadata?.name || "Unnamed Secret"}
@@ -110,8 +117,8 @@ export function Secrets({ organizationId }: SecretsProps) {
   if (isLoading) {
     return (
       <div className="space-y-6 pt-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
-          <div className="px-6 pb-6 min-h-96 flex justify-center items-center">
+        <div className={settingsTableCardClassName}>
+          <div className="flex min-h-96 items-center justify-center px-6 pb-6">
             <p className="text-gray-500 dark:text-gray-400">Loading secrets...</p>
           </div>
         </div>
@@ -128,7 +135,7 @@ export function Secrets({ organizationId }: SecretsProps) {
 
   return (
     <div className="space-y-6 pt-6">
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className={settingsTableCardClassName}>
         {sortedSecrets.length > 0 && (
           <div className="px-6 pt-6 pb-4 flex items-center justify-start">
             <CreateSecretButton {...createButtonProps} />

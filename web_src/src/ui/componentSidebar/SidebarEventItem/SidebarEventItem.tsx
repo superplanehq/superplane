@@ -166,7 +166,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       {showActionsMenu && (isHovered || isDropdownOpen) && (
         <div className="absolute top-0 right-0 h-full flex items-center bg-transparent">
           <div
-            className="h-full bg-white/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2"
+            className="h-full bg-white/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2 dark:bg-gray-900/80"
             onClick={(e) => e.stopPropagation()}
           >
             <SidebarEventActionsMenu
@@ -397,9 +397,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       {/* Payload Modal */}
       {isPayloadModalOpen && modalPayload && (
         <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-800">Payload</h3>
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col dark:bg-gray-900">
+            <div className="flex items-center justify-between p-4 border-b dark:border-gray-800/70">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Payload</h3>
               <div className="flex items-center gap-2">
                 <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
                   <Button
@@ -424,7 +424,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto bg-white rounded-b-lg">
+            <div className="flex-1 overflow-auto bg-white rounded-b-lg dark:bg-gray-900">
               <div className="p-4">
                 <JsonView
                   value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload}

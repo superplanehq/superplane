@@ -1,7 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render as testingLibraryRender, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ChangeEvent } from "react";
+
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
 
@@ -72,10 +74,11 @@ function panelEditorElement({
 }
 
 function renderPanelEditor(initialContent: MarkdownContent = { title: "Before", body: "Original" }) {
-  return render(
+  return testingLibraryRender(
     panelEditorElement({
       initialContent,
     }),
+    { wrapper: ThemeProvider },
   );
 }
 
@@ -102,7 +105,9 @@ describe("PanelEditorDialog", () => {
   it("closes the YAML diff modal when the editor closes", async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
-    const { rerender } = render(panelEditorElement({ open: true, onOpenChange }));
+    const { rerender } = testingLibraryRender(panelEditorElement({ open: true, onOpenChange }), {
+      wrapper: ThemeProvider,
+    });
 
     await user.clear(screen.getByLabelText("Panel title"));
     await user.type(screen.getByLabelText("Panel title"), "After");

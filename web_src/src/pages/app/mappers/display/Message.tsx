@@ -1,6 +1,7 @@
 import type React from "react";
 
 import { getBackgroundColorClass } from "@/lib/colors";
+import { withEventSectionDarkBackground } from "@/lib/eventSectionBackground";
 import type { ExecutionInfo } from "../types";
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -22,10 +23,10 @@ export function Message({ lastExecution }: { lastExecution: ExecutionInfo | null
   const rawColor = metadata["color"];
   const color = typeof rawColor === "string" && rawColor.length > 0 ? rawColor : "gray";
 
-  const colorClass = getBackgroundColorClass(color);
+  const colorClass = withEventSectionDarkBackground(getBackgroundColorClass(color));
 
   return (
-    <div className={`px-2 py-1.5 text-left text-base max-h-20 truncate ${colorClass}`}>
+    <div className={`px-2 py-1.5 text-left text-sm max-h-20 truncate ${colorClass}`}>
       <pre className="break-all whitespace-pre-wrap">{message}</pre>
     </div>
   );

@@ -5,6 +5,7 @@ import { resolveIcon } from "@/lib/utils";
 import { coerceMonacoValue } from "@/lib/monaco";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useTheme } from "@/contexts/useTheme";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 
@@ -12,6 +13,8 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [validationError, setValidationError] = React.useState<string | null>(null);
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
     autocompleteExampleObj,
     languageId: "xml",
@@ -87,7 +90,7 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
   return (
     <>
       <div className="flex flex-col gap-2 relative">
-        <div className="border rounded-md border-gray-300 dark:border-gray-700 p-1" style={{ height: "200px" }}>
+        <div className="border rounded-md border-gray-300 dark:border-gray-600 p-1" style={{ height: "200px" }}>
           <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
             <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
               <button onClick={copyToClipboard} className="p-1 rounded text-gray-500 hover:text-gray-800">
@@ -106,7 +109,7 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
             value={editorValue}
             onChange={handleEditorChange}
             onMount={handleEditorMount}
-            theme="vs"
+            theme={monacoTheme}
             options={editorOptions}
           />
         </div>
@@ -137,14 +140,14 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
               </Button>
             </SimpleTooltip>
           </div>
-          <div className="flex-1 border border-gray-200 dark:border-gray-700 rounded-md">
+          <div className="flex-1 border border-gray-200 dark:border-gray-600 rounded-md">
             <Editor
               height="600px"
               defaultLanguage="xml"
               value={editorValue}
               onChange={handleEditorChange}
               onMount={handleEditorMount}
-              theme="vs"
+              theme={monacoTheme}
               options={{
                 ...editorOptions,
                 automaticLayout: true,

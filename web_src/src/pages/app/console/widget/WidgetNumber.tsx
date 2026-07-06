@@ -64,13 +64,13 @@ export function WidgetNumber({ render, rows, isLoading, totalCount, composite, v
     if (variant === "inline") {
       return (
         <div className="flex items-center justify-center py-1">
-          <Loader2 className="size-4 animate-spin text-slate-400" />
+          <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
         </div>
       );
     }
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <Loader2 className="size-4 animate-spin text-slate-400" />
+        <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
       </div>
     );
   }
@@ -95,9 +95,11 @@ function NumberDisplay({ render, value, sparkline, variant }: NumberDisplayProps
     variant === "inline"
       ? "flex flex-col items-start justify-center gap-1 text-left"
       : "flex h-full flex-col items-start justify-center gap-1 p-4";
-  const valueClassName = "text-4xl font-medium text-slate-900";
+  const valueClassName = "text-4xl font-medium text-slate-900 dark:text-gray-100";
   const suffixClassName =
-    variant === "inline" ? "text-base font-semibold text-slate-900" : "text-xl font-semibold text-slate-900";
+    variant === "inline"
+      ? "text-base font-semibold text-slate-900 dark:text-gray-100"
+      : "text-xl font-semibold text-slate-900 dark:text-gray-100";
   const hasSuffix = formatted != null && Boolean(render.suffix);
   const hasSparkline = sparkline != null && sparkline.length > 1;
   const valueBlock =
@@ -118,7 +120,9 @@ function NumberDisplay({ render, value, sparkline, variant }: NumberDisplayProps
   return (
     <div className={className} data-testid="widget-number">
       {render.label ? (
-        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{render.label}</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-gray-400">
+          {render.label}
+        </span>
       ) : null}
       {hasSparkline ? (
         <div className={variant === "inline" ? "flex flex-col gap-2" : "flex flex-col gap-3"}>
@@ -158,7 +162,13 @@ function Sparkline({ values }: { values: number[] }) {
   const baselineY = plotBottom.toFixed(1);
   const areaPath = `M${linePoints[0]} L${linePoints.slice(1).join(" L")} L${lastX},${baselineY} L${firstX},${baselineY} Z`;
   return (
-    <svg width={width} height={height} className="block text-sky-500" viewBox={`0 0 ${width} ${height}`} aria-hidden>
+    <svg
+      width={width}
+      height={height}
+      className="block text-sky-500 dark:text-gray-400"
+      viewBox={`0 0 ${width} ${height}`}
+      aria-hidden
+    >
       <path d={areaPath} fill="currentColor" fillOpacity={0.2} stroke="none" />
       <polyline
         points={lineCoords}

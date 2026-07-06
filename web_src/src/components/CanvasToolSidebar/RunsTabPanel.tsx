@@ -197,7 +197,7 @@ export function RunsTabPanel({
         />
 
         <div
-          className={`absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-white transition-transform duration-300 ease-in-out ${
+          className={`absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden bg-white transition-transform duration-300 ease-in-out dark:bg-gray-900 ${
             isDetailView ? "translate-x-0" : "translate-x-full"
           } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
         >

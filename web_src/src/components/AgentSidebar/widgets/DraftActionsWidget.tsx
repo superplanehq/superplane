@@ -88,13 +88,13 @@ export function DraftActionsWidget({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-slate-600 flex-1 truncate">{displayMessage}</span>
+      <span className="flex-1 truncate text-xs text-slate-600 dark:text-gray-300">{displayMessage}</span>
       {!isEditing && (
         <Button
           variant="outline"
           size="sm"
           onClick={handleViewInEditor}
-          className="text-xs h-7 gap-1"
+          className="h-7 gap-1 text-xs"
           disabled={busy !== null}
         >
           <Eye size={12} />
@@ -106,12 +106,12 @@ export function DraftActionsWidget({
         size="sm"
         onClick={handleDiscard}
         disabled={busy !== null}
-        className="text-xs h-7 gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+        className="h-7 gap-1 border-red-200 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/50 dark:hover:text-red-200"
       >
         <Trash2 size={12} />
         {busy === "discard" ? "Discarding..." : "Discard"}
       </Button>
-      <Button variant="default" size="sm" onClick={handleCommit} disabled={busy !== null} className="text-xs h-7 gap-1">
+      <Button variant="default" size="sm" onClick={handleCommit} disabled={busy !== null} className="h-7 gap-1 text-xs">
         <Rocket size={12} />
         {busy === "commit" ? "Committing..." : "Commit"}
       </Button>
