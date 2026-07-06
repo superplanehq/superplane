@@ -12,6 +12,7 @@ import type {
 } from "@/api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import type { CanvasEdge, CanvasNode, SidebarData } from "@/ui/CanvasPage";
+import type { LogEntry } from "@/ui/CanvasLogSidebar";
 import { getColorClass } from "@/lib/colors";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
 import { prepareComponentNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
@@ -19,6 +20,7 @@ import { getNodeIntegrationName } from "./lib/node-integrations";
 import type { TriggerActionModal, User } from "./mappers/types";
 import {
   buildUserInfo,
+  mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
@@ -48,6 +50,41 @@ export function getCanvasLogNodesSignature(nodes: ComponentsNode[]): string {
       warningMessage: node.warningMessage,
     })),
   );
+}
+
+export function prepareCanvasLogNodes(
+  nodes: ComponentsNode[],
+  edges: ComponentsEdge[],
+  components: ActionsAction[],
+  includeDerivedWarnings: boolean,
+): ComponentsNode[] {
+  if (!includeDerivedWarnings) {
+    return nodes;
+  }
+
+  return withDerivedNodeWarnings(nodes, edges, components);
+}
+
+export function buildCanvasLogEntries(
+  nodes: ComponentsNode[],
+  workflowUpdatedAt: string,
+  onNodeSelect: (nodeId: string) => void,
+): LogEntry[] {
+  return mapCanvasNodesToLogEntries({ nodes, workflowUpdatedAt, onNodeSelect }).sort((a, b) => {
+    const aTime = Date.parse(a.timestamp || "") || 0;
+    const bTime = Date.parse(b.timestamp || "") || 0;
+    return aTime - bTime;
+  });
+}
+
+export function isCanvasPrepLoading(
+  canvas: CanvasesCanvas | null | undefined,
+  canvasLoading: boolean,
+  triggersLoading: boolean,
+  componentsLoading: boolean,
+  integrationsLoading: boolean,
+): boolean {
+  return !canvas || canvasLoading || triggersLoading || componentsLoading || integrationsLoading;
 }
 
 // Merge a run's lightweight execution ref with the matching full execution (preferred from the
