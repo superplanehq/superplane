@@ -24,9 +24,11 @@ export async function canvasVersionExists(canvasId: string, versionId: string): 
   }
 }
 
-// fetchRepositorySpecFileContent reads a canvas.yaml/console.yaml file. When
-// `stage` is set (only meaningful for a draft version), the server returns the
-// effective staged content (staged edits overlaid on the committed version).
+// fetchRepositorySpecFileContent reads a repository file. The server treats
+// `version_id` and `stage` as mutually exclusive query modes:
+// - stage=true: effective staged content (or live committed when nothing is staged)
+// - version_id: committed content for a historical version
+// - neither: committed content for the live version
 export async function fetchRepositorySpecFileContent(
   canvasId: string,
   path: string,
@@ -34,11 +36,10 @@ export async function fetchRepositorySpecFileContent(
   stage = false,
 ): Promise<string> {
   const params = new URLSearchParams({ path });
-  if (versionId) {
-    params.set("version_id", versionId);
-  }
-  if (stage && versionId) {
+  if (stage) {
     params.set("stage", "true");
+  } else if (versionId) {
+    params.set("version_id", versionId);
   }
 
   const response = await fetch(`/api/v1/canvases/${encodeURIComponent(canvasId)}/repository/file?${params}`, {
