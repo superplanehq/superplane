@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -501,7 +502,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			r.Organization.ID,
 			r.User,
 			[]models.CanvasNode{
-				componentCanvasNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+				componentCanvasNode("node-a", "Node A", "missingcomponent", map[string]any{"value": "before"}),
 			},
 			nil,
 		)
@@ -547,6 +548,122 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		updatedVersionNode := findVersionNode(t, publishedVersion.Nodes, "node-a")
 		require.NotNil(t, updatedVersionNode.ErrorMessage)
 		require.Equal(t, existingError, *updatedVersionNode.ErrorMessage)
+	})
+
+	t.Run("update node rejects component changes", func(t *testing.T) {
+		r := support.Setup(t)
+
+		now := time.Now()
+		staleWebhookID := uuid.New()
+		require.NoError(t, database.Conn().Create(&models.Webhook{
+			ID:        staleWebhookID,
+			State:     models.WebhookStateReady,
+			Secret:    []byte("secret"),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}).Error)
+
+		existingNode := componentCanvasNode("node-a", "Node A", "runnerBash", runnerConfiguration())
+		existingNode.WebhookID = &staleWebhookID
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{existingNode},
+			nil,
+		)
+
+		err := database.Conn().
+			Model(&models.CanvasNode{}).
+			Where("workflow_id = ?", canvas.ID).
+			Where("node_id = ?", "node-a").
+			Update("webhook_id", staleWebhookID).
+			Error
+		require.NoError(t, err)
+
+		storedNode, err := models.FindCanvasNode(database.Conn(), canvas.ID, "node-a")
+		require.NoError(t, err)
+		require.NotNil(t, storedNode.WebhookID)
+		require.Equal(t, staleWebhookID, *storedNode.WebhookID)
+
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			"Test commit",
+			[]models.Node{
+				componentNode("node-a", "Node A", "runnerPython", runnerConfiguration()),
+			},
+			nil,
+		)
+		require.NoError(t, err)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, err)
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.ErrorContains(t, err, "cannot change node node-a implementation; delete the node and add a new one instead")
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		activeNode := findCanvasNode(t, activeNodes, "node-a")
+		require.Equal(t, models.NodeTypeComponent, activeNode.Type)
+		require.Equal(t, "runnerBash", activeNode.Ref.Data().Component.Name)
+		require.NotNil(t, activeNode.WebhookID)
+		require.Equal(t, staleWebhookID, *activeNode.WebhookID)
+		require.Equal(t, models.CanvasNodeStateReady, activeNode.State)
+
+		staleWebhookNodes, err := models.FindWebhookNodesInTransaction(database.Conn(), staleWebhookID)
+		require.NoError(t, err)
+		require.Len(t, staleWebhookNodes, 1)
+
+		var staleWebhook models.Webhook
+		err = database.Conn().Unscoped().First(&staleWebhook, staleWebhookID).Error
+		require.NoError(t, err)
+		require.False(t, staleWebhook.DeletedAt.Valid)
+	})
+
+	t.Run("update node rejects widget changes", func(t *testing.T) {
+		r := support.Setup(t)
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				componentCanvasNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			},
+			nil,
+		)
+
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			"Test commit",
+			[]models.Node{
+				widgetNode("node-a", "Node A", "group", map[string]any{}),
+			},
+			nil,
+		)
+		require.NoError(t, err)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, err)
+		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.ErrorContains(t, err, "cannot change node node-a implementation; delete the node and add a new one instead")
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		activeNode := findCanvasNode(t, activeNodes, "node-a")
+		require.Equal(t, models.NodeTypeComponent, activeNode.Type)
+		require.Equal(t, "noop", activeNode.Ref.Data().Component.Name)
 	})
 
 	t.Run("add node with conflicting id rewrites id in db and published version", func(t *testing.T) {
@@ -826,12 +943,32 @@ func componentNode(nodeID string, name string, component string, configuration m
 	}
 }
 
+func runnerConfiguration() map[string]any {
+	return map[string]any{
+		"machine_type":   "e1-large-amd64",
+		"execution_mode": "host",
+		"script":         "echo hello",
+	}
+}
+
 func triggerNode(nodeID string, name string, trigger string, configuration map[string]any) models.Node {
 	return models.Node{
 		ID:            nodeID,
 		Name:          name,
 		Type:          models.NodeTypeTrigger,
 		Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: trigger}},
+		Configuration: configuration,
+		Metadata:      map[string]any{},
+		Position:      models.Position{X: 10, Y: 20},
+	}
+}
+
+func widgetNode(nodeID string, name string, widget string, configuration map[string]any) models.Node {
+	return models.Node{
+		ID:            nodeID,
+		Name:          name,
+		Type:          models.NodeTypeWidget,
+		Ref:           models.NodeRef{Widget: &models.WidgetRef{Name: widget}},
 		Configuration: configuration,
 		Metadata:      map[string]any{},
 		Position:      models.Position{X: 10, Y: 20},
