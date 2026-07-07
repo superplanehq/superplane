@@ -416,7 +416,10 @@ export const useStagedCanvasSpec = (
   const versionId = versionMetadata?.metadata?.id;
   return useQuery({
     queryKey: canvasKeys.stagedCanvasSpec(canvasId),
-    queryFn: async () => fetchStagedCanvasVersionWithSpec(canvasId, versionMetadata ?? undefined),
+    queryFn: async () => {
+      const staged = await fetchStagedCanvasVersionWithSpec(canvasId, versionMetadata ?? undefined);
+      return staged ?? null;
+    },
     enabled: !!canvasId && !!versionId && enabled,
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: false,

@@ -43,31 +43,33 @@ export function useDraftCanvasSpecSync({
       return;
     }
 
-    if (isEnteringEditSession) {
+    // Live staged edit draft state is owned by resyncStagedEditorState (remote
+    // staging) and local canvas mutations — not by React Query sync effects.
+    if (shouldReadStagedCanvasVersion) {
       return;
     }
 
-    if (shouldReadStagedCanvasVersion && isAwaitingStagedCanvasSpec) {
+    if (isEnteringEditSession || isAwaitingStagedCanvasSpec) {
       return;
     }
 
-    const preservedDraftSpec = draftCanvasSpecsRef.current.get(activeCanvasVersionId);
     const nextDraftSpec = selectedCanvasVersion?.spec ?? null;
+    if (!nextDraftSpec) {
+      return;
+    }
 
     if (shouldSkipDraftSpecSyncFromLoadedVersion(draftCanvasSpec, nextDraftSpec)) {
       return;
     }
+
+    const preservedDraftSpec = draftCanvasSpecsRef.current.get(activeCanvasVersionId);
 
     if (shouldApplyPreservedDraftSpec(preservedDraftSpec, nextDraftSpec)) {
       setDraftCanvasSpec(preservedDraftSpec);
       return;
     }
 
-    if (nextDraftSpec) {
-      draftCanvasSpecsRef.current.set(activeCanvasVersionId, nextDraftSpec);
-    } else {
-      draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
-    }
+    draftCanvasSpecsRef.current.set(activeCanvasVersionId, nextDraftSpec);
     setDraftCanvasSpec(nextDraftSpec);
   }, [
     isEditing,
@@ -86,6 +88,11 @@ export function useDraftCanvasSpecSync({
     if (!isEditing || !activeCanvasVersionId || !liveCanvas?.spec) {
       return;
     }
+
+    if (shouldReadStagedCanvasVersion) {
+      return;
+    }
+
     if (!draftCanvasSpec && !selectedCanvasVersion?.spec) {
       return;
     }
@@ -111,6 +118,7 @@ export function useDraftCanvasSpecSync({
     });
   }, [
     isEditing,
+    shouldReadStagedCanvasVersion,
     activeCanvasVersionId,
     liveCanvas?.spec,
     liveCanvasVersion?.spec,
