@@ -432,7 +432,7 @@ describe("useUpdateCanvasConsole", () => {
 
   it("optimistically updates the dashboard cache while console changes are saving", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.consoleStaged("canvas-1", "version-1");
+    const dashboardKey = canvasKeys.stagedConsole("canvas-1");
     let resolveSave: (value: unknown) => void = () => {};
     const savePromise = new Promise((resolve) => {
       resolveSave = resolve;
@@ -475,7 +475,7 @@ describe("useUpdateCanvasConsole", () => {
 
   it("rolls back the dashboard cache when console save fails", async () => {
     const queryClient = createQueryClient();
-    const dashboardKey = canvasKeys.consoleStaged("canvas-1", "version-1");
+    const dashboardKey = canvasKeys.stagedConsole("canvas-1");
     queryClient.setQueryData(dashboardKey, {
       canvasId: "canvas-1",
       versionId: "version-1",
