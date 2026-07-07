@@ -36,13 +36,7 @@ func TestCanvasYAMLFromVersionIncludesActionNodeType(t *testing.T) {
 	liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 	require.NoError(t, err)
 
-	yamlText, err := ReadRepositorySpecFile(
-		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		liveVersion.ID.String(),
-		CanvasYAMLRepositoryPath,
-	)
+	yamlText, err := ReadRepositorySpecFile(ctx, canvas, liveVersion, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 	require.Contains(t, yamlText, "component: wait")
 	assert.True(t, strings.Contains(yamlText, "type: TYPE_ACTION") || strings.Contains(yamlText, "type: \"TYPE_ACTION\""))
