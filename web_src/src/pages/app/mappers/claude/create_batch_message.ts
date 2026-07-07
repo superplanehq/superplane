@@ -33,6 +33,7 @@ type CreateBatchMessageConfiguration = {
   model?: string;
   outputSchema?: string;
   requests?: { customId?: string }[];
+  requestsExpression?: string;
 };
 
 function executedAt(execution: ExecutionInfo): string {
@@ -70,9 +71,13 @@ function requestsMetadata(node: NodeInfo): MetadataItem[] {
     items.push({ icon: "sparkles", label: model });
   }
 
-  const count = config?.requests?.length;
-  if (count) {
-    items.push({ icon: "layers", label: `${count} request${count === 1 ? "" : "s"}` });
+  if (config?.requestsExpression) {
+    items.push({ icon: "layers", label: "Dynamic batch" });
+  } else {
+    const count = config?.requests?.length;
+    if (count) {
+      items.push({ icon: "layers", label: `${count} request${count === 1 ? "" : "s"}` });
+    }
   }
 
   return items;

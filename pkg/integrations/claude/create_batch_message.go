@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/google/uuid"
@@ -40,6 +41,11 @@ type BatchMessageSpec struct {
 	Temperature   *float64               `json:"temperature" mapstructure:"temperature"`
 	OutputSchema  string                 `json:"outputSchema" mapstructure:"outputSchema"`
 	Requests      []BatchMessageItemSpec `json:"requests" mapstructure:"requests"`
+	// RequestsExpression, when set, is evaluated at execution time and replaces
+	// Requests entirely. It lets a batch be built from a dynamic-length
+	// upstream array (e.g. every open GitHub issue) instead of a manually
+	// authored, fixed list.
+	RequestsExpression string `json:"requestsExpression" mapstructure:"requestsExpression"`
 }
 
 // BatchMessageNodeMetadata is node-level metadata surfaced in the UI, mirroring
@@ -113,6 +119,7 @@ Batches typically complete within an hour, but can take up to 24 hours. This com
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0), applied to every request.
 - **Structured Output**: (Optional) A JSON Schema every response must conform to.
 - **Requests**: The list of prompts to send. Each has a **Custom ID** (unique within the batch, used to match it to its result) and a **Prompt**.
+- **Requests From Expression**: (Optional, advanced) Build the batch from a dynamic-length array produced by an upstream node instead of manually adding requests above.` + " e.g. `map($['Fetch Issues'].json, {customId: string(#.number), prompt: 'Triage: ' + #.title})` to batch every issue an HTTP Request node just fetched. Each array element is either a plain string (used as the prompt, with an auto-numbered Custom ID) or an object with `customId`/`prompt`. Takes precedence over the manually-added Requests when set." + `
 
 ## Output
 
@@ -224,8 +231,8 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 			Name:        "requests",
 			Label:       "Requests",
 			Type:        configuration.FieldTypeList,
-			Required:    true,
-			Description: fmt.Sprintf("Prompts to send as one batch (up to %d). Each needs a unique Custom ID used to match it to its result.", maxBatchRequests),
+			Required:    false,
+			Description: fmt.Sprintf("Prompts to send as one batch (up to %d). Each needs a unique Custom ID used to match it to its result. Ignored when Requests From Expression (below) is set.", maxBatchRequests),
 			Default: []map[string]any{
 				{"customId": "request-1", "prompt": ""},
 			},
@@ -257,6 +264,15 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 					},
 				},
 			},
+		},
+		{
+			Name:        "requestsExpression",
+			Label:       "Requests From Expression",
+			Type:        configuration.FieldTypeExpression,
+			Required:    false,
+			Togglable:   true,
+			Placeholder: `map($['Fetch Issues'].json, {customId: string(#.number), prompt: "Triage: " + #.title})`,
+			Description: fmt.Sprintf("Advanced: build the batch from a dynamic-length upstream array instead of the manually-added Requests above. Must evaluate to an array of up to %d items, each either a plain string (used as the prompt; Custom IDs are auto-numbered) or an object with `customId` and `prompt`. When set, this replaces Requests entirely.", maxBatchRequests),
 		},
 	}
 }
@@ -299,6 +315,17 @@ func (c *CreateBatchMessage) Execute(ctx core.ExecutionContext) error {
 	}
 	if err := validateBatchMessageSpec(spec); err != nil {
 		return err
+	}
+
+	if strings.TrimSpace(spec.RequestsExpression) != "" {
+		items, err := resolveRequestsFromExpression(ctx.Expressions, spec.RequestsExpression)
+		if err != nil {
+			return fmt.Errorf("requestsExpression: %w", err)
+		}
+		if err := validateRequestItems(items); err != nil {
+			return fmt.Errorf("requestsExpression result: %w", err)
+		}
+		spec.Requests = items
 	}
 
 	if spec.MaxTokens == 0 {
@@ -391,6 +418,10 @@ func decodeBatchMessageSpec(config any) (BatchMessageSpec, error) {
 	return spec, nil
 }
 
+// validateBatchMessageSpec validates everything that's known at design time.
+// When RequestsExpression is set, the manually-authored Requests list is
+// unused, so it's not validated here — its resolved contents are validated by
+// validateRequestItems once the expression has been evaluated in Execute.
 func validateBatchMessageSpec(spec BatchMessageSpec) error {
 	if strings.TrimSpace(spec.Model) == "" {
 		return fmt.Errorf("model is required")
@@ -400,15 +431,35 @@ func validateBatchMessageSpec(spec BatchMessageSpec) error {
 		return fmt.Errorf("maxTokens must be at least 1")
 	}
 
-	if len(spec.Requests) == 0 {
+	if strings.TrimSpace(spec.RequestsExpression) == "" {
+		if err := validateRequestItems(spec.Requests); err != nil {
+			return err
+		}
+	}
+
+	hasSchema := strings.TrimSpace(spec.OutputSchema) != ""
+	if hasSchema && !strings.Contains(spec.OutputSchema, "{{") {
+		if _, err := structuredoutput.Parse(spec.OutputSchema); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateRequestItems validates a resolved list of batch requests, whether it
+// came from the manually-authored Requests field or from evaluating
+// RequestsExpression.
+func validateRequestItems(items []BatchMessageItemSpec) error {
+	if len(items) == 0 {
 		return fmt.Errorf("at least one request is required")
 	}
-	if len(spec.Requests) > maxBatchRequests {
+	if len(items) > maxBatchRequests {
 		return fmt.Errorf("a batch cannot contain more than %d requests", maxBatchRequests)
 	}
 
-	seen := make(map[string]bool, len(spec.Requests))
-	for i, r := range spec.Requests {
+	seen := make(map[string]bool, len(items))
+	for i, r := range items {
 		id := strings.TrimSpace(r.CustomID)
 		if id == "" {
 			return fmt.Errorf("requests[%d].customId is required", i)
@@ -426,14 +477,66 @@ func validateBatchMessageSpec(spec BatchMessageSpec) error {
 		}
 	}
 
-	hasSchema := strings.TrimSpace(spec.OutputSchema) != ""
-	if hasSchema && !strings.Contains(spec.OutputSchema, "{{") {
-		if _, err := structuredoutput.Parse(spec.OutputSchema); err != nil {
-			return err
+	return nil
+}
+
+// resolveRequestsFromExpression evaluates an expression that must return an
+// array. Each element is either a plain string (used as the prompt, with an
+// auto-numbered Custom ID) or an object with customId/prompt fields.
+func resolveRequestsFromExpression(expressions core.ExpressionContext, expression string) ([]BatchMessageItemSpec, error) {
+	result, err := expressions.Run(expression)
+	if err != nil {
+		return nil, fmt.Errorf("expression evaluation failed: %w", err)
+	}
+
+	raw, err := toAnySlice(result)
+	if err != nil {
+		return nil, fmt.Errorf("expression must evaluate to an array: %w", err)
+	}
+
+	items := make([]BatchMessageItemSpec, 0, len(raw))
+	for i, entry := range raw {
+		switch v := entry.(type) {
+		case string:
+			items = append(items, BatchMessageItemSpec{
+				CustomID: fmt.Sprintf("request-%d", i+1),
+				Prompt:   v,
+			})
+		case map[string]any:
+			item := BatchMessageItemSpec{}
+			if err := mapstructure.Decode(v, &item); err != nil {
+				return nil, fmt.Errorf("item %d: %w", i, err)
+			}
+			if strings.TrimSpace(item.CustomID) == "" {
+				item.CustomID = fmt.Sprintf("request-%d", i+1)
+			}
+			items = append(items, item)
+		default:
+			return nil, fmt.Errorf("item %d: expected a string or an object with customId/prompt, got %T", i, entry)
 		}
 	}
 
-	return nil
+	return items, nil
+}
+
+// toAnySlice normalizes an expression result into a []any, the same way
+// pkg/components/foreach does for its arrayExpression field.
+func toAnySlice(v any) ([]any, error) {
+	if v == nil {
+		return nil, fmt.Errorf("got nil")
+	}
+	if s, ok := v.([]any); ok {
+		return s, nil
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("got %T", v)
+	}
+	out := make([]any, rv.Len())
+	for i := range out {
+		out[i] = rv.Index(i).Interface()
+	}
+	return out, nil
 }
 
 func buildBatchRequestItems(spec BatchMessageSpec, schema map[string]any) []CreateMessageBatchRequestItem {

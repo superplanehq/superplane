@@ -116,7 +116,7 @@ func Test__CreateBatchMessage__Execute__endsImmediately(t *testing.T) {
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","type":"message_batch","processing_status":"ended","request_counts":{"succeeded":2}}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
-				`{"custom_id":"request-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"Paris"}],"stop_reason":"end_turn","usage":{"input_tokens":5,"output_tokens":3}}}}`+"\n"+
+				`{"custom_id":"request-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"Paris"}],"stop_reason":"end_turn","usage":{"input_tokens":5,"output_tokens":3}}}}` + "\n" +
 					`{"custom_id":"request-2","result":{"type":"errored","error":{"type":"invalid_request_error","message":"bad input"}}}`,
 			))},
 		},
@@ -301,4 +301,136 @@ func Test__CreateBatchMessage__Cancel(t *testing.T) {
 	require.NoError(t, c.Cancel(execCtx))
 	require.Len(t, httpContext.Requests, 1)
 	assert.Contains(t, httpContext.Requests[0].URL.Path, "/messages/batches/msgbatch_1/cancel")
+}
+
+func Test__CreateBatchMessage__Setup__requestsExpression_skipsListValidation(t *testing.T) {
+	c := &CreateBatchMessage{}
+	ctx := core.SetupContext{
+		Configuration: map[string]any{
+			"model":              "claude-opus-4-6",
+			"requestsExpression": `$['Fetch Issues'].json`,
+		},
+		Metadata: &contexts.MetadataContext{},
+	}
+	require.NoError(t, c.Setup(ctx))
+}
+
+func Test__CreateBatchMessage__Execute__requestsExpression_strings(t *testing.T) {
+	c := &CreateBatchMessage{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":2}}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				`{"custom_id":"request-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"A"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
+					`{"custom_id":"request-2","result":{"type":"succeeded","message":{"id":"msg_2","content":[{"type":"text","text":"B"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
+			))},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	metadataCtx := &contexts.MetadataContext{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	requestsCtx := &contexts.RequestContext{}
+
+	execCtx := core.ExecutionContext{
+		ID: uuid.New(),
+		Configuration: map[string]any{
+			"model":              "claude-opus-4-6",
+			"requestsExpression": `dummy`,
+		},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Requests:       requestsCtx,
+		Expressions:    &contexts.ExpressionContext{Output: []any{"Prompt A", "Prompt B"}},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.Execute(execCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+
+	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
+	require.Len(t, out.Results, 2)
+	assert.Equal(t, "A", out.Results[0].Text)
+	assert.Equal(t, "B", out.Results[1].Text)
+}
+
+func Test__CreateBatchMessage__Execute__requestsExpression_objects(t *testing.T) {
+	c := &CreateBatchMessage{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				`{"custom_id":"issue-42","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"Triaged"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
+			))},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	metadataCtx := &contexts.MetadataContext{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	execCtx := core.ExecutionContext{
+		ID: uuid.New(),
+		Configuration: map[string]any{
+			"model":              "claude-opus-4-6",
+			"requestsExpression": `dummy`,
+		},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Requests:       &contexts.RequestContext{},
+		Expressions: &contexts.ExpressionContext{Output: []any{
+			map[string]any{"customId": "issue-42", "prompt": "Triage issue 42"},
+		}},
+		Logger: logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.Execute(execCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+
+	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
+	require.Len(t, out.Results, 1)
+	assert.Equal(t, "issue-42", out.Results[0].CustomID)
+	assert.Equal(t, "Triaged", out.Results[0].Text)
+}
+
+func Test__CreateBatchMessage__Execute__requestsExpression_notAnArray(t *testing.T) {
+	c := &CreateBatchMessage{}
+	execCtx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"model":              "claude-opus-4-6",
+			"requestsExpression": `dummy`,
+		},
+		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
+		Metadata:    &contexts.MetadataContext{},
+		Expressions: &contexts.ExpressionContext{Output: "not-an-array"},
+		Logger:      logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.Execute(execCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must evaluate to an array")
+}
+
+func Test__CreateBatchMessage__Execute__requestsExpression_missingPrompt(t *testing.T) {
+	c := &CreateBatchMessage{}
+	execCtx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"model":              "claude-opus-4-6",
+			"requestsExpression": `dummy`,
+		},
+		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
+		Metadata:    &contexts.MetadataContext{},
+		Expressions: &contexts.ExpressionContext{Output: []any{
+			map[string]any{"customId": "issue-1", "prompt": ""},
+		}},
+		Logger: logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.Execute(execCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "prompt is required")
 }
