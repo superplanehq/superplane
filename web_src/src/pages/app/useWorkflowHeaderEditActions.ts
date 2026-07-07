@@ -6,6 +6,7 @@ import {
   markAgentBootReady,
   PLACEHOLDER_NODE_CONTEXT_KEY,
 } from "@/lib/agentBootContext";
+import { clearRunInspectionSearchParams } from "./viewState";
 
 type PlaceholderAddHandler = (data: { position: { x: number; y: number } }) => Promise<string>;
 
@@ -25,14 +26,6 @@ interface WorkflowHeaderEditActionsConfig {
   setRunDetailNodeId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
   startup?: WorkflowStartupActionsConfig;
-}
-
-function clearRunInspectionSearchParams(current: URLSearchParams): URLSearchParams {
-  const next = new URLSearchParams(current);
-  next.delete("run");
-  next.delete("sidebar");
-  next.delete("node");
-  return next;
 }
 
 export function useWorkflowHeaderEditActions({

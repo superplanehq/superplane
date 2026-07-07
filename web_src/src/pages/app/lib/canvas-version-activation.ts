@@ -5,7 +5,7 @@ import type { SetURLSearchParams } from "react-router-dom";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, invalidateStagedCanvasCaches } from "@/hooks/useCanvasData";
 
-import { clearComponentSidebarSearchParams } from "../viewState";
+import { clearRunInspectionSearchParams } from "../viewState";
 
 export function updateCanvasDetailForSelectedVersion({
   queryClient,
@@ -204,7 +204,7 @@ export function activateCanvasVersionForEditing({
     } else {
       next.set("version", versionID);
     }
-    return clearComponentSidebarSearchParams(next);
+    return clearRunInspectionSearchParams(next);
   });
 
   if (!preserveStagedLayer) {
