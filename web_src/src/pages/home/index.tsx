@@ -44,6 +44,7 @@ export function HomePage() {
   );
   const updateCanvasPreference = useUpdateCanvasPreference(organizationId || "");
   const preferredFilteredCanvases = applyCanvasAppPreferences(filteredCanvases);
+  const canCreateCanvases = canAct("canvases", "create");
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
@@ -89,6 +90,7 @@ export function HomePage() {
             onEditCanvas={openEdit}
             onTogglePin={(canvasId, pinned) => updateCanvasPreference.mutate({ canvasId, pinned })}
             onToggleStar={(canvasId, starred) => updateCanvasPreference.mutate({ canvasId, starred })}
+            canCreateCanvases={canCreateCanvases}
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
@@ -117,6 +119,7 @@ function Content({
   onEditCanvas,
   onTogglePin,
   onToggleStar,
+  canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -129,6 +132,7 @@ function Content({
   onEditCanvas: (canvas: CanvasCardData) => void;
   onTogglePin: (canvasId: string, pinned: boolean) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
+  canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -187,6 +191,7 @@ function Content({
           onEditCanvas={onEditCanvas}
           onTogglePin={onTogglePin}
           onToggleStar={onToggleStar}
+          canCreateCanvases={canCreateCanvases}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
