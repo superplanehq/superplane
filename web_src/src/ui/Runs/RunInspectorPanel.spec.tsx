@@ -35,6 +35,22 @@ const executions: CanvasesCanvasNodeExecution[] = [
     configuration: { mode: "create" },
   },
 ];
+const runningExecutions: CanvasesCanvasNodeExecution[] = [
+  {
+    id: "execution-running",
+    nodeId: "action-2",
+    state: "STATE_STARTED",
+    result: "RESULT_UNKNOWN",
+    resultReason: "RESULT_REASON_OK",
+    resultMessage: "",
+    createdAt: "2026-05-01T12:00:03Z",
+    updatedAt: "2026-05-01T12:00:04Z",
+    outputs: {},
+    metadata: {},
+    configuration: { mode: "create" },
+  },
+];
+let mockedExecutions = executions;
 
 vi.mock("@uiw/react-json-view", () => ({
   default: ({ value }: { value: unknown }) => <pre data-testid="json-view">{JSON.stringify(value)}</pre>,
@@ -42,6 +58,8 @@ vi.mock("@uiw/react-json-view", () => ({
 
 const reemitTriggerEventMock = vi.fn();
 const cancelExecutionMock = vi.fn();
+const listNodeQueueItemsMock = vi.fn();
+const deleteNodeQueueItemMock = vi.fn();
 
 vi.mock("@/api-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api-client")>();
@@ -49,12 +67,14 @@ vi.mock("@/api-client", async (importOriginal) => {
     ...actual,
     canvasesReemitTriggerEvent: (...args: unknown[]) => reemitTriggerEventMock(...args),
     canvasesCancelExecution: (...args: unknown[]) => cancelExecutionMock(...args),
+    canvasesListNodeQueueItems: (...args: unknown[]) => listNodeQueueItemsMock(...args),
+    canvasesDeleteNodeQueueItem: (...args: unknown[]) => deleteNodeQueueItemMock(...args),
   };
 });
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useEventExecutions: () => ({
-    data: { executions },
+    data: { executions: mockedExecutions },
     isLoading: false,
   }),
 }));
@@ -85,8 +105,11 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 beforeEach(() => {
+  mockedExecutions = executions;
   reemitTriggerEventMock.mockResolvedValue({});
   cancelExecutionMock.mockResolvedValue({});
+  listNodeQueueItemsMock.mockResolvedValue({ data: { items: [] } });
+  deleteNodeQueueItemMock.mockResolvedValue({});
 });
 
 afterEach(() => {
@@ -213,6 +236,47 @@ describe("RunInspectorPanel", () => {
     });
   });
 
+  it("stops running executions and queued items for the inspected run", async () => {
+    mockedExecutions = runningExecutions;
+    listNodeQueueItemsMock.mockImplementation(({ path }: { path: { nodeId: string } }) => ({
+      data: {
+        items:
+          path.nodeId === "action-2"
+            ? [
+                { id: "queue-1", rootEvent: { id: "event-running" } },
+                { id: "queue-other", rootEvent: { id: "other-event" } },
+              ]
+            : [],
+      },
+    }));
+
+    renderInspector({ run: runningRun });
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+
+    await waitFor(() => {
+      expect(cancelExecutionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: {
+            canvasId: "canvas-1",
+            executionId: "execution-running",
+          },
+        }),
+      );
+      expect(deleteNodeQueueItemMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: {
+            canvasId: "canvas-1",
+            nodeId: "action-2",
+            itemId: "queue-1",
+          },
+        }),
+      );
+    });
+
+    expect(deleteNodeQueueItemMock).toHaveBeenCalledTimes(1);
+  });
+
   it("stores a resized inspector width", () => {
     Object.defineProperty(window, "innerWidth", { value: 1200, configurable: true });
     renderInspector();
@@ -229,10 +293,12 @@ function renderInspector({
   selectedNodeId = null,
   onSelectNode = vi.fn(),
   onClose = vi.fn(),
+  run: inspectedRun = run,
 }: {
   selectedNodeId?: string | null;
   onSelectNode?: (nodeId: string) => void;
   onClose?: () => void;
+  run?: CanvasesCanvasRun;
 } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -246,7 +312,7 @@ function renderInspector({
       <ThemeProvider>
         <RunInspectorPanel
           canvasId="canvas-1"
-          run={run}
+          run={inspectedRun}
           workflowNodes={workflowNodes}
           selectedNodeId={selectedNodeId}
           onSelectNode={onSelectNode}
@@ -308,6 +374,22 @@ const run: CanvasesCanvasRun = {
   updatedAt: "2026-05-01T12:00:05Z",
   rootEvent: {
     id: "event-1",
+    nodeId: "trigger-1",
+    customName: "Deploy main",
+    createdAt: "2026-05-01T12:00:00Z",
+    data: { repository: "superplane" },
+  },
+};
+
+const runningRun: CanvasesCanvasRun = {
+  id: "run-running",
+  canvasId: "canvas-1",
+  state: "STATE_STARTED",
+  result: "RESULT_UNKNOWN",
+  createdAt: "2026-05-01T12:00:00Z",
+  updatedAt: "2026-05-01T12:00:05Z",
+  rootEvent: {
+    id: "event-running",
     nodeId: "trigger-1",
     customName: "Deploy main",
     createdAt: "2026-05-01T12:00:00Z",

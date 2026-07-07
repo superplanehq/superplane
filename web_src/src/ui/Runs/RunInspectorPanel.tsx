@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   canvasesCancelExecution,
+  canvasesDeleteNodeQueueItem,
+  canvasesListNodeQueueItems,
   canvasesReemitTriggerEvent,
   type CanvasesCanvasRun,
   type ComponentsEdge,
@@ -64,6 +66,7 @@ export function RunInspectorPanel({
         .map((execution) => execution!.id!),
     [sections],
   );
+  const stoppableNodeIds = useMemo(() => [...new Set(sections.map((section) => section.nodeId))], [sections]);
 
   const refreshRunQueries = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["canvases"] });
@@ -97,12 +100,18 @@ export function RunInspectorPanel({
 
   const stopMutation = useMutation({
     mutationFn: async () => {
-      if (runningExecutionIds.length === 0) {
-        throw new Error("No running steps to stop");
+      const queuedItems = await listQueuedItemsForRun({
+        canvasId,
+        nodeIds: stoppableNodeIds,
+        rootEventId: run.rootEvent?.id,
+      });
+
+      if (runningExecutionIds.length === 0 && queuedItems.length === 0) {
+        throw new Error("No running or queued steps to stop");
       }
 
-      await Promise.all(
-        runningExecutionIds.map((executionId) =>
+      await Promise.all([
+        ...runningExecutionIds.map((executionId) =>
           canvasesCancelExecution(
             withOrganizationHeader({
               path: {
@@ -112,7 +121,18 @@ export function RunInspectorPanel({
             }),
           ),
         ),
-      );
+        ...queuedItems.map((item) =>
+          canvasesDeleteNodeQueueItem(
+            withOrganizationHeader({
+              path: {
+                canvasId,
+                nodeId: item.nodeId,
+                itemId: item.itemId,
+              },
+            }),
+          ),
+        ),
+      ]);
     },
     onSuccess: async () => {
       await refreshRunQueries();
@@ -170,7 +190,7 @@ export function RunInspectorPanel({
         actionPending={presentation.status === "running" ? stopMutation.isPending : rerunMutation.isPending}
         actionDisabled={
           presentation.status === "running"
-            ? runningExecutionIds.length === 0 || stopMutation.isPending
+            ? (runningExecutionIds.length === 0 && !run.rootEvent?.id) || stopMutation.isPending
             : !run.rootEvent?.id
         }
       />
@@ -189,4 +209,37 @@ export function RunInspectorPanel({
       />
     </aside>
   );
+}
+
+async function listQueuedItemsForRun({
+  canvasId,
+  nodeIds,
+  rootEventId,
+}: {
+  canvasId: string;
+  nodeIds: string[];
+  rootEventId?: string;
+}) {
+  if (!rootEventId || nodeIds.length === 0) {
+    return [];
+  }
+
+  const responses = await Promise.all(
+    nodeIds.map(async (nodeId) => {
+      const response = await canvasesListNodeQueueItems(
+        withOrganizationHeader({
+          path: { canvasId, nodeId },
+          query: { limit: 100 },
+        }),
+      );
+
+      return (
+        response.data?.items
+          ?.filter((item) => item.id && item.rootEvent?.id === rootEventId)
+          .map((item) => ({ nodeId, itemId: item.id! })) ?? []
+      );
+    }),
+  );
+
+  return responses.flat();
 }
