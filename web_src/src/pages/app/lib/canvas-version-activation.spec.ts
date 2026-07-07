@@ -5,6 +5,11 @@ import { activateCanvasVersionForEditing } from "./canvas-version-activation";
 describe("activateCanvasVersionForEditing", () => {
   it("clears run inspection params when activating a version", () => {
     const setSearchParams = vi.fn();
+    const queryClient = {
+      cancelQueries: vi.fn(),
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      setQueryData: vi.fn(),
+    };
 
     activateCanvasVersionForEditing({
       organizationId: "org-1",
@@ -13,9 +18,7 @@ describe("activateCanvasVersionForEditing", () => {
       version: { metadata: { id: "version-live" }, spec: {} },
       effectiveLiveCanvasVersionId: "version-live",
       liveCanvasVersionId: "version-live",
-      queryClient: {
-        cancelQueries: vi.fn(),
-      } as never,
+      queryClient: queryClient as never,
       draftCanvasSpec: null,
       draftCanvasSpecsRef: { current: new Map() },
       activeCanvasVersionIdRef: { current: "" },

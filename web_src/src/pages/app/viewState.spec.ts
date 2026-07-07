@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyRunInspectionNavigationSearchParams, clearRunInspectionSearchParams, getWorkflowViewPresentation } from "./viewState";
+import {
+  applyRunInspectionNavigationSearchParams,
+  clearRunInspectionSearchParams,
+  getWorkflowViewPresentation,
+} from "./viewState";
 
 describe("clearRunInspectionSearchParams", () => {
   it("removes run inspection params from the URL", () => {

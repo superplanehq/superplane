@@ -1260,10 +1260,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showRunInspectionFloatingBar =
-    props.isRunInspectionMode &&
-    !props.isEditSessionActive &&
-    !props.isEditing &&
-    !!props.onBackToLiveCanvas;
+    props.isRunInspectionMode && !props.isEditSessionActive && !props.isEditing && !!props.onBackToLiveCanvas;
   const showPreviewFloatingBar =
     canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 

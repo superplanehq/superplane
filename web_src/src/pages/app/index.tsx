@@ -3336,8 +3336,7 @@ export function AppPage() {
     [handleUseVersion, hasEditableVersion, hasLocalSaveActivity, effectiveLiveCanvasVersionId, liveCanvasVersionId],
   );
 
-  const runInspectionChromeActive =
-    isRunInspectionMode && !editSessionActive && !isEnteringEditSession;
+  const runInspectionChromeActive = isRunInspectionMode && !editSessionActive && !isEnteringEditSession;
 
   const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
     getWorkflowViewPresentation({
