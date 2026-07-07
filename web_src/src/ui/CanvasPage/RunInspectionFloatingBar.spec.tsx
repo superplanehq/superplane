@@ -109,6 +109,27 @@ describe("RunInspectionFloatingBar", () => {
     expect(onBackToLiveCanvas).toHaveBeenCalledTimes(1);
   });
 
+  it("hides the run inspection bar while an edit session is active", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          isEditSessionActive
+          onBackToLiveCanvas={vi.fn()}
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText("Previewing previous run")).not.toBeInTheDocument();
+  });
+
   it("does not show the previous version bar while inspecting a run", () => {
     render(
       <MemoryRouter>

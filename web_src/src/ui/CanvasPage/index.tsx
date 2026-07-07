@@ -1259,7 +1259,11 @@ function CanvasPage(props: CanvasPageProps) {
   }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
   const canvasStateMode = props.canvasStateMode || "default";
-  const showRunInspectionFloatingBar = props.isRunInspectionMode && !!props.onBackToLiveCanvas;
+  const showRunInspectionFloatingBar =
+    props.isRunInspectionMode &&
+    !props.isEditSessionActive &&
+    !props.isEditing &&
+    !!props.onBackToLiveCanvas;
   const showPreviewFloatingBar =
     canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
