@@ -1259,8 +1259,9 @@ function CanvasPage(props: CanvasPageProps) {
   }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
   const canvasStateMode = props.canvasStateMode || "default";
-  const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
   const showRunInspectionFloatingBar = props.isRunInspectionMode && !!props.onBackToLiveCanvas;
+  const showPreviewFloatingBar =
+    canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
   const liveBottomInspectorOpen = !props.isRunInspectionMode && !props.isEditing && state.componentSidebar.isOpen;
 

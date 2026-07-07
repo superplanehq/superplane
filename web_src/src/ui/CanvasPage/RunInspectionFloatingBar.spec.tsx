@@ -108,4 +108,27 @@ describe("RunInspectionFloatingBar", () => {
 
     expect(onBackToLiveCanvas).toHaveBeenCalledTimes(1);
   });
+
+  it("does not show the previous version bar while inspecting a run", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="previewing-previous-version"
+          isRunInspectionMode
+          onBackToLiveCanvas={vi.fn()}
+          onSeeCurrentVersion={vi.fn()}
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Previewing previous run")).toBeInTheDocument();
+    expect(screen.queryByText("Previewing previous version")).not.toBeInTheDocument();
+  });
 });
