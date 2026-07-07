@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { isDraftCanvasLoadingWhileEditing, isEditBootstrapReady, isEditStagingActionsReady } from "./edit-staging-ready";
+import {
+  isDraftCanvasLoadingWhileEditing,
+  isEditBootstrapReady,
+  isEditStagingActionsReady,
+} from "./edit-staging-ready";
 
 describe("isEditBootstrapReady", () => {
   it("waits for baselines and staged draft before edit UI is shown", () => {

@@ -43,6 +43,34 @@ async function removeStaleVersionQueriesAfterCommit(
   removeCanvasVersionScopedQueries(queryClient, canvasId, previousVersionId);
 }
 
+function clearDraftSpecsAfterCommit(
+  draftCanvasSpecsRef: MutableRefObject<Map<string, DraftSpec>>,
+  activeCanvasVersionId: string,
+  committedVersionId: string,
+) {
+  draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
+  if (committedVersionId !== activeCanvasVersionId) {
+    draftCanvasSpecsRef.current.delete(committedVersionId);
+  }
+}
+
+async function applyPostCommitCacheUpdates({
+  queryClient,
+  organizationId,
+  canvasId,
+  previousVersionId,
+  committedVersionId,
+}: {
+  queryClient: QueryClient;
+  organizationId: string;
+  canvasId: string;
+  previousVersionId: string;
+  committedVersionId: string;
+}) {
+  await removeStaleVersionQueriesAfterCommit(queryClient, canvasId, previousVersionId, committedVersionId);
+  await invalidatePostCommitCaches(queryClient, organizationId, canvasId);
+}
+
 export async function executeCommitStaging({
   organizationId,
   canvasId,
@@ -95,16 +123,17 @@ export async function executeCommitStaging({
   // Leave edit mode before touching caches so version-scoped hooks (console,
   // files, baselines) stop querying the pre-commit live version id.
   onCommittedVersionId?.(committedVersionId);
-
-  draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
-  if (committedVersionId !== activeCanvasVersionId) {
-    draftCanvasSpecsRef.current.delete(committedVersionId);
-  }
+  clearDraftSpecsAfterCommit(draftCanvasSpecsRef, activeCanvasVersionId, committedVersionId);
   setDraftCanvasSpec(null);
 
   if (organizationId && canvasId && committedVersionId) {
-    await removeStaleVersionQueriesAfterCommit(queryClient, canvasId, previousVersionId, committedVersionId);
-    await invalidatePostCommitCaches(queryClient, organizationId, canvasId);
+    await applyPostCommitCacheUpdates({
+      queryClient,
+      organizationId,
+      canvasId,
+      previousVersionId,
+      committedVersionId,
+    });
   }
 
   releaseCanvasUpdatedEcho?.();

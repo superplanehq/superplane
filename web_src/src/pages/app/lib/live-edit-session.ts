@@ -61,9 +61,7 @@ function isStagedCanvasVersionForActiveVersion(
   loadedStagedCanvasVersion: CanvasesCanvasVersion | null | undefined,
   activeCanvasVersionId: string,
 ): loadedStagedCanvasVersion is CanvasesCanvasVersion {
-  return (
-    !!loadedStagedCanvasVersion?.metadata?.id && loadedStagedCanvasVersion.metadata.id === activeCanvasVersionId
-  );
+  return !!loadedStagedCanvasVersion?.metadata?.id && loadedStagedCanvasVersion.metadata.id === activeCanvasVersionId;
 }
 
 export function isAwaitingStagedCanvasSpec({
