@@ -131,6 +131,7 @@ import {
   isCanvasWorkflowTab,
   useWorkflowUrlViewFlags,
   readStoredBoolean,
+  clearRunInspectionSearchParams,
 } from "./viewState";
 import {
   buildExecutionInfo,
@@ -3335,9 +3336,13 @@ export function AppPage() {
     [handleUseVersion, hasEditableVersion, hasLocalSaveActivity, effectiveLiveCanvasVersionId, liveCanvasVersionId],
   );
 
+  const runInspectionChromeActive =
+    isRunInspectionMode && !editSessionActive && !isEnteringEditSession;
+
   const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
     getWorkflowViewPresentation({
       ...urlViewFlags,
+      isRunInspectionMode: runInspectionChromeActive,
       hasEditableVersion: hasEditableVersion || isEnteringEditSession,
       isViewingCurrentLiveVersion,
     });
@@ -3437,6 +3442,12 @@ export function AppPage() {
       return;
     }
 
+    if (searchParams.get("run")) {
+      setRunDetailNodeId(null);
+      setFocusRequest(null);
+      setSearchParams((current) => clearRunInspectionSearchParams(current), { replace: true });
+    }
+
     void enterLiveEditSession();
   }, [
     organizationId,
@@ -3450,6 +3461,9 @@ export function AppPage() {
     refreshLatestLiveCanvasData,
     setSearchParams,
     queryClient,
+    searchParams,
+    setRunDetailNodeId,
+    setFocusRequest,
   ]);
 
   const exitEditableVersionForRunInspection = useCallback(() => {
@@ -3551,18 +3565,7 @@ export function AppPage() {
   const handleClearRunInspection = useCallback(() => {
     setRunDetailNodeId(null);
     setFocusRequest(null);
-    startTransition(() => {
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.delete("run");
-          next.delete("sidebar");
-          next.delete("node");
-          return next;
-        },
-        { replace: true },
-      );
-    });
+    setSearchParams((current) => clearRunInspectionSearchParams(current), { replace: true });
   }, [setSearchParams, setRunDetailNodeId]);
 
   const handleRunNodeDetailSelection = useCallback(
@@ -3958,7 +3961,7 @@ export function AppPage() {
   // The versions sidebar is available only during an edit session while on the
   // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).
   // Within the edit session it can be shown/hidden with the header toggle.
-  const showVersionsSidebar = editSessionActive && !isRunInspectionMode && !urlViewFlags.isMemoryMode;
+  const showVersionsSidebar = editSessionActive && !runInspectionChromeActive && !urlViewFlags.isMemoryMode;
 
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
     isOpen: showRunsSidebar,
@@ -4063,7 +4066,7 @@ export function AppPage() {
           // In run inspection, sidebar/node params restore the run detail pane,
           // not the live node inspector.
           initialSidebar={
-            isRunInspectionMode
+            runInspectionChromeActive
               ? { isOpen: false, nodeId: null }
               : {
                   isOpen: searchParams.get("sidebar") === "1",
@@ -4121,26 +4124,26 @@ export function AppPage() {
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly || readOnlyViewModes}
-          hasFitToViewRef={isRunInspectionMode ? runsHasFitToViewRef : hasFitToViewRef}
-          isRunInspectionMode={isRunInspectionMode}
+          hasFitToViewRef={runInspectionChromeActive ? runsHasFitToViewRef : hasFitToViewRef}
+          isRunInspectionMode={runInspectionChromeActive}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
-          viewportRef={isRunInspectionMode ? runsViewportRef : viewportRef}
+          viewportRef={runInspectionChromeActive ? runsViewportRef : viewportRef}
           fitViewContentKey={`${canvasId}:${resolveFitViewVersionId({ liveCanvasVersionId, activeCanvasVersionId, isViewingDraftVersion: isEditing, draftSpec: draftSpecToRender, selectedVersion: selectedCanvasVersion })}`}
           lastFittedContentKeyRef={lastFittedContentKeyRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           fitAllFocusNodeIds={
-            isRunInspectionMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
+            runInspectionChromeActive && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
               ? runCanvasData.participantNodeIds
               : undefined
           }
           runParticipantNodeIds={
-            isRunInspectionMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
+            runInspectionChromeActive && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
               ? runCanvasData.participantNodeIds
               : undefined
           }
-          runCanvasLoading={runCanvasLoading}
-          runNodeDetailRun={isRunInspectionMode ? selectedRun : null}
+          runCanvasLoading={runInspectionChromeActive && runCanvasLoading}
+          runNodeDetailRun={runInspectionChromeActive ? selectedRun : null}
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
           onRunNodeDetailClose={() => handleRunNodeDetailSelection(null)}
@@ -4210,7 +4213,7 @@ export function AppPage() {
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && showLiveActivity ? handleAcknowledgeErrors : undefined}
-          onNodeClick={isRunInspectionMode ? handleRunCanvasNodeClick : undefined}
+          onNodeClick={runInspectionChromeActive ? handleRunCanvasNodeClick : undefined}
           toolSidebarRunsContent={toolSidebarRunsContent}
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
