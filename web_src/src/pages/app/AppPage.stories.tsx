@@ -12,8 +12,8 @@ import { canvasAppIds } from "./__fixtures__/handlers";
  * rather than MSW: MSW relies on a Service Worker, which is silently disabled in
  * non-secure contexts (opening Storybook via a LAN IP instead of `localhost`),
  * causing every request to escape to the live API. The fetch override has no
- * such dependency, so the graph, runs sidebar, versions, and run-inspection
- * detail pane render deterministic fake data however Storybook is opened.
+ * such dependency, so the graph, runs sidebar, versions, and run inspector
+ * render deterministic fake data however Storybook is opened.
  */
 const meta = {
   title: "Pages/AppPage",
@@ -33,9 +33,9 @@ export const LiveCanvas: Story = {
 };
 
 /**
- * Run inspection: a finished (passed) run is selected and the bottom
- * `RunNodeDetailPane` is opened on the `post-assessment` node, showing that
- * node's execution output for the run.
+ * Run inspection: a finished (passed) run is selected and the right inspector
+ * is opened on the `post-assessment` node, showing that node's execution output
+ * for the run.
  */
 export const RunInspection: Story = {
   render: () => <AppPageHarness query={`run=${canvasAppIds.publishedRunId}&sidebar=1&node=post-assessment`} />,
