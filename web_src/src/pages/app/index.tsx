@@ -1656,13 +1656,9 @@ export function AppPage() {
     [handleSidebarChange],
   );
 
-  const handleLogRunNodeSelect = useCallback(
-    (nodeId: string) => {
-      handleSidebarChange(true, nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "live", tab: "latest" });
-    },
-    [handleSidebarChange],
-  );
+  const handleLogRunNodeSelect = useCallback((nodeId: string) => {
+    setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "live", tab: "latest" });
+  }, []);
 
   const handleRunItemOpen = useCallback(
     (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => {
@@ -4281,7 +4277,12 @@ export function AppPage() {
               ? runCanvasData.participantNodeIds
               : undefined
           }
-          runCanvasLoading={runInspectionChromeActive && runCanvasLoading}
+          runCanvasLoading={
+            runInspectionChromeActive &&
+            selectedRunId !== null &&
+            detailDismissedForRunId !== selectedRunId &&
+            runCanvasLoading
+          }
           runNodeDetailRun={
             runInspectionChromeActive && selectedRunId && detailDismissedForRunId !== selectedRunId ? selectedRun : null
           }

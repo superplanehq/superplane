@@ -608,6 +608,28 @@ describe("CanvasPage run inspection", () => {
     expect(onBackToLiveCanvas).not.toHaveBeenCalled();
   });
 
+  it("shows right run inspector loading chrome while run detail is loading", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          runCanvasLoading
+          runNodeDetailCanvasId="canvas-1"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("complementary", { name: "Run inspector" })).toBeInTheDocument();
+    expect(screen.queryByTestId("run-inspector-panel")).not.toBeInTheDocument();
+  });
+
   it("does not open the right run inspector while editing", () => {
     render(
       <MemoryRouter>
