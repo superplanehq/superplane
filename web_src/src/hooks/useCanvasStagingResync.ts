@@ -53,6 +53,9 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
 
       if (spec) {
         draftCanvasSpecsRef.current.set(versionId, spec);
+        queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) =>
+          current ? { ...current, spec: { ...current.spec, ...spec } } : current,
+        );
       } else {
         draftCanvasSpecsRef.current.delete(versionId);
       }
@@ -120,12 +123,6 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
         });
         const stagedSpec = stagedVersion?.spec ?? null;
 
-        if (stagedSpec) {
-          queryClient.setQueryData<CanvasesCanvas | undefined>(
-            canvasKeys.detail(organizationId, canvasId),
-            (current) => (current ? { ...current, spec: { ...current.spec, ...stagedSpec } } : current),
-          );
-        }
         applyStagedSpec(versionId, stagedSpec);
 
         if (bumpResetNonce) {

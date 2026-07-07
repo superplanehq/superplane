@@ -87,6 +87,7 @@ import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
+import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
 import { resolveCanvasForView, syncLoadedVersionToCanvasDetail } from "./lib/resolve-canvas-for-view";
 import { activateCanvasVersionForEditing as applyCanvasVersionForEditing } from "./lib/canvas-version-activation";
 import {
@@ -618,6 +619,20 @@ export function AppPage() {
     [organizationId, canvasId, queryClient, isEditing, activeCanvasVersionId],
   );
 
+  const getCurrentWorkflowSnapshot = useCallback(() => {
+    const renderedWorkflow = canvasRef.current;
+    if (!organizationId || !canvasId) {
+      return renderedWorkflow;
+    }
+
+    const detailWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+    return resolveEditableWorkflowSnapshot({
+      isEditing,
+      renderedWorkflow,
+      detailWorkflow,
+    });
+  }, [organizationId, canvasId, queryClient, isEditing]);
+
   // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
   // Subscribe to version to ensure React detects all updates
   const storeVersion = useNodeExecutionStore((state) => state.version);
@@ -941,10 +956,10 @@ export function AppPage() {
 
   const saveMatchesCurrentCanvas = useCallback(
     (workflow: CanvasesCanvas) => {
-      const currentWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId!, canvasId!));
+      const currentWorkflow = getCurrentWorkflowSnapshot();
       return getWorkflowSaveSignature(currentWorkflow) === getWorkflowSaveSignature(workflow);
     },
-    [organizationId, canvasId, queryClient],
+    [getCurrentWorkflowSnapshot],
   );
 
   const processQueuedCanvasSave = useCallback(
@@ -1135,6 +1150,7 @@ export function AppPage() {
             canvasId,
             pendingPositionUpdatesRef,
             isReadOnly,
+            isEditing,
             canvasRef,
             queryClient,
             activeCanvasVersionIdRef,
@@ -1153,6 +1169,7 @@ export function AppPage() {
       activeCanvasVersionId,
       queryClient,
       isReadOnly,
+      isEditing,
       enqueueCanvasSave,
       applyLocalWorkflowUpdate,
       setLastSavedWorkflowSnapshot,
@@ -2167,7 +2184,7 @@ export function AppPage() {
             return;
           }
 
-          const latestWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+          const latestWorkflow = getCurrentWorkflowSnapshot();
 
           if (!latestWorkflow?.spec?.nodes) return;
 
@@ -2210,7 +2227,7 @@ export function AppPage() {
         },
         isReadOnly ? 2000 : 100,
       ),
-    [organizationId, canvasId, queryClient, handleSaveWorkflow, isReadOnly],
+    [organizationId, canvasId, getCurrentWorkflowSnapshot, handleSaveWorkflow, isReadOnly],
   );
 
   const handleAnnotationBlur = useCallback(() => {
@@ -2238,14 +2255,6 @@ export function AppPage() {
       isDrainingCanvasSaveQueueRef.current
     );
   }, []);
-
-  const getCurrentWorkflowSnapshot = useCallback(() => {
-    if (!organizationId || !canvasId) {
-      return canvasRef.current;
-    }
-
-    return queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvasRef.current;
-  }, [organizationId, canvasId, queryClient]);
 
   const hasPendingLocalDraftChanges = useCallback(() => {
     if (!activeCanvasVersionIdRef.current) {
@@ -2330,8 +2339,8 @@ export function AppPage() {
       if (!canvas || !organizationId || !canvasId) return;
       if (Object.keys(updates).length === 0) return;
 
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+      const latestWorkflow = getCurrentWorkflowSnapshot();
+      if (!latestWorkflow) return;
 
       // Separate position updates from configuration updates
       const { x, y, ...configurationUpdates } = updates;
@@ -2394,7 +2403,7 @@ export function AppPage() {
       canvas,
       organizationId,
       canvasId,
-      queryClient,
+      getCurrentWorkflowSnapshot,
       debouncedAnnotationAutoSave,
       debouncedAutoSave,
       isReadOnly,
@@ -2406,8 +2415,7 @@ export function AppPage() {
     async (newNodeData: NewNodeData): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+      const latestWorkflow = getCurrentWorkflowSnapshot();
       if (!latestWorkflow) return "";
 
       // Save snapshot before making changes
@@ -2504,7 +2512,7 @@ export function AppPage() {
       canvas,
       organizationId,
       canvasId,
-      queryClient,
+      getCurrentWorkflowSnapshot,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
       isReadOnly,
@@ -2521,8 +2529,7 @@ export function AppPage() {
     }): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
-      const latestWorkflow =
-        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+      const latestWorkflow = getCurrentWorkflowSnapshot();
       if (!latestWorkflow) return "";
 
       const placeholderName = "New Component";
@@ -2574,7 +2581,7 @@ export function AppPage() {
       canvas,
       organizationId,
       canvasId,
-      queryClient,
+      getCurrentWorkflowSnapshot,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
       isReadOnly,
