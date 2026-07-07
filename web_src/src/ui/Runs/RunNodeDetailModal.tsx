@@ -11,7 +11,7 @@ interface RunNodeDetailModalProps {
   onNavigateNode?: (nodeId: string) => void;
 }
 
-/** @deprecated Use RunNodeDetailPane in runs mode. Kept for tests and backward compatibility. */
+/** @deprecated Use RunInspectorPanel in runs mode. Kept for tests and backward compatibility. */
 export function RunNodeDetailModal({
   canvasId,
   run,

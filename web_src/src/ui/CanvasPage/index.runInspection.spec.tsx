@@ -1,4 +1,5 @@
-import { act, render as testingLibraryRender, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, fireEvent, render as testingLibraryRender, screen, waitFor } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -97,7 +98,22 @@ vi.mock("./Header", () => ({
 import { CanvasPage } from "./index";
 
 function render(ui: ReactElement) {
-  return testingLibraryRender(ui, { wrapper: ThemeProvider });
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  return testingLibraryRender(ui, { wrapper: Wrapper });
 }
 
 describe("CanvasPage run inspection", () => {
@@ -506,7 +522,7 @@ describe("CanvasPage run inspection", () => {
     expect(selectedRunNode()?.selected).toBe(true);
   });
 
-  it("shows the run node detail pane during run inspection even when the live node inspector would be open", async () => {
+  it("shows the right run inspector during run inspection even when the live node inspector would be open", async () => {
     render(
       <MemoryRouter>
         <CanvasPage
@@ -540,8 +556,90 @@ describe("CanvasPage run inspection", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("run-node-detail-pane")).toBeInTheDocument();
+      expect(screen.getByTestId("run-inspector-panel")).toBeInTheDocument();
     });
     expect(screen.queryByTestId("live-node-detail-pane")).not.toBeInTheDocument();
+  });
+
+  it("closes only the right run inspector when the inspector close button is clicked", async () => {
+    const onRunNodeDetailClose = vi.fn();
+    const onBackToLiveCanvas = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          runNodeDetailNodeId="run-node-1"
+          runNodeDetailCanvasId="canvas-1"
+          runNodeDetailRun={{
+            id: "run-1",
+            rootEvent: { id: "root-event-1", nodeId: "trigger-node" },
+          }}
+          onRunNodeDetailClose={onRunNodeDetailClose}
+          onBackToLiveCanvas={onBackToLiveCanvas}
+          nodes={[
+            {
+              id: "run-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Run node",
+                state: "success",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("run-inspector-panel")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(onRunNodeDetailClose).toHaveBeenCalledOnce();
+    expect(onBackToLiveCanvas).not.toHaveBeenCalled();
+  });
+
+  it("does not open the right run inspector while editing", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          runNodeDetailNodeId="run-node-1"
+          runNodeDetailCanvasId="canvas-1"
+          runNodeDetailRun={{
+            id: "run-1",
+            rootEvent: { id: "root-event-1", nodeId: "trigger-node" },
+          }}
+          nodes={[
+            {
+              id: "run-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Run node",
+                state: "success",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId("run-inspector-panel")).not.toBeInTheDocument();
   });
 });

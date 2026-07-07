@@ -11,7 +11,7 @@ import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
-import { RunNodeDetailPane } from "@/ui/Runs/RunNodeDetailPane";
+import { RunInspectorPanel } from "@/ui/Runs/RunInspectorPanel";
 
 import {
   allOutcomeRuns,
@@ -24,7 +24,7 @@ import {
 } from "./__fixtures__/canvasRunsExample";
 
 // CanvasRunsPage is a composite Storybook page that combines the runs sidebar
-// (RunsTabPanel inside CanvasRunsSidebar) and the bottom RunNodeDetailPane with
+// (RunsTabPanel inside CanvasRunsSidebar) and the right-side RunInspectorPanel with
 // real captured data from the live "Clean Code Assessment" canvas. The full
 // CanvasPage isn't mounted here because ReactFlow + the dozens of inter-related
 // callbacks make a story brittle without adding any new visual information; the
@@ -35,7 +35,7 @@ const meta = {
   parameters: {
     layout: "fullscreen",
   },
-} satisfies Meta<typeof RunNodeDetailPane>;
+} satisfies Meta<typeof RunInspectorPanel>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -45,7 +45,7 @@ interface CanvasRunsPageStoryProps {
   initialRunId: string | null;
   initialNodeId: string | null;
   initialOpenDetail: boolean;
-  showBottomPane: boolean;
+  showInspector: boolean;
   detailLookup: Record<string, RunDetailExample>;
   canvasArea?: (context: { selectedNodeId: string | null }) => ReactNode;
 }
@@ -55,7 +55,7 @@ function CanvasRunsPageStory({
   initialRunId,
   initialNodeId,
   initialOpenDetail,
-  showBottomPane,
+  showInspector,
   detailLookup,
   canvasArea,
 }: CanvasRunsPageStoryProps) {
@@ -68,7 +68,7 @@ function CanvasRunsPageStory({
   );
 
   const selectedDetail = selectedRunId ? (detailLookup[selectedRunId] ?? null) : null;
-  const bottomPaneOpen = showBottomPane && !!selectedDetail && !!selectedNodeId;
+  const inspectorOpen = showInspector && !!selectedDetail;
 
   return (
     <div className="flex h-screen min-h-0 w-full flex-col bg-slate-50">
@@ -95,18 +95,19 @@ function CanvasRunsPageStory({
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {canvasArea ? canvasArea({ selectedNodeId }) : <CanvasAreaPlaceholder />}
-          {bottomPaneOpen && selectedDetail ? (
-            <RunNodeDetailPane
-              canvasId={canvasFixture.id}
-              run={selectedDetail.run}
-              nodeId={selectedNodeId!}
-              workflowNodes={canvasFixture.nodes}
-              componentIconMap={componentIconMap}
-              onClose={() => setSelectedNodeId(null)}
-              onNavigateNode={setSelectedNodeId}
-            />
-          ) : null}
         </div>
+        {inspectorOpen && selectedDetail ? (
+          <RunInspectorPanel
+            canvasId={canvasFixture.id}
+            run={selectedDetail.run}
+            workflowNodes={canvasFixture.nodes}
+            componentIconMap={componentIconMap}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            onClearSelectedNode={() => setSelectedNodeId(null)}
+            onClose={() => setSelectedRunId(null)}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -128,7 +129,7 @@ function CanvasAreaPlaceholder() {
 function buildPrefilledQueryClient(details: RunDetailExample[]): QueryClient {
   // useEventExecutions stores `response.data` (the full ListEventExecutions
   // response) under canvasKeys.eventExecution(canvasId, eventId). Prefilling
-  // here means the bottom pane and the left RunDetailPanel both render
+  // here means the right run inspector renders
   // executions synchronously without any network call.
   const client = new QueryClient({
     defaultOptions: {
@@ -164,7 +165,7 @@ const detailLookup: Record<string, RunDetailExample> = {
 };
 
 export const Default: Story = {
-  name: "Failed run + bottom pane",
+  name: "Failed run + inspector",
   render: () => (
     <StoryProviders>
       <CanvasRunsPageStory
@@ -172,7 +173,7 @@ export const Default: Story = {
         initialRunId={failedRunDetail.run.id ?? null}
         initialNodeId={failedRunDetail.nodeId}
         initialOpenDetail
-        showBottomPane
+        showInspector
         detailLookup={detailLookup}
       />
     </StoryProviders>
@@ -180,7 +181,7 @@ export const Default: Story = {
 };
 
 export const PassedRun: Story = {
-  name: "Passed run + bottom pane",
+  name: "Passed run + inspector",
   render: () => (
     <StoryProviders>
       <CanvasRunsPageStory
@@ -188,7 +189,7 @@ export const PassedRun: Story = {
         initialRunId={passedRunDetail.run.id ?? null}
         initialNodeId={passedRunDetail.nodeId}
         initialOpenDetail
-        showBottomPane
+        showInspector
         detailLookup={detailLookup}
       />
     </StoryProviders>
@@ -204,7 +205,7 @@ export const RunsListOnly: Story = {
         initialRunId={null}
         initialNodeId={null}
         initialOpenDetail={false}
-        showBottomPane={false}
+        showInspector={false}
         detailLookup={detailLookup}
       />
     </StoryProviders>
@@ -220,7 +221,7 @@ export const AllOutcomes: Story = {
         initialRunId={null}
         initialNodeId={null}
         initialOpenDetail={false}
-        showBottomPane={false}
+        showInspector={false}
         detailLookup={detailLookup}
       />
     </StoryProviders>
@@ -444,7 +445,7 @@ export const FullPage: Story = {
         initialRunId={passedRunDetail.run.id ?? null}
         initialNodeId={passedRunDetail.nodeId}
         initialOpenDetail
-        showBottomPane
+        showInspector
         detailLookup={detailLookup}
         canvasArea={({ selectedNodeId }) => (
           <CanvasGraphView detail={passedRunDetail} selectedNodeId={selectedNodeId} />
