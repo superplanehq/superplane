@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	canvasactions "github.com/superplanehq/superplane/pkg/agents/agent_tools/actions"
 	"github.com/superplanehq/superplane/pkg/agents"
+	canvasactions "github.com/superplanehq/superplane/pkg/agents/agent_tools/actions"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
