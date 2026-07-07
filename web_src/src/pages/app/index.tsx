@@ -614,6 +614,7 @@ export function AppPage() {
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const consoleMutationGenerationRef = useRef(0);
+  const liveCanvasNodeClickLookupRef = useRef(0);
   const handleRemoteStagingUpdatedRef = useRef<() => Promise<void>>(async () => {});
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const { registerIgnoredCanvasUpdatedEcho, consumeIgnoredCanvasUpdatedEcho, resetLifecycleEchoGuards } =
@@ -3780,18 +3781,25 @@ export function AppPage() {
         return;
       }
 
+      const lookupId = liveCanvasNodeClickLookupRef.current + 1;
+      liveCanvasNodeClickLookupRef.current = lookupId;
+
       void (async () => {
-        const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
-        if (!lookupEvent) {
-          return;
-        }
+        try {
+          const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
+          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) {
+            return;
+          }
 
-        const runId = await fetchRunIdForSidebarEvent(lookupEvent);
-        if (!runId) {
-          return;
-        }
+          const runId = await fetchRunIdForSidebarEvent(lookupEvent);
+          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) {
+            return;
+          }
 
-        handleSelectRunFromSidebarEvent(runId, { nodeId });
+          handleSelectRunFromSidebarEvent(runId, { nodeId });
+        } catch (error) {
+          console.error("Failed to inspect latest node run", error);
+        }
       })();
     },
     [
@@ -3803,6 +3811,10 @@ export function AppPage() {
       resolveLatestNodeRunLookupEvent,
     ],
   );
+
+  useEffect(() => {
+    liveCanvasNodeClickLookupRef.current += 1;
+  }, [isEditing, isRunInspectionMode, liveSidebarRunLookupEnabled]);
 
   useEffect(() => {
     if (!isRunInspectionMode || isViewingLiveVersion) return;
@@ -4261,7 +4273,7 @@ export function AppPage() {
           }
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
-          runNodeDetailEdges={selectedRunCanvas?.spec?.edges ?? canvasEdges}
+          runNodeDetailEdges={selectedRunCanvas?.spec?.edges}
           onRunNodeDetailClose={handleBackToRunList}
           onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
