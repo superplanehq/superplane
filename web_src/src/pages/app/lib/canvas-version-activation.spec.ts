@@ -3,22 +3,20 @@ import { describe, expect, it, vi } from "vitest";
 import { activateCanvasVersionForEditing } from "./canvas-version-activation";
 
 describe("activateCanvasVersionForEditing", () => {
-  it("clears run inspection params when activating a version", () => {
+  it("clears run inspection params when activating the live version for edit", () => {
     const setSearchParams = vi.fn();
-    const queryClient = {
-      cancelQueries: vi.fn(),
-      invalidateQueries: vi.fn().mockResolvedValue(undefined),
-      setQueryData: vi.fn(),
-    };
 
     activateCanvasVersionForEditing({
       organizationId: "org-1",
       canvasId: "canvas-1",
       versionID: "version-live",
       version: { metadata: { id: "version-live" }, spec: {} },
+      options: { preserveStagedLayer: true },
       effectiveLiveCanvasVersionId: "version-live",
       liveCanvasVersionId: "version-live",
-      queryClient: queryClient as never,
+      queryClient: {
+        cancelQueries: vi.fn(),
+      } as never,
       draftCanvasSpec: null,
       draftCanvasSpecsRef: { current: new Map() },
       activeCanvasVersionIdRef: { current: "" },
