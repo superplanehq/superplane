@@ -4147,6 +4147,7 @@ export function AppPage() {
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           runNodeDetailPaneHeight={runNodeDetailPaneHeight}
           onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
+          onBackToLiveCanvas={handleSelectLiveCanvas}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
           visualDiffEnabled={draftVisualDiff.visualDiffEnabled && isEditSessionUiReady}

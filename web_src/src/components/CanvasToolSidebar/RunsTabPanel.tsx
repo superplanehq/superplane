@@ -189,11 +189,13 @@ export function RunsTabPanel({
           hasAnyFilter={filterState.hasAnyFilter}
           selectedStatuses={filterState.selectedStatuses}
           selectedTriggerIds={filterState.selectedTriggerIds}
+          searchQuery={filterState.searchQuery}
           triggerOptions={filterState.triggerOptions}
           onToggleStatus={filterState.toggleStatus}
           onClearStatuses={filterState.clearStatuses}
           onToggleTrigger={filterState.toggleTrigger}
           onClearTriggers={filterState.clearTriggers}
+          onSearchQueryChange={filterState.setSearchQuery}
         />
 
         <div
