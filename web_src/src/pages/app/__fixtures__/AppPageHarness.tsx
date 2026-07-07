@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
-import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { AppPage } from "..";
@@ -96,26 +95,24 @@ export function AppPageHarness({ query = "", fixture }: AppPageHarnessProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider delayDuration={150}>
-          {/* AppPage's root is `h-full`, so it needs an ancestor with an explicit
-              height (the real app gets this from AppRouter's `h-dvh` wrapper). */}
-          <div className="h-dvh w-full">
-            <MemoryRouter initialEntries={[path]}>
-              <Routes>
-                <Route
-                  path=":organizationId/apps/:appId"
-                  element={
-                    <PermissionsProvider>
-                      <AppPage />
-                    </PermissionsProvider>
-                  }
-                />
-              </Routes>
-            </MemoryRouter>
-          </div>
-        </TooltipProvider>
-      </ThemeProvider>
+      <TooltipProvider delayDuration={150}>
+        {/* AppPage's root is `h-full`, so it needs an ancestor with an explicit
+            height (the real app gets this from AppRouter's `h-dvh` wrapper). */}
+        <div className="h-dvh w-full">
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route
+                path=":organizationId/apps/:appId"
+                element={
+                  <PermissionsProvider>
+                    <AppPage />
+                  </PermissionsProvider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
+        </div>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
