@@ -260,6 +260,56 @@ describe("WidgetTable row actions — permission gating", () => {
   });
 });
 
+describe("WidgetTable row actions — manual-run gating", () => {
+  const PR_NODE: SuperplaneComponentsNode = {
+    id: "pr-id",
+    name: "on-pr",
+    type: "TYPE_TRIGGER",
+    component: "github.pullRequest",
+  };
+  const START_NODE_WITH_COMPONENT: SuperplaneComponentsNode = { ...START_NODE, component: "start" };
+  const EVENT_ROW_RENDER: WidgetTableRender = {
+    kind: "table",
+    columns: [{ field: "service", label: "Service" }],
+    rowActions: [
+      { kind: "trigger", label: "Redeploy", node: "start" },
+      { kind: "trigger", label: "Reopen PR", node: "on-pr" },
+    ],
+  };
+
+  function renderWithManualRunCatalog(manualRunTriggers: ReadonlySet<string>) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider
+            canvasId="canvas-1"
+            organizationId="org-1"
+            nodes={[START_NODE_WITH_COMPONENT, PR_NODE]}
+            canRunNodes
+            manualRunTriggers={manualRunTriggers}
+            onTriggerNode={() => undefined}
+          >
+            <WidgetTable render={EVENT_ROW_RENDER} rows={ROWS} isLoading={false} />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("hides row actions whose node is not manual-runnable", () => {
+    renderWithManualRunCatalog(new Set(["start"]));
+    expect(screen.queryAllByTestId("widget-row-action-start")).toHaveLength(2);
+    expect(screen.queryByTestId("widget-row-action-on-pr")).toBeNull();
+  });
+
+  it("keeps manual-run actions visible when the catalog lists them", () => {
+    renderWithManualRunCatalog(new Set(["start", "github.pullRequest"]));
+    expect(screen.queryAllByTestId("widget-row-action-start")).toHaveLength(2);
+    expect(screen.queryAllByTestId("widget-row-action-on-pr")).toHaveLength(2);
+  });
+});
+
 describe("WidgetTable row actions — confirm dialog preview", () => {
   it("shows resolved trigger node, template, and run hook parameters", () => {
     const onTrigger = vi.fn().mockResolvedValue(undefined);

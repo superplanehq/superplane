@@ -10,6 +10,7 @@ import type {
   CanvasConsoleQueryResult,
   UpdateCanvasConsoleMutationResult,
 } from "@/hooks/useCanvasData";
+import { useTriggers } from "@/hooks/useCanvasData";
 
 import { ConsoleView } from "./ConsoleView";
 import { ConsoleYamlModal } from "./ConsoleYamlModal";
@@ -107,6 +108,20 @@ export function ConsoleOverlay({
   }, []);
 
   const contextNodes = canvasNodes ?? [];
+  const triggersQuery = useTriggers();
+  // Build the manual-run trigger catalog once per fetch. While the query is
+  // loading `manualRunTriggers` stays undefined and `isManualRunNode` keeps
+  // the pre-existing `TYPE_TRIGGER`-only behavior so widgets don't flicker
+  // between "runnable" and "hidden" on first paint.
+  const manualRunTriggers = useMemo(() => {
+    const triggers = triggersQuery.data;
+    if (!triggers) return undefined;
+    const names = new Set<string>();
+    for (const trigger of triggers) {
+      if (trigger.manualRunnable && trigger.name) names.add(trigger.name);
+    }
+    return names;
+  }, [triggersQuery.data]);
   const leftOffset = useEffectiveLeftSidebarWidth();
   // The YAML modal is opened from the canvas page header (next to "Add panel").
   // The dashboard overlay no longer renders its own toolbar so the white
@@ -168,6 +183,7 @@ export function ConsoleOverlay({
       nodes={contextNodes}
       nodeStatuses={nodeStatuses}
       canRunNodes={canRunNodes}
+      manualRunTriggers={manualRunTriggers}
       onTriggerNode={canRunNodes ? onTriggerNode : undefined}
     >
       {overlayContent}
