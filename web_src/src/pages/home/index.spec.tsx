@@ -8,14 +8,13 @@ import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-cli
 import type { ReactNode } from "react";
 import { showErrorToast } from "@/lib/toast";
 
-vi.stubGlobal(
-  "ResizeObserver",
-  class ResizeObserver {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  },
-);
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+vi.stubGlobal("ResizeObserver", MockResizeObserver);
 
 const {
   useCanvases,
@@ -54,6 +53,12 @@ const mutationMocks = vi.hoisted(() => ({
   updateCanvasPreference: vi.fn(),
 }));
 
+type CanAct = (resource: string, action: string) => boolean;
+
+const permissionMocks = vi.hoisted(() => ({
+  canAct: vi.fn<CanAct>(() => true),
+}));
+
 vi.mock("@/components/OrganizationMenuButton", () => ({
   OrganizationMenuButton: () => null,
 }));
@@ -75,7 +80,7 @@ vi.mock("@/contexts/useAccount", () => ({
 
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
-    canAct: () => true,
+    canAct: permissionMocks.canAct,
     isLoading: false,
   }),
 }));
@@ -155,7 +160,7 @@ function makeFolder(
   } as CanvasFoldersCanvasFolder;
 }
 
-function renderHome() {
+function renderHome(initialEntries = ["/org-123"]) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -165,11 +170,12 @@ function renderHome() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/org-123"]}>
+      <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route path="/:organizationId">
             <Route index element={<HomePage />} />
             <Route path="apps/new" element={<NewAppPage />} />
+            <Route path="apps/:canvasId" element={<div>Canvas editor</div>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -179,8 +185,11 @@ function renderHome() {
 
 describe("HomePage canvas folders", () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal("ResizeObserver", MockResizeObserver);
     vi.clearAllMocks();
     window.localStorage.clear();
+    permissionMocks.canAct.mockReturnValue(true);
     mutationMocks.createCanvasFolder.mockResolvedValue({ data: { folder: { metadata: { id: "new-folder" } } } });
     mutationMocks.updateCanvasFolder.mockResolvedValue({});
     mutationMocks.moveCanvasFolder.mockResolvedValue({});
@@ -404,6 +413,133 @@ describe("HomePage canvas folders", () => {
 
     await user.click(screen.getByLabelText("Folder actions"));
     expect(await screen.findByText("Change folder name")).toBeInTheDocument();
+  });
+
+  it("opens the new app page scoped to a folder", async () => {
+    const user = userEvent.setup();
+    mutationMocks.createCanvasAsync.mockResolvedValue({
+      data: { canvas: { metadata: { id: "canvas-new" } } },
+    });
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({
+      data: [makeFolder("folder-1", "Deployments", "green", ["existing-canvas"])],
+      isLoading: false,
+      error: null,
+    });
+
+    renderHome();
+    const deploymentsSection = screen.getByText("Deployments").closest("section")!;
+    await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
+    expect(await screen.findByRole("heading", { name: "Create New App in Deployments Folder" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /start from scratch/i }));
+
+    await waitFor(() => {
+      expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
+        name: expect.stringMatching(/^[a-z]+-[a-z]+$/),
+        method: "ui",
+      });
+      expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({
+        folderId: "folder-1",
+        title: "Deployments",
+        backgroundColor: "green",
+        canvasIds: ["existing-canvas", "canvas-new"],
+      });
+    });
+  });
+
+  it("opens a folder-scoped new app when folder membership update fails", async () => {
+    const user = userEvent.setup();
+    mutationMocks.createCanvasAsync.mockResolvedValue({
+      data: { canvas: { metadata: { id: "canvas-new" } } },
+    });
+    mutationMocks.updateCanvasFolderMembership.mockRejectedValue(new Error("Failed to fetch"));
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({
+      data: [makeFolder("folder-1", "Deployments", "green")],
+      isLoading: false,
+      error: null,
+    });
+
+    renderHome();
+    const deploymentsSection = screen.getByText("Deployments").closest("section")!;
+    await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
+    await user.click(await screen.findByRole("button", { name: /start from scratch/i }));
+
+    expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
+    expect(showErrorToast).toHaveBeenCalledWith("App created, but failed to add it to folder");
+  });
+
+  it("opens a folder-scoped installed app when folder membership update fails", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ integrations: [], installParams: [] }), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ canvasId: "canvas-installed", organizationId: "org-123" }), { status: 200 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    mutationMocks.updateCanvasFolderMembership.mockRejectedValue(new Error("Failed to fetch"));
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({
+      data: [makeFolder("folder-1", "Deployments", "green")],
+      isLoading: false,
+      error: null,
+    });
+
+    renderHome(["/org-123/apps/new?folderId=folder-1"]);
+    await user.click((await screen.findAllByRole("button", { name: "Install" }))[0]);
+    await user.click(await screen.findByRole("button", { name: "Just take me there" }));
+
+    expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
+    expect(showErrorToast).toHaveBeenCalledWith("App installed, but failed to add it to folder");
+  });
+
+  it("disables folder header creation without update permission", async () => {
+    permissionMocks.canAct.mockImplementation((_resource: string, action: string) => action !== "update");
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({
+      data: [makeFolder("folder-1", "Deployments", "green")],
+      isLoading: false,
+      error: null,
+    });
+
+    renderHome();
+    const deploymentsSection = screen.getByText("Deployments").closest("section")!;
+
+    expect(within(deploymentsSection).getByLabelText("Create app in folder Deployments")).toBeDisabled();
+  });
+
+  it("does not create from a folder-scoped new app URL without update permission", async () => {
+    const user = userEvent.setup();
+    permissionMocks.canAct.mockImplementation((_resource: string, action: string) => action !== "update");
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({
+      data: [makeFolder("folder-1", "Deployments", "green")],
+      isLoading: false,
+      error: null,
+    });
+
+    renderHome(["/org-123/apps/new?folderId=folder-1"]);
+    await user.click(await screen.findByRole("button", { name: /start from scratch/i }));
+
+    expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalledWith("You don't have permission to update canvases.");
+  });
+
+  it("does not create outside a folder while folder context is loading", async () => {
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({
+      data: [],
+      isLoading: true,
+      error: null,
+    });
+
+    renderHome(["/org-123/apps/new?folderId=folder-1"]);
+
+    expect(await screen.findByRole("button", { name: /start from scratch/i })).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "Install" })[0]).toBeDisabled();
+    expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
   });
 
   it("adds a canvas to an existing folder", async () => {
