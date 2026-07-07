@@ -406,6 +406,39 @@ describe("HomePage canvas folders", () => {
     expect(await screen.findByText("Change folder name")).toBeInTheDocument();
   });
 
+  it("opens the new app page scoped to a folder", async () => {
+    const user = userEvent.setup();
+    mutationMocks.createCanvasAsync.mockResolvedValue({
+      data: { canvas: { metadata: { id: "canvas-new" } } },
+    });
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({
+      data: [makeFolder("folder-1", "Deployments", "green", ["existing-canvas"])],
+      isLoading: false,
+      error: null,
+    });
+
+    renderHome();
+    const deploymentsSection = screen.getByText("Deployments").closest("section")!;
+    await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
+    expect(await screen.findByRole("heading", { name: "Create New App in Deployments Folder" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /start from scratch/i }));
+
+    await waitFor(() => {
+      expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
+        name: expect.stringMatching(/^[a-z]+-[a-z]+$/),
+        method: "ui",
+      });
+      expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({
+        folderId: "folder-1",
+        title: "Deployments",
+        backgroundColor: "green",
+        canvasIds: ["existing-canvas", "canvas-new"],
+      });
+    });
+  });
+
   it("adds a canvas to an existing folder", async () => {
     const user = userEvent.setup();
     useCanvases.mockReturnValue({
