@@ -30,8 +30,10 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
+  invalidateStagedCanvasCaches,
   useCanvas,
   useCanvasMemoryEntries,
+  useStagedCanvasSpec,
   useCanvasVersion,
   useCanvasVersions,
   useCreateCanvasMemoryNamespace,
@@ -97,16 +99,24 @@ import { resolveCanvasForView, syncLoadedVersionToCanvasDetail } from "./lib/res
 import {
   clearLiveEditSessionDraftState,
   clearLiveEditSessionSearchParams,
+  isAwaitingStagedCanvasSpec,
+  isViewingCurrentLiveCanvasVersion,
   resetCommittedLiveCanvasDetail,
+  resolveSelectedCanvasVersion,
   shouldReadStagedCanvasVersion,
 } from "./lib/live-edit-session";
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
 import { sortVersionsDesc } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
+import { useCommittedDraftBaselines } from "./useCommittedDraftBaselines";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandlers";
 import { useDraftStagingActions } from "./useDraftStagingActions";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
+import {
+  isDraftCanvasLoadingWhileEditing,
+  isEditBootstrapReady as resolveEditBootstrapReady,
+} from "./lib/edit-staging-ready";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { buildCanvasYamlExportPayload, materializeCanvasSpec } from "./lib/workflow-spec-files";
@@ -285,6 +295,7 @@ export function AppPage() {
   // sidebar visible even when previewing the current/old version (not editing a
   // draft), and ends only when the user explicitly exits.
   const [editSessionActive, setEditSessionActive] = useState(false);
+  const [isEnteringEditSession, setIsEnteringEditSession] = useState(false);
   const editSessionActiveRef = useRef(false);
   const activeCanvasVersionIdRef = useRef<string>("");
   // Distinguishes "user deliberately selected Current version from the sidebar"
@@ -383,22 +394,64 @@ export function AppPage() {
     effectiveLiveCanvasVersionId,
     liveCanvasVersionId,
   });
+  const stagedVersionMetadataShell = activeCanvasVersion ?? selectableVersionsById.get(activeCanvasVersionId) ?? null;
   const {
-    data: loadedCanvasVersion,
-    isLoading: loadedCanvasVersionLoading,
-    isFetching: loadedCanvasVersionFetching,
+    data: loadedStagedCanvasVersion,
+    isLoading: loadedStagedCanvasVersionLoading,
+    isFetching: loadedStagedCanvasVersionFetching,
+  } = useStagedCanvasSpec(canvasId!, stagedVersionMetadataShell, shouldReadStagedCanvasVersionFlag);
+  const {
+    data: loadedCommittedCanvasVersion,
+    isLoading: loadedCommittedCanvasVersionLoading,
+    isFetching: loadedCommittedCanvasVersionFetching,
   } = useCanvasVersion(
     organizationId!,
     canvasId!,
     activeCanvasVersionId,
-    !!activeCanvasVersionId,
-    shouldReadStagedCanvasVersionFlag,
+    !!activeCanvasVersionId && !shouldReadStagedCanvasVersionFlag,
   );
-  const selectedCanvasVersion = activeCanvasVersionId ? loadedCanvasVersion || activeCanvasVersion : null;
-  const isViewingCurrentLiveVersion =
-    !selectedCanvasVersion ||
-    (!!effectiveLiveCanvasVersionId && selectedCanvasVersion.metadata?.id === effectiveLiveCanvasVersionId) ||
-    selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
+  const loadedCanvasVersion = shouldReadStagedCanvasVersionFlag
+    ? loadedStagedCanvasVersion
+    : loadedCommittedCanvasVersion;
+  const loadedCanvasVersionLoading = shouldReadStagedCanvasVersionFlag
+    ? loadedStagedCanvasVersionLoading
+    : loadedCommittedCanvasVersionLoading;
+  const loadedCanvasVersionFetching = shouldReadStagedCanvasVersionFlag
+    ? loadedStagedCanvasVersionFetching
+    : loadedCommittedCanvasVersionFetching;
+  const isAwaitingStagedCanvasSpecFlag = isAwaitingStagedCanvasSpec({
+    activeCanvasVersionId,
+    shouldReadStagedCanvasVersion: shouldReadStagedCanvasVersionFlag,
+    loadedStagedCanvasVersion,
+    loadedStagedCanvasVersionLoading,
+    loadedStagedCanvasVersionFetching,
+    isEnteringEditSession,
+  });
+  const selectedCanvasVersion = useMemo(
+    () =>
+      resolveSelectedCanvasVersion({
+        activeCanvasVersionId,
+        shouldReadStagedCanvasVersion: shouldReadStagedCanvasVersionFlag,
+        loadedStagedCanvasVersion,
+        loadedCommittedCanvasVersion,
+        activeCanvasVersion,
+        isAwaitingStagedSpec: isAwaitingStagedCanvasSpecFlag,
+      }),
+    [
+      activeCanvasVersionId,
+      shouldReadStagedCanvasVersionFlag,
+      loadedStagedCanvasVersion,
+      loadedCommittedCanvasVersion,
+      activeCanvasVersion,
+      isAwaitingStagedCanvasSpecFlag,
+    ],
+  );
+  const isViewingCurrentLiveVersion = isViewingCurrentLiveCanvasVersion({
+    activeCanvasVersionId,
+    selectedCanvasVersion,
+    effectiveLiveCanvasVersionId,
+    liveCanvasVersionId,
+  });
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
   const isEditing = editSessionActive && isViewingCurrentLiveVersion;
   const hasEditableVersion = isEditing;
@@ -409,14 +462,30 @@ export function AppPage() {
   const showLiveActivity = isViewingLiveVersion && !(editSessionActive && !isRunInspectionMode && !isMemoryMode);
   const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
   const draftSpecToRender = draftCanvasSpec ?? selectedCanvasVersion?.spec ?? null;
+  const committedBaselinesForEdit = useCommittedDraftBaselines({
+    canvasId,
+    versionId: activeCanvasVersionId || undefined,
+    enabled: isEditing,
+    stagingResetNonce,
+  });
+  const isEditBootstrapReady = resolveEditBootstrapReady({
+    isEditing,
+    isEnteringEditSession,
+    stagingBaselinesReady: committedBaselinesForEdit.ready,
+    draftCanvasSpec,
+    shouldReadStagedCanvasVersion: shouldReadStagedCanvasVersionFlag,
+  });
+  const draftSpecForView = isEditing && !isEditBootstrapReady ? null : draftSpecToRender;
   useEffect(() => {
     if (!isEditing || !activeCanvasVersionId) {
       return;
     }
 
-    const awaitingStagedVersionLoad =
-      !!activeCanvasVersion && !loadedCanvasVersion && (loadedCanvasVersionLoading || loadedCanvasVersionFetching);
-    if (awaitingStagedVersionLoad) {
+    if (isEnteringEditSession) {
+      return;
+    }
+
+    if (shouldReadStagedCanvasVersionFlag && isAwaitingStagedCanvasSpecFlag) {
       return;
     }
 
@@ -440,11 +509,10 @@ export function AppPage() {
     setDraftCanvasSpec(nextDraftSpec);
   }, [
     isEditing,
+    isEnteringEditSession,
+    shouldReadStagedCanvasVersionFlag,
+    isAwaitingStagedCanvasSpecFlag,
     activeCanvasVersionId,
-    activeCanvasVersion,
-    loadedCanvasVersion,
-    loadedCanvasVersionLoading,
-    loadedCanvasVersionFetching,
     selectedCanvasVersion?.metadata?.id,
     selectedCanvasVersion?.spec,
     draftCanvasSpec,
@@ -491,12 +559,13 @@ export function AppPage() {
         isEditing,
         isViewingCurrentLiveVersion,
         liveCanvas,
-        draftSpecToRender,
+        draftSpecToRender: draftSpecForView,
         selectedCanvasVersion,
         canvasId: canvasId!,
       }),
-    [liveCanvas, selectedCanvasVersion, isEditing, isViewingCurrentLiveVersion, draftSpecToRender, canvasId],
+    [liveCanvas, selectedCanvasVersion, isEditing, isViewingCurrentLiveVersion, draftSpecForView, canvasId],
   );
+  const canvasForPrep = canvas ?? ((isEditing || isEnteringEditSession) && liveCanvas ? liveCanvas : null);
 
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(
@@ -599,6 +668,7 @@ export function AppPage() {
   // Canvas/version the persisted viewport was fitted for; switching content re-fits the graph.
   const lastFittedContentKeyRef = useRef<string | null>(null);
   const hasSyncedVersionFromURLRef = useRef(false);
+  const stableCanvasViewKeyRef = useRef<string>("live");
 
   /**
    * Capture the initial node focus from the URL so we only zoom once.
@@ -718,15 +788,13 @@ export function AppPage() {
       setActiveCanvasVersion((current) =>
         current?.metadata?.id === activeCanvasVersionId ? { ...current, spec: updatedWorkflow.spec } : current,
       );
-      queryClient.setQueryData<CanvasesCanvasVersion | undefined>(
-        canvasKeys.versionStagedDetail(canvasId, activeCanvasVersionId),
-        (current) =>
-          current
-            ? { ...current, spec: updatedWorkflow.spec }
-            : {
-                metadata: { id: activeCanvasVersionId },
-                spec: updatedWorkflow.spec,
-              },
+      queryClient.setQueryData<CanvasesCanvasVersion | undefined>(canvasKeys.stagedCanvasSpec(canvasId), (current) =>
+        current
+          ? { ...current, spec: updatedWorkflow.spec }
+          : {
+              metadata: { id: activeCanvasVersionId },
+              spec: updatedWorkflow.spec,
+            },
       );
     },
     [organizationId, canvasId, queryClient, isEditing, activeCanvasVersionId],
@@ -912,7 +980,6 @@ export function AppPage() {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
     } else if (activeCanvasVersionId) {
       draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
     }
 
     setRemoteCanvasUpdatePending(false);
@@ -1002,6 +1069,8 @@ export function AppPage() {
     draftSpecToRender,
     canvas,
     getConsoleMutationGeneration: () => consoleMutationGenerationRef.current,
+    committedBaselines: committedBaselinesForEdit,
+    editBootstrapReady: isEditBootstrapReady,
   });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
@@ -1434,19 +1503,19 @@ export function AppPage() {
   }, []);
 
   const dataLoading = isCanvasPrepLoading(
-    canvas,
+    canvasForPrep,
     canvasLoading,
     triggersLoading,
     componentsLoading,
     integrationsLoading,
   );
   const { nodes: preparedNodes, edges: preparedEdges } = useMemo(() => {
-    if (dataLoading) {
+    if (dataLoading || !canvasForPrep) {
       return { nodes: [], edges: [] };
     }
 
     return prepareData(
-      canvas!,
+      canvasForPrep,
       allTriggers,
       allComponents,
       visibleNodeEventsMap,
@@ -1459,7 +1528,7 @@ export function AppPage() {
       openTriggerModal,
     );
   }, [
-    canvas,
+    canvasForPrep,
     allTriggers,
     allComponents,
     visibleNodeEventsMap,
@@ -1474,7 +1543,7 @@ export function AppPage() {
   ]);
 
   const draftVisualDiff = useDraftVisualDiff({
-    isViewingDraftVersion: isEditing,
+    isViewingDraftVersion: isEditing && isEditBootstrapReady,
     canvas,
     liveCanvasVersion,
     latestDraftVersion: liveCanvasVersion,
@@ -1748,7 +1817,6 @@ export function AppPage() {
     isViewingLiveVersion,
     true,
     handleCanvasStagingEvent,
-    () => activeCanvasVersionId || effectiveLiveCanvasVersionId || undefined,
   );
   const rawLogNodes = prepareCanvasLogNodes(canvasNodes, canvasEdges, allComponents, !dataLoading);
   const logNodesSignature = useMemo(() => getCanvasLogNodesSignature(rawLogNodes), [rawLogNodes]);
@@ -3353,7 +3421,7 @@ export function AppPage() {
   }, [handleResetStaging]);
 
   const activateCanvasVersionForEditing = useCallback(
-    (versionID: string, version: CanvasesCanvasVersion) => {
+    (versionID: string, version: CanvasesCanvasVersion, options?: { preserveStagedLayer?: boolean }) => {
       if (!organizationId || !canvasId) {
         return false;
       }
@@ -3362,6 +3430,7 @@ export function AppPage() {
       const isCurrentLive =
         (!!effectiveLiveCanvasVersionId && versionId === effectiveLiveCanvasVersionId) ||
         (!!liveCanvasVersionId && versionId === liveCanvasVersionId);
+      const preserveStagedLayer = !!options?.preserveStagedLayer && isCurrentLive;
 
       clearPendingAutoSaveWork();
 
@@ -3370,21 +3439,21 @@ export function AppPage() {
         draftCanvasSpecsRef.current.set(previousVersionId, draftCanvasSpec);
       }
 
-      if (isCurrentLive) {
+      if (isCurrentLive && !preserveStagedLayer) {
         draftCanvasSpecsRef.current.delete(versionId);
-        void queryClient.invalidateQueries({
-          queryKey: canvasKeys.versionStagedDetail(canvasId, versionId),
-        });
+        invalidateStagedCanvasCaches(queryClient, canvasId);
       }
 
       if (!isCurrentLive) {
         void queryClient.cancelQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
-        void queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionID) });
-        void queryClient.invalidateQueries({ queryKey: canvasKeys.versionStagedDetail(canvasId, versionID) });
       }
 
       activeCanvasVersionIdRef.current = versionID;
-      setDraftCanvasSpec(isCurrentLive ? null : (version.spec ?? null));
+      if (!isCurrentLive) {
+        setDraftCanvasSpec(version.spec ?? null);
+      } else if (!preserveStagedLayer) {
+        setDraftCanvasSpec(null);
+      }
       setActiveCanvasVersion(version);
 
       lastAppliedVersionSnapshotRef.current = "";
@@ -3401,17 +3470,19 @@ export function AppPage() {
         return clearComponentSidebarSearchParams(next);
       });
 
-      updateCanvasDetailForSelectedVersion({
-        queryClient,
-        organizationId,
-        canvasId,
-        isCurrentLive,
-        version,
-        liveCanvasVersion,
-        liveCanvas,
-      });
+      if (!preserveStagedLayer) {
+        updateCanvasDetailForSelectedVersion({
+          queryClient,
+          organizationId,
+          canvasId,
+          isCurrentLive,
+          version,
+          liveCanvasVersion,
+          liveCanvas,
+        });
+      }
 
-      if (isCurrentLive) {
+      if (isCurrentLive && !preserveStagedLayer) {
         refreshLiveCanvasAfterVersionSelection({
           queryClient,
           organizationId,
@@ -3440,7 +3511,7 @@ export function AppPage() {
   );
 
   const handleUseVersion = useCallback(
-    (versionID: string) => {
+    (versionID: string, options?: { preserveStagedLayer?: boolean }) => {
       if (!organizationId || !canvasId) {
         return;
       }
@@ -3451,7 +3522,7 @@ export function AppPage() {
         return;
       }
 
-      activateCanvasVersionForEditing(versionID, version);
+      activateCanvasVersionForEditing(versionID, version, options);
     },
     [activateCanvasVersionForEditing, canvasId, organizationId, selectableVersionsById],
   );
@@ -3492,7 +3563,7 @@ export function AppPage() {
   const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
     getWorkflowViewPresentation({
       ...urlViewFlags,
-      hasEditableVersion,
+      hasEditableVersion: hasEditableVersion || isEnteringEditSession,
       isViewingCurrentLiveVersion,
     });
 
@@ -3514,11 +3585,19 @@ export function AppPage() {
         return false;
       }
 
-      setEditSessionActive(true);
-      previewingCurrentVersionRef.current = true;
-      handleUseVersion(effectiveLiveCanvasVersionId);
-      await resyncStagedEditorState(effectiveLiveCanvasVersionId, { bumpResetNonce: false });
-      return true;
+      setIsEnteringEditSession(true);
+      try {
+        previewingCurrentVersionRef.current = true;
+        handleUseVersion(effectiveLiveCanvasVersionId, { preserveStagedLayer: true });
+        await resyncStagedEditorState(effectiveLiveCanvasVersionId, {
+          bumpResetNonce: false,
+          preferCachedStagedSpec: true,
+        });
+        setEditSessionActive(true);
+        return true;
+      } finally {
+        setIsEnteringEditSession(false);
+      }
     })();
 
     enterLiveEditSessionInFlightRef.current = enterPromise;
@@ -3605,6 +3684,7 @@ export function AppPage() {
         activeCanvasVersionIdRef,
         previewingCurrentVersionRef,
       });
+      setIsEnteringEditSession(false);
       setSearchParams(clearLiveEditSessionSearchParams);
       void refreshLatestLiveCanvasData();
       return;
@@ -4027,11 +4107,15 @@ export function AppPage() {
 
   const isInitialCanvasBootstrapLoading =
     !canvas && (canvasLoading || triggersLoading || componentsLoading || widgetsLoading);
-  const isDraftCanvasLoading =
-    isEditing &&
-    !!activeCanvasVersionId &&
-    !draftSpecToRender &&
-    (loadedCanvasVersionLoading || loadedCanvasVersionFetching || !loadedCanvasVersion?.spec);
+  const isDraftCanvasLoading = isDraftCanvasLoadingWhileEditing({
+    isEditing,
+    shouldReadStagedCanvasVersion: shouldReadStagedCanvasVersionFlag,
+    isEnteringEditSession,
+    isEditBootstrapReady,
+    draftCanvasSpec,
+    loadedCanvasVersionLoading,
+    loadedCanvasVersionFetching,
+  });
 
   useReportPageReady(!isInitialCanvasBootstrapLoading && !!canvas, {
     failed: !canvas && !canvasLoading && !isDraftCanvasLoading,
@@ -4081,10 +4165,6 @@ export function AppPage() {
       await queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       return;
     }
-
-    if (activeCanvasVersionId) {
-      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
-    }
   };
 
   const backToAppId = searchParams.get("appId") ?? undefined;
@@ -4117,7 +4197,13 @@ export function AppPage() {
       </div>
     ) : null;
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
-  const canvasRenderKey = `${canvasViewKey}:${isDraftCanvasLoading ? "draft-loading" : "draft-ready"}:${isRunInspectionMode ? "runs" : "canvas"}:reset-${stagingResetNonce}`;
+  const pinCanvasViewKey = isEnteringEditSession || (isEditing && !isEditBootstrapReady);
+  if (!pinCanvasViewKey) {
+    stableCanvasViewKeyRef.current = canvasViewKey;
+  }
+  const stableCanvasViewKey = pinCanvasViewKey ? stableCanvasViewKeyRef.current : canvasViewKey;
+  const isEditSessionUiReady = !isEditing || (isEditBootstrapReady && !isDraftCanvasLoading);
+  const canvasRenderKey = `${stableCanvasViewKey}:${isRunInspectionMode ? "runs" : "canvas"}:reset-${stagingResetNonce}`;
   const headerBanners = [appBanner, remoteUpdateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const enterEditModeDisabled = !canUpdateCanvas || canvasDeletedRemotely;
@@ -4196,7 +4282,7 @@ export function AppPage() {
     <>
       <div className="relative h-full w-full">
         <WorkflowPageModeOverlays
-          key={`overlays:${canvasViewKey}:reset-${stagingResetNonce}`}
+          key={`overlays:${stableCanvasViewKey}:reset-${stagingResetNonce}`}
           urlViewFlags={urlViewFlags}
           console={{
             canActOnCanvas,
@@ -4218,7 +4304,7 @@ export function AppPage() {
             nodeStatuses: consoleNodeStatuses,
             onTriggerNode: handleConsoleTriggerNode,
             visualDiff: {
-              enabled: draftVisualDiff.visualDiffEnabled && isEditing,
+              enabled: draftVisualDiff.visualDiffEnabled && isEditSessionUiReady,
               summary: canvasConsoleVersionDiff.draftConsoleDiffSummary,
             },
             onEffectiveConsoleChange: handleEffectiveConsoleChange,
@@ -4341,8 +4427,8 @@ export function AppPage() {
           onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
-          visualDiffEnabled={draftVisualDiff.visualDiffEnabled}
-          draftVisualDiff={draftVisualDiff}
+          visualDiffEnabled={draftVisualDiff.visualDiffEnabled && isEditSessionUiReady}
+          draftVisualDiff={isEditSessionUiReady ? draftVisualDiff : undefined}
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           headerMode={headerMode}
@@ -4358,15 +4444,15 @@ export function AppPage() {
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           {...draftChangeIndicators}
-          hasStagingChanges={isEditing && hasStagingChanges}
+          hasStagingChanges={isEditSessionUiReady && hasStagingChanges}
           stagingStale={isEditing && stagingStale}
-          editTabTone={editTabTone}
-          hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
-          hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
-          hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
+          editTabTone={isEditSessionUiReady ? editTabTone : "neutral"}
+          hasUncommittedCanvasDraftChanges={isEditSessionUiReady && hasUncommittedCanvasDraftChanges}
+          hasUncommittedConsoleDraftChanges={isEditSessionUiReady && hasUncommittedConsoleDraftChanges}
+          hasUncommittedFilesDraftChanges={isEditSessionUiReady && hasUncommittedFilesDraftChanges}
           hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
           hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
-          hasFilesStagingChanges={isEditing && hasFilesStagingChanges}
+          hasFilesStagingChanges={isEditSessionUiReady && hasFilesStagingChanges}
           onCommitStaging={handleOpenCommitDialog}
           commitStagingPending={commitStagingPending}
           resetStagingPending={resetStagingPending}

@@ -12,11 +12,18 @@ async function invalidatePostCommitCaches(
   organizationId: string,
   canvasId: string,
 ): Promise<void> {
+  // Drop canvas-scoped staged overlays immediately so a re-enter after commit
+  // cannot briefly resolve the previous live version id from warm cache.
+  queryClient.removeQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId) });
+  queryClient.removeQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
+
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId), refetchType: "all" }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId), refetchType: "all" }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, undefined), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId), refetchType: "all" }),
   ]);
