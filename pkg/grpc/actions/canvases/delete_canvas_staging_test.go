@@ -9,22 +9,22 @@ import (
 )
 
 func Test__DeleteCanvasStaging(t *testing.T) {
-	r, ctx, canvasID, versionID := setupLiveCanvasStaging(t)
+	r, ctx, canvas, version := setupLiveCanvasStaging(t)
 	orgID := r.Organization.ID.String()
 
-	baseline, err := ReadRepositorySpecFile(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	_, err = PutCanvasStaging(ctx, orgID, canvasID, []*pb.CanvasRepositoryFileOperation{
+	_, err = PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
 		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# pending\n")},
 	})
 	require.NoError(t, err)
 
-	state, err := DeleteCanvasStaging(ctx, orgID, canvasID, nil)
+	state, err := DeleteCanvasStaging(ctx, orgID, canvas.ID.String(), nil)
 	require.NoError(t, err)
 	assert.False(t, state.GetHasStaging())
 
-	effective, err := ReadRepositorySpecFileStaged(ctx, orgID, canvasID, versionID, CanvasYAMLRepositoryPath)
+	effective, err := ReadRepositorySpecFileStaged(ctx, canvas, version, CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 	assert.Equal(t, baseline, effective)
 }

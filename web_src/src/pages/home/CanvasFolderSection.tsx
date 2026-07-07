@@ -1,3 +1,4 @@
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { Heading } from "@/components/Heading/heading";
 import { Input } from "@/components/Input/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -5,7 +6,7 @@ import { useUpdateCanvasFolder } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getApiErrorMessage } from "@/lib/errors";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, Plus } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -19,6 +20,7 @@ import { CanvasFolderActionsMenu } from "./CanvasFolderActionsMenu";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { FOLDER_COLOR_OPTIONS, CANVAS_FOLDER_SECTION_SHELL_CLASS, folderColorStyles } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
+import { useNavigate } from "react-router-dom";
 
 interface CanvasFolderSectionProps {
   folder: CanvasFolderData;
@@ -28,6 +30,7 @@ interface CanvasFolderSectionProps {
   onEditCanvas: (canvas: CanvasCardData) => void;
   onTogglePin: (canvasId: string, pinned: boolean) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
+  canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
@@ -64,6 +67,31 @@ interface SubmitCanvasFolderRenameOptions {
     backgroundColor: CanvasFolderData["backgroundColor"];
   }) => Promise<unknown>;
   setIsRenaming: (isRenaming: boolean) => void;
+}
+
+type UpdateCanvasFolderMutation = ReturnType<typeof useUpdateCanvasFolder>;
+
+interface CanvasFolderHeaderProps {
+  folder: CanvasFolderData;
+  organizationId: string;
+  canCreateCanvases: boolean;
+  canUpdateCanvases: boolean;
+  permissionsLoading: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  updateCanvasFolderMutation: UpdateCanvasFolderMutation;
+  renameInputRef: RefObject<HTMLInputElement | null>;
+  isRenaming: boolean;
+  draftTitle: string;
+  isSubmittingRenameRef: MutableRefObject<boolean>;
+  ignoreBlurUntilRef: MutableRefObject<number>;
+  onDraftTitleChange: (title: string) => void;
+  onStartRenaming: () => void;
+  onSubmitRename: () => void;
+  onCancelRenaming: () => void;
+  onFocusRenameInput: () => void;
+  onCreateAppInFolder: () => void;
+  onRenameRequest: () => void;
 }
 
 function CanvasFolderTitle({
@@ -157,6 +185,7 @@ export function CanvasFolderSection({
   onEditCanvas,
   onTogglePin,
   onToggleStar,
+  canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
@@ -169,6 +198,7 @@ export function CanvasFolderSection({
   const isSubmittingRenameRef = useRef(false);
   const ignoreBlurUntilRef = useRef(0);
   const updateCanvasFolderMutation = useUpdateCanvasFolder(organizationId);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!isRenaming) {
@@ -224,35 +254,28 @@ export function CanvasFolderSection({
     <section
       className={cn(CANVAS_FOLDER_SECTION_SHELL_CLASS, FOLDER_COLOR_OPTIONS[folder.backgroundColor].backgroundClass)}
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <CanvasFolderTitle
-            folder={folder}
-            canUpdateCanvases={canUpdateCanvases}
-            renameInputRef={renameInputRef}
-            isRenaming={isRenaming}
-            draftTitle={draftTitle}
-            isPending={updateCanvasFolderMutation.isPending}
-            onDraftTitleChange={setDraftTitle}
-            onStartRenaming={() => startRenaming()}
-            onSubmitRename={() => void submitRename()}
-            onCancelRenaming={cancelRenaming}
-            onFocusRenameInput={focusRenameInput}
-            isSubmittingRenameRef={isSubmittingRenameRef}
-            ignoreBlurUntilRef={ignoreBlurUntilRef}
-          />
-        </div>
-        <CanvasFolderActionsMenu
-          folder={folder}
-          organizationId={organizationId}
-          canUpdateCanvases={canUpdateCanvases}
-          permissionsLoading={permissionsLoading}
-          canMoveUp={canMoveUp}
-          canMoveDown={canMoveDown}
-          updateCanvasFolderMutation={updateCanvasFolderMutation}
-          onRenameRequest={startRenamingPreservingFocus}
-        />
-      </div>
+      <CanvasFolderHeader
+        folder={folder}
+        organizationId={organizationId}
+        canCreateCanvases={canCreateCanvases}
+        canUpdateCanvases={canUpdateCanvases}
+        permissionsLoading={permissionsLoading}
+        canMoveUp={canMoveUp}
+        canMoveDown={canMoveDown}
+        updateCanvasFolderMutation={updateCanvasFolderMutation}
+        renameInputRef={renameInputRef}
+        isRenaming={isRenaming}
+        draftTitle={draftTitle}
+        isSubmittingRenameRef={isSubmittingRenameRef}
+        ignoreBlurUntilRef={ignoreBlurUntilRef}
+        onDraftTitleChange={setDraftTitle}
+        onStartRenaming={() => startRenaming()}
+        onSubmitRename={() => void submitRename()}
+        onCancelRenaming={cancelRenaming}
+        onFocusRenameInput={focusRenameInput}
+        onCreateAppInFolder={() => navigate(`/${organizationId}/apps/new?folderId=${encodeURIComponent(folder.id)}`)}
+        onRenameRequest={startRenamingPreservingFocus}
+      />
 
       {canvases.length > 0 ? (
         <CanvasCardsGrid
@@ -273,6 +296,109 @@ export function CanvasFolderSection({
   );
 }
 
+function CanvasFolderHeader({
+  folder,
+  organizationId,
+  canCreateCanvases,
+  canUpdateCanvases,
+  permissionsLoading,
+  canMoveUp,
+  canMoveDown,
+  updateCanvasFolderMutation,
+  renameInputRef,
+  isRenaming,
+  draftTitle,
+  isSubmittingRenameRef,
+  ignoreBlurUntilRef,
+  onDraftTitleChange,
+  onStartRenaming,
+  onSubmitRename,
+  onCancelRenaming,
+  onFocusRenameInput,
+  onCreateAppInFolder,
+  onRenameRequest,
+}: CanvasFolderHeaderProps) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <CanvasFolderTitle
+          folder={folder}
+          canUpdateCanvases={canUpdateCanvases}
+          renameInputRef={renameInputRef}
+          isRenaming={isRenaming}
+          draftTitle={draftTitle}
+          isPending={updateCanvasFolderMutation.isPending}
+          onDraftTitleChange={onDraftTitleChange}
+          onStartRenaming={onStartRenaming}
+          onSubmitRename={onSubmitRename}
+          onCancelRenaming={onCancelRenaming}
+          onFocusRenameInput={onFocusRenameInput}
+          isSubmittingRenameRef={isSubmittingRenameRef}
+          ignoreBlurUntilRef={ignoreBlurUntilRef}
+        />
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <CreateAppInFolderButton
+          folder={folder}
+          canCreateCanvases={canCreateCanvases}
+          canUpdateCanvases={canUpdateCanvases}
+          permissionsLoading={permissionsLoading}
+          onCreate={onCreateAppInFolder}
+        />
+        <CanvasFolderActionsMenu
+          folder={folder}
+          organizationId={organizationId}
+          canUpdateCanvases={canUpdateCanvases}
+          permissionsLoading={permissionsLoading}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          updateCanvasFolderMutation={updateCanvasFolderMutation}
+          onRenameRequest={onRenameRequest}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CreateAppInFolderButton({
+  folder,
+  canCreateCanvases,
+  canUpdateCanvases,
+  permissionsLoading,
+  onCreate,
+}: {
+  folder: CanvasFolderData;
+  canCreateCanvases: boolean;
+  canUpdateCanvases: boolean;
+  permissionsLoading: boolean;
+  onCreate: () => void;
+}) {
+  const colorStyles = folderColorStyles(folder.backgroundColor);
+  const canCreateInFolder = canCreateCanvases && canUpdateCanvases;
+  const allowed = canCreateInFolder || permissionsLoading;
+
+  return (
+    <PermissionTooltip
+      allowed={allowed}
+      message={getCreateAppInFolderPermissionMessage(canCreateCanvases, canUpdateCanvases)}
+    >
+      <button
+        type="button"
+        className={cn(
+          "rounded p-1 disabled:cursor-not-allowed disabled:opacity-50",
+          colorStyles.foregroundMutedClass,
+          colorStyles.headerInteractiveClass,
+        )}
+        aria-label={`Create app in folder ${folder.title}`}
+        disabled={!canCreateInFolder}
+        onClick={onCreate}
+      >
+        <Plus size={16} aria-hidden />
+      </button>
+    </PermissionTooltip>
+  );
+}
+
 function EmptyCanvasFolder({ backgroundColor }: { backgroundColor: CanvasFolderData["backgroundColor"] }) {
   const colorStyles = folderColorStyles(backgroundColor);
 
@@ -287,6 +413,18 @@ function EmptyCanvasFolder({ backgroundColor }: { backgroundColor: CanvasFolderD
       <span>No canvases in this folder</span>
     </div>
   );
+}
+
+function getCreateAppInFolderPermissionMessage(canCreateCanvases: boolean, canUpdateCanvases: boolean) {
+  if (!canCreateCanvases) {
+    return "You don't have permission to create canvases.";
+  }
+
+  if (!canUpdateCanvases) {
+    return "You don't have permission to update canvases.";
+  }
+
+  return "You don't have permission to update canvases.";
 }
 
 async function submitCanvasFolderRename({
