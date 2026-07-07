@@ -71,6 +71,38 @@ describe("isAwaitingStagedCanvasSpec", () => {
       }),
     ).toBe(true);
   });
+
+  it("waits while a matched staged cache is refetching", () => {
+    expect(
+      isAwaitingStagedCanvasSpec({
+        activeCanvasVersionId: "live-version",
+        shouldReadStagedCanvasVersion: true,
+        loadedStagedCanvasVersion: {
+          metadata: { id: "live-version" },
+          spec: { nodes: [{ id: "stale-node" }], edges: [] },
+        },
+        loadedStagedCanvasVersionLoading: false,
+        loadedStagedCanvasVersionFetching: true,
+        isEnteringEditSession: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("uses a settled staged cache for the active live version", () => {
+    expect(
+      isAwaitingStagedCanvasSpec({
+        activeCanvasVersionId: "live-version",
+        shouldReadStagedCanvasVersion: true,
+        loadedStagedCanvasVersion: {
+          metadata: { id: "live-version" },
+          spec: { nodes: [{ id: "staged-node" }], edges: [] },
+        },
+        loadedStagedCanvasVersionLoading: false,
+        loadedStagedCanvasVersionFetching: false,
+        isEnteringEditSession: false,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("isViewingCurrentLiveCanvasVersion", () => {

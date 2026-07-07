@@ -79,18 +79,19 @@ export function isAwaitingStagedCanvasSpec({
   loadedStagedCanvasVersionFetching: boolean;
   isEnteringEditSession: boolean;
 }): boolean {
-  const matchedStagedCanvasVersion = isStagedCanvasVersionForActiveVersion(
-    loadedStagedCanvasVersion,
-    activeCanvasVersionId,
-  )
-    ? loadedStagedCanvasVersion
-    : undefined;
+  if (!shouldReadStagedCanvasVersion) {
+    return false;
+  }
 
-  return (
-    shouldReadStagedCanvasVersion &&
-    !matchedStagedCanvasVersion &&
-    (loadedStagedCanvasVersionLoading || loadedStagedCanvasVersionFetching || isEnteringEditSession)
-  );
+  if (isEnteringEditSession) {
+    return true;
+  }
+
+  if (loadedStagedCanvasVersionLoading || loadedStagedCanvasVersionFetching) {
+    return true;
+  }
+
+  return !isStagedCanvasVersionForActiveVersion(loadedStagedCanvasVersion, activeCanvasVersionId);
 }
 
 // While staged canvas.yaml is still loading, avoid falling back to the version-list
