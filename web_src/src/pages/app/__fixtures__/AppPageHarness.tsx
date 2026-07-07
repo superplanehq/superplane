@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
@@ -9,7 +9,34 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { AppPage } from "..";
 import { canvasAppIds, createFixtureFetch, type CanvasAppFixture } from "./handlers";
 
-type PatchedFetch = typeof fetch & { __fixtureFetch?: boolean };
+interface FixtureFetchState {
+  original: typeof fetch;
+  delegate: typeof fetch | null;
+}
+
+// The holder lives on `window` (not in module scope) so Storybook HMR module
+// reloads reuse the existing wrapper instead of wrapping it again.
+const FIXTURE_FETCH_KEY = "__appPageFixtureFetch";
+
+/**
+ * Installs a permanent `window.fetch` wrapper (once) that delegates to the
+ * currently active fixture fetch, or to the real network when no story is
+ * mounted. Swapping a delegate instead of swapping `window.fetch` itself
+ * means story transitions can never race: the new story's install and the
+ * old story's cleanup each only touch their own delegate slot.
+ */
+function fixtureFetchState(): FixtureFetchState {
+  const holder = window as unknown as Record<string, FixtureFetchState | undefined>;
+  let state = holder[FIXTURE_FETCH_KEY];
+  if (!state) {
+    const created: FixtureFetchState = { original: window.fetch.bind(window), delegate: null };
+    holder[FIXTURE_FETCH_KEY] = created;
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
+      (created.delegate ?? created.original)(input, init)) as typeof fetch;
+    state = created;
+  }
+  return state;
+}
 
 interface AppPageHarnessProps {
   /** Query string appended to the AppPage route (without the leading `?`). */
@@ -26,34 +53,38 @@ interface AppPageHarnessProps {
  * exercises the full app orchestrator shares this harness so the fetch
  * override, memory router, and React Query wiring stay in one place.
  *
- * The fixture fetch is installed *synchronously during render* — before
+ * The fixture fetch is activated *synchronously during render* — before
  * `AppPage` mounts and its React Query hooks fire — so no request ever
  * reaches the network. A lazy `useState` initializer is the earliest safe
  * hook point; a `useEffect` would run after the child queries had already
- * started. Nested `AppPageHarness` renders (a story wrapper mounting another)
- * see the sentinel `__fixtureFetch` flag and reuse the outer install rather
- * than double-wrapping.
+ * started. Each harness instance registers its own delegate, so switching
+ * stories always serves the incoming story's fixture even while the outgoing
+ * story's cleanup hasn't run yet.
  */
 export function AppPageHarness({ query = "", fixture }: AppPageHarnessProps) {
-  const originalFetch = useRef<typeof fetch | null>(null);
-
-  useState(() => {
-    if (!(window.fetch as PatchedFetch).__fixtureFetch) {
-      originalFetch.current = window.fetch.bind(window);
-      const patched = createFixtureFetch(originalFetch.current, fixture) as PatchedFetch;
-      patched.__fixtureFetch = true;
-      window.fetch = patched;
-    }
-    return null;
+  const [fixtureFetch] = useState(() => {
+    const state = fixtureFetchState();
+    const impl = createFixtureFetch(state.original, fixture);
+    state.delegate = impl;
+    return impl;
   });
 
   useEffect(() => {
+    const state = fixtureFetchState();
+    // Re-claim the delegate if the slot is free so StrictMode's dev-only
+    // unmount/remount cycle doesn't leave it cleared by our own cleanup.
+    // (The initial claim happens in the useState initializer above.)
+    if (state.delegate === null) {
+      state.delegate = fixtureFetch;
+    }
     return () => {
-      if (originalFetch.current) {
-        window.fetch = originalFetch.current;
+      // Only clear the delegate if it is still ours; a newer story may have
+      // already installed its own fixture by the time this cleanup runs.
+      if (state.delegate === fixtureFetch) {
+        state.delegate = null;
       }
     };
-  }, []);
+  }, [fixtureFetch]);
 
   const orgId = fixture?.organizationId ?? canvasAppIds.organizationId;
   const canvasId = fixture?.canvasId ?? canvasAppIds.canvasId;
