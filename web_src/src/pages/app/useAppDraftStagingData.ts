@@ -2,8 +2,10 @@ import type { CanvasesCanvas } from "@/api-client";
 import { useCanvasStaging, useCommitCanvasStaging, useDiscardCanvasStaging } from "@/hooks/useCanvasData";
 
 import { useCanvasConsoleVersionDiff } from "./useCanvasConsoleVersionDiff";
-import { useCommittedDraftBaselines } from "./useCommittedDraftBaselines";
+import type { useCommittedDraftBaselines } from "./useCommittedDraftBaselines";
 import { useDraftStagingIndicators } from "./useDraftStagingIndicators";
+
+type CommittedBaselines = ReturnType<typeof useCommittedDraftBaselines>;
 
 type UseAppDraftStagingDataOptions = {
   canvasId: string;
@@ -15,6 +17,8 @@ type UseAppDraftStagingDataOptions = {
   draftSpecToRender: CanvasesCanvas["spec"] | null | undefined;
   canvas: CanvasesCanvas | null | undefined;
   getConsoleMutationGeneration: () => number;
+  committedBaselines: CommittedBaselines;
+  editBootstrapReady: boolean;
 };
 
 export function useAppDraftStagingData({
@@ -27,16 +31,12 @@ export function useAppDraftStagingData({
   draftSpecToRender,
   canvas,
   getConsoleMutationGeneration,
+  committedBaselines,
+  editBootstrapReady,
 }: UseAppDraftStagingDataOptions) {
   const canvasStagingQuery = useCanvasStaging(canvasId, hasEditableVersion);
-  const committedBaselines = useCommittedDraftBaselines({
-    canvasId,
-    versionId: activeCanvasVersionId || undefined,
-    enabled: isEditing,
-    stagingResetNonce,
-  });
   const commitCanvasStagingMutation = useCommitCanvasStaging(canvasId);
-  const discardCanvasStagingMutation = useDiscardCanvasStaging(canvasId, activeCanvasVersionId);
+  const discardCanvasStagingMutation = useDiscardCanvasStaging(canvasId);
 
   const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({
     canvasId,
@@ -53,9 +53,10 @@ export function useAppDraftStagingData({
   });
   const { consoleQuery, updateConsoleMutation, draftChangeIndicators } = canvasConsoleVersionDiff;
 
-  const effectiveCanvasSpec = draftSpecToRender ?? canvas?.spec ?? undefined;
+  const effectiveCanvasSpec = editBootstrapReady ? (draftSpecToRender ?? canvas?.spec ?? undefined) : undefined;
   const stagingIndicators = useDraftStagingIndicators({
     isEditing,
+    editBootstrapReady,
     canvasId,
     activeCanvasVersionId,
     stagingResetNonce,
@@ -67,6 +68,7 @@ export function useAppDraftStagingData({
   });
 
   return {
+    stagingBaselinesReady: committedBaselines.ready,
     stagingStale: !!canvasStagingQuery.data?.stale,
     commitCanvasStagingMutation,
     discardCanvasStagingMutation,

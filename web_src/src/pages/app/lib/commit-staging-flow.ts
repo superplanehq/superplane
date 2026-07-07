@@ -12,11 +12,18 @@ async function invalidatePostCommitCaches(
   organizationId: string,
   canvasId: string,
 ): Promise<void> {
+  // Drop canvas-scoped staged overlays immediately so a re-enter after commit
+  // cannot briefly resolve the previous live version id from warm cache.
+  queryClient.removeQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId) });
+  queryClient.removeQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
+
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId), refetchType: "all" }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId), refetchType: "all" }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, undefined), refetchType: "all" }),
     queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId), refetchType: "all" }),
   ]);
@@ -34,6 +41,34 @@ async function removeStaleVersionQueriesAfterCommit(
 
   await cancelCanvasVersionQueries(queryClient, canvasId, previousVersionId);
   removeCanvasVersionScopedQueries(queryClient, canvasId, previousVersionId);
+}
+
+function clearDraftSpecsAfterCommit(
+  draftCanvasSpecsRef: MutableRefObject<Map<string, DraftSpec>>,
+  activeCanvasVersionId: string,
+  committedVersionId: string,
+) {
+  draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
+  if (committedVersionId !== activeCanvasVersionId) {
+    draftCanvasSpecsRef.current.delete(committedVersionId);
+  }
+}
+
+async function applyPostCommitCacheUpdates({
+  queryClient,
+  organizationId,
+  canvasId,
+  previousVersionId,
+  committedVersionId,
+}: {
+  queryClient: QueryClient;
+  organizationId: string;
+  canvasId: string;
+  previousVersionId: string;
+  committedVersionId: string;
+}) {
+  await removeStaleVersionQueriesAfterCommit(queryClient, canvasId, previousVersionId, committedVersionId);
+  await invalidatePostCommitCaches(queryClient, organizationId, canvasId);
 }
 
 export async function executeCommitStaging({
@@ -88,16 +123,17 @@ export async function executeCommitStaging({
   // Leave edit mode before touching caches so version-scoped hooks (console,
   // files, baselines) stop querying the pre-commit live version id.
   onCommittedVersionId?.(committedVersionId);
-
-  draftCanvasSpecsRef.current.delete(activeCanvasVersionId);
-  if (committedVersionId !== activeCanvasVersionId) {
-    draftCanvasSpecsRef.current.delete(committedVersionId);
-  }
+  clearDraftSpecsAfterCommit(draftCanvasSpecsRef, activeCanvasVersionId, committedVersionId);
   setDraftCanvasSpec(null);
 
   if (organizationId && canvasId && committedVersionId) {
-    await removeStaleVersionQueriesAfterCommit(queryClient, canvasId, previousVersionId, committedVersionId);
-    await invalidatePostCommitCaches(queryClient, organizationId, canvasId);
+    await applyPostCommitCacheUpdates({
+      queryClient,
+      organizationId,
+      canvasId,
+      previousVersionId,
+      committedVersionId,
+    });
   }
 
   releaseCanvasUpdatedEcho?.();
