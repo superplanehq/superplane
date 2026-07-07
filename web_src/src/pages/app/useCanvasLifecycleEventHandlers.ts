@@ -93,11 +93,11 @@ export function useCanvasLifecycleEventHandlers({
 
       if (editSessionActiveRef.current && hasLocalSaveActivity) {
         setRemoteCanvasUpdatePending(true);
-        return true;
+        return false;
       }
 
       onRemoteStagingUpdated?.();
-      return true;
+      return false;
     },
     [
       editSessionActiveRef,
