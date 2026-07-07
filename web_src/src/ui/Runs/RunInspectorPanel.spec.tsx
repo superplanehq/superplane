@@ -295,6 +295,21 @@ describe("RunInspectorPanel", () => {
     expect(listNodeQueueItemsMock).not.toHaveBeenCalled();
   });
 
+  it("keeps the stop action disabled when no action steps are loaded", () => {
+    mockedExecutions = [];
+    mockedExecutionsLoading = false;
+
+    renderInspector({ run: runningRun });
+
+    const stopButton = screen.getByRole("button", { name: "Stop" });
+    expect(stopButton).toBeDisabled();
+
+    fireEvent.click(stopButton);
+
+    expect(cancelExecutionMock).not.toHaveBeenCalled();
+    expect(listNodeQueueItemsMock).not.toHaveBeenCalled();
+  });
+
   it("stores a resized inspector width", () => {
     Object.defineProperty(window, "innerWidth", { value: 1200, configurable: true });
     renderInspector();

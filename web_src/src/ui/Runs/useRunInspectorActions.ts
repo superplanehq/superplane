@@ -31,6 +31,7 @@ export function useRunInspectorActions({
         .map((execution) => execution!.id!),
     [sections],
   );
+  const hasActionSection = useMemo(() => sections.some((section) => !section.isTrigger), [sections]);
   const stoppableNodeIds = useMemo(() => [...new Set(sections.map((section) => section.nodeId))], [sections]);
 
   const refreshRunQueries = useCallback(async () => {
@@ -115,7 +116,9 @@ export function useRunInspectorActions({
     stop: () => stopMutation.mutate(),
     stopPending: stopMutation.isPending,
     stopDisabled:
-      executionsLoading || stopMutation.isPending || (runningExecutionIds.length === 0 && !run.rootEvent?.id),
+      executionsLoading ||
+      stopMutation.isPending ||
+      (runningExecutionIds.length === 0 && (!run.rootEvent?.id || !hasActionSection)),
   };
 }
 
