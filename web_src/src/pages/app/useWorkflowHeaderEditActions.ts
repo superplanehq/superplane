@@ -43,6 +43,10 @@ export function useWorkflowHeaderEditActions({
     }
 
     await handleToggleEditMode();
+
+    if (isRunInspectionMode) {
+      handleClearRunInspection();
+    }
   }, [handleClearRunInspection, handleToggleEditMode, isRunInspectionMode]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
@@ -60,9 +64,8 @@ export function useWorkflowHeaderEditActions({
       return;
     }
 
-    setRunDetailNodeId(null);
-    setSearchParams(clearRunInspectionSearchParams, { replace: true });
-  }, [isRunInspectionMode, setRunDetailNodeId, setSearchParams]);
+    handleClearRunInspection();
+  }, [handleClearRunInspection, isRunInspectionMode]);
 
   return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader, clearRunInspectionForEdit };
 }
@@ -98,6 +101,10 @@ function useAutoEditMode(
       }
 
       await handleToggleEditMode();
+      if (searchParams.get("run")) {
+        setRunDetailNodeId(null);
+        setSearchParams(clearRunInspectionSearchParams, { replace: true });
+      }
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);

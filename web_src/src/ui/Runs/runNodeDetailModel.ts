@@ -1,6 +1,7 @@
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
+  ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { flattenObject } from "@/lib/utils";
@@ -50,6 +51,42 @@ export type RunNodeDetailTabData = {
   details?: Record<string, unknown>;
   payload?: unknown;
   configuration?: unknown;
+};
+
+export type RunInspectorOutputSection = {
+  channel: string;
+  value: unknown;
+  sizeKb: string;
+};
+
+export type RunInspectorUpstreamSection = {
+  nodeId: string;
+  nodeName: string;
+  workflowNode?: ComponentsNode;
+  badge: { badgeColor: string; label: string } | null;
+  output: unknown;
+};
+
+export type RunInspectorNodeSection = {
+  nodeId: string;
+  nodeName: string;
+  workflowNode?: ComponentsNode;
+  execution?: CanvasesCanvasNodeExecution;
+  isTrigger: boolean;
+  createdAt?: string;
+  durationMs?: number;
+  badge: { badgeColor: string; label: string } | null;
+  tabData: RunNodeDetailTabData | null;
+  upstreamSections: RunInspectorUpstreamSection[];
+  primaryInputNodeId?: string;
+  outputSections: RunInspectorOutputSection[];
+  errorMessage?: string;
+};
+
+export type RunInspectorErrorSummary = {
+  nodeId: string;
+  nodeName: string;
+  message: string;
 };
 
 export function workflowComponentName(node: ComponentsNode | undefined): string {
@@ -107,6 +144,301 @@ export function getAdjacentRunNodeId(
   return chain[nextIndex] ?? null;
 }
 
+export function buildRunInspectorNodeSections({
+  run,
+  executions,
+  workflowNodes,
+  workflowEdges,
+}: {
+  run: CanvasesCanvasRun;
+  executions: CanvasesCanvasNodeExecution[];
+  workflowNodes: ComponentsNode[];
+  workflowEdges?: ComponentsEdge[];
+}): RunInspectorNodeSection[] {
+  const triggerNodeId = run.rootEvent?.nodeId;
+  const executionChain = buildExecutionChain(executions, triggerNodeId);
+  const executionIndexByNodeId = new Map(executionChain.map((nodeId, index) => [nodeId, index]));
+
+  return executionChain.map((nodeId, index) => {
+    const workflowNode = workflowNodes.find((node) => node.id === nodeId);
+    const execution = executions.find((item) => item.nodeId === nodeId);
+    const isTrigger = nodeId === triggerNodeId;
+    const tabData = isTrigger
+      ? buildTriggerTabData(run, workflowNode)
+      : execution
+        ? buildExecutionTabData(execution, workflowNode, workflowNodes)
+        : null;
+    const upstreamSections = isTrigger
+      ? []
+      : buildUpstreamSections({
+          executionChain,
+          currentIndex: index,
+          run,
+          executions,
+          workflowNodes,
+          workflowEdges,
+          executionIndexByNodeId,
+        });
+
+    return {
+      nodeId,
+      nodeName: workflowNode?.name || nodeId,
+      workflowNode,
+      execution,
+      isTrigger,
+      createdAt: isTrigger ? run.rootEvent?.createdAt : execution?.createdAt,
+      durationMs: execution ? calculateExecutionDuration(execution) : undefined,
+      badge: isTrigger
+        ? eventBadgeForTriggeredTrigger(workflowNode)
+        : execution
+          ? eventBadgeForExecution(workflowNode, execution)
+          : null,
+      tabData,
+      upstreamSections,
+      primaryInputNodeId: isTrigger
+        ? undefined
+        : findPrimaryInputNodeId({
+            executionChain,
+            currentIndex: index,
+            run,
+            executions,
+            workflowEdges,
+            executionIndexByNodeId,
+          }),
+      outputSections: isTrigger
+        ? buildTriggerOutputSections(run)
+        : execution
+          ? buildOutputSections(execution.outputs)
+          : [],
+      errorMessage: execution ? getExecutionErrorMessage(execution) : undefined,
+    };
+  });
+}
+
+export function findRunInspectorErrorSummaries(sections: RunInspectorNodeSection[]): RunInspectorErrorSummary[] {
+  return sections
+    .filter((section) => !!section.errorMessage)
+    .map((section) => ({
+      nodeId: section.nodeId,
+      nodeName: section.nodeName,
+      message: section.errorMessage!,
+    }));
+}
+
+export function calculateRunDuration(run: CanvasesCanvasRun): number | null {
+  return calculateDuration(run.createdAt, run.finishedAt || run.updatedAt);
+}
+
+function calculateExecutionDuration(execution: CanvasesCanvasNodeExecution): number | undefined {
+  return calculateDuration(execution.createdAt, execution.updatedAt) ?? undefined;
+}
+
+function calculateDuration(start?: string, end?: string): number | null {
+  if (!start || !end) return null;
+
+  const startedAt = new Date(start).getTime();
+  const endedAt = new Date(end).getTime();
+  if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt) || endedAt < startedAt) return null;
+
+  return endedAt - startedAt;
+}
+
+function buildUpstreamSections({
+  executionChain,
+  currentIndex,
+  run,
+  executions,
+  workflowNodes,
+  workflowEdges,
+  executionIndexByNodeId,
+}: {
+  executionChain: string[];
+  currentIndex: number;
+  run: CanvasesCanvasRun;
+  executions: CanvasesCanvasNodeExecution[];
+  workflowNodes: ComponentsNode[];
+  workflowEdges?: ComponentsEdge[];
+  executionIndexByNodeId: Map<string, number>;
+}): RunInspectorUpstreamSection[] {
+  if (currentIndex <= 0) return [];
+
+  const accessibleNodeIds =
+    workflowEdges === undefined
+      ? executionChain.slice(0, currentIndex)
+      : findAccessibleUpstreamNodeIds(executionChain[currentIndex], workflowEdges, executionIndexByNodeId);
+
+  const orderedNodeIds =
+    workflowEdges === undefined
+      ? accessibleNodeIds
+      : accessibleNodeIds.sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions));
+
+  return orderedNodeIds.map((nodeId) => {
+    const workflowNode = workflowNodes.find((node) => node.id === nodeId);
+    const execution = executions.find((item) => item.nodeId === nodeId);
+    const isTrigger = nodeId === run.rootEvent?.nodeId;
+
+    return {
+      nodeId,
+      nodeName: workflowNode?.name || nodeId,
+      workflowNode,
+      badge: isTrigger
+        ? eventBadgeForTriggeredTrigger(workflowNode)
+        : execution
+          ? eventBadgeForExecution(workflowNode, execution)
+          : null,
+      output: isTrigger ? run.rootEvent?.data : normalizeExecutionOutputsForDisplay(execution?.outputs),
+    };
+  });
+}
+
+function findPrimaryInputNodeId({
+  executionChain,
+  currentIndex,
+  run,
+  executions,
+  workflowEdges,
+  executionIndexByNodeId,
+}: {
+  executionChain: string[];
+  currentIndex: number;
+  run: CanvasesCanvasRun;
+  executions: CanvasesCanvasNodeExecution[];
+  workflowEdges?: ComponentsEdge[];
+  executionIndexByNodeId: Map<string, number>;
+}): string | undefined {
+  if (currentIndex <= 0) return undefined;
+
+  if (workflowEdges === undefined) {
+    return executionChain[currentIndex - 1];
+  }
+
+  const currentNodeId = executionChain[currentIndex];
+  const directInputNodeIds = workflowEdges
+    .filter((edge) => edge.targetId === currentNodeId && edge.sourceId)
+    .map((edge) => edge.sourceId!)
+    .filter((nodeId) => {
+      const executionIndex = executionIndexByNodeId.get(nodeId);
+      return executionIndex !== undefined && executionIndex < currentIndex;
+    });
+
+  if (directInputNodeIds.length > 0) {
+    return directInputNodeIds.sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions)).at(-1);
+  }
+
+  return findAccessibleUpstreamNodeIds(currentNodeId, workflowEdges, executionIndexByNodeId)
+    .sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions))
+    .at(-1);
+}
+
+function findAccessibleUpstreamNodeIds(
+  nodeId: string,
+  workflowEdges: ComponentsEdge[],
+  executionIndexByNodeId: Map<string, number>,
+): string[] {
+  const accessibleNodeIds = new Set<string>();
+  const visited = new Set<string>();
+  const pending = [nodeId];
+  const currentNodeIndex = executionIndexByNodeId.get(nodeId) ?? Number.POSITIVE_INFINITY;
+
+  while (pending.length > 0) {
+    const currentNodeId = pending.pop();
+    if (!currentNodeId || visited.has(currentNodeId)) continue;
+
+    visited.add(currentNodeId);
+
+    workflowEdges
+      .filter((edge) => edge.targetId === currentNodeId && edge.sourceId)
+      .forEach((edge) => {
+        const sourceId = edge.sourceId!;
+        const sourceIndex = executionIndexByNodeId.get(sourceId);
+        if (sourceIndex !== undefined && sourceIndex < currentNodeIndex) {
+          accessibleNodeIds.add(sourceId);
+        }
+        if (!visited.has(sourceId)) {
+          pending.push(sourceId);
+        }
+      });
+  }
+
+  return Array.from(accessibleNodeIds);
+}
+
+function compareUpstreamCreatedAt(
+  leftNodeId: string,
+  rightNodeId: string,
+  run: CanvasesCanvasRun,
+  executions: CanvasesCanvasNodeExecution[],
+): number {
+  return getUpstreamCreatedAt(leftNodeId, run, executions) - getUpstreamCreatedAt(rightNodeId, run, executions);
+}
+
+function getUpstreamCreatedAt(
+  nodeId: string,
+  run: CanvasesCanvasRun,
+  executions: CanvasesCanvasNodeExecution[],
+): number {
+  const createdAt =
+    nodeId === run.rootEvent?.nodeId
+      ? run.rootEvent?.createdAt
+      : executions.find((item) => item.nodeId === nodeId)?.createdAt;
+
+  const timestamp = createdAt ? new Date(createdAt).getTime() : Number.POSITIVE_INFINITY;
+  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
+}
+
+function buildTriggerOutputSections(run: CanvasesCanvasRun): RunInspectorOutputSection[] {
+  if (!hasObjectValue(run.rootEvent?.data)) return [];
+
+  return [
+    {
+      channel: run.rootEvent?.channel || "default",
+      value: run.rootEvent?.data,
+      sizeKb: formatJsonSizeKb(run.rootEvent?.data),
+    },
+  ];
+}
+
+function buildOutputSections(outputs?: CanvasesCanvasNodeExecution["outputs"]): RunInspectorOutputSection[] {
+  if (!outputs || Object.keys(outputs).length === 0) return [];
+
+  return Object.entries(outputs).map(([channel, value]) => {
+    const displayValue = normalizeExecutionChannelOutput(value);
+
+    return {
+      channel,
+      value: displayValue,
+      sizeKb: formatJsonSizeKb(displayValue),
+    };
+  });
+}
+
+function normalizeExecutionOutputsForDisplay(outputs?: CanvasesCanvasNodeExecution["outputs"]): unknown {
+  const outputSections = buildOutputSections(outputs);
+  if (outputSections.length === 0) return undefined;
+  if (outputSections.length === 1) return outputSections[0].value;
+
+  return Object.fromEntries(outputSections.map((section) => [section.channel, section.value]));
+}
+
+function normalizeExecutionChannelOutput(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  return value[0];
+}
+
+function formatJsonSizeKb(value: unknown): string {
+  const json = JSON.stringify(value ?? null);
+  const bytes = new Blob([json]).size;
+  return `${Math.max(bytes / 1024, 0.01).toFixed(2)} KB`;
+}
+
+function getExecutionErrorMessage(execution: CanvasesCanvasNodeExecution): string | undefined {
+  if (execution.result !== "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR") {
+    return undefined;
+  }
+
+  return execution.resultMessage || execution.resultReason || "Execution failed";
+}
+
 function extractExecutionPayload(execution: CanvasesCanvasNodeExecution): unknown {
   if (!execution.outputs || Object.keys(execution.outputs).length === 0) {
     return undefined;
@@ -136,8 +468,8 @@ function buildDefaultExecutionDetails(
     }
   }
 
-  const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
-  return { ...flattenObject((hasOutputs ? execution.outputs : execution.metadata) || {}) };
+  const displayOutputs = normalizeExecutionOutputsForDisplay(execution.outputs);
+  return { ...flattenObject((displayOutputs ?? execution.metadata) || {}) };
 }
 
 function applyExecutionResultDetails(
