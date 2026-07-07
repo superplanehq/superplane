@@ -95,8 +95,8 @@ export function useRepositoryFileStaging({
   pendingChanges,
   onFlushReady,
 }: UseRepositoryFileStagingOptions) {
-  const stageFiles = useStageRepositoryFiles(canvasId ?? "", versionId ?? "");
-  const discardPaths = useDiscardRepositoryFilePaths(canvasId ?? "", versionId ?? "");
+  const stageFiles = useStageRepositoryFiles(canvasId ?? "");
+  const discardPaths = useDiscardRepositoryFilePaths(canvasId ?? "");
   const stageFilesRef = useRef(stageFiles);
   stageFilesRef.current = stageFiles;
   const discardPathsRef = useRef(discardPaths);

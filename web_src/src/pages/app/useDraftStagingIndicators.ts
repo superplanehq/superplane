@@ -16,23 +16,19 @@ type ConsoleQueryData = ConsoleVersionDiff["consoleQuery"]["data"];
 
 function resolveEditingStagingFlags({
   isEditing,
+  editBootstrapReady,
   committedBaselinesReady,
   localHasCanvasStaging,
   localHasConsoleStaging,
-  serverHasCanvasStaging,
-  serverHasConsoleStaging,
-  serverHasStagingChanges,
   filesLocalStagingActive,
   localHasFilesStaging,
   serverHasFilesStaging,
 }: {
   isEditing: boolean;
+  editBootstrapReady: boolean;
   committedBaselinesReady: boolean;
   localHasCanvasStaging: boolean;
   localHasConsoleStaging: boolean;
-  serverHasCanvasStaging: boolean;
-  serverHasConsoleStaging: boolean;
-  serverHasStagingChanges: boolean;
   filesLocalStagingActive: boolean;
   localHasFilesStaging: boolean;
   serverHasFilesStaging: boolean;
@@ -46,12 +42,19 @@ function resolveEditingStagingFlags({
     };
   }
 
-  const hasCanvasStagingChanges = committedBaselinesReady ? localHasCanvasStaging : serverHasCanvasStaging;
-  const hasConsoleStagingChanges = committedBaselinesReady ? localHasConsoleStaging : serverHasConsoleStaging;
+  if (!editBootstrapReady || !committedBaselinesReady) {
+    return {
+      hasCanvasStagingChanges: false,
+      hasConsoleStagingChanges: false,
+      hasFilesStagingChanges: false,
+      hasStagingChanges: false,
+    };
+  }
+
+  const hasCanvasStagingChanges = localHasCanvasStaging;
+  const hasConsoleStagingChanges = localHasConsoleStaging;
   const hasFilesStagingChanges = filesLocalStagingActive ? localHasFilesStaging : serverHasFilesStaging;
-  const hasStagingChanges = committedBaselinesReady
-    ? localHasCanvasStaging || localHasConsoleStaging || hasFilesStagingChanges
-    : serverHasStagingChanges;
+  const hasStagingChanges = localHasCanvasStaging || localHasConsoleStaging || hasFilesStagingChanges;
 
   return { hasCanvasStagingChanges, hasConsoleStagingChanges, hasFilesStagingChanges, hasStagingChanges };
 }
@@ -90,6 +93,7 @@ function buildDraftChangeFlags({
 
 type UseDraftStagingIndicatorsOptions = {
   isEditing: boolean;
+  editBootstrapReady: boolean;
   canvasId?: string;
   activeCanvasVersionId: string;
   stagingResetNonce: number;
@@ -102,6 +106,7 @@ type UseDraftStagingIndicatorsOptions = {
 
 export function useDraftStagingIndicators({
   isEditing,
+  editBootstrapReady,
   canvasStagingQuery,
   committedBaselines,
   effectiveCanvasSpec,
@@ -148,20 +153,16 @@ export function useDraftStagingIndicators({
     [committedBaselines.console, effectiveConsole],
   );
 
-  const { serverHasCanvasStaging, serverHasConsoleStaging, serverHasFilesStaging } = getServerStagingFlags(
-    canvasStagingQuery.data?.stagedPaths,
-  );
+  const { serverHasFilesStaging } = getServerStagingFlags(canvasStagingQuery.data?.stagedPaths);
   const serverHasStagingChanges = !!canvasStagingQuery.data?.hasStaging;
 
   const { hasCanvasStagingChanges, hasConsoleStagingChanges, hasFilesStagingChanges, hasStagingChanges } =
     resolveEditingStagingFlags({
       isEditing,
+      editBootstrapReady,
       committedBaselinesReady: committedBaselines.ready,
       localHasCanvasStaging,
       localHasConsoleStaging,
-      serverHasCanvasStaging,
-      serverHasConsoleStaging,
-      serverHasStagingChanges,
       filesLocalStagingActive,
       localHasFilesStaging,
       serverHasFilesStaging,

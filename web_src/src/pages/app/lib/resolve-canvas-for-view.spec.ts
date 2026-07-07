@@ -40,6 +40,19 @@ describe("resolveCanvasForView", () => {
     expect(canvas?.spec).toEqual(liveCanvas.spec);
   });
 
+  it("keeps the live canvas visible while the staged draft is still loading in edit mode", () => {
+    const canvas = resolveCanvasForView({
+      isEditing: true,
+      isViewingCurrentLiveVersion: true,
+      liveCanvas,
+      draftSpecToRender: null,
+      selectedCanvasVersion: null,
+      canvasId: "canvas-1",
+    });
+
+    expect(canvas?.spec).toEqual(liveCanvas.spec);
+  });
+
   it("overlays a committed historical version when previewing outside edit mode", () => {
     const historicalSpec = { nodes: [{ id: "old-node" }], edges: [] };
 

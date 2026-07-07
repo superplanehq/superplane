@@ -4,7 +4,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 
-import { fetchCanvasVersionWithSpec, fetchLiveCommittedCanvasVersionWithSpec } from "./repository-spec-files";
+import { fetchCommittedCanvasVersionWithSpec, fetchLiveCommittedCanvasVersionWithSpec } from "./repository-spec-files";
 
 export async function syncCommittedConsoleCaches({
   queryClient,
@@ -17,16 +17,13 @@ export async function syncCommittedConsoleCaches({
 }): Promise<void> {
   const consoleData = await fetchCanvasConsoleData(canvasId, versionId, false);
   if (!consoleData) {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) }),
-      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) }),
-    ]);
+    await queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
     return;
   }
 
   queryClient.setQueryData(canvasKeys.console(canvasId, versionId), consoleData);
   // After commit, staging is cleared — mirror the committed console in the staged cache.
-  queryClient.setQueryData(canvasKeys.consoleStaged(canvasId, versionId), consoleData);
+  queryClient.setQueryData(canvasKeys.stagedConsole(canvasId), consoleData);
 }
 
 export async function syncCommittedCanvasDraftState({
@@ -46,14 +43,14 @@ export async function syncCommittedCanvasDraftState({
 }): Promise<CanvasesCanvasVersion | undefined> {
   const committedVersion = resolveLiveVersion
     ? await fetchLiveCommittedCanvasVersionWithSpec(canvasId)
-    : await fetchCanvasVersionWithSpec(canvasId, versionId, false);
+    : await fetchCommittedCanvasVersionWithSpec(canvasId, versionId);
   if (!committedVersion) {
     return undefined;
   }
 
   const cacheVersionId = committedVersion.metadata?.id ?? versionId;
 
-  queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, cacheVersionId), committedVersion);
+  queryClient.setQueryData(canvasKeys.stagedCanvasSpec(canvasId), committedVersion);
   queryClient.setQueryData(canvasKeys.versionDetail(canvasId, cacheVersionId), committedVersion);
 
   if (!skipVersionListUpdate) {

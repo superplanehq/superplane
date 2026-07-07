@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
-import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasEvent,
@@ -15,7 +15,7 @@ import {
   upsertRunIntoInfiniteData,
   type InfiniteRunsPage,
 } from "./canvasInfiniteCache";
-import { canvasKeys } from "./useCanvasData";
+import { canvasKeys, invalidateStagedCanvasCaches } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
@@ -43,40 +43,6 @@ interface QueuedMessage {
   timestamp: number;
 }
 
-function queryKeyStartsWith(queryKey: readonly unknown[], prefix: readonly unknown[]): boolean {
-  return prefix.every((part, index) => queryKey[index] === part);
-}
-
-function isDraftRepositoryFileQuery(queryKey: readonly unknown[], canvasId: string, versionId: string): boolean {
-  const repositoryPrefix = canvasKeys.repository(canvasId);
-  const fileSegmentIndex = repositoryPrefix.length;
-  return (
-    queryKeyStartsWith(queryKey, repositoryPrefix) &&
-    queryKey.length === repositoryPrefix.length + 4 &&
-    queryKey[fileSegmentIndex] === "file" &&
-    queryKey[fileSegmentIndex + 2] === versionId &&
-    queryKey[fileSegmentIndex + 3] === "staged"
-  );
-}
-
-// Refreshes caches that read a draft version's staging layer. versionStagedDetail,
-// consoleStaged and staged repositoryFileContent keys all end with "staged";
-// repositoryFile keys feed the visible Files tab editor and include the draft id.
-function invalidateStagedCanvasQueries(queryClient: QueryClient, canvasId: string, versionId: string): void {
-  queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
-  queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
-  queryClient.invalidateQueries({
-    predicate: (query) => {
-      const key = query.queryKey;
-      if (!Array.isArray(key) || !key.includes(versionId)) {
-        return false;
-      }
-
-      return key[key.length - 1] === "staged" || isDraftRepositoryFileQuery(key, canvasId, versionId);
-    },
-  });
-}
-
 export function useCanvasWebsocket(
   canvasId: string,
   organizationId: string,
@@ -88,7 +54,6 @@ export function useCanvasWebsocket(
   processRuntimeEvents = true,
   enabled = true,
   onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void,
-  getStagingVersionId?: () => string | undefined,
 ): void {
   const updateNodeEvent = useNodeExecutionStore((state) => state.updateNodeEvent);
   const updateNodeExecution = useNodeExecutionStore((state) => state.updateNodeExecution);
@@ -284,13 +249,7 @@ export function useCanvasWebsocket(
           const shouldInvalidateStagingQueries =
             onCanvasStagingEvent?.(stagingMessage as CanvasWebsocketPayload, "staging_updated") !== false;
           if (shouldInvalidateStagingQueries) {
-            const stagingVersionId = getStagingVersionId?.();
-            if (stagingVersionId) {
-              invalidateStagedCanvasQueries(queryClient, canvasId, stagingVersionId);
-            } else {
-              queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
-              queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
-            }
+            invalidateStagedCanvasCaches(queryClient, canvasId);
           }
           break;
         }
@@ -325,7 +284,6 @@ export function useCanvasWebsocket(
       patchExecutionInCache,
       invalidateMemoryEntries,
       invalidateRuns,
-      getStagingVersionId,
     ],
   );
 

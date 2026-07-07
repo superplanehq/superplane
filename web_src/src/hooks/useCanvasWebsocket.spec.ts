@@ -377,7 +377,6 @@ describe("useCanvasWebsocket", () => {
           false,
           true,
           onCanvasStagingEvent,
-          () => "version-1",
         ),
       {
         wrapper: ({ children }: { children: ReactNode }) =>
@@ -392,12 +391,13 @@ describe("useCanvasWebsocket", () => {
 
     expect(onCanvasStagingEvent).toHaveBeenCalledWith({ canvasId: testCanvasId, userId: "user-1" }, "staging_updated");
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.canvasStaging(testCanvasId))).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.stagedCanvasSpec(testCanvasId))).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.stagedConsole(testCanvasId))).toHaveLength(1);
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.repositoryFiles(testCanvasId))).toHaveLength(1);
 
     const [stagedPredicate] = getInvalidationPredicates(invalidateQueriesSpy);
     expect(stagedPredicate).toBeDefined();
-    expect(stagedPredicate({ queryKey: canvasKeys.versionStagedDetail(testCanvasId, "version-1") })).toBe(true);
-    expect(stagedPredicate({ queryKey: canvasKeys.consoleStaged(testCanvasId, "version-1") })).toBe(true);
+    expect(stagedPredicate({ queryKey: canvasKeys.stagedConsole(testCanvasId) })).toBe(true);
     expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md", "version-1", true) })).toBe(
       true,
     );
