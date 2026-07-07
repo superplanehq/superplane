@@ -3494,7 +3494,7 @@ export function AppPage() {
       return;
     }
 
-    void enterLiveEditSession();
+    await enterLiveEditSession();
   }, [
     organizationId,
     canvasId,
@@ -3608,24 +3608,24 @@ export function AppPage() {
   const handleClearRunInspection = useCallback(() => {
     setRunDetailNodeId(null);
     setFocusRequest(null);
-    startTransition(() => {
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.delete("run");
-          next.delete("sidebar");
-          next.delete("node");
-          return next;
-        },
-        { replace: true },
-      );
-    });
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("run");
+        next.delete("sidebar");
+        next.delete("node");
+        return next;
+      },
+      { replace: true },
+    );
   }, [setSearchParams, setRunDetailNodeId]);
 
   const handleRunNodeDetailSelection = useCallback(
     (nodeId: string | null) => {
       setRunDetailNodeId(nodeId);
-      if (!nodeId) {
+      if (nodeId) {
+        clearDismissedRunDetail();
+      } else {
         setFocusRequest(null);
       }
 
@@ -3644,7 +3644,7 @@ export function AppPage() {
         { replace: true },
       );
     },
-    [setRunDetailNodeId, setSearchParams],
+    [clearDismissedRunDetail, setRunDetailNodeId, setSearchParams],
   );
 
   const handleRunNodeDetailNavigate = useCallback(
@@ -4256,10 +4256,14 @@ export function AppPage() {
               : undefined
           }
           runCanvasLoading={runCanvasLoading}
-          runNodeDetailRun={isRunInspectionMode ? selectedRun : null}
+          runNodeDetailRun={
+            isRunInspectionMode && selectedRunId && detailDismissedForRunId !== selectedRunId ? selectedRun : null
+          }
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
-          onRunNodeDetailClose={() => handleRunNodeDetailSelection(null)}
+          runNodeDetailEdges={selectedRunCanvas?.spec?.edges ?? canvasEdges}
+          onRunNodeDetailClose={handleBackToRunList}
+          onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           onBackToLiveCanvas={handleSelectLiveCanvas}
           onShowDiff={onShowDiff}

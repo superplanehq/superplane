@@ -42,6 +42,7 @@ import type {
   CanvasesCanvasRun,
   CanvasesCanvasNodeExecution,
   ActionsAction,
+  ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
@@ -365,7 +366,9 @@ export interface CanvasPageProps {
   runNodeDetailRun?: CanvasesCanvasRun | null;
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
+  runNodeDetailEdges?: ComponentsEdge[];
   onRunNodeDetailClose?: () => void;
+  onRunNodeDetailClear?: () => void;
   onRunNodeDetailNavigate?: (nodeId: string) => void;
 
   // Full history functionality
@@ -1258,7 +1261,8 @@ function CanvasPage(props: CanvasPageProps) {
   const showPreviewFloatingBar =
     canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
-  const runInspectorOpen = props.isRunInspectionMode && !!props.runNodeDetailRun && !!props.runNodeDetailCanvasId;
+  const runInspectorOpen =
+    props.isRunInspectionMode && !props.isEditing && !!props.runNodeDetailRun && !!props.runNodeDetailCanvasId;
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1554,11 +1558,12 @@ function CanvasPage(props: CanvasPageProps) {
             canvasId={props.runNodeDetailCanvasId!}
             run={props.runNodeDetailRun!}
             workflowNodes={props.workflowNodes ?? []}
+            workflowEdges={props.runNodeDetailEdges}
             componentIconMap={props.runsComponentIconMap}
             selectedNodeId={props.runNodeDetailNodeId}
             onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
-            onClearSelectedNode={() => props.onRunNodeDetailClose?.()}
-            onClose={() => props.onBackToLiveCanvas?.()}
+            onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
+            onClose={() => props.onRunNodeDetailClose?.()}
           />
         ) : null}
       </div>

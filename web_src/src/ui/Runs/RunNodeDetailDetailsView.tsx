@@ -30,15 +30,13 @@ export function RunNodeDetailDetailsView({
     <div className="flex flex-col gap-1.5 text-[13px]">
       {statusBadge ? (
         <div className="flex items-start gap-2">
-          <span className="w-[120px] shrink-0 truncate text-right text-gray-500 dark:text-gray-400">Status:</span>
+          <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400">Status:</span>
           <EventSectionStatusBadge badgeColor={statusBadge.badgeColor} label={statusBadge.label} />
         </div>
       ) : null}
       {relativeTime ? (
         <div className="flex items-start gap-2">
-          <span className="w-[120px] shrink-0 truncate text-right text-gray-500 dark:text-gray-400">
-            Relative time:
-          </span>
+          <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400">Relative time:</span>
           <span className="min-w-0 break-all text-gray-800 dark:text-gray-100">
             <Timestamp date={relativeTime} display="relative" relativeStyle="abbreviated" />
           </span>
@@ -48,7 +46,7 @@ export function RunNodeDetailDetailsView({
         if (isErrorValue(value)) {
           return (
             <div key={key} className="flex items-start gap-2">
-              <span className="w-[120px] shrink-0 truncate text-right text-gray-500 dark:text-gray-400" title={key}>
+              <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400" title={key}>
                 {key}:
               </span>
               <span className="min-w-0 break-all font-medium text-red-600 dark:text-red-400">{value.message}</span>
@@ -58,7 +56,7 @@ export function RunNodeDetailDetailsView({
 
         return (
           <div key={key} className="flex items-start gap-2">
-            <span className="w-[120px] shrink-0 truncate text-right text-gray-500 dark:text-gray-400" title={key}>
+            <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400" title={key}>
               {key}:
             </span>
             <DetailValue value={value} />
