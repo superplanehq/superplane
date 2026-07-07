@@ -87,6 +87,14 @@ export function clearComponentSidebarSearchParams(params: URLSearchParams): URLS
   return params;
 }
 
+export function clearRunInspectionSearchParams(params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.delete("run");
+  next.delete("sidebar");
+  next.delete("node");
+  return next;
+}
+
 /** Run inspection is only valid on the canvas tab; panel views must be cleared first. */
 export function clearNonCanvasViewSearchParam(params: URLSearchParams): void {
   const view = params.get("view") ?? "";

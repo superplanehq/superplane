@@ -49,8 +49,7 @@ describe("useWorkflowHeaderEditActions", () => {
       await result.current.handleEnterEditModeFromHeader();
     });
 
-    expect(config.setRunDetailNodeId).toHaveBeenCalledWith(null);
-    expect(config.setSearchParams).toHaveBeenCalledTimes(1);
+    expect(config.handleClearRunInspection).toHaveBeenCalledTimes(1);
     expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
   });
 

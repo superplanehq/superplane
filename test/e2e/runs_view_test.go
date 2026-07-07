@@ -33,6 +33,17 @@ func TestRunsView(t *testing.T) {
 		steps.thenEditModeIsVisible()
 	})
 
+	t.Run("enters edit mode from run inspection header and clears run URL", func(t *testing.T) {
+		steps := &runsViewSteps{t: t}
+		steps.start()
+		steps.givenACanvasWithManualTriggerAndNoop()
+		steps.whenTheManualTriggerRuns()
+		steps.whenIVisitRunInspection()
+		steps.thenRunInspectionChromeIsVisible()
+		steps.whenIClickEditFromRunInspection()
+		steps.thenEditModeIsVisibleAfterHeaderEdit()
+	})
+
 	t.Run("autoloads more runs from the sidebar history", func(t *testing.T) {
 		steps := &runsViewSteps{t: t}
 		steps.start()
@@ -228,6 +239,32 @@ func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
 	}
 	require.NotContains(s.t, s.session.Page().URL(), "run=")
 	s.canvas.EnterEditMode()
+}
+
+func (s *runsViewSteps) thenRunInspectionChromeIsVisible() {
+	require.NotNil(s.t, s.run, "expected run to be created")
+	s.session.AssertURLContains("run=" + s.run.ID.String())
+	s.session.AssertText("Previewing previous run")
+	s.session.AssertVisible(q.Locator(`button:has-text("Back to Live Canvas")`))
+	s.session.AssertVisible(q.TestID("canvas-edit-button"))
+}
+
+func (s *runsViewSteps) whenIClickEditFromRunInspection() {
+	s.canvas.EnterEditMode()
+}
+
+func (s *runsViewSteps) thenEditModeIsVisibleAfterHeaderEdit() {
+	s.canvas.WaitForEnabledExitEditButton()
+	s.waitForURLNotContaining("run=")
+	s.session.AssertHidden(q.Locator(`button:has-text("Back to Live Canvas")`))
+	s.session.AssertHidden(q.Locator(`:text("Previewing previous run")`))
+	s.session.AssertHidden(q.TestID("canvas-edit-button"))
+}
+
+func (s *runsViewSteps) waitForURLNotContaining(part string) {
+	require.Eventually(s.t, func() bool {
+		return !strings.Contains(s.session.Page().URL(), part)
+	}, 10*time.Second, 200*time.Millisecond, "expected URL not to contain %q, got %q", part, s.session.Page().URL())
 }
 
 func (s *runsViewSteps) whenIOpenVersionsSidebar() {
