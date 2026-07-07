@@ -210,22 +210,23 @@ func (s *runsViewSteps) whenIOpenRunNodeDetails() {
 }
 
 func (s *runsViewSteps) thenRunNodeDetailsModalIsVisible() {
-	s.session.AssertVisible(q.TestID("run-node-detail-modal"))
-	s.session.AssertText("Details")
+	s.session.AssertVisible(q.TestID("run-inspector-panel"))
+	s.session.AssertHidden(q.TestID("run-node-detail-modal"))
+	s.session.AssertText("SUMMARY")
 }
 
 func (s *runsViewSteps) whenICloseRunNodeDetails() {
-	s.session.PressKey("Escape")
+	s.session.Click(q.TestID("run-panel-close"))
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		modal := q.TestID("run-node-detail-modal").Run(s.session)
-		visible, err := modal.IsVisible()
+		panel := q.TestID("run-inspector-panel").Run(s.session)
+		visible, err := panel.IsVisible()
 		if err == nil && !visible {
 			return
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	s.session.AssertHidden(q.TestID("run-node-detail-modal"))
+	s.session.AssertHidden(q.TestID("run-inspector-panel"))
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
