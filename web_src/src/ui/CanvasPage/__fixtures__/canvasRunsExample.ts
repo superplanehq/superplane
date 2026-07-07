@@ -4,7 +4,7 @@ import rawData from "./canvasRunsExample.json";
 // canvasRunsExample.json is a sanitized snapshot captured from the public
 // "Clean Code Assessment" canvas on app.superplane.com. It contains 25 real
 // runs (11 passed, 14 failed) plus the full executions for one passed run
-// and one failed run, used to drive the bottom RunNodeDetailPane. The
+// and one failed run, used to drive the right run inspector. The
 // GitHub PR webhook payloads in each rootEvent are trimmed to just the
 // fields the github.onPullRequest trigger renderer reads.
 
@@ -57,7 +57,7 @@ export const failedRunDetail: RunDetailExample = {
   run: findRun(data.selectedFailedRunId),
   rootEventId: data.selectedFailedRootEventId,
   // The failed run terminates on analyze-pr (RESULT_FAILED with a clear error
-  // message), so it's the most informative node to feature in the bottom pane.
+  // message), so it's the most informative node to feature in the inspector.
   nodeId: "analyze-pr",
   executions: data.failedRunExecutions,
 };

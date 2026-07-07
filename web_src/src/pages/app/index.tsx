@@ -85,6 +85,7 @@ import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
+import { resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -195,8 +196,6 @@ export function AppPage() {
     openRunDetailOnMount,
     runDetailNodeId,
     setRunDetailNodeId,
-    runNodeDetailPaneHeight,
-    setRunNodeDetailPaneHeight,
     clearDismissedRunDetail,
     detailDismissedForRunId,
     handleBackToRunList,
@@ -558,6 +557,7 @@ export function AppPage() {
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const consoleMutationGenerationRef = useRef(0);
+  const liveCanvasNodeClickLookupRef = useRef(0);
   const handleRemoteStagingUpdatedRef = useRef<() => Promise<void>>(async () => {});
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const { registerIgnoredCanvasUpdatedEcho, consumeIgnoredCanvasUpdatedEcho, resetLifecycleEchoGuards } =
@@ -639,6 +639,7 @@ export function AppPage() {
   const storeVersion = useNodeExecutionStore((state) => state.version);
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
+  const refetchNodeDataMethod = useNodeExecutionStore((state) => state.refetchNodeData);
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
 
   // Redirect to home page if workflow is not found (404)
@@ -1594,13 +1595,9 @@ export function AppPage() {
     [handleSidebarChange],
   );
 
-  const handleLogRunNodeSelect = useCallback(
-    (nodeId: string) => {
-      handleSidebarChange(true, nodeId);
-      setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "live", tab: "latest" });
-    },
-    [handleSidebarChange],
-  );
+  const handleLogRunNodeSelect = useCallback((nodeId: string) => {
+    setFocusRequest({ nodeId, requestId: Date.now(), targetMode: "live", tab: "latest" });
+  }, []);
 
   const handleRunItemOpen = useCallback(
     (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => {
@@ -3445,9 +3442,10 @@ export function AppPage() {
       setRunDetailNodeId(null);
       setFocusRequest(null);
       setSearchParams((current) => clearRunInspectionSearchParams(current), { replace: true });
+      await Promise.resolve();
     }
 
-    void enterLiveEditSession();
+    await enterLiveEditSession();
   }, [
     organizationId,
     canvasId,
@@ -3570,7 +3568,9 @@ export function AppPage() {
   const handleRunNodeDetailSelection = useCallback(
     (nodeId: string | null) => {
       setRunDetailNodeId(nodeId);
-      if (!nodeId) {
+      if (nodeId) {
+        clearDismissedRunDetail();
+      } else {
         setFocusRequest(null);
       }
 
@@ -3589,7 +3589,7 @@ export function AppPage() {
         { replace: true },
       );
     },
-    [setRunDetailNodeId, setSearchParams],
+    [clearDismissedRunDetail, setRunDetailNodeId, setSearchParams],
   );
 
   const handleRunNodeDetailNavigate = useCallback(
@@ -3689,6 +3689,63 @@ export function AppPage() {
     },
     [handleRunNodeDetailSelection, isRunInspectionMode, selectedRun, runCanvasData],
   );
+
+  const resolveLatestNodeRunLookupEvent = useCallback(
+    async (nodeId: string): Promise<SidebarEvent | null> => {
+      const workflowNode = canvasNodesById.get(nodeId);
+      if (!workflowNode || !canvasId) {
+        return null;
+      }
+
+      const nodeType = workflowNode.type || "TYPE_ACTION";
+      await refetchNodeDataMethod(canvasId, nodeId, nodeType, queryClient);
+
+      const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
+      return resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
+    },
+    [canvasId, canvasNodesById, refetchNodeDataMethod, queryClient],
+  );
+
+  const handleLiveCanvasNodeClick = useCallback(
+    (nodeId: string) => {
+      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) {
+        return;
+      }
+
+      const lookupId = liveCanvasNodeClickLookupRef.current + 1;
+      liveCanvasNodeClickLookupRef.current = lookupId;
+
+      void (async () => {
+        try {
+          const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
+          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) {
+            return;
+          }
+
+          const runId = await fetchRunIdForSidebarEvent(lookupEvent);
+          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) {
+            return;
+          }
+
+          handleSelectRunFromSidebarEvent(runId, { nodeId });
+        } catch (error) {
+          console.error("Failed to inspect latest node run", error);
+        }
+      })();
+    },
+    [
+      fetchRunIdForSidebarEvent,
+      handleSelectRunFromSidebarEvent,
+      isEditing,
+      isRunInspectionMode,
+      liveSidebarRunLookupEnabled,
+      resolveLatestNodeRunLookupEvent,
+    ],
+  );
+
+  useEffect(() => {
+    liveCanvasNodeClickLookupRef.current += 1;
+  }, [isEditing, isRunInspectionMode, liveSidebarRunLookupEnabled]);
 
   useEffect(() => {
     if (!isRunInspectionMode || isViewingLiveVersion) return;
@@ -4141,14 +4198,21 @@ export function AppPage() {
               ? runCanvasData.participantNodeIds
               : undefined
           }
-          runCanvasLoading={runInspectionChromeActive && runCanvasLoading}
-          runNodeDetailRun={runInspectionChromeActive ? selectedRun : null}
+          runCanvasLoading={
+            runInspectionChromeActive &&
+            selectedRunId !== null &&
+            detailDismissedForRunId !== selectedRunId &&
+            runCanvasLoading
+          }
+          runNodeDetailRun={
+            runInspectionChromeActive && selectedRunId && detailDismissedForRunId !== selectedRunId ? selectedRun : null
+          }
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
-          onRunNodeDetailClose={() => handleRunNodeDetailSelection(null)}
+          runNodeDetailEdges={selectedRunCanvas?.spec?.edges}
+          onRunNodeDetailClose={handleBackToRunList}
+          onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
-          runNodeDetailPaneHeight={runNodeDetailPaneHeight}
-          onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
           onBackToLiveCanvas={handleSelectLiveCanvas}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
@@ -4212,7 +4276,9 @@ export function AppPage() {
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && showLiveActivity ? handleAcknowledgeErrors : undefined}
-          onNodeClick={runInspectionChromeActive ? handleRunCanvasNodeClick : undefined}
+          onNodeClick={
+            runInspectionChromeActive ? handleRunCanvasNodeClick : !isEditing ? handleLiveCanvasNodeClick : undefined
+          }
           toolSidebarRunsContent={toolSidebarRunsContent}
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
