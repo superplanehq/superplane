@@ -64,7 +64,7 @@ func (a patchStagingAction) Execute(ctx context.Context, session agents.AgentSes
 		return updateResult{}, fmt.Errorf("load canvas: %w", err)
 	}
 
-	stagedCanvas, err := a.readStagedDraftCanvas(ctx, session, target.draft)
+	stagedCanvas, err := a.readStagedCanvas(ctx, session, canvas, target.draft)
 	if err != nil {
 		return updateResult{}, err
 	}
@@ -121,12 +121,11 @@ func resolvePatchStagingTarget(session agents.AgentSessionContext, input Input) 
 	}, nil
 }
 
-func (a patchStagingAction) readStagedDraftCanvas(ctx context.Context, session agents.AgentSessionContext, draft *models.CanvasVersion) (stagedDraftCanvas, error) {
+func (a patchStagingAction) readStagedCanvas(ctx context.Context, session agents.AgentSessionContext, canvas *models.Canvas, version *models.CanvasVersion) (stagedDraftCanvas, error) {
 	canvasYAML, err := canvasRepository.ReadRepositorySpecFileStaged(
 		ctx,
-		session.OrganizationID,
-		session.CanvasID,
-		draft.ID.String(),
+		canvas,
+		version,
 		canvasRepository.CanvasYAMLRepositoryPath,
 	)
 	if err != nil {

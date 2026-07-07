@@ -46,9 +46,8 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	// otherwise) so the agent observes the same state the UI editor uses.
 	canvasYAML, err := canvasRepository.ReadRepositorySpecFileStaged(
 		ctx,
-		session.OrganizationID,
-		session.CanvasID,
-		versionID,
+		canvas,
+		liveVersion,
 		canvasRepository.CanvasYAMLRepositoryPath,
 	)
 	if err != nil {
@@ -72,9 +71,8 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	if input.IncludeConsole {
 		consoleYAML, consoleErr := canvasRepository.ReadRepositorySpecFileStaged(
 			ctx,
-			session.OrganizationID,
-			session.CanvasID,
-			versionID,
+			canvas,
+			liveVersion,
 			canvasRepository.ConsoleYAMLRepositoryPath,
 		)
 		if consoleErr != nil {

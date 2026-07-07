@@ -55,7 +55,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
-  useCanvasVersionStaging: () => ({
+  useCanvasStaging: () => ({
     data: { hasStaging: stagedPaths.length > 0, stagedPaths },
     isLoading: false,
     error: null,

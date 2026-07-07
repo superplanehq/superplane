@@ -12,7 +12,7 @@ import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
 import { isNotFoundError } from "../workflowPageHelpers";
 
 // Confirms whether a canvas version still exists. Used to distinguish a deleted
-// version from an incidental repository-file 404, since fetchCanvasVersionWithSpec
+// version from an incidental repository-file 404, since fetchCommittedCanvasVersionWithSpec
 // loads the version and its canvas.yaml in parallel. A non-404 describe error is
 // treated as "exists" so the original failure is surfaced as transient.
 export async function canvasVersionExists(canvasId: string, versionId: string): Promise<boolean> {
@@ -24,9 +24,11 @@ export async function canvasVersionExists(canvasId: string, versionId: string): 
   }
 }
 
-// fetchRepositorySpecFileContent reads a canvas.yaml/console.yaml file. When
-// `stage` is set (only meaningful for a draft version), the server returns the
-// effective staged content (staged edits overlaid on the committed version).
+// fetchRepositorySpecFileContent reads a repository file. The server treats
+// `version_id` and `stage` as mutually exclusive query modes:
+// - stage=true: effective staged content (or live committed when nothing is staged)
+// - version_id: committed content for a historical version
+// - neither: committed content for the live version
 export async function fetchRepositorySpecFileContent(
   canvasId: string,
   path: string,
@@ -34,11 +36,10 @@ export async function fetchRepositorySpecFileContent(
   stage = false,
 ): Promise<string> {
   const params = new URLSearchParams({ path });
-  if (versionId) {
-    params.set("version_id", versionId);
-  }
-  if (stage && versionId) {
+  if (stage) {
     params.set("stage", "true");
+  } else if (versionId) {
+    params.set("version_id", versionId);
   }
 
   const response = await fetch(`/api/v1/canvases/${encodeURIComponent(canvasId)}/repository/file?${params}`, {
@@ -65,14 +66,6 @@ export async function fetchCanvasStagingSummary(canvasId: string): Promise<Canva
   return response.data?.stagingSummary;
 }
 
-/** @deprecated Use fetchCanvasStagingSummary */
-export async function fetchCanvasVersionStagingSummary(
-  canvasId: string,
-  _versionId: string,
-): Promise<CanvasesStagingSummary | undefined> {
-  return fetchCanvasStagingSummary(canvasId);
-}
-
 export function canvasVersionWithSpecFromYaml(
   version: CanvasesCanvasVersion | undefined,
   canvasYaml: string | undefined,
@@ -93,10 +86,22 @@ export function canvasVersionWithSpecFromYaml(
   return { ...version, spec };
 }
 
-export async function fetchCanvasVersionWithSpec(
+// fetchStagedCanvasVersionWithSpec reads the canvas-scoped staging layer. Staging
+// is not keyed by version id; version metadata is only used as a display shell.
+export async function fetchStagedCanvasVersionWithSpec(
+  canvasId: string,
+  versionMetadata?: CanvasesCanvasVersion,
+): Promise<CanvasesCanvasVersion | undefined> {
+  const canvasYaml = await fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, undefined, true);
+  return canvasVersionWithSpecFromYaml(versionMetadata, canvasYaml);
+}
+
+// fetchCommittedCanvasVersionWithSpec reads immutable committed content for a
+// specific version. Versions never change after publish, so callers should cache
+// aggressively and avoid invalidating these reads.
+export async function fetchCommittedCanvasVersionWithSpec(
   canvasId: string,
   versionId: string,
-  stage = false,
 ): Promise<CanvasesCanvasVersion | undefined> {
   const describeResponse = await canvasesDescribeCanvasVersion(
     withOrganizationHeader({
@@ -105,13 +110,9 @@ export async function fetchCanvasVersionWithSpec(
   );
 
   try {
-    const canvasYaml = await fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, versionId, stage);
+    const canvasYaml = await fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, versionId, false);
     return canvasVersionWithSpecFromYaml(describeResponse.data?.version, canvasYaml);
   } catch (error) {
-    if (stage) {
-      throw error;
-    }
-
     // Committed yaml reads are live-version-only. Historical versions keep their
     // graph on the version row returned by the list API.
     const listResponse = await canvasesListCanvasVersions(
