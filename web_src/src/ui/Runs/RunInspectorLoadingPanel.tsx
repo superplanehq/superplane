@@ -2,7 +2,8 @@ import { Loader2 } from "lucide-react";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { RunInspectorChrome } from "./RunInspectorChrome";
-import { ResizeHandle, useResizableInspectorWidth } from "./RunInspectorResize";
+import { ResizeHandle } from "./RunInspectorResize";
+import { useResizableInspectorWidth } from "./useResizableInspectorWidth";
 
 export function RunInspectorLoadingPanel({ onClose }: { onClose: () => void }) {
   const inspectorWidth = useResizableInspectorWidth();

@@ -2625,7 +2625,7 @@ function CanvasContent({
     if (onBuildingBlocksSidebarToggle) {
       onBuildingBlocksSidebarToggle(false);
     }
-  }, [isEditMode, isRunInspectionMode, onBuildingBlocksSidebarToggle, runSelectedNodeId]);
+  }, [isRunInspectionMode, onBuildingBlocksSidebarToggle, runSelectedNodeId]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(

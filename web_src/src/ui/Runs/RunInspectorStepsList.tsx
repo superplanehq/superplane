@@ -4,7 +4,7 @@ import { RunInspectorErrorSummaryCard } from "./RunInspectorErrorSummaryCard";
 import { RunInspectorNodeAccordion } from "./RunInspectorNodeAccordion";
 import { RunInspectorStepsHeader } from "./RunInspectorStepsHeader";
 import type { RunInspectorErrorSummary, RunInspectorNodeSection } from "./runNodeDetailModel";
-import { RUN_STATUS_META } from "./runPresentation";
+import type { RUN_STATUS_META } from "./runPresentation";
 
 export function RunInspectorStepsList({
   errorSummaries,
