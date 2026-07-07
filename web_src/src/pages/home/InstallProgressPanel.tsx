@@ -12,6 +12,7 @@ import { IntegrationIcons } from "./AppDetailModal";
 import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegrationsSection";
 import { useInstallPreviewData } from "./useInstallPreviewData";
 import { useInstallAction } from "./useInstallAction";
+import type { CanvasFolderData } from "./types";
 import type { InstallParam } from "../install/types";
 import { cn } from "@/lib/utils";
 import {
@@ -37,6 +38,7 @@ function normalizeResourceValue(val: string | string[] | undefined): string {
 
 interface InstallProgressPanelProps {
   app: AppEntry;
+  folder?: CanvasFolderData;
   organizationId?: string;
   canvasName?: string;
   /** When provided, the panel renders the canvas name as an editable input. */
@@ -50,6 +52,7 @@ interface InstallProgressPanelProps {
 
 export function InstallProgressPanel({
   app,
+  folder,
   organizationId: propOrgId,
   canvasName,
   onCanvasNameChange,
@@ -81,6 +84,7 @@ export function InstallProgressPanel({
   const { doInstall, isInstalling } = useInstallAction({
     organizationId,
     app,
+    folder,
     canvasName,
     installParams: preview.installParams,
     paramValues: preview.paramValues,
