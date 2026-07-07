@@ -44,7 +44,11 @@ func NewCanvasService(
 
 func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.ListCanvases(ctx, s.registry, organizationID)
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return canvases.ListCanvases(ctx, s.registry, organizationID, userID)
 }
 
 func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
@@ -55,6 +59,18 @@ func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanv
 func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRequest) (*pb.UpdateCanvasResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.UpdateCanvas(ctx, organizationID, req.Id, req.Name, req.Description)
+}
+
+func (s *CanvasService) UpdateCanvasPreference(
+	ctx context.Context,
+	req *pb.UpdateCanvasPreferenceRequest,
+) (*pb.UpdateCanvasPreferenceResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return canvases.UpdateCanvasPreference(ctx, organizationID, userID, req)
 }
 
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {

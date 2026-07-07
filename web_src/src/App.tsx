@@ -1,8 +1,9 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { appPath, appSettingsPath } from "./lib/appPaths";
+import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -10,6 +11,7 @@ import "./App.css";
 import AuthGuard from "./components/AuthGuard";
 import { GlobalCommandPalette } from "./components/GlobalCommandPalette";
 import { AccountProvider } from "./contexts/AccountProvider";
+import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
@@ -62,12 +64,14 @@ const withAuthAndPermission = (Component: React.ComponentType, resource: string,
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AccountProvider>
-        <TooltipProvider delayDuration={150}>
-          <AppRouter />
-        </TooltipProvider>
-        <Toaster position="bottom-center" closeButton />
-      </AccountProvider>
+      <ThemeProvider>
+        <AccountProvider>
+          <TooltipProvider delayDuration={150}>
+            <AppRouter />
+          </TooltipProvider>
+          <Toaster position="bottom-center" closeButton />
+        </AccountProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
@@ -139,6 +143,15 @@ function PageObservabilityScope() {
 }
 
 function OrganizationScope() {
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const { account } = useAccount();
+
+  useEffect(() => {
+    if (account?.id && organizationId) {
+      recordLastVisitedOrganization(account.id, organizationId);
+    }
+  }, [account?.id, organizationId]);
+
   return (
     <PermissionsProvider>
       <Outlet />

@@ -7,6 +7,7 @@ import {
   canvasesDescribeCanvasVersion,
   canvasesCreateCanvas,
   canvasesUpdateCanvas,
+  canvasesUpdateCanvasPreference,
   canvasFoldersListCanvasFolders,
   canvasFoldersCreateCanvasFolder,
   canvasFoldersUpdateCanvasFolder,
@@ -260,9 +261,19 @@ export interface ConsoleLayoutItem {
   minH?: number;
 }
 
-export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "yellow", "slate", "orange"] as const;
+export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "slate", "orange"] as const;
 export type CanvasFolderColor = (typeof CANVAS_FOLDER_COLORS)[number];
 export const DEFAULT_CANVAS_FOLDER_COLOR: CanvasFolderColor = "blue";
+
+export function normalizeCanvasFolderColor(value?: string): CanvasFolderColor {
+  if (value === "yellow") {
+    return "slate";
+  }
+
+  return CANVAS_FOLDER_COLORS.includes(value as CanvasFolderColor)
+    ? (value as CanvasFolderColor)
+    : DEFAULT_CANVAS_FOLDER_COLOR;
+}
 
 export const triggerKeys = {
   all: ["triggers"] as const,
@@ -549,6 +560,75 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
     },
   });
 };
+
+type UpdateCanvasPreferenceInput = {
+  canvasId: string;
+  pinned?: boolean;
+  starred?: boolean;
+};
+
+export const useUpdateCanvasPreference = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ canvasId, pinned, starred }: UpdateCanvasPreferenceInput) => {
+      return await canvasesUpdateCanvasPreference(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {
+            pinned,
+            starred,
+          },
+        }),
+      );
+    },
+    onMutate: async (preference) => {
+      await queryClient.cancelQueries({ queryKey: canvasKeys.list(organizationId) });
+      const previousCanvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
+      const timestamp = new Date().toISOString();
+
+      queryClient.setQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId), (current = []) =>
+        current.map((canvas) => applyCanvasPreferenceToSummary(canvas, preference, timestamp)),
+      );
+
+      return { previousCanvases };
+    },
+    onError: (_error, _preference, context) => {
+      if (context?.previousCanvases) {
+        queryClient.setQueryData(canvasKeys.list(organizationId), context.previousCanvases);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    },
+  });
+};
+
+function applyCanvasPreferenceToSummary(
+  canvas: CanvasesCanvasSummary,
+  preference: UpdateCanvasPreferenceInput,
+  timestamp: string,
+): CanvasesCanvasSummary {
+  if (canvas.id !== preference.canvasId) {
+    return canvas;
+  }
+
+  return {
+    ...canvas,
+    ...(preference.pinned === undefined
+      ? {}
+      : {
+          pinned: preference.pinned,
+          pinnedAt: preference.pinned ? timestamp : undefined,
+        }),
+    ...(preference.starred === undefined
+      ? {}
+      : {
+          starred: preference.starred,
+          starredAt: preference.starred ? timestamp : undefined,
+        }),
+  };
+}
 
 export const useCreateCanvasFolder = (organizationId: string) => {
   const queryClient = useQueryClient();

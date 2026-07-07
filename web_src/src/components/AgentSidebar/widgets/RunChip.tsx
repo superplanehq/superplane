@@ -24,7 +24,7 @@ function parseStatus(raw?: string): RunStatusKey {
 
 /** Chat-local color overrides for run pills (e.g. green instead of emerald for passed). */
 const STYLE_BY_STATUS: Partial<Record<RunStatusKey, string>> = {
-  passed: "bg-green-50 text-green-700",
+  passed: "bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-300",
 };
 
 export function RunChipFromLink({

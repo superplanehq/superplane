@@ -39,7 +39,7 @@ export function RunNodeDetailContent({
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-gray-900"
       data-testid={testId}
       aria-label={`${presentation.nodeName} run details`}
     >
@@ -54,7 +54,7 @@ export function RunNodeDetailContent({
       />
 
       {isExecutionsLoading && !presentation.isTriggerNode ? (
-        <div className="flex items-center justify-center gap-2 px-4 py-8 text-xs text-gray-400">
+        <div className="flex items-center justify-center gap-2 px-4 py-8 text-xs text-gray-400 dark:text-gray-500">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading run details...
         </div>
@@ -70,7 +70,9 @@ export function RunNodeDetailContent({
           onSelectTab={selectTab}
         />
       ) : (
-        <div className="px-4 py-6 text-center text-xs text-gray-400">No execution data for this node in this run.</div>
+        <div className="px-4 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
+          No execution data for this node in this run.
+        </div>
       )}
     </div>
   );

@@ -17,6 +17,7 @@ import { CopyButton } from "@/ui/CopyButton";
 import { useAccount } from "@/contexts/useAccount";
 import { showErrorToast } from "@/lib/toast.ts";
 import { ChangePasswordDialog } from "./components/ChangePasswordDialog";
+import { settingsCardClassName } from "./settingsPageStyles";
 
 export function Profile() {
   usePageTitle(["Profile"]);
@@ -91,7 +92,7 @@ export function Profile() {
       </Heading>
       <div className="space-y-6">
         {/* Profile Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
+        <div className={settingsCardClassName}>
           <div className="space-y-6">
             {/* User Avatar and Basic Info */}
             <div className="flex items-center space-x-4">
@@ -150,7 +151,7 @@ export function Profile() {
         </Text>
 
         {/* API Token Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
+        <div className={settingsCardClassName}>
           <div className="space-y-4">
             {/* Token Status */}
             {!user.hasToken && (

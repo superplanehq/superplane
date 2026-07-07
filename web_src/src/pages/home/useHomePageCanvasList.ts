@@ -1,20 +1,8 @@
 import type { CanvasFoldersCanvasFolder, CanvasesCanvasSummary } from "@/api-client";
-import {
-  CANVAS_FOLDER_COLORS,
-  DEFAULT_CANVAS_FOLDER_COLOR,
-  useCanvasFolders,
-  useCanvases,
-  type CanvasFolderColor,
-} from "@/hooks/useCanvasData";
+import { normalizeCanvasFolderColor, useCanvasFolders, useCanvases } from "@/hooks/useCanvasData";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 
 const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
-
-function asCanvasFolderColor(value?: string): CanvasFolderColor {
-  return CANVAS_FOLDER_COLORS.includes(value as CanvasFolderColor)
-    ? (value as CanvasFolderColor)
-    : DEFAULT_CANVAS_FOLDER_COLOR;
-}
 
 function formatCanvasDate(value?: string) {
   if (!value) return "Unknown";
@@ -34,6 +22,10 @@ function toCanvasCardData(canvas: CanvasesCanvasSummary): CanvasCardData | null 
     description: canvas.description,
     createdAt: formatCanvasDate(canvas.createdAt),
     canvasFolderId: canvas.folderId || undefined,
+    isPinned: canvas.pinned ?? false,
+    isStarred: canvas.starred ?? false,
+    pinnedAt: canvas.pinnedAt,
+    starredAt: canvas.starredAt,
     createdBy: { name: createdByName },
     nodes: canvas.nodes || [],
     edges: canvas.edges || [],
@@ -50,7 +42,7 @@ function toCanvasFolderData(folder: CanvasFoldersCanvasFolder): CanvasFolderData
   return {
     id,
     title,
-    backgroundColor: asCanvasFolderColor(folder.spec?.backgroundColor),
+    backgroundColor: normalizeCanvasFolderColor(folder.spec?.backgroundColor),
     canvasIds: folder.spec?.canvases?.map((canvas) => canvas.id || "").filter(Boolean) || [],
   };
 }

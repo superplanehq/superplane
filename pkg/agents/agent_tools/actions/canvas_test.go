@@ -261,13 +261,7 @@ func TestAppAgentTool_PatchStagingStagesSmallGraphEdits(t *testing.T) {
 	assert.True(t, staging.GetHasStaging())
 	assert.Contains(t, staging.GetStagedPaths(), canvasRepository.CanvasYAMLRepositoryPath)
 
-	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
-		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		update.VersionID,
-		canvasRepository.CanvasYAMLRepositoryPath,
-	)
+	staged, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, &liveVersion, canvasRepository.CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
 	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
@@ -327,13 +321,7 @@ func TestAppAgentTool_PatchStagingAddsIntegrationBackedNode(t *testing.T) {
 	require.True(t, ok)
 	assert.Empty(t, update.NodeIssues)
 
-	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
-		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		update.VersionID,
-		canvasRepository.CanvasYAMLRepositoryPath,
-	)
+	staged, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, &liveVersion, canvasRepository.CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
 	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
@@ -351,13 +339,7 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	liveVersion := requireLiveVersion(t, canvas.ID)
-	consoleYAML, err := canvasRepository.ReadRepositorySpecFile(
-		context.Background(),
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		"",
-		canvasRepository.ConsoleYAMLRepositoryPath,
-	)
+	consoleYAML, err := canvasRepository.ReadRepositorySpecFile(context.Background(), canvas, &liveVersion, canvasRepository.ConsoleYAMLRepositoryPath)
 	require.NoError(t, err)
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -398,9 +380,8 @@ func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
 	// read path the `read` action now uses.
 	staged, err := canvasRepository.ReadRepositorySpecFileStaged(
 		ctx,
-		r.Organization.ID.String(),
-		canvas.ID.String(),
-		update.VersionID,
+		canvas,
+		&liveVersion,
 		canvasRepository.ConsoleYAMLRepositoryPath,
 	)
 	require.NoError(t, err)
@@ -759,6 +740,131 @@ func TestAppAgentTool_WriteFileRejectsSpecFiles(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "use patch_staging")
+}
+
+func TestAppAgentTool_ReadFileReturnsLiveCommittedContent(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+	head, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
+	require.NoError(t, err)
+	_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, gitprovider.CommitOptions{
+		Branch:          "main",
+		BaseBranch:      "main",
+		ExpectedHeadSHA: head,
+		Message:         "Add notes",
+		Author:          gitprovider.CommitAuthor{Name: "Test", Email: "test@example.com"},
+		Operations: []gitprovider.FileOperation{
+			{Path: "notes.md", Content: strings.NewReader("live content\n"), SizeBytes: int64(len("live content\n"))},
+		},
+	})
+	require.NoError(t, err)
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action: "read_file",
+		Path:   "notes.md",
+	})
+
+	require.NoError(t, err)
+	read, ok := result.(fileReadResult)
+	require.True(t, ok)
+	require.Len(t, read.Files, 1)
+	assert.Equal(t, "notes.md", read.Files[0].Path)
+	assert.Equal(t, "live content\n", read.Files[0].Content)
+	assert.Equal(t, "live", read.Files[0].Source)
+	assert.Empty(t, read.Files[0].VersionID)
+}
+
+func TestAppAgentTool_ReadFileReturnsStagedSpecFileContent(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	liveVersion := requireLiveVersion(t, canvas.ID)
+	upsertUserStagingYAML(t, canvas, r.User, "draft: staged\n")
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
+	result, err := registry.Execute(ctx, agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}, Input{
+		Action:    "read_file",
+		VersionID: liveVersion.ID.String(),
+		Path:      canvasRepository.CanvasYAMLRepositoryPath,
+	})
+
+	require.NoError(t, err)
+	read, ok := result.(fileReadResult)
+	require.True(t, ok)
+	require.Len(t, read.Files, 1)
+	assert.Equal(t, canvasRepository.CanvasYAMLRepositoryPath, read.Files[0].Path)
+	assert.Equal(t, "draft: staged\n", read.Files[0].Content)
+	assert.Equal(t, "staging", read.Files[0].Source)
+	assert.Equal(t, liveVersion.ID.String(), read.Files[0].VersionID)
+}
+
+func TestAppAgentTool_DeleteFileStagesDeletion(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+	liveVersion := requireLiveVersion(t, canvas.ID)
+	head, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
+	require.NoError(t, err)
+	_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, gitprovider.CommitOptions{
+		Branch:          "main",
+		BaseBranch:      "main",
+		ExpectedHeadSHA: head,
+		Message:         "Add notes",
+		Author:          gitprovider.CommitAuthor{Name: "Test", Email: "test@example.com"},
+		Operations: []gitprovider.FileOperation{
+			{Path: "notes.md", Content: strings.NewReader("delete me\n"), SizeBytes: int64(len("delete me\n"))},
+		},
+	})
+	require.NoError(t, err)
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	registry := NewDefaultRegistry(Dependencies{GitProvider: r.GitProvider})
+	session := agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		CanvasID:       canvas.ID.String(),
+	}
+
+	result, err := registry.Execute(ctx, session, Input{
+		Action:    "delete_file",
+		VersionID: liveVersion.ID.String(),
+		Path:      "notes.md",
+	})
+	require.NoError(t, err)
+
+	deleted, ok := result.(fileStageResult)
+	require.True(t, ok)
+	assert.Equal(t, "delete_file", deleted.Action)
+	assert.True(t, deleted.Deleted)
+	assert.Equal(t, "notes.md", deleted.Path)
+	assert.True(t, deleted.StagingSummary.HasStaging)
+	assert.Contains(t, deleted.StagingSummary.StagedPaths, "notes.md")
+
+	_, err = registry.Execute(ctx, session, Input{
+		Action:    "read_file",
+		VersionID: liveVersion.ID.String(),
+		Path:      "notes.md",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "staged for deletion")
 }
 
 func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {

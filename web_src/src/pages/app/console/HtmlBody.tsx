@@ -57,7 +57,7 @@ export function HtmlBody({ body, vars }: { body: string; vars: Record<string, un
 
   return (
     <div
-      className={cn(HTML_ROOT_CLASSES)}
+      className={cn("dark-mode-disabled", HTML_ROOT_CLASSES)}
       data-testid="console-html"
       {...{ [HTML_WIDGET_ROOT_ATTR]: rootId }}
       dangerouslySetInnerHTML={{ __html: sanitized }}
@@ -73,7 +73,7 @@ export function HtmlBody({ body, vars }: { body: string; vars: Record<string, un
 export function HtmlBodyLoading() {
   return (
     <div className="flex h-full min-h-[3rem] items-center justify-center" data-testid="console-html-loading">
-      <Loader2 className="size-4 animate-spin text-slate-400" />
+      <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
     </div>
   );
 }

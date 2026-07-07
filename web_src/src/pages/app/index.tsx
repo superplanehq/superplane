@@ -138,7 +138,6 @@ import {
   buildTabData,
   generateNodeId,
   generateUniqueNodeName,
-  mapCanvasNodesToLogEntries,
   getWorkflowSaveSignature,
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
@@ -146,18 +145,20 @@ import { runPositionAutoSave } from "./runPositionAutoSave";
 import { syncRunInspectionViewportTransition } from "./lib/run-inspection-viewport";
 import {
   clearRunDetailNodeSearchParams,
+  buildCanvasLogEntries,
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
   isCanvasLoadNotFoundError,
+  isCanvasPrepLoading,
   isValidRunId,
+  prepareCanvasLogNodes,
   prepareData,
   prepareSidebarData,
   shouldClearRunDetailNode,
 } from "./workflowPageHelpers";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
-const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
-const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
+const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
 
 function updateCanvasDetailForSelectedVersion({
   queryClient,
@@ -1347,8 +1348,8 @@ export function AppPage() {
     () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
     [triggers, components, availableIntegrations],
   );
-  const canvasNodes = canvas?.spec?.nodes ?? EMPTY_CANVAS_NODES;
-  const canvasEdges = canvas?.spec?.edges ?? EMPTY_CANVAS_EDGES;
+  const canvasNodes = canvas?.spec?.nodes ?? EMPTY_CANVAS_SPEC_ITEMS;
+  const canvasEdges = canvas?.spec?.edges ?? EMPTY_CANVAS_SPEC_ITEMS;
   const canvasNodesById = useMemo(() => {
     const nodesById = new Map<string, ComponentsNode>();
     canvasNodes.forEach((node) => {
@@ -1432,13 +1433,20 @@ export function AppPage() {
     triggerModalHostRef.current?.(modal);
   }, []);
 
+  const dataLoading = isCanvasPrepLoading(
+    canvas,
+    canvasLoading,
+    triggersLoading,
+    componentsLoading,
+    integrationsLoading,
+  );
   const { nodes: preparedNodes, edges: preparedEdges } = useMemo(() => {
-    if (!canvas || canvasLoading || triggersLoading || componentsLoading || integrationsLoading) {
+    if (dataLoading) {
       return { nodes: [], edges: [] };
     }
 
     return prepareData(
-      canvas,
+      canvas!,
       allTriggers,
       allComponents,
       visibleNodeEventsMap,
@@ -1459,10 +1467,7 @@ export function AppPage() {
     visibleNodeQueueItemsMap,
     canvasId,
     queryClient,
-    canvasLoading,
-    triggersLoading,
-    componentsLoading,
-    integrationsLoading,
+    dataLoading,
     me,
     canvasMode,
     openTriggerModal,
@@ -1745,31 +1750,21 @@ export function AppPage() {
     handleCanvasStagingEvent,
     () => activeCanvasVersionId || effectiveLiveCanvasVersionId || undefined,
   );
-
-  const rawLogNodes = canvasNodes;
+  const rawLogNodes = prepareCanvasLogNodes(canvasNodes, canvasEdges, allComponents, !dataLoading);
   const logNodesSignature = useMemo(() => getCanvasLogNodesSignature(rawLogNodes), [rawLogNodes]);
   const logNodesRef = useRef<{ signature: string; nodes: ComponentsNode[] }>({ signature: "", nodes: [] });
   const logNodes = useMemo(() => {
     if (logNodesRef.current.signature === logNodesSignature) {
       return logNodesRef.current.nodes;
     }
-
     logNodesRef.current = { signature: logNodesSignature, nodes: rawLogNodes };
     return rawLogNodes;
   }, [rawLogNodes, logNodesSignature]);
 
-  const logEntries = useMemo(() => {
-    return mapCanvasNodesToLogEntries({
-      nodes: logNodes,
-      workflowUpdatedAt: canvas?.metadata?.updatedAt || "",
-      onNodeSelect: handleLogNodeSelect,
-    }).sort((a, b) => {
-      const aTime = Date.parse(a.timestamp || "") || 0;
-      const bTime = Date.parse(b.timestamp || "") || 0;
-      return aTime - bTime;
-    });
-  }, [handleLogNodeSelect, canvas?.metadata?.updatedAt, logNodes]);
-
+  const logEntries = useMemo(
+    () => buildCanvasLogEntries(logNodes, canvas?.metadata?.updatedAt || "", handleLogNodeSelect),
+    [handleLogNodeSelect, canvas?.metadata?.updatedAt, logNodes],
+  );
   const nodeHistoryQuery = useNodeHistory({
     canvasId: canvasId || "",
     nodeId: currentHistoryNode?.nodeId || "",
@@ -4243,6 +4238,7 @@ export function AppPage() {
           files={{
             isEditing,
             canvasId: canvasId || undefined,
+            organizationId,
             versionId: activeCanvasVersionId || undefined,
             canWrite: canActOnCanvas,
             files: appFiles,
@@ -4411,8 +4407,8 @@ export function AppPage() {
           focusRequest={focusRequest}
         />
         {isDraftCanvasLoading ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
-            <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px] dark:bg-gray-900/70">
+            <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>Loading canvas...</span>
             </div>

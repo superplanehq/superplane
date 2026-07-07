@@ -5,6 +5,7 @@ import { ConfigurationFieldRenderer } from "./index";
 import { resolveIcon } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useTheme } from "@/contexts/useTheme";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 import { parseDefaultValues } from "../../lib/components";
@@ -45,6 +46,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   const [editorValue, setEditorValue] = React.useState<string>(() => serializeValueForEditor(value));
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
     autocompleteExampleObj,
     languageId: "json",
@@ -195,7 +198,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     return (
       <>
         <div className="flex flex-col gap-2 relative">
-          <div className="border rounded-md border-gray-300 dark:border-gray-700 p-2" style={{ height: "200px" }}>
+          <div className="border rounded-md border-gray-300 dark:border-gray-600 p-2" style={{ height: "200px" }}>
             <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
               <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
                 <button onClick={copyToClipboard} className="p-1 rounded text-gray-500 hover:text-gray-800">
@@ -214,7 +217,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
               value={editorValue}
               onChange={handleEditorChange}
               onMount={handleEditorMount}
-              theme="vs"
+              theme={monacoTheme}
               options={editorOptions}
             />
           </div>
@@ -245,14 +248,14 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
                 </Button>
               </SimpleTooltip>
             </div>
-            <div className="flex-1 overflow-auto rounded-md p-2 relative border border-gray-300 dark:border-gray-700">
+            <div className="flex-1 overflow-auto rounded-md p-2 relative border border-gray-300 dark:border-gray-600">
               <Editor
                 height="600px"
                 defaultLanguage="json"
                 value={editorValue}
                 onChange={handleEditorChange}
                 onMount={handleEditorMount}
-                theme="vs"
+                theme={monacoTheme}
                 options={{
                   ...editorOptions,
                   automaticLayout: true,
@@ -267,7 +270,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   }
 
   return (
-    <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
+    <div className="border border-gray-300 dark:border-gray-600 rounded-md p-4 space-y-4">
       {schema.map((schemaField, schemaIndex) => (
         <ConfigurationFieldRenderer
           allowExpressions={allowExpressions}

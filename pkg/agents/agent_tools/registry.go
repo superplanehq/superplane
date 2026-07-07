@@ -59,7 +59,7 @@ type toolCall struct {
 
 type factory func(Dependencies) tool
 
-const toolContractRevision = "agent-tools-v1.1.2"
+const toolContractRevision = "agent-tools-v1.1.4"
 
 var registeredTools = struct {
 	sync.RWMutex

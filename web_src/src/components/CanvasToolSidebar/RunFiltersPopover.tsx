@@ -46,87 +46,159 @@ export function RunFiltersPopover({
           variant="ghost"
           size="icon-xs"
           className={cn(
-            "relative shrink-0 hover:bg-gray-100",
-            hasTriggerFilter || hasStatusFilter ? "text-sky-700 hover:bg-sky-100" : "text-gray-500 hover:text-gray-700",
+            "relative shrink-0 hover:bg-gray-100 dark:hover:bg-gray-800",
+            hasTriggerFilter || hasStatusFilter
+              ? "text-sky-700 hover:bg-sky-100 dark:text-indigo-300 dark:hover:bg-gray-800"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200",
           )}
           aria-label="Filter runs"
           title="Filter runs"
         >
           <ListFilter className="size-3.5 shrink-0" aria-hidden />
           {hasTriggerFilter || hasStatusFilter ? (
-            <span className="absolute -right-0.5 -top-0.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-sky-500 px-0.5 text-[8px] font-semibold leading-none text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-3 min-w-3 items-center justify-center rounded-full bg-sky-500 px-0.5 text-[8px] font-semibold leading-none text-white dark:bg-indigo-300 dark:text-indigo-950">
               {totalFilters}
             </span>
           ) : null}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 border-slate-950/20 bg-white p-0 shadow-md" sideOffset={4}>
-        <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-[12px] font-medium text-gray-700">Filter by status</span>
-          <button
-            type="button"
-            onClick={onClearStatuses}
-            disabled={!hasStatusFilter}
-            className={cn("text-[11px]", hasStatusFilter ? "text-sky-600 hover:text-sky-800" : "text-gray-400")}
-          >
-            Clear
-          </button>
-        </div>
-        <div className="py-1">
-          {RUN_STATUS_FILTER_OPTIONS.map((option) => (
-            <label
-              key={option.id}
-              className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50"
-            >
-              <Checkbox
-                checked={selectedStatuses.has(option.id)}
-                onChange={() => onToggleStatus(option.id)}
-                className="size-3.5"
-              />
-              <span className={cn("inline-block h-2 w-2 shrink-0 rounded-full", option.dotClassName)} />
-              <span className="min-w-0 truncate">{option.label}</span>
-            </label>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-[12px] font-medium text-gray-700">Filter by trigger</span>
-          <button
-            type="button"
-            onClick={onClearTriggers}
-            disabled={!hasTriggerFilter}
-            className={cn("text-[11px]", hasTriggerFilter ? "text-sky-600 hover:text-sky-800" : "text-gray-400")}
-          >
-            Clear
-          </button>
-        </div>
-        <div className="max-h-64 overflow-y-auto py-1">
-          {triggerOptions.length === 0 ? (
-            <div className="px-3 py-4 text-center text-[11px] text-gray-400">No triggers in this canvas</div>
-          ) : (
-            triggerOptions.map((option) => (
-              <label
-                key={option.id}
-                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50"
-              >
-                <Checkbox
-                  checked={selectedTriggerIds.has(option.id)}
-                  onChange={() => onToggleTrigger(option.id)}
-                  className="size-3.5"
-                />
-                <RunNodeIcon
-                  iconSrc={option.iconSrc}
-                  iconSlug={option.iconSlug}
-                  alt={option.name}
-                  size={RUN_NODE_ICON_SIZE}
-                  className="shrink-0 text-gray-500"
-                />
-                <span className="min-w-0 truncate">{option.name}</span>
-              </label>
-            ))
-          )}
-        </div>
+      <PopoverContent
+        align="end"
+        className="w-64 border-slate-950/20 bg-white p-0 shadow-md dark:border-gray-800/70 dark:bg-gray-900"
+        sideOffset={4}
+      >
+        <RunStatusFilterSection
+          selectedStatuses={selectedStatuses}
+          hasStatusFilter={hasStatusFilter}
+          onToggleStatus={onToggleStatus}
+          onClearStatuses={onClearStatuses}
+        />
+        <RunTriggerFilterSection
+          triggerOptions={triggerOptions}
+          selectedTriggerIds={selectedTriggerIds}
+          hasTriggerFilter={hasTriggerFilter}
+          onToggleTrigger={onToggleTrigger}
+          onClearTriggers={onClearTriggers}
+        />
       </PopoverContent>
     </Popover>
+  );
+}
+
+function RunFilterHeader({
+  title,
+  hasFilter,
+  onClear,
+  className,
+}: {
+  title: string;
+  hasFilter: boolean;
+  onClear: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center justify-between px-3 py-2", className)}>
+      <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">{title}</span>
+      <button
+        type="button"
+        onClick={onClear}
+        disabled={!hasFilter}
+        className={cn(
+          "text-[11px]",
+          hasFilter
+            ? "text-sky-600 hover:text-sky-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+            : "text-gray-400 dark:text-gray-500",
+        )}
+      >
+        Clear
+      </button>
+    </div>
+  );
+}
+
+function RunStatusFilterSection({
+  selectedStatuses,
+  hasStatusFilter,
+  onToggleStatus,
+  onClearStatuses,
+}: {
+  selectedStatuses: Set<RunStatusFilter>;
+  hasStatusFilter: boolean;
+  onToggleStatus: (status: RunStatusFilter) => void;
+  onClearStatuses: () => void;
+}) {
+  return (
+    <>
+      <RunFilterHeader title="Filter by status" hasFilter={hasStatusFilter} onClear={onClearStatuses} />
+      <div className="py-1">
+        {RUN_STATUS_FILTER_OPTIONS.map((option) => (
+          <label
+            key={option.id}
+            className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            <Checkbox
+              checked={selectedStatuses.has(option.id)}
+              onChange={() => onToggleStatus(option.id)}
+              className="size-3.5"
+            />
+            <span className={cn("inline-block h-2 w-2 shrink-0 rounded-full", option.dotClassName)} />
+            <span className="min-w-0 truncate">{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function RunTriggerFilterSection({
+  triggerOptions,
+  selectedTriggerIds,
+  hasTriggerFilter,
+  onToggleTrigger,
+  onClearTriggers,
+}: {
+  triggerOptions: TriggerOption[];
+  selectedTriggerIds: Set<string>;
+  hasTriggerFilter: boolean;
+  onToggleTrigger: (triggerId: string) => void;
+  onClearTriggers: () => void;
+}) {
+  return (
+    <>
+      <RunFilterHeader
+        title="Filter by trigger"
+        hasFilter={hasTriggerFilter}
+        onClear={onClearTriggers}
+        className="border-t border-slate-950/10 dark:border-gray-800/70"
+      />
+      <div className="max-h-64 overflow-y-auto py-1">
+        {triggerOptions.length === 0 ? (
+          <div className="px-3 py-4 text-center text-[11px] text-gray-400 dark:text-gray-500">
+            No triggers in this canvas
+          </div>
+        ) : (
+          triggerOptions.map((option) => (
+            <label
+              key={option.id}
+              className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              <Checkbox
+                checked={selectedTriggerIds.has(option.id)}
+                onChange={() => onToggleTrigger(option.id)}
+                className="size-3.5"
+              />
+              <RunNodeIcon
+                iconSrc={option.iconSrc}
+                iconSlug={option.iconSlug}
+                alt={option.name}
+                size={RUN_NODE_ICON_SIZE}
+                className="shrink-0 text-gray-500 dark:text-gray-400"
+              />
+              <span className="min-w-0 truncate">{option.name}</span>
+            </label>
+          ))
+        )}
+      </div>
+    </>
   );
 }

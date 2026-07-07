@@ -35,7 +35,7 @@ import { buildTemplateParametersAutocompleteObject } from "./templateParametersA
 import { getRunTitlePresentation, RUN_TITLE_EXCLUDED_SUGGESTIONS } from "./runTitlePresentation";
 
 const REQUIRED_FIELD_BADGE_CLASS =
-  "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
+  "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50 dark:border-orange-400/50 dark:bg-orange-950/30 dark:text-orange-300";
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   allowExpressions?: boolean;
@@ -473,7 +473,7 @@ export const ConfigurationFieldRenderer = ({
           <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
           <Label className="block text-left flex-1 min-w-0">
             {fieldLabel}
-            {isRequired && <span className="text-gray-800 ml-1">*</span>}
+            {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -518,7 +518,7 @@ export const ConfigurationFieldRenderer = ({
           {renderField()}
           <Label className="text-left cursor-pointer">
             {fieldLabel}
-            {isRequired && <span className="text-gray-800 ml-1">*</span>}
+            {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -557,7 +557,7 @@ export const ConfigurationFieldRenderer = ({
         {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
         <Label className="block text-left flex-1 min-w-0">
           {fieldLabel}
-          {isRequired && <span className="text-gray-800 ml-1">*</span>}
+          {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
           {hasFieldError &&
             ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
               (!enableRealtimeValidation &&

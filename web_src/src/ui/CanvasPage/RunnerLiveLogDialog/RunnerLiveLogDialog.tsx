@@ -33,11 +33,11 @@ export function RunnerLiveLogDialog({ title, canvasMode, execution }: RunnerLive
           className="flex flex-col gap-0 overflow-hidden p-0"
           onClick={(e) => e.stopPropagation()}
         >
-          <DialogHeader className="shrink-0 border-b border-gray-200 px-4 py-3 text-left">
+          <DialogHeader className="shrink-0 border-b border-gray-200 px-4 py-3 text-left dark:border-gray-800">
             <DialogTitle className="text-sm font-medium">{title}</DialogTitle>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 bg-slate-50">
+          <div className="min-h-0 flex-1 bg-slate-50 dark:bg-gray-900">
             <LiveLogStreamView execution={execution} />
           </div>
         </DialogContent>
