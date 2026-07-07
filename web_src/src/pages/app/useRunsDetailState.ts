@@ -40,6 +40,14 @@ export function useRunsDetailState(
   }, [searchParams]);
 
   useEffect(() => {
+    const urlRequestsRunDetail =
+      isRunInspectionMode && searchParams.get("run") === selectedRunId && searchParams.get("sidebar") === "1";
+    if (urlRequestsRunDetail) {
+      setDetailDismissedForRunId(null);
+    }
+  }, [isRunInspectionMode, searchParams, selectedRunId]);
+
+  useEffect(() => {
     if (isRunInspectionMode && !wasRunInspectionModeRef.current) {
       const runId = searchParams.get("run");
       setOpenRunDetailOnMount(Boolean(runId && runId !== detailDismissedForRunId));
