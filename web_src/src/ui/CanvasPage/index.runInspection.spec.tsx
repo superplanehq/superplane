@@ -506,7 +506,7 @@ describe("CanvasPage run inspection", () => {
     expect(selectedRunNode()?.selected).toBe(true);
   });
 
-  it("shows the run node detail pane during run inspection even when the live node inspector would be open", async () => {
+  it("shows the right run inspector during run inspection even when the live node inspector would be open", async () => {
     render(
       <MemoryRouter>
         <CanvasPage
@@ -540,7 +540,7 @@ describe("CanvasPage run inspection", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("run-node-detail-pane")).toBeInTheDocument();
+      expect(screen.getByTestId("run-inspector-panel")).toBeInTheDocument();
     });
     expect(screen.queryByTestId("live-node-detail-pane")).not.toBeInTheDocument();
   });

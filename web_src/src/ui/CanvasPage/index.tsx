@@ -88,9 +88,7 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
-import { RunNodeDetailPane } from "../Runs/RunNodeDetailPane";
-import { ResizableBottomPane } from "./ResizableBottomPane";
-import { LiveBottomInspectorEmptyState } from "./LiveBottomInspectorEmptyState";
+import { RunInspectorPanel } from "../Runs/RunInspectorPanel";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -363,14 +361,12 @@ export interface CanvasPageProps {
   runParticipantNodeIds?: string[];
   /** Shows a loading indicator over the canvas (not the sidebar) while run executions are being fetched. */
   runCanvasLoading?: boolean;
-  /** Runs mode: selected run for the bottom node detail pane. */
+  /** Runs mode: selected run for the right-side run inspector. */
   runNodeDetailRun?: CanvasesCanvasRun | null;
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
   onRunNodeDetailClose?: () => void;
   onRunNodeDetailNavigate?: (nodeId: string) => void;
-  runNodeDetailPaneHeight?: number;
-  onRunNodeDetailPaneHeightChange?: (height: number) => void;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -795,7 +791,6 @@ function CanvasPage(props: CanvasPageProps) {
   const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
-  const [liveNodeDetailPaneHeight, setLiveNodeDetailPaneHeight] = useState(320);
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const localHasFitToViewRef = useRef(false);
@@ -1263,15 +1258,7 @@ function CanvasPage(props: CanvasPageProps) {
   const showPreviewFloatingBar =
     canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
-  const liveBottomInspectorOpen = !props.isRunInspectionMode && !props.isEditing && state.componentSidebar.isOpen;
-
-  const runNodeDetailPaneOpen =
-    props.isRunInspectionMode &&
-    !!props.runNodeDetailRun &&
-    !!props.runNodeDetailNodeId &&
-    !!props.runNodeDetailCanvasId;
-
-  const bottomDetailPaneOpen = runNodeDetailPaneOpen || liveBottomInspectorOpen;
+  const runInspectorOpen = props.isRunInspectionMode && !!props.runNodeDetailRun && !!props.runNodeDetailCanvasId;
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1545,7 +1532,6 @@ function CanvasPage(props: CanvasPageProps) {
                   fitAllFocusNodeIds={props.fitAllFocusNodeIds}
                   runParticipantNodeIds={props.runParticipantNodeIds}
                   runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
-                  runNodeDetailPaneOpen={bottomDetailPaneOpen}
                   logRuns={props.logRuns}
                   runsNodes={props.runsNodes}
                   runsComponentIconMap={props.runsComponentIconMap}
@@ -1562,34 +1548,19 @@ function CanvasPage(props: CanvasPageProps) {
               ? renderInspectorSidebar("sidebar")
               : null}
           </div>
-          {runNodeDetailPaneOpen ? (
-            <RunNodeDetailPane
-              canvasId={props.runNodeDetailCanvasId!}
-              run={props.runNodeDetailRun!}
-              nodeId={props.runNodeDetailNodeId!}
-              workflowNodes={props.workflowNodes}
-              componentIconMap={props.runsComponentIconMap}
-              onClose={() => props.onRunNodeDetailClose?.()}
-              onNavigateNode={props.onRunNodeDetailNavigate}
-              height={props.runNodeDetailPaneHeight}
-              onHeightChange={props.onRunNodeDetailPaneHeightChange}
-            />
-          ) : null}
-          {liveBottomInspectorOpen ? (
-            <ResizableBottomPane
-              height={liveNodeDetailPaneHeight}
-              onHeightChange={setLiveNodeDetailPaneHeight}
-              testId="live-node-detail-pane"
-              resizeHandleTestId="live-node-detail-pane-resize-handle"
-            >
-              {state.componentSidebar.selectedNodeId ? (
-                renderInspectorSidebar("bottom")
-              ) : (
-                <LiveBottomInspectorEmptyState onClose={handleSidebarClose} />
-              )}
-            </ResizableBottomPane>
-          ) : null}
         </div>
+        {runInspectorOpen ? (
+          <RunInspectorPanel
+            canvasId={props.runNodeDetailCanvasId!}
+            run={props.runNodeDetailRun!}
+            workflowNodes={props.workflowNodes ?? []}
+            componentIconMap={props.runsComponentIconMap}
+            selectedNodeId={props.runNodeDetailNodeId}
+            onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
+            onClearSelectedNode={() => props.onRunNodeDetailClose?.()}
+            onClose={() => props.onBackToLiveCanvas?.()}
+          />
+        ) : null}
       </div>
 
       {/* Edit existing node modal - now handled by settings sidebar */}
@@ -1712,12 +1683,17 @@ function Sidebar({
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
   const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode;
 
-  // Trigger data loading when sidebar opens for a node
+  // Trigger data loading when sidebar opens for a node.
   useEffect(() => {
-    if (shouldShowRunsSidebar && state.componentSidebar.selectedNodeId && loadSidebarData) {
+    if (
+      shouldShowRunsSidebar &&
+      state.componentSidebar.isOpen &&
+      state.componentSidebar.selectedNodeId &&
+      loadSidebarData
+    ) {
       loadSidebarData(state.componentSidebar.selectedNodeId);
     }
-  }, [state.componentSidebar.selectedNodeId, loadSidebarData, shouldShowRunsSidebar]);
+  }, [state.componentSidebar.isOpen, state.componentSidebar.selectedNodeId, loadSidebarData, shouldShowRunsSidebar]);
 
   useEffect(() => {
     if (sidebarData?.latestEvents) {
@@ -2137,7 +2113,6 @@ function CanvasContent({
   fitAllFocusNodeIds,
   runParticipantNodeIds,
   runSelectedNodeId,
-  runNodeDetailPaneOpen,
   logRuns,
   runsNodes,
   runsComponentIconMap,
@@ -2192,7 +2167,6 @@ function CanvasContent({
   fitAllFocusNodeIds?: string[];
   runParticipantNodeIds?: string[];
   runSelectedNodeId?: string | null;
-  runNodeDetailPaneOpen?: boolean;
   logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
@@ -2621,23 +2595,6 @@ function CanvasContent({
     previouslySelectedRef.current = new Set();
 
     if (isRunInspectionMode && runSelectedNodeId) {
-      return;
-    }
-
-    const isLiveBottomInspectorOpen = !isRunInspectionMode && !isEditMode && stateRef.current.componentSidebar.isOpen;
-
-    if (isLiveBottomInspectorOpen) {
-      stateRef.current.setNodes((nodes) =>
-        nodes.map((node) => ({
-          ...node,
-          selected: false,
-        })),
-      );
-      stateRef.current.componentSidebar.clearSelection();
-      return;
-    }
-
-    if (!isEditMode && stateRef.current.componentSidebar.isOpen) {
       return;
     }
 
@@ -3307,10 +3264,7 @@ function CanvasContent({
               <div className="flex h-7 items-center gap-3">
                 <ZoomSlider
                   orientation="horizontal"
-                  className={cn(
-                    "!static !m-0",
-                    runNodeDetailPaneOpen && "opacity-50 transition-opacity hover:opacity-100",
-                  )}
+                  className="!static !m-0"
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
                 >

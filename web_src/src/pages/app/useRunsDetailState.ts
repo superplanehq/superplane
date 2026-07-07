@@ -28,7 +28,6 @@ export function useRunsDetailState(
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(() =>
     getRunDetailNodeIdFromSearchParams(searchParams, isRunInspectionMode, selectedRunId),
   );
-  const [runNodeDetailPaneHeight, setRunNodeDetailPaneHeight] = useState(320);
   const [detailDismissedForRunId, setDetailDismissedForRunId] = useState<string | null>(null);
   const wasRunInspectionModeRef = useRef(isRunInspectionMode);
   const previousSelectedRunIdForDetailRef = useRef<string | null>(selectedRunId);
@@ -86,8 +85,6 @@ export function useRunsDetailState(
     openRunDetailOnMount,
     runDetailNodeId,
     setRunDetailNodeId,
-    runNodeDetailPaneHeight,
-    setRunNodeDetailPaneHeight,
     clearDismissedRunDetail,
     detailDismissedForRunId,
     handleBackToRunList,

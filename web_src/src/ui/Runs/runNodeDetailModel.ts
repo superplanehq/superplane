@@ -52,6 +52,40 @@ export type RunNodeDetailTabData = {
   configuration?: unknown;
 };
 
+export type RunInspectorOutputSection = {
+  channel: string;
+  value: unknown;
+  sizeKb: string;
+};
+
+export type RunInspectorUpstreamSection = {
+  nodeId: string;
+  nodeName: string;
+  badge: { badgeColor: string; label: string } | null;
+  output: unknown;
+};
+
+export type RunInspectorNodeSection = {
+  nodeId: string;
+  nodeName: string;
+  workflowNode?: ComponentsNode;
+  execution?: CanvasesCanvasNodeExecution;
+  isTrigger: boolean;
+  createdAt?: string;
+  durationMs?: number;
+  badge: { badgeColor: string; label: string } | null;
+  tabData: RunNodeDetailTabData | null;
+  upstreamSections: RunInspectorUpstreamSection[];
+  outputSections: RunInspectorOutputSection[];
+  errorMessage?: string;
+};
+
+export type RunInspectorErrorSummary = {
+  nodeId: string;
+  nodeName: string;
+  message: string;
+};
+
 export function workflowComponentName(node: ComponentsNode | undefined): string {
   if (node?.type === "TYPE_ACTION" && node.component) return node.component;
   if (node?.type === "TYPE_TRIGGER" && node.component) return node.component;
@@ -105,6 +139,123 @@ export function getAdjacentRunNodeId(
 
   const nextIndex = direction === "prev" ? currentIndex - 1 : currentIndex + 1;
   return chain[nextIndex] ?? null;
+}
+
+export function buildRunInspectorNodeSections({
+  run,
+  executions,
+  workflowNodes,
+}: {
+  run: CanvasesCanvasRun;
+  executions: CanvasesCanvasNodeExecution[];
+  workflowNodes: ComponentsNode[];
+}): RunInspectorNodeSection[] {
+  const triggerNodeId = run.rootEvent?.nodeId;
+  const executionChain = buildExecutionChain(executions, triggerNodeId);
+
+  return executionChain.map((nodeId) => {
+    const workflowNode = workflowNodes.find((node) => node.id === nodeId);
+    const execution = executions.find((item) => item.nodeId === nodeId);
+    const isTrigger = nodeId === triggerNodeId;
+    const tabData = isTrigger
+      ? buildTriggerTabData(run, workflowNode)
+      : execution
+        ? buildExecutionTabData(execution, workflowNode, workflowNodes)
+        : null;
+
+    return {
+      nodeId,
+      nodeName: workflowNode?.name || nodeId,
+      workflowNode,
+      execution,
+      isTrigger,
+      createdAt: isTrigger ? run.rootEvent?.createdAt : execution?.createdAt,
+      durationMs: execution ? calculateExecutionDuration(execution) : undefined,
+      badge: isTrigger
+        ? eventBadgeForTriggeredTrigger(workflowNode)
+        : execution
+          ? eventBadgeForExecution(workflowNode, execution)
+          : null,
+      tabData,
+      upstreamSections: execution ? buildUpstreamSections(execution, executions, workflowNodes) : [],
+      outputSections: execution ? buildOutputSections(execution.outputs) : [],
+      errorMessage: execution ? getExecutionErrorMessage(execution) : undefined,
+    };
+  });
+}
+
+export function findRunInspectorErrorSummaries(sections: RunInspectorNodeSection[]): RunInspectorErrorSummary[] {
+  return sections
+    .filter((section) => !!section.errorMessage)
+    .map((section) => ({
+      nodeId: section.nodeId,
+      nodeName: section.nodeName,
+      message: section.errorMessage!,
+    }));
+}
+
+export function calculateRunDuration(run: CanvasesCanvasRun): number | null {
+  return calculateDuration(run.createdAt, run.finishedAt || run.updatedAt);
+}
+
+function calculateExecutionDuration(execution: CanvasesCanvasNodeExecution): number | undefined {
+  return calculateDuration(execution.createdAt, execution.updatedAt) ?? undefined;
+}
+
+function calculateDuration(start?: string, end?: string): number | null {
+  if (!start || !end) return null;
+
+  const startedAt = new Date(start).getTime();
+  const endedAt = new Date(end).getTime();
+  if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt) || endedAt < startedAt) return null;
+
+  return endedAt - startedAt;
+}
+
+function buildUpstreamSections(
+  execution: CanvasesCanvasNodeExecution,
+  executions: CanvasesCanvasNodeExecution[],
+  workflowNodes: ComponentsNode[],
+): RunInspectorUpstreamSection[] {
+  if (!execution.previousExecutionId) return [];
+
+  const previousExecution = executions.find((item) => item.id === execution.previousExecutionId);
+  if (!previousExecution?.nodeId) return [];
+
+  const workflowNode = workflowNodes.find((node) => node.id === previousExecution.nodeId);
+
+  return [
+    {
+      nodeId: previousExecution.nodeId,
+      nodeName: workflowNode?.name || previousExecution.nodeId,
+      badge: eventBadgeForExecution(workflowNode, previousExecution),
+      output: previousExecution.outputs,
+    },
+  ];
+}
+
+function buildOutputSections(outputs?: CanvasesCanvasNodeExecution["outputs"]): RunInspectorOutputSection[] {
+  if (!outputs || Object.keys(outputs).length === 0) return [];
+
+  return Object.entries(outputs).map(([channel, value]) => ({
+    channel,
+    value,
+    sizeKb: formatJsonSizeKb(value),
+  }));
+}
+
+function formatJsonSizeKb(value: unknown): string {
+  const json = JSON.stringify(value ?? null);
+  const bytes = new Blob([json]).size;
+  return `${Math.max(bytes / 1024, 0.01).toFixed(2)} KB`;
+}
+
+function getExecutionErrorMessage(execution: CanvasesCanvasNodeExecution): string | undefined {
+  if (execution.result !== "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR") {
+    return undefined;
+  }
+
+  return execution.resultMessage || execution.resultReason || "Execution failed";
 }
 
 function extractExecutionPayload(execution: CanvasesCanvasNodeExecution): unknown {
