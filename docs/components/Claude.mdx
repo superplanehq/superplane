@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Batch Message" href="#create-batch-message" description="Sends many prompts to Claude in a single Message Batches request, at lower cost than individual calls" />
   <LinkCard title="Get Daily Usage" href="#get-daily-usage" description="Fetches daily Messages and Claude Code usage metrics from Anthropic's Admin API." />
   <LinkCard title="Run Claude Agent" href="#run-claude-agent" description="Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated." />
   <LinkCard title="Run Code Agent" href="#run-code-agent" description="Runs an autonomous Claude coding agent against a repository in Anthropic's managed sandbox and opens (or updates) a pull request." />
@@ -18,6 +19,93 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
+
+<a id="create-batch-message"></a>
+
+## Create Batch Message
+
+**Component key:** `claude.createBatchMessage`
+
+The Create Batch Message component uses [Anthropic's Message Batches API](https://platform.claude.com/docs/en/build-with-claude/batch-processing) to process many prompts asynchronously in one request, at a lower cost than issuing them individually.
+
+### Use Cases
+
+- **Bulk classification or extraction**: Run the same prompt template over many inputs.
+- **Large-scale content generation**: Draft many summaries, descriptions, or messages at once.
+- **Cost-sensitive workloads**: Batches are billed at a discount versus the equivalent individual requests.
+
+### How It Works
+
+1. Submits all configured requests as a single batch (`POST /v1/messages/batches`).
+2. Polls the batch status until it reaches a terminal state.
+3. Downloads the results and emits one entry per request, matched by **Custom ID**.
+
+Batches typically complete within an hour, but can take up to 24 hours. This component polls with increasing backoff and keeps the execution open (without emitting) until the batch ends.
+
+### Configuration
+
+- **Model**: The Claude model used for every request in the batch.
+- **System Message**: (Optional) Context applied to every request in the batch.
+- **Max Tokens**: (Optional) Limit the length of each generated response.
+- **Temperature**: (Optional) Control randomness (0.0 to 1.0), applied to every request.
+- **Structured Output**: (Optional) A JSON Schema every response must conform to.
+- **Requests**: The list of prompts to send. Each has a **Custom ID** (unique within the batch, used to match it to its result) and a **Prompt**.
+
+### Output
+
+Emits a single payload once the batch ends, containing:
+- **status**: `ended`, `timeout`, or `error` (the latter two only if polling could not confirm completion).
+- **batchId**: The Anthropic batch ID.
+- **requestCounts**: How many requests succeeded, errored, were canceled, or expired.
+- **results**: One entry per request (by **Custom ID**), with the generated text, stop reason, token usage, and any error.
+
+### Notes
+
+- Requires a valid Claude API key configured in the integration.
+- Custom IDs must be unique within the batch (max 64 characters).
+- Cancelling the workflow execution requests cancellation of the batch on Anthropic's side; requests already completed are unaffected.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "status": "ended",
+    "batchId": "msgbatch_01HkcTjaV5uDC8jWR4ZsqFqz",
+    "requestCounts": {
+      "processing": 0,
+      "succeeded": 2,
+      "errored": 0,
+      "canceled": 0,
+      "expired": 0
+    },
+    "results": [
+      {
+        "customId": "request-1",
+        "type": "succeeded",
+        "text": "Paris is the capital of France.",
+        "stopReason": "end_turn",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 9
+        }
+      },
+      {
+        "customId": "request-2",
+        "type": "succeeded",
+        "text": "Berlin is the capital of Germany.",
+        "stopReason": "end_turn",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 9
+        }
+      }
+    ]
+  },
+  "timestamp": "2026-07-07T12:00:00Z",
+  "type": "claude.createBatchMessage.result"
+}
+```
 
 <a id="get-daily-usage"></a>
 
