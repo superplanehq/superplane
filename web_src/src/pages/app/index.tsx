@@ -184,6 +184,10 @@ function newestByTimestamp<T>(items: T[], timestamp: (item: T) => number): T | n
   return newest;
 }
 
+function safeTimestamp(value: number): number {
+  return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+}
+
 function runLookupEventFromExecution(nodeId: string, execution: CanvasesCanvasNodeExecution): SidebarEvent | null {
   const executionId = execution.id;
   if (!executionId && !execution.rootEvent?.id) {
@@ -3766,13 +3770,18 @@ export function AppPage() {
 
       const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
       const latestExecution = newestByTimestamp(nodeData.executions, executionTimestamp);
-      if (latestExecution) {
-        return runLookupEventFromExecution(nodeId, latestExecution);
+      const latestEvent = newestByTimestamp(nodeData.events, eventTimestamp);
+
+      if (
+        latestEvent &&
+        (!latestExecution ||
+          safeTimestamp(eventTimestamp(latestEvent)) > safeTimestamp(executionTimestamp(latestExecution)))
+      ) {
+        return runLookupEventFromTriggerEvent(nodeId, latestEvent);
       }
 
-      const latestEvent = newestByTimestamp(nodeData.events, eventTimestamp);
-      if (latestEvent) {
-        return runLookupEventFromTriggerEvent(nodeId, latestEvent);
+      if (latestExecution) {
+        return runLookupEventFromExecution(nodeId, latestExecution);
       }
 
       return null;

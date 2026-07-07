@@ -190,6 +190,46 @@ describe("buildRunInspectorNodeSections", () => {
     ]);
   });
 
+  it("falls back to execution-chain inputs when workflow edges are empty", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: new Date().toISOString(),
+        data: { trigger: true },
+      },
+    };
+
+    const sections = buildRunInspectorNodeSections({
+      run,
+      executions: [
+        {
+          id: "execution-1",
+          nodeId: "first-action",
+          outputs: { default: [{ first: true }] },
+          metadata: {},
+        },
+        {
+          id: "execution-2",
+          nodeId: "second-action",
+          outputs: { default: [{ second: true }] },
+          metadata: {},
+        },
+      ],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "first-action", name: "First Action", type: "TYPE_ACTION", component: "test.first" },
+        { id: "second-action", name: "Second Action", type: "TYPE_ACTION", component: "test.second" },
+      ],
+      workflowEdges: [],
+    });
+
+    const secondAction = sections.find((section) => section.nodeId === "second-action");
+
+    expect(secondAction?.upstreamSections.map((section) => section.nodeName)).toEqual(["Trigger", "First Action"]);
+    expect(secondAction?.primaryInputNodeId).toBe("first-action");
+  });
+
   it("uses edges to include only accessible upstream nodes ordered by creation time", () => {
     const run: CanvasesCanvasRun = {
       rootEvent: {

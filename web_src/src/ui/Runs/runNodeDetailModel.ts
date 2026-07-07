@@ -262,15 +262,16 @@ function buildUpstreamSections({
 }): RunInspectorUpstreamSection[] {
   if (currentIndex <= 0) return [];
 
-  const accessibleNodeIds =
-    workflowEdges === undefined
-      ? executionChain.slice(0, currentIndex)
-      : findAccessibleUpstreamNodeIds(executionChain[currentIndex], workflowEdges, executionIndexByNodeId);
-
-  const orderedNodeIds =
-    workflowEdges === undefined
-      ? accessibleNodeIds
-      : accessibleNodeIds.sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions));
+  let orderedNodeIds: string[];
+  if (!hasWorkflowEdges(workflowEdges)) {
+    orderedNodeIds = executionChain.slice(0, currentIndex);
+  } else {
+    orderedNodeIds = findAccessibleUpstreamNodeIds(
+      executionChain[currentIndex],
+      workflowEdges,
+      executionIndexByNodeId,
+    ).sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions));
+  }
 
   return orderedNodeIds.map((nodeId) => {
     const workflowNode = workflowNodes.find((node) => node.id === nodeId);
@@ -308,7 +309,7 @@ function findPrimaryInputNodeId({
 }): string | undefined {
   if (currentIndex <= 0) return undefined;
 
-  if (workflowEdges === undefined) {
+  if (!hasWorkflowEdges(workflowEdges)) {
     return executionChain[currentIndex - 1];
   }
 
@@ -328,6 +329,10 @@ function findPrimaryInputNodeId({
   return findAccessibleUpstreamNodeIds(currentNodeId, workflowEdges, executionIndexByNodeId)
     .sort((left, right) => compareUpstreamCreatedAt(left, right, run, executions))
     .at(-1);
+}
+
+function hasWorkflowEdges(workflowEdges: ComponentsEdge[] | undefined): workflowEdges is ComponentsEdge[] {
+  return Boolean(workflowEdges?.length);
 }
 
 function findAccessibleUpstreamNodeIds(

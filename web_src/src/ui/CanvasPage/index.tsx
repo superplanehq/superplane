@@ -89,6 +89,7 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
+import { RunInspectorLoadingPanel } from "../Runs/RunInspectorLoadingPanel";
 import { RunInspectorPanel } from "../Runs/RunInspectorPanel";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
@@ -1263,7 +1264,10 @@ function CanvasPage(props: CanvasPageProps) {
     canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
   const runInspectorOpen =
-    props.isRunInspectionMode && !props.isEditing && !!props.runNodeDetailRun && !!props.runNodeDetailCanvasId;
+    props.isRunInspectionMode &&
+    !props.isEditing &&
+    !!props.runNodeDetailCanvasId &&
+    (!!props.runNodeDetailRun || !!props.runCanvasLoading);
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1554,7 +1558,7 @@ function CanvasPage(props: CanvasPageProps) {
               : null}
           </div>
         </div>
-        {runInspectorOpen ? (
+        {runInspectorOpen && props.runNodeDetailRun ? (
           <RunInspectorPanel
             canvasId={props.runNodeDetailCanvasId!}
             run={props.runNodeDetailRun!}
@@ -1566,6 +1570,8 @@ function CanvasPage(props: CanvasPageProps) {
             onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
             onClose={() => props.onRunNodeDetailClose?.()}
           />
+        ) : runInspectorOpen ? (
+          <RunInspectorLoadingPanel onClose={() => props.onRunNodeDetailClose?.()} />
         ) : null}
       </div>
 
