@@ -51,6 +51,7 @@ const runningExecutions: CanvasesCanvasNodeExecution[] = [
   },
 ];
 let mockedExecutions = executions;
+let mockedExecutionsLoading = false;
 
 vi.mock("@uiw/react-json-view", () => ({
   default: ({ value }: { value: unknown }) => <pre data-testid="json-view">{JSON.stringify(value)}</pre>,
@@ -75,7 +76,7 @@ vi.mock("@/api-client", async (importOriginal) => {
 vi.mock("@/hooks/useCanvasData", () => ({
   useEventExecutions: () => ({
     data: { executions: mockedExecutions },
-    isLoading: false,
+    isLoading: mockedExecutionsLoading,
   }),
 }));
 
@@ -106,6 +107,7 @@ vi.mock("@/lib/toast", () => ({
 
 beforeEach(() => {
   mockedExecutions = executions;
+  mockedExecutionsLoading = false;
   reemitTriggerEventMock.mockResolvedValue({});
   cancelExecutionMock.mockResolvedValue({});
   listNodeQueueItemsMock.mockResolvedValue({ data: { items: [] } });
@@ -275,6 +277,21 @@ describe("RunInspectorPanel", () => {
     });
 
     expect(deleteNodeQueueItemMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the stop action disabled while executions are loading", () => {
+    mockedExecutions = [];
+    mockedExecutionsLoading = true;
+
+    renderInspector({ run: runningRun });
+
+    const stopButton = screen.getByRole("button", { name: "Stop" });
+    expect(stopButton).toBeDisabled();
+
+    fireEvent.click(stopButton);
+
+    expect(cancelExecutionMock).not.toHaveBeenCalled();
+    expect(listNodeQueueItemsMock).not.toHaveBeenCalled();
   });
 
   it("stores a resized inspector width", () => {

@@ -143,6 +143,8 @@ export function RunInspectorPanel({
       showErrorToast("Failed to stop run");
     },
   });
+  const stopActionDisabled =
+    executionsQuery.isLoading || stopMutation.isPending || (runningExecutionIds.length === 0 && !run.rootEvent?.id);
 
   const handleValueChange = (value: string) => {
     if (value) {
@@ -188,11 +190,7 @@ export function RunInspectorPanel({
         stepCount={sections.length || run.executions?.length || 0}
         onAction={() => (presentation.status === "running" ? stopMutation.mutate() : rerunMutation.mutate())}
         actionPending={presentation.status === "running" ? stopMutation.isPending : rerunMutation.isPending}
-        actionDisabled={
-          presentation.status === "running"
-            ? (runningExecutionIds.length === 0 && !run.rootEvent?.id) || stopMutation.isPending
-            : !run.rootEvent?.id
-        }
+        actionDisabled={presentation.status === "running" ? stopActionDisabled : !run.rootEvent?.id}
       />
 
       <RunInspectorStepsList
