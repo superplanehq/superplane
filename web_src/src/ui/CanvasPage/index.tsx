@@ -398,6 +398,8 @@ export interface CanvasPageProps {
 
   /** Returns to the current live canvas version from a published history preview. */
   onSeeCurrentVersion?: () => void;
+  /** Returns from run inspection to the current live canvas. */
+  onBackToLiveCanvas?: () => void;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -447,6 +449,33 @@ const EDGE_STYLE = {
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
 const SNAP_GRID_STEP_PX = 24;
+
+function CanvasModeFloatingBar({
+  label,
+  actionLabel,
+  onAction,
+}: {
+  label: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center px-4 pt-3">
+      <div className="pointer-events-auto flex max-w-[min(100vw-2rem,34rem)] items-center gap-2 rounded-full bg-slate-500 py-1.5 pl-3 pr-1.5 shadow-sm dark:bg-slate-600">
+        <span className="min-w-0 truncate text-[13px] font-medium text-white">{label}</span>
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          className="h-7 shrink-0 rounded-full border-0 bg-white px-3 text-[13px] font-medium text-slate-800 shadow-none hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-500 dark:hover:bg-slate-700 dark:hover:text-white"
+          onClick={onAction}
+        >
+          {actionLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 type CanvasAnnotationUpdate = {
   text?: string;
@@ -1230,7 +1259,9 @@ function CanvasPage(props: CanvasPageProps) {
   }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
   const canvasStateMode = props.canvasStateMode || "default";
-  const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
+  const showRunInspectionFloatingBar = props.isRunInspectionMode && !!props.onBackToLiveCanvas;
+  const showPreviewFloatingBar =
+    canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
   const liveBottomInspectorOpen = !props.isRunInspectionMode && !props.isEditing && state.componentSidebar.isOpen;
 
@@ -1450,24 +1481,22 @@ function CanvasPage(props: CanvasPageProps) {
               </div>
             ) : null}
             {showPreviewFloatingBar ? (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
-                <div className="pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-full bg-gray-500 pl-3 pr-1.5 py-1.5">
-                  <span className="flex min-w-0 max-w-full shrink-0 truncate items-center gap-1 text-[13px] font-medium text-white">
-                    Previewing previous version
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    className="shrink-0 border-0 shadow-none"
-                    onClick={() => {
-                      props.onSeeCurrentVersion?.();
-                    }}
-                  >
-                    See Current Version
-                  </Button>
-                </div>
-              </div>
+              <CanvasModeFloatingBar
+                label="Previewing previous version"
+                actionLabel="See Current Version"
+                onAction={() => {
+                  props.onSeeCurrentVersion?.();
+                }}
+              />
+            ) : null}
+            {showRunInspectionFloatingBar ? (
+              <CanvasModeFloatingBar
+                label="Previewing previous run"
+                actionLabel="Back to Live Canvas"
+                onAction={() => {
+                  props.onBackToLiveCanvas?.();
+                }}
+              />
             ) : null}
             {props.headerMode === "files" ? (
               <div
