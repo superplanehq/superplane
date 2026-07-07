@@ -54,7 +54,6 @@ export function useEnterLiveEditSession({
         handleUseVersion(effectiveLiveCanvasVersionId, { preserveStagedLayer: true });
         await resyncStagedEditorState(effectiveLiveCanvasVersionId, {
           bumpResetNonce: false,
-          preferCachedStagedSpec: true,
         });
         setEditSessionActive(true);
         return true;

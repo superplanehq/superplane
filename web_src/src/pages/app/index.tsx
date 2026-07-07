@@ -101,6 +101,7 @@ import { useAppDraftStagingData } from "./useAppDraftStagingData";
 import { useCanvasEditVersionState } from "./useCanvasEditVersionState";
 import { useEditSessionBootstrap } from "./useEditSessionBootstrap";
 import { useDraftCanvasSpecSync } from "./useDraftCanvasSpecSync";
+import { fetchCanvasStagingSummary } from "./lib/repository-spec-files";
 import { useEnterLiveEditSession } from "./useEnterLiveEditSession";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandlers";
@@ -817,6 +818,7 @@ export function AppPage() {
     }
 
     setRemoteCanvasUpdatePending(false);
+    void handleRemoteStagingUpdatedRef.current();
   }, [
     remoteCanvasUpdatePending,
     hasLocalSaveActivity,
@@ -3361,24 +3363,28 @@ export function AppPage() {
 
   handleRemoteStagingUpdatedRef.current = async () => {
     const targetVersionId = effectiveLiveCanvasVersionId;
-    if (!targetVersionId || targetVersionId !== effectiveLiveCanvasVersionId || !canvasId) {
+    if (!targetVersionId || !canvasId) {
       return;
     }
 
-    const stagingSummary = queryClient.getQueryData<{ hasStaging?: boolean }>(canvasKeys.canvasStaging(canvasId));
-    // Commit/discard clears staging in the cache before the websocket echo arrives.
-    if (stagingSummary?.hasStaging === false) {
-      return;
-    }
-
-    if (editSessionActive && isViewingCurrentLiveVersion) {
+    if (editSessionActiveRef.current && activeCanvasVersionIdRef.current === targetVersionId) {
       await resyncStagedEditorState(targetVersionId, { bumpResetNonce: false });
       return;
     }
 
-    if (!editSessionActive) {
-      await enterLiveEditSession();
+    const stagingSummary = await queryClient.fetchQuery({
+      queryKey: canvasKeys.canvasStaging(canvasId),
+      queryFn: async () => {
+        const summary = await fetchCanvasStagingSummary(canvasId);
+        return summary ?? { hasStaging: false, stagedPaths: [] };
+      },
+      staleTime: 0,
+    });
+    if (!stagingSummary.hasStaging) {
+      return;
     }
+
+    await enterLiveEditSession();
   };
 
   const handleAgentStagingReady = useCallback(async (): Promise<boolean> => {
