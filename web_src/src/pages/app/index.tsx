@@ -85,6 +85,7 @@ import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
+import { resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -159,69 +160,6 @@ import {
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
-
-function executionTimestamp(execution: CanvasesCanvasNodeExecution): number {
-  return Date.parse(execution.updatedAt || execution.createdAt || "");
-}
-
-function eventTimestamp(event: CanvasesCanvasEvent): number {
-  return Date.parse(event.createdAt || "");
-}
-
-function newestByTimestamp<T>(items: T[], timestamp: (item: T) => number): T | null {
-  let newest: T | null = null;
-  let newestTimestamp = Number.NEGATIVE_INFINITY;
-
-  for (const item of items) {
-    const candidateTimestamp = timestamp(item);
-    const safeTimestamp = Number.isFinite(candidateTimestamp) ? candidateTimestamp : Number.NEGATIVE_INFINITY;
-    if (safeTimestamp > newestTimestamp) {
-      newest = item;
-      newestTimestamp = safeTimestamp;
-    }
-  }
-
-  return newest;
-}
-
-function safeTimestamp(value: number): number {
-  return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
-}
-
-function runLookupEventFromExecution(nodeId: string, execution: CanvasesCanvasNodeExecution): SidebarEvent | null {
-  const executionId = execution.id;
-  if (!executionId && !execution.rootEvent?.id) {
-    return null;
-  }
-
-  return {
-    id: executionId || execution.rootEvent!.id!,
-    title: "",
-    state: "processed",
-    isOpen: false,
-    nodeId,
-    executionId,
-    originalExecution: execution,
-    kind: "execution",
-  };
-}
-
-function runLookupEventFromTriggerEvent(nodeId: string, event: CanvasesCanvasEvent): SidebarEvent | null {
-  if (!event.id) {
-    return null;
-  }
-
-  return {
-    id: event.id,
-    title: "",
-    state: "processed",
-    isOpen: false,
-    nodeId,
-    triggerEventId: event.id,
-    originalEvent: event,
-    kind: "trigger",
-  };
-}
 
 export function AppPage() {
   const { organizationId, appId } = useParams<{
@@ -701,6 +639,7 @@ export function AppPage() {
   const storeVersion = useNodeExecutionStore((state) => state.version);
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
+  const refetchNodeDataMethod = useNodeExecutionStore((state) => state.refetchNodeData);
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
 
   // Redirect to home page if workflow is not found (404)
@@ -3758,31 +3697,13 @@ export function AppPage() {
         return null;
       }
 
-      const currentData = getNodeData(nodeId);
-      const hasCachedActivity = currentData.executions.length > 0 || currentData.events.length > 0;
-      if (!hasCachedActivity) {
-        await loadNodeDataMethod(canvasId, nodeId, workflowNode.type || "TYPE_ACTION", queryClient);
-      }
+      const nodeType = workflowNode.type || "TYPE_ACTION";
+      await refetchNodeDataMethod(canvasId, nodeId, nodeType, queryClient);
 
       const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
-      const latestExecution = newestByTimestamp(nodeData.executions, executionTimestamp);
-      const latestEvent = newestByTimestamp(nodeData.events, eventTimestamp);
-
-      if (
-        latestEvent &&
-        (!latestExecution ||
-          safeTimestamp(eventTimestamp(latestEvent)) > safeTimestamp(executionTimestamp(latestExecution)))
-      ) {
-        return runLookupEventFromTriggerEvent(nodeId, latestEvent);
-      }
-
-      if (latestExecution) {
-        return runLookupEventFromExecution(nodeId, latestExecution);
-      }
-
-      return null;
+      return resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
     },
-    [canvasId, canvasNodesById, getNodeData, loadNodeDataMethod, queryClient],
+    [canvasId, canvasNodesById, refetchNodeDataMethod, queryClient],
   );
 
   const handleLiveCanvasNodeClick = useCallback(
