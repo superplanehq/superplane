@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import type { QueryClient } from "@tanstack/react-query";
-import { canvasKeys } from "@/hooks/useCanvasData";
+import { canvasKeys, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { setAgentBootContext } from "@/lib/agentBootContext";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
@@ -11,7 +11,9 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { appPath } from "@/lib/appPaths";
 import type { AppEntry } from "./AppDetailModal";
+import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
 import type { IntegrationSelections } from "./InstallIntegrationsSection";
+import type { CanvasFolderData } from "./types";
 import type { InstallParam } from "../install/types";
 
 async function executeInstall(opts: {
@@ -54,6 +56,7 @@ function prepareAgentSidebar(app: AppEntry, canvasId: string) {
 interface UseInstallActionOptions {
   organizationId: string | undefined;
   app: AppEntry;
+  folder?: CanvasFolderData;
   canvasName?: string;
   installParams: InstallParam[];
   paramValues: Record<string, string>;
@@ -65,6 +68,7 @@ interface UseInstallActionOptions {
 export function useInstallAction({
   organizationId,
   app,
+  folder,
   canvasName,
   installParams,
   paramValues,
@@ -74,6 +78,8 @@ export function useInstallAction({
 }: UseInstallActionOptions) {
   const [isInstalling, setIsInstalling] = useState(false);
   const isInstallingRef = useRef(false);
+  const updateCanvasFolderMembershipMutation = useUpdateCanvasFolderMembership(organizationId || "");
+  const { mutateAsync: updateCanvasFolderMembership } = updateCanvasFolderMembershipMutation;
 
   const doInstall = useCallback(
     async (skipParams: boolean) => {
@@ -88,6 +94,17 @@ export function useInstallAction({
           installParams: !skipParams && installParams.length > 0 ? paramValues : undefined,
           integrations: integrationSelections,
         });
+        if (folder) {
+          try {
+            await updateCanvasFolderMembership(appendCanvasToFolderMembership(folder, result.canvasId));
+          } catch (error) {
+            isInstallingRef.current = false;
+            setIsInstalling(false);
+            showErrorToast(getApiErrorMessage(error, "App installed, but failed to add it to folder"));
+            return;
+          }
+        }
+
         await queryClient.refetchQueries({ queryKey: canvasKeys.list(result.organizationId) });
         prepareAgentSidebar(app, result.canvasId);
         navigate(appPath(result.organizationId, result.canvasId, "?edit=1"));
@@ -97,7 +114,18 @@ export function useInstallAction({
         showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install")));
       }
     },
-    [organizationId, app, canvasName, paramValues, installParams, integrationSelections, queryClient, navigate],
+    [
+      organizationId,
+      app,
+      canvasName,
+      folder,
+      paramValues,
+      installParams,
+      integrationSelections,
+      queryClient,
+      navigate,
+      updateCanvasFolderMembership,
+    ],
   );
 
   return { doInstall, isInstalling };

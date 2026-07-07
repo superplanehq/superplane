@@ -21,9 +21,15 @@ import {
   homePageSubtitleClassName,
   homePageTitleClassName,
 } from "./homePageStyles";
+import type { CanvasFolderData } from "./types";
 
-export function ZeroStatePage() {
-  const { createApp, isSaving } = useCreateApp();
+interface ZeroStatePageProps {
+  folder?: CanvasFolderData;
+  title?: string;
+}
+
+export function ZeroStatePage({ folder, title = "Create New App" }: ZeroStatePageProps) {
+  const { createApp, isSaving } = useCreateApp({ folder });
   const [visibleCount, setVisibleCount] = useState(7);
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
   const [installingApp, setInstallingApp] = useState<AppEntry | null>(null);
@@ -79,7 +85,7 @@ export function ZeroStatePage() {
       )}
       <div className="mx-auto w-full max-w-3xl px-8 py-16">
         <div className="mb-10 text-center">
-          <h1 className={homePageTitleClassName}>Create New App</h1>
+          <h1 className={homePageTitleClassName}>{title}</h1>
           <p className={homePageSubtitleClassName}>Create a blank app or pick one from the catalog below.</p>
         </div>
 
@@ -104,6 +110,7 @@ export function ZeroStatePage() {
               onSelect={setSelectedApp}
               onInstall={handleInstall}
               onCloseInstall={() => setInstallingApp(null)}
+              folder={folder}
             />
           ))}
           {visibleCount < APP_CATALOG.length && <div ref={sentinelRef} className="h-1" />}
@@ -138,6 +145,7 @@ function AppListItem({
   onInstall,
   onSelect,
   onCloseInstall,
+  folder,
 }: {
   app: AppEntry;
   busy: boolean;
@@ -145,6 +153,7 @@ function AppListItem({
   onInstall: (app: AppEntry) => void;
   onSelect: (app: AppEntry) => void;
   onCloseInstall: () => void;
+  folder?: CanvasFolderData;
 }) {
   return (
     <>
@@ -185,7 +194,7 @@ function AppListItem({
           </div>
         </div>
       </div>
-      {isInstalling && <InstallProgressPanel app={app} onClose={onCloseInstall} />}
+      {isInstalling && <InstallProgressPanel app={app} folder={folder} onClose={onCloseInstall} />}
     </>
   );
 }
