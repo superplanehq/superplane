@@ -1,4 +1,4 @@
-import { AlertTriangle, type LucideIcon, Rows3, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, type LucideIcon } from "lucide-react";
 import type { ReactNode, Ref } from "react";
 import type {
   CanvasesCanvasNodeExecution,
@@ -8,7 +8,6 @@ import type {
 import { TimeAgo } from "@/components/TimeAgo";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { StepDetailMode } from "./RunStepAccordion";
 import { RUN_STATUS_META, type RunStatusKey } from "./runPresentation";
 import { formatRunDuration, RUN_STEP_FILTERS, type RunStepFilter, type RunStepSummary } from "./runSummary";
 
@@ -208,44 +207,7 @@ export function ErrorBanner({
   );
 }
 
-const STEP_DETAIL_MODES: { mode: StepDetailMode; label: string; icon: LucideIcon }[] = [
-  { mode: "run-details", label: "Run details", icon: Rows3 },
-  { mode: "step-config", label: "Step config", icon: SlidersHorizontal },
-];
-
-/** Segmented control that switches expanded steps between run details and read-only step configuration. */
-function StepDetailModeToggle({
-  stepDetailMode,
-  onSetStepDetailMode,
-}: {
-  stepDetailMode: StepDetailMode;
-  onSetStepDetailMode: (mode: StepDetailMode) => void;
-}) {
-  return (
-    <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-slate-200 bg-slate-50 p-0.5">
-      {STEP_DETAIL_MODES.map(({ mode, label, icon: Icon }) => {
-        const active = stepDetailMode === mode;
-        return (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => onSetStepDetailMode(mode)}
-            aria-pressed={active}
-            className={cn(
-              "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
-              active ? "bg-white text-slate-800 shadow-sm" : "text-gray-500 hover:text-gray-700",
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Sticky toolbar: state-based step filters (Errors / Running / Waiting) and the step-content mode toggle. */
+/** Sticky toolbar: state-based step filters (Errors / Running / Waiting). */
 export function StepToolbar({
   summary,
   statusFilter,
@@ -253,8 +215,6 @@ export function StepToolbar({
   contentClass,
   stickyTop = 0,
   rootRef,
-  stepDetailMode,
-  onSetStepDetailMode,
 }: {
   summary: RunStepSummary;
   statusFilter: RunStepFilter[];
@@ -263,8 +223,6 @@ export function StepToolbar({
   /** Offset from the top of the scroll container, so it stops below the sticky header. */
   stickyTop?: number;
   rootRef?: Ref<HTMLDivElement>;
-  stepDetailMode: StepDetailMode;
-  onSetStepDetailMode: (mode: StepDetailMode) => void;
 }) {
   const countFor = (id: RunStepFilter) =>
     id === "error" ? summary.errors : id === "running" ? summary.running : summary.waiting;
@@ -275,7 +233,7 @@ export function StepToolbar({
       ref={rootRef}
       style={{ top: stickyTop }}
       className={cn(
-        "sticky z-10 flex items-center justify-between gap-2 border-b border-slate-950/10 bg-white/95 py-2 backdrop-blur",
+        "sticky z-10 flex items-center gap-2 border-b border-slate-950/10 bg-white/95 py-2 backdrop-blur",
         contentClass,
       )}
     >
@@ -302,7 +260,6 @@ export function StepToolbar({
           );
         })}
       </div>
-      <StepDetailModeToggle stepDetailMode={stepDetailMode} onSetStepDetailMode={onSetStepDetailMode} />
     </div>
   );
 }

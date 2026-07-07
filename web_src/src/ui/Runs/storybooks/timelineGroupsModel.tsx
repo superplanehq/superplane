@@ -1,5 +1,5 @@
 import JsonView from "@uiw/react-json-view";
-import { ChevronDown, ChevronRight, GitBranch, Terminal, Webhook } from "lucide-react";
+import { ChevronDown, ChevronRight, GitBranch, Pencil, Terminal, Webhook } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { RunNodeDetailDetailsView } from "../RunNodeDetailDetailsView";
@@ -12,6 +12,16 @@ import {
   type InputChainStep,
 } from "../RunStepTimeline";
 import { DetailBox, ErrorDetailBox, HeaderIconButton } from "../RunStepAccordion";
+import { RunStepConfigFields } from "../RunStepConfigView";
+
+/** Real node fed into the Runtime Config card so its read-only form has schema/values. */
+export interface RuntimeConfigNode {
+  component?: string;
+  name?: string;
+  configuration?: Record<string, unknown>;
+  iconSrc?: string;
+  iconSlug?: string;
+}
 
 /**
  * Wireframe-only model for the flat "timeline events" design (never merged to
@@ -186,8 +196,95 @@ function CollapsedPayloadCard({ card }: { card: Extract<TimelineCardEvent, { kin
   );
 }
 
-function CardEventView({ card }: { card: TimelineCardEvent }) {
+/** Small segmented control on the Runtime Config card: read-only form vs raw JSON. */
+function ConfigViewToggle({ view, onChange }: { view: "form" | "json"; onChange: (view: "form" | "json") => void }) {
+  const options: { id: "form" | "json"; label: string }[] = [
+    { id: "form", label: "Form" },
+    { id: "json", label: "JSON" },
+  ];
+  return (
+    <div className="flex shrink-0 items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+      {options.map((option) => {
+        const active = view === option.id;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => onChange(option.id)}
+            aria-pressed={active}
+            className={cn(
+              "rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors",
+              active ? "bg-slate-100 text-slate-800" : "text-slate-500 hover:text-slate-700",
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The Runtime Config card: renders a step's configuration as a read-only form (default)
+ * or raw JSON, with a per-step toggle and an Edit button (wireframe placeholder for now,
+ * intended to later enter edit mode with this node selected). Collapsed by default like
+ * the other cards. Falls back to JSON-only when no node schema is available.
+ */
+function RuntimeConfigCard({
+  card,
+  configNode,
+}: {
+  card: Extract<TimelineCardEvent, { kind: "payload" }>;
+  configNode?: RuntimeConfigNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"form" | "json">("form");
+  const canShowForm = !!configNode;
+  const effectiveView = canShowForm ? view : "json";
+  return (
+    <div className="overflow-hidden rounded border border-slate-200 bg-white">
+      <div className="flex items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
+        <EventStatusPill dotClassName={card.status.dotClassName} label={card.status.label} />
+        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          Runtime Config
+        </span>
+        <span className="min-w-0 truncate text-[12px] font-medium text-slate-600">{card.sourceName}</span>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {card.meta ? <span className="pr-1 text-[11px] tabular-nums text-slate-600">{card.meta}</span> : null}
+          {open && canShowForm ? <ConfigViewToggle view={view} onChange={setView} /> : null}
+          {open ? <HeaderIconButton label="Edit configuration" icon={<Pencil className="h-3.5 w-3.5" />} /> : null}
+          <HeaderIconButton
+            label={open ? "Collapse" : "Expand"}
+            icon={open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            active={open}
+            onClick={() => setOpen((value) => !value)}
+          />
+        </div>
+      </div>
+      {open ? (
+        <div className="px-3 py-2.5">
+          {effectiveView === "form" ? (
+            <RunStepConfigFields component={configNode?.component} configuration={configNode?.configuration} />
+          ) : (
+            <JsonView
+              value={(card.payload ?? {}) as object}
+              collapsed={2}
+              displayDataTypes={false}
+              style={{ fontSize: 12 }}
+            />
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CardEventView({ card, configNode }: { card: TimelineCardEvent; configNode?: RuntimeConfigNode }) {
   if (card.kind === "payload") {
+    if (card.kicker === "Runtime Config") {
+      return <RuntimeConfigCard card={card} configNode={configNode} />;
+    }
     return <CollapsedPayloadCard card={card} />;
   }
   if (card.kind === "summary") {
@@ -456,7 +553,15 @@ function cardMarker(card: TimelineCardEvent): ReactNode {
 }
 
 /** A single flat feed row: marker column + card/line content. */
-function EventRow({ event, isLast }: { event: TimelineEvent; isLast?: boolean }) {
+function EventRow({
+  event,
+  isLast,
+  configNode,
+}: {
+  event: TimelineEvent;
+  isLast?: boolean;
+  configNode?: RuntimeConfigNode;
+}) {
   if (event.type === "line") {
     return (
       <EventRail marker={<DotMarker className={event.line.dotClassName} />} isLast={isLast}>
@@ -466,7 +571,7 @@ function EventRow({ event, isLast }: { event: TimelineEvent; isLast?: boolean })
   }
   return (
     <EventRail marker={cardMarker(event.card)} isLast={isLast}>
-      <CardEventView card={event.card} />
+      <CardEventView card={event.card} configNode={configNode} />
     </EventRail>
   );
 }
@@ -474,7 +579,7 @@ function EventRow({ event, isLast }: { event: TimelineEvent; isLast?: boolean })
 /** Line-event ids for queue lifecycle transitions, which we don't surface in the timeline. */
 const QUEUE_LINE_IDS = new Set(["q-enter", "q-exit"]);
 
-export function EventTimeline({ events }: { events: TimelineEvent[] }) {
+export function EventTimeline({ events, configNode }: { events: TimelineEvent[]; configNode?: RuntimeConfigNode }) {
   // Queueing (enter/exit queue) is noise for this view, so it's dropped from the feed.
   const visible = events.filter((event) => !(event.type === "line" && QUEUE_LINE_IDS.has(event.id)));
   // The run summary is pinned to the top (before the timeline), not left as a terminal
@@ -493,7 +598,7 @@ export function EventTimeline({ events }: { events: TimelineEvent[] }) {
         </div>
       ) : null}
       {feed.map((event, index) => (
-        <EventRow key={event.id} event={event} isLast={index === feed.length - 1} />
+        <EventRow key={event.id} event={event} isLast={index === feed.length - 1} configNode={configNode} />
       ))}
     </div>
   );

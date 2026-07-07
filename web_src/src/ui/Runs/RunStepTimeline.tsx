@@ -1,6 +1,6 @@
 import JsonView from "@uiw/react-json-view";
-import { ArrowUp, Check, ChevronDown, ChevronRight, CircleHelp, Copy, Maximize2, Sparkles } from "lucide-react";
-import { Fragment, useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Check, ChevronDown, ChevronRight, CircleHelp, Copy, Maximize2, Sparkles } from "lucide-react";
+import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasRun,
@@ -86,25 +86,21 @@ export function InputChainModal({
                 </HoverCardContent>
               </HoverCard>
             </div>
-            {steps.map((step, index) => (
-              <Fragment key={step.nodeId}>
-                {index > 0 ? (
-                  <ArrowUp aria-hidden className="mx-auto my-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => setSelectedNodeId(step.nodeId)}
-                  className={cn(
-                    "flex items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] transition-colors",
-                    selected?.nodeId === step.nodeId
-                      ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200"
-                      : "text-slate-600 hover:bg-slate-100",
-                  )}
-                >
-                  {step.icon}
-                  <span className="min-w-0 truncate">{step.name}</span>
-                </button>
-              </Fragment>
+            {steps.map((step) => (
+              <button
+                key={step.nodeId}
+                type="button"
+                onClick={() => setSelectedNodeId(step.nodeId)}
+                className={cn(
+                  "flex items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] transition-colors",
+                  selected?.nodeId === step.nodeId
+                    ? "bg-white font-medium text-slate-900 shadow-sm ring-1 ring-slate-200"
+                    : "text-slate-600 hover:bg-slate-100",
+                )}
+              >
+                {step.icon}
+                <span className="min-w-0 truncate">{step.name}</span>
+              </button>
             ))}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">

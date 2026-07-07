@@ -8,7 +8,7 @@ import {
   memoryEvents,
   runBashEvents,
 } from "./storybooks/timelineGroupsFixtures";
-import { EventTimeline, type TimelineEvent } from "./storybooks/timelineGroupsModel";
+import { EventTimeline, type RuntimeConfigNode, type TimelineEvent } from "./storybooks/timelineGroupsModel";
 
 /**
  * Wireframe/design spec (never merged to production) for a flat run-step timeline:
@@ -16,11 +16,11 @@ import { EventTimeline, type TimelineEvent } from "./storybooks/timelineGroupsMo
  * or a Line (GitHub-commit style). No lifecycle grouping/nesting.
  */
 
-function TimelineEventsPanel({ events }: { events: TimelineEvent[] }) {
+function TimelineEventsPanel({ events, configNode }: { events: TimelineEvent[]; configNode?: RuntimeConfigNode }) {
   return (
     <div className="min-h-screen bg-white p-6">
       <div className="mx-auto w-full max-w-[480px] overflow-hidden rounded-lg border border-slate-200 shadow-sm">
-        <EventTimeline events={events} />
+        <EventTimeline events={events} configNode={configNode} />
       </div>
     </div>
   );
@@ -38,29 +38,42 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Approval: Story = {
-  render: () => <TimelineEventsPanel events={approvalEvents} />,
+  render: () => (
+    <TimelineEventsPanel events={approvalEvents} configNode={{ component: "approval", name: "approve-deploy" }} />
+  ),
 };
 
 export const ApprovalCanceled: Story = {
-  render: () => <TimelineEventsPanel events={approvalCanceledEvents} />,
+  render: () => (
+    <TimelineEventsPanel
+      events={approvalCanceledEvents}
+      configNode={{ component: "approval", name: "approve-deploy" }}
+    />
+  ),
 };
 
 export const RunBash: Story = {
-  render: () => <TimelineEventsPanel events={runBashEvents} />,
+  render: () => <TimelineEventsPanel events={runBashEvents} configNode={{ component: "build", name: "run-tests" }} />,
 };
 
 export const CursorAgent: Story = {
-  render: () => <TimelineEventsPanel events={cursorAgentEvents} />,
+  render: () => (
+    <TimelineEventsPanel events={cursorAgentEvents} configNode={{ component: "cursor-agent", name: "cursor-agent" }} />
+  ),
 };
 
 export const Github: Story = {
-  render: () => <TimelineEventsPanel events={githubEvents} />,
+  render: () => <TimelineEventsPanel events={githubEvents} configNode={{ component: "github", name: "create-pr" }} />,
 };
 
 export const GithubError: Story = {
-  render: () => <TimelineEventsPanel events={githubErrorEvents} />,
+  render: () => (
+    <TimelineEventsPanel events={githubErrorEvents} configNode={{ component: "github", name: "create-pr" }} />
+  ),
 };
 
 export const Memory: Story = {
-  render: () => <TimelineEventsPanel events={memoryEvents} />,
+  render: () => (
+    <TimelineEventsPanel events={memoryEvents} configNode={{ component: "memory", name: "upsert-memory" }} />
+  ),
 };

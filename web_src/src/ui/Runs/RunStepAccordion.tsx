@@ -13,7 +13,6 @@ import { useEventExecutions } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RUN_NODE_ICON_SIZE, RunNodeIcon } from "./RunNodeIcon";
-import { RunStepConfigView } from "./RunStepConfigView";
 import {
   approvalEvents,
   cursorAgentEvents,
@@ -21,12 +20,9 @@ import {
   memoryEvents,
   runBashEvents,
 } from "./storybooks/timelineGroupsFixtures";
-import { EventTimeline, type TimelineEvent } from "./storybooks/timelineGroupsModel";
+import { EventTimeline, type RuntimeConfigNode, type TimelineEvent } from "./storybooks/timelineGroupsModel";
 import { buildExecutionChain, eventBadgeForExecution, eventBadgeForTriggeredTrigger } from "./runNodeDetailModel";
 import { formatEventTimestamp, formatStepDuration, getStepActivity } from "./runSummary";
-
-/** Controls what expanded steps render: the run-detail timeline or the read-only step configuration. */
-export type StepDetailMode = "run-details" | "step-config";
 
 export function StatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
   return (
@@ -253,19 +249,13 @@ export function AccordionNodeDetail({
   workflowNodes,
   componentIconMap = {},
   executions,
-  stepDetailMode = "run-details",
 }: {
   run: CanvasesCanvasRun;
   nodeId: string;
   workflowNodes: ComponentsNode[];
   componentIconMap?: Record<string, string>;
   executions: CanvasesCanvasNodeExecution[];
-  stepDetailMode?: StepDetailMode;
 }) {
-  if (stepDetailMode === "step-config") {
-    return <RunStepConfigView nodeId={nodeId} workflowNodes={workflowNodes} componentIconMap={componentIconMap} />;
-  }
-
   // WIREFRAME PREVIEW (never merged to production): render the flat timeline-events
   // design with mocked data instead of the real RunStepTimeline, so it can be reviewed
   // inside the live-canvas run inspection panel. The scenario shape is picked by
@@ -273,11 +263,22 @@ export function AccordionNodeDetail({
   // that errored render an error terminal instead of the mocked Output/Summary cards.
   // `run` stays in the props contract but is unused by the mocked wireframe.
   void run;
-  const component = (workflowNodes.find((node) => node.id === nodeId)?.component ?? "").toLowerCase();
+  const node = workflowNodes.find((item) => item.id === nodeId);
+  const component = (node?.component ?? "").toLowerCase();
   const execution = executions.find((item) => item.nodeId === nodeId);
   const base = pickWireframeScenario(component);
   const wireframeEvents = executionErrored(execution) ? applyErrorTerminal(base, execution) : base;
-  return <EventTimeline events={wireframeEvents} />;
+  // Feed the real node into the Runtime Config card so its read-only form has schema/values.
+  const configNode: RuntimeConfigNode | undefined = node
+    ? {
+        component: node.component,
+        name: node.name,
+        configuration: node.configuration as Record<string, unknown> | undefined,
+        iconSrc: getHeaderIconSrc(node.component),
+        iconSlug: node.component ? componentIconMap[node.component] : undefined,
+      }
+    : undefined;
+  return <EventTimeline events={wireframeEvents} configNode={configNode} />;
 }
 
 /** Whether a step's real execution resolved as an error (matching the app's own definition). */
