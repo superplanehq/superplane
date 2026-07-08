@@ -103,7 +103,9 @@ function renderPanel({
   manualRunTriggers?: ReadonlySet<string>;
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  // Fresh element per call — reusing the same element reference would let
+  // React bail out of re-rendering, hiding `mockInFlight` changes.
+  const buildUi = () => (
     <QueryClientProvider client={queryClient}>
       <ConsoleContextProvider
         canvasId="canvas-1"
@@ -115,8 +117,13 @@ function renderPanel({
       >
         <NodesPanelCard panel={panel} readOnly onDelete={() => undefined} onChange={() => undefined} />
       </ConsoleContextProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(buildUi());
+  // Re-render the same tree — lets tests mutate `mockInFlight` mid-test to
+  // simulate a run starting elsewhere while a dialog is already open.
+  const rerenderPanel = () => view.rerender(buildUi());
+  return { ...view, rerenderPanel };
 }
 
 afterEach(() => {
@@ -249,6 +256,17 @@ describe("NodesPanelCard — single-entry layout", () => {
     // Row-layout locators must not appear for a one-entry panel.
     expect(screen.queryByTestId("nodes-panel-row")).toBeNull();
   });
+
+  it("renders the compact unconfigured state for a legacy type: 'node' panel without a node", () => {
+    const legacyPanel: ConsolePanel = {
+      id: "legacy-empty",
+      type: "node",
+      content: { title: "Deploy" },
+    };
+    renderPanel({ canRunNodes: true, panel: legacyPanel });
+    expect(screen.getByText(/pick a node from the editor/i)).toBeInTheDocument();
+    expect(screen.queryByText(/add nodes from the editor/i)).toBeNull();
+  });
 });
 
 describe("NodesPanelCard — in-flight lock", () => {
@@ -278,6 +296,22 @@ describe("NodesPanelCard — in-flight lock", () => {
       expect(button).toBeDisabled();
       expect(button).toHaveAttribute("data-disabled-reason", "run-in-flight");
     }
+  });
+
+  it("blocks a confirm dialog opened before a run started from firing a duplicate", () => {
+    const onTrigger = vi.fn();
+    const { rerenderPanel } = renderPanel({ canRunNodes: true, onTriggerNode: onTrigger });
+    fireEvent.click(screen.getByTestId("node-panel-run"));
+    const submit = screen.getByTestId("node-panel-run-dialog-submit");
+    expect(submit).not.toBeDisabled();
+
+    // A run for the same trigger starts elsewhere while the dialog is open.
+    mockInFlight = new Set(["node-1"]);
+    rerenderPanel();
+
+    expect(submit).toBeDisabled();
+    fireEvent.click(submit);
+    expect(onTrigger).not.toHaveBeenCalled();
   });
 });
 

@@ -72,9 +72,12 @@ export function nodesPanelContentFromLegacyNode(raw: Record<string, unknown> | u
     triggerName: typeof obj.triggerName === "string" ? obj.triggerName : undefined,
     promptConfirmation: typeof obj.promptConfirmation === "boolean" ? obj.promptConfirmation : false,
   };
+  // Always fold into exactly one entry — even when the legacy node is
+  // unset — so the merged renderer keeps the compact single-node layout
+  // and its "pick a node" empty state, matching the pre-merge card.
   return {
     title: typeof obj.title === "string" ? obj.title : "",
-    nodes: node ? [entry] : [],
+    nodes: [entry],
   };
 }
 

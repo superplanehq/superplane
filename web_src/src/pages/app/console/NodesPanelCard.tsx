@@ -239,6 +239,8 @@ function NodesPanelRunControl({
         resolved={resolved}
         templateName={entry.triggerName}
         onConfirm={runTrigger}
+        confirmDisabled={disabled}
+        confirmDisabledTitle={disabledTitleFor(disabledReason)}
         testId={testIds.dialog}
       />
     </>

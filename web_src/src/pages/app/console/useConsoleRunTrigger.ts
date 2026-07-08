@@ -108,6 +108,12 @@ export function useConsoleRunTrigger({
       const nodeId = resolved?.node?.id;
       if (!nodeId) return;
       if (runningRef.current) return;
+      // A confirm dialog can outlive the state that opened it — e.g. another
+      // widget fires the same trigger while the dialog is up. Re-check the
+      // shared lock at fire time so a stale confirm can't enqueue a
+      // duplicate run.
+      if (lock.runInFlightIds.has(nodeId)) return;
+      if (effectiveLockKey && lock.pendingLockKeys.has(effectiveLockKey)) return;
       runningRef.current = true;
       setRunning(true);
       lock.beginSubmission(nodeId, effectiveLockKey);
