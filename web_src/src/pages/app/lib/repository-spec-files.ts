@@ -1,6 +1,5 @@
 import {
   canvasesDescribeCanvasVersion,
-  type CanvasesCanvas,
   type CanvasesCanvasSpec,
   type CanvasesCanvasVersion,
   type CanvasesStaging,
@@ -108,20 +107,5 @@ export function consoleSpecFromYaml(consoleYaml: string): ConsoleSpecData | unde
     panels: parsed.panels,
     layout: parsed.layout,
     consoleYaml,
-  };
-}
-
-export function liveCanvasVersionFromDescribe(canvas: CanvasesCanvas | undefined): CanvasesCanvasVersion | undefined {
-  const versionId = canvas?.metadata?.versionId;
-  if (!versionId || !canvas?.spec) {
-    return undefined;
-  }
-
-  return {
-    metadata: {
-      id: versionId,
-      canvasId: canvas.metadata?.id,
-    },
-    spec: canvas.spec,
   };
 }

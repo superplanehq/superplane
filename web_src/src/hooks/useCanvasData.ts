@@ -60,7 +60,7 @@ import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "../pages/app/lib/workflow-s
 import { committedCanvasMatchesYaml, committedConsoleMatchesYaml } from "../pages/app/lib/staging-content-match";
 import { materializeConsoleSpec } from "../pages/app/lib/workflow-spec-files";
 
-export { emptyCanvasStaging, liveCanvasVersionFromDescribe } from "../pages/app/lib/repository-spec-files";
+export { emptyCanvasStaging } from "../pages/app/lib/repository-spec-files";
 
 function toCanvasConsoleData(
   canvasId: string,
@@ -343,7 +343,7 @@ export function getCanvasStagingQueryOptions(canvasId: string) {
       const response = await canvasesGetCanvasStaging(withOrganizationHeader({ path: { canvasId } }));
       return response.data?.staging ?? emptyCanvasStaging();
     },
-    staleTime: 0,
+    staleTime: 30_000,
   } as const;
 }
 
@@ -412,6 +412,7 @@ export const useCanvasVersion = (organizationId: string, canvasId: string, versi
   return useQuery({
     ...getCanvasVersionQueryOptions(canvasId, versionId),
     enabled: !!organizationId && !!canvasId && !!versionId && enabled,
+    refetchOnMount: false,
   });
 };
 
@@ -420,6 +421,7 @@ export const useCanvasStaging = (canvasId: string | undefined, enabled = true) =
   return useQuery({
     ...getCanvasStagingQueryOptions(canvasId ?? ""),
     enabled: enabled && !!canvasId,
+    refetchOnMount: false,
   });
 };
 

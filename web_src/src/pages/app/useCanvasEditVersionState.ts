@@ -41,11 +41,9 @@ export function useCanvasEditVersionState({
     effectiveLiveCanvasVersionId,
     liveCanvasVersionId,
   });
-  const {
-    data: staging,
-    isLoading: stagingLoading,
-    isFetching: stagingFetching,
-  } = useCanvasStaging(canvasId, shouldReadStagedCanvasVersionFlag);
+  const shouldLoadStaging = shouldReadStagedCanvasVersionFlag || isEnteringEditSession;
+  const canvasStagingQuery = useCanvasStaging(canvasId, shouldLoadStaging);
+  const { data: staging, isLoading: stagingLoading, isFetching: stagingFetching } = canvasStagingQuery;
   const {
     data: loadedCommittedCanvasVersion,
     isLoading: loadedCommittedCanvasVersionLoading,
@@ -63,7 +61,7 @@ export function useCanvasEditVersionState({
   const loadedCanvasVersionFetching = shouldReadStagedCanvasVersionFlag
     ? stagingFetching
     : loadedCommittedCanvasVersionFetching;
-  const isAwaitingStagedCanvasSpecFlag = isAwaitingCanvasStaging({
+  const awaitingCanvasStaging = isAwaitingCanvasStaging({
     shouldReadStagedCanvasVersion: shouldReadStagedCanvasVersionFlag,
     stagingLoading,
     stagingFetching,
@@ -78,7 +76,7 @@ export function useCanvasEditVersionState({
         staging,
         loadedCommittedCanvasVersion,
         activeCanvasVersion,
-        isAwaitingStagedSpec: isAwaitingStagedCanvasSpecFlag,
+        awaitingCanvasStaging,
       }),
     [
       activeCanvasVersionId,
@@ -86,7 +84,7 @@ export function useCanvasEditVersionState({
       staging,
       loadedCommittedCanvasVersion,
       activeCanvasVersion,
-      isAwaitingStagedCanvasSpecFlag,
+      awaitingCanvasStaging,
     ],
   );
   const isViewingCurrentLiveVersion = isViewingCurrentLiveCanvasVersion({
@@ -101,11 +99,12 @@ export function useCanvasEditVersionState({
   return {
     activeCanvasVersionId,
     shouldReadStagedCanvasVersionFlag,
+    canvasStagingQuery,
     staging,
     loadedCanvasVersion,
     loadedCanvasVersionLoading,
     loadedCanvasVersionFetching,
-    isAwaitingStagedCanvasSpecFlag,
+    awaitingCanvasStaging,
     selectedCanvasVersion,
     isViewingCurrentLiveVersion,
     isViewingLiveVersion: isViewingCurrentLiveVersion,

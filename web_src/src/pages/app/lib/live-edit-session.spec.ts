@@ -139,7 +139,7 @@ describe("resolveSelectedCanvasVersion", () => {
         staging,
         loadedCommittedCanvasVersion: undefined,
         activeCanvasVersion: shellVersion,
-        isAwaitingStagedSpec: false,
+        awaitingCanvasStaging: false,
       }),
     ).toEqual({
       metadata: { id: "live-version" },
@@ -155,7 +155,7 @@ describe("resolveSelectedCanvasVersion", () => {
         staging: undefined,
         loadedCommittedCanvasVersion: undefined,
         activeCanvasVersion: shellVersion,
-        isAwaitingStagedSpec: true,
+        awaitingCanvasStaging: true,
       }),
     ).toEqual({
       metadata: { id: "live-version" },
@@ -174,7 +174,7 @@ describe("resolveSelectedCanvasVersion", () => {
           metadata: { id: "new-live-version" },
           spec: { nodes: [{ id: "live-node" }], edges: [] },
         },
-        isAwaitingStagedSpec: false,
+        awaitingCanvasStaging: false,
       }),
     ).toEqual({
       metadata: { id: "new-live-version" },

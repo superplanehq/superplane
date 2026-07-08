@@ -2,7 +2,7 @@ import type { CanvasesCanvas } from "@/api-client";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { getCanvasVersionQueryOptions } from "@/hooks/useCanvasData";
+import { canvasKeys, getCanvasVersionQueryOptions } from "@/hooks/useCanvasData";
 import { consoleSpecFromCanvasSpec } from "./lib/repository-spec-files";
 import type { ConsoleLayoutItem, ConsolePanel } from "@/hooks/useCanvasData";
 
@@ -41,7 +41,7 @@ export function useCommittedDraftBaselines({
     let cancelled = false;
     setBaselines({ ready: false });
 
-    void queryClient.fetchQuery(getCanvasVersionQueryOptions(canvasId, versionId)).then((version) => {
+    const applyBaselines = (version: { spec?: CanvasesCanvas["spec"] } | undefined) => {
       if (cancelled) {
         return;
       }
@@ -55,7 +55,19 @@ export function useCommittedDraftBaselines({
         },
         ready: true,
       });
-    });
+    };
+
+    const cachedVersion = queryClient.getQueryData<{ spec?: CanvasesCanvas["spec"] }>(
+      canvasKeys.versionDetail(canvasId, versionId),
+    );
+    if (cachedVersion?.spec) {
+      applyBaselines(cachedVersion);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void queryClient.fetchQuery(getCanvasVersionQueryOptions(canvasId, versionId)).then(applyBaselines);
 
     return () => {
       cancelled = true;

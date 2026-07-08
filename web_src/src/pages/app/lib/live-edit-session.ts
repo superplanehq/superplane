@@ -93,14 +93,14 @@ export function resolveSelectedCanvasVersion({
   staging,
   loadedCommittedCanvasVersion,
   activeCanvasVersion,
-  isAwaitingStagedSpec,
+  awaitingCanvasStaging,
 }: {
   activeCanvasVersionId: string;
   shouldReadStagedCanvasVersion: boolean;
   staging: CanvasesStaging | undefined;
   loadedCommittedCanvasVersion: CanvasesCanvasVersion | null | undefined;
   activeCanvasVersion: CanvasesCanvasVersion | null;
-  isAwaitingStagedSpec: boolean;
+  awaitingCanvasStaging: boolean;
 }): CanvasesCanvasVersion | null {
   if (!activeCanvasVersionId) {
     return null;
@@ -111,7 +111,7 @@ export function resolveSelectedCanvasVersion({
       return { ...activeCanvasVersion, spec: staging.spec };
     }
 
-    if (isAwaitingStagedSpec && activeCanvasVersion) {
+    if (awaitingCanvasStaging && activeCanvasVersion) {
       return { ...activeCanvasVersion, spec: undefined };
     }
 
@@ -197,6 +197,3 @@ export function resetCommittedLiveCanvasDetail({
     return { ...current, spec: committedSpec };
   });
 }
-
-// Backwards-compatible alias while callers migrate naming.
-export const isAwaitingStagedCanvasSpec = isAwaitingCanvasStaging;
