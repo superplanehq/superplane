@@ -1056,16 +1056,28 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 		exampleData, _ := structpb.NewStruct(trigger.ExampleData())
 
 		out[i] = &triggerpb.Trigger{
-			Name:          trigger.Name(),
-			Label:         trigger.Label(),
-			Description:   trigger.Description(),
-			Icon:          trigger.Icon(),
-			Color:         trigger.Color(),
-			Configuration: configuration,
-			ExampleData:   exampleData,
+			Name:           trigger.Name(),
+			Label:          trigger.Label(),
+			Description:    trigger.Description(),
+			Icon:           trigger.Icon(),
+			Color:          trigger.Color(),
+			Configuration:  configuration,
+			ExampleData:    exampleData,
+			ManualRunnable: triggerHasManualRunHook(trigger),
 		}
 	}
 	return out
+}
+
+// triggerHasManualRunHook mirrors the check enforced in
+// InvokeNodeTriggerHook: the frontend uses this bit to filter which trigger
+// nodes expose a manual "Run" affordance in the console. Keep the condition
+// in lockstep with that RPC — a hook named `core.HookNameRun` with
+// `HookTypeUser` is what makes a trigger manually invokable.
+func triggerHasManualRunHook(trigger core.Trigger) bool {
+	return slices.ContainsFunc(trigger.Hooks(), func(hook core.Hook) bool {
+		return hook.Name == core.HookNameRun && hook.Type == core.HookTypeUser
+	})
 }
 
 func AppendGlobalTriggerFields(triggerName string, fields []configuration.Field) []configuration.Field {

@@ -5,7 +5,7 @@ import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
+import { isManualRunNode, useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
 import { applyTableWhere } from "./evalTableWhere";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
@@ -82,13 +82,15 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
 
   const resolveRowStyle = useMemo(() => makeRowStyleResolver(render.rowStyles), [render.rowStyles]);
 
-  // Collect the unique trigger node ids referenced by this table's row actions
-  // so the action lock can subscribe to the runs query only when needed.
+  // Row actions whose configured node isn't manually runnable are hidden
+  // downstream in `WidgetTableGrid`; unresolved actions still render with a
+  // "Node not found" tooltip. We only need the trigger id set here to scope
+  // the lock's runs subscription to the actual manual-runnable targets.
   const triggerNodeIds = useMemo(() => {
     const ids = new Set<string>();
     for (const action of render.rowActions ?? []) {
       const resolved = resolveConsoleNode(ctx, action.node);
-      if (resolved?.node.id && resolved.node.type === "TYPE_TRIGGER") ids.add(resolved.node.id);
+      if (resolved?.node.id && isManualRunNode(ctx, resolved.node)) ids.add(resolved.node.id);
     }
     return Array.from(ids);
   }, [render.rowActions, ctx]);
@@ -183,7 +185,12 @@ function WidgetTableGrid({
   onLoadMore,
   onScroll,
 }: WidgetTableGridProps) {
-  const hasActions = Boolean(render.rowActions && render.rowActions.length > 0);
+  const ctx = useConsoleContext();
+  const rowActions = (render.rowActions ?? []).filter((action) => {
+    const resolved = resolveConsoleNode(ctx, action.node);
+    return !resolved || isManualRunNode(ctx, resolved.node);
+  });
+  const hasActions = rowActions.length > 0;
   return (
     <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
       <table className="w-full border-collapse text-[13px]">
@@ -226,8 +233,8 @@ function WidgetTableGrid({
                 {hasActions ? (
                   <td className="px-3 py-1.5 text-right">
                     <div className="inline-flex items-center gap-1">
-                      {render.rowActions
-                        ?.filter((action) => evaluateRowShow(action.show, row))
+                      {rowActions
+                        .filter((action) => evaluateRowShow(action.show, row))
                         .map((action, ai) => (
                           <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
                         ))}
@@ -340,24 +347,22 @@ function formatAbsoluteTitle(value: unknown): string | undefined {
   return formatTimestampInUserTimezone(new Date(ms).toISOString());
 }
 
-type ActionDisabledReason = "no-perm" | "no-node" | "not-trigger" | "run-in-flight" | "submitting" | null;
+type ActionDisabledReason = "no-perm" | "no-node" | "not-manual-run" | "run-in-flight" | "submitting" | null;
 
-function disabledReason({
-  canRun,
-  hasResolvedNode,
-  isTrigger,
-  runInFlight,
-  submitting,
-}: {
-  canRun: boolean;
-  hasResolvedNode: boolean;
-  isTrigger: boolean;
-  runInFlight: boolean;
-  submitting: boolean;
-}): ActionDisabledReason {
+// `not-manual-run` is defense in depth: `WidgetTableGrid` already hides
+// non-manual-run actions upstream. This branch covers the transient case
+// before the trigger catalog resolves — the action then renders disabled
+// rather than as a button that would fail server-side.
+function disabledReason(
+  canRun: boolean,
+  hasResolvedNode: boolean,
+  isManualRun: boolean,
+  runInFlight: boolean,
+  submitting: boolean,
+): ActionDisabledReason {
   if (!canRun) return "no-perm";
   if (!hasResolvedNode) return "no-node";
-  if (!isTrigger) return "not-trigger";
+  if (!isManualRun) return "not-manual-run";
   if (runInFlight) return "run-in-flight";
   if (submitting) return "submitting";
   return null;
@@ -387,8 +392,8 @@ function disabledTooltip(reason: ActionDisabledReason, node: string): string | u
       return "You do not have permission to run actions in this canvas";
     case "no-node":
       return `Node "${node}" not found on this canvas`;
-    case "not-trigger":
-      return "Only trigger nodes can be run from the console. Pick the trigger that starts your flow.";
+    case "not-manual-run":
+      return "Only trigger nodes with a manual run can be fired from the console.";
     case "run-in-flight":
       return "A run for this trigger is already in progress.";
     case "submitting":
@@ -455,7 +460,9 @@ function useRowActionGate(action: WidgetRowAction, rowKey: string) {
   const lock = useWidgetTableActionLock();
   const canRun = ctx?.canRunNodes ?? false;
   const resolved = resolveConsoleNode(ctx, action.node);
-  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
+  // WidgetTable hides non-manual actions upstream; at this level `true` is
+  // the normal case, unresolved nodes render disabled with a tooltip.
+  const isManualRun = isManualRunNode(ctx, resolved?.node);
   const triggerNodeId = resolved?.node.id;
   // Per-row locking: a row's button is disabled by `runInFlight` only when
   // its own submission produced the in-flight run (i.e. the mapping points
@@ -465,16 +472,10 @@ function useRowActionGate(action: WidgetRowAction, rowKey: string) {
     triggerNodeId && lock.runInFlightIds.has(triggerNodeId) && lock.inFlightRowByTrigger.get(triggerNodeId) === rowKey,
   );
   const submitting = lock.pendingRowKeys.has(rowKey);
-  const reason = disabledReason({
-    canRun,
-    hasResolvedNode: Boolean(resolved),
-    isTrigger,
-    runInFlight,
-    submitting,
-  });
+  const reason = disabledReason(canRun, Boolean(resolved), isManualRun, runInFlight, submitting);
   return {
     resolved,
-    isTrigger,
+    isManualRun,
     disabled: reason !== null,
     reason,
     tooltip: disabledTooltip(reason, action.node),
@@ -492,7 +493,7 @@ function RowActionButton({
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { resolved, isTrigger, disabled, reason, tooltip } = useRowActionGate(action, rowKey);
+  const { resolved, isManualRun, disabled, reason, tooltip } = useRowActionGate(action, rowKey);
   const label = action.label ?? "Run";
   const hookName = action.hook ?? "run";
   const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
@@ -548,7 +549,7 @@ function RowActionButton({
           action={action}
           row={row}
           resolved={resolved}
-          isTrigger={isTrigger}
+          isManualRun={isManualRun}
           hookName={hookName}
           label={label}
           open={confirmOpen}

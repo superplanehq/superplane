@@ -40,6 +40,16 @@ export interface ConsoleContextValue {
    */
   canRunNodes: boolean;
   /**
+   * Names of triggers (component identifiers, e.g. `start`, `schedule`) that
+   * expose a user-invokable `run` hook — the same condition
+   * `InvokeNodeTriggerHook` enforces on the backend. When defined, console
+   * widgets use it to hide manual-run affordances (Run buttons, table row
+   * actions) for event triggers such as `github.pullRequest`. When
+   * `undefined` (catalog still loading), consumers fall back to the previous
+   * `TYPE_TRIGGER`-only heuristic to avoid flicker on first paint.
+   */
+  manualRunTriggers?: ReadonlySet<string>;
+  /**
    * Open the manual-trigger flow for the given node. Resolution is by node id;
    * if undefined the chip falls back to dispatching the
    * `dashboard:trigger-node` window event so a host can react when wired.
@@ -76,4 +86,27 @@ export function resolveConsoleNode(
   const byName = ctx.nodes.find((n) => n.name === trimmed);
   if (byName) return { node: byName, label: byName.name || byName.id || trimmed };
   return undefined;
+}
+
+/**
+ * Single source of truth for "this node can be manually run from the
+ * console". Combines the structural `TYPE_TRIGGER` check with the trigger
+ * catalog's `manualRunnable` bit (populated from the backend's user `run`
+ * hook). While the catalog is still loading (`manualRunTriggers` undefined)
+ * we intentionally return `true` for any `TYPE_TRIGGER` so first paint keeps
+ * the previous behavior — the widgets will re-render once the query settles.
+ *
+ * Nodes without a `component` (unlikely at runtime, but possible in
+ * partially normalized fixtures) are rejected once the catalog is loaded.
+ */
+export function isManualRunNode(
+  ctx: Pick<ConsoleContextValue, "manualRunTriggers"> | undefined,
+  node: SuperplaneComponentsNode | undefined,
+): boolean {
+  if (!node) return false;
+  if (node.type !== "TYPE_TRIGGER") return false;
+  const catalog = ctx?.manualRunTriggers;
+  if (catalog === undefined) return true;
+  const component = node.component;
+  return Boolean(component) && catalog.has(component!);
 }
