@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/server"
 	"github.com/superplanehq/superplane/test/e2e/session"
