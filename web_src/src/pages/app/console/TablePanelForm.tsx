@@ -1,4 +1,4 @@
-import { useConsoleContext } from "./ConsoleContext";
+import { isManualRunNode, useConsoleContext } from "./ConsoleContext";
 import { DataSourceForm } from "./DataSourceForm";
 import type { TablePanelContent } from "./panelTypes";
 import {
@@ -23,7 +23,11 @@ interface TablePanelFormProps {
 export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
   const ctx = useConsoleContext();
   const canvasId = ctx?.canvasId;
-  const triggerNodes = (ctx?.nodes ?? []).filter((n) => n.type === "TYPE_TRIGGER");
+  // Row actions fire the user-invokable `run` hook, so the editor's node
+  // dropdown must only expose triggers the backend will actually accept.
+  // `isManualRunNode` combines `TYPE_TRIGGER` with the trigger catalog's
+  // `manualRunnable` bit — the same check the runtime path uses.
+  const triggerNodes = (ctx?.nodes ?? []).filter((n) => isManualRunNode(ctx, n));
   const namespace = value.dataSource.kind === "memory" ? value.dataSource.namespace : "";
   const { fields: memoryFields } = useMemoryCatalog(canvasId, namespace);
   const fields = resolveFieldCatalog(value, memoryFields);

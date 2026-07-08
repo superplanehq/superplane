@@ -153,6 +153,53 @@ func TestSerializeTriggersAddsDefaultRunTitleExpression(t *testing.T) {
 	require.Equal(t, "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}", runTitle.GetDefaultValue())
 }
 
+func TestSerializeTriggersManualRunnable(t *testing.T) {
+	t.Run("marks trigger with user 'run' hook as manual-runnable", func(t *testing.T) {
+		triggers := SerializeTriggers([]core.Trigger{
+			&testTriggerDefinition{
+				name:  "start",
+				hooks: []core.Hook{{Name: core.HookNameRun, Type: core.HookTypeUser}},
+			},
+		})
+
+		require.Len(t, triggers, 1)
+		assert.True(t, triggers[0].ManualRunnable, "trigger with user 'run' hook must be manual-runnable")
+	})
+
+	t.Run("event trigger without user 'run' hook is not manual-runnable", func(t *testing.T) {
+		triggers := SerializeTriggers([]core.Trigger{
+			&testTriggerDefinition{name: "github.pullRequest"},
+		})
+
+		require.Len(t, triggers, 1)
+		assert.False(t, triggers[0].ManualRunnable, "event trigger with no hooks must not be manual-runnable")
+	})
+
+	t.Run("trigger with only internal 'run' hook is not manual-runnable", func(t *testing.T) {
+		triggers := SerializeTriggers([]core.Trigger{
+			&testTriggerDefinition{
+				name:  "internal.only",
+				hooks: []core.Hook{{Name: core.HookNameRun, Type: core.HookTypeInternal}},
+			},
+		})
+
+		require.Len(t, triggers, 1)
+		assert.False(t, triggers[0].ManualRunnable, "internal 'run' hook must not surface as manual-runnable")
+	})
+
+	t.Run("trigger with unrelated user hook is not manual-runnable", func(t *testing.T) {
+		triggers := SerializeTriggers([]core.Trigger{
+			&testTriggerDefinition{
+				name:  "webhook",
+				hooks: []core.Hook{{Name: "resetAuthentication", Type: core.HookTypeUser}},
+			},
+		})
+
+		require.Len(t, triggers, 1)
+		assert.False(t, triggers[0].ManualRunnable, "user hooks other than 'run' must not surface as manual-runnable")
+	})
+}
+
 func TestDefaultRunTitleExpressionsResolveAgainstExampleData(t *testing.T) {
 	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
@@ -285,7 +332,8 @@ func cloneExampleValue(value any) any {
 }
 
 type testTriggerDefinition struct {
-	name string
+	name  string
+	hooks []core.Hook
 }
 
 func (t *testTriggerDefinition) Name() string                         { return t.name }
@@ -300,7 +348,7 @@ func (t *testTriggerDefinition) HandleWebhook(core.WebhookRequestContext) (int, 
 	return 200, nil, nil
 }
 func (t *testTriggerDefinition) Setup(core.TriggerContext) error { return nil }
-func (t *testTriggerDefinition) Hooks() []core.Hook              { return nil }
+func (t *testTriggerDefinition) Hooks() []core.Hook              { return t.hooks }
 func (t *testTriggerDefinition) HandleHook(core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }

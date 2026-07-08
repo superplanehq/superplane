@@ -1,22 +1,18 @@
-import { useId, useState } from "react";
-import { Network, Play, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { CircleDot, Network, Play } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/ui/checkbox";
 import type { ConsolePanel } from "@/hooks/useCanvasData";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { WidgetEmptyState } from "./WidgetEmptyState";
-import { useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
+import { isManualRunNode, useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import { useConsoleRunTrigger } from "./useConsoleRunTrigger";
 import type { NodesPanelContent, NodesPanelNode } from "./nodesPanelContent";
+import { nodesPanelContentFromLegacyNode } from "./nodesPanelContent";
+import { NodesPanelForm } from "./NodesPanelForm";
 
 interface NodesPanelCardProps {
   panel: ConsolePanel;
@@ -27,18 +23,19 @@ interface NodesPanelCardProps {
 }
 
 /**
- * Multi-node panel: renders a compact list of canvas nodes with an optional
- * purpose line. Useful for "Key Nodes" style cards that want to surface
- * several pinned nodes in a single console card instead of one panel per
- * node.
+ * Adaptive node panel: renders as a compact centered card when exactly one
+ * node is configured (status + optional manual-run button) and as a row
+ * list otherwise. Handles both the modern `type: "nodes"` shape and the
+ * legacy `type: "node"` shape by folding the latter into a one-entry list.
  *
- * Resolution and trigger plumbing reuse {@link useConsoleContext} and
- * mirror the single-node panel so authorization and runtime behavior stay
- * consistent across both panel types.
+ * Resolution and trigger plumbing reuse {@link useConsoleContext} and the
+ * shared {@link useConsoleRunTrigger} hook so authorization, manual-run
+ * gating, and re-entry protection stay consistent everywhere the console
+ * fires a trigger.
  */
 export function NodesPanelCard({ panel, readOnly, onDelete, onChange, onEditingChange }: NodesPanelCardProps) {
   const [editing, setEditing] = useState(false);
-  const content = normalizeContent(panel.content);
+  const content = normalizeContent(panel);
   const setEditingState = (next: boolean) => {
     setEditing(next);
     onEditingChange?.(next);
@@ -74,20 +71,65 @@ function NodesPanelBody({ content }: { content: NodesPanelContent }) {
       <WidgetEmptyState icon={Network} className="min-h-0" message="Add nodes from the editor to surface them here." />
     );
   }
+  if (content.nodes.length === 1) {
+    return <SingleNodeBody entry={content.nodes[0]} entryIndex={0} />;
+  }
   return (
     <ul className="flex h-full flex-col divide-y divide-slate-100 dark:divide-gray-800" data-testid="nodes-panel-list">
       {content.nodes.map((entry, idx) => (
-        <NodesPanelRow key={`${entry.node}-${idx}`} entry={entry} />
+        <NodesPanelRow key={`${entry.node}-${idx}`} entry={entry} entryIndex={idx} />
       ))}
     </ul>
   );
 }
 
-function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
+/**
+ * Compact single-node presentation used when the panel holds exactly one
+ * entry — matches the pre-merge single-node card so existing dashboards
+ * keep their look after we consolidate the widget.
+ */
+function SingleNodeBody({ entry, entryIndex }: { entry: NodesPanelNode; entryIndex: number }) {
+  const ctx = useConsoleContext();
+  if (!entry.node) {
+    return (
+      <WidgetEmptyState
+        icon={CircleDot}
+        className="min-h-0"
+        message="Pick a node from the editor to display it here."
+      />
+    );
+  }
+  const resolved = resolveConsoleNode(ctx, entry.node);
+  const displayName = entry.label?.trim() || resolved?.label || entry.node || "—";
+  const canManualRun = isManualRunNode(ctx, resolved?.node);
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
+      <div className="text-[13px] font-semibold text-slate-800 dark:text-gray-100" data-testid="node-panel-name">
+        {displayName}
+      </div>
+      {entry.showRun && canManualRun ? (
+        <NodesPanelRunControl
+          entry={entry}
+          entryIndex={entryIndex}
+          resolved={resolved}
+          testIds={{ button: "node-panel-run", dialog: "node-panel-run-dialog" }}
+        />
+      ) : null}
+      {!resolved && entry.node ? (
+        <p className="text-[13px] text-amber-600 dark:text-amber-400">
+          Node {JSON.stringify(entry.node)} not found in this canvas.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function NodesPanelRow({ entry, entryIndex }: { entry: NodesPanelNode; entryIndex: number }) {
   const ctx = useConsoleContext();
   const resolved = resolveConsoleNode(ctx, entry.node);
   const displayName = entry.label?.trim() || resolved?.label || entry.node;
-  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
+  const canManualRun = isManualRunNode(ctx, resolved?.node);
 
   return (
     <li className="flex items-center gap-3 px-3 py-2" data-testid="nodes-panel-row">
@@ -109,29 +151,69 @@ function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
           </p>
         ) : null}
       </div>
-      {entry.showRun && isTrigger ? <NodesPanelRunControl entry={entry} resolved={resolved} /> : null}
+      {entry.showRun && canManualRun ? (
+        <NodesPanelRunControl
+          entry={entry}
+          entryIndex={entryIndex}
+          resolved={resolved}
+          testIds={{ button: "nodes-panel-row-run", dialog: "nodes-panel-row-run-dialog" }}
+          buttonClassName="shrink-0"
+        />
+      ) : null}
     </li>
   );
 }
 
+interface RunControlTestIds {
+  button: string;
+  dialog: string;
+}
+
+function disabledTitleFor(reason: string | null): string | undefined {
+  switch (reason) {
+    case "no-perm":
+      return "You do not have permission to run this node";
+    case "not-manual-run":
+      return "Only trigger nodes with a manual run can be fired from the console.";
+    case "run-in-flight":
+      return "A run for this trigger is already in progress.";
+    case "submitting":
+      return "Submitting trigger…";
+    default:
+      return undefined;
+  }
+}
+
 /**
- * Run button + confirm dialog for a single Key Nodes row. A template with
- * input fields always opens {@link NodeRunConfirmDialog} so the operator can
- * fill them in. A parameter-less template only prompts when the row opts in
- * via `promptConfirmation`; otherwise the click fires the trigger directly.
+ * Run button + confirm dialog for one entry. A template with input fields
+ * always opens {@link NodeRunConfirmDialog} so the operator can fill them
+ * in. A parameter-less template only prompts when the entry opts in via
+ * `promptConfirmation`; otherwise the click fires the trigger directly.
+ *
+ * The button is locked while `useConsoleRunTrigger` reports a submission or
+ * in-flight run for the trigger, so users can't queue duplicate runs while
+ * the pipeline is still executing.
  */
 function NodesPanelRunControl({
   entry,
+  entryIndex,
   resolved,
+  testIds,
+  buttonClassName,
 }: {
   entry: NodesPanelNode;
+  entryIndex: number;
   resolved: ReturnType<typeof resolveConsoleNode>;
+  testIds: RunControlTestIds;
+  buttonClassName?: string;
 }) {
-  const { canRun, running, dialogOpen, setDialogOpen, handleClick, runTrigger } = useConsoleRunTrigger({
-    resolved,
-    triggerName: entry.triggerName,
-    promptConfirmation: entry.promptConfirmation,
-  });
+  const { running, disabled, disabledReason, dialogOpen, setDialogOpen, handleClick, runTrigger } =
+    useConsoleRunTrigger({
+      resolved,
+      triggerName: entry.triggerName,
+      promptConfirmation: entry.promptConfirmation,
+      lockKey: `nodes-panel-entry:${entryIndex}:${resolved?.node?.id ?? entry.node}`,
+    });
 
   return (
     <>
@@ -139,13 +221,14 @@ function NodesPanelRunControl({
         type="button"
         size="xs"
         variant="outline"
-        loading={running}
-        loadingText="Running…"
+        loading={running || disabledReason === "run-in-flight"}
+        loadingText={disabledReason === "run-in-flight" ? "Running…" : "Running…"}
         onClick={handleClick}
-        disabled={!canRun || running}
-        title={canRun ? undefined : "You do not have permission to run this node"}
-        data-testid="nodes-panel-row-run"
-        className="shrink-0"
+        disabled={disabled}
+        title={disabledTitleFor(disabledReason)}
+        data-testid={testIds.button}
+        data-disabled-reason={disabledReason ?? undefined}
+        className={buttonClassName}
       >
         <Play className="mr-1 h-3 w-3" />
         Run
@@ -156,187 +239,28 @@ function NodesPanelRunControl({
         resolved={resolved}
         templateName={entry.triggerName}
         onConfirm={runTrigger}
-        testId="nodes-panel-row-run-dialog"
+        confirmDisabled={disabled}
+        confirmDisabledTitle={disabledTitleFor(disabledReason)}
+        testId={testIds.dialog}
       />
     </>
   );
 }
 
-function NodesPanelForm({
-  value,
-  onChange,
-}: {
-  value: NodesPanelContent;
-  onChange: (next: NodesPanelContent) => void;
-}) {
-  const updateEntry = (index: number, patch: Partial<NodesPanelNode>) => {
-    const nodes = value.nodes.map((entry, i) => (i === index ? { ...entry, ...patch } : entry));
-    onChange({ ...value, nodes });
-  };
-  const removeEntry = (index: number) => {
-    onChange({ ...value, nodes: value.nodes.filter((_, i) => i !== index) });
-  };
-  const addEntry = () => {
-    onChange({ ...value, nodes: [...value.nodes, { node: "", description: "", showRun: false }] });
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Title (optional)</Label>
-        <Input
-          value={value.title ?? ""}
-          onChange={(e) => onChange({ ...value, title: e.target.value })}
-          placeholder="Defaults to panel id"
-        />
-      </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Nodes</Label>
-          <Button type="button" size="sm" variant="outline" onClick={addEntry} data-testid="nodes-panel-add-entry">
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            Add node
-          </Button>
-        </div>
-        {value.nodes.length === 0 ? (
-          <p className="rounded border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-500 dark:border-gray-600 dark:text-gray-400">
-            No nodes yet. Add one to display it in this panel.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {value.nodes.map((entry, index) => (
-              <NodesPanelEntryRow
-                key={index}
-                entry={entry}
-                onChange={(patch) => updateEntry(index, patch)}
-                onRemove={() => removeEntry(index)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+/**
+ * Accept both the modern `type: "nodes"` shape and the legacy `type: "node"`
+ * shape (still present in old canvases and YAML imports). Legacy content is
+ * folded into a one-entry `nodes` list so the merged renderer treats both
+ * uniformly.
+ */
+function normalizeContent(panel: ConsolePanel): NodesPanelContent {
+  if (panel.type === "node") {
+    return nodesPanelContentFromLegacyNode(panel.content);
+  }
+  return normalizeNodesContent(panel.content);
 }
 
-function NodesPanelEntryRow({
-  entry,
-  onChange,
-  onRemove,
-}: {
-  entry: NodesPanelNode;
-  onChange: (patch: Partial<NodesPanelNode>) => void;
-  onRemove: () => void;
-}) {
-  const ctx = useConsoleContext();
-  const nodes = ctx?.nodes ?? [];
-  const showRunId = useId();
-  const promptConfirmationId = useId();
-  const resolved = resolveConsoleNode(ctx, entry.node);
-  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
-
-  return (
-    <div className="space-y-2 rounded border border-slate-200 p-2.5 dark:border-gray-600">
-      <div className="grid grid-cols-12 gap-2">
-        <div className="col-span-6 space-y-1.5">
-          <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Node</Label>
-          <Select value={entry.node || "__none__"} onValueChange={(v) => onChange({ node: v === "__none__" ? "" : v })}>
-            <SelectTrigger className="h-8">
-              <SelectValue placeholder="Select a node" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Select a node…</SelectItem>
-              {nodes.map((n) => (
-                <SelectItem key={n.id} value={n.name || n.id || ""}>
-                  {n.name || n.id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="col-span-5 space-y-1.5">
-          <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Label (optional)</Label>
-          <Input
-            value={entry.label ?? ""}
-            onChange={(e) => onChange({ label: e.target.value || undefined })}
-            placeholder="Display name override"
-            className="h-8"
-          />
-        </div>
-        <div className="col-span-1 flex items-end justify-end">
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            onClick={onRemove}
-            aria-label="Remove node entry"
-            data-testid="nodes-panel-remove-entry"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">Description (optional)</Label>
-        <Textarea
-          value={entry.description ?? ""}
-          onChange={(e) => onChange({ description: e.target.value || undefined })}
-          placeholder="Short purpose line shown under the node name"
-          className="min-h-[2.25rem] text-xs"
-          rows={1}
-        />
-      </div>
-      {isTrigger ? (
-        <>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={showRunId}
-              checked={Boolean(entry.showRun)}
-              onCheckedChange={(checked) => onChange({ showRun: checked === true })}
-              className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600 dark:border-gray-600"
-            />
-            <Label htmlFor={showRunId} className="text-xs text-slate-700 dark:text-gray-300">
-              Show a manual "Run" button (requires run permission).
-            </Label>
-          </div>
-          {entry.showRun ? (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-[11px] font-medium text-slate-600 dark:text-gray-400">
-                  Trigger template (optional)
-                </Label>
-                <Input
-                  value={entry.triggerName ?? ""}
-                  onChange={(e) => onChange({ triggerName: e.target.value || undefined })}
-                  placeholder="e.g. manual"
-                  className="h-8"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id={promptConfirmationId}
-                  checked={Boolean(entry.promptConfirmation)}
-                  onCheckedChange={(checked) => onChange({ promptConfirmation: checked === true })}
-                  className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
-                />
-                <Label htmlFor={promptConfirmationId} className="text-xs text-slate-700 dark:text-gray-300">
-                  Prompt confirmation before running (templates with input fields always prompt).
-                </Label>
-              </div>
-            </>
-          ) : null}
-        </>
-      ) : entry.node && resolved ? (
-        <p className="text-[11px] text-slate-500 dark:text-gray-400">
-          Only trigger nodes can be run from the console. Pick the trigger that starts your flow.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function normalizeContent(raw: Record<string, unknown> | undefined): NodesPanelContent {
+function normalizeNodesContent(raw: Record<string, unknown> | undefined): NodesPanelContent {
   const title = typeof raw?.title === "string" ? raw.title : "";
   const rawNodes = Array.isArray(raw?.nodes) ? raw.nodes : [];
   const nodes = rawNodes.map(normalizeEntry).filter((entry): entry is NodesPanelNode => entry != null);
