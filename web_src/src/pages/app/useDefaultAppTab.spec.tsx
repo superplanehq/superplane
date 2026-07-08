@@ -87,6 +87,33 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" });
   });
 
+  it("skips the redirect when the stored tab already matches the current tab, preserving other params", () => {
+    mockPreferenceQuery = { isPending: false, data: { lastVisitedTab: "canvas" } };
+
+    const { setSearchParams } = renderDefaultAppTab({
+      // Refresh on the Canvas tab with node selection + sidebar state in the
+      // URL (no `view` param). Rewriting the URL here would delete
+      // `node`/`sidebar`/`file` even though no tab change is needed.
+      searchParams: new URLSearchParams("node=abc&sidebar=nodeEditor"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+    // Identical stored value — nothing to write back either.
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("still records a later tab change after the redirect was skipped as already-on-tab", () => {
+    mockPreferenceQuery = { isPending: false, data: { lastVisitedTab: "canvas" } };
+
+    const { rerender } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("node=abc"),
+    });
+    rerender({ urlViewFlags: MEMORY_FLAGS });
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" });
+  });
+
   it("records the current tab when there is no stored preference and no redirect", () => {
     renderDefaultAppTab();
 

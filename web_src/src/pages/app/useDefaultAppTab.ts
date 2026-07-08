@@ -88,8 +88,13 @@ export function useDefaultAppTab({
     const storedTab = preferenceQuery.data?.lastVisitedTab;
     if (isAppTabId(storedTab)) {
       redirectResolvedRef.current = true;
-      pendingRedirectTabRef.current = storedTab;
-      applyTabToSearchParams(storedTab, setSearchParams);
+      // Already on the stored tab (e.g. a refresh landing on Canvas with a
+      // stored "canvas" preference): rewriting the URL would only strip
+      // unrelated params like `node`/`sidebar`/`file`, losing selection state.
+      if (storedTab !== currentTab) {
+        pendingRedirectTabRef.current = storedTab;
+        applyTabToSearchParams(storedTab, setSearchParams);
+      }
       return;
     }
 
@@ -106,7 +111,15 @@ export function useDefaultAppTab({
       pendingRedirectTabRef.current = "console";
       applyTabToSearchParams("console", setSearchParams);
     }
-  }, [organizationId, canvasId, preferenceQuery.isPending, preferenceQuery.data, consoleQuery, setSearchParams]);
+  }, [
+    organizationId,
+    canvasId,
+    currentTab,
+    preferenceQuery.isPending,
+    preferenceQuery.data,
+    consoleQuery,
+    setSearchParams,
+  ]);
 
   // Record tab changes to the backend once the initial redirect has settled.
   useEffect(() => {
