@@ -35,7 +35,7 @@ export const SignupWaitlist: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <Text className="text-left text-sm leading-6 text-gray-600">
+      <Text className="text-left text-sm leading-6 text-gray-600 dark:text-gray-400">
         We are opening access gradually while demand is high.
         {hubSpotConfig && " Leave your email and we will send an invite as capacity opens."}
       </Text>
@@ -72,13 +72,13 @@ export const SignupWaitlist: React.FC = () => {
           </LoadingButton>
 
           {status === "submitted" && (
-            <p className="text-left text-sm leading-6 text-gray-700" role="status">
+            <p className="text-left text-sm leading-6 text-gray-700 dark:text-gray-300" role="status">
               You are on the waitlist. We will email you when access opens.
             </p>
           )}
 
           {status === "failed" && (
-            <p className="text-left text-sm leading-6 text-red-600" role="alert">
+            <p className="text-left text-sm leading-6 text-red-600 dark:text-red-400" role="alert">
               We could not save your email. Please try again.
             </p>
           )}

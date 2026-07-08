@@ -44,10 +44,10 @@ function AccountsTable({
   onPromoteDemote,
 }: AccountsTableProps) {
   return (
-    <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden">
+    <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-100">
+          <tr className="border-b border-slate-100 dark:border-gray-700/70">
             <SortableHeader
               label="Name"
               field="name"
@@ -62,7 +62,7 @@ function AccountsTable({
               currentDirection={sortDirection}
               onSort={onSort}
             />
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Access</th>
+            <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Access</th>
             <SortableHeader
               label="Created"
               field="created_at"
@@ -70,7 +70,7 @@ function AccountsTable({
               currentDirection={sortDirection}
               onSort={onSort}
             />
-            <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Actions</th>
+            <th className="text-right px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -158,8 +158,8 @@ const AccountsList: React.FC = () => {
   if (loading && accounts.length === 0)
     return (
       <div className="flex flex-col items-center space-y-4 py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
-        <Text className="text-gray-500">Loading accounts...</Text>
+        <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
+        <Text className="text-gray-500 dark:text-gray-400">Loading accounts...</Text>
       </div>
     );
 
@@ -182,7 +182,9 @@ const AccountsList: React.FC = () => {
       />
       {accounts.length === 0 ? (
         <div className="text-center py-12">
-          <Text className="text-gray-500">{search ? "No accounts match." : "No accounts found."}</Text>
+          <Text className="text-gray-500 dark:text-gray-400">
+            {search ? "No accounts match." : "No accounts found."}
+          </Text>
         </div>
       ) : (
         <>
