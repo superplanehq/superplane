@@ -230,6 +230,44 @@ describe("buildRunInspectorNodeSections", () => {
     expect(secondAction?.primaryInputNodeId).toBe("first-action");
   });
 
+  it("includes execution refs when full execution details are unavailable", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: "2026-05-01T12:00:00Z",
+        data: { trigger: true },
+      },
+      executions: [
+        {
+          id: "execution-approval",
+          nodeId: "approval",
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          resultReason: "RESULT_REASON_OK",
+          createdAt: "2026-05-01T12:00:01Z",
+          updatedAt: "2026-05-01T12:00:02Z",
+        },
+      ],
+    };
+
+    const sections = buildRunInspectorNodeSections({
+      run,
+      executions: [],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "approval", name: "Await Approval", type: "TYPE_ACTION", component: "approval" },
+      ],
+    });
+
+    const approvalSection = sections.find((section) => section.nodeId === "approval");
+
+    expect(approvalSection?.nodeName).toBe("Await Approval");
+    expect(approvalSection?.execution).toBeUndefined();
+    expect(approvalSection?.executionRef?.id).toBe("execution-approval");
+    expect(approvalSection?.actions.approvalRecords).toEqual([]);
+  });
+
   it("uses edges to include only accessible upstream nodes ordered by creation time", () => {
     const run: CanvasesCanvasRun = {
       rootEvent: {
