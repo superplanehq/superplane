@@ -63,20 +63,20 @@ func (s *CanvasSteps) AssertEditModeTabChrome() {
 	nav := q.Locator(`nav[aria-label="Canvas view"]`).Run(s.session)
 	require.Eventually(s.t, func() bool {
 		class, err := nav.GetAttribute("class")
-		if err != nil || class == nil {
+		if err != nil || class == "" {
 			return false
 		}
-		return strings.Contains(*class, "bg-orange-200") || strings.Contains(*class, "dark:bg-orange-900/55")
+		return strings.Contains(class, "bg-orange-200") || strings.Contains(class, "dark:bg-orange-900/55")
 	}, 15*time.Second, 200*time.Millisecond, "edit-mode tab bar should use orange styling")
 
 	activeTab := q.Locator(`nav[aria-label="Canvas view"] [aria-current="page"]`).Run(s.session)
 	require.Eventually(s.t, func() bool {
 		class, err := activeTab.GetAttribute("class")
-		if err != nil || class == nil {
+		if err != nil || class == "" {
 			return false
 		}
-		return strings.Contains(*class, "font-bold") &&
-			(strings.Contains(*class, "bg-orange-100") || strings.Contains(*class, "dark:bg-orange-700/60"))
+		return strings.Contains(class, "font-bold") &&
+			(strings.Contains(class, "bg-orange-100") || strings.Contains(class, "dark:bg-orange-700/60"))
 	}, 15*time.Second, 200*time.Millisecond, "active edit-mode tab should be bold with orange styling")
 }
 
