@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useRunsDetailState } from "./useRunsDetailState";
 
@@ -255,5 +255,34 @@ describe("useRunsDetailState", () => {
 
     expect(result.current.openRunDetailOnMount).toBe(false);
     expect(onBackToRunList).toHaveBeenCalledOnce();
+  });
+
+  it("lets URL state reopen run detail for a run that was dismissed locally", async () => {
+    const onBackToRunList = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ searchParams }) => useRunsDetailState(searchParams, true, "run-1", undefined, onBackToRunList),
+      {
+        initialProps: {
+          searchParams: new URLSearchParams("run=run-1"),
+        },
+      },
+    );
+
+    act(() => {
+      result.current.handleBackToRunList();
+    });
+
+    expect(result.current.detailDismissedForRunId).toBe("run-1");
+    expect(result.current.runDetailNodeId).toBeNull();
+    expect(onBackToRunList).toHaveBeenCalledOnce();
+
+    rerender({
+      searchParams: new URLSearchParams("run=run-1&sidebar=1&node=node-1"),
+    });
+
+    await waitFor(() => {
+      expect(result.current.detailDismissedForRunId).toBeNull();
+    });
+    expect(result.current.runDetailNodeId).toBe("node-1");
   });
 });

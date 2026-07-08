@@ -223,53 +223,36 @@ describe("RunsTabPanel", () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
-  it("opens run detail on initial deep link", () => {
+  it("keeps the runs list visible on initial deep link", () => {
     render(<RunsTabPanel runs={[makeRun()]} selectedRunId="run-1" initialOpenDetail {...baseProps} />, {
       wrapper: routerWrapper,
     });
 
-    expect(screen.getByTestId("run-detail-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
+    expect(screen.getByText("Deploy main")).toBeInTheDocument();
   });
 
-  it("opens run detail when the selected run is provided outside the runs list", () => {
+  it("keeps the runs list visible when the selected run is provided outside the loaded list", () => {
     render(<RunsTabPanel runs={[]} selectedRunId="run-1" selectedRun={makeRun()} initialOpenDetail {...baseProps} />, {
       wrapper: routerWrapper,
     });
 
-    expect(screen.getByTestId("run-detail-panel")).toBeInTheDocument();
-    expect(screen.getByText("Deploy main")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
   });
 
-  it("shows loading state in run detail while the selected run is resolving", () => {
+  it("does not replace the list with a loading detail while the selected run is resolving", () => {
     render(<RunsTabPanel runs={[]} selectedRunId="run-1" initialOpenDetail isSelectedRunLoading {...baseProps} />, {
       wrapper: routerWrapper,
     });
 
-    expect(screen.getByText("Loading run…")).toBeInTheDocument();
+    expect(screen.queryByText("Loading run…")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
-  });
-
-  it("returns to the run list when back is clicked", async () => {
-    const user = userEvent.setup();
-    const onBackToRunList = vi.fn();
-
-    render(
-      <RunsTabPanel
-        runs={[makeRun()]}
-        selectedRunId="run-1"
-        initialOpenDetail
-        onBackToRunList={onBackToRunList}
-        {...baseProps}
-      />,
-      { wrapper: routerWrapper },
-    );
-
-    await user.click(screen.getByTestId("run-detail-back"));
-    expect(onBackToRunList).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
   });
 
-  it("opens run detail when initialOpenDetail arrives after mount", () => {
+  it("keeps the runs list visible when initialOpenDetail arrives after mount", () => {
     const runs = [makeRun()];
 
     const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId={null} {...baseProps} />, {
@@ -279,10 +262,11 @@ describe("RunsTabPanel", () => {
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" initialOpenDetail {...baseProps} />);
 
-    expect(within(screen.getByTestId("run-detail-panel")).getByText("Deploy main")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+    expect(screen.getByText("Deploy main")).toBeInTheDocument();
   });
 
-  it("opens run detail when the selected run changes from the URL", () => {
+  it("keeps the selected run highlighted when the selected run changes from the URL", () => {
     const runs = [
       makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
       makeRun({ id: "run-2", rootEvent: { ...makeRun().rootEvent, customName: "Second run" } }),
@@ -297,11 +281,11 @@ describe("RunsTabPanel", () => {
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" {...baseProps} />);
-    expect(screen.getByTestId("run-detail-back")).toBeInTheDocument();
-    expect(within(screen.getByTestId("run-detail-panel")).getByText("Second run")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+    expect(screen.getByText("Second run")).toBeInTheDocument();
   });
 
-  it("stays on the list when URL navigation returns to a dismissed run", () => {
+  it("keeps the list visible when URL navigation returns to a dismissed run", () => {
     const runs = [
       makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
       makeRun({ id: "run-2", rootEvent: { ...makeRun().rootEvent, customName: "Second run" } }),
@@ -315,263 +299,10 @@ describe("RunsTabPanel", () => {
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" detailDismissedForRunId="run-1" {...baseProps} />);
-    expect(within(screen.getByTestId("run-detail-panel")).getByText("Second run")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+    expect(screen.getByText("Second run")).toBeInTheDocument();
 
     rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />);
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
-  });
-
-  it("navigates between runs from the detail header", async () => {
-    const user = userEvent.setup();
-    const onNavigateRun = vi.fn();
-    localStorage.clear();
-    const runs = [
-      makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
-      makeRun({
-        id: "run-2",
-        createdAt: "2026-05-01T11:00:00Z",
-        rootEvent: { ...makeRun().rootEvent, customName: "Second run" },
-      }),
-    ];
-
-    render(
-      <RunsTabPanel runs={runs} selectedRunId="run-2" initialOpenDetail {...baseProps} onNavigateRun={onNavigateRun} />,
-      { wrapper: routerWrapper },
-    );
-
-    expect(screen.getByTestId("run-detail-newer")).toBeEnabled();
-    expect(screen.getByTestId("run-detail-older")).toBeDisabled();
-
-    await user.click(screen.getByTestId("run-detail-newer"));
-    expect(onNavigateRun).toHaveBeenCalledWith("run-1");
-  });
-
-  it("loads more runs when navigating older at the pagination boundary", async () => {
-    const user = userEvent.setup();
-    const onLoadMore = vi.fn();
-    const onNavigateRun = vi.fn();
-    const runs = [
-      makeRun({
-        id: "run-newer",
-        createdAt: "2026-05-01T13:00:00Z",
-        rootEvent: { ...makeRun().rootEvent, customName: "Newer run" },
-      }),
-      makeRun({
-        id: "run-last-loaded",
-        createdAt: "2026-05-01T12:00:00Z",
-        rootEvent: { ...makeRun().rootEvent, customName: "Last loaded run" },
-      }),
-    ];
-
-    render(
-      <RunsTabPanel
-        runs={runs}
-        selectedRunId="run-last-loaded"
-        initialOpenDetail
-        hasNextPage
-        onLoadMore={onLoadMore}
-        onNavigateRun={onNavigateRun}
-        {...baseProps}
-      />,
-      { wrapper: routerWrapper },
-    );
-
-    expect(screen.getByTestId("run-detail-older")).toBeEnabled();
-
-    await user.click(screen.getByTestId("run-detail-older"));
-    expect(onLoadMore).toHaveBeenCalledTimes(1);
-    expect(onNavigateRun).not.toHaveBeenCalled();
-  });
-
-  it("navigates to the next older run after pagination loads", async () => {
-    const user = userEvent.setup();
-    const onLoadMore = vi.fn();
-    const onNavigateRun = vi.fn();
-    const runs = [
-      makeRun({
-        id: "run-newer",
-        createdAt: "2026-05-01T13:00:00Z",
-        rootEvent: { ...makeRun().rootEvent, customName: "Newer run" },
-      }),
-      makeRun({
-        id: "run-last-loaded",
-        createdAt: "2026-05-01T12:00:00Z",
-        rootEvent: { ...makeRun().rootEvent, customName: "Last loaded run" },
-      }),
-    ];
-
-    const { rerender } = render(
-      <RunsTabPanel
-        runs={runs}
-        selectedRunId="run-last-loaded"
-        initialOpenDetail
-        hasNextPage
-        isFetchingNextPage={false}
-        onLoadMore={onLoadMore}
-        onNavigateRun={onNavigateRun}
-        {...baseProps}
-      />,
-      { wrapper: routerWrapper },
-    );
-
-    await user.click(screen.getByTestId("run-detail-older"));
-    expect(onLoadMore).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <RunsTabPanel
-        runs={[
-          ...runs,
-          makeRun({
-            id: "run-older-page-2",
-            createdAt: "2026-05-01T11:00:00Z",
-            rootEvent: { ...makeRun().rootEvent, customName: "Older page run" },
-          }),
-        ]}
-        selectedRunId="run-last-loaded"
-        initialOpenDetail
-        hasNextPage={false}
-        isFetchingNextPage={false}
-        onLoadMore={onLoadMore}
-        onNavigateRun={onNavigateRun}
-        {...baseProps}
-      />,
-    );
-
-    expect(onNavigateRun).toHaveBeenCalledWith("run-older-page-2");
-  });
-
-  it("retries older-run pagination after a fetch leaves the filtered list unchanged", async () => {
-    const user = userEvent.setup();
-    const onLoadMore = vi.fn();
-    const onNavigateRun = vi.fn();
-    const runs = [
-      makeRun({
-        id: "run-newer",
-        createdAt: "2026-05-01T13:00:00Z",
-        rootEvent: { ...makeRun().rootEvent, customName: "Newer run" },
-      }),
-      makeRun({
-        id: "run-last-loaded",
-        createdAt: "2026-05-01T12:00:00Z",
-        rootEvent: { ...makeRun().rootEvent, customName: "Last loaded run" },
-      }),
-    ];
-
-    const { rerender } = render(
-      <RunsTabPanel
-        runs={runs}
-        selectedRunId="run-last-loaded"
-        initialOpenDetail
-        hasNextPage
-        isFetchingNextPage={false}
-        onLoadMore={onLoadMore}
-        onNavigateRun={onNavigateRun}
-        {...baseProps}
-      />,
-      { wrapper: routerWrapper },
-    );
-
-    await user.click(screen.getByTestId("run-detail-older"));
-    expect(onLoadMore).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <RunsTabPanel
-        runs={runs}
-        selectedRunId="run-last-loaded"
-        initialOpenDetail
-        hasNextPage
-        isFetchingNextPage={true}
-        onLoadMore={onLoadMore}
-        onNavigateRun={onNavigateRun}
-        {...baseProps}
-      />,
-    );
-
-    rerender(
-      <RunsTabPanel
-        runs={runs}
-        selectedRunId="run-last-loaded"
-        initialOpenDetail
-        hasNextPage
-        isFetchingNextPage={false}
-        onLoadMore={onLoadMore}
-        onNavigateRun={onNavigateRun}
-        {...baseProps}
-      />,
-    );
-
-    await user.click(screen.getByTestId("run-detail-older"));
-    expect(onLoadMore).toHaveBeenCalledTimes(2);
-    expect(onNavigateRun).not.toHaveBeenCalled();
-  });
-
-  it("cancels pending older navigation when the selected run changes", async () => {
-    const user = userEvent.setup();
-    const onLoadMore = vi.fn();
-    const onNavigateRun = vi.fn();
-    const runs = [
-      makeRun({
-        id: "run-newer",
-        createdAt: "2026-05-01T13:00:00Z",
-        rootEvent: { ...makeRun().rootEvent, customName: "Newer run" },
-      }),
-      makeRun({
-        id: "run-last-loaded",
-        createdAt: "2026-05-01T12:00:00Z",
-        rootEvent: { ...makeRun().rootEvent, customName: "Last loaded run" },
-      }),
-    ];
-
-    const { rerender } = render(
-      <RunsTabPanel
-        runs={runs}
-        selectedRunId="run-last-loaded"
-        initialOpenDetail
-        hasNextPage
-        isFetchingNextPage={false}
-        onLoadMore={onLoadMore}
-        onNavigateRun={onNavigateRun}
-        {...baseProps}
-      />,
-      { wrapper: routerWrapper },
-    );
-
-    await user.click(screen.getByTestId("run-detail-older"));
-    expect(onLoadMore).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <RunsTabPanel
-        runs={runs}
-        selectedRunId="run-newer"
-        initialOpenDetail
-        hasNextPage
-        isFetchingNextPage={true}
-        onLoadMore={onLoadMore}
-        onNavigateRun={onNavigateRun}
-        {...baseProps}
-      />,
-    );
-
-    rerender(
-      <RunsTabPanel
-        runs={[
-          ...runs,
-          makeRun({
-            id: "run-older-page-2",
-            createdAt: "2026-05-01T11:00:00Z",
-            rootEvent: { ...makeRun().rootEvent, customName: "Older page run" },
-          }),
-        ]}
-        selectedRunId="run-newer"
-        initialOpenDetail
-        hasNextPage={false}
-        isFetchingNextPage={false}
-        onLoadMore={onLoadMore}
-        onNavigateRun={onNavigateRun}
-        {...baseProps}
-      />,
-    );
-
-    expect(onNavigateRun).not.toHaveBeenCalledWith("run-older-page-2");
   });
 });
