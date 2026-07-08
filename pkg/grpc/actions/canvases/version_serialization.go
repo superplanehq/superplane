@@ -22,15 +22,15 @@ func canvasMetadataFromCanvas(canvas *models.Canvas) (name, description string) 
 }
 
 func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
-	var owner *pb.UserRef
+	var author *pb.UserRef
 	if version.OwnerID != nil {
-		owner = canvasVersionOwnerRef(organizationID, version.OwnerID.String(), ownersByID)
+		author = canvasVersionOwnerRef(organizationID, version.OwnerID.String(), ownersByID)
 	}
 
 	metadata := &pb.CanvasVersion_Metadata{
 		Id:            version.ID.String(),
 		CanvasId:      version.WorkflowID.String(),
-		Owner:         owner,
+		Author:        author,
 		CommitMessage: version.CommitMessage,
 	}
 
@@ -41,12 +41,17 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		metadata.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
 
-	return &pb.CanvasVersion{
-		Metadata: metadata,
-		Spec: &pb.Canvas_Spec{
+	spec, err := SerializeCanvasSpecFromVersion(version)
+	if err != nil {
+		spec = &pb.Canvas_Spec{
 			Nodes: actions.NodesToProto(version.Nodes),
 			Edges: actions.EdgesToProto(version.Edges),
-		},
+		}
+	}
+
+	return &pb.CanvasVersion{
+		Metadata: metadata,
+		Spec:     spec,
 	}
 }
 

@@ -14,6 +14,7 @@ import type {
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
   CanvasesCanvasVersion,
+  CanvasesStaging,
   ActionsAction,
   ComponentsEdge,
   ComponentsIntegrationRef,
@@ -30,9 +31,10 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
+  getCanvasStagingQueryOptions,
   useCanvas,
   useCanvasMemoryEntries,
-  useCanvasVersions,
+  useCanvasVersion,
   useCreateCanvasMemoryNamespace,
   useDeleteCanvasMemoryEntry,
   useUpdateCanvasMemoryNamespace,
@@ -102,7 +104,7 @@ import { useAppDraftStagingData } from "./useAppDraftStagingData";
 import { useCanvasEditVersionState } from "./useCanvasEditVersionState";
 import { useEditSessionBootstrap } from "./useEditSessionBootstrap";
 import { useDraftCanvasSpecSync } from "./useDraftCanvasSpecSync";
-import { fetchCanvasStagingSummary } from "./lib/repository-spec-files";
+import { liveCanvasVersionFromDescribe } from "./lib/repository-spec-files";
 import { useEnterLiveEditSession } from "./useEnterLiveEditSession";
 import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandlers";
@@ -354,16 +356,28 @@ export function AppPage() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
-  const { data: canvasVersions = [], isLoading: canvasVersionsLoading } = useCanvasVersions(organizationId!, canvasId!);
+  const liveCanvasVersionIdFromDescribe = liveCanvas?.metadata?.versionId;
+  const { data: committedLiveCanvasVersion, isLoading: committedLiveCanvasVersionLoading } = useCanvasVersion(
+    organizationId!,
+    canvasId!,
+    liveCanvasVersionIdFromDescribe!,
+    !!liveCanvasVersionIdFromDescribe,
+  );
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
   const paginatedVersions = useMemo(
     () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
     [canvasLiveVersionsQuery.data?.pages],
   );
   const liveCanvasVersion = useMemo(() => {
-    if (paginatedVersions.length > 0) return paginatedVersions[0];
-    return canvasVersions[0];
-  }, [paginatedVersions, canvasVersions]);
+    if (committedLiveCanvasVersion) {
+      return committedLiveCanvasVersion;
+    }
+    const fromDescribe = liveCanvasVersionFromDescribe(liveCanvas);
+    if (fromDescribe) {
+      return fromDescribe;
+    }
+    return paginatedVersions[0];
+  }, [committedLiveCanvasVersion, liveCanvas, paginatedVersions]);
   const visibleCanvasVersions = useMemo(() => {
     const versionMap = new Map<string, CanvasesCanvasVersion>();
     const addVersion = (version: CanvasesCanvasVersion) => {
@@ -371,10 +385,12 @@ export function AppPage() {
       if (!versionID || versionMap.has(versionID)) return;
       versionMap.set(versionID, version);
     };
-    canvasVersions.forEach(addVersion);
+    if (liveCanvasVersion?.metadata?.id) {
+      addVersion(liveCanvasVersion);
+    }
     paginatedVersions.forEach(addVersion);
     return Array.from(versionMap.values());
-  }, [canvasVersions, paginatedVersions]);
+  }, [liveCanvasVersion, paginatedVersions]);
   const liveVersions = useMemo(() => sortVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
   const selectableVersionsById = useMemo(() => {
     const indexedVersions = new Map<string, CanvasesCanvasVersion>();
@@ -387,20 +403,15 @@ export function AppPage() {
   }, [visibleCanvasVersions]);
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
-  const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
-  const isLiveVersionLoading = canvasVersionsLoading || canvasLiveVersionsQuery.isLoading;
+  const liveCanvasVersionId = liveCanvasVersionIdFromDescribe ?? liveCanvasVersion?.metadata?.id;
+  const isLiveVersionLoading = canvasLoading || committedLiveCanvasVersionLoading || canvasLiveVersionsQuery.isLoading;
   const effectiveLiveCanvasVersionId = useMemo(() => {
     if (liveCanvasVersionId) {
       return liveCanvasVersionId;
     }
 
-    const fromPaginated = paginatedVersions[0]?.metadata?.id;
-    if (fromPaginated) {
-      return fromPaginated;
-    }
-
-    return canvasVersions[0]?.metadata?.id;
-  }, [liveCanvasVersionId, paginatedVersions, canvasVersions]);
+    return paginatedVersions[0]?.metadata?.id;
+  }, [liveCanvasVersionId, paginatedVersions]);
   const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(
     organizationId,
     canvasId,
@@ -709,11 +720,12 @@ export function AppPage() {
       setActiveCanvasVersion((current) =>
         current?.metadata?.id === activeCanvasVersionId ? { ...current, spec: updatedWorkflow.spec } : current,
       );
-      queryClient.setQueryData<CanvasesCanvasVersion | undefined>(canvasKeys.stagedCanvasSpec(canvasId), (current) =>
+      queryClient.setQueryData<CanvasesStaging>(canvasKeys.canvasStaging(canvasId), (current) =>
         current
-          ? { ...current, spec: updatedWorkflow.spec }
+          ? { ...current, spec: updatedWorkflow.spec, hasStaging: true }
           : {
-              metadata: { id: activeCanvasVersionId },
+              hasStaging: true,
+              stagedPaths: [],
               spec: updatedWorkflow.spec,
             },
       );
@@ -1108,7 +1120,13 @@ export function AppPage() {
           return;
         }
 
-        syncCurrentCanvasWithSavedVersion(request.workflow, response?.data?.version);
+        const staging = response?.data?.staging;
+        if (staging?.spec) {
+          syncCurrentCanvasWithSavedVersion(request.workflow, {
+            metadata: { id: request.savingVersionId },
+            spec: staging.spec,
+          });
+        }
 
         request.resolve({
           status: "saved",
@@ -1948,8 +1966,16 @@ export function AppPage() {
           return result;
         }
 
-        if (result.response?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
-          setActiveCanvasVersion(result.response.data.version);
+        if (
+          result.response?.data?.staging?.spec &&
+          savingVersionID &&
+          activeCanvasVersionIdRef.current === savingVersionID
+        ) {
+          setActiveCanvasVersion((current) =>
+            current?.metadata?.id === savingVersionID
+              ? { ...current, spec: result.response?.data?.staging?.spec }
+              : current,
+          );
         }
         if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
           return result;
@@ -3426,15 +3452,8 @@ export function AppPage() {
       return;
     }
 
-    const stagingSummary = await queryClient.fetchQuery({
-      queryKey: canvasKeys.canvasStaging(canvasId),
-      queryFn: async () => {
-        const summary = await fetchCanvasStagingSummary(canvasId);
-        return summary ?? { hasStaging: false, stagedPaths: [] };
-      },
-      staleTime: 0,
-    });
-    if (!stagingSummary.hasStaging) {
+    const staging = await queryClient.fetchQuery(getCanvasStagingQueryOptions(canvasId));
+    if (!staging?.hasStaging) {
       return;
     }
 
@@ -3959,7 +3978,7 @@ export function AppPage() {
     hasUnpublishedDraftChanges: hasStagingChanges,
     liveCanvas,
     liveCanvasVersion,
-    draftCanvasVersion: liveCanvasVersion,
+    draftCanvasVersion: selectedCanvasVersion ?? activeCanvasVersion ?? liveCanvasVersion,
     draftCanvas: canvas,
     draftNodes: nodes,
     activeCanvasVersionId,

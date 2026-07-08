@@ -9,7 +9,7 @@ type UseEnterLiveEditSessionOptions = {
   handleUseVersion: (versionId: string, options?: { preserveStagedLayer?: boolean }) => void;
   resyncStagedEditorState: (
     versionId: string,
-    options?: { bumpResetNonce?: boolean; preferCachedStagedSpec?: boolean },
+    options?: { bumpResetNonce?: boolean; preferCachedStaging?: boolean },
   ) => Promise<void>;
   previewingCurrentVersionRef: React.MutableRefObject<boolean>;
   setEditSessionActive: (value: boolean) => void;

@@ -1,10 +1,8 @@
 import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { fetchStagedCanvasVersionWithSpec } from "@/pages/app/lib/repository-spec-files";
-
-import { canvasKeys } from "@/hooks/useCanvasData";
+import type { CanvasesCanvas, CanvasesCanvasVersion, CanvasesStaging } from "@/api-client";
+import { canvasKeys, ensureCanvasStaging } from "@/hooks/useCanvasData";
 
 type CanvasSpec = CanvasesCanvas["spec"] | null;
 
@@ -23,8 +21,8 @@ interface UseCanvasStagingResyncOptions {
 type ResyncStagedOptions = {
   /** Bumps stagingResetNonce so file/console baselines reset. Avoid when entering edit from agent staging — it remounts CanvasPage and can loop auto-open. */
   bumpResetNonce?: boolean;
-  /** When true, reuse a warm stagedCanvasSpec cache instead of forcing a refetch. */
-  preferCachedStagedSpec?: boolean;
+  /** When true, reuse a warm staging cache instead of forcing a refetch. */
+  preferCachedStaging?: boolean;
 };
 
 // Re-applies the staged (uncommitted) spec into React editor state after a remote
@@ -93,7 +91,7 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
       }
 
       const bumpResetNonce = options?.bumpResetNonce ?? true;
-      const preferCachedStagedSpec = options?.preferCachedStagedSpec ?? false;
+      const preferCachedStaging = options?.preferCachedStaging ?? false;
 
       const resyncPromise = (async () => {
         if (activeCanvasVersionIdRef.current !== versionId) {
@@ -101,44 +99,26 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
           return;
         }
 
-        const versionShell = queryClient.getQueryData<CanvasesCanvasVersion>(
-          canvasKeys.versionDetail(canvasId, versionId),
-        ) ??
-          queryClient
-            .getQueryData<CanvasesCanvasVersion[]>(canvasKeys.versionList(canvasId))
-            ?.find((item) => item.metadata?.id === versionId) ?? { metadata: { id: versionId } };
+        const stagingKey = canvasKeys.canvasStaging(canvasId);
+        const cachedStaging = preferCachedStaging ? queryClient.getQueryData<CanvasesStaging>(stagingKey) : undefined;
+        const cachedStagingQueryState = preferCachedStaging ? queryClient.getQueryState(stagingKey) : undefined;
 
-        const stagedCanvasSpecKey = canvasKeys.stagedCanvasSpec(canvasId);
-        const cachedStaged = preferCachedStagedSpec
-          ? queryClient.getQueryData<CanvasesCanvasVersion>(stagedCanvasSpecKey)
-          : undefined;
-        const cachedStagedQueryState = preferCachedStagedSpec
-          ? queryClient.getQueryState(stagedCanvasSpecKey)
-          : undefined;
-
-        if (
-          cachedStaged?.spec &&
-          cachedStaged.metadata?.id === versionId &&
-          cachedStagedQueryState?.isInvalidated !== true
-        ) {
-          applyStagedSpec(versionId, cachedStaged.spec);
+        if (cachedStaging?.spec && cachedStagingQueryState?.isInvalidated !== true) {
+          applyStagedSpec(versionId, cachedStaging.spec);
           return;
         }
 
         consoleMutationGenerationRef.current += 1;
-        await queryClient.cancelQueries({ queryKey: stagedCanvasSpecKey });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+        await queryClient.cancelQueries({ queryKey: stagingKey });
 
-        const stagedVersion = await fetchStagedCanvasVersionWithSpec(canvasId, versionShell);
-        const stagedSpec = stagedVersion?.spec ?? null;
+        const staging = await ensureCanvasStaging(queryClient, canvasId);
+        const stagedSpec = staging?.spec ?? null;
 
-        // Apply editor state before updating the staged query cache so draft sync
+        // Apply editor state before updating the staging cache so draft sync
         // effects cannot briefly overwrite resynced content with a stale snapshot.
         applyStagedSpec(versionId, stagedSpec);
-        await queryClient.cancelQueries({ queryKey: stagedCanvasSpecKey });
-        queryClient.setQueryData(stagedCanvasSpecKey, stagedVersion ?? null);
+        await queryClient.cancelQueries({ queryKey: stagingKey });
+        queryClient.setQueryData(stagingKey, staging);
 
         if (bumpResetNonce) {
           setStagingResetNonce((nonce) => nonce + 1);

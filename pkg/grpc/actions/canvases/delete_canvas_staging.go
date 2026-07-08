@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func DeleteCanvasStaging(ctx context.Context, organizationID string, canvasID string, paths []string) (*pb.StagingSummary, error) {
+func DeleteCanvasStaging(ctx context.Context, organizationID string, canvasID string, paths []string) (*pb.Staging, error) {
 	db := database.DB(ctx)
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -41,7 +41,8 @@ func DeleteCanvasStaging(ctx context.Context, organizationID string, canvasID st
 		return nil, grpcerrors.Internal(err, "failed to load canvas")
 	}
 
-	if err := models.DiscardStagedFilesForUser(db, canvas.ID, uuid.MustParse(userID), paths); err != nil {
+	userUUID := uuid.MustParse(userID)
+	if err := models.DiscardStagedFilesForUser(db, canvas.ID, userUUID, paths); err != nil {
 		return nil, grpcerrors.Internal(err, "failed to discard staging")
 	}
 
@@ -49,5 +50,10 @@ func DeleteCanvasStaging(ctx context.Context, organizationID string, canvasID st
 		log.Errorf("failed to publish canvas staging updated RabbitMQ message: %v", err)
 	}
 
-	return buildStagingSummary(canvas, []models.WorkflowStagedFile{}), nil
+	rows, err := models.ListStagedFilesForUser(db, canvas.ID, userUUID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load staging")
+	}
+
+	return buildStaging(ctx, canvas, rows)
 }
