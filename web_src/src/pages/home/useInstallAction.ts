@@ -82,11 +82,17 @@ export function useInstallAction({
   const updateCanvasFolderMembershipMutation = useUpdateCanvasFolderMembership(organizationId || "");
   const { mutateAsync: updateCanvasFolderMembership } = updateCanvasFolderMembershipMutation;
   const { canAct } = usePermissions();
+  const canCreateCanvases = canAct("canvases", "create");
   const canUpdateCanvases = canAct("canvases", "update");
 
   const doInstall = useCallback(
     async (skipParams: boolean) => {
       if (!organizationId || isInstallingRef.current) return;
+      if (!canCreateCanvases) {
+        showErrorToast("You don't have permission to create canvases.");
+        return;
+      }
+
       if (folder && !canUpdateCanvases) {
         showErrorToast("You don't have permission to update canvases.");
         return;
@@ -122,6 +128,7 @@ export function useInstallAction({
     [
       organizationId,
       app,
+      canCreateCanvases,
       canUpdateCanvases,
       canvasName,
       folder,

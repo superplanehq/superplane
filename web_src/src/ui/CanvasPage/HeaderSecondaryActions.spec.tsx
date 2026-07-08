@@ -133,6 +133,24 @@ describe("SecondaryHeaderActions", () => {
     expect(screen.queryByTestId("canvas-publish-version-button")).not.toBeInTheDocument();
   });
 
+  it("shows reset without commit when committing is not allowed", () => {
+    render(
+      <SecondaryHeaderActions
+        canvasName="Canvas"
+        mode="version-live"
+        isEditing
+        hasStagingChanges
+        onResetStaging={vi.fn()}
+        toolSidebarState={{} as CanvasToolSidebarState}
+        runsSidebarState={runsSidebarState}
+        versionsSidebarState={versionsSidebarState}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-reset-staging-button")).toBeEnabled();
+    expect(screen.queryByTestId("canvas-commit-staging-button")).not.toBeInTheDocument();
+  });
+
   it("keeps staging controls disabled while reset settles after staging clears", () => {
     render(
       <SecondaryHeaderActions
