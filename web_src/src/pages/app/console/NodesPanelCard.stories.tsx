@@ -6,9 +6,10 @@ import { NodesPanelCard } from "./NodesPanelCard";
 import { MockConsoleProvider, PanelFrame } from "./__stories__/storyDecorators";
 
 /**
- * Multi-node ("Key Nodes") panel. Renders a compact list of canvas nodes with
- * an optional description line and per-row Run button. Uses the real
- * `NodesPanelCard` with the mock `ConsoleContext` for node resolution.
+ * Adaptive node panel. Renders as a compact centered card when configured
+ * with exactly one entry (matching the pre-merge single-node card) and as a
+ * row list otherwise. Uses the real `NodesPanelCard` with the mock
+ * `ConsoleContext` for node resolution.
  */
 const meta = {
   title: "Console/Nodes",
@@ -41,6 +42,31 @@ type Story = StoryObj<typeof meta>;
 function panel(content: Record<string, unknown>): ConsolePanel {
   return { id: "panel-nodes", type: "nodes", content };
 }
+
+/** Legacy single-node panel (`type: "node"`) — kept for import compatibility. */
+function legacyNodePanel(content: Record<string, unknown>): ConsolePanel {
+  return { id: "panel-node-legacy", type: "node", content };
+}
+
+/**
+ * Compact single-entry rendering (equivalent to the pre-merge single-node
+ * card). The panel is a modern `nodes` shape with a single entry.
+ */
+export const SingleNode: Story = {
+  args: {
+    panel: panel({ title: "Deploy to prod", nodes: [{ node: "deploy-prod", showRun: true }] }),
+  },
+};
+
+/**
+ * Legacy `type: "node"` panels still render — the merged card folds them
+ * into a one-entry list and uses the compact layout automatically.
+ */
+export const LegacyNodePanel: Story = {
+  args: {
+    panel: legacyNodePanel({ title: "Deploy to prod", node: "deploy-prod", showRun: true }),
+  },
+};
 
 export const MultipleNodes: Story = {
   args: {
