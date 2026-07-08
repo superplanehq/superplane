@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  type ActionsAction,
   type CanvasesCanvasRun,
   type ComponentsEdge,
   type SuperplaneComponentsNode as ComponentsNode,
+  type TriggersTrigger,
 } from "@/api-client";
 import { useEventExecutions } from "@/hooks/useCanvasData";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
@@ -18,9 +20,12 @@ import { useRunInspectorActions } from "./useRunInspectorActions";
 
 export interface RunInspectorPanelProps {
   canvasId: string;
+  organizationId?: string;
   run: CanvasesCanvasRun;
   workflowNodes: ComponentsNode[];
   workflowEdges?: ComponentsEdge[];
+  componentDefinitions?: ActionsAction[];
+  triggerDefinitions?: TriggersTrigger[];
   componentIconMap?: Record<string, string>;
   selectedNodeId?: string | null;
   onSelectNode: (nodeId: string) => void;
@@ -30,9 +35,12 @@ export interface RunInspectorPanelProps {
 
 export function RunInspectorPanel({
   canvasId,
+  organizationId,
   run,
   workflowNodes,
   workflowEdges,
+  componentDefinitions,
+  triggerDefinitions,
   componentIconMap = {},
   selectedNodeId = null,
   onSelectNode,
@@ -45,8 +53,16 @@ export function RunInspectorPanel({
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
   const presentation = useMemo(() => buildRunPresentation(run, nodeMap), [nodeMap, run]);
   const sections = useMemo(
-    () => buildRunInspectorNodeSections({ run, executions, workflowNodes, workflowEdges }),
-    [executions, run, workflowEdges, workflowNodes],
+    () =>
+      buildRunInspectorNodeSections({
+        run,
+        executions,
+        workflowNodes,
+        workflowEdges,
+        componentDefinitions,
+        triggerDefinitions,
+      }),
+    [componentDefinitions, executions, run, triggerDefinitions, workflowEdges, workflowNodes],
   );
   const errorSummaries = useMemo(() => findRunInspectorErrorSummaries(sections), [sections]);
   const inspectorWidth = useResizableInspectorWidth();
@@ -113,10 +129,12 @@ export function RunInspectorPanel({
         isLoading={executionsQuery.isLoading}
         selectedValue={selectedValue}
         componentIconMap={componentIconMap}
+        organizationId={organizationId}
         onValueChange={handleValueChange}
         onJumpToError={jumpToErrorOutput}
         onRerun={actions.rerun}
         rerunPending={actions.rerunPending}
+        actions={actions}
       />
     </aside>
   );

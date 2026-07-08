@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 import {
   canvasesCancelExecution,
   canvasesDeleteNodeQueueItem,
+  canvasesInvokeNodeExecutionHook,
   canvasesListNodeQueueItems,
   canvasesReemitTriggerEvent,
   type CanvasesCanvasRun,
@@ -110,6 +111,60 @@ export function useRunInspectorActions({
     },
   });
 
+  const stopNodeMutation = useMutation({
+    mutationFn: async (executionId: string) => {
+      await canvasesCancelExecution(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            executionId,
+          },
+        }),
+      );
+    },
+    onSuccess: async () => {
+      await refreshRunQueries();
+      showSuccessToast("Step stopped");
+    },
+    onError: (error) => {
+      console.error("Failed to stop step", error);
+      showErrorToast("Failed to stop step");
+    },
+  });
+
+  const executionHookMutation = useMutation({
+    mutationFn: async ({
+      executionId,
+      hookName,
+      parameters,
+    }: {
+      executionId: string;
+      hookName: string;
+      parameters?: Record<string, unknown> | null;
+    }) => {
+      await canvasesInvokeNodeExecutionHook(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            executionId,
+            hookName,
+          },
+          body: {
+            parameters: parameters ?? undefined,
+          },
+        }),
+      );
+    },
+    onSuccess: async (_data, variables) => {
+      await refreshRunQueries();
+      showSuccessToast(successMessageForHook(variables.hookName));
+    },
+    onError: (error, variables) => {
+      console.error(`Failed to invoke ${variables.hookName} hook`, error);
+      showErrorToast(errorMessageForHook(variables.hookName));
+    },
+  });
+
   return {
     rerun: () => rerunMutation.mutate(),
     rerunPending: rerunMutation.isPending,
@@ -119,7 +174,35 @@ export function useRunInspectorActions({
       executionsLoading ||
       stopMutation.isPending ||
       (runningExecutionIds.length === 0 && (!run.rootEvent?.id || !hasActionSection)),
+    stopNode: (section: RunInspectorNodeSection) => {
+      if (!section.execution?.id) return;
+      stopNodeMutation.mutate(section.execution.id);
+    },
+    stopNodePending: stopNodeMutation.isPending,
+    invokeNodeHook: (
+      section: RunInspectorNodeSection,
+      hookName: string,
+      parameters?: Record<string, unknown> | null,
+    ) => {
+      if (!section.execution?.id) return;
+      executionHookMutation.mutate({ executionId: section.execution.id, hookName, parameters });
+    },
+    nodeHookPending: executionHookMutation.isPending,
   };
+}
+
+function successMessageForHook(hookName: string): string {
+  if (hookName === "approve") return "Approval submitted";
+  if (hookName === "reject") return "Rejection submitted";
+  if (hookName === "pushThrough") return "Step pushed through";
+  return "Action submitted";
+}
+
+function errorMessageForHook(hookName: string): string {
+  if (hookName === "approve") return "Failed to approve";
+  if (hookName === "reject") return "Failed to reject";
+  if (hookName === "pushThrough") return "Failed to push through";
+  return "Failed to run action";
 }
 
 async function listQueuedItemsForRun({

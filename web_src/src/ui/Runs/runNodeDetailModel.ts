@@ -1,8 +1,12 @@
 import type {
+  ActionsAction,
   CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
   ComponentsEdge,
+  ConfigurationField,
   SuperplaneComponentsNode as ComponentsNode,
+  TriggersTrigger,
 } from "@/api-client";
 import { flattenObject } from "@/lib/utils";
 import { getExecutionDetails, getState, getStateMap, getTriggerRenderer } from "@/pages/app/mappers";
@@ -59,6 +63,23 @@ export type RunInspectorOutputSection = {
   sizeKb: string;
 };
 
+export type RunInspectorApprovalRecord = {
+  index: number;
+  state?: string;
+  type?: string;
+  user?: {
+    id?: string;
+    email?: string;
+    name?: string;
+  };
+};
+
+export type RunInspectorNodeActions = {
+  canStop: boolean;
+  canPushThrough: boolean;
+  approvalRecords: RunInspectorApprovalRecord[];
+};
+
 export type RunInspectorUpstreamSection = {
   nodeId: string;
   nodeName: string;
@@ -72,6 +93,7 @@ export type RunInspectorNodeSection = {
   nodeName: string;
   workflowNode?: ComponentsNode;
   execution?: CanvasesCanvasNodeExecution;
+  executionRef?: CanvasesCanvasNodeExecutionRef;
   isTrigger: boolean;
   createdAt?: string;
   durationMs?: number;
@@ -81,6 +103,8 @@ export type RunInspectorNodeSection = {
   primaryInputNodeId?: string;
   outputSections: RunInspectorOutputSection[];
   errorMessage?: string;
+  actions: RunInspectorNodeActions;
+  configurationFields: ConfigurationField[];
 };
 
 export type RunInspectorErrorSummary = {
@@ -113,7 +137,30 @@ export function eventBadgeForExecution(
   return { badgeColor: style.badgeColor, label: style.label ?? String(eventState) };
 }
 
-export function buildExecutionChain(executions: CanvasesCanvasNodeExecution[], triggerNodeId?: string | null) {
+export function eventBadgeForExecutionRef(
+  node: ComponentsNode | undefined,
+  executionRef: CanvasesCanvasNodeExecutionRef,
+): { badgeColor: string; label: string } {
+  return eventBadgeForExecution(node, {
+    id: executionRef.id,
+    nodeId: executionRef.nodeId,
+    state: executionRef.state ?? "STATE_UNKNOWN",
+    result: executionRef.result ?? "RESULT_UNKNOWN",
+    resultReason: executionRef.resultReason ?? "RESULT_REASON_OK",
+    resultMessage: executionRef.resultMessage ?? "",
+    createdAt: executionRef.createdAt,
+    updatedAt: executionRef.updatedAt,
+    outputs: {},
+    metadata: {},
+    configuration: {},
+  });
+}
+
+export function buildExecutionChain(
+  executions: CanvasesCanvasNodeExecution[],
+  triggerNodeId?: string | null,
+  executionRefs: CanvasesCanvasNodeExecutionRef[] = [],
+) {
   const chain: string[] = [];
   const visited = new Set<string>();
 
@@ -122,10 +169,10 @@ export function buildExecutionChain(executions: CanvasesCanvasNodeExecution[], t
     visited.add(triggerNodeId);
   }
 
-  for (const execution of executions) {
-    if (execution.nodeId && !visited.has(execution.nodeId)) {
-      visited.add(execution.nodeId);
-      chain.push(execution.nodeId);
+  for (const executionRef of [...executionRefs, ...executions]) {
+    if (executionRef.nodeId && !visited.has(executionRef.nodeId)) {
+      visited.add(executionRef.nodeId);
+      chain.push(executionRef.nodeId);
     }
   }
 
@@ -149,19 +196,26 @@ export function buildRunInspectorNodeSections({
   executions,
   workflowNodes,
   workflowEdges,
+  componentDefinitions,
+  triggerDefinitions,
 }: {
   run: CanvasesCanvasRun;
   executions: CanvasesCanvasNodeExecution[];
   workflowNodes: ComponentsNode[];
   workflowEdges?: ComponentsEdge[];
+  componentDefinitions?: ActionsAction[];
+  triggerDefinitions?: TriggersTrigger[];
 }): RunInspectorNodeSection[] {
   const triggerNodeId = run.rootEvent?.nodeId;
-  const executionChain = buildExecutionChain(executions, triggerNodeId);
+  const executionChain = buildExecutionChain(executions, triggerNodeId, run.executions);
   const executionIndexByNodeId = new Map(executionChain.map((nodeId, index) => [nodeId, index]));
+  const componentDefinitionsByName = buildComponentDefinitionsByName(componentDefinitions);
+  const triggerDefinitionsByName = buildTriggerDefinitionsByName(triggerDefinitions);
 
   return executionChain.map((nodeId, index) => {
     const workflowNode = workflowNodes.find((node) => node.id === nodeId);
     const execution = executions.find((item) => item.nodeId === nodeId);
+    const executionRef = run.executions?.find((item) => item.nodeId === nodeId) ?? execution;
     const isTrigger = nodeId === triggerNodeId;
     const tabData = isTrigger
       ? buildTriggerTabData(run, workflowNode)
@@ -185,14 +239,21 @@ export function buildRunInspectorNodeSections({
       nodeName: workflowNode?.name || nodeId,
       workflowNode,
       execution,
+      executionRef,
       isTrigger,
-      createdAt: isTrigger ? run.rootEvent?.createdAt : execution?.createdAt,
-      durationMs: execution ? calculateExecutionDuration(execution) : undefined,
+      createdAt: isTrigger ? run.rootEvent?.createdAt : (execution?.createdAt ?? executionRef?.createdAt),
+      durationMs: execution
+        ? calculateExecutionDuration(execution)
+        : executionRef
+          ? calculateExecutionRefDuration(executionRef)
+          : undefined,
       badge: isTrigger
         ? eventBadgeForTriggeredTrigger(workflowNode)
         : execution
           ? eventBadgeForExecution(workflowNode, execution)
-          : null,
+          : executionRef
+            ? eventBadgeForExecutionRef(workflowNode, executionRef)
+            : null,
       tabData,
       upstreamSections,
       primaryInputNodeId: isTrigger
@@ -211,8 +272,52 @@ export function buildRunInspectorNodeSections({
           ? buildOutputSections(execution.outputs)
           : [],
       errorMessage: execution ? getExecutionErrorMessage(execution) : undefined,
+      actions: buildNodeActions(workflowNode, execution),
+      configurationFields: resolveConfigurationFields({
+        workflowNode,
+        componentDefinitionsByName,
+        triggerDefinitionsByName,
+      }),
     };
   });
+}
+
+function buildComponentDefinitionsByName(
+  componentDefinitions: ActionsAction[] | undefined,
+): Map<string, ActionsAction> {
+  return new Map(
+    componentDefinitions?.filter((definition) => definition.name).map((definition) => [definition.name!, definition]),
+  );
+}
+
+function buildTriggerDefinitionsByName(
+  triggerDefinitions: TriggersTrigger[] | undefined,
+): Map<string, TriggersTrigger> {
+  return new Map(
+    triggerDefinitions?.filter((definition) => definition.name).map((definition) => [definition.name!, definition]),
+  );
+}
+
+function resolveConfigurationFields({
+  workflowNode,
+  componentDefinitionsByName,
+  triggerDefinitionsByName,
+}: {
+  workflowNode?: ComponentsNode;
+  componentDefinitionsByName: Map<string, ActionsAction>;
+  triggerDefinitionsByName: Map<string, TriggersTrigger>;
+}): ConfigurationField[] {
+  if (!workflowNode?.component) return [];
+
+  if (workflowNode.type === "TYPE_ACTION") {
+    return componentDefinitionsByName.get(workflowNode.component)?.configuration ?? [];
+  }
+
+  if (workflowNode.type === "TYPE_TRIGGER") {
+    return triggerDefinitionsByName.get(workflowNode.component)?.configuration ?? [];
+  }
+
+  return [];
 }
 
 export function findRunInspectorErrorSummaries(sections: RunInspectorNodeSection[]): RunInspectorErrorSummary[] {
@@ -230,6 +335,10 @@ export function calculateRunDuration(run: CanvasesCanvasRun): number | null {
 }
 
 function calculateExecutionDuration(execution: CanvasesCanvasNodeExecution): number | undefined {
+  return calculateDuration(execution.createdAt, execution.updatedAt) ?? undefined;
+}
+
+function calculateExecutionRefDuration(execution: CanvasesCanvasNodeExecutionRef): number | undefined {
   return calculateDuration(execution.createdAt, execution.updatedAt) ?? undefined;
 }
 
@@ -444,6 +553,50 @@ function getExecutionErrorMessage(execution: CanvasesCanvasNodeExecution): strin
   return execution.resultMessage || execution.resultReason || "Execution failed";
 }
 
+function buildNodeActions(
+  workflowNode: ComponentsNode | undefined,
+  execution: CanvasesCanvasNodeExecution | undefined,
+): RunInspectorNodeActions {
+  const isActive = execution?.state === "STATE_STARTED" || execution?.state === "STATE_PENDING";
+  const componentName = normalizeComponentName(workflowNode?.component);
+
+  return {
+    canStop: Boolean(execution?.id && isActive),
+    canPushThrough: Boolean(execution?.id && isActive && (componentName === "wait" || componentName === "timegate")),
+    approvalRecords: componentName.includes("approval") ? extractApprovalRecords(execution?.metadata) : [],
+  };
+}
+
+function normalizeComponentName(componentName: string | undefined): string {
+  return (componentName || "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+}
+
+function extractApprovalRecords(metadata: CanvasesCanvasNodeExecution["metadata"]): RunInspectorApprovalRecord[] {
+  const records = metadata?.records;
+  if (!Array.isArray(records)) return [];
+
+  return records.filter(isApprovalRecord).map((record) => ({
+    index: record.index,
+    state: typeof record.state === "string" ? record.state : undefined,
+    type: typeof record.type === "string" ? record.type : undefined,
+    user: isObjectRecord(record.user)
+      ? {
+          id: typeof record.user.id === "string" ? record.user.id : undefined,
+          email: typeof record.user.email === "string" ? record.user.email : undefined,
+          name: typeof record.user.name === "string" ? record.user.name : undefined,
+        }
+      : undefined,
+  }));
+}
+
+function isApprovalRecord(value: unknown): value is { index: number; state?: unknown; type?: unknown; user?: unknown } {
+  return isObjectRecord(value) && typeof value.index === "number";
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object";
+}
+
 function extractExecutionPayload(execution: CanvasesCanvasNodeExecution): unknown {
   if (!execution.outputs || Object.keys(execution.outputs).length === 0) {
     return undefined;
@@ -576,6 +729,6 @@ export function isErrorValue(value: unknown): value is { __type: "error"; messag
   return !!value && typeof value === "object" && (value as { __type?: string }).__type === "error";
 }
 
-export function hasObjectValue(value: unknown) {
+export function hasObjectValue(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && Object.keys(value).length > 0;
 }

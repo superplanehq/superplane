@@ -33,6 +33,7 @@ import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSu
 import type { AuthorizationDomainType } from "@/api-client";
 import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
 import { getRunTitlePresentation, RUN_TITLE_EXCLUDED_SUGGESTIONS } from "./runTitlePresentation";
+import { ReadonlyConfigurationField } from "./ReadonlyFieldRenderer";
 
 const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50 dark:border-orange-400/50 dark:bg-orange-950/30 dark:text-orange-300";
@@ -140,6 +141,7 @@ export const ConfigurationFieldRenderer = ({
   enableRealtimeValidation = false,
   autocompleteExampleObj,
   allowExpressions = false,
+  readOnly = false,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -302,9 +304,23 @@ export const ConfigurationFieldRenderer = ({
     integrationId,
     organizationId,
     allowExpressions: fieldAllowsExpressions,
+    readOnly,
     excludedSuggestions: runTitlePresentation ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
     valuePreviewLabel: runTitlePresentation?.previewLabel,
   };
+
+  if (readOnly && !shouldRenderFieldForReadOnly(field)) {
+    return (
+      <ReadonlyConfigurationField
+        field={field}
+        label={fieldLabel}
+        description={fieldDescription}
+        value={value}
+        isTogglable={isTogglable}
+        isEnabled={isEnabled}
+      />
+    );
+  }
 
   const renderField = () => {
     switch (field.type) {
@@ -389,6 +405,7 @@ export const ConfigurationFieldRenderer = ({
             onChange={onChange}
             domainId={domainId}
             allValues={allValues}
+            readOnly={readOnly}
           />
         );
 
@@ -403,6 +420,7 @@ export const ConfigurationFieldRenderer = ({
             onChange={onChange}
             domainId={domainId}
             allValues={allValues}
+            readOnly={readOnly}
           />
         );
 
@@ -418,6 +436,7 @@ export const ConfigurationFieldRenderer = ({
             onChange={onChange}
             domainId={domainId}
             allValues={allValues}
+            readOnly={readOnly}
           />
         );
 
@@ -596,3 +615,15 @@ export const ConfigurationFieldRenderer = ({
     </div>
   );
 };
+
+function shouldRenderFieldForReadOnly(field: ConfigurationField): boolean {
+  return (
+    field.type === "list" ||
+    field.type === "select" ||
+    field.type === "multi-select" ||
+    field.type === "user" ||
+    field.type === "role" ||
+    field.type === "group" ||
+    (field.type === "object" && Boolean(field.typeOptions?.object?.schema?.length))
+  );
+}
