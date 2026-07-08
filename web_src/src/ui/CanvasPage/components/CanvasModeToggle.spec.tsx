@@ -106,7 +106,6 @@ describe("CanvasModeToggle", () => {
         editing
         hasCanvasUncommitted
         hasConsoleUncommitted
-        editTabTone="uncommitted"
       />,
       { wrapper: routerWrapper },
     );
@@ -121,7 +120,7 @@ describe("CanvasModeToggle", () => {
     expect(screen.getByTestId("canvas-view-mode-console-uncommitted-dot")).toHaveClass("bg-orange-500");
   });
 
-  it("shows orange tab styling in edit mode even when ready to publish", () => {
+  it("uses orange tab styling in edit mode regardless of committed draft dots", () => {
     render(
       <CanvasModeToggle
         mode="version-live"
@@ -129,7 +128,6 @@ describe("CanvasModeToggle", () => {
         onSelectConsole={vi.fn()}
         editing
         hasCanvasCommitted
-        editTabTone="ready"
       />,
       { wrapper: routerWrapper },
     );
