@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Daily Usage" href="#get-daily-usage" description="Fetches daily Messages and Claude Code usage metrics from Anthropic's Admin API." />
   <LinkCard title="Run Claude Agent" href="#run-claude-agent" description="Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated." />
   <LinkCard title="Run Code Agent" href="#run-code-agent" description="Runs an autonomous Claude coding agent against a repository in Anthropic's managed sandbox and opens (or updates) a pull request." />
   <LinkCard title="Text Prompt" href="#text-prompt" description="Generate a response using Anthropic's Claude models via the Messages API" />
@@ -17,6 +18,121 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
+
+<a id="get-daily-usage"></a>
+
+## Get Daily Usage
+
+**Component key:** `claude.getDailyUsage`
+
+The Get Daily Usage component fetches usage metrics from Anthropic's Admin API,
+combining raw API/SDK token usage with Claude Code productivity metrics.
+
+### Use Cases
+
+- **Usage reporting**: Track token consumption and Claude Code productivity across the org
+- **Cost tracking**: Monitor estimated Claude Code spend by model
+- **Analytics dashboards**: Build custom dashboards combining both data sources
+
+### How It Works
+
+1. Fetches token usage for the date range from the Messages usage report
+2. Fetches productivity metrics (sessions, lines of code, commits, PRs, tool actions) for the
+   date range from the Claude Code usage report
+3. Aggregates both into rollup totals, per-model/per-actor breakdowns, and a daily time series
+
+### Configuration
+
+- **Start Date**: Start of the date range (YYYY-MM-DD format, defaults to 7 days ago)
+- **End Date**: End of the date range (YYYY-MM-DD format, defaults to today)
+
+### Output
+
+- **messages**: Token usage totals and per-model breakdown (no cost data; Messages usage has
+  no dollar figure attached)
+- **claudeCode**: Sessions, lines of code, commits, pull requests, tool action accept/reject
+  counts, estimated cost, and per-model/per-actor breakdowns
+- **daily**: Org-wide per-day rollup combining both reports, for trend charts
+
+### Notes
+
+- Requires an Admin API key configured in the integration, separate from the regular API key
+- The date range cannot exceed 31 days
+- The Claude Code usage report only accepts one day per call, so the component issues one
+  request per day in the range
+
+### Example Output
+
+```json
+{
+  "data": {
+    "period": {
+      "startDate": "2026-06-26",
+      "endDate": "2026-07-03"
+    },
+    "messages": {
+      "inputTokens": 1250000,
+      "outputTokens": 380000,
+      "cacheReadTokens": 900000,
+      "cacheCreationTokens": 60000,
+      "webSearchRequests": 42,
+      "byModel": [
+        {
+          "model": "claude-sonnet-5",
+          "inputTokens": 1250000,
+          "outputTokens": 380000,
+          "cacheReadTokens": 900000,
+          "cacheCreationTokens": 60000
+        }
+      ]
+    },
+    "claudeCode": {
+      "sessions": 87,
+      "linesAdded": 15400,
+      "linesRemoved": 6200,
+      "commits": 63,
+      "pullRequests": 21,
+      "toolActionsAccepted": 512,
+      "toolActionsRejected": 34,
+      "estimatedCostUsd": 42.17,
+      "byModel": [
+        {
+          "model": "claude-sonnet-5",
+          "inputTokens": 45230,
+          "outputTokens": 12450,
+          "estimatedCostUsd": 1.86
+        }
+      ],
+      "byActor": [
+        {
+          "actor": "developer@company.com",
+          "type": "user_actor",
+          "sessions": 12,
+          "linesAdded": 2200,
+          "linesRemoved": 900,
+          "commits": 9,
+          "pullRequests": 3
+        }
+      ]
+    },
+    "daily": [
+      {
+        "date": "2026-06-26",
+        "messagesInputTokens": 178571,
+        "messagesOutputTokens": 54285,
+        "codeSessions": 12,
+        "codeLinesAdded": 2200,
+        "codeLinesRemoved": 900,
+        "codeCommits": 9,
+        "codePullRequests": 3,
+        "codeEstimatedCostUsd": 6.02
+      }
+    ]
+  },
+  "timestamp": "2026-07-03T19:29:35.841265352Z",
+  "type": "claude.getDailyUsage.result"
+}
+```
 
 <a id="run-claude-agent"></a>
 
