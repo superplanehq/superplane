@@ -145,7 +145,7 @@ function EditModeStagingActions({
     );
   }
 
-  const showStagingActions = !!onCommitStaging && (!!hasStagingChanges || stagingActionPending);
+  const showStagingActions = (!!onCommitStaging || !!onResetStaging) && (!!hasStagingChanges || stagingActionPending);
   if (!showStagingActions) {
     return null;
   }
@@ -153,7 +153,9 @@ function EditModeStagingActions({
   return (
     <div className="flex items-center gap-1.5">
       {onResetStaging ? <ResetStagingButton onReset={() => onResetStaging()} disabled={stagingActionPending} /> : null}
-      <CommitStagingButton onCommit={() => onCommitStaging?.()} disabled={stagingActionPending} />
+      {onCommitStaging ? (
+        <CommitStagingButton onCommit={() => onCommitStaging()} disabled={stagingActionPending} />
+      ) : null}
     </div>
   );
 }
