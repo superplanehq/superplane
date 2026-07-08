@@ -1,15 +1,9 @@
 import JsonView from "@uiw/react-json-view";
 import { Copy, Check, Maximize2 } from "lucide-react";
 import { useState } from "react";
+import { useTheme } from "@/contexts/useTheme";
+import { getJsonViewStyle, jsonViewClassName } from "@/lib/jsonViewTheme";
 import { PayloadDialog } from "./PayloadDialog";
-
-const jsonViewStyle = {
-  fontSize: "12px",
-  fontFamily: 'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
-  backgroundColor: "#ffffff",
-  color: "#24292e",
-  padding: "8px",
-} as const;
 
 interface PayloadPreviewProps {
   value: Record<string, unknown>;
@@ -31,10 +25,12 @@ export function PayloadPreview({
   labelSize = "sm",
   onExpand,
 }: PayloadPreviewProps) {
+  const { resolvedTheme } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const payloadString = JSON.stringify(value, null, 2);
   const managesOwnDialog = !onExpand;
+  const jsonViewStyle = getJsonViewStyle(resolvedTheme);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(payloadString);
@@ -45,8 +41,8 @@ export function PayloadPreview({
   const iconSize = labelSize === "md" ? 16 : 12;
   const labelClass =
     labelSize === "md"
-      ? "text-[13px] font-medium text-gray-500"
-      : "text-[11px] font-medium text-gray-400 uppercase tracking-wide";
+      ? "text-[13px] font-medium text-gray-500 dark:text-gray-400"
+      : "text-[11px] font-medium text-gray-400 uppercase tracking-wide dark:text-gray-500";
 
   return (
     <>
@@ -54,12 +50,15 @@ export function PayloadPreview({
         <p className={labelClass}>{label}</p>
         <div className="flex items-center gap-1">
           {showCopy && (
-            <button onClick={handleCopy} className="p-1 text-gray-500 hover:text-gray-800">
+            <button
+              onClick={handleCopy}
+              className="p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+            >
               {copied ? <Check size={iconSize} /> : <Copy size={iconSize} />}
             </button>
           )}
           <button
-            className="p-1 text-gray-500 hover:text-gray-800"
+            className="p-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
@@ -77,8 +76,8 @@ export function PayloadPreview({
       <div className={`${maxHeight} overflow-auto rounded`}>
         <JsonView
           value={value}
-          style={jsonViewStyle}
-          className="json-viewer-hide-types"
+          style={{ ...jsonViewStyle, padding: "8px" }}
+          className={jsonViewClassName}
           displayObjectSize={false}
           enableClipboard={false}
         />

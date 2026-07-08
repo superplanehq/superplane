@@ -1,4 +1,4 @@
-import { useCanvasVersionStaging } from "@/hooks/useCanvasData";
+import { useCanvasStaging } from "@/hooks/useCanvasData";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { useMemo, useRef, useState } from "react";
 
@@ -42,7 +42,7 @@ export function useEditor({
   const leftOffset = useEffectiveLeftSidebarWidth();
   const canManageRepositoryFiles = canWrite && !!canvasId && isEditing;
   const catalog = useCatalog(canvasId, files);
-  const stagingQuery = useCanvasVersionStaging(canvasId ?? "", versionId, canManageRepositoryFiles && !!versionId);
+  const stagingQuery = useCanvasStaging(canvasId, canManageRepositoryFiles);
   const stagedRepositoryPaths = useMemo(() => {
     const stagedPaths = stagingQuery.data?.stagedPaths ?? [];
     return stagedPaths.filter((path) => !catalog.generatedPathSet.has(path));

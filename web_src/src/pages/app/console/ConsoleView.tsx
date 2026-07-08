@@ -70,9 +70,9 @@ export function ConsoleView({
 
   if (errorMessage) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-sm text-red-600">
+      <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-sm text-red-600 dark:text-red-400">
         <p className="font-medium">Failed to load console</p>
-        <p className="text-slate-500">{errorMessage}</p>
+        <p className="text-slate-500 dark:text-gray-400">{errorMessage}</p>
       </div>
     );
   }
@@ -80,7 +80,7 @@ export function ConsoleView({
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+        <Loader2 className="h-5 w-5 animate-spin text-slate-400 dark:text-gray-500" />
       </div>
     );
   }
@@ -193,13 +193,15 @@ function countDiffItems(items: DraftConsoleDiffItem[], changeType: DraftConsoleD
 function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
   return (
     <div className="flex flex-1 items-center justify-center p-6 sm:p-8" data-testid="console-empty-state">
-      <div className="flex w-full max-w-3xl flex-col items-center overflow-hidden rounded-2xl border border-slate-950/15 bg-white">
+      <div className="flex w-full max-w-3xl flex-col items-center overflow-hidden rounded-2xl border border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
         <div className="flex flex-col items-center px-4 pb-6 pt-8 text-center sm:px-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-50">
-            <LayoutGrid className="h-6 w-6 text-sky-600" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-50 dark:bg-gray-800">
+            <LayoutGrid className="h-6 w-6 text-sky-600 dark:text-gray-300" />
           </div>
-          <h3 className="mt-4 text-lg font-medium tracking-tight text-slate-900">Build your console</h3>
-          <p className="mx-auto mt-1 max-w-xs text-sm leading-normal text-gray-500">
+          <h3 className="mt-4 text-lg font-medium tracking-tight text-slate-900 dark:text-gray-100">
+            Build your console
+          </h3>
+          <p className="mx-auto mt-1 max-w-xs text-sm leading-normal text-gray-500 dark:text-gray-400">
             Console panels surface the most important docs, links, and live data for this canvas.
           </p>
           {onAddFirstPanel ? (
@@ -217,23 +219,25 @@ function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
           ) : null}
         </div>
 
-        <div className="mt-6 grid w-full gap-3 border-t border-slate-950/15 px-4 pb-8 pt-6 sm:grid-cols-3 sm:px-6">
+        <div className="mt-6 grid w-full gap-3 border-t border-slate-950/15 px-4 pb-8 pt-6 dark:border-gray-700/70 sm:grid-cols-3 sm:px-6">
           <div className="rounded-xl px-2 py-3 text-left">
-            <FileText className="h-5 w-5 text-sky-600" aria-hidden />
-            <h4 className="mt-3 text-sm font-medium text-slate-900">Document with markdown</h4>
-            <p className="mt-1 text-sm leading-normal text-gray-500">Write runbooks, links, and notes in markdown.</p>
+            <FileText className="h-5 w-5 text-sky-600 dark:text-gray-300" aria-hidden />
+            <h4 className="mt-3 text-sm font-medium text-slate-900 dark:text-gray-100">Document with markdown</h4>
+            <p className="mt-1 text-sm leading-normal text-gray-500 dark:text-gray-400">
+              Write runbooks, links, and notes in markdown.
+            </p>
           </div>
           <div className="rounded-xl px-2 py-3 text-left">
-            <Table2 className="h-5 w-5 text-sky-600" aria-hidden />
-            <h4 className="mt-3 text-sm font-medium text-slate-900">Show live data</h4>
-            <p className="mt-1 text-sm leading-normal text-gray-500">
+            <Table2 className="h-5 w-5 text-sky-600 dark:text-gray-300" aria-hidden />
+            <h4 className="mt-3 text-sm font-medium text-slate-900 dark:text-gray-100">Show live data</h4>
+            <p className="mt-1 text-sm leading-normal text-gray-500 dark:text-gray-400">
               Tables, charts, and KPIs over executions or memory.
             </p>
           </div>
           <div className="rounded-xl px-2 py-3 text-left">
-            <Workflow className="h-5 w-5 text-sky-600" aria-hidden />
-            <h4 className="mt-3 text-sm font-medium text-slate-900">Surface key nodes</h4>
-            <p className="mt-1 text-sm leading-normal text-gray-500">
+            <Workflow className="h-5 w-5 text-sky-600 dark:text-gray-300" aria-hidden />
+            <h4 className="mt-3 text-sm font-medium text-slate-900 dark:text-gray-100">Surface key nodes</h4>
+            <p className="mt-1 text-sm leading-normal text-gray-500 dark:text-gray-400">
               Pin a node with its live status and an optional Run button.
             </p>
           </div>
@@ -299,7 +303,7 @@ function AddPanelDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl dark:border-gray-700/70 dark:bg-gray-900">
         <DialogHeader>
           <DialogTitle className="text-base font-medium">Add panel</DialogTitle>
         </DialogHeader>
@@ -338,17 +342,19 @@ function AddPanelDialog({
                     aria-checked={selected}
                     onClick={() => setType(t)}
                     className={cn(
-                      "flex flex-col items-start gap-1 rounded-md border bg-white p-3 text-left transition-colors",
-                      "hover:border-sky-400 hover:bg-sky-50",
-                      selected ? "border-sky-500 bg-sky-50" : "border-slate-200",
+                      "flex flex-col items-start gap-1 rounded-md border bg-white p-3 text-left transition-colors dark:bg-gray-900",
+                      "hover:border-sky-400 hover:bg-sky-50 dark:hover:border-gray-500 dark:hover:bg-gray-800",
+                      selected
+                        ? "border-sky-500 bg-sky-50 dark:border-gray-500 dark:bg-gray-800"
+                        : "border-slate-200 dark:border-gray-700/70",
                     )}
                     data-testid={`add-panel-type-${t}`}
                   >
                     <div className="flex items-center gap-1.5">
-                      <Icon className="h-4 w-4 text-slate-600" aria-hidden />
-                      <span className="text-sm font-medium text-slate-800">{meta.label}</span>
+                      <Icon className="h-4 w-4 text-slate-600 dark:text-gray-400" aria-hidden />
+                      <span className="text-sm font-medium text-slate-800 dark:text-gray-100">{meta.label}</span>
                     </div>
-                    <span className="text-xs leading-normal text-gray-500">{meta.description}</span>
+                    <span className="text-xs leading-normal text-gray-500 dark:text-gray-400">{meta.description}</span>
                   </button>
                 );
               })}

@@ -112,7 +112,7 @@ export function IntegrationsSection({
 
   return (
     <>
-      <p className="text-xs font-semibold text-slate-700 mb-3">Integrations</p>
+      <p className="mb-3 text-xs font-semibold text-slate-700 dark:text-gray-300">Integrations</p>
       <div className="space-y-2.5">
         {integrationData.map((data) => (
           <IntegrationRow
@@ -249,7 +249,7 @@ function IntegrationRow({
           </SelectContent>
         </Select>
       ) : (
-        <span className="text-xs text-slate-400">Not connected</span>
+        <span className="text-xs text-slate-400 dark:text-gray-500">Not connected</span>
       )}
       <button
         type="button"

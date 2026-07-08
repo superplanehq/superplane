@@ -310,7 +310,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                     key={keyName}
                     className={
                       isEditing
-                        ? "flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-800/50 space-y-2"
+                        ? "flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-600 p-4 bg-gray-50/50 dark:bg-gray-800/50 space-y-2"
                         : "flex items-center gap-2 text-sm font-mono bg-gray-50 dark:bg-gray-800 rounded px-3 py-2"
                     }
                   >
@@ -392,7 +392,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                 );
               })}
               {isAddingKey && (
-                <div className="flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-700 border-dashed p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                <div className="flex gap-2 items-start rounded-md border border-gray-200 dark:border-gray-600 border-dashed p-4 bg-gray-50/50 dark:bg-gray-800/50">
                   <div className="flex-1 min-w-0 space-y-2">
                     <Label className="text-xs text-gray-500 dark:text-gray-400 font-normal">Key</Label>
                     <Input

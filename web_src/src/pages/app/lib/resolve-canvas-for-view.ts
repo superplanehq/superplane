@@ -38,7 +38,9 @@ export function resolveCanvasForView({
 }): CanvasesCanvas | null | undefined {
   if (isEditing) {
     if (!draftSpecToRender) {
-      return null;
+      // Keep the live graph visible under enter-edit loading until staged draft
+      // state is applied. Returning null here clears prepared nodes and flashes empty.
+      return liveCanvas ?? null;
     }
 
     return buildEditingCanvasView(liveCanvas, draftSpecToRender, canvasId);

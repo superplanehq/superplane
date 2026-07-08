@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -31,6 +31,17 @@ func TestRunsView(t *testing.T) {
 		steps.whenICloseRunNodeDetails()
 		steps.whenIEnterEditModeFromRuns()
 		steps.thenEditModeIsVisible()
+	})
+
+	t.Run("enters edit mode from run inspection header and clears run URL", func(t *testing.T) {
+		steps := &runsViewSteps{t: t}
+		steps.start()
+		steps.givenACanvasWithManualTriggerAndNoop()
+		steps.whenTheManualTriggerRuns()
+		steps.whenIVisitRunInspection()
+		steps.thenRunInspectionChromeIsVisible()
+		steps.whenIClickEditFromRunInspection()
+		steps.thenEditModeIsVisibleAfterHeaderEdit()
 	})
 
 	t.Run("autoloads more runs from the sidebar history", func(t *testing.T) {
@@ -199,22 +210,23 @@ func (s *runsViewSteps) whenIOpenRunNodeDetails() {
 }
 
 func (s *runsViewSteps) thenRunNodeDetailsModalIsVisible() {
-	s.session.AssertVisible(q.TestID("run-node-detail-modal"))
-	s.session.AssertText("Details")
+	s.session.AssertVisible(q.TestID("run-inspector-panel"))
+	s.session.AssertHidden(q.TestID("run-node-detail-modal"))
+	s.session.AssertText("SUMMARY")
 }
 
 func (s *runsViewSteps) whenICloseRunNodeDetails() {
-	s.session.PressKey("Escape")
+	s.session.Click(q.TestID("run-panel-close"))
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		modal := q.TestID("run-node-detail-modal").Run(s.session)
-		visible, err := modal.IsVisible()
+		panel := q.TestID("run-inspector-panel").Run(s.session)
+		visible, err := panel.IsVisible()
 		if err == nil && !visible {
 			return
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	s.session.AssertHidden(q.TestID("run-node-detail-modal"))
+	s.session.AssertHidden(q.TestID("run-inspector-panel"))
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
@@ -228,6 +240,32 @@ func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
 	}
 	require.NotContains(s.t, s.session.Page().URL(), "run=")
 	s.canvas.EnterEditMode()
+}
+
+func (s *runsViewSteps) thenRunInspectionChromeIsVisible() {
+	require.NotNil(s.t, s.run, "expected run to be created")
+	s.session.AssertURLContains("run=" + s.run.ID.String())
+	s.session.AssertText("Previewing previous run")
+	s.session.AssertVisible(q.Locator(`button:has-text("Back to Live Canvas")`))
+	s.session.AssertVisible(q.TestID("canvas-edit-button"))
+}
+
+func (s *runsViewSteps) whenIClickEditFromRunInspection() {
+	s.canvas.EnterEditMode()
+}
+
+func (s *runsViewSteps) thenEditModeIsVisibleAfterHeaderEdit() {
+	s.canvas.WaitForEnabledExitEditButton()
+	s.waitForURLNotContaining("run=")
+	s.session.AssertHidden(q.Locator(`button:has-text("Back to Live Canvas")`))
+	s.session.AssertHidden(q.Locator(`:text("Previewing previous run")`))
+	s.session.AssertHidden(q.TestID("canvas-edit-button"))
+}
+
+func (s *runsViewSteps) waitForURLNotContaining(part string) {
+	require.Eventually(s.t, func() bool {
+		return !strings.Contains(s.session.Page().URL(), part)
+	}, 10*time.Second, 200*time.Millisecond, "expected URL not to contain %q, got %q", part, s.session.Page().URL())
 }
 
 func (s *runsViewSteps) whenIOpenVersionsSidebar() {

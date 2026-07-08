@@ -114,7 +114,7 @@ export function ConsoleOverlay({
   const overlayContent = (
     <>
       <div
-        className="absolute bottom-0 top-[5rem] z-10 flex flex-row bg-slate-100"
+        className="absolute bottom-0 top-[5rem] z-10 flex flex-row bg-slate-100 dark:bg-gray-900"
         style={{ left: leftOffset, right: 0 }}
         data-testid="console-overlay"
       >

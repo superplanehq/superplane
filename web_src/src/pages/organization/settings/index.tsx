@@ -20,6 +20,7 @@ import { Usage } from "./Usage";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import {
   ArrowRightLeft,
   Gauge,
@@ -41,6 +42,23 @@ import { PermissionTooltip, RequireAnyPermission, RequirePermission } from "@/co
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
 import { IntegrationSetup } from "./components/IntegrationSetup";
+import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
+
+function settingsSidebarNavLinkClass(active: boolean) {
+  return cn(
+    "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition-colors",
+    active
+      ? "bg-sky-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
+      : "text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+  );
+}
+
+function settingsSidebarNavIconClass(active: boolean) {
+  return cn(
+    "text-gray-500 transition-colors group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-100",
+    active && "text-gray-800 dark:text-gray-100",
+  );
+}
 
 export function OrganizationSettings() {
   const location = useLocation();
@@ -188,7 +206,7 @@ export function OrganizationSettings() {
       Icon: Key,
       permission: { resource: "secrets", action: "read" },
     },
-    { id: "change-org", label: "Change Organization", href: "/", Icon: ArrowRightLeft },
+    { id: "change-org", label: "Change Organization", href: "/?select=true", Icon: ArrowRightLeft },
   ];
 
   if (usageEnabled) {
@@ -282,20 +300,24 @@ export function OrganizationSettings() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
-      <Sidebar className="w-60 bg-white dark:bg-gray-800 border-r border-gray-300 dark:border-gray-800">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <Sidebar className={cn("w-60 border-r bg-white", appDarkModeClasses.sidebarEdge, appDarkModeClasses.surface)}>
         <SidebarBody>
           <SidebarSection className="px-4 py-2.5">
-            <Link to={`/${organizationId}`} className="block w-7 h-7" aria-label="Go to Apps">
-              <img src={SuperplaneLogo} alt="SuperPlane" className="w-7 h-7 object-contain" />
+            <Link to={`/${organizationId}`} className="block h-7 w-7" aria-label="Go to Apps">
+              <img
+                src={SuperplaneLogo}
+                alt="SuperPlane"
+                className="h-7 w-7 object-contain dark:brightness-0 dark:invert"
+              />
             </Link>
           </SidebarSection>
-          <SidebarSection className="p-4 border-t border-gray-300">
+          <SidebarSection className={cn("border-t p-4", appDarkModeClasses.sidebarDivider)}>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 inline px-1 py-0.5 rounded">
+              <p className="inline rounded bg-gray-800 px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-100 dark:bg-gray-300 dark:text-gray-950">
                 Org
               </p>
-              <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-white truncate">{organizationName}</p>
+              <p className="mt-2 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{organizationName}</p>
               <div className="mt-3 flex flex-col">
                 {organizationLinks.map((link) => {
                   const allowed = canAccessLink(link);
@@ -312,11 +334,11 @@ export function OrganizationSettings() {
                           type="button"
                           disabled
                           className={cn(
-                            "group flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
-                            "text-gray-500 dark:text-gray-300 opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
+                            "group flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition-colors",
+                            "cursor-not-allowed text-gray-500 opacity-60 hover:bg-transparent hover:text-gray-500 dark:text-gray-400 dark:hover:bg-transparent dark:hover:text-gray-400",
                           )}
                         >
-                          <link.Icon size={16} className="text-gray-500" />
+                          <link.Icon size={16} className="text-gray-500 dark:text-gray-400" />
                           <span className="truncate">{link.label}</span>
                           <Lock size={12} className="ml-auto text-gray-400" />
                         </button>
@@ -326,23 +348,8 @@ export function OrganizationSettings() {
 
                   if (link.href) {
                     return (
-                      <Link
-                        key={link.id}
-                        to={link.href}
-                        className={cn(
-                          "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
-                          isLinkActive(link)
-                            ? "bg-sky-100 text-gray-800 dark:bg-sky-800/40 dark:text-white"
-                            : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
-                        )}
-                      >
-                        <link.Icon
-                          size={16}
-                          className={cn(
-                            "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
-                            isLinkActive(link) && "text-gray-800 dark:text-white",
-                          )}
-                        />
+                      <Link key={link.id} to={link.href} className={settingsSidebarNavLinkClass(isLinkActive(link))}>
+                        <link.Icon size={16} className={settingsSidebarNavIconClass(isLinkActive(link))} />
                         <span className="truncate">{link.label}</span>
                       </Link>
                     );
@@ -353,20 +360,9 @@ export function OrganizationSettings() {
                       key={link.id}
                       type="button"
                       onClick={link.action}
-                      className={cn(
-                        "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
-                        isLinkActive(link)
-                          ? "bg-sky-100 text-gray-800 dark:bg-sky-800/40 dark:text-white"
-                          : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
-                      )}
+                      className={settingsSidebarNavLinkClass(isLinkActive(link))}
                     >
-                      <link.Icon
-                        size={16}
-                        className={cn(
-                          "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
-                          isLinkActive(link) && "text-gray-800 dark:text-white",
-                        )}
-                      />
+                      <link.Icon size={16} className={settingsSidebarNavIconClass(isLinkActive(link))} />
                       <span className="truncate">{link.label}</span>
                     </button>
                   );
@@ -375,35 +371,20 @@ export function OrganizationSettings() {
             </div>
           </SidebarSection>
 
-          <SidebarSection className="p-4 border-t border-gray-300">
+          <SidebarSection className={cn("border-t p-4", appDarkModeClasses.sidebarDivider)}>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white bg-sky-500 inline px-1 py-0.5 rounded">
+              <p className="inline rounded bg-sky-500 px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white dark:bg-sky-300 dark:text-sky-950">
                 You
               </p>
               <div className="mt-2">
-                <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">{userName}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{userEmail}</p>
+                <p className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{userName}</p>
+                <p className="truncate text-[13px] font-medium text-gray-500 dark:text-gray-400">{userEmail}</p>
               </div>
               <div className="mt-3 flex flex-col">
                 {userLinks.map((link) =>
                   link.href ? (
-                    <Link
-                      key={link.id}
-                      to={link.href}
-                      className={cn(
-                        "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
-                        isLinkActive(link)
-                          ? "bg-sky-100 text-sky-900 dark:bg-sky-800/40 dark:text-white"
-                          : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
-                      )}
-                    >
-                      <link.Icon
-                        size={16}
-                        className={cn(
-                          "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
-                          isLinkActive(link) && "text-sky-900 dark:text-white",
-                        )}
-                      />
+                    <Link key={link.id} to={link.href} className={settingsSidebarNavLinkClass(isLinkActive(link))}>
+                      <link.Icon size={16} className={settingsSidebarNavIconClass(isLinkActive(link))} />
                       <span className="truncate">{link.label}</span>
                     </Link>
                   ) : (
@@ -411,35 +392,29 @@ export function OrganizationSettings() {
                       key={link.id}
                       type="button"
                       onClick={link.action}
-                      className={cn(
-                        "group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium transition",
-                        isLinkActive(link)
-                          ? "bg-sky-100 text-sky-900 dark:bg-sky-800/40 dark:text-white"
-                          : "text-gray-500 dark:text-gray-300 hover:bg-sky-100 hover:text-gray-900 dark:hover:bg-gray-800",
-                      )}
+                      className={settingsSidebarNavLinkClass(isLinkActive(link))}
                     >
-                      <link.Icon
-                        size={16}
-                        className={cn(
-                          "text-gray-500 transition group-hover:text-gray-900 dark:group-hover:text-white",
-                          isLinkActive(link) && "text-sky-900 dark:text-white",
-                        )}
-                      />
+                      <link.Icon size={16} className={settingsSidebarNavIconClass(isLinkActive(link))} />
                       <span className="truncate">{link.label}</span>
                     </button>
                   ),
                 )}
+                <ThemePreferenceControl />
               </div>
             </div>
           </SidebarSection>
         </SidebarBody>
       </Sidebar>
 
-      <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900 [scrollbar-gutter:stable]">
+      <div className={cn("flex-1 overflow-auto bg-slate-100 [scrollbar-gutter:stable]", appDarkModeClasses.surface)}>
         <div className={cn("mx-auto w-full px-8 pb-8", isIntegrationSetupRoute ? "max-w-6xl" : "max-w-3xl")}>
           <div className="pt-10 pb-8">
-            <h1 className="!text-2xl font-medium text-gray-900 dark:text-white">{activeMeta.title}</h1>
-            <p className="text-sm mt-2 text-gray-800 dark:text-gray-300">{activeMeta.description}</p>
+            <h1 className={cn("!text-2xl font-medium text-gray-900", appDarkModeClasses.textPrimary)}>
+              {activeMeta.title}
+            </h1>
+            <p className={cn("mt-2 text-sm text-gray-800", appDarkModeClasses.textSecondary)}>
+              {activeMeta.description}
+            </p>
           </div>
           <Routes>
             <Route path="" element={<Navigate to="general" replace />} />

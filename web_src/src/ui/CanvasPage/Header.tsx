@@ -87,7 +87,6 @@ export interface HeaderProps {
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasCommittedFilesDraftChanges?: boolean;
-  editTabTone?: "uncommitted" | "ready" | "neutral";
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
@@ -167,7 +166,7 @@ function PageHeader({
   const inEditSession = isEditSessionActive ?? isEditing;
 
   return (
-    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-2 sm:px-3">
+    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-2 sm:px-3 dark:border-gray-700/70">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </div>
@@ -181,7 +180,9 @@ function PageHeader({
               canUpdateCanvas={showCanvasSettingsMenu}
             />
           ) : (
-            <span className="block truncate text-center text-[13px] font-medium text-slate-900">{headerTitle}</span>
+            <span className="block truncate text-center text-[13px] font-medium text-slate-900 dark:text-gray-100">
+              {headerTitle}
+            </span>
           )}
         </div>
       </div>
@@ -190,7 +191,7 @@ function PageHeader({
           <div className="flex items-center">
             {activeDraftBranchLabel ? (
               <span
-                className="hidden text-[13px] font-medium text-slate-600 sm:inline"
+                className="hidden text-[13px] font-medium text-slate-600 sm:inline dark:text-gray-400"
                 data-testid="active-draft-branch-chip"
               >
                 Editing: {activeDraftBranchLabel}
@@ -220,10 +221,9 @@ function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle = shouldShowCanvasViewModeToggle(props);
   const canvasViewMode = getCanvasViewMode(props.mode);
   const editing = props.isEditing ?? false;
-  const editTabTone = props.editTabTone ?? (editing ? (props.hasStagingChanges ? "uncommitted" : "ready") : "neutral");
 
   return (
-    <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3">
+    <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3 dark:border-gray-700/70 dark:bg-gray-900">
       <div className="relative z-10 -ml-1.5 flex h-7 shrink-0 items-center gap-1">
         <CanvasToolSidebarTrigger toolSidebarState={props.toolSidebarState} />
         <CanvasRunsSidebarTrigger runsSidebarState={props.runsSidebarState} />
@@ -246,7 +246,6 @@ function SecondaryHeader(props: HeaderProps) {
               hasConsoleCommitted={!!props.hasCommittedConsoleDraftChanges}
               hasFilesUncommitted={!!props.hasUncommittedFilesDraftChanges}
               hasFilesCommitted={!!props.hasCommittedFilesDraftChanges}
-              editTabTone={editTabTone}
             />
           ) : null}
         </div>

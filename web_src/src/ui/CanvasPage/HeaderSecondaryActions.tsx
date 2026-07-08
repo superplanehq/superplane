@@ -145,15 +145,18 @@ function EditModeStagingActions({
     );
   }
 
-  const showStagingActions = !!onCommitStaging && (!!hasStagingChanges || stagingActionPending);
-  if (!showStagingActions) {
+  if (!onCommitStaging) {
     return null;
   }
 
+  const stagingActionsDisabled = stagingActionPending || !hasStagingChanges;
+
   return (
     <div className="flex items-center gap-1.5">
-      {onResetStaging ? <ResetStagingButton onReset={() => onResetStaging()} disabled={stagingActionPending} /> : null}
-      <CommitStagingButton onCommit={() => onCommitStaging?.()} disabled={stagingActionPending} />
+      {onResetStaging ? (
+        <ResetStagingButton onReset={() => onResetStaging()} disabled={stagingActionsDisabled} />
+      ) : null}
+      <CommitStagingButton onCommit={() => onCommitStaging?.()} disabled={stagingActionsDisabled} />
     </div>
   );
 }
@@ -184,7 +187,9 @@ function CommitStagingButton({ onCommit, disabled }: { onCommit: () => void; dis
       type="button"
       variant="default"
       size="sm"
-      className={cn("bg-orange-500 text-white hover:bg-orange-600 hover:opacity-95 focus-visible:ring-orange-500/40")}
+      className={cn(
+        "bg-orange-500 text-white hover:bg-orange-600 hover:opacity-95 focus-visible:ring-orange-500/40 dark:bg-orange-300 dark:text-orange-950 dark:hover:bg-orange-400/90 dark:focus-visible:ring-orange-400/40",
+      )}
       onClick={onCommit}
       disabled={disabled}
       data-testid="canvas-commit-staging-button"
@@ -295,9 +300,9 @@ function ExitEditButton({
       disabled={disabled}
       data-testid="canvas-exit-edit-button"
       aria-label="Exit edit"
-      className="-mr-0.5 size-8 shrink-0 p-0 text-slate-950 hover:bg-transparent hover:text-slate-900"
+      className="-mr-0.5 size-8 shrink-0 p-0 text-slate-950 hover:bg-transparent hover:text-slate-900 dark:text-gray-100 dark:hover:text-gray-100"
     >
-      <X className="size-5 stroke-[2] text-slate-950 opacity-65" aria-hidden />
+      <X className="size-5 stroke-[2] text-slate-950 opacity-65 dark:text-gray-100" aria-hidden />
     </UIButton>
   );
 

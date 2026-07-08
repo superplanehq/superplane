@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { getDraftDiffEdgeStyle } from "@/lib/draftDiff";
+import { DARK_BASE_BG_HEX } from "@/lib/darkThemeSurfaces";
 import { cn } from "@/lib/utils";
 import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Search, Trash2, CircleAlert } from "lucide-react";
 import {
@@ -41,6 +42,7 @@ import type {
   CanvasesCanvasRun,
   CanvasesCanvasNodeExecution,
   ActionsAction,
+  ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
@@ -76,6 +78,7 @@ import {
   RUN_CANVAS_FIT_VIEW_OPTIONS,
 } from "@/ui/CanvasPage/canvasFitOptions";
 import { Sentry } from "@/sentry";
+import { useTheme } from "@/contexts/useTheme";
 import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
@@ -86,9 +89,8 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
-import { RunNodeDetailPane } from "../Runs/RunNodeDetailPane";
-import { ResizableBottomPane } from "./ResizableBottomPane";
-import { LiveBottomInspectorEmptyState } from "./LiveBottomInspectorEmptyState";
+import { RunInspectorLoadingPanel } from "../Runs/RunInspectorLoadingPanel";
+import { RunInspectorPanel } from "../Runs/RunInspectorPanel";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -239,7 +241,6 @@ export interface CanvasPageProps {
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasCommittedFilesDraftChanges?: boolean;
-  editTabTone?: "uncommitted" | "ready" | "neutral";
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
@@ -361,14 +362,14 @@ export interface CanvasPageProps {
   runParticipantNodeIds?: string[];
   /** Shows a loading indicator over the canvas (not the sidebar) while run executions are being fetched. */
   runCanvasLoading?: boolean;
-  /** Runs mode: selected run for the bottom node detail pane. */
+  /** Runs mode: selected run for the right-side run inspector. */
   runNodeDetailRun?: CanvasesCanvasRun | null;
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
+  runNodeDetailEdges?: ComponentsEdge[];
   onRunNodeDetailClose?: () => void;
+  onRunNodeDetailClear?: () => void;
   onRunNodeDetailNavigate?: (nodeId: string) => void;
-  runNodeDetailPaneHeight?: number;
-  onRunNodeDetailPaneHeightChange?: (height: number) => void;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -396,6 +397,8 @@ export interface CanvasPageProps {
 
   /** Returns to the current live canvas version from a published history preview. */
   onSeeCurrentVersion?: () => void;
+  /** Returns from run inspection to the current live canvas. */
+  onBackToLiveCanvas?: () => void;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -413,7 +416,7 @@ function ComponentSidebarLoadingSkeleton({ layout = "sidebar" }: { layout?: "sid
 
   if (layout === "bottom") {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white dark:bg-gray-900">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
           <p className="text-sm text-gray-500">Loading events...</p>
@@ -424,7 +427,7 @@ function ComponentSidebarLoadingSkeleton({ layout = "sidebar" }: { layout?: "sid
 
   return (
     <div
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white dark:bg-gray-900"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
       <div className="flex items-center justify-center h-full">
@@ -445,6 +448,33 @@ const EDGE_STYLE = {
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
 const SNAP_GRID_STEP_PX = 24;
+
+function CanvasModeFloatingBar({
+  label,
+  actionLabel,
+  onAction,
+}: {
+  label: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center px-4 pt-3">
+      <div className="pointer-events-auto flex max-w-[min(100vw-2rem,34rem)] items-center gap-2 rounded-full bg-slate-500 py-1.5 pl-3 pr-1.5 shadow-sm dark:bg-slate-600">
+        <span className="min-w-0 truncate text-[13px] font-medium text-white">{label}</span>
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          className="h-7 shrink-0 rounded-full border-0 bg-white px-3 text-[13px] font-medium text-slate-800 shadow-none hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-500 dark:hover:bg-slate-700 dark:hover:text-white"
+          onClick={onAction}
+        >
+          {actionLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 type CanvasAnnotationUpdate = {
   text?: string;
@@ -764,7 +794,6 @@ function CanvasPage(props: CanvasPageProps) {
   const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">(() =>
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
-  const [liveNodeDetailPaneHeight, setLiveNodeDetailPaneHeight] = useState(320);
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const localHasFitToViewRef = useRef(false);
@@ -1228,17 +1257,16 @@ function CanvasPage(props: CanvasPageProps) {
   }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
   const canvasStateMode = props.canvasStateMode || "default";
-  const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
+  const showRunInspectionFloatingBar =
+    props.isRunInspectionMode && !props.isEditSessionActive && !props.isEditing && !!props.onBackToLiveCanvas;
+  const showPreviewFloatingBar =
+    canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion && !showRunInspectionFloatingBar;
 
-  const liveBottomInspectorOpen = !props.isRunInspectionMode && !props.isEditing && state.componentSidebar.isOpen;
-
-  const runNodeDetailPaneOpen =
+  const runInspectorOpen =
     props.isRunInspectionMode &&
-    !!props.runNodeDetailRun &&
-    !!props.runNodeDetailNodeId &&
-    !!props.runNodeDetailCanvasId;
-
-  const bottomDetailPaneOpen = runNodeDetailPaneOpen || liveBottomInspectorOpen;
+    !props.isEditing &&
+    !!props.runNodeDetailCanvasId &&
+    (!!props.runNodeDetailRun || !!props.runCanvasLoading);
 
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
@@ -1387,7 +1415,6 @@ function CanvasPage(props: CanvasPageProps) {
           hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
           hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
           hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
-          editTabTone={props.editTabTone}
           activeDraftBranchLabel={props.activeDraftBranchLabel}
           activeDraftBranchShortSha={props.activeDraftBranchShortSha}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
@@ -1442,33 +1469,35 @@ function CanvasPage(props: CanvasPageProps) {
           <div className="relative min-h-0 flex-1">
             {props.runCanvasLoading && props.isRunInspectionMode ? (
               <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
-                <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm">
-                  <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm dark:bg-gray-900/80">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-500 dark:text-gray-400" />
                 </div>
               </div>
             ) : null}
             {showPreviewFloatingBar ? (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
-                <div className="pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-full bg-gray-500 pl-3 pr-1.5 py-1.5">
-                  <span className="flex min-w-0 max-w-full shrink-0 truncate items-center gap-1 text-[13px] font-medium text-white">
-                    Previewing previous version
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    className="shrink-0 border-0 shadow-none"
-                    onClick={() => {
-                      props.onSeeCurrentVersion?.();
-                    }}
-                  >
-                    See Current Version
-                  </Button>
-                </div>
-              </div>
+              <CanvasModeFloatingBar
+                label="Previewing previous version"
+                actionLabel="See Current Version"
+                onAction={() => {
+                  props.onSeeCurrentVersion?.();
+                }}
+              />
+            ) : null}
+            {showRunInspectionFloatingBar ? (
+              <CanvasModeFloatingBar
+                label="Previewing previous run"
+                actionLabel="Back to Live Canvas"
+                onAction={() => {
+                  props.onBackToLiveCanvas?.();
+                }}
+              />
             ) : null}
             {props.headerMode === "files" ? (
-              <div className="absolute inset-0 bg-slate-50" data-testid="canvas-files-backdrop" aria-hidden />
+              <div
+                className="absolute inset-0 bg-slate-50 dark:bg-gray-900"
+                data-testid="canvas-files-backdrop"
+                aria-hidden
+              />
             ) : (
               <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
                 <CanvasContent
@@ -1510,7 +1539,6 @@ function CanvasPage(props: CanvasPageProps) {
                   fitAllFocusNodeIds={props.fitAllFocusNodeIds}
                   runParticipantNodeIds={props.runParticipantNodeIds}
                   runSelectedNodeId={props.isRunInspectionMode ? props.runNodeDetailNodeId : null}
-                  runNodeDetailPaneOpen={bottomDetailPaneOpen}
                   logRuns={props.logRuns}
                   runsNodes={props.runsNodes}
                   runsComponentIconMap={props.runsComponentIconMap}
@@ -1527,34 +1555,22 @@ function CanvasPage(props: CanvasPageProps) {
               ? renderInspectorSidebar("sidebar")
               : null}
           </div>
-          {runNodeDetailPaneOpen ? (
-            <RunNodeDetailPane
-              canvasId={props.runNodeDetailCanvasId!}
-              run={props.runNodeDetailRun!}
-              nodeId={props.runNodeDetailNodeId!}
-              workflowNodes={props.workflowNodes}
-              componentIconMap={props.runsComponentIconMap}
-              onClose={() => props.onRunNodeDetailClose?.()}
-              onNavigateNode={props.onRunNodeDetailNavigate}
-              height={props.runNodeDetailPaneHeight}
-              onHeightChange={props.onRunNodeDetailPaneHeightChange}
-            />
-          ) : null}
-          {liveBottomInspectorOpen ? (
-            <ResizableBottomPane
-              height={liveNodeDetailPaneHeight}
-              onHeightChange={setLiveNodeDetailPaneHeight}
-              testId="live-node-detail-pane"
-              resizeHandleTestId="live-node-detail-pane-resize-handle"
-            >
-              {state.componentSidebar.selectedNodeId ? (
-                renderInspectorSidebar("bottom")
-              ) : (
-                <LiveBottomInspectorEmptyState onClose={handleSidebarClose} />
-              )}
-            </ResizableBottomPane>
-          ) : null}
         </div>
+        {runInspectorOpen && props.runNodeDetailRun ? (
+          <RunInspectorPanel
+            canvasId={props.runNodeDetailCanvasId!}
+            run={props.runNodeDetailRun!}
+            workflowNodes={props.workflowNodes ?? []}
+            workflowEdges={props.runNodeDetailEdges}
+            componentIconMap={props.runsComponentIconMap}
+            selectedNodeId={props.runNodeDetailNodeId}
+            onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
+            onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
+            onClose={() => props.onRunNodeDetailClose?.()}
+          />
+        ) : runInspectorOpen ? (
+          <RunInspectorLoadingPanel onClose={() => props.onRunNodeDetailClose?.()} />
+        ) : null}
       </div>
 
       {/* Edit existing node modal - now handled by settings sidebar */}
@@ -1677,12 +1693,17 @@ function Sidebar({
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
   const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode;
 
-  // Trigger data loading when sidebar opens for a node
+  // Trigger data loading when sidebar opens for a node.
   useEffect(() => {
-    if (shouldShowRunsSidebar && state.componentSidebar.selectedNodeId && loadSidebarData) {
+    if (
+      shouldShowRunsSidebar &&
+      state.componentSidebar.isOpen &&
+      state.componentSidebar.selectedNodeId &&
+      loadSidebarData
+    ) {
       loadSidebarData(state.componentSidebar.selectedNodeId);
     }
-  }, [state.componentSidebar.selectedNodeId, loadSidebarData, shouldShowRunsSidebar]);
+  }, [state.componentSidebar.isOpen, state.componentSidebar.selectedNodeId, loadSidebarData, shouldShowRunsSidebar]);
 
   useEffect(() => {
     if (sidebarData?.latestEvents) {
@@ -1867,7 +1888,6 @@ function CanvasContentHeader({
   hasCommittedCanvasDraftChanges,
   hasCommittedConsoleDraftChanges,
   hasCommittedFilesDraftChanges,
-  editTabTone,
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
   showCanvasSettingsMenu,
@@ -1932,7 +1952,6 @@ function CanvasContentHeader({
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasCommittedFilesDraftChanges?: boolean;
-  editTabTone?: "uncommitted" | "ready" | "neutral";
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
@@ -1989,7 +2008,6 @@ function CanvasContentHeader({
       hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
       hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
       hasCommittedFilesDraftChanges={hasCommittedFilesDraftChanges}
-      editTabTone={editTabTone}
       activeDraftBranchLabel={activeDraftBranchLabel}
       activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
@@ -2102,7 +2120,6 @@ function CanvasContent({
   fitAllFocusNodeIds,
   runParticipantNodeIds,
   runSelectedNodeId,
-  runNodeDetailPaneOpen,
   logRuns,
   runsNodes,
   runsComponentIconMap,
@@ -2157,7 +2174,6 @@ function CanvasContent({
   fitAllFocusNodeIds?: string[];
   runParticipantNodeIds?: string[];
   runSelectedNodeId?: string | null;
-  runNodeDetailPaneOpen?: boolean;
   logRuns?: CanvasesCanvasRun[];
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
@@ -2170,6 +2186,10 @@ function CanvasContent({
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
   const { zoom } = useViewport();
+  const { resolvedTheme } = useTheme();
+  const flowColorMode = resolvedTheme === "dark" ? "dark" : "light";
+  const flowBgColor = resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9";
+  const flowDotColor = resolvedTheme === "dark" ? "#374151" : "#cbd5e1";
   const isReadOnly = readOnly ?? false;
   // The content-key driven re-fit only applies when viewing the live/version
   // canvas. Run inspection keeps its own dedicated fit/viewport handling, and
@@ -2585,23 +2605,6 @@ function CanvasContent({
       return;
     }
 
-    const isLiveBottomInspectorOpen = !isRunInspectionMode && !isEditMode && stateRef.current.componentSidebar.isOpen;
-
-    if (isLiveBottomInspectorOpen) {
-      stateRef.current.setNodes((nodes) =>
-        nodes.map((node) => ({
-          ...node,
-          selected: false,
-        })),
-      );
-      stateRef.current.componentSidebar.clearSelection();
-      return;
-    }
-
-    if (!isEditMode && stateRef.current.componentSidebar.isOpen) {
-      return;
-    }
-
     // Clear ReactFlow's selection state and close both sidebars
     stateRef.current.setNodes((nodes) =>
       nodes.map((node) => ({
@@ -2617,7 +2620,7 @@ function CanvasContent({
     if (onBuildingBlocksSidebarToggle) {
       onBuildingBlocksSidebarToggle(false);
     }
-  }, [isEditMode, isRunInspectionMode, onBuildingBlocksSidebarToggle, runSelectedNodeId]);
+  }, [isRunInspectionMode, onBuildingBlocksSidebarToggle, runSelectedNodeId]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
@@ -3141,7 +3144,7 @@ function CanvasContent({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 px-0 text-slate-600 hover:text-slate-900"
+              className="h-7 w-7 px-0 text-slate-600 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
               onClick={handleToggleAutoLayoutOnUpdate}
               disabled={isAutoLayoutToggleDisabled}
               aria-pressed={isAutoLayoutOnUpdateEnabled}
@@ -3208,6 +3211,7 @@ function CanvasContent({
       <div className="h-full">
         <div className="h-full w-full">
           <ReactFlow
+            colorMode={flowColorMode}
             nodes={culledNodes}
             edges={culledEdges}
             nodeTypes={nodeTypes}
@@ -3248,7 +3252,7 @@ function CanvasContent({
             style={reactFlowStyle}
             className="h-full w-full"
           >
-            <Background gap={8} size={2} bgColor="#F1F5F9" color="#cbd5e1" />
+            <Background gap={8} size={2} bgColor={flowBgColor} color={flowDotColor} />
             <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"
@@ -3267,17 +3271,14 @@ function CanvasContent({
               <div className="flex h-7 items-center gap-3">
                 <ZoomSlider
                   orientation="horizontal"
-                  className={cn(
-                    "!static !m-0",
-                    runNodeDetailPaneOpen && "opacity-50 transition-opacity hover:opacity-100",
-                  )}
+                  className="!static !m-0"
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
                 >
                   {zoomSliderContent}
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex h-7 items-center gap-1 rounded-md p-0.5">
+                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex h-7 items-center gap-1 rounded-md p-0.5 dark:bg-gray-800 dark:text-gray-100 dark:outline-gray-600/70 [&_[data-slot=button]]:dark:hover:bg-gray-700">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -3290,11 +3291,17 @@ function CanvasContent({
                           onClick={() => handleLogButtonClick("errors")}
                         >
                           <CircleX
-                            className={unacknowledgedErrorCount > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"}
+                            className={
+                              unacknowledgedErrorCount > 0
+                                ? "h-3 w-3 text-red-500"
+                                : "h-3 w-3 text-gray-800 dark:text-gray-100"
+                            }
                           />
                           <span
                             className={
-                              unacknowledgedErrorCount > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"
+                              unacknowledgedErrorCount > 0
+                                ? "tabular-nums text-red-500"
+                                : "tabular-nums text-gray-800 dark:text-gray-100"
                             }
                           >
                             {unacknowledgedErrorCount}
@@ -3312,11 +3319,17 @@ function CanvasContent({
                           onClick={() => handleLogButtonClick("warnings")}
                         >
                           <CircleAlert
-                            className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
+                            className={
+                              logCounts.warning > 0
+                                ? "h-3 w-3 text-orange-500 dark:text-orange-300"
+                                : "h-3 w-3 text-gray-800 dark:text-gray-100"
+                            }
                           />
                           <span
                             className={
-                              logCounts.warning > 0 ? "tabular-nums text-orange-500" : "tabular-nums text-gray-800"
+                              logCounts.warning > 0
+                                ? "tabular-nums text-orange-500 dark:text-orange-300"
+                                : "tabular-nums text-gray-800 dark:text-gray-100"
                             }
                           >
                             {logCounts.warning}

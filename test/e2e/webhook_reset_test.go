@@ -56,6 +56,7 @@ func (s *WebhookResetSteps) addWebhookTrigger(name string, pos models.Position) 
 }
 
 func (s *WebhookResetSteps) openWebhookConfiguration(nodeName string) {
+	s.canvas.EnterEditMode()
 	s.canvas.StartEditingNode(nodeName)
 	s.session.Click(q.Text("Configuration"))
 	s.session.Sleep(200)

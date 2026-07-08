@@ -39,37 +39,6 @@ func effectiveSpecYAML(
 	}
 }
 
-func ReadStagedRepositoryFile(
-	ctx context.Context,
-	db *gorm.DB,
-	organizationID string,
-	canvasID string,
-	path string,
-) (content string, found bool, deleted bool, err error) {
-	userID, ok := authentication.GetUserIdFromMetadata(ctx)
-	if !ok {
-		return "", false, false, grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-
-	stagedFiles, err := models.ListStagedFilesForUser(db, uuid.MustParse(canvasID), uuid.MustParse(userID))
-	if err != nil {
-		return "", false, false, err
-	}
-
-	normalized := normalizeRepositoryFilePath(path)
-	for _, row := range stagedFiles {
-		if row.Path != normalized {
-			continue
-		}
-		if row.Deleted {
-			return "", true, true, nil
-		}
-		return row.Content, true, false, nil
-	}
-
-	return "", false, false, nil
-}
-
 func ReadStagedRepositorySpecFile(
 	ctx context.Context,
 	db *gorm.DB,

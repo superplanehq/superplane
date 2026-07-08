@@ -72,8 +72,10 @@ export function NodeChipFromLink({
 
 function getChipStyle(node: SuperplaneComponentsNode | undefined, component?: string, isTrigger?: boolean) {
   const trigger = isTrigger ?? isTriggerNode(node, component);
-  if (!node && !component) return "bg-slate-100 text-slate-600";
-  return trigger ? "bg-violet-100 text-violet-700 hover:bg-violet-200" : "bg-blue-100 text-blue-700 hover:bg-blue-200";
+  if (!node && !component) return "bg-slate-100 text-slate-600 dark:bg-gray-700 dark:text-gray-300";
+  return trigger
+    ? "bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:hover:bg-violet-900"
+    : "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900";
 }
 
 function NodeIconInline({ component, isTrigger }: { component?: string; isTrigger: boolean }) {
@@ -108,14 +110,14 @@ function NodeHoverHeader({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 px-3 py-2 border-b border-slate-100",
-        isTrigger ? "bg-violet-50" : "bg-blue-50",
+        "flex items-center gap-2 border-b border-slate-100 px-3 py-2 dark:border-gray-700",
+        isTrigger ? "bg-violet-50 dark:bg-violet-950/40" : "bg-blue-50 dark:bg-blue-950/40",
       )}
     >
       <NodeHoverIcon component={component} isTrigger={isTrigger} />
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-slate-900 truncate">{node.name || node.id}</p>
-        <p className="text-[10px] text-slate-500">
+        <p className="truncate text-xs font-medium text-slate-900 dark:text-gray-100">{node.name || node.id}</p>
+        <p className="text-[10px] text-slate-500 dark:text-gray-400">
           {component || "unknown"} · {isTrigger ? "Trigger" : "Action"}
         </p>
       </div>
@@ -194,13 +196,13 @@ function NodeHoverContent({
 
       {/* Config summary */}
       {summary && (
-        <div className="px-3 py-2 border-b border-slate-100">
-          <p className="text-[10px] text-slate-500 font-mono truncate">{summary}</p>
+        <div className="border-b border-slate-100 px-3 py-2 dark:border-gray-700">
+          <p className="truncate font-mono text-[10px] text-slate-500 dark:text-gray-400">{summary}</p>
         </div>
       )}
 
       {/* Connections */}
-      <div className="px-3 py-2 flex items-center gap-3 text-[10px] text-slate-500">
+      <div className="flex items-center gap-3 px-3 py-2 text-[10px] text-slate-500 dark:text-gray-400">
         <span>{incoming} incoming</span>
         <span>·</span>
         <span>{outgoing} outgoing</span>
@@ -208,7 +210,7 @@ function NodeHoverContent({
 
       {/* Error/warning */}
       {node.errorMessage && (
-        <div className="px-3 py-1.5 bg-red-50 border-t border-red-100 text-[10px] text-red-600 truncate">
+        <div className="truncate border-t border-red-100 bg-red-50 px-3 py-1.5 text-[10px] text-red-600 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
           ⚠ {node.errorMessage}
         </div>
       )}

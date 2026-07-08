@@ -1,4 +1,5 @@
 import { Timestamp } from "@/components/Timestamp";
+import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
 import { cn, isUrl } from "@/lib/utils";
 import { isErrorValue } from "./runNodeDetailModel";
 
@@ -8,7 +9,7 @@ function EventSectionStatusBadge({ badgeColor, label }: { badgeColor: string; la
     <span
       className={cn(
         "inline-flex shrink-0 items-center justify-center rounded px-[5px] py-[1.5px] text-[10px] font-semibold uppercase tracking-wide text-white",
-        badgeColor,
+        withEventStatusBadgeClasses(badgeColor),
       )}
     >
       {label}
@@ -29,14 +30,14 @@ export function RunNodeDetailDetailsView({
     <div className="flex flex-col gap-1.5 text-[13px]">
       {statusBadge ? (
         <div className="flex items-start gap-2">
-          <span className="w-[120px] shrink-0 truncate text-right text-gray-500">Status:</span>
+          <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400">Status:</span>
           <EventSectionStatusBadge badgeColor={statusBadge.badgeColor} label={statusBadge.label} />
         </div>
       ) : null}
       {relativeTime ? (
         <div className="flex items-start gap-2">
-          <span className="w-[120px] shrink-0 truncate text-right text-gray-500">Relative time:</span>
-          <span className="min-w-0 break-all text-gray-800">
+          <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400">Relative time:</span>
+          <span className="min-w-0 break-all text-gray-800 dark:text-gray-100">
             <Timestamp date={relativeTime} display="relative" relativeStyle="abbreviated" />
           </span>
         </div>
@@ -45,17 +46,17 @@ export function RunNodeDetailDetailsView({
         if (isErrorValue(value)) {
           return (
             <div key={key} className="flex items-start gap-2">
-              <span className="w-[120px] shrink-0 truncate text-right text-gray-500" title={key}>
+              <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400" title={key}>
                 {key}:
               </span>
-              <span className="min-w-0 break-all font-medium text-red-600">{value.message}</span>
+              <span className="min-w-0 break-all font-medium text-red-600 dark:text-red-400">{value.message}</span>
             </div>
           );
         }
 
         return (
           <div key={key} className="flex items-start gap-2">
-            <span className="w-[120px] shrink-0 truncate text-right text-gray-500" title={key}>
+            <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400" title={key}>
               {key}:
             </span>
             <DetailValue value={value} />
@@ -75,12 +76,12 @@ function DetailValue({ value }: { value: unknown }) {
         href={stringValue}
         target="_blank"
         rel="noopener noreferrer"
-        className="min-w-0 break-all text-blue-600 underline underline-offset-2 hover:text-blue-700"
+        className="min-w-0 break-all text-blue-600 underline underline-offset-2 hover:text-blue-700 dark:text-indigo-300 dark:hover:text-indigo-200"
       >
         {stringValue}
       </a>
     );
   }
 
-  return <span className="min-w-0 break-all text-gray-800">{stringValue}</span>;
+  return <span className="min-w-0 break-all text-gray-800 dark:text-gray-100">{stringValue}</span>;
 }
