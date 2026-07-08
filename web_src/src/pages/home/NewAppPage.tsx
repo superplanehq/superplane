@@ -1,3 +1,4 @@
+import { RequirePermission } from "@/components/PermissionGate";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { HomePageShell } from "./HomePageShell";
@@ -11,8 +12,10 @@ export function NewAppPage() {
   useReportPageReady(true);
 
   return (
-    <HomePageShell>
-      <ZeroStatePage folder={folder} folderContextPending={folderContextPending} title={title} />
-    </HomePageShell>
+    <RequirePermission resource="canvases" action="create">
+      <HomePageShell>
+        <ZeroStatePage folder={folder} folderContextPending={folderContextPending} title={title} />
+      </HomePageShell>
+    </RequirePermission>
   );
 }
