@@ -108,8 +108,9 @@ func serializeCanvasVersions(ctx context.Context, versions []models.CanvasVersio
 	for i := range versions {
 		v, err := SerializeCanvasVersion(&versions[i], organizationID, ownersByID)
 		if err != nil {
-			continue
+			return nil, err
 		}
+
 		protoVersions = append(protoVersions, v)
 	}
 

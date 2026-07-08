@@ -48,3 +48,54 @@ func GetCanvasStaging(ctx context.Context, organizationID string, canvasID strin
 
 	return buildStaging(ctx, canvas, rows)
 }
+
+func buildStaging(ctx context.Context, canvas *models.Canvas, rows []models.WorkflowStagedFile) (*pb.Staging, error) {
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.DB(ctx), canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	state := &pb.Staging{}
+
+	//
+	// If nothing is staged, just use what is in the live version
+	//
+	if len(rows) == 0 {
+		spec, err := SerializeCanvasSpecFromVersion(liveVersion)
+		if err != nil {
+			return nil, err
+		}
+		state.Spec = spec
+		return state, nil
+	}
+
+	//
+	// Otherwise, combine the live version with the staged changes
+	//
+	spec, err := effectiveCanvasSpec(canvas, liveVersion, canvas.OrganizationID.String(), rows)
+	if err != nil {
+		return nil, err
+	}
+
+	state.Spec = spec
+
+	paths := make([]string, 0, len(rows))
+	for _, row := range rows {
+		paths = append(paths, row.Path)
+	}
+
+	base := findStagingBaseVersionID(rows)
+	state.HasStaging = true
+	state.StagedPaths = paths
+	state.BaseVersionId = base.String()
+	state.Stale = canvas.LiveVersionID.String() != base.String()
+
+	return state, nil
+}
+
+func findStagingBaseVersionID(rows []models.WorkflowStagedFile) uuid.UUID {
+	if len(rows) == 0 {
+		return uuid.Nil
+	}
+	return rows[0].BaseVersionID
+}

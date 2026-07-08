@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { upsertRunIntoDescribeRunData } from "./canvasInfiniteCache";
 import {
   canvasesListCanvases,
@@ -39,11 +40,11 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasVersion,
   CanvasesCanvasSummary,
   CanvasesCanvasRun,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
-  CanvasesCanvasVersion,
   CanvasesCanvasRepositoryFileOperation,
   CanvasesStaging,
 } from "../api-client/types.gen";
@@ -59,6 +60,7 @@ import { encodeRepositoryFileContent } from "../pages/app/files/lib/repository-f
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "../pages/app/lib/workflow-spec-paths";
 import { committedCanvasMatchesYaml, committedConsoleMatchesYaml } from "../pages/app/lib/staging-content-match";
 import { materializeConsoleSpec } from "../pages/app/lib/workflow-spec-files";
+import { sortVersionsDesc } from "../pages/app/lib/canvas-versions";
 
 export { emptyCanvasStaging } from "../pages/app/lib/repository-spec-files";
 
@@ -1806,6 +1808,54 @@ export const useDiscardRepositoryFilePaths = (canvasId: string) => {
     },
   });
 };
+
+export function useLiveCanvasVersionCatalog(
+  organizationId: string,
+  canvasId: string,
+  liveCanvasVersionIdFromDescribe: string | undefined,
+  canvasLoading: boolean,
+) {
+  const { data: committedLiveCanvasVersion, isLoading: committedLiveCanvasVersionLoading } = useCanvasVersion(
+    organizationId,
+    canvasId,
+    liveCanvasVersionIdFromDescribe!,
+    !!liveCanvasVersionIdFromDescribe,
+  );
+  const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId, canvasId, true);
+  const paginatedVersions = useMemo(
+    () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
+    [canvasLiveVersionsQuery.data?.pages],
+  );
+  const liveCanvasVersion = committedLiveCanvasVersion ?? paginatedVersions[0];
+  const { visibleCanvasVersions, selectableVersionsById } = useMemo(() => {
+    const versionMap = new Map<string, CanvasesCanvasVersion>();
+    const candidates = liveCanvasVersion ? [liveCanvasVersion, ...paginatedVersions] : paginatedVersions;
+    for (const version of candidates) {
+      const id = version.metadata?.id;
+      if (id && !versionMap.has(id)) {
+        versionMap.set(id, version);
+      }
+    }
+    return {
+      visibleCanvasVersions: Array.from(versionMap.values()),
+      selectableVersionsById: versionMap,
+    };
+  }, [liveCanvasVersion, paginatedVersions]);
+
+  return {
+    canvasLiveVersionsQuery,
+    liveCanvasVersion,
+    visibleCanvasVersions,
+    selectableVersionsById,
+    liveVersions: useMemo(() => sortVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]),
+    hasMoreLiveVersions: canvasLiveVersionsQuery.hasNextPage || false,
+    isLoadingMoreLiveVersions: canvasLiveVersionsQuery.isFetchingNextPage,
+    liveCanvasVersionId: liveCanvasVersionIdFromDescribe ?? liveCanvasVersion?.metadata?.id,
+    isLiveVersionLoading: canvasLoading || committedLiveCanvasVersionLoading || canvasLiveVersionsQuery.isLoading,
+    effectiveLiveCanvasVersionId:
+      liveCanvasVersionIdFromDescribe ?? liveCanvasVersion?.metadata?.id ?? paginatedVersions[0]?.metadata?.id,
+  };
+}
 
 export type CanvasRepositoryFilesQueryResult = ReturnType<typeof useCanvasRepositoryFiles>;
 export type CanvasRepositoryFileQueryResult = ReturnType<typeof useCanvasRepositoryFile>;

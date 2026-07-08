@@ -4,10 +4,10 @@ import { canvasesGetCanvasStaging } from "@/api-client";
 import { useDraftActions } from "./useDraftActions";
 import type { AgentMessage } from "@/components/CanvasToolSidebar/types";
 
-vi.mock("@/api-client", async () => {
-  const actual = await vi.importActual<typeof import("@/api-client")>("@/api-client");
+vi.mock("@/api-client", async (importOriginal) => {
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as Record<string, unknown>),
     canvasesGetCanvasStaging: vi.fn(),
   };
 });

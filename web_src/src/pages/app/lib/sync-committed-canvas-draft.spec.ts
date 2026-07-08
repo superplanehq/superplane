@@ -6,18 +6,18 @@ import { canvasKeys } from "@/hooks/useCanvasData";
 
 import { syncCommittedCanvasDraftState } from "./sync-committed-canvas-draft";
 
-vi.mock("@/api-client", async () => {
-  const actual = await vi.importActual<typeof import("@/api-client")>("@/api-client");
+vi.mock("@/api-client", async (importOriginal) => {
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as Record<string, unknown>),
     canvasesDescribeCanvas: vi.fn(),
   };
 });
 
-vi.mock("@/hooks/useCanvasData", async () => {
-  const actual = await vi.importActual<typeof import("@/hooks/useCanvasData")>("@/hooks/useCanvasData");
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as Record<string, unknown>),
     ensureCanvasVersion: vi.fn(),
   };
 });

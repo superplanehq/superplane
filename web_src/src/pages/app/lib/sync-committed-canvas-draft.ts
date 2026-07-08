@@ -1,7 +1,12 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { Dispatch, SetStateAction } from "react";
 
-import { canvasesDescribeCanvas, type CanvasesCanvas, type CanvasesCanvasVersion } from "@/api-client";
+import {
+  canvasesDescribeCanvas,
+  type CanvasesCanvas,
+  type CanvasesCanvasVersion,
+  type CanvasesStaging,
+} from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys, ensureCanvasVersion, getCanvasVersionQueryOptions } from "@/hooks/useCanvasData";
 import { consoleSpecFromCanvasSpec } from "./repository-spec-files";
@@ -146,4 +151,33 @@ export async function restoreCommittedCanvasDraftState({
     current?.metadata?.id === activeCanvasVersionId ? { ...current, spec: committedVersion.spec } : current,
   );
   onCanvasDraftRestoredToCommitted?.(committedVersion);
+}
+
+type CanvasSpec = CanvasesCanvas["spec"];
+
+export function applySavedStagingSpecToActiveVersion(
+  stagingSpec: CanvasSpec | undefined,
+  savingVersionID: string | undefined,
+  activeVersionID: string,
+  setActiveCanvasVersion: Dispatch<SetStateAction<CanvasesCanvasVersion | null>>,
+): void {
+  if (!stagingSpec || !savingVersionID || activeVersionID !== savingVersionID) {
+    return;
+  }
+
+  setActiveCanvasVersion((current) =>
+    current?.metadata?.id === savingVersionID ? { ...current, spec: stagingSpec } : current,
+  );
+}
+
+export function updateCanvasStagingCacheFromDraft(queryClient: QueryClient, canvasId: string, spec: CanvasSpec): void {
+  queryClient.setQueryData<CanvasesStaging>(canvasKeys.canvasStaging(canvasId), (current) =>
+    current
+      ? { ...current, spec, hasStaging: true }
+      : {
+          hasStaging: true,
+          stagedPaths: [],
+          spec,
+        },
+  );
 }

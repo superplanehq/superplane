@@ -9,10 +9,10 @@ import {
   matchesCommittedConsoleYaml,
 } from "./staging-content-match";
 
-vi.mock("@/api-client", async () => {
-  const actual = await vi.importActual<typeof import("@/api-client")>("@/api-client");
+vi.mock("@/api-client", async (importOriginal) => {
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as Record<string, unknown>),
     canvasesDescribeCanvasVersion: vi.fn(),
   };
 });

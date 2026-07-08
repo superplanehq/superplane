@@ -4,10 +4,10 @@ import { canvasesGetCanvasStaging } from "@/api-client";
 
 import { fetchRepositorySpecFileContent } from "./repository-spec-files";
 
-vi.mock("@/api-client", async () => {
-  const actual = await vi.importActual<typeof import("@/api-client")>("@/api-client");
+vi.mock("@/api-client", async (importOriginal) => {
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as Record<string, unknown>),
     canvasesGetCanvasStaging: vi.fn(),
     canvasesDescribeCanvasVersion: vi.fn(),
     canvasesDescribeCanvas: vi.fn(),
