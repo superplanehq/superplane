@@ -22,22 +22,28 @@ const ConfirmAdminDialog: React.FC<ConfirmAdminDialogProps> = ({
 }) => (
   <Dialog open={open} onClose={onClose} size="md">
     <div className="flex items-center gap-3 mb-2">
-      <div className={`p-2 rounded-full ${isPromoting ? "bg-amber-100 text-amber-600" : "bg-red-100 text-red-600"}`}>
+      <div
+        className={`p-2 rounded-full ${
+          isPromoting
+            ? "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"
+            : "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-300"
+        }`}
+      >
         <AlertTriangle size={20} />
       </div>
-      <DialogTitle className="text-gray-800">
+      <DialogTitle className="text-gray-800 dark:text-gray-100">
         {isPromoting ? "Promote to Installation Admin" : "Remove Installation Admin"}
       </DialogTitle>
     </div>
 
-    <DialogDescription className="text-sm text-gray-600 mt-2 space-y-2">
+    <DialogDescription className="text-sm text-gray-600 mt-2 space-y-2 dark:text-gray-400">
       {isPromoting ? (
         <>
           <p>
             You are about to grant <strong>{accountName}</strong> ({accountEmail}) installation admin access.
           </p>
           <p>This will allow them to:</p>
-          <ul className="list-disc pl-5 space-y-1 text-gray-500">
+          <ul className="list-disc pl-5 space-y-1 text-gray-500 dark:text-gray-400">
             <li>View all organizations and their data across this installation</li>
             <li>Impersonate any user in any organization</li>
             <li>Promote or demote other installation admins</li>
