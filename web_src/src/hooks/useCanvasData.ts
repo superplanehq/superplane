@@ -38,6 +38,7 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasPreference,
   CanvasesCanvasSummary,
   CanvasesCanvasRun,
   CanvasesCanvasRunResult,
@@ -127,6 +128,8 @@ export const canvasKeys = {
   folderList: (orgId: string) => [...canvasKeys.folders(), orgId] as const,
   details: () => [...canvasKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
+  preferences: () => [...canvasKeys.all, "preference"] as const,
+  preference: (orgId: string, id: string) => [...canvasKeys.preferences(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
   versionList: (canvasId: string) => [...canvasKeys.versions(), canvasId] as const,
   versionHistory: (canvasId: string) => [...canvasKeys.versions(), canvasId, "history"] as const,
@@ -322,6 +325,29 @@ type UseCanvasOptions = {
   refetchOnMount?: boolean;
 };
 
+// DescribeCanvas returns both the canvas payload and the caller's canvas
+// preference, but `useCanvas` and `useCanvasPreference` cache the two slices
+// under different query keys, so React Query cannot dedupe their fetches.
+// Share one in-flight request per canvas so mounting both hooks together (as
+// the app page does) issues a single describe call instead of two.
+type DescribeCanvasResult = Awaited<ReturnType<typeof canvasesDescribeCanvas>>;
+
+const describeCanvasInFlight = new Map<string, Promise<DescribeCanvasResult>>();
+
+function describeCanvasDeduped(canvasId: string): Promise<DescribeCanvasResult> {
+  const existing = describeCanvasInFlight.get(canvasId);
+  if (existing) return existing;
+  const request = Promise.resolve(
+    canvasesDescribeCanvas(
+      withOrganizationHeader({
+        path: { id: canvasId },
+      }),
+    ),
+  ).finally(() => describeCanvasInFlight.delete(canvasId));
+  describeCanvasInFlight.set(canvasId, request);
+  return request;
+}
+
 export const useCanvas = (organizationId: string, canvasId: string, options: UseCanvasOptions = {}) => {
   const {
     enabled = true,
@@ -330,14 +356,17 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
     refetchOnReconnect = true,
     refetchOnMount = true,
   } = options;
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: canvasKeys.detail(organizationId, canvasId),
     queryFn: async () => {
-      const response = await canvasesDescribeCanvas(
-        withOrganizationHeader({
-          path: { id: canvasId },
-        }),
+      const response = await describeCanvasDeduped(canvasId);
+      // The preference query never refetches on its own (staleTime Infinity),
+      // so reseed it from the same payload whenever the detail query fetches.
+      queryClient.setQueryData<CanvasesCanvasPreference | null>(
+        canvasKeys.preference(organizationId, canvasId),
+        response.data?.preference ?? null,
       );
       return response.data?.canvas;
     },
@@ -346,6 +375,20 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
     refetchOnReconnect,
     refetchOnMount,
     enabled: enabled && !!organizationId && !!canvasId,
+  });
+};
+
+export const useCanvasPreference = (organizationId: string, canvasId: string) => {
+  return useQuery({
+    queryKey: canvasKeys.preference(organizationId, canvasId),
+    queryFn: async (): Promise<CanvasesCanvasPreference | null> => {
+      const response = await describeCanvasDeduped(canvasId);
+      return response.data?.preference ?? null;
+    },
+    enabled: !!organizationId && !!canvasId,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 };
 
@@ -557,24 +600,31 @@ type UpdateCanvasPreferenceInput = {
   canvasId: string;
   pinned?: boolean;
   starred?: boolean;
+  lastVisitedTab?: string;
 };
 
 export const useUpdateCanvasPreference = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ canvasId, pinned, starred }: UpdateCanvasPreferenceInput) => {
+    mutationFn: async ({ canvasId, pinned, starred, lastVisitedTab }: UpdateCanvasPreferenceInput) => {
       return await canvasesUpdateCanvasPreference(
         withOrganizationHeader({
           path: { canvasId },
           body: {
             pinned,
             starred,
+            lastVisitedTab,
           },
         }),
       );
     },
     onMutate: async (preference) => {
+      // Pinned/starred drives the home page canvas list; last_visited_tab does not.
+      if (preference.pinned === undefined && preference.starred === undefined) {
+        return { previousCanvases: undefined };
+      }
+
       await queryClient.cancelQueries({ queryKey: canvasKeys.list(organizationId) });
       const previousCanvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
       const timestamp = new Date().toISOString();
@@ -590,8 +640,10 @@ export const useUpdateCanvasPreference = (organizationId: string) => {
         queryClient.setQueryData(canvasKeys.list(organizationId), context.previousCanvases);
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    onSettled: (_data, _error, variables) => {
+      if (variables.pinned !== undefined || variables.starred !== undefined) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      }
     },
   });
 };

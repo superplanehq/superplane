@@ -13,6 +13,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// validAppTabs are the tabs that AppPage can render; empty string clears the stored tab.
+var validAppTabs = map[string]struct{}{
+	"":        {},
+	"canvas":  {},
+	"console": {},
+	"memory":  {},
+	"files":   {},
+}
+
 func UpdateCanvasPreference(
 	ctx context.Context,
 	organizationID string,
@@ -38,6 +47,12 @@ func UpdateCanvasPreference(
 		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
 	}
 
+	if req.LastVisitedTab != nil {
+		if _, ok := validAppTabs[*req.LastVisitedTab]; !ok {
+			return nil, grpcerrors.InvalidArgument(nil, "invalid last visited tab")
+		}
+	}
+
 	var preference *models.UserCanvasPreference
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		var err error
@@ -48,6 +63,7 @@ func UpdateCanvasPreference(
 			canvasID,
 			req.Pinned,
 			req.Starred,
+			req.LastVisitedTab,
 		)
 		return err
 	})
@@ -77,6 +93,11 @@ func serializeCanvasPreference(preference *models.UserCanvasPreference) *pb.Canv
 
 	if preference.StarredAt != nil {
 		serialized.StarredAt = timestamppb.New(*preference.StarredAt)
+	}
+
+	if preference.LastVisitedTab != nil {
+		tab := *preference.LastVisitedTab
+		serialized.LastVisitedTab = &tab
 	}
 
 	return serialized
