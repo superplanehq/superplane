@@ -107,8 +107,16 @@ export async function runPositionAutoSave({
     if (saveResult.status !== "saved") {
       return;
     }
-    if (saveResult.response?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
-      setActiveCanvasVersion(saveResult.response.data.version);
+    if (
+      saveResult.response?.data?.staging?.spec &&
+      savingVersionID &&
+      activeCanvasVersionIdRef.current === savingVersionID
+    ) {
+      setActiveCanvasVersion((current) =>
+        current?.metadata?.id === savingVersionID
+          ? { ...current, spec: saveResult.response?.data?.staging?.spec }
+          : current,
+      );
     }
     if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
       return;

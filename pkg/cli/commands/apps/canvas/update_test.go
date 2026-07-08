@@ -74,7 +74,7 @@ func expectStageCanvasYAML(canvasID string) requestExpectation {
 		path:   stagingPath(canvasID),
 		handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["canvas.yaml"]}}`))
+			_, _ = w.Write([]byte(`{"staging":{"hasStaging":true,"stagedPaths":["canvas.yaml"]}}`))
 		},
 	}
 }

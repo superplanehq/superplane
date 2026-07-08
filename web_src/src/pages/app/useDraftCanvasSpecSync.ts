@@ -15,7 +15,7 @@ type UseDraftCanvasSpecSyncOptions = {
   isEditing: boolean;
   isEnteringEditSession: boolean;
   shouldReadStagedCanvasVersion: boolean;
-  isAwaitingStagedCanvasSpec: boolean;
+  awaitingCanvasStaging: boolean;
   activeCanvasVersionId: string;
   selectedCanvasVersion: CanvasesCanvasVersion | null;
   draftCanvasSpec: DraftSpec;
@@ -29,7 +29,7 @@ export function useDraftCanvasSpecSync({
   isEditing,
   isEnteringEditSession,
   shouldReadStagedCanvasVersion,
-  isAwaitingStagedCanvasSpec,
+  awaitingCanvasStaging,
   activeCanvasVersionId,
   selectedCanvasVersion,
   draftCanvasSpec,
@@ -49,7 +49,7 @@ export function useDraftCanvasSpecSync({
       return;
     }
 
-    if (isEnteringEditSession || isAwaitingStagedCanvasSpec) {
+    if (isEnteringEditSession || awaitingCanvasStaging) {
       return;
     }
 
@@ -75,7 +75,7 @@ export function useDraftCanvasSpecSync({
     isEditing,
     isEnteringEditSession,
     shouldReadStagedCanvasVersion,
-    isAwaitingStagedCanvasSpec,
+    awaitingCanvasStaging,
     activeCanvasVersionId,
     selectedCanvasVersion?.metadata?.id,
     selectedCanvasVersion?.spec,
