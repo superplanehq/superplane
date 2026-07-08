@@ -14,6 +14,7 @@ import { useTriggers } from "@/hooks/useCanvasData";
 
 import { ConsoleView } from "./ConsoleView";
 import { ConsoleYamlModal } from "./ConsoleYamlModal";
+import { manualRunTriggersFromCatalog } from "./ConsoleContext";
 import type { ConsoleContextValue, ConsoleNodeStatus } from "./ConsoleContext";
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
 
@@ -112,16 +113,13 @@ export function ConsoleOverlay({
   // Build the manual-run trigger catalog once per fetch. While the query is
   // loading `manualRunTriggers` stays undefined and `isManualRunNode` keeps
   // the pre-existing `TYPE_TRIGGER`-only behavior so widgets don't flicker
-  // between "runnable" and "hidden" on first paint.
-  const manualRunTriggers = useMemo(() => {
-    const triggers = triggersQuery.data;
-    if (!triggers) return undefined;
-    const names = new Set<string>();
-    for (const trigger of triggers) {
-      if (trigger.manualRunnable && trigger.name) names.add(trigger.name);
-    }
-    return names;
-  }, [triggersQuery.data]);
+  // between "runnable" and "hidden" on first paint. When the fetch errors
+  // out the catalog resolves to an empty set (fail closed) so event-only
+  // triggers don't keep showing Run controls the backend would reject.
+  const manualRunTriggers = useMemo(
+    () => manualRunTriggersFromCatalog(triggersQuery.data, triggersQuery.isError),
+    [triggersQuery.data, triggersQuery.isError],
+  );
   const leftOffset = useEffectiveLeftSidebarWidth();
   // The YAML modal is opened from the canvas page header (next to "Add panel").
   // The dashboard overlay no longer renders its own toolbar so the white

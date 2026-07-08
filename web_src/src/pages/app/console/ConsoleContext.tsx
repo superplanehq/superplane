@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-import type { SuperplaneComponentsNode } from "@/api-client";
+import type { SuperplaneComponentsNode, TriggersTrigger } from "@/api-client";
 
 /**
  * Public status shape used by status chips. Mirrors the categories already
@@ -44,9 +44,10 @@ export interface ConsoleContextValue {
    * expose a user-invokable `run` hook — the same condition
    * `InvokeNodeTriggerHook` enforces on the backend. When defined, console
    * widgets use it to hide manual-run affordances (Run buttons, table row
-   * actions) for event triggers such as `github.pullRequest`. When
-   * `undefined` (catalog still loading), consumers fall back to the previous
-   * `TYPE_TRIGGER`-only heuristic to avoid flicker on first paint.
+   * actions) for event triggers such as `github.pullRequest`. `undefined`
+   * strictly means the catalog is still loading — consumers then fall back
+   * to the previous `TYPE_TRIGGER`-only heuristic to avoid flicker on first
+   * paint. A failed fetch yields an empty set (fail closed) instead.
    */
   manualRunTriggers?: ReadonlySet<string>;
   /**
@@ -86,6 +87,29 @@ export function resolveConsoleNode(
   const byName = ctx.nodes.find((n) => n.name === trimmed);
   if (byName) return { node: byName, label: byName.name || byName.id || trimmed };
   return undefined;
+}
+
+const NO_MANUAL_RUN_TRIGGERS: ReadonlySet<string> = new Set();
+
+/**
+ * Build the manual-run trigger catalog from the triggers API response.
+ *
+ * Returns `undefined` only while the catalog is genuinely still loading so
+ * {@link isManualRunNode} keeps the permissive first-paint fallback. When the
+ * fetch has failed we fail closed with an empty set instead — otherwise
+ * event-only triggers would keep showing Run controls that the backend would
+ * reject anyway.
+ */
+export function manualRunTriggersFromCatalog(
+  triggers: TriggersTrigger[] | undefined,
+  fetchFailed: boolean,
+): ReadonlySet<string> | undefined {
+  if (!triggers) return fetchFailed ? NO_MANUAL_RUN_TRIGGERS : undefined;
+  const names = new Set<string>();
+  for (const trigger of triggers) {
+    if (trigger.manualRunnable && trigger.name) names.add(trigger.name);
+  }
+  return names;
 }
 
 /**
