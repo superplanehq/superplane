@@ -142,4 +142,45 @@ describe("RunsTabList refactor", () => {
 
     expect(screen.getByText("3s")).toBeInTheDocument();
   });
+
+  it("formats sub-second run durations without milliseconds", () => {
+    render(
+      <RunsTabPanel
+        runs={[
+          makeRun({
+            createdAt: "2026-05-01T12:00:00.000Z",
+            finishedAt: "2026-05-01T12:00:00.250Z",
+          }),
+        ]}
+        selectedRunId={null}
+        {...baseProps}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    const row = screen.getByTestId("runs-sidebar-row");
+    expect(within(row).getByText("<1s")).toBeInTheDocument();
+    expect(within(row).queryByText("250ms")).not.toBeInTheDocument();
+  });
+
+  it("formats run durations with minutes and seconds only", () => {
+    render(
+      <RunsTabPanel
+        runs={[
+          makeRun({
+            createdAt: "2026-05-01T12:00:00.000Z",
+            finishedAt: "2026-05-01T13:01:30.500Z",
+          }),
+        ]}
+        selectedRunId={null}
+        {...baseProps}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    const row = screen.getByTestId("runs-sidebar-row");
+    expect(within(row).getByText("61m 30s")).toBeInTheDocument();
+    expect(within(row).queryByText(/ms/)).not.toBeInTheDocument();
+    expect(within(row).queryByText(/h/)).not.toBeInTheDocument();
+  });
 });
