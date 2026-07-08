@@ -69,13 +69,11 @@ function getServerStagingFlags(stagedPaths: string[] | undefined) {
 
 function buildDraftChangeFlags({
   isEditing,
-  hasStagingChanges,
   hasCanvasStagingChanges,
   hasConsoleStagingChanges,
   hasFilesStagingChanges,
 }: {
   isEditing: boolean;
-  hasStagingChanges: boolean;
   hasCanvasStagingChanges: boolean;
   hasConsoleStagingChanges: boolean;
   hasFilesStagingChanges: boolean;
@@ -174,7 +172,6 @@ export function useDraftStagingIndicators({
     hasCommittedConsoleDraftChanges,
   } = buildDraftChangeFlags({
     isEditing,
-    hasStagingChanges,
     hasCanvasStagingChanges,
     hasConsoleStagingChanges,
     hasFilesStagingChanges,
