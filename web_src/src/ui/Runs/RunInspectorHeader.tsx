@@ -2,7 +2,7 @@ import { Loader2, Square } from "lucide-react";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatDuration } from "@/lib/duration";
+import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { calculateRunDuration } from "./runNodeDetailModel";
 import { getRunStatus, RUN_STATUS_META } from "./runPresentation";
@@ -26,6 +26,7 @@ export function RunInspectorHeader({
   const meta = RUN_STATUS_META[status];
   const Icon = meta.icon;
   const duration = calculateRunDuration(run);
+  const durationText = duration !== null ? formatMinutesSecondsDuration(duration) : "";
   const actionLabel = status === "running" ? "Stop" : "Rerun";
   const actionTooltip =
     status === "running"
@@ -52,12 +53,12 @@ export function RunInspectorHeader({
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400">
             {run.createdAt ? <Timestamp date={run.createdAt} display="relative" relativeStyle="abbreviated" /> : null}
-            {duration !== null ? (
+            {durationText ? (
               <>
                 <span className="text-gray-300" aria-hidden>
                   ·
                 </span>
-                <span>{formatDuration(duration)}</span>
+                <span>{durationText}</span>
               </>
             ) : null}
             <span className="text-gray-300" aria-hidden>
