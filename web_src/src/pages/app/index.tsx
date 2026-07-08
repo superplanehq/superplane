@@ -13,6 +13,7 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
+  CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   ActionsAction,
   ComponentsEdge,
@@ -151,6 +152,7 @@ import {
   buildCanvasLogEntries,
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
+  getRunningRunsCount,
   isCanvasLoadNotFoundError,
   isCanvasPrepLoading,
   isValidRunId,
@@ -162,6 +164,7 @@ import {
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
+const RUNNING_RUNS_FILTERS = { states: ["STATE_STARTED" as CanvasesCanvasRunState] };
 
 type DuplicatedNodesResult = {
   newNodes: ComponentsNode[];
@@ -492,6 +495,7 @@ export function AppPage() {
   );
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
   const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
+  const infiniteRunningRunsQuery = useInfiniteCanvasRuns(canvasId!, RUNNING_RUNS_FILTERS, isViewingLiveVersion);
   const selectedRunIdIsValid = selectedRunId ? isValidRunId(selectedRunId) : false;
   const describedRunQuery = useDescribeRun(
     canvasId!,
@@ -523,6 +527,7 @@ export function AppPage() {
       });
     return { runs };
   }, [infiniteLogRunsQuery.data]);
+  const runningRunsCount = getRunningRunsCount(infiniteRunningRunsQuery.data, isViewingLiveVersion);
   const selectedRunFromList = useMemo(
     () => runsData.runs.find((run) => run.id === selectedRunId) || null,
     [runsData.runs, selectedRunId],
@@ -4340,6 +4345,7 @@ export function AppPage() {
           triggers={allTriggers}
           logEntries={logEntries}
           logRuns={isViewingLiveVersion ? logRunsData.runs : []}
+          runningRunsCount={runningRunsCount}
           runsNodes={canvasNodes}
           runsComponentIconMap={componentIconMap}
           onRunNodeSelect={handleLogRunNodeSelect}
