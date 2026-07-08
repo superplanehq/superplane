@@ -1,8 +1,12 @@
 import { createContext, useContext } from "react";
 
+import type { ConsoleTriggerLock } from "../useConsoleTriggerLock";
+
 /**
- * Per-table action lock state. Combines two signals so authors cannot fire
- * a duplicate trigger while a pipeline is still running:
+ * Per-table action lock state. Combines the same three signals as
+ * {@link ConsoleTriggerLock} but re-exposed under the table's original
+ * row-key terminology so the existing table code (and its specs) keep
+ * their names:
  *
  * 1. `runInFlightIds` — trigger node ids whose latest canvas run is currently
  *    in `STATE_STARTED`. Driven by the runs query + canvas websocket.
@@ -16,9 +20,9 @@ import { createContext, useContext } from "react";
  *    design: the user explicitly asked for "only the affected row" locking.
  */
 export interface WidgetTableActionLock {
-  runInFlightIds: Set<string>;
-  pendingRowKeys: Set<string>;
-  inFlightRowByTrigger: Map<string, string>;
+  runInFlightIds: ReadonlySet<string>;
+  pendingRowKeys: ReadonlySet<string>;
+  inFlightRowByTrigger: ReadonlyMap<string, string>;
   beginSubmission: (triggerNodeId: string | undefined, rowKey: string) => void;
   endSubmission: (triggerNodeId: string | undefined, rowKey: string, succeeded: boolean) => void;
 }
@@ -40,4 +44,21 @@ const FALLBACK_LOCK: WidgetTableActionLock = {
  */
 export function useWidgetTableActionLock(): WidgetTableActionLock {
   return useContext(WidgetTableActionLockReactContext) ?? FALLBACK_LOCK;
+}
+
+/**
+ * Adapt a generic {@link ConsoleTriggerLock} to the row-scoped
+ * {@link WidgetTableActionLock} shape. The two structures are identical up
+ * to naming — this just re-exposes the fields under the table's original
+ * `pendingRowKeys` / `inFlightRowByTrigger` labels so the existing table
+ * code keeps its intent-revealing names.
+ */
+export function widgetTableLockFromConsoleLock(lock: ConsoleTriggerLock): WidgetTableActionLock {
+  return {
+    runInFlightIds: lock.runInFlightIds,
+    pendingRowKeys: lock.pendingLockKeys,
+    inFlightRowByTrigger: lock.inFlightLockByTrigger,
+    beginSubmission: lock.beginSubmission,
+    endSubmission: lock.endSubmission,
+  };
 }
