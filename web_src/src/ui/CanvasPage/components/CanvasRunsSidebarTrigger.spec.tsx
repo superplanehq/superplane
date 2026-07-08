@@ -30,4 +30,11 @@ describe("CanvasRunsSidebarTrigger", () => {
 
     expect(handleRunsSidebarToggle).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the running runs indicator", () => {
+    render(<CanvasRunsSidebarTrigger runsSidebarState={makeRunsSidebarState({ runningRunsCount: 2 })} />);
+
+    expect(screen.getByRole("button", { name: "Toggle Runs, 2 running" })).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
 });

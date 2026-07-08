@@ -1,27 +1,39 @@
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { formatDuration } from "@/lib/duration";
+import { Button } from "@/components/ui/button";
+import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { AccordionContent, AccordionItem } from "@/ui/accordion";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
 import { RunInspectorStepTimeline } from "./RunInspectorStepTimeline";
-import type { RunInspectorNodeSection } from "./runNodeDetailModel";
+import type {
+  RunInspectorApprovalRecord,
+  RunInspectorCurrentUser,
+  RunInspectorNodeSection,
+} from "./runNodeDetailModel";
+import type { useRunInspectorActions } from "./useRunInspectorActions";
 
 export function RunInspectorNodeAccordion({
   section,
   componentIconMap,
+  organizationId,
   isOpen,
   onRerun,
   rerunPending,
+  actions,
+  currentUser,
 }: {
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
+  organizationId?: string;
   isOpen: boolean;
   onRerun: () => void;
   rerunPending: boolean;
+  actions: ReturnType<typeof useRunInspectorActions>;
+  currentUser?: RunInspectorCurrentUser;
 }) {
   const iconSrc = getHeaderIconSrc(section.workflowNode?.component);
   const iconSlug = section.workflowNode?.component ? componentIconMap[section.workflowNode.component] : undefined;
@@ -77,13 +89,133 @@ export function RunInspectorNodeAccordion({
             {section.nodeName}
           </span>
         </AccordionPrimitive.Trigger>
+        <NodeActions section={section} actions={actions} currentUser={currentUser} />
         <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
       </AccordionPrimitive.Header>
       <AccordionContent className="bg-slate-50 px-3 pb-3 pt-3 dark:bg-gray-950">
-        <RunInspectorStepTimeline section={section} componentIconMap={componentIconMap} />
+        <RunInspectorStepTimeline
+          section={section}
+          componentIconMap={componentIconMap}
+          organizationId={organizationId}
+        />
       </AccordionContent>
     </AccordionItem>
   );
+}
+
+function NodeActions({
+  section,
+  actions,
+  currentUser,
+}: {
+  section: RunInspectorNodeSection;
+  actions: ReturnType<typeof useRunInspectorActions>;
+  currentUser?: RunInspectorCurrentUser;
+}) {
+  const actionableApproval = findActionableApprovalRecord(section.actions.approvalRecords, currentUser ?? null);
+  const hasActions = section.actions.canStop || section.actions.canPushThrough || actionableApproval;
+
+  if (!hasActions) return null;
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 pl-3">
+      {actionableApproval ? (
+        <>
+          <NodeActionButton
+            label="Approve"
+            tone="success"
+            disabled={actions.nodeHookPending}
+            onClick={() => actions.invokeNodeHook(section, "approve", { index: actionableApproval.index, comment: "" })}
+          />
+          <NodeActionButton
+            label="Reject"
+            tone="danger"
+            disabled={actions.nodeHookPending}
+            onClick={() => {
+              const reason = window.prompt("Reason for rejection");
+              if (!reason?.trim()) return;
+              actions.invokeNodeHook(section, "reject", { index: actionableApproval.index, reason: reason.trim() });
+            }}
+          />
+        </>
+      ) : null}
+      {section.actions.canPushThrough ? (
+        <NodeActionButton
+          label="Push through"
+          tone="neutral"
+          disabled={actions.nodeHookPending}
+          onClick={() => actions.invokeNodeHook(section, "pushThrough", null)}
+        />
+      ) : null}
+      {section.actions.canStop ? (
+        <NodeActionButton
+          label="Stop"
+          tone="danger"
+          disabled={actions.stopNodePending}
+          onClick={() => actions.stopNode(section)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function NodeActionButton({
+  label,
+  tone,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  tone: "success" | "danger" | "neutral";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="xs"
+      disabled={disabled}
+      className={cn(
+        "h-7 rounded-sm bg-white px-2.5 text-xs font-medium shadow-none disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-950",
+        tone === "success" &&
+          "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/50",
+        tone === "danger" &&
+          "border-red-300 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/50",
+        tone === "neutral" &&
+          "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800",
+      )}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      {label}
+    </Button>
+  );
+}
+
+function findActionableApprovalRecord(
+  records: RunInspectorApprovalRecord[],
+  account: RunInspectorCurrentUser | null,
+): RunInspectorApprovalRecord | null {
+  if (!account || hasCurrentUserActed(records, account)) return null;
+
+  return records.find((record) => record.state === "pending" && canCurrentUserActOnRecord(record, account)) ?? null;
+}
+
+function hasCurrentUserActed(records: RunInspectorApprovalRecord[], account: RunInspectorCurrentUser): boolean {
+  return records.some(
+    (record) => record.state !== "pending" && (record.user?.id === account.id || record.user?.email === account.email),
+  );
+}
+
+function canCurrentUserActOnRecord(record: RunInspectorApprovalRecord, account: RunInspectorCurrentUser): boolean {
+  if (record.type === "anyone") return true;
+  if (record.type === "user") return record.user?.id === account.id || record.user?.email === account.email;
+  if (record.type === "role") return !!record.roleRef?.name && (account.roles ?? []).includes(record.roleRef.name);
+  if (record.type === "group") return !!record.groupRef?.name && (account.groups ?? []).includes(record.groupRef.name);
+  return false;
 }
 
 function NodeMetadata({
@@ -121,8 +253,7 @@ function NodeMetadata({
 }
 
 function formatStepDuration(durationMs: number): string {
-  if (durationMs > 0 && durationMs < 1000) return "<1s";
-  return formatDuration(durationMs);
+  return formatMinutesSecondsDuration(durationMs);
 }
 
 function formatEventTimestamp(timestamp: string): string {

@@ -38,7 +38,12 @@ function toCheckboxOptionId(fieldName: string, optionValue: string): string {
   return `${safeFieldName}-${safeOptionValue}`;
 }
 
-export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  readOnly = false,
+}) => {
   const useCheckboxes = field.typeOptions?.multiSelect?.useCheckboxes === true;
 
   const comboboxOptions: SelectOption[] = useMemo(() => {
@@ -64,10 +69,12 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, 
 
   // Set initial value on first render if no value is present but there's a default
   useEffect(() => {
+    if (readOnly) return;
+
     if ((value === undefined || value === null) && defaultValues.length > 0) {
       onChange(defaultValues);
     }
-  }, [value, defaultValues, onChange]);
+  }, [readOnly, value, defaultValues, onChange]);
 
   const currentValue = useMemo(() => {
     if (value === undefined || value === null) {
@@ -110,10 +117,14 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, 
                   id={optionId}
                   checked={selectedValues.has(option.value)}
                   onCheckedChange={(checked) => handleCheckboxChange(option.value, checked === true)}
+                  disabled={readOnly}
                   className="mt-0.5"
                 />
                 <div className="flex flex-col gap-1 py-0.5">
-                  <Label htmlFor={optionId} className="cursor-pointer font-medium leading-none">
+                  <Label
+                    htmlFor={optionId}
+                    className={readOnly ? "font-medium leading-none" : "cursor-pointer font-medium leading-none"}
+                  >
                     {option.label}
                   </Label>
                   {option.description && (
@@ -134,8 +145,9 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, 
       displayValue={(option) => option.label}
       placeholder={`Select ${field.label || field.name}...`}
       value={selectedOptions}
-      onChange={handleComboboxChange}
+      onChange={readOnly ? undefined : handleComboboxChange}
       showButton={false}
+      disabled={readOnly}
     >
       {(option) => <MultiComboboxLabel>{option.label}</MultiComboboxLabel>}
     </MultiCombobox>
