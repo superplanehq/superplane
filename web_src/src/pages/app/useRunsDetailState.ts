@@ -28,7 +28,6 @@ export function useRunsDetailState(
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(() =>
     getRunDetailNodeIdFromSearchParams(searchParams, isRunInspectionMode, selectedRunId),
   );
-  const [runNodeDetailPaneHeight, setRunNodeDetailPaneHeight] = useState(320);
   const [detailDismissedForRunId, setDetailDismissedForRunId] = useState<string | null>(null);
   const wasRunInspectionModeRef = useRef(isRunInspectionMode);
   const previousSelectedRunIdForDetailRef = useRef<string | null>(selectedRunId);
@@ -39,6 +38,14 @@ export function useRunsDetailState(
       setDetailDismissedForRunId(null);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const urlRequestsRunDetail =
+      isRunInspectionMode && searchParams.get("run") === selectedRunId && searchParams.get("sidebar") === "1";
+    if (urlRequestsRunDetail) {
+      setDetailDismissedForRunId(null);
+    }
+  }, [isRunInspectionMode, searchParams, selectedRunId]);
 
   useEffect(() => {
     if (isRunInspectionMode && !wasRunInspectionModeRef.current) {
@@ -86,8 +93,6 @@ export function useRunsDetailState(
     openRunDetailOnMount,
     runDetailNodeId,
     setRunDetailNodeId,
-    runNodeDetailPaneHeight,
-    setRunNodeDetailPaneHeight,
     clearDismissedRunDetail,
     detailDismissedForRunId,
     handleBackToRunList,
