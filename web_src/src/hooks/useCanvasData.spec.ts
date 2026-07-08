@@ -503,4 +503,55 @@ describe("useUpdateCanvasConsole", () => {
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
     });
   });
+
+  it("uses staging from the write response instead of a warm React Query cache", async () => {
+    const queryClient = createQueryClient();
+    const dashboardKey = canvasKeys.stagedConsole("canvas-1");
+    const staleStaging = {
+      hasStaging: false,
+      stagedPaths: [],
+      spec: committedEmptyConsoleVersion.spec,
+    };
+    queryClient.setQueryData(canvasKeys.canvasStaging("canvas-1"), staleStaging);
+    queryClient.setQueryData(dashboardKey, {
+      canvasId: "canvas-1",
+      versionId: "version-1",
+      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before", body: "Before body" } }],
+      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      consoleYaml: emptyConsoleYaml,
+    });
+
+    const updatedPanels = [{ id: "panel-1", type: "markdown", content: { title: "After", body: "After body" } }];
+    const writeResponseStaging = {
+      hasStaging: true,
+      stagedPaths: ["console.yaml"],
+      spec: {
+        panels: updatedPanels,
+        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      },
+    };
+    canvasesPutCanvasStaging.mockResolvedValue({ data: { staging: writeResponseStaging } });
+    mockCommittedConsoleVersion(committedConsoleVersionWithPanel);
+    canvasesGetCanvasStaging.mockResolvedValue({
+      data: { staging: staleStaging },
+    });
+
+    const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await result.current.mutateAsync({
+      panels: updatedPanels,
+      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+    });
+
+    expect(canvasesGetCanvasStaging).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
+      panels: updatedPanels,
+    });
+    expect(queryClient.getQueryData(canvasKeys.canvasStaging("canvas-1"))).toMatchObject({
+      hasStaging: true,
+      stagedPaths: ["console.yaml"],
+    });
+  });
 });

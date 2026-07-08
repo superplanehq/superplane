@@ -365,6 +365,7 @@ func (s *CanvasSteps) WaitForStagingOnCurrentDraft() uuid.UUID {
 }
 
 const canvasYAMLRepositoryPath = "canvas.yaml"
+const consoleYAMLRepositoryPath = "console.yaml"
 
 // DraftEffectiveSpec returns nodes and edges from staged canvas.yaml when present,
 // otherwise from the live version row.
@@ -485,6 +486,68 @@ func (s *CanvasSteps) StagingContainsNodeForUser(userID uuid.UUID, nodeName stri
 		}
 	}
 	return false
+}
+
+// StagingContainsConsoleTextForUser reports whether a user's staged console.yaml includes text.
+func (s *CanvasSteps) StagingContainsConsoleTextForUser(userID uuid.UUID, text string) bool {
+	rows, err := models.ListStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
+	if err != nil {
+		return false
+	}
+	for _, row := range rows {
+		if row.Path == consoleYAMLRepositoryPath && strings.Contains(row.Content, text) {
+			return true
+		}
+	}
+	return false
+}
+
+// WarmLiveViewStagingCaches reproduces a canvas that already fetched /staging on live view
+// and briefly entered edit mode, leaving a warm React Query staging snapshot behind.
+func (s *CanvasSteps) WarmLiveViewStagingCaches() {
+	s.EnterEditModeWithoutStagingActionAssertions()
+	s.ExitEditMode()
+	s.waitForEnabledEditButton()
+}
+
+// SwitchToConsoleView opens the Console tab while editing.
+func (s *CanvasSteps) SwitchToConsoleView() {
+	s.session.Click(q.TestID("canvas-view-mode-console"))
+	s.session.Sleep(500)
+}
+
+// AddMarkdownConsolePanel adds a markdown panel from the empty-console state.
+func (s *CanvasSteps) AddMarkdownConsolePanel(name string) {
+	s.session.Click(q.TestID("console-add-first-panel"))
+	s.session.FillIn(q.TestID("add-panel-name-input"), name)
+	s.session.Click(q.TestID("add-panel-confirm"))
+	s.session.Sleep(300)
+}
+
+// EditFirstMarkdownConsoleBody opens the first markdown panel editor and saves body text.
+func (s *CanvasSteps) EditFirstMarkdownConsoleBody(body string) {
+	emptyPanel := q.TestID("console-markdown-empty").Run(s.session)
+	viewPanel := q.TestID("console-markdown-view").Run(s.session)
+
+	require.Eventually(s.t, func() bool {
+		emptyVisible, err := emptyPanel.IsVisible()
+		if err == nil && emptyVisible {
+			return true
+		}
+		viewVisible, err := viewPanel.IsVisible()
+		return err == nil && viewVisible
+	}, 15*time.Second, 200*time.Millisecond, "expected a markdown panel to render")
+
+	if visible, err := emptyPanel.IsVisible(); err == nil && visible {
+		require.NoError(s.t, emptyPanel.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	} else {
+		require.NoError(s.t, viewPanel.Dblclick(pw.LocatorDblclickOptions{Timeout: pw.Float(15000)}))
+	}
+
+	s.session.AssertVisible(q.TestID("console-markdown-editor"))
+	s.session.FillIn(q.TestID("console-markdown-editor"), body)
+	s.session.Click(q.TestID("console-markdown-save"))
+	s.session.Sleep(800)
 }
 
 // FindDraftByDisplayName returns the live version (display names are no longer used).

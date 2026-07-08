@@ -81,22 +81,24 @@ function toCanvasConsoleData(
 // canvas staging layer without creating a new version row.
 async function stageSpecOperations(canvasId: string, operations: CanvasesCanvasRepositoryFileOperation[]) {
   registerLocalStagingWrite(canvasId);
-  await canvasesPutCanvasStaging(
+  const response = await canvasesPutCanvasStaging(
     withOrganizationHeader({
       path: { canvasId },
       body: { operations },
     }),
   );
+  return response.data?.staging ?? emptyCanvasStaging();
 }
 
 async function discardStagedPaths(canvasId: string, paths: string[]) {
   registerLocalStagingWrite(canvasId);
-  await canvasesDeleteCanvasStaging(
+  const response = await canvasesDeleteCanvasStaging(
     withOrganizationHeader({
       path: { canvasId },
       query: paths.length > 0 ? { paths } : undefined,
     }),
   );
+  return response.data?.staging ?? emptyCanvasStaging();
 }
 
 export type CanvasConsoleData = {
@@ -173,6 +175,16 @@ export const canvasKeys = {
   repositoryFileContent: (canvasId: string, path: string, versionId: string | undefined, stage: boolean) =>
     [...canvasKeys.repositoryFile(canvasId, path, versionId), "content", stage ? "staged" : "committed"] as const,
 };
+
+export function applyCanvasStagingCache(
+  queryClient: QueryClient,
+  canvasId: string,
+  staging: CanvasesStaging | undefined,
+): CanvasesStaging {
+  const nextStaging = staging ?? emptyCanvasStaging();
+  queryClient.setQueryData(canvasKeys.canvasStaging(canvasId), nextStaging);
+  return nextStaging;
+}
 
 function canvasVersionScopedQueryKeys(canvasId: string, versionId: string) {
   return [canvasKeys.versionDetail(canvasId, versionId), canvasKeys.console(canvasId, versionId)];
@@ -364,6 +376,13 @@ export function getCanvasVersionQueryOptions(canvasId: string, versionId: string
 
 export async function ensureCanvasStaging(queryClient: QueryClient, canvasId: string): Promise<CanvasesStaging> {
   return queryClient.fetchQuery(getCanvasStagingQueryOptions(canvasId));
+}
+
+export async function fetchFreshCanvasStaging(queryClient: QueryClient, canvasId: string): Promise<CanvasesStaging> {
+  return queryClient.fetchQuery({
+    ...getCanvasStagingQueryOptions(canvasId),
+    staleTime: 0,
+  });
 }
 
 export async function ensureCanvasVersion(
@@ -897,19 +916,16 @@ export const useUpdateCanvasVersion = (canvasId: string) => {
       // (useCommitCanvasStaging).
       const committedVersion = await ensureCanvasVersion(queryClient, canvasId, data.versionId);
       const canvasMatchesCommitted = committedCanvasMatchesYaml(committedVersion?.spec, data.canvasYaml);
-      if (canvasMatchesCommitted) {
-        await discardStagedPaths(canvasId, [CANVAS_YAML_PATH]);
-      } else {
-        await stageSpecOperations(canvasId, [
-          {
-            path: CANVAS_YAML_PATH,
-            content: encodeRepositoryFileContent(data.canvasYaml),
-          },
-        ]);
-      }
+      const staging = canvasMatchesCommitted
+        ? await discardStagedPaths(canvasId, [CANVAS_YAML_PATH])
+        : await stageSpecOperations(canvasId, [
+            {
+              path: CANVAS_YAML_PATH,
+              content: encodeRepositoryFileContent(data.canvasYaml),
+            },
+          ]);
 
-      const staging = await ensureCanvasStaging(queryClient, canvasId);
-      return { data: { staging } };
+      return { data: { staging: applyCanvasStagingCache(queryClient, canvasId, staging) } };
     },
     onSuccess: (response, variables) => {
       if (variables.versionId) {
@@ -1553,20 +1569,17 @@ export const useUpdateCanvasConsole = (
 
       const committedVersion = await ensureCanvasVersion(queryClient, canvasId, versionId);
       const consoleMatchesCommitted = committedConsoleMatchesYaml(canvasId, committedVersion?.spec, consoleYaml);
-      if (consoleMatchesCommitted) {
-        await discardStagedPaths(canvasId, [CONSOLE_YAML_PATH]);
-      } else {
-        await stageSpecOperations(canvasId, [
-          {
-            path: CONSOLE_YAML_PATH,
-            content: encodeRepositoryFileContent(consoleYaml),
-          },
-        ]);
-      }
-
-      const staging = await ensureCanvasStaging(queryClient, canvasId);
-      const consoleData = staging?.spec
-        ? toCanvasConsoleData(canvasId, versionId, staging.spec)
+      const staging = consoleMatchesCommitted
+        ? await discardStagedPaths(canvasId, [CONSOLE_YAML_PATH])
+        : await stageSpecOperations(canvasId, [
+            {
+              path: CONSOLE_YAML_PATH,
+              content: encodeRepositoryFileContent(consoleYaml),
+            },
+          ]);
+      const cachedStaging = applyCanvasStagingCache(queryClient, canvasId, staging);
+      const consoleData = cachedStaging?.spec
+        ? toCanvasConsoleData(canvasId, versionId, cachedStaging.spec)
         : {
             canvasId,
             versionId,
@@ -1576,7 +1589,7 @@ export const useUpdateCanvasConsole = (
           };
       return {
         consoleData,
-        staging,
+        staging: cachedStaging,
       };
     },
     onError: (_error, _input, context) => {

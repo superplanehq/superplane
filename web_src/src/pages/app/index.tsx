@@ -31,7 +31,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
-  getCanvasStagingQueryOptions,
+  fetchFreshCanvasStaging,
   useCanvas,
   useCanvasMemoryEntries,
   useCanvasVersion,
@@ -3477,11 +3477,11 @@ export function AppPage() {
     }
 
     if (editSessionActiveRef.current && activeCanvasVersionIdRef.current === targetVersionId) {
-      await resyncStagedEditorState(targetVersionId, { bumpResetNonce: false });
+      await resyncStagedEditorState(targetVersionId, { bumpResetNonce: false, preferCachedStaging: false });
       return;
     }
 
-    const staging = await queryClient.ensureQueryData(getCanvasStagingQueryOptions(canvasId));
+    const staging = await fetchFreshCanvasStaging(queryClient, canvasId);
     if (!staging?.hasStaging) {
       return;
     }
@@ -3495,7 +3495,10 @@ export function AppPage() {
     }
 
     if (editSessionActive && isViewingCurrentLiveVersion) {
-      await resyncStagedEditorState(effectiveLiveCanvasVersionId, { bumpResetNonce: false });
+      await resyncStagedEditorState(effectiveLiveCanvasVersionId, {
+        bumpResetNonce: false,
+        preferCachedStaging: false,
+      });
       return true;
     }
 

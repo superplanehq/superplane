@@ -2,7 +2,7 @@ import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStat
 import { useQueryClient } from "@tanstack/react-query";
 
 import type { CanvasesCanvas, CanvasesCanvasVersion, CanvasesStaging } from "@/api-client";
-import { canvasKeys, getCanvasStagingQueryOptions } from "@/hooks/useCanvasData";
+import { canvasKeys, fetchFreshCanvasStaging } from "@/hooks/useCanvasData";
 
 type CanvasSpec = CanvasesCanvas["spec"] | null;
 
@@ -43,7 +43,7 @@ async function resolveStaging(
     return cachedStaging;
   }
 
-  return queryClient.ensureQueryData(getCanvasStagingQueryOptions(canvasId));
+  return fetchFreshCanvasStaging(queryClient, canvasId);
 }
 
 // Re-applies the staged (uncommitted) spec into React editor state after a remote
@@ -112,7 +112,7 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
       }
 
       const bumpResetNonce = options?.bumpResetNonce ?? true;
-      const preferCachedStaging = options?.preferCachedStaging ?? true;
+      const preferCachedStaging = options?.preferCachedStaging ?? false;
 
       const resyncPromise = (async () => {
         if (activeCanvasVersionIdRef.current !== versionId) {

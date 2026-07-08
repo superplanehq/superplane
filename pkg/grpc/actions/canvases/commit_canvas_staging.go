@@ -205,8 +205,13 @@ func CommitCanvasStaging(
 		return nil, grpcerrors.Internal(err, "failed to build staging response")
 	}
 
+	version, err := SerializeCanvasVersion(newLiveVersion, organizationID, ownersByID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to serialize version")
+	}
+
 	return &pb.CommitCanvasStagingResponse{
-		Version: SerializeCanvasVersion(newLiveVersion, organizationID, ownersByID),
+		Version: version,
 		Staging: staging,
 	}, nil
 }
