@@ -509,7 +509,14 @@ export function OrganizationSettings() {
                 </RequirePermission>
               }
             />
-            <Route path="secrets/:secretId" element={<SecretDetail organizationId={organizationId || ""} />} />
+            <Route
+              path="secrets/:secretId"
+              element={
+                <RequirePermission resource="secrets" action="read">
+                  <SecretDetail organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
             <Route
               path="service-accounts"
               element={
@@ -526,8 +533,22 @@ export function OrganizationSettings() {
                 </RequirePermission>
               }
             />
-            <Route path="create-role" element={<CreateRolePage />} />
-            <Route path="create-role/:roleName" element={<CreateRolePage />} />
+            <Route
+              path="create-role"
+              element={
+                <RequirePermission resource="roles" action="create">
+                  <CreateRolePage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="create-role/:roleName"
+              element={
+                <RequirePermission resource="roles" action="read">
+                  <CreateRolePage />
+                </RequirePermission>
+              }
+            />
             <Route path="profile" element={<Profile />} />
             <Route
               path="billing"

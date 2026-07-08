@@ -145,7 +145,9 @@ function EditModeStagingActions({
     );
   }
 
-  if (!onCommitStaging) {
+  const showStagingActions =
+    (!!onCommitStaging || !!onResetStaging) && (!!onCommitStaging || !!hasStagingChanges || stagingActionPending);
+  if (!showStagingActions) {
     return null;
   }
 
@@ -156,7 +158,9 @@ function EditModeStagingActions({
       {onResetStaging ? (
         <ResetStagingButton onReset={() => onResetStaging()} disabled={stagingActionsDisabled} />
       ) : null}
-      <CommitStagingButton onCommit={() => onCommitStaging?.()} disabled={stagingActionsDisabled} />
+      {onCommitStaging ? (
+        <CommitStagingButton onCommit={() => onCommitStaging()} disabled={stagingActionsDisabled} />
+      ) : null}
     </div>
   );
 }
