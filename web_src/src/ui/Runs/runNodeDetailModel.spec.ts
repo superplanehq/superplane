@@ -230,6 +230,44 @@ describe("buildRunInspectorNodeSections", () => {
     expect(secondAction?.primaryInputNodeId).toBe("first-action");
   });
 
+  it("includes execution refs when full execution details are unavailable", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: "2026-05-01T12:00:00Z",
+        data: { trigger: true },
+      },
+      executions: [
+        {
+          id: "execution-approval",
+          nodeId: "approval",
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          resultReason: "RESULT_REASON_OK",
+          createdAt: "2026-05-01T12:00:01Z",
+          updatedAt: "2026-05-01T12:00:02Z",
+        },
+      ],
+    };
+
+    const sections = buildRunInspectorNodeSections({
+      run,
+      executions: [],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "approval", name: "Await Approval", type: "TYPE_ACTION", component: "approval" },
+      ],
+    });
+
+    const approvalSection = sections.find((section) => section.nodeId === "approval");
+
+    expect(approvalSection?.nodeName).toBe("Await Approval");
+    expect(approvalSection?.execution).toBeUndefined();
+    expect(approvalSection?.executionRef?.id).toBe("execution-approval");
+    expect(approvalSection?.actions.approvalRecords).toEqual([]);
+  });
+
   it("uses edges to include only accessible upstream nodes ordered by creation time", () => {
     const run: CanvasesCanvasRun = {
       rootEvent: {
@@ -286,6 +324,105 @@ describe("buildRunInspectorNodeSections", () => {
       { first: true },
     ]);
     expect(secondAction?.primaryInputNodeId).toBe("first-action");
+  });
+
+  it("orders ref-only upstream nodes by their execution ref creation time", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: "2026-05-01T12:00:00Z",
+        data: { trigger: true },
+      },
+      executions: [
+        {
+          id: "execution-ref-only",
+          nodeId: "ref-only-action",
+          createdAt: "2026-05-01T12:00:01Z",
+        },
+        {
+          id: "execution-loaded",
+          nodeId: "loaded-action",
+          createdAt: "2026-05-01T12:00:03Z",
+        },
+        {
+          id: "execution-current",
+          nodeId: "current-action",
+          createdAt: "2026-05-01T12:00:04Z",
+        },
+      ],
+    };
+
+    const sections = buildRunInspectorNodeSections({
+      run,
+      executions: [
+        {
+          id: "execution-loaded",
+          nodeId: "loaded-action",
+          createdAt: "2026-05-01T12:00:03Z",
+          outputs: { default: [{ loaded: true }] },
+          metadata: {},
+        },
+        {
+          id: "execution-current",
+          nodeId: "current-action",
+          createdAt: "2026-05-01T12:00:04Z",
+          outputs: {},
+          metadata: {},
+        },
+      ],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "ref-only-action", name: "Ref Only Action", type: "TYPE_ACTION", component: "test.ref" },
+        { id: "loaded-action", name: "Loaded Action", type: "TYPE_ACTION", component: "test.loaded" },
+        { id: "current-action", name: "Current Action", type: "TYPE_ACTION", component: "test.current" },
+      ],
+      workflowEdges: [
+        { sourceId: "ref-only-action", targetId: "current-action" },
+        { sourceId: "loaded-action", targetId: "current-action" },
+      ],
+    });
+
+    const currentAction = sections.find((section) => section.nodeId === "current-action");
+
+    expect(currentAction?.upstreamSections.map((section) => section.nodeName)).toEqual([
+      "Ref Only Action",
+      "Loaded Action",
+    ]);
+    expect(currentAction?.primaryInputNodeId).toBe("loaded-action");
+  });
+
+  it("uses execution ref failures for node error messages", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: "2026-05-01T12:00:00Z",
+        data: { trigger: true },
+      },
+      executions: [
+        {
+          id: "execution-failed",
+          nodeId: "failed-action",
+          result: "RESULT_FAILED",
+          resultReason: "RESULT_REASON_ERROR",
+          resultMessage: "failed before details loaded",
+        },
+      ],
+    };
+
+    const sections = buildRunInspectorNodeSections({
+      run,
+      executions: [],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "failed-action", name: "Failed Action", type: "TYPE_ACTION", component: "test.failed" },
+      ],
+    });
+
+    const failedAction = sections.find((section) => section.nodeId === "failed-action");
+
+    expect(failedAction?.errorMessage).toBe("failed before details loaded");
   });
 
   it("keeps channel names when displaying multiple execution output channels", () => {
