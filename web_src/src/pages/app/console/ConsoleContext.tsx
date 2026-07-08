@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-import type { SuperplaneComponentsNode } from "@/api-client";
+import type { SuperplaneComponentsNode, TriggersTrigger } from "@/api-client";
 
 /**
  * Public status shape used by status chips. Mirrors the categories already
@@ -40,6 +40,17 @@ export interface ConsoleContextValue {
    */
   canRunNodes: boolean;
   /**
+   * Names of triggers (component identifiers, e.g. `start`, `schedule`) that
+   * expose a user-invokable `run` hook — the same condition
+   * `InvokeNodeTriggerHook` enforces on the backend. When defined, console
+   * widgets use it to hide manual-run affordances (Run buttons, table row
+   * actions) for event triggers such as `github.pullRequest`. `undefined`
+   * strictly means the catalog is still loading — consumers then fall back
+   * to the previous `TYPE_TRIGGER`-only heuristic to avoid flicker on first
+   * paint. A failed fetch yields an empty set (fail closed) instead.
+   */
+  manualRunTriggers?: ReadonlySet<string>;
+  /**
    * Open the manual-trigger flow for the given node. Resolution is by node id;
    * if undefined the chip falls back to dispatching the
    * `dashboard:trigger-node` window event so a host can react when wired.
@@ -76,4 +87,50 @@ export function resolveConsoleNode(
   const byName = ctx.nodes.find((n) => n.name === trimmed);
   if (byName) return { node: byName, label: byName.name || byName.id || trimmed };
   return undefined;
+}
+
+const NO_MANUAL_RUN_TRIGGERS: ReadonlySet<string> = new Set();
+
+/**
+ * Build the manual-run trigger catalog from the triggers API response.
+ *
+ * Returns `undefined` only while the catalog is genuinely still loading so
+ * {@link isManualRunNode} keeps the permissive first-paint fallback. When the
+ * fetch has failed we fail closed with an empty set instead — otherwise
+ * event-only triggers would keep showing Run controls that the backend would
+ * reject anyway.
+ */
+export function manualRunTriggersFromCatalog(
+  triggers: TriggersTrigger[] | undefined,
+  fetchFailed: boolean,
+): ReadonlySet<string> | undefined {
+  if (!triggers) return fetchFailed ? NO_MANUAL_RUN_TRIGGERS : undefined;
+  const names = new Set<string>();
+  for (const trigger of triggers) {
+    if (trigger.manualRunnable && trigger.name) names.add(trigger.name);
+  }
+  return names;
+}
+
+/**
+ * Single source of truth for "this node can be manually run from the
+ * console". Combines the structural `TYPE_TRIGGER` check with the trigger
+ * catalog's `manualRunnable` bit (populated from the backend's user `run`
+ * hook). While the catalog is still loading (`manualRunTriggers` undefined)
+ * we intentionally return `true` for any `TYPE_TRIGGER` so first paint keeps
+ * the previous behavior — the widgets will re-render once the query settles.
+ *
+ * Nodes without a `component` (unlikely at runtime, but possible in
+ * partially normalized fixtures) are rejected once the catalog is loaded.
+ */
+export function isManualRunNode(
+  ctx: Pick<ConsoleContextValue, "manualRunTriggers"> | undefined,
+  node: SuperplaneComponentsNode | undefined,
+): boolean {
+  if (!node) return false;
+  if (node.type !== "TYPE_TRIGGER") return false;
+  const catalog = ctx?.manualRunTriggers;
+  if (catalog === undefined) return true;
+  const component = node.component;
+  return Boolean(component) && catalog.has(component!);
 }
