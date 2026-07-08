@@ -115,7 +115,7 @@ function AppRouter() {
               <Route path=":organizationId" element={<OrganizationScope />}>
                 <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
                 <Route path="apps">
-                  <Route path="new" element={withAuthAndPermission(NewAppPage, "canvases", "read")} />
+                  <Route path="new" element={withAuthAndPermission(NewAppPage, "canvases", "create")} />
                   <Route
                     path=":appId/settings"
                     element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
