@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  type ActionsAction,
   type CanvasesCanvasRun,
   type ComponentsEdge,
+  type SuperplaneMeUser,
   type SuperplaneComponentsNode as ComponentsNode,
+  type TriggersTrigger,
 } from "@/api-client";
+import { useAccount } from "@/contexts/useAccount";
 import { useEventExecutions } from "@/hooks/useCanvasData";
+import { useMe } from "@/hooks/useMe";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { RunInspectorChrome } from "./RunInspectorChrome";
@@ -12,41 +17,71 @@ import { RunInspectorHeader } from "./RunInspectorHeader";
 import { ResizeHandle } from "./RunInspectorResize";
 import { RunInspectorStepsList } from "./RunInspectorStepsList";
 import { buildNodeMap, buildRunPresentation } from "./runPresentation";
-import { buildRunInspectorNodeSections, findRunInspectorErrorSummaries } from "./runNodeDetailModel";
+import {
+  buildRunInspectorNodeSections,
+  findRunInspectorErrorSummaries,
+  type RunInspectorCurrentUser,
+} from "./runNodeDetailModel";
 import { useResizableInspectorWidth } from "./useResizableInspectorWidth";
 import { useRunInspectorActions } from "./useRunInspectorActions";
 
 export interface RunInspectorPanelProps {
   canvasId: string;
+  organizationId?: string;
   run: CanvasesCanvasRun;
   workflowNodes: ComponentsNode[];
   workflowEdges?: ComponentsEdge[];
+  componentDefinitions?: ActionsAction[];
+  triggerDefinitions?: TriggersTrigger[];
   componentIconMap?: Record<string, string>;
+  currentUser?: RunInspectorCurrentUser;
   selectedNodeId?: string | null;
   onSelectNode: (nodeId: string) => void;
   onClearSelectedNode?: () => void;
   onClose: () => void;
 }
 
+type AccountFallback = {
+  id: string;
+  email: string;
+  roles?: string[];
+  groups?: string[];
+} | null;
+
 export function RunInspectorPanel({
   canvasId,
+  organizationId,
   run,
   workflowNodes,
   workflowEdges,
+  componentDefinitions,
+  triggerDefinitions,
   componentIconMap = {},
+  currentUser,
   selectedNodeId = null,
   onSelectNode,
   onClearSelectedNode,
   onClose,
 }: RunInspectorPanelProps) {
+  const { account } = useAccount();
+  const { data: me } = useMe(true, organizationId ?? null);
+  const resolvedCurrentUser = useMemo(() => resolveCurrentUser(currentUser, me, account), [account, currentUser, me]);
   const rootEventId = run.rootEvent?.id || null;
   const executionsQuery = useEventExecutions(canvasId, rootEventId);
   const executions = useMemo(() => executionsQuery.data?.executions || [], [executionsQuery.data?.executions]);
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
   const presentation = useMemo(() => buildRunPresentation(run, nodeMap), [nodeMap, run]);
   const sections = useMemo(
-    () => buildRunInspectorNodeSections({ run, executions, workflowNodes, workflowEdges }),
-    [executions, run, workflowEdges, workflowNodes],
+    () =>
+      buildRunInspectorNodeSections({
+        run,
+        executions,
+        workflowNodes,
+        workflowEdges,
+        componentDefinitions,
+        triggerDefinitions,
+      }),
+    [componentDefinitions, executions, run, triggerDefinitions, workflowEdges, workflowNodes],
   );
   const errorSummaries = useMemo(() => findRunInspectorErrorSummaries(sections), [sections]);
   const inspectorWidth = useResizableInspectorWidth();
@@ -113,11 +148,25 @@ export function RunInspectorPanel({
         isLoading={executionsQuery.isLoading}
         selectedValue={selectedValue}
         componentIconMap={componentIconMap}
+        organizationId={organizationId}
         onValueChange={handleValueChange}
         onJumpToError={jumpToErrorOutput}
         onRerun={actions.rerun}
         rerunPending={actions.rerunPending}
+        actions={actions}
+        currentUser={resolvedCurrentUser}
       />
     </aside>
   );
+}
+
+function resolveCurrentUser(
+  currentUser: RunInspectorCurrentUser | undefined,
+  me: SuperplaneMeUser | null | undefined,
+  account: AccountFallback,
+): RunInspectorCurrentUser | undefined {
+  if (currentUser) return currentUser;
+  if (me) return { id: me.id ?? "", email: me.email ?? "", roles: me.roles, groups: me.groups };
+  if (account) return { id: account.id, email: account.email, roles: account.roles, groups: account.groups };
+  return undefined;
 }
