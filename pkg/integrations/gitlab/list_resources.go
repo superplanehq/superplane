@@ -50,9 +50,18 @@ func ListMembers(ctx core.ListResourcesContext) ([]core.IntegrationResource, err
 		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
 
-	members, err := client.ListGroupMembers(client.groupID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list members: %v", err)
+	var members []User
+	if client.groupID == "" {
+		user, err := client.getCurrentUser()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current user: %v", err)
+		}
+		members = []User{*user}
+	} else {
+		members, err = client.ListGroupMembers(client.groupID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list members: %v", err)
+		}
 	}
 
 	resources := make([]core.IntegrationResource, 0, len(members))
