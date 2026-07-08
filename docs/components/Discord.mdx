@@ -118,6 +118,7 @@ The Send Text Message component sends a message to a Discord channel.
 - **Embed Description**: Optional description for a rich embed
 - **Embed Color**: Hex color code for the embed (e.g., #5865F2)
 - **Embed URL**: Optional URL to link from the embed title
+- **Files**: Optional URLs of files to attach. Each file is downloaded and uploaded to Discord as an attachment — for example, an artifact link produced by Cursor's Download Artifact component.
 
 ### Output
 
@@ -125,7 +126,8 @@ Returns metadata about the sent message including message ID, channel ID, and au
 
 ### Notes
 
-- Either content or embed (title/description) must be provided
+- Either content, embed (title/description), or files must be provided
+- Up to 10 files per message, 8 MiB each (Discord limits)
 - The Discord bot must be installed and have permission to post to the selected channel
 - Supports Discord's rich embed formatting for visually appealing messages
 

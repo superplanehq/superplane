@@ -3,6 +3,8 @@ package discord
 import (
 	"errors"
 	"fmt"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 
@@ -15,12 +17,13 @@ import (
 type SendTextMessage struct{}
 
 type SendTextMessageConfiguration struct {
-	Channel          string `json:"channel" mapstructure:"channel"`
-	Content          string `json:"content" mapstructure:"content"`
-	EmbedTitle       string `json:"embedTitle" mapstructure:"embedTitle"`
-	EmbedDescription string `json:"embedDescription" mapstructure:"embedDescription"`
-	EmbedColor       string `json:"embedColor" mapstructure:"embedColor"`
-	EmbedURL         string `json:"embedUrl" mapstructure:"embedUrl"`
+	Channel          string   `json:"channel" mapstructure:"channel"`
+	Content          string   `json:"content" mapstructure:"content"`
+	EmbedTitle       string   `json:"embedTitle" mapstructure:"embedTitle"`
+	EmbedDescription string   `json:"embedDescription" mapstructure:"embedDescription"`
+	EmbedColor       string   `json:"embedColor" mapstructure:"embedColor"`
+	EmbedURL         string   `json:"embedUrl" mapstructure:"embedUrl"`
+	Files            []string `json:"files" mapstructure:"files"`
 }
 
 type SendTextMessageMetadata struct {
@@ -62,6 +65,7 @@ func (c *SendTextMessage) Documentation() string {
 - **Embed Description**: Optional description for a rich embed
 - **Embed Color**: Hex color code for the embed (e.g., #5865F2)
 - **Embed URL**: Optional URL to link from the embed title
+- **Files**: Optional URLs of files to attach. Each file is downloaded and uploaded to Discord as an attachment — for example, an artifact link produced by Cursor's Download Artifact component.
 
 ## Output
 
@@ -69,7 +73,8 @@ Returns metadata about the sent message including message ID, channel ID, and au
 
 ## Notes
 
-- Either content or embed (title/description) must be provided
+- Either content, embed (title/description), or files must be provided
+- Up to 10 files per message, 8 MiB each (Discord limits)
 - The Discord bot must be installed and have permission to post to the selected channel
 - Supports Discord's rich embed formatting for visually appealing messages`
 }
@@ -135,6 +140,21 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 			Required:    false,
 			Description: "URL to link from the embed title",
 		},
+		{
+			Name:        "files",
+			Label:       "Files",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "URLs of files to attach (e.g. an artifact link from Cursor's Download Artifact)",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "File URL",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -148,17 +168,21 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 		return errors.New("channel is required")
 	}
 
-	// At least content or embed must be provided
+	// At least content, embed, or a file must be provided
 	hasContent := config.Content != ""
 	hasEmbed := config.EmbedTitle != "" || config.EmbedDescription != ""
 
-	if !hasContent && !hasEmbed {
-		return fmt.Errorf("either content or embed (title/description) is required")
+	if !hasContent && !hasEmbed && len(config.Files) == 0 {
+		return fmt.Errorf("either content, embed (title/description), or files is required")
 	}
 
 	// Validate content length
 	if len(config.Content) > 2000 {
 		return fmt.Errorf("content exceeds maximum length of 2000 characters")
+	}
+
+	if err := validateFiles(config.Files); err != nil {
+		return err
 	}
 
 	// Validate color format if provided
@@ -232,7 +256,7 @@ func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
 		req.Embeds = []Embed{embed}
 	}
 
-	response, err := client.CreateMessage(config.Channel, req)
+	response, err := sendMessage(client, config, req)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
@@ -260,6 +284,70 @@ func (c *SendTextMessage) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 
 func (c *SendTextMessage) Cancel(ctx core.ExecutionContext) error {
 	return nil
+}
+
+// validateFiles checks the attachment URL list at config time. Entries with
+// unresolved expressions are skipped since they only resolve at execution.
+func validateFiles(files []string) error {
+	if len(files) > maxMessageFiles {
+		return fmt.Errorf("at most %d files can be attached to a message", maxMessageFiles)
+	}
+
+	for _, file := range files {
+		if file == "" || strings.Contains(file, "{{") {
+			continue
+		}
+		parsed, err := url.Parse(file)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return fmt.Errorf("invalid file URL %q: must be an http(s) URL", file)
+		}
+	}
+
+	return nil
+}
+
+// fileNameFromURL derives an attachment filename from the URL path, falling
+// back to a positional name for URLs without one (e.g. bare presigned links).
+func fileNameFromURL(fileURL string, index int) string {
+	fallback := fmt.Sprintf("file-%d", index+1)
+	parsed, err := url.Parse(fileURL)
+	if err != nil {
+		return fallback
+	}
+	name := path.Base(parsed.Path)
+	if name == "" || name == "." || name == "/" {
+		return fallback
+	}
+	return name
+}
+
+// sendMessage sends the message, fetching and attaching files when configured.
+func sendMessage(client *Client, config SendTextMessageConfiguration, req CreateMessageRequest) (*Message, error) {
+	if len(config.Files) == 0 {
+		return client.CreateMessage(config.Channel, req)
+	}
+
+	if len(config.Files) > maxMessageFiles {
+		return nil, fmt.Errorf("at most %d files can be attached to a message", maxMessageFiles)
+	}
+
+	files := make([]MessageFile, 0, len(config.Files))
+	for i, fileURL := range config.Files {
+		if fileURL == "" {
+			continue
+		}
+		content, err := client.FetchFile(fileURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch file %q: %w", fileURL, err)
+		}
+		files = append(files, MessageFile{Name: fileNameFromURL(fileURL, i), Content: content})
+	}
+
+	if len(files) == 0 {
+		return client.CreateMessage(config.Channel, req)
+	}
+
+	return client.CreateMessageWithFiles(config.Channel, req, files)
 }
 
 // parseHexColor converts a hex color string to decimal integer
