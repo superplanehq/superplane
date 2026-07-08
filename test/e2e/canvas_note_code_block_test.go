@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -73,7 +73,7 @@ func (s *noteCodeBlockSteps) startEditingNote() {
 		State:   pw.WaitForSelectorStateVisible,
 		Timeout: pw.Float(10000),
 	}))
-	require.NoError(s.t, note.Dblclick(pw.LocatorDblclickOptions{Timeout: pw.Float(10000)}))
+	require.NoError(s.t, note.Dblclick())
 	s.session.AssertVisible(q.Locator(`textarea[aria-label="Note note"]`))
 }
 

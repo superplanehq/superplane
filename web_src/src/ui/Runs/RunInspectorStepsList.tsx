@@ -3,7 +3,7 @@ import { Accordion } from "@/ui/accordion";
 import { RunInspectorErrorSummaryCard } from "./RunInspectorErrorSummaryCard";
 import { RunInspectorNodeAccordion } from "./RunInspectorNodeAccordion";
 import { RunInspectorStepsHeader } from "./RunInspectorStepsHeader";
-import type { RunInspectorErrorSummary, RunInspectorNodeSection } from "./runNodeDetailModel";
+import type { RunInspectorCurrentUser, RunInspectorErrorSummary, RunInspectorNodeSection } from "./runNodeDetailModel";
 import type { RUN_STATUS_META } from "./runPresentation";
 import type { useRunInspectorActions } from "./useRunInspectorActions";
 
@@ -20,6 +20,7 @@ export function RunInspectorStepsList({
   onRerun,
   rerunPending,
   actions,
+  currentUser,
 }: {
   errorSummaries: RunInspectorErrorSummary[];
   status: keyof typeof RUN_STATUS_META;
@@ -33,6 +34,7 @@ export function RunInspectorStepsList({
   onRerun: () => void;
   rerunPending: boolean;
   actions: ReturnType<typeof useRunInspectorActions>;
+  currentUser?: RunInspectorCurrentUser;
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="run-panel-step-list">
@@ -70,6 +72,7 @@ export function RunInspectorStepsList({
               onRerun={onRerun}
               rerunPending={rerunPending}
               actions={actions}
+              currentUser={currentUser}
             />
           ))}
         </Accordion>

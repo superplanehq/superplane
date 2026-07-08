@@ -9,8 +9,103 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Usage Data" href="#get-usage-data" description="Fetches organization usage metrics from OpenAI's Usage API." />
   <LinkCard title="Text Prompt" href="#text-prompt" description="Generate a text response using OpenAI" />
 </CardGrid>
+
+## Instructions
+
+## OpenAI API Key
+
+Create an [OpenAI API key](https://platform.openai.com/api-keys) and copy it.
+
+- Used for model components like Text Prompt.
+- For OpenAI-compatible providers (e.g. Azure OpenAI, Ollama, vLLM), set a custom **Base URL** below.
+
+## Admin API Key (optional)
+
+Only required for the **Get Usage Data** component.
+
+Create an [Admin API key](https://platform.openai.com/settings/organization/admin-keys) and copy it (starts with `sk-admin-`).
+
+- Only **Organization Owners** can create admin keys.
+- Admin keys can read organization usage and costs but cannot call model endpoints.
+
+> **Note:** Both keys are shown only once — store them somewhere safe before continuing.
+
+<a id="get-usage-data"></a>
+
+## Get Usage Data
+
+**Component key:** `openai.getUsage`
+
+The Get Usage Data component fetches organization usage metrics from OpenAI's Usage and Costs APIs.
+
+### Use Cases
+
+- **Usage reporting**: Track token consumption and request counts across models
+- **Cost tracking**: Monitor daily spend with the Costs usage type
+- **Analytics dashboards**: Build custom dashboards with OpenAI usage data
+
+### How It Works
+
+1. Fetches usage data for the specified date range from OpenAI's organization Usage API
+2. Returns daily buckets of metrics, optionally grouped by model or project
+
+### Configuration
+
+- **Start Date**: Start of the date range (YYYY-MM-DD format, defaults to 7 days ago)
+- **End Date**: End of the date range (YYYY-MM-DD format, defaults to today)
+- **Usage Type**: The usage category to fetch (completions, embeddings, images, audio, costs, ...)
+- **Group By**: (Optional) Group results by model or project. Line item grouping is only available for costs; model grouping is not available for costs, vector stores, or code interpreter sessions.
+
+### Output
+
+The output includes daily usage buckets. Each bucket carries its time range and results with metrics that depend on the usage type, e.g. for completions:
+- Input/output/cached token counts
+- Number of model requests
+- Model and project identifiers (when grouped)
+
+For costs, each result carries the amount value and currency per line item.
+
+### Notes
+
+- Requires an organization admin API key (sk-admin-...) configured in the integration
+- Admin keys are created by organization owners at platform.openai.com/settings/organization/admin-keys
+- Usage data is always fetched from the OpenAI platform API; a custom Base URL configured for model endpoints does not apply
+
+### Example Output
+
+```json
+{
+  "data": {
+    "data": [
+      {
+        "end_time": 1730505600,
+        "object": "bucket",
+        "results": [
+          {
+            "input_cached_tokens": 800,
+            "input_tokens": 1000,
+            "model": "gpt-5.2",
+            "num_model_requests": 5,
+            "object": "organization.usage.completions.result",
+            "output_tokens": 500
+          }
+        ],
+        "start_time": 1730419200
+      }
+    ],
+    "period": {
+      "endDate": "2026-07-03",
+      "startDate": "2026-06-26"
+    },
+    "usageType": "completions"
+  },
+  "timestamp": "2026-07-03T12:00:00.000000000Z",
+  "type": "openai.getUsage.result"
+}
+```
 
 <a id="text-prompt"></a>
 

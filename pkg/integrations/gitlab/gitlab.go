@@ -94,14 +94,17 @@ func (g *GitLab) Description() string {
 
 func (g *GitLab) Instructions() string {
 	return fmt.Sprintf(`
-When connecting using App OAuth:
-- Leave **Client ID** and **Secret** empty to start the setup wizard.
+**Setup steps:**
+1. Optionally enter a **Group ID** to work with a group's projects: in GitLab, open your group's page and select **Actions (⋮) → Copy Group ID**. The group path (e.g. `+"`my-org/my-subgroup`"+`) also works. Leave it empty to use your personal projects.
+2. Choose an **Auth Type** and connect:
 
-When connecting using Personal Access Token:
-- Go to Preferences → Personal Access Token → Add New token
-- Use **Scopes**: %s
-- Copy the token and paste it into the **Access Token** configuration field, then click **Save**.
-`, strings.Join(scopeList, ", "))
+To connect with **App OAuth**:
+1. Leave **Client ID** and **Client Secret** empty and click **Save** to start the setup wizard. It guides you through creating a GitLab OAuth application and authorizing SuperPlane.
+
+To connect with a **Personal Access Token**:
+1. [Create a personal access token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=%s) — the link prefills the name and scopes (%s), so you only need to click **Create personal access token**. On a self-managed instance, use the same path on your GitLab URL.
+2. Paste the token into the **Access Token** field and click **Save**.
+`, strings.Join(scopeList, ","), strings.Join(scopeList, ", "))
 }
 
 func (g *GitLab) Configuration() []configuration.Field {
@@ -117,8 +120,7 @@ func (g *GitLab) Configuration() []configuration.Field {
 			Name:        "groupId",
 			Label:       "Group ID",
 			Type:        configuration.FieldTypeString,
-			Description: "Group ID",
-			Required:    true,
+			Description: "Group ID or full path (e.g. my-org/my-subgroup). Leave empty to use your personal projects (projects you own).",
 		},
 		{
 			Name:     "authType",

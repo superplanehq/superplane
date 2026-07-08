@@ -1,4 +1,6 @@
 import { useState, type CSSProperties } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { getJsonViewStyle } from "@/lib/jsonViewTheme";
 import { Accordion } from "@/ui/accordion";
 import { useTheme } from "@/contexts/useTheme";
@@ -123,15 +125,17 @@ function RuntimeViewToggle({ mode, onChange }: { mode: "form" | "json"; onChange
   return (
     <span className="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white p-0.5 text-xs font-medium dark:border-gray-700 dark:bg-gray-950">
       {(["form", "json"] as const).map((item) => (
-        <button
+        <Button
           key={item}
           type="button"
+          variant="ghost"
+          size="xs"
           aria-label={item === "form" ? "Form" : "JSON"}
           aria-pressed={mode === item}
           className={
             mode === item
-              ? "h-6 rounded bg-slate-100 px-2 text-slate-900 shadow-sm dark:bg-gray-800 dark:text-gray-50"
-              : "h-6 rounded px-2 text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100"
+              ? "h-6 rounded bg-slate-100 px-2 text-xs text-slate-900 shadow-sm hover:bg-slate-100 dark:bg-gray-800 dark:text-gray-50 dark:hover:bg-gray-800"
+              : "h-6 rounded px-2 text-xs text-slate-500 shadow-none hover:bg-slate-50 hover:text-slate-800 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100"
           }
           onClick={(event) => {
             event.stopPropagation();
@@ -139,7 +143,7 @@ function RuntimeViewToggle({ mode, onChange }: { mode: "form" | "json"; onChange
           }}
         >
           {item === "form" ? "Form" : "JSON"}
-        </button>
+        </Button>
       ))}
     </span>
   );
@@ -244,11 +248,11 @@ function RuntimeFallbackConfigField({
     return (
       <label className="block space-y-1.5">
         <span className="text-sm font-medium text-slate-800 dark:text-gray-100">{label}</span>
-        <input
+        <Input
           aria-label={label}
           readOnly
           value={value === null ? "" : String(value)}
-          className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+          className="h-9 border-slate-300 bg-white text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
         />
       </label>
     );

@@ -10,7 +10,7 @@ export interface VersionsTabPanelProps {
   liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   liveVersions: CanvasesCanvasVersion[];
-  canUpdateCanvas: boolean;
+  canEditCanvasVersion: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
   onLoadMoreLiveVersions?: () => void;
@@ -33,7 +33,7 @@ export function VersionsTabPanel({
   liveCanvasVersion,
   selectedCanvasVersion,
   liveVersions,
-  canUpdateCanvas,
+  canEditCanvasVersion,
   canvasDeletedRemotely,
   onUseVersion,
   onLoadMoreLiveVersions,
@@ -64,7 +64,7 @@ export function VersionsTabPanel({
         data-testid="versions-sidebar-scroll"
         onScroll={handleScroll}
       >
-        <VersionsNotices canUpdateCanvas={canUpdateCanvas} canvasDeletedRemotely={canvasDeletedRemotely} />
+        <VersionsNotices canEditCanvasVersion={canEditCanvasVersion} canvasDeletedRemotely={canvasDeletedRemotely} />
 
         <section>
           <VersionsSectionHeader label="History" />
@@ -120,15 +120,15 @@ function VersionsSectionHeader({ label }: { label: string }) {
 }
 
 function VersionsNotices({
-  canUpdateCanvas,
+  canEditCanvasVersion,
   canvasDeletedRemotely,
 }: {
-  canUpdateCanvas: boolean;
+  canEditCanvasVersion: boolean;
   canvasDeletedRemotely: boolean;
 }) {
   return (
     <>
-      {!canUpdateCanvas && !canvasDeletedRemotely ? (
+      {!canEditCanvasVersion && !canvasDeletedRemotely ? (
         <p className="px-3 py-2 text-xs text-slate-600 dark:text-gray-400">
           You do not have permission to edit this canvas.
         </p>

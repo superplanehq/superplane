@@ -206,12 +206,12 @@ export function getExitEditModeDisabledTooltip({
   canvasDeletedRemotely: boolean;
   hasEditableVersion: boolean;
 }): string | undefined {
-  if (!canUpdateCanvas) {
-    return "You don't have permission to edit this canvas.";
-  }
-
   if (canvasDeletedRemotely) {
     return "This canvas was deleted in another session.";
+  }
+
+  if (!canUpdateCanvas) {
+    return "You don't have permission to edit this canvas.";
   }
 
   if (!hasEditableVersion) {
