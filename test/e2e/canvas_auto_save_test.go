@@ -121,7 +121,7 @@ func (s *canvasAutoSaveSteps) startEditingNoteWithText(text string) {
 		Timeout: pw.Float(10000),
 	})
 	require.NoError(s.t, err)
-	require.NoError(s.t, note.Dblclick(pw.LocatorDblclickOptions{Timeout: pw.Float(10000)}))
+	require.NoError(s.t, note.Dblclick())
 	s.session.AssertVisible(q.Locator(`textarea[aria-label="Note note"]`))
 }
 

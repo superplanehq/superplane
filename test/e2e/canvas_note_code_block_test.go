@@ -73,7 +73,7 @@ func (s *noteCodeBlockSteps) startEditingNote() {
 		State:   pw.WaitForSelectorStateVisible,
 		Timeout: pw.Float(10000),
 	}))
-	require.NoError(s.t, note.Dblclick(pw.LocatorDblclickOptions{Timeout: pw.Float(10000)}))
+	require.NoError(s.t, note.Dblclick())
 	s.session.AssertVisible(q.Locator(`textarea[aria-label="Note note"]`))
 }
 
