@@ -8,9 +8,16 @@ interface RoleFieldRendererProps {
   onChange: (value: string | undefined) => void;
   domainId: string;
   allValues?: Record<string, unknown>;
+  readOnly?: boolean;
 }
 
-export const RoleFieldRenderer = ({ value, onChange, domainId, allValues }: RoleFieldRendererProps) => {
+export const RoleFieldRenderer = ({
+  value,
+  onChange,
+  domainId,
+  allValues,
+  readOnly = false,
+}: RoleFieldRendererProps) => {
   // Fetch roles from the organization
   const { data: roles, isLoading, error } = useOrganizationRoles(domainId);
   const approvalContext = getApprovalListContext(allValues);
@@ -56,7 +63,7 @@ export const RoleFieldRenderer = ({ value, onChange, domainId, allValues }: Role
   }
 
   return (
-    <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)}>
+    <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)} disabled={readOnly}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Select role" />
       </SelectTrigger>
