@@ -5,7 +5,8 @@ import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-import { isManualRunNode, useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
+import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
+import { isManualRunNode } from "../manualRunTriggers";
 import { applyTableWhere } from "./evalTableWhere";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
@@ -90,7 +91,7 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
     const ids = new Set<string>();
     for (const action of render.rowActions ?? []) {
       const resolved = resolveConsoleNode(ctx, action.node);
-      if (resolved?.node.id && isManualRunNode(ctx, resolved.node)) ids.add(resolved.node.id);
+      if (resolved?.node.id && isManualRunNode(resolved.node)) ids.add(resolved.node.id);
     }
     return Array.from(ids);
   }, [render.rowActions, ctx]);
@@ -188,7 +189,7 @@ function WidgetTableGrid({
   const ctx = useConsoleContext();
   const rowActions = (render.rowActions ?? []).filter((action) => {
     const resolved = resolveConsoleNode(ctx, action.node);
-    return !resolved || isManualRunNode(ctx, resolved.node);
+    return !resolved || isManualRunNode(resolved.node);
   });
   const hasActions = rowActions.length > 0;
   return (
@@ -462,7 +463,7 @@ function useRowActionGate(action: WidgetRowAction, rowKey: string) {
   const resolved = resolveConsoleNode(ctx, action.node);
   // WidgetTable hides non-manual actions upstream; at this level `true` is
   // the normal case, unresolved nodes render disabled with a tooltip.
-  const isManualRun = isManualRunNode(ctx, resolved?.node);
+  const isManualRun = isManualRunNode(resolved?.node);
   const triggerNodeId = resolved?.node.id;
   // Per-row locking: a row's button is disabled by `runInFlight` only when
   // its own submission produced the in-flight run (i.e. the mapping points

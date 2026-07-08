@@ -13,7 +13,6 @@ export function ConsoleContextProvider({
   nodes,
   nodeStatuses,
   canRunNodes,
-  manualRunTriggers,
   onTriggerNode,
   onOpenNode,
 }: ConsoleContextProviderProps) {
@@ -24,11 +23,10 @@ export function ConsoleContextProvider({
       nodes,
       nodeStatuses,
       canRunNodes,
-      manualRunTriggers,
       onTriggerNode,
       onOpenNode,
     }),
-    [canvasId, organizationId, nodes, nodeStatuses, canRunNodes, manualRunTriggers, onTriggerNode, onOpenNode],
+    [canvasId, organizationId, nodes, nodeStatuses, canRunNodes, onTriggerNode, onOpenNode],
   );
 
   return <ConsoleContext.Provider value={value}>{children}</ConsoleContext.Provider>;

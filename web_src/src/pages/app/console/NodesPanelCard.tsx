@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CircleDot, Network, Play } from "lucide-react";
 
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -7,9 +7,11 @@ import type { ConsolePanel } from "@/hooks/useCanvasData";
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { WidgetEmptyState } from "./WidgetEmptyState";
-import { isManualRunNode, useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
+import { useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
+import { isManualRunNode } from "./manualRunTriggers";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import { useConsoleRunTrigger } from "./useConsoleRunTrigger";
+import { useConsoleTriggerLock, type ConsoleTriggerLock } from "./useConsoleTriggerLock";
 import type { NodesPanelContent, NodesPanelNode } from "./nodesPanelContent";
 import { nodesPanelContentFromLegacyNode } from "./nodesPanelContent";
 import { NodesPanelForm } from "./NodesPanelForm";
@@ -66,18 +68,34 @@ export function NodesPanelCard({ panel, readOnly, onDelete, onChange, onEditingC
 }
 
 function NodesPanelBody({ content }: { content: NodesPanelContent }) {
+  const ctx = useConsoleContext();
+  // One lock instance for the whole panel. Submissions inside
+  // `useConsoleRunTrigger` are keyed by trigger node id, so two entries
+  // pointing at the same trigger disable together the moment either fires —
+  // per-entry lock instances would leave siblings clickable until the
+  // websocket reports the run as STATE_STARTED.
+  const runTriggerNodeIds = useMemo(
+    () =>
+      content.nodes
+        .filter((entry) => entry.showRun && entry.node)
+        .map((entry) => resolveConsoleNode(ctx, entry.node)?.node.id)
+        .filter((id): id is string => Boolean(id)),
+    [ctx, content.nodes],
+  );
+  const lock = useConsoleTriggerLock({ triggerNodeIds: runTriggerNodeIds });
+
   if (content.nodes.length === 0) {
     return (
       <WidgetEmptyState icon={Network} className="min-h-0" message="Add nodes from the editor to surface them here." />
     );
   }
   if (content.nodes.length === 1) {
-    return <SingleNodeBody entry={content.nodes[0]} entryIndex={0} />;
+    return <SingleNodeBody entry={content.nodes[0]} lock={lock} />;
   }
   return (
     <ul className="flex h-full flex-col divide-y divide-slate-100 dark:divide-gray-800" data-testid="nodes-panel-list">
       {content.nodes.map((entry, idx) => (
-        <NodesPanelRow key={`${entry.node}-${idx}`} entry={entry} entryIndex={idx} />
+        <NodesPanelRow key={`${entry.node}-${idx}`} entry={entry} lock={lock} />
       ))}
     </ul>
   );
@@ -88,7 +106,7 @@ function NodesPanelBody({ content }: { content: NodesPanelContent }) {
  * entry — matches the pre-merge single-node card so existing dashboards
  * keep their look after we consolidate the widget.
  */
-function SingleNodeBody({ entry, entryIndex }: { entry: NodesPanelNode; entryIndex: number }) {
+function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTriggerLock }) {
   const ctx = useConsoleContext();
   if (!entry.node) {
     return (
@@ -101,7 +119,7 @@ function SingleNodeBody({ entry, entryIndex }: { entry: NodesPanelNode; entryInd
   }
   const resolved = resolveConsoleNode(ctx, entry.node);
   const displayName = entry.label?.trim() || resolved?.label || entry.node || "—";
-  const canManualRun = isManualRunNode(ctx, resolved?.node);
+  const canManualRun = isManualRunNode(resolved?.node);
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
@@ -111,8 +129,8 @@ function SingleNodeBody({ entry, entryIndex }: { entry: NodesPanelNode; entryInd
       {entry.showRun && canManualRun ? (
         <NodesPanelRunControl
           entry={entry}
-          entryIndex={entryIndex}
           resolved={resolved}
+          lock={lock}
           testIds={{ button: "node-panel-run", dialog: "node-panel-run-dialog" }}
         />
       ) : null}
@@ -125,11 +143,11 @@ function SingleNodeBody({ entry, entryIndex }: { entry: NodesPanelNode; entryInd
   );
 }
 
-function NodesPanelRow({ entry, entryIndex }: { entry: NodesPanelNode; entryIndex: number }) {
+function NodesPanelRow({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleTriggerLock }) {
   const ctx = useConsoleContext();
   const resolved = resolveConsoleNode(ctx, entry.node);
   const displayName = entry.label?.trim() || resolved?.label || entry.node;
-  const canManualRun = isManualRunNode(ctx, resolved?.node);
+  const canManualRun = isManualRunNode(resolved?.node);
 
   return (
     <li className="flex items-center gap-3 px-3 py-2" data-testid="nodes-panel-row">
@@ -154,8 +172,8 @@ function NodesPanelRow({ entry, entryIndex }: { entry: NodesPanelNode; entryInde
       {entry.showRun && canManualRun ? (
         <NodesPanelRunControl
           entry={entry}
-          entryIndex={entryIndex}
           resolved={resolved}
+          lock={lock}
           testIds={{ button: "nodes-panel-row-run", dialog: "nodes-panel-row-run-dialog" }}
           buttonClassName="shrink-0"
         />
@@ -192,18 +210,20 @@ function disabledTitleFor(reason: string | null): string | undefined {
  *
  * The button is locked while `useConsoleRunTrigger` reports a submission or
  * in-flight run for the trigger, so users can't queue duplicate runs while
- * the pipeline is still executing.
+ * the pipeline is still executing. The lock is shared across the panel and
+ * keyed per trigger node, so sibling entries targeting the same trigger
+ * lock together as soon as any of them submits.
  */
 function NodesPanelRunControl({
   entry,
-  entryIndex,
   resolved,
+  lock,
   testIds,
   buttonClassName,
 }: {
   entry: NodesPanelNode;
-  entryIndex: number;
   resolved: ReturnType<typeof resolveConsoleNode>;
+  lock: ConsoleTriggerLock;
   testIds: RunControlTestIds;
   buttonClassName?: string;
 }) {
@@ -212,7 +232,7 @@ function NodesPanelRunControl({
       resolved,
       triggerName: entry.triggerName,
       promptConfirmation: entry.promptConfirmation,
-      lockKey: `nodes-panel-entry:${entryIndex}:${resolved?.node?.id ?? entry.node}`,
+      lock,
     });
 
   return (

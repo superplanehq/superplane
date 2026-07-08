@@ -21,7 +21,7 @@ const PR_NODE: SuperplaneComponentsNode = {
   id: "pr-id",
   name: "on-pr",
   type: "TYPE_TRIGGER",
-  component: "github.pullRequest",
+  component: "github.onPullRequest",
 };
 
 const INITIAL: TablePanelContent = {
@@ -34,19 +34,13 @@ const INITIAL: TablePanelContent = {
   },
 };
 
-function Harness({ manualRunTriggers }: { manualRunTriggers?: ReadonlySet<string> }) {
+function Harness() {
   const [value, setValue] = useState<TablePanelContent>(INITIAL);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
-        <ConsoleContextProvider
-          canvasId="canvas-1"
-          organizationId="org-1"
-          nodes={[START_NODE, PR_NODE]}
-          canRunNodes
-          manualRunTriggers={manualRunTriggers}
-        >
+        <ConsoleContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[START_NODE, PR_NODE]} canRunNodes>
           <TablePanelForm value={value} onChange={setValue} />
         </ConsoleContextProvider>
       </QueryClientProvider>
@@ -75,19 +69,11 @@ describe("TablePanelForm trigger node dropdown", () => {
     return nodeSelect;
   }
 
-  it("only lists manually runnable triggers when the catalog is loaded", () => {
-    render(<Harness manualRunTriggers={new Set(["start"])} />);
+  it("only lists manually runnable triggers (start / schedule)", () => {
+    render(<Harness />);
     openTriggerNodeSelect();
     const listbox = screen.getByRole("listbox");
     expect(within(listbox).getByText("start")).toBeInTheDocument();
     expect(within(listbox).queryByText("on-pr")).toBeNull();
-  });
-
-  it("keeps all trigger nodes visible while the trigger catalog is loading", () => {
-    render(<Harness manualRunTriggers={undefined} />);
-    openTriggerNodeSelect();
-    const listbox = screen.getByRole("listbox");
-    expect(within(listbox).getByText("start")).toBeInTheDocument();
-    expect(within(listbox).getByText("on-pr")).toBeInTheDocument();
   });
 });

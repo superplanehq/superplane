@@ -94,13 +94,11 @@ function renderPanel({
   onTriggerNode,
   nodes = [NODE],
   panel = singleNodePanel(),
-  manualRunTriggers,
 }: {
   canRunNodes: boolean;
   onTriggerNode?: (nodeId: string, options?: ConsoleTriggerOptions) => void;
   nodes?: SuperplaneComponentsNode[];
   panel?: ConsolePanel;
-  manualRunTriggers?: ReadonlySet<string>;
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   // Fresh element per call — reusing the same element reference would let
@@ -112,7 +110,6 @@ function renderPanel({
         organizationId="org-1"
         nodes={nodes}
         canRunNodes={canRunNodes}
-        manualRunTriggers={manualRunTriggers}
         onTriggerNode={onTriggerNode}
       >
         <NodesPanelCard panel={panel} readOnly onDelete={() => undefined} onChange={() => undefined} />
@@ -225,7 +222,6 @@ describe("NodesPanelCard — single-entry layout", () => {
     renderPanel({
       canRunNodes: true,
       nodes: [PR_TRIGGER],
-      manualRunTriggers: new Set(["start"]),
       panel: multiNodePanel([{ node: "on-pr", showRun: true }]),
     });
     expect(screen.queryByTestId("node-panel-run")).toBeNull();
@@ -298,6 +294,43 @@ describe("NodesPanelCard — in-flight lock", () => {
     }
   });
 
+  it("locks sibling entries targeting the same trigger while a submission is still in flight", async () => {
+    let resolveTrigger: (() => void) | undefined;
+    const onTrigger = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveTrigger = resolve;
+        }),
+    );
+    renderPanel({
+      canRunNodes: true,
+      onTriggerNode: onTrigger,
+      nodes: [NODE_NO_PARAMS],
+      panel: multiNodePanel([
+        { node: "deploy-prod", showRun: true },
+        { node: "deploy-prod", showRun: true },
+      ]),
+    });
+    const [first, second] = screen.getAllByTestId("nodes-panel-row-run");
+    fireEvent.click(first);
+    // The sibling button must lock before the websocket reports the run as
+    // STATE_STARTED — the shared per-panel lock keys submissions by trigger
+    // node id, so both entries disable as soon as the invoke starts.
+    await waitFor(() => expect(second).toBeDisabled());
+    expect(second).toHaveAttribute("data-disabled-reason", "submitting");
+    fireEvent.click(second);
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveTrigger?.();
+    });
+    // Both stay locked through the submission grace window that bridges the
+    // gap until the runs query refreshes.
+    expect(first).toBeDisabled();
+    expect(second).toBeDisabled();
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+  });
+
   it("blocks a confirm dialog opened before a run started from firing a duplicate", () => {
     const onTrigger = vi.fn();
     const { rerenderPanel } = renderPanel({ canRunNodes: true, onTriggerNode: onTrigger });
@@ -332,7 +365,6 @@ describe("NodesPanelCard — multi-entry layout", () => {
     renderPanel({
       canRunNodes: true,
       nodes: [NODE, PR_TRIGGER],
-      manualRunTriggers: new Set(["start"]),
       panel: multiNodePanel([
         { node: "deploy-prod", showRun: true },
         { node: "on-pr", showRun: true },

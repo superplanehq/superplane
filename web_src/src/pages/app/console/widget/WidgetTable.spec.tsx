@@ -13,6 +13,7 @@ const START_NODE: SuperplaneComponentsNode = {
   id: "start-id",
   name: "start",
   type: "TYPE_TRIGGER",
+  component: "start",
   configuration: {
     templates: [{ name: "default", payload: { issue: { number: 0 } } }],
   },
@@ -265,19 +266,25 @@ describe("WidgetTable row actions — manual-run gating", () => {
     id: "pr-id",
     name: "on-pr",
     type: "TYPE_TRIGGER",
-    component: "github.pullRequest",
+    component: "github.onPullRequest",
   };
-  const START_NODE_WITH_COMPONENT: SuperplaneComponentsNode = { ...START_NODE, component: "start" };
+  const SCHEDULE_NODE: SuperplaneComponentsNode = {
+    id: "schedule-id",
+    name: "nightly",
+    type: "TYPE_TRIGGER",
+    component: "schedule",
+  };
   const EVENT_ROW_RENDER: WidgetTableRender = {
     kind: "table",
     columns: [{ field: "service", label: "Service" }],
     rowActions: [
       { kind: "trigger", label: "Redeploy", node: "start" },
       { kind: "trigger", label: "Reopen PR", node: "on-pr" },
+      { kind: "trigger", label: "Run now", node: "nightly" },
     ],
   };
 
-  function renderWithManualRunCatalog(manualRunTriggers: ReadonlySet<string>) {
+  function renderWithNodes(nodes: SuperplaneComponentsNode[]) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     return render(
       <MemoryRouter>
@@ -285,9 +292,8 @@ describe("WidgetTable row actions — manual-run gating", () => {
           <ConsoleContextProvider
             canvasId="canvas-1"
             organizationId="org-1"
-            nodes={[START_NODE_WITH_COMPONENT, PR_NODE]}
+            nodes={nodes}
             canRunNodes
-            manualRunTriggers={manualRunTriggers}
             onTriggerNode={() => undefined}
           >
             <WidgetTable render={EVENT_ROW_RENDER} rows={ROWS} isLoading={false} />
@@ -297,16 +303,11 @@ describe("WidgetTable row actions — manual-run gating", () => {
     );
   }
 
-  it("hides row actions whose node is not manual-runnable", () => {
-    renderWithManualRunCatalog(new Set(["start"]));
+  it("hides row actions whose trigger is event-driven (not start/schedule)", () => {
+    renderWithNodes([START_NODE, PR_NODE, SCHEDULE_NODE]);
     expect(screen.queryAllByTestId("widget-row-action-start")).toHaveLength(2);
+    expect(screen.queryAllByTestId("widget-row-action-nightly")).toHaveLength(2);
     expect(screen.queryByTestId("widget-row-action-on-pr")).toBeNull();
-  });
-
-  it("keeps manual-run actions visible when the catalog lists them", () => {
-    renderWithManualRunCatalog(new Set(["start", "github.pullRequest"]));
-    expect(screen.queryAllByTestId("widget-row-action-start")).toHaveLength(2);
-    expect(screen.queryAllByTestId("widget-row-action-on-pr")).toHaveLength(2);
   });
 });
 

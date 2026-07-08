@@ -105,6 +105,8 @@ Runtime flow: `WidgetTable` → `mergeTriggerPayload` → `onTriggerNode` → `u
 
 Legacy fields normalized in FE: `target` → `node`, `triggerName` → `template`.
 
+Manual-run gate: only the built-in `start` and `schedule` triggers expose a user-invokable `run` hook. The UI filters on `node.component` against the hardcoded allowlist in `web_src/src/pages/app/console/manualRunTriggers.ts` — `TablePanelForm` hides non-manual triggers from the dropdown, `WidgetTable` hides their row actions, and `NodesPanelCard`/`NodesPanelForm` hide the Run affordance. Backend authorization stays in `InvokeNodeTriggerHook`; adding a new manual-run trigger requires a matching entry in the frontend allowlist.
+
 ### Expressions
 
 - **`{{ CEL }}`** — `cel-js` via `widget/celExpr.ts`; row env + `now` (Unix seconds).

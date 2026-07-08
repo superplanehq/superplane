@@ -30,8 +30,9 @@ const SUBMISSION_GRACE_MS = 1500;
  *    and the HTTP response plus a short grace window.
  * 3. `inFlightLockByTrigger` — `triggerNodeId → lockKey` mapping recorded on
  *    submission. Table widgets use it to lock *only* the originating row
- *    when the same trigger is fired again; node panels don't need per-source
- *    scoping because each panel entry has exactly one button.
+ *    when the same trigger is fired again; node panels key submissions by
+ *    the trigger node id itself, so every entry targeting that trigger in
+ *    the panel's shared lock instance disables together.
  */
 export interface ConsoleTriggerLock {
   runInFlightIds: ReadonlySet<string>;
@@ -50,11 +51,12 @@ interface UseConsoleTriggerLockArgs {
 
 /**
  * Shared submission + in-flight lock for anywhere the console fires a
- * trigger — currently table row actions and the merged node panel. The
- * table's row-scoped provider ({@link WidgetTableActionLockProvider}) and
- * the node-panel Run button both consume this hook so the "don't fire the
- * same trigger twice" behavior stays consistent, and any new
- * trigger-firing widget picks it up automatically.
+ * trigger — currently table row actions and the merged node panel. Lock
+ * state is scoped to the hook instance, so create **one instance per
+ * widget** and share it across that widget's buttons: the table does this
+ * through {@link WidgetTableActionLockProvider}, and the node panel hoists
+ * one instance per panel body. Per-button instances would not see each
+ * other's pending submissions.
  */
 export function useConsoleTriggerLock({ triggerNodeIds, canvasId }: UseConsoleTriggerLockArgs): ConsoleTriggerLock {
   const ctx = useConsoleContext();

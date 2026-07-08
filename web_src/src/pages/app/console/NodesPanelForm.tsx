@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/ui/checkbox";
 
-import { isManualRunNode, useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
+import { useConsoleContext, resolveConsoleNode } from "./ConsoleContext";
+import { isManualRunNode } from "./manualRunTriggers";
 import type { NodesPanelContent, NodesPanelNode } from "./nodesPanelContent";
 
 interface NodesPanelFormProps {
@@ -86,7 +87,7 @@ function NodesPanelEntryRow({
   const showRunId = useId();
   const promptConfirmationId = useId();
   const resolved = resolveConsoleNode(ctx, entry.node);
-  const canManualRun = isManualRunNode(ctx, resolved?.node);
+  const canManualRun = isManualRunNode(resolved?.node);
 
   return (
     <div className="space-y-2 rounded border border-slate-200 p-2.5 dark:border-gray-600">
