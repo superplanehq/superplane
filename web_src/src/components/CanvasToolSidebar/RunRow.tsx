@@ -2,7 +2,6 @@ import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } fr
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Timestamp } from "@/components/Timestamp";
 import { appPath } from "@/lib/appPaths";
-import { formatDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
@@ -258,7 +257,7 @@ function getRunDurationText(run: CanvasesCanvasRun, status: RunStatusKey, curren
   const endedAt = status === "running" ? currentTime : parseTimestamp(run.finishedAt);
   if (endedAt === null || endedAt < startedAt) return null;
 
-  return formatDuration(endedAt - startedAt) || null;
+  return formatSidebarDuration(endedAt - startedAt);
 }
 
 function parseTimestamp(value: string | undefined) {
@@ -266,4 +265,16 @@ function parseTimestamp(value: string | undefined) {
 
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function formatSidebarDuration(durationMs: number): string {
+  if (durationMs < 1000) return "<1s";
+
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0 && seconds > 0) return `${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
 }
