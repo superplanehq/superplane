@@ -47,12 +47,13 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   fieldPath = field.name || "",
   autocompleteExampleObj,
   allowExpressions = false,
+  readOnly = false,
 }) => {
   const listOptions = field.typeOptions?.list;
   const itemDefinition = listOptions?.itemDefinition;
   const maxItems = listOptions?.maxItems;
   const useAccordion = listOptions?.accordion === true;
-  const allowReorder = listOptions?.reorderable === true;
+  const allowReorder = listOptions?.reorderable === true && !readOnly;
   const items = Array.isArray(value)
     ? itemDefinition?.type === "day-in-year"
       ? value.filter((item) => typeof item === "string" && item.trim().length > 0)
@@ -187,6 +188,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           organizationId={organizationId}
           hasError={hasNestedError}
           autocompleteExampleObj={autocompleteExampleObj}
+          readOnly={readOnly}
         />
       );
     });
@@ -221,6 +223,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
       <Input
         type={itemDefinition?.type === "number" ? "number" : "text"}
         value={(item as string | number) ?? ""}
+        readOnly={readOnly}
+        disabled={readOnly}
         onChange={(e) => {
           const val =
             itemDefinition?.type === "number"
@@ -320,16 +324,18 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                       {renderListItemBody(item, index)}
                     </AccordionContent>
                   </div>
-                  {renderRemoveButton(index, "mt-1 shrink-0")}
+                  {readOnly ? null : renderRemoveButton(index, "mt-1 shrink-0")}
                 </div>
               </AccordionItem>
             );
           })}
         </Accordion>
-        <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
-          <Plus />
-          Add {itemLabel}
-        </Button>
+        {readOnly ? null : (
+          <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
+            <Plus />
+            Add {itemLabel}
+          </Button>
+        )}
       </div>
     );
   }
@@ -356,14 +362,16 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                 renderListItemBody(item, index)
               )}
             </div>
-            {renderRemoveButton(index, "mt-1")}
+            {readOnly ? null : renderRemoveButton(index, "mt-1")}
           </div>
         );
       })}
-      <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
-        <Plus />
-        Add {itemLabel}
-      </Button>
+      {readOnly ? null : (
+        <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
+          <Plus />
+          Add {itemLabel}
+        </Button>
+      )}
     </div>
   );
 };

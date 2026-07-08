@@ -12,6 +12,8 @@ interface Account {
   avatar_url: string;
   installation_admin: boolean;
   has_password: boolean;
+  roles?: string[];
+  groups?: string[];
   impersonation?: AccountImpersonation;
 }
 
