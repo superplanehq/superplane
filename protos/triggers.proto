@@ -71,9 +71,4 @@ message Trigger {
   string color = 5;
   repeated Configuration.Field configuration = 6;
   google.protobuf.Struct example_data = 7;
-  // True when this trigger exposes a user-invokable `run` hook — i.e. it can
-  // be fired manually from the console (Run buttons, table row actions).
-  // Event triggers (e.g. GitHub PR opened) declare no user hooks and are
-  // false here so the UI hides manual-run controls for them.
-  bool manual_runnable = 8;
 }

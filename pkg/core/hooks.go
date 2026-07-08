@@ -12,13 +12,6 @@ const (
 	HookTypeUser     HookType = "user"
 )
 
-// HookNameRun is the conventional hook name for the user-invokable "run"
-// affordance a trigger exposes to the console (Manual Run, Schedule, etc.).
-// The InvokeNodeTriggerHook RPC gates on `Hook.Type == HookTypeUser` for
-// this name; SerializeTriggers reports triggers declaring it as
-// `manual_runnable = true` so the UI can hide non-manual triggers.
-const HookNameRun = "run"
-
 type Hook struct {
 	Type       HookType
 	Name       string
