@@ -40,17 +40,23 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 // EnterEditMode clicks the Edit button in the header to start editing the live canvas.
 // This must be called before making any canvas changes.
 func (s *CanvasSteps) EnterEditMode() {
+	s.EnterEditModeWithoutStagingActionAssertions()
+	if s.userHasStaging() {
+		s.AssertStagingActionsVisibleAndEnabled()
+		return
+	}
+	s.AssertStagingActionsVisibleAndDisabled()
+}
+
+// EnterEditModeWithoutStagingActionAssertions enters edit mode without assuming
+// which staging actions the current user's permissions allow.
+func (s *CanvasSteps) EnterEditModeWithoutStagingActionAssertions() {
 	s.waitForEnabledEditButton()
 	editButton := q.TestID("canvas-edit-button").Run(s.session)
 	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.Sleep(500)
 	s.waitForEnabledExitEditButton()
 	s.AssertEditModeTabChrome()
-	if s.userHasStaging() {
-		s.AssertStagingActionsVisibleAndEnabled()
-		return
-	}
-	s.AssertStagingActionsVisibleAndDisabled()
 }
 
 func (s *CanvasSteps) userHasStaging() bool {

@@ -255,6 +255,8 @@ export interface CanvasPageProps {
   hideAddControls?: boolean;
   /** Hide the Agent / Versions left panel toggle (templates only). */
   hideCanvasToolSidebar?: boolean;
+  /** Enables managed agent chat controls when the user has the required RBAC permissions. */
+  canUseAgents?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -830,6 +832,7 @@ function CanvasPage(props: CanvasPageProps) {
   const toolSidebarState = useCanvasToolSidebarState({
     isEditing: props.isEditing,
     hideCanvasToolSidebar: props.hideCanvasToolSidebar ?? false,
+    canUseAgents: props.canUseAgents ?? true,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
