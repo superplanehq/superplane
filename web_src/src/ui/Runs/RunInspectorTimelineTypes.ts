@@ -13,9 +13,9 @@ export type StatusPill = {
 };
 
 export const defaultAccordionPreferences: InternalAccordionPreferences = {
-  input: true,
-  runtime: true,
-  output: true,
+  input: false,
+  runtime: false,
+  output: false,
 };
 
 export function buildTimelineItems(section: RunInspectorNodeSection, hasRuntimeConfig: boolean) {
