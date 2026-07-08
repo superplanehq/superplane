@@ -190,6 +190,27 @@ func Test__Client__FetchIntegrationData(t *testing.T) {
 		assert.Equal(t, 2, projects[1].ID)
 	})
 
+	t.Run("current user fetch fails when no group is configured", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusUnauthorized, `{"message": "401 Unauthorized"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "",
+			httpClient: mockClient,
+		}
+
+		_, _, err := client.FetchIntegrationData()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get current user")
+		require.Len(t, mockClient.Requests, 1)
+	})
+
 	t.Run("forbidden", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
 			Responses: []*http.Response{

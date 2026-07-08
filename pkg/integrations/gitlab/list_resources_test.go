@@ -52,6 +52,40 @@ func Test__GitLab__ListResources(t *testing.T) {
 		assert.Equal(t, "102", resources[1].ID)
 	})
 
+	t.Run("returns project members when no group is configured and project is selected", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 101, "name": "User One", "username": "user1"},
+					{"id": 102, "name": "User Two", "username": "user2"}
+				]`),
+			},
+		}
+
+		ctx := core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":     "https://gitlab.com",
+					"authType":    AuthTypePersonalAccessToken,
+					"accessToken": "token",
+				},
+			},
+			HTTP: httpContext,
+			Parameters: map[string]string{
+				"project": "456",
+			},
+		}
+
+		resources, err := g.ListResources("member", ctx)
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/members/all?per_page=100&page=1", httpContext.Requests[0].URL.String())
+		require.Len(t, resources, 2)
+		assert.Equal(t, "101", resources[0].ID)
+		assert.Equal(t, "User One (@user1)", resources[0].Name)
+	})
+
 	t.Run("returns current user as member when no group is configured", func(t *testing.T) {
 		ctx := core.ListResourcesContext{
 			Integration: &contexts.IntegrationContext{

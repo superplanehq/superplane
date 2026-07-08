@@ -237,6 +237,13 @@ func (c *Client) ListGroupMembers(groupID string) ([]User, error) {
 	})
 }
 
+// ListProjectMembers lists all members of a project, including inherited ones.
+func (c *Client) ListProjectMembers(projectID string) ([]User, error) {
+	return fetchAllResources[User](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/members/all?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), page)
+	})
+}
+
 func (c *Client) FetchIntegrationData() (*User, []Project, error) {
 	user, err := c.getCurrentUser()
 	if err != nil {

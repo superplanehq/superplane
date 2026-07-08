@@ -120,7 +120,7 @@ func (g *GitLab) Configuration() []configuration.Field {
 			Name:        "groupId",
 			Label:       "Group ID",
 			Type:        configuration.FieldTypeString,
-			Description: "Group ID or full path (e.g. my-org/my-subgroup). Leave empty to use your personal projects.",
+			Description: "Group ID or full path (e.g. my-org/my-subgroup). Leave empty to use your personal projects (projects you own).",
 		},
 		{
 			Name:     "authType",
