@@ -59,7 +59,8 @@ Use this skill when working on **per-canvas dashboards**: the workflow v2 overla
 | --- | --- | --- |
 | `markdown` | GFM body with `{{ name.field }}` interpolation | `title?`, `body?`, `variables?` |
 | `html` | Sanitized HTML body with `{{ name.field }}` interpolation, scoped `<style>`, Tailwind via safelist | `title?`, `body?`, `variables?` |
-| `node` | Status chip + optional Run | `node`, `showRun?`, `triggerName?` |
+| `nodes` | Adaptive card: one entry uses the compact single-node layout; multiple entries render as a row list. Optional per-entry Run button (manual-run triggers only). | `title?`, `nodes[]` with `node`, `label?`, `description?`, `showRun?`, `triggerName?`, `promptConfirmation?` |
+| `node` *(legacy)* | Same renderer as `nodes` — the merged card folds legacy single-node content into a one-entry list. Kept for import compatibility; migrates to `nodes` on first save. | `node`, `showRun?`, `triggerName?` |
 | `table` | `WidgetTable` | `dataSource`, `render.kind: "table"` |
 | `chart` | `WidgetChart` (SVG) | `dataSource`, `render.kind: "chart"` |
 | `number` | `WidgetNumber` | `dataSource`, `render.kind: "number"` |
@@ -233,6 +234,6 @@ go test ./pkg/grpc/actions/canvases -run CanvasDashboard
 | Table CEL / filters / actions | `WidgetTable.tsx`, `celExpr.ts`, `evalTableWhere.ts`, `mergeTriggerPayload.ts` |
 | Table editor | `TablePanelForm.tsx`, `TablePanelFormRows.tsx` |
 | Trigger from dashboard | `useDashboardTriggerNode.ts`, `dashboardTriggerParameters.ts` |
-| Node status chip | `NodePanelCard.tsx`, `deriveNodeStatuses.ts` |
+| Node status chip / Run button | `NodesPanelCard.tsx`, `useConsoleRunTrigger.ts`, `useConsoleTriggerLock.ts`, `deriveNodeStatuses.ts` |
 | Header dashboard actions | `dashboardHeaderActions.ts`, `useDashboardModeActions.ts` |
 | API hooks | `web_src/src/hooks/useCanvasData.ts` — `useCanvasDashboard`, `useUpdateCanvasDashboard` |
