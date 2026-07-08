@@ -16,10 +16,9 @@ import { Label } from "@/components/ui/label";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { registerLocalStagingWrite } from "@/lib/canvasStagingEcho";
-import { canvasKeys } from "@/hooks/useCanvasData";
+import { canvasKeys, getCanvasVersionQueryOptions } from "@/hooks/useCanvasData";
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { encodeRepositoryFileContent } from "../../files/lib/repository-files";
-import { fetchCommittedCanvasVersionWithSpec } from "../../lib/repository-spec-files";
 import { materializeCanvasSpec } from "../../lib/workflow-spec-files";
 import { CANVAS_YAML_PATH } from "../../lib/workflow-spec-paths";
 
@@ -111,10 +110,7 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
       );
       const configured = (invokeResponse.data?.result?.signingSecretConfigured as boolean) ?? false;
 
-      const freshVersion = await queryClient.fetchQuery({
-        queryKey: canvasKeys.versionDetail(canvasId, versionId),
-        queryFn: async () => fetchCommittedCanvasVersionWithSpec(canvasId, versionId),
-      });
+      const freshVersion = await queryClient.fetchQuery(getCanvasVersionQueryOptions(canvasId, versionId));
 
       if (!freshVersion) {
         showErrorToast("Could not load version to save");

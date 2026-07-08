@@ -1,17 +1,24 @@
 package canvases
 
 import (
+	"strings"
+
 	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"strings"
 )
 
 func canvasYAMLFromVersion(canvas *models.Canvas, version *models.CanvasVersion, organizationID string) (string, error) {
 	name, description := canvasMetadataFromCanvas(canvas)
+
+	serializedVersion, err := SerializeCanvasVersion(version, organizationID, nil)
+	if err != nil {
+		return "", err
+	}
+
 	return canvasyaml.CanvasResourceYAML(
-		SerializeCanvasVersion(version, organizationID, nil),
+		serializedVersion,
 		canvas.ID.String(),
 		name,
 		description,

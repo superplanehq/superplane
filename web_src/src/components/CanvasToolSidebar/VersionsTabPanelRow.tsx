@@ -83,7 +83,7 @@ export function VersionRow({
 function deriveVersionRowFields(version: CanvasesCanvasVersion, isFirstCanvasVersion: boolean) {
   return {
     versionID: version.metadata?.id ?? "",
-    ownerName: version.metadata?.owner?.name || "Unknown owner",
+    ownerName: version.metadata?.author?.name || "Unknown author",
     versionLabel: isFirstCanvasVersion ? "v1" : formatVersionLabel(version),
     timestamp: version.metadata?.updatedAt || version.metadata?.createdAt,
   };

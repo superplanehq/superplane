@@ -59,7 +59,7 @@ func expectStageConsoleYAML() requestExpectation {
 			require.True(t, ok)
 			require.Equal(t, "console.yaml", first["path"])
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["console.yaml"]}}`))
+			_, _ = w.Write([]byte(`{"staging":{"hasStaging":true,"stagedPaths":["console.yaml"]}}`))
 		},
 	}
 }

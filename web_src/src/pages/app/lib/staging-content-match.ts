@@ -1,10 +1,56 @@
-import type { CanvasesCanvasVersion } from "@/api-client";
+import { canvasesDescribeCanvasVersion, type CanvasesCanvasVersion } from "@/api-client";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 import { hasDraftVersusLiveConsoleDiff } from "../draftConsoleDiff";
 import { hasDraftVersusLiveGraphDiff } from "../draftNodeDiff";
-import { consoleSpecFromYaml, fetchRepositorySpecFileContent } from "./repository-spec-files";
+import {
+  consoleSpecFromCanvasSpec,
+  consoleSpecFromYaml,
+  fetchRepositorySpecFileContent,
+} from "./repository-spec-files";
 import { dematerializeCanvasSpec } from "./workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
+
+export function committedCanvasMatchesYaml(
+  committedSpec: CanvasesCanvasVersion["spec"] | undefined,
+  nextCanvasYaml: string,
+): boolean {
+  const nextSpec = dematerializeCanvasSpec(nextCanvasYaml);
+  if (!committedSpec || !nextSpec) {
+    return false;
+  }
+
+  return !hasDraftVersusLiveGraphDiff(
+    { spec: committedSpec } as CanvasesCanvasVersion,
+    { spec: nextSpec } as CanvasesCanvasVersion,
+  );
+}
+
+export function committedConsoleMatchesYaml(
+  canvasId: string,
+  committedSpec: CanvasesCanvasVersion["spec"] | undefined,
+  nextConsoleYaml: string,
+): boolean {
+  const committed = consoleSpecFromCanvasSpec(canvasId, committedSpec);
+  const next = consoleSpecFromYaml(nextConsoleYaml);
+  if (!next) {
+    return false;
+  }
+
+  return !hasDraftVersusLiveConsoleDiff(committed, next);
+}
+
+async function loadCommittedVersionSpec(
+  canvasId: string,
+  versionId: string,
+): Promise<CanvasesCanvasVersion["spec"] | undefined> {
+  const response = await canvasesDescribeCanvasVersion(
+    withOrganizationHeader({
+      path: { canvasId, versionId },
+    }),
+  );
+  return response.data?.version?.spec;
+}
 
 export async function matchesCommittedCanvasYaml(
   canvasId: string,
@@ -12,17 +58,8 @@ export async function matchesCommittedCanvasYaml(
   nextCanvasYaml: string,
 ): Promise<boolean> {
   try {
-    const committedYaml = await fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, versionId, false);
-    const committedSpec = dematerializeCanvasSpec(committedYaml);
-    const nextSpec = dematerializeCanvasSpec(nextCanvasYaml);
-    if (!committedSpec || !nextSpec) {
-      return committedYaml === nextCanvasYaml;
-    }
-
-    return !hasDraftVersusLiveGraphDiff(
-      { spec: committedSpec } as CanvasesCanvasVersion,
-      { spec: nextSpec } as CanvasesCanvasVersion,
-    );
+    const committedSpec = await loadCommittedVersionSpec(canvasId, versionId);
+    return committedCanvasMatchesYaml(committedSpec, nextCanvasYaml);
   } catch {
     return false;
   }
@@ -34,14 +71,8 @@ export async function matchesCommittedConsoleYaml(
   nextConsoleYaml: string,
 ): Promise<boolean> {
   try {
-    const committedYaml = await fetchRepositorySpecFileContent(canvasId, CONSOLE_YAML_PATH, versionId, false);
-    const committed = consoleSpecFromYaml(committedYaml);
-    const next = consoleSpecFromYaml(nextConsoleYaml);
-    if (!committed || !next) {
-      return committedYaml === nextConsoleYaml;
-    }
-
-    return !hasDraftVersusLiveConsoleDiff(committed, next);
+    const committedSpec = await loadCommittedVersionSpec(canvasId, versionId);
+    return committedConsoleMatchesYaml(canvasId, committedSpec, nextConsoleYaml);
   } catch {
     return false;
   }

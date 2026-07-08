@@ -361,22 +361,25 @@ describe("useUpdateCanvasFolderMembership", () => {
 const emptyConsoleYaml =
   "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels: []\n  layout: []\n";
 
-const afterConsoleYaml =
-  "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: canvas-1\nspec:\n  panels:\n    - id: panel-1\n      type: markdown\n      content:\n        title: After\n  layout:\n    - i: panel-1\n      x: 0\n      y: 0\n      w: 12\n      h: 6\n";
+const committedEmptyConsoleVersion = {
+  metadata: { id: "version-1" },
+  spec: { panels: [], layout: [] },
+};
 
-function mockConsoleRepositoryFileFetch(yamlBody: string, options?: { committedYaml?: string }) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/repository/file") && url.includes("console.yaml")) {
-        const committedYaml = options?.committedYaml ?? yamlBody;
-        const body = url.includes("stage=true") ? yamlBody : committedYaml;
-        return new Response(body, { status: 200 });
-      }
-      return new Response("not found", { status: 404 });
-    }),
-  );
+const committedConsoleVersionWithPanel = {
+  metadata: { id: "version-1" },
+  spec: {
+    panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+    layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+  },
+};
+
+function mockCommittedConsoleVersion(
+  version: typeof committedEmptyConsoleVersion | typeof committedConsoleVersionWithPanel = committedEmptyConsoleVersion,
+) {
+  canvasesDescribeCanvasVersion.mockResolvedValue({
+    data: { version },
+  } as never);
 }
 
 describe("useUpdateCanvasConsole", () => {
@@ -393,15 +396,12 @@ describe("useUpdateCanvasConsole", () => {
     canvasesPutCanvasStaging.mockResolvedValue({ data: {} });
     canvasesCommitCanvasStaging.mockResolvedValue({ data: {} });
     canvasesDeleteCanvasStaging.mockResolvedValue({
-      data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
+      data: { staging: { hasStaging: false, stagedPaths: [] } },
     });
-    canvasesDescribeCanvasVersion.mockResolvedValue({
-      data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
-    });
+    mockCommittedConsoleVersion();
     canvasesGetCanvasStaging.mockResolvedValue({
-      data: { stagingSummary: { hasStaging: false, stagedPaths: [] } },
+      data: { staging: { hasStaging: false, stagedPaths: [] } },
     });
-    mockConsoleRepositoryFileFetch(emptyConsoleYaml);
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
       wrapper: createWrapper(queryClient),
@@ -421,6 +421,7 @@ describe("useUpdateCanvasConsole", () => {
 
   it("surfaces dashboard save failures", async () => {
     const queryClient = createQueryClient();
+    mockCommittedConsoleVersion(committedConsoleVersionWithPanel);
     canvasesPutCanvasStaging.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
@@ -446,10 +447,12 @@ describe("useUpdateCanvasConsole", () => {
     });
     canvasesPutCanvasStaging.mockReturnValue(savePromise);
     canvasesCommitCanvasStaging.mockResolvedValue({ data: {} });
-    canvasesDescribeCanvasVersion.mockResolvedValue({
-      data: { stagingSummary: { hasStaging: true, stagedPaths: ["console.yaml"] } },
+    mockCommittedConsoleVersion();
+    canvasesGetCanvasStaging.mockResolvedValue({
+      data: {
+        staging: { hasStaging: true, stagedPaths: ["console.yaml"], spec: committedConsoleVersionWithPanel.spec },
+      },
     });
-    mockConsoleRepositoryFileFetch(afterConsoleYaml, { committedYaml: emptyConsoleYaml });
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
       wrapper: createWrapper(queryClient),
@@ -482,6 +485,7 @@ describe("useUpdateCanvasConsole", () => {
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
       layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
     });
+    mockCommittedConsoleVersion();
     canvasesPutCanvasStaging.mockRejectedValue(new Error("request failed"));
 
     const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
@@ -497,6 +501,57 @@ describe("useUpdateCanvasConsole", () => {
 
     expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+    });
+  });
+
+  it("uses staging from the write response instead of a warm React Query cache", async () => {
+    const queryClient = createQueryClient();
+    const dashboardKey = canvasKeys.stagedConsole("canvas-1");
+    const staleStaging = {
+      hasStaging: false,
+      stagedPaths: [],
+      spec: committedEmptyConsoleVersion.spec,
+    };
+    queryClient.setQueryData(canvasKeys.canvasStaging("canvas-1"), staleStaging);
+    queryClient.setQueryData(dashboardKey, {
+      canvasId: "canvas-1",
+      versionId: "version-1",
+      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before", body: "Before body" } }],
+      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      consoleYaml: emptyConsoleYaml,
+    });
+
+    const updatedPanels = [{ id: "panel-1", type: "markdown", content: { title: "After", body: "After body" } }];
+    const writeResponseStaging = {
+      hasStaging: true,
+      stagedPaths: ["console.yaml"],
+      spec: {
+        panels: updatedPanels,
+        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      },
+    };
+    canvasesPutCanvasStaging.mockResolvedValue({ data: { staging: writeResponseStaging } });
+    mockCommittedConsoleVersion(committedConsoleVersionWithPanel);
+    canvasesGetCanvasStaging.mockResolvedValue({
+      data: { staging: staleStaging },
+    });
+
+    const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await result.current.mutateAsync({
+      panels: updatedPanels,
+      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+    });
+
+    expect(canvasesGetCanvasStaging).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
+      panels: updatedPanels,
+    });
+    expect(queryClient.getQueryData(canvasKeys.canvasStaging("canvas-1"))).toMatchObject({
+      hasStaging: true,
+      stagedPaths: ["console.yaml"],
     });
   });
 });
