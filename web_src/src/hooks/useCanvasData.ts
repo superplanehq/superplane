@@ -38,6 +38,7 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasPreference,
   CanvasesCanvasSummary,
   CanvasesCanvasRun,
   CanvasesCanvasRunResult,
@@ -127,6 +128,8 @@ export const canvasKeys = {
   folderList: (orgId: string) => [...canvasKeys.folders(), orgId] as const,
   details: () => [...canvasKeys.all, "detail"] as const,
   detail: (orgId: string, id: string) => [...canvasKeys.details(), orgId, id] as const,
+  preferences: () => [...canvasKeys.all, "preference"] as const,
+  preference: (orgId: string, id: string) => [...canvasKeys.preferences(), orgId, id] as const,
   versions: () => [...canvasKeys.all, "versions"] as const,
   versionList: (canvasId: string) => [...canvasKeys.versions(), canvasId] as const,
   versionHistory: (canvasId: string) => [...canvasKeys.versions(), canvasId, "history"] as const,
@@ -349,6 +352,24 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
   });
 };
 
+export const useCanvasPreference = (organizationId: string, canvasId: string) => {
+  return useQuery({
+    queryKey: canvasKeys.preference(organizationId, canvasId),
+    queryFn: async (): Promise<CanvasesCanvasPreference | null> => {
+      const response = await canvasesDescribeCanvas(
+        withOrganizationHeader({
+          path: { id: canvasId },
+        }),
+      );
+      return response.data?.preference ?? null;
+    },
+    enabled: !!organizationId && !!canvasId,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+};
+
 export const useCanvasVersions = (organizationId: string, canvasId: string) => {
   return useQuery({
     queryKey: canvasKeys.versionList(canvasId),
@@ -557,24 +578,31 @@ type UpdateCanvasPreferenceInput = {
   canvasId: string;
   pinned?: boolean;
   starred?: boolean;
+  lastVisitedTab?: string;
 };
 
 export const useUpdateCanvasPreference = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ canvasId, pinned, starred }: UpdateCanvasPreferenceInput) => {
+    mutationFn: async ({ canvasId, pinned, starred, lastVisitedTab }: UpdateCanvasPreferenceInput) => {
       return await canvasesUpdateCanvasPreference(
         withOrganizationHeader({
           path: { canvasId },
           body: {
             pinned,
             starred,
+            lastVisitedTab,
           },
         }),
       );
     },
     onMutate: async (preference) => {
+      // Pinned/starred drives the home page canvas list; last_visited_tab does not.
+      if (preference.pinned === undefined && preference.starred === undefined) {
+        return { previousCanvases: undefined };
+      }
+
       await queryClient.cancelQueries({ queryKey: canvasKeys.list(organizationId) });
       const previousCanvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
       const timestamp = new Date().toISOString();
@@ -590,8 +618,10 @@ export const useUpdateCanvasPreference = (organizationId: string) => {
         queryClient.setQueryData(canvasKeys.list(organizationId), context.previousCanvases);
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+    onSettled: (_data, _error, variables) => {
+      if (variables.pinned !== undefined || variables.starred !== undefined) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+      }
     },
   });
 };
