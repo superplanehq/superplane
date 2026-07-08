@@ -45,6 +45,65 @@ func (s *CanvasSteps) EnterEditMode() {
 	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.Sleep(500)
 	s.waitForEnabledExitEditButton()
+	s.AssertEditModeTabChrome()
+	if s.userHasStaging() {
+		s.AssertStagingActionsVisibleAndEnabled()
+		return
+	}
+	s.AssertStagingActionsVisibleAndDisabled()
+}
+
+func (s *CanvasSteps) userHasStaging() bool {
+	hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, s.sessionUserID())
+	return err == nil && hasStaging
+}
+
+// AssertEditModeTabChrome verifies the header tabs use edit-mode orange styling.
+func (s *CanvasSteps) AssertEditModeTabChrome() {
+	nav := q.Locator(`nav[aria-label="Canvas view"]`).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		class, err := nav.GetAttribute("class")
+		if err != nil || class == "" {
+			return false
+		}
+		return strings.Contains(class, "bg-orange-200") || strings.Contains(class, "dark:bg-orange-900/55")
+	}, 15*time.Second, 200*time.Millisecond, "edit-mode tab bar should use orange styling")
+
+	activeTab := q.Locator(`nav[aria-label="Canvas view"] [aria-current="page"]`).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		class, err := activeTab.GetAttribute("class")
+		if err != nil || class == "" {
+			return false
+		}
+		return strings.Contains(class, "font-bold") &&
+			(strings.Contains(class, "bg-orange-100") || strings.Contains(class, "dark:bg-orange-700/60"))
+	}, 15*time.Second, 200*time.Millisecond, "active edit-mode tab should be bold with orange styling")
+}
+
+// AssertStagingActionsVisibleAndDisabled verifies commit/reset stay visible but disabled with no staged changes.
+func (s *CanvasSteps) AssertStagingActionsVisibleAndDisabled() {
+	s.session.AssertVisible(q.TestID("canvas-commit-staging-button"))
+	s.session.AssertVisible(q.TestID("canvas-reset-staging-button"))
+	s.session.AssertDisabled(q.TestID("canvas-commit-staging-button"))
+	s.session.AssertDisabled(q.TestID("canvas-reset-staging-button"))
+}
+
+// AssertStagingActionsVisibleAndEnabled verifies commit/reset are visible and actionable once staging exists.
+func (s *CanvasSteps) AssertStagingActionsVisibleAndEnabled() {
+	s.assertStagingActionEnabled("canvas-commit-staging-button")
+	s.assertStagingActionEnabled("canvas-reset-staging-button")
+}
+
+func (s *CanvasSteps) assertStagingActionEnabled(testID string) {
+	button := q.TestID(testID).Run(s.session)
+	require.Eventually(s.t, func() bool {
+		visible, err := button.IsVisible()
+		if err != nil || !visible {
+			return false
+		}
+		disabled, err := button.IsDisabled()
+		return err == nil && !disabled
+	}, 15*time.Second, 200*time.Millisecond, "%s should be visible and enabled when staging exists", testID)
 }
 
 func (s *CanvasSteps) sessionUserID() uuid.UUID {
@@ -294,6 +353,8 @@ func (s *CanvasSteps) WaitForStagingOnCurrentDraft() uuid.UUID {
 	s.WaitForStaging(uuid.Nil)
 	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
 	require.NoError(s.t, err)
+	s.AssertEditModeTabChrome()
+	s.AssertStagingActionsVisibleAndEnabled()
 	return live.ID
 }
 
@@ -344,6 +405,7 @@ func (s *CanvasSteps) CommitStaging() {
 		visible, err := commitButton.IsVisible()
 		return err == nil && visible
 	}, 15*time.Second, 200*time.Millisecond)
+	s.AssertStagingActionsVisibleAndEnabled()
 
 	require.NoError(s.t, commitButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 
