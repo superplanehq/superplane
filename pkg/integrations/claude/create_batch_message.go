@@ -119,7 +119,7 @@ Batches typically complete within an hour, but can take up to 24 hours. This com
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0), applied to every request.
 - **Structured Output**: (Optional) A JSON Schema every response must conform to.
 - **Requests**: The list of prompts to send. Each has a **Custom ID** (unique within the batch, used to match it to its result) and a **Prompt**.
-- **Requests From Expression**: (Optional, advanced) Build the batch from a dynamic-length array produced by an upstream node instead of manually adding requests above.` + " e.g. `map($['Fetch Issues'].body, {customId: string(#.number), prompt: 'Triage: ' + #.title})` to batch every issue an HTTP Request node just fetched. Each array element is either a plain string (used as the prompt, with an auto-numbered Custom ID) or an object with `customId`/`prompt`. Takes precedence over the manually-added Requests when set." + `
+- **Requests From Expression**: (Optional, advanced) Build the batch from a dynamic-length array produced by an upstream node instead of manually adding requests above.` + " e.g. `map($['Fetch Issues'].body, { {customId: string(#.number), prompt: 'Triage: ' + #.title} })` to batch every issue an HTTP Request node just fetched. Each array element is either a plain string (used as the prompt, with an auto-numbered Custom ID) or an object with `customId`/`prompt`. Takes precedence over the manually-added Requests when set. Note the spaced-out braces: `map`'s closure argument is itself `{...}`, so returning an object literal needs its own inner `{...}` around the fields — write it as `{ {...} }` with a space, not `{{...}}`. A tight `{{...}}` is parsed identically by the expression engine, but is also read by this platform as `{{ }}` template-placeholder framing (the syntax used by plain text fields), which mangles it before it reaches this field. Keep the space to avoid that." + `
 
 ## Output
 
@@ -271,8 +271,8 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Togglable:   true,
-			Placeholder: `map($['Fetch Issues'].body, {customId: string(#.number), prompt: "Triage: " + #.title})`,
-			Description: fmt.Sprintf("Advanced: build the batch from a dynamic-length upstream array instead of the manually-added Requests above. Must evaluate to an array of up to %d items, each either a plain string (used as the prompt; Custom IDs are auto-numbered) or an object with `customId` and `prompt`. When set, this replaces Requests entirely.", maxBatchRequests),
+			Placeholder: `map($['Fetch Issues'].body, { {customId: string(#.number), prompt: "Triage: " + #.title} })`,
+			Description: fmt.Sprintf("Advanced: build the batch from a dynamic-length upstream array instead of the manually-added Requests above. Must evaluate to an array of up to %d items, each either a plain string (used as the prompt; Custom IDs are auto-numbered) or an object with `customId` and `prompt`. When set, this replaces Requests entirely. Note the spaced braces in the example: map()'s closure is itself `{...}`, so returning an object literal needs its own inner `{...}` around the fields — keep a space between them (`{ {...} }`), since a tight `{{...}}` is also read as {{ }} template-placeholder framing and gets mangled before reaching this field.", maxBatchRequests),
 		},
 	}
 }
