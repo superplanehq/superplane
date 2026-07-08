@@ -32,10 +32,7 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 	baseURLBytes, _ := ctx.GetConfig("baseUrl")
 	baseURL := normalizeBaseURL(string(baseURLBytes))
 
-	groupIDBytes, err := ctx.GetConfig("groupId")
-	if err != nil || len(groupIDBytes) == 0 {
-		return nil, fmt.Errorf("groupId is required")
-	}
+	groupIDBytes, _ := ctx.GetConfig("groupId")
 	groupID := string(groupIDBytes)
 
 	token, err := getAuthToken(ctx, authType)
@@ -113,9 +110,13 @@ type Project struct {
 	WebURL            string `json:"web_url"`
 }
 
-func (c *Client) listProjects() ([]Project, error) {
+// listProjects lists the group's projects when a group is configured,
+// and the user's personal projects otherwise.
+func (c *Client) listProjects(user *User) ([]Project, error) {
 	if c.groupID == "" {
-		return nil, fmt.Errorf("groupID is missing")
+		return fetchAllResources[Project](c, func(page int) string {
+			return fmt.Sprintf("%s/api/%s/users/%d/projects?per_page=100&page=%d", c.baseURL, apiVersion, user.ID, page)
+		})
 	}
 
 	return fetchAllResources[Project](c, func(page int) string {
@@ -236,13 +237,20 @@ func (c *Client) ListGroupMembers(groupID string) ([]User, error) {
 	})
 }
 
+// ListProjectMembers lists all members of a project, including inherited ones.
+func (c *Client) ListProjectMembers(projectID string) ([]User, error) {
+	return fetchAllResources[User](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/members/all?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), page)
+	})
+}
+
 func (c *Client) FetchIntegrationData() (*User, []Project, error) {
 	user, err := c.getCurrentUser()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current user: %v", err)
 	}
 
-	projects, err := c.listProjects()
+	projects, err := c.listProjects(user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list projects: %v", err)
 	}
