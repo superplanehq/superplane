@@ -50,6 +50,8 @@ export type UseCanvasToolSidebarStateOptions = {
   onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
   /** When true (e.g. template canvas picker), hides the tool sidebar toggle and clears open state. */
   hideCanvasToolSidebar?: boolean;
+  /** Whether the current user can use managed agent chat endpoints. */
+  canUseAgents?: boolean;
   /** Keeps the tool sidebar available even when managed agents are disabled (runs/versions flows). */
   forceEnable?: boolean;
   /** Called before the user closes the tool sidebar via the header toggle. */
@@ -67,11 +69,13 @@ export function useCanvasToolSidebarState({
   onAgentStagingReady,
   onAgentStagingCommit,
   hideCanvasToolSidebar,
+  canUseAgents = true,
   forceEnable = false,
   onBeforeClose,
 }: UseCanvasToolSidebarStateOptions) {
   const { has: hasFeature } = useExperimentalFeature(organizationId);
   const featureEnabled = hasFeature(FEATURE_CLAUDE_MANAGED_AGENTS);
+  const agentEnabled = canUseAgents && featureEnabled;
 
   const [isToolSidebarOpen, setIsToolSidebarOpen] = useState(() => readInitialToolSidebarOpen(canvasId));
   const [agentMode, setAgentMode] = useState<AgentMode>(readInitialAgentMode);
@@ -138,12 +142,12 @@ export function useCanvasToolSidebarState({
   }, [agentUnavailable, canvasId]);
 
   useEffect(() => {
-    if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar) {
+    if ((!agentEnabled && !forceEnable) || hideCanvasToolSidebar) {
       setIsToolSidebarOpen(false);
     }
-  }, [featureEnabled, forceEnable, hideCanvasToolSidebar]);
+  }, [agentEnabled, forceEnable, hideCanvasToolSidebar]);
 
-  const showToolSidebarToggle = (featureEnabled || forceEnable) && !hideCanvasToolSidebar;
+  const showToolSidebarToggle = (agentEnabled || forceEnable) && !hideCanvasToolSidebar;
 
   useEffect(() => {
     if (!showToolSidebarToggle) return;
@@ -185,7 +189,7 @@ export function useCanvasToolSidebarState({
     readOnly,
     isToolSidebarOpen,
     showToolSidebarToggle,
-    isAgentEnabled: featureEnabled,
+    isAgentEnabled: agentEnabled,
     agentUnavailable,
     markAgentUnavailable,
     markAgentAvailable,

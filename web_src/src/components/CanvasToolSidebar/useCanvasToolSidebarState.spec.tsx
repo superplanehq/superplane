@@ -1,17 +1,30 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
+const featureFlags = vi.hoisted(() => ({ enabled: false }));
+
 vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ has: () => false, enabledExperimentalFeatures: [] }),
+  useExperimentalFeature: () => ({ has: () => featureFlags.enabled, enabledExperimentalFeatures: [] }),
 }));
 
-function Harness({ onBeforeClose, canvasId }: { onBeforeClose: () => void; canvasId?: string }) {
+function Harness({
+  onBeforeClose,
+  canvasId,
+  canUseAgents,
+  forceEnable = true,
+}: {
+  onBeforeClose: () => void;
+  canvasId?: string;
+  canUseAgents?: boolean;
+  forceEnable?: boolean;
+}) {
   const state = useCanvasToolSidebarState({
     isEditing: false,
     readOnly: false,
-    forceEnable: true,
+    forceEnable,
     canvasId,
+    canUseAgents,
     onBeforeClose,
   });
 
@@ -35,6 +48,11 @@ function Harness({ onBeforeClose, canvasId }: { onBeforeClose: () => void; canva
 }
 
 describe("useCanvasToolSidebarState", () => {
+  beforeEach(() => {
+    featureFlags.enabled = false;
+    window.localStorage.clear();
+  });
+
   it("invokes onBeforeClose when toggling from open to closed", () => {
     window.localStorage.setItem("canvasAgentSidebarOpen", "true");
     const onBeforeClose = vi.fn();
@@ -67,6 +85,14 @@ describe("useCanvasToolSidebarState", () => {
 
     expect(onBeforeClose).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+  });
+
+  it("hides the agent surface when the user cannot use agents", () => {
+    featureFlags.enabled = true;
+    render(<Harness onBeforeClose={vi.fn()} canUseAgents={false} forceEnable={false} />);
+
+    expect(screen.getByTestId("agent-state")).toHaveTextContent("disabled");
+    expect(screen.getByTestId("toggle-state")).toHaveTextContent("hidden");
   });
 
   it("reads and persists the open state per canvas", () => {

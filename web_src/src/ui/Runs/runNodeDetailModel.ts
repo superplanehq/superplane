@@ -8,10 +8,25 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
   TriggersTrigger,
 } from "@/api-client";
-import { flattenObject } from "@/lib/utils";
-import { getExecutionDetails, getState, getStateMap, getTriggerRenderer } from "@/pages/app/mappers";
-import { buildEventInfo, buildExecutionInfo } from "@/pages/app/utils";
+import { getState, getStateMap } from "@/pages/app/mappers";
+import { buildExecutionInfo } from "@/pages/app/utils";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import {
+  buildComponentDefinitionsByName,
+  buildTriggerDefinitionsByName,
+  resolveConfigurationFields,
+} from "./runNodeConfigurationFields";
+import {
+  buildNodeActions,
+  buildOutputSections,
+  buildTriggerOutputSections,
+  getExecutionErrorMessage,
+  normalizeExecutionOutputsForDisplay,
+} from "./runNodeDetailOutputs";
+import { buildExecutionTabData, buildTriggerTabData } from "./runNodeDetailTabs";
+
+export { buildExecutionTabData, buildTriggerTabData, isErrorValue } from "./runNodeDetailTabs";
+export { hasObjectValue } from "./runNodeDetailOutputs";
 
 export type RunNodeDetailTabKey = "details" | "payload" | "configuration";
 
@@ -63,6 +78,13 @@ export type RunInspectorOutputSection = {
   sizeKb: string;
 };
 
+export type RunInspectorCurrentUser = {
+  id: string;
+  email: string;
+  roles?: string[];
+  groups?: string[];
+};
+
 export type RunInspectorApprovalRecord = {
   index: number;
   state?: string;
@@ -71,6 +93,14 @@ export type RunInspectorApprovalRecord = {
     id?: string;
     email?: string;
     name?: string;
+  };
+  roleRef?: {
+    name?: string;
+    displayName?: string;
+  };
+  groupRef?: {
+    name?: string;
+    displayName?: string;
   };
 };
 
@@ -282,44 +312,6 @@ export function buildRunInspectorNodeSections({
   });
 }
 
-function buildComponentDefinitionsByName(
-  componentDefinitions: ActionsAction[] | undefined,
-): Map<string, ActionsAction> {
-  return new Map(
-    componentDefinitions?.filter((definition) => definition.name).map((definition) => [definition.name!, definition]),
-  );
-}
-
-function buildTriggerDefinitionsByName(
-  triggerDefinitions: TriggersTrigger[] | undefined,
-): Map<string, TriggersTrigger> {
-  return new Map(
-    triggerDefinitions?.filter((definition) => definition.name).map((definition) => [definition.name!, definition]),
-  );
-}
-
-function resolveConfigurationFields({
-  workflowNode,
-  componentDefinitionsByName,
-  triggerDefinitionsByName,
-}: {
-  workflowNode?: ComponentsNode;
-  componentDefinitionsByName: Map<string, ActionsAction>;
-  triggerDefinitionsByName: Map<string, TriggersTrigger>;
-}): ConfigurationField[] {
-  if (!workflowNode?.component) return [];
-
-  if (workflowNode.type === "TYPE_ACTION") {
-    return componentDefinitionsByName.get(workflowNode.component)?.configuration ?? [];
-  }
-
-  if (workflowNode.type === "TYPE_TRIGGER") {
-    return triggerDefinitionsByName.get(workflowNode.component)?.configuration ?? [];
-  }
-
-  return [];
-}
-
 export function findRunInspectorErrorSummaries(sections: RunInspectorNodeSection[]): RunInspectorErrorSummary[] {
   return sections
     .filter((section) => !!section.errorMessage)
@@ -498,237 +490,4 @@ function getUpstreamCreatedAt(
 
   const timestamp = createdAt ? new Date(createdAt).getTime() : Number.POSITIVE_INFINITY;
   return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
-}
-
-function buildTriggerOutputSections(run: CanvasesCanvasRun): RunInspectorOutputSection[] {
-  if (!hasObjectValue(run.rootEvent?.data)) return [];
-
-  return [
-    {
-      channel: run.rootEvent?.channel || "default",
-      value: run.rootEvent?.data,
-      sizeKb: formatJsonSizeKb(run.rootEvent?.data),
-    },
-  ];
-}
-
-function buildOutputSections(outputs?: CanvasesCanvasNodeExecution["outputs"]): RunInspectorOutputSection[] {
-  if (!outputs || Object.keys(outputs).length === 0) return [];
-
-  return Object.entries(outputs).map(([channel, value]) => {
-    const displayValue = normalizeExecutionChannelOutput(value);
-
-    return {
-      channel,
-      value: displayValue,
-      sizeKb: formatJsonSizeKb(displayValue),
-    };
-  });
-}
-
-function normalizeExecutionOutputsForDisplay(outputs?: CanvasesCanvasNodeExecution["outputs"]): unknown {
-  const outputSections = buildOutputSections(outputs);
-  if (outputSections.length === 0) return undefined;
-  if (outputSections.length === 1) return outputSections[0].value;
-
-  return Object.fromEntries(outputSections.map((section) => [section.channel, section.value]));
-}
-
-function normalizeExecutionChannelOutput(value: unknown): unknown {
-  if (!Array.isArray(value)) return value;
-  return value[0];
-}
-
-function formatJsonSizeKb(value: unknown): string {
-  const json = JSON.stringify(value ?? null);
-  const bytes = new Blob([json]).size;
-  return `${Math.max(bytes / 1024, 0.01).toFixed(2)} KB`;
-}
-
-function getExecutionErrorMessage(execution: CanvasesCanvasNodeExecution): string | undefined {
-  if (execution.result !== "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR") {
-    return undefined;
-  }
-
-  return execution.resultMessage || execution.resultReason || "Execution failed";
-}
-
-function buildNodeActions(
-  workflowNode: ComponentsNode | undefined,
-  execution: CanvasesCanvasNodeExecution | undefined,
-): RunInspectorNodeActions {
-  const isActive = execution?.state === "STATE_STARTED" || execution?.state === "STATE_PENDING";
-  const componentName = normalizeComponentName(workflowNode?.component);
-
-  return {
-    canStop: Boolean(execution?.id && isActive),
-    canPushThrough: Boolean(execution?.id && isActive && (componentName === "wait" || componentName === "timegate")),
-    approvalRecords: componentName.includes("approval") ? extractApprovalRecords(execution?.metadata) : [],
-  };
-}
-
-function normalizeComponentName(componentName: string | undefined): string {
-  return (componentName || "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-}
-
-function extractApprovalRecords(metadata: CanvasesCanvasNodeExecution["metadata"]): RunInspectorApprovalRecord[] {
-  const records = metadata?.records;
-  if (!Array.isArray(records)) return [];
-
-  return records.filter(isApprovalRecord).map((record) => ({
-    index: record.index,
-    state: typeof record.state === "string" ? record.state : undefined,
-    type: typeof record.type === "string" ? record.type : undefined,
-    user: isObjectRecord(record.user)
-      ? {
-          id: typeof record.user.id === "string" ? record.user.id : undefined,
-          email: typeof record.user.email === "string" ? record.user.email : undefined,
-          name: typeof record.user.name === "string" ? record.user.name : undefined,
-        }
-      : undefined,
-  }));
-}
-
-function isApprovalRecord(value: unknown): value is { index: number; state?: unknown; type?: unknown; user?: unknown } {
-  return isObjectRecord(value) && typeof value.index === "number";
-}
-
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object";
-}
-
-function extractExecutionPayload(execution: CanvasesCanvasNodeExecution): unknown {
-  if (!execution.outputs || Object.keys(execution.outputs).length === 0) {
-    return undefined;
-  }
-
-  const outputData = Object.values(execution.outputs).find((output) => Array.isArray(output) && output.length > 0) as
-    | unknown[]
-    | undefined;
-  if (outputData && outputData.length > 0) {
-    return outputData[0];
-  }
-
-  return execution.outputs;
-}
-
-function buildDefaultExecutionDetails(
-  execution: CanvasesCanvasNodeExecution,
-  workflowNode: ComponentsNode | undefined,
-  workflowNodes: ComponentsNode[],
-): Record<string, unknown> {
-  const componentName = typeof workflowNode?.component === "string" ? workflowNode.component : undefined;
-
-  if (componentName && workflowNode) {
-    const customDetails = getExecutionDetails(componentName, execution, workflowNode, workflowNodes);
-    if (customDetails && Object.keys(customDetails).length > 0) {
-      return { ...customDetails };
-    }
-  }
-
-  const displayOutputs = normalizeExecutionOutputsForDisplay(execution.outputs);
-  return { ...flattenObject((displayOutputs ?? execution.metadata) || {}) };
-}
-
-function applyExecutionResultDetails(
-  details: Record<string, unknown>,
-  execution: CanvasesCanvasNodeExecution,
-): Record<string, unknown> {
-  const next = { ...details };
-
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED") &&
-    !("Error" in next)
-  ) {
-    next.Error = {
-      __type: "error",
-      message: execution.resultMessage,
-    };
-  }
-
-  if (execution.result === "RESULT_CANCELLED" && !("Cancelled by" in next)) {
-    const cancelledBy = execution.cancelledBy;
-    next["Cancelled by"] = cancelledBy?.name || cancelledBy?.id || "Unknown";
-  }
-
-  return next;
-}
-
-function filterEmptyDetailEntries(details: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(details).filter(([, value]) => value !== undefined && value !== "" && value !== null),
-  );
-}
-
-export function buildExecutionTabData(
-  execution: CanvasesCanvasNodeExecution,
-  workflowNode: ComponentsNode | undefined,
-  workflowNodes: ComponentsNode[],
-): RunNodeDetailTabData {
-  const tabData: RunNodeDetailTabData = {
-    details: filterEmptyDetailEntries(
-      applyExecutionResultDetails(buildDefaultExecutionDetails(execution, workflowNode, workflowNodes), execution),
-    ),
-    payload: extractExecutionPayload(execution),
-  };
-
-  if (execution.configuration && Object.keys(execution.configuration).length > 0) {
-    tabData.configuration = execution.configuration;
-  }
-
-  return tabData;
-}
-
-export function buildTriggerTabData(
-  run: CanvasesCanvasRun,
-  workflowNode: ComponentsNode | undefined,
-): RunNodeDetailTabData {
-  const rootEvent = run.rootEvent;
-  const mappedDetails = buildTriggerEventDetails(rootEvent, workflowNode);
-  const fallbackDetails = buildFallbackTriggerEventDetails(rootEvent);
-  const details = Object.keys(mappedDetails).length > 0 ? mappedDetails : fallbackDetails;
-
-  const tabData: RunNodeDetailTabData = {
-    details: Object.keys(details).length > 0 ? filterEmptyDetailEntries(details) : undefined,
-    payload: rootEvent?.data && Object.keys(rootEvent.data).length > 0 ? rootEvent.data : undefined,
-  };
-
-  if (
-    workflowNode?.configuration &&
-    typeof workflowNode.configuration === "object" &&
-    Object.keys(workflowNode.configuration).length > 0
-  ) {
-    tabData.configuration = workflowNode.configuration;
-  }
-
-  return tabData;
-}
-
-function buildTriggerEventDetails(
-  rootEvent: CanvasesCanvasRun["rootEvent"],
-  workflowNode: ComponentsNode | undefined,
-): Record<string, unknown> {
-  if (!rootEvent) return {};
-
-  const triggerRenderer = getTriggerRenderer(workflowComponentName(workflowNode));
-  return triggerRenderer.getRootEventValues({ event: buildEventInfo(rootEvent) });
-}
-
-function buildFallbackTriggerEventDetails(rootEvent: CanvasesCanvasRun["rootEvent"]): Record<string, unknown> {
-  const details: Record<string, unknown> = {};
-
-  if (rootEvent?.channel) details.Channel = rootEvent.channel;
-  if (rootEvent?.customName) details.Name = rootEvent.customName;
-  if (rootEvent?.createdAt) details["Triggered at"] = rootEvent.createdAt;
-
-  return details;
-}
-
-export function isErrorValue(value: unknown): value is { __type: "error"; message: string } {
-  return !!value && typeof value === "object" && (value as { __type?: string }).__type === "error";
-}
-
-export function hasObjectValue(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && Object.keys(value).length > 0;
 }

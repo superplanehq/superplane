@@ -14,7 +14,11 @@ import { RunInspectorHeader } from "./RunInspectorHeader";
 import { ResizeHandle } from "./RunInspectorResize";
 import { RunInspectorStepsList } from "./RunInspectorStepsList";
 import { buildNodeMap, buildRunPresentation } from "./runPresentation";
-import { buildRunInspectorNodeSections, findRunInspectorErrorSummaries } from "./runNodeDetailModel";
+import {
+  buildRunInspectorNodeSections,
+  findRunInspectorErrorSummaries,
+  type RunInspectorCurrentUser,
+} from "./runNodeDetailModel";
 import { useResizableInspectorWidth } from "./useResizableInspectorWidth";
 import { useRunInspectorActions } from "./useRunInspectorActions";
 
@@ -27,6 +31,7 @@ export interface RunInspectorPanelProps {
   componentDefinitions?: ActionsAction[];
   triggerDefinitions?: TriggersTrigger[];
   componentIconMap?: Record<string, string>;
+  currentUser?: RunInspectorCurrentUser;
   selectedNodeId?: string | null;
   onSelectNode: (nodeId: string) => void;
   onClearSelectedNode?: () => void;
@@ -42,6 +47,7 @@ export function RunInspectorPanel({
   componentDefinitions,
   triggerDefinitions,
   componentIconMap = {},
+  currentUser,
   selectedNodeId = null,
   onSelectNode,
   onClearSelectedNode,
@@ -135,6 +141,7 @@ export function RunInspectorPanel({
         onRerun={actions.rerun}
         rerunPending={actions.rerunPending}
         actions={actions}
+        currentUser={currentUser}
       />
     </aside>
   );

@@ -63,7 +63,7 @@ export function HomePage() {
     return <ErrorView />;
   }
 
-  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError) {
+  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError && canCreateCanvases) {
     return <Navigate to={`/${organizationId}/apps/new`} replace />;
   }
 

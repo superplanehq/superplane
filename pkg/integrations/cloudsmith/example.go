@@ -117,3 +117,33 @@ func onSecurityScanCompletedExampleData() map[string]any {
 func onPackageCreatedExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPackageCreatedOnce, exampleDataOnPackageCreatedBytes, &exampleDataOnPackageCreated)
 }
+
+//go:embed example_output_create_vulnerability_policy.json
+var exampleOutputCreateVulnerabilityPolicyBytes []byte
+
+var exampleOutputCreateVulnerabilityPolicyOnce sync.Once
+var exampleOutputCreateVulnerabilityPolicy map[string]any
+
+func (c *CreateVulnerabilityPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateVulnerabilityPolicyOnce, exampleOutputCreateVulnerabilityPolicyBytes, &exampleOutputCreateVulnerabilityPolicy)
+}
+
+//go:embed example_output_get_vulnerability_policy.json
+var exampleOutputGetVulnerabilityPolicyBytes []byte
+
+var exampleOutputGetVulnerabilityPolicyOnce sync.Once
+var exampleOutputGetVulnerabilityPolicy map[string]any
+
+func (g *GetVulnerabilityPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetVulnerabilityPolicyOnce, exampleOutputGetVulnerabilityPolicyBytes, &exampleOutputGetVulnerabilityPolicy)
+}
+
+//go:embed example_output_delete_vulnerability_policy.json
+var exampleOutputDeleteVulnerabilityPolicyBytes []byte
+
+var exampleOutputDeleteVulnerabilityPolicyOnce sync.Once
+var exampleOutputDeleteVulnerabilityPolicy map[string]any
+
+func (d *DeleteVulnerabilityPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteVulnerabilityPolicyOnce, exampleOutputDeleteVulnerabilityPolicyBytes, &exampleOutputDeleteVulnerabilityPolicy)
+}

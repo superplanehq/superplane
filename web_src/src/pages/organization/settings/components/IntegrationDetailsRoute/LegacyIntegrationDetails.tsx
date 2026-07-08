@@ -394,6 +394,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                 }}
                 className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 gap-1"
                 disabled={!canDeleteIntegrations}
+                data-testid="integration-detail-delete"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete Integration

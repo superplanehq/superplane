@@ -433,6 +433,14 @@ export function CreateRolePage() {
     }
   };
 
+  if (permissionsLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[40vh]">
+        <p className="text-gray-500">Checking permissions...</p>
+      </div>
+    );
+  }
+
   if (!canReadRoles) {
     return <NotFoundPage />;
   }
@@ -443,14 +451,6 @@ export function CreateRolePage() {
 
   if (!isEditMode && !canCreateRoles) {
     return <NotFoundPage />;
-  }
-
-  if (permissionsLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[40vh]">
-        <p className="text-gray-500">Checking permissions...</p>
-      </div>
-    );
   }
 
   return (
