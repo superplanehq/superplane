@@ -184,15 +184,17 @@ type MessageFile struct {
 }
 
 // FetchFile downloads a file from a URL (e.g. a presigned artifact link from
-// a Cursor agent run) so it can be attached to a message. The per-file size
-// limit is enforced while reading.
-func (c *Client) FetchFile(fileURL string) ([]byte, error) {
+// a Cursor agent run) so it can be attached to a message. The request goes
+// through the workflow HTTP context so the platform's SSRF policy (blocked
+// hosts, private IP ranges, redirect checks, response limits) applies to
+// user-supplied URLs. The per-file size limit is enforced while reading.
+func (c *Client) FetchFile(httpCtx core.HTTPContext, fileURL string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, fileURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpCtx.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch file: %w", err)
 	}

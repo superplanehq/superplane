@@ -168,11 +168,11 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 		return errors.New("channel is required")
 	}
 
-	// At least content, embed, or a file must be provided
+	// At least content, embed, or a non-empty file entry must be provided
 	hasContent := config.Content != ""
 	hasEmbed := config.EmbedTitle != "" || config.EmbedDescription != ""
 
-	if !hasContent && !hasEmbed && len(config.Files) == 0 {
+	if !hasContent && !hasEmbed && !hasAttachableFile(config.Files) {
 		return fmt.Errorf("either content, embed (title/description), or files is required")
 	}
 
@@ -256,7 +256,7 @@ func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
 		req.Embeds = []Embed{embed}
 	}
 
-	response, err := sendMessage(client, config, req)
+	response, err := sendMessage(client, ctx.HTTP, config, req)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
@@ -294,7 +294,7 @@ func validateFiles(files []string) error {
 	}
 
 	for _, file := range files {
-		if file == "" || strings.Contains(file, "{{") {
+		if file == "" || isExpressionValue(file) {
 			continue
 		}
 		parsed, err := url.Parse(file)
@@ -304,6 +304,16 @@ func validateFiles(files []string) error {
 	}
 
 	return nil
+}
+
+// hasAttachableFile reports whether the list has at least one non-empty entry.
+func hasAttachableFile(files []string) bool {
+	for _, file := range files {
+		if file != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // fileNameFromURL derives an attachment filename from the URL path, falling
@@ -322,11 +332,7 @@ func fileNameFromURL(fileURL string, index int) string {
 }
 
 // sendMessage sends the message, fetching and attaching files when configured.
-func sendMessage(client *Client, config SendTextMessageConfiguration, req CreateMessageRequest) (*Message, error) {
-	if len(config.Files) == 0 {
-		return client.CreateMessage(config.Channel, req)
-	}
-
+func sendMessage(client *Client, httpCtx core.HTTPContext, config SendTextMessageConfiguration, req CreateMessageRequest) (*Message, error) {
 	if len(config.Files) > maxMessageFiles {
 		return nil, fmt.Errorf("at most %d files can be attached to a message", maxMessageFiles)
 	}
@@ -336,7 +342,7 @@ func sendMessage(client *Client, config SendTextMessageConfiguration, req Create
 		if fileURL == "" {
 			continue
 		}
-		content, err := client.FetchFile(fileURL)
+		content, err := client.FetchFile(httpCtx, fileURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch file %q: %w", fileURL, err)
 		}
@@ -344,6 +350,11 @@ func sendMessage(client *Client, config SendTextMessageConfiguration, req Create
 	}
 
 	if len(files) == 0 {
+		// File entries can resolve to empty at execution; without content or an
+		// embed there is nothing left to send and Discord would reject it.
+		if req.Content == "" && len(req.Embeds) == 0 {
+			return nil, fmt.Errorf("nothing to send: content, embed, or a non-empty file URL is required")
+		}
 		return client.CreateMessage(config.Channel, req)
 	}
 
