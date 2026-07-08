@@ -47,7 +47,7 @@ func (i *Cursor) Configuration() []configuration.Field {
 			Label:       "Cloud Agent API Key",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Required for launching AI Agents.",
+			Description: "Required for launching AI Agents and downloading agent artifacts.",
 			Required:    false,
 		},
 		{

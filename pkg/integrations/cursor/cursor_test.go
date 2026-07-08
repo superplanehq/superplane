@@ -221,6 +221,25 @@ func Test__Cursor__ListResources(t *testing.T) {
 		assert.Equal(t, "o1-mini", resources[3].ID)
 	})
 
+	t.Run("list artifacts with expression agent returns empty", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"launchAgentKey": "test-key",
+			},
+		}
+
+		resources, err := c.ListResources("artifact", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters:  map[string]string{"agent": `{{ $["launch-agent"].agentId }}`},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+		assert.Empty(t, httpContext.Requests)
+	})
+
 	t.Run("unknown resource type returns empty", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{}
 		integrationCtx := &contexts.IntegrationContext{}

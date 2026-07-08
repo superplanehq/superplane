@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -61,6 +62,21 @@ type ConversationMessage struct {
 type ConversationResponse struct {
 	ID       string                `json:"id"`
 	Messages []ConversationMessage `json:"messages"`
+}
+
+type DownloadArtifactResponse struct {
+	URL       string `json:"url"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
+type ArtifactItem struct {
+	Path      string `json:"path"`
+	SizeBytes int64  `json:"sizeBytes"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type ListArtifactsResponse struct {
+	Items []ArtifactItem `json:"items"`
 }
 
 func (c *Client) ListModels() ([]string, error) {
@@ -172,6 +188,44 @@ func (c *Client) CancelAgent(agentID string) error {
 	url := fmt.Sprintf("%s/v0/agents/%s/cancel", c.BaseURL, agentID)
 	_, err := c.execRequest(http.MethodPost, url, nil, c.LaunchAgentKey)
 	return err
+}
+
+func (c *Client) ListArtifacts(agentID string) ([]ArtifactItem, error) {
+	if c.LaunchAgentKey == "" {
+		return nil, fmt.Errorf("Cloud Agent API key is not configured")
+	}
+
+	requestURL := fmt.Sprintf("%s/v1/agents/%s/artifacts", c.BaseURL, agentID)
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, c.LaunchAgentKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ListArtifactsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal artifacts response: %w", err)
+	}
+
+	return response.Items, nil
+}
+
+func (c *Client) DownloadArtifact(agentID, path string) (*DownloadArtifactResponse, error) {
+	if c.LaunchAgentKey == "" {
+		return nil, fmt.Errorf("Cloud Agent API key is not configured")
+	}
+
+	requestURL := fmt.Sprintf("%s/v1/agents/%s/artifacts/download?path=%s", c.BaseURL, agentID, url.QueryEscape(path))
+	responseBody, err := c.execRequest(http.MethodGet, requestURL, nil, c.LaunchAgentKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var response DownloadArtifactResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal artifact download response: %w", err)
+	}
+
+	return &response, nil
 }
 
 func (c *Client) GetAgentConversation(agentID string) (*ConversationResponse, error) {

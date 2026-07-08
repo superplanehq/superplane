@@ -21,7 +21,7 @@ To set up Discord integration:
 2. Click **New Application** and give it a name
 3. Go to **OAuth2** → **URL Generator**:
    - Under **Scopes**, select **bot**
-   - Under **Bot Permissions**, select **View Channels**, **Send Messages**, and **Read Message History**
+   - Under **Bot Permissions**, select **View Channels**, **Send Messages**, **Attach Files**, and **Read Message History**. **Attach Files** is required for the Send Text Message component to upload file attachments.
    - Copy the generated URL and open it in a new tab to invite the bot to your server
 4. Go to the **Bot** section:
    - Click **Add Bot** (if not already added)
@@ -118,6 +118,7 @@ The Send Text Message component sends a message to a Discord channel.
 - **Embed Description**: Optional description for a rich embed
 - **Embed Color**: Hex color code for the embed (e.g., #5865F2)
 - **Embed URL**: Optional URL to link from the embed title
+- **Files**: Optional URLs of files to attach. Each file is downloaded and uploaded to Discord as an attachment — for example, an artifact link produced by Cursor's Download Artifact component.
 
 ### Output
 
@@ -125,7 +126,8 @@ Returns metadata about the sent message including message ID, channel ID, and au
 
 ### Notes
 
-- Either content or embed (title/description) must be provided
+- Either content, embed (title/description), or files must be provided
+- Up to 10 files per message, 8 MiB each (Discord limits)
 - The Discord bot must be installed and have permission to post to the selected channel
 - Supports Discord's rich embed formatting for visually appealing messages
 
