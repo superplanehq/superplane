@@ -8,9 +8,16 @@ interface UserFieldRendererProps {
   onChange: (value: string | undefined) => void;
   domainId: string;
   allValues?: Record<string, unknown>;
+  readOnly?: boolean;
 }
 
-export const UserFieldRenderer = ({ value, onChange, domainId, allValues }: UserFieldRendererProps) => {
+export const UserFieldRenderer = ({
+  value,
+  onChange,
+  domainId,
+  allValues,
+  readOnly = false,
+}: UserFieldRendererProps) => {
   // Fetch users from the organization
   const { data: users, isLoading, error } = useOrganizationUsers(domainId);
   const approvalContext = getApprovalListContext(allValues);
@@ -56,7 +63,7 @@ export const UserFieldRenderer = ({ value, onChange, domainId, allValues }: User
   }
 
   return (
-    <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)}>
+    <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)} disabled={readOnly}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Select user" />
       </SelectTrigger>
