@@ -1,56 +1,16 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { useState } from "react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
 import type * as ApiClient from "@/api-client";
-import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
-import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { RunInspectorPanel } from "./RunInspectorPanel";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import {
+  executions,
+  firePointerEvent,
+  renderInspector,
+  renderInteractiveInspector,
+  runningExecutions,
+  runningRun,
+} from "./RunInspectorPanel.spec.fixtures";
 
-const executions: CanvasesCanvasNodeExecution[] = [
-  {
-    id: "execution-1",
-    nodeId: "action-1",
-    state: "STATE_FINISHED",
-    result: "RESULT_FAILED",
-    resultReason: "RESULT_REASON_ERROR",
-    resultMessage: "expression evaluation failed",
-    createdAt: "2026-05-01T12:00:01Z",
-    updatedAt: "2026-05-01T12:00:02Z",
-    outputs: {},
-    metadata: {},
-    configuration: { retries: 1 },
-  },
-  {
-    id: "execution-2",
-    nodeId: "action-2",
-    previousExecutionId: "execution-1",
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    createdAt: "2026-05-01T12:00:03Z",
-    updatedAt: "2026-05-01T12:00:04Z",
-    outputs: { default: [{ data: { ok: true } }] },
-    metadata: {},
-    configuration: { mode: "create" },
-  },
-];
-const runningExecutions: CanvasesCanvasNodeExecution[] = [
-  {
-    id: "execution-running",
-    nodeId: "action-2",
-    state: "STATE_STARTED",
-    result: "RESULT_UNKNOWN",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    createdAt: "2026-05-01T12:00:03Z",
-    updatedAt: "2026-05-01T12:00:04Z",
-    outputs: {},
-    metadata: {},
-    configuration: { mode: "create" },
-  },
-];
 let mockedExecutions = executions;
 let mockedExecutionsLoading = false;
 
@@ -60,6 +20,7 @@ vi.mock("@uiw/react-json-view", () => ({
 
 const reemitTriggerEventMock = vi.fn();
 const cancelExecutionMock = vi.fn();
+const invokeExecutionHookMock = vi.fn();
 const listNodeQueueItemsMock = vi.fn();
 const deleteNodeQueueItemMock = vi.fn();
 
@@ -69,6 +30,7 @@ vi.mock("@/api-client", async (importOriginal) => {
     ...actual,
     canvasesReemitTriggerEvent: (...args: unknown[]) => reemitTriggerEventMock(...args),
     canvasesCancelExecution: (...args: unknown[]) => cancelExecutionMock(...args),
+    canvasesInvokeNodeExecutionHook: (...args: unknown[]) => invokeExecutionHookMock(...args),
     canvasesListNodeQueueItems: (...args: unknown[]) => listNodeQueueItemsMock(...args),
     canvasesDeleteNodeQueueItem: (...args: unknown[]) => deleteNodeQueueItemMock(...args),
   };
@@ -111,6 +73,7 @@ beforeEach(() => {
   mockedExecutionsLoading = false;
   reemitTriggerEventMock.mockResolvedValue({});
   cancelExecutionMock.mockResolvedValue({});
+  invokeExecutionHookMock.mockResolvedValue({});
   listNodeQueueItemsMock.mockResolvedValue({ data: { items: [] } });
   deleteNodeQueueItemMock.mockResolvedValue({});
 });
@@ -128,6 +91,10 @@ describe("RunInspectorPanel", () => {
     expect(screen.getByText("Deploy main")).toBeInTheDocument();
     expect(screen.getAllByText("Save Assessment").length).toBeGreaterThan(0);
     expect(screen.getByText("OUTPUT · DEFAULT · 0.02 KB")).toBeInTheDocument();
+    expect(screen.queryByText(/"data":\{"ok":true\}/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Output · default/i }));
+
     expect(screen.getByText(/"data":\{"ok":true\}/)).toBeInTheDocument();
     expect(screen.queryByText(/\[\{"data":\{"ok":true\}\}\]/)).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Copy" }).length).toBeGreaterThanOrEqual(2);
@@ -141,6 +108,10 @@ describe("RunInspectorPanel", () => {
     expect(screen.queryByRole("button", { name: /Input/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Runtime config/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Output · default/i })).toBeInTheDocument();
+    expect(screen.queryByText(/"repository":"superplane"/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Output · default/i }));
+
     expect(screen.getByText(/"repository":"superplane"/)).toBeInTheDocument();
   });
 
@@ -189,10 +160,42 @@ describe("RunInspectorPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /Runtime config/i }));
 
     expect(JSON.parse(localStorage.getItem("superplane.runInspector.internalAccordions") || "{}")).toMatchObject({
-      input: true,
-      runtime: false,
-      output: true,
+      input: false,
+      runtime: true,
+      output: false,
     });
+  });
+
+  it("shows applied runtime config as a read-only form with a JSON switch", () => {
+    renderInspector({ selectedNodeId: "action-2" });
+
+    fireEvent.click(screen.getByRole("button", { name: /Runtime config/i }));
+
+    expect(screen.getByRole("button", { name: "Form" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Mode")).toBeInTheDocument();
+    expect(screen.getByText("Create")).toBeInTheDocument();
+    expect(screen.getByText("Approvers")).toBeInTheDocument();
+    expect(screen.getByText("Request approval from")).toBeInTheDocument();
+    expect(screen.getByText("Any one")).toBeInTheDocument();
+    expect(screen.queryByText(/"type":"anyone"/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("json-view")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "JSON" }));
+
+    expect(screen.getByRole("button", { name: "JSON" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("json-view")).toHaveTextContent(/"mode":"create"/);
+    expect(screen.getByTestId("json-view")).toHaveTextContent(/"type":"anyone"/);
+  });
+
+  it("honors stored internal accordion preferences", () => {
+    localStorage.setItem(
+      "superplane.runInspector.internalAccordions",
+      JSON.stringify({ input: false, runtime: false, output: true }),
+    );
+
+    renderInspector({ selectedNodeId: "action-2" });
+
+    expect(screen.getByText(/"data":\{"ok":true\}/)).toBeInTheDocument();
   });
 
   it("opens the upstream input chain in a modal from the more chip", () => {
@@ -255,7 +258,7 @@ describe("RunInspectorPanel", () => {
 
     renderInspector({ run: runningRun });
 
-    fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]);
 
     await waitFor(() => {
       expect(cancelExecutionMock).toHaveBeenCalledWith(
@@ -278,6 +281,101 @@ describe("RunInspectorPanel", () => {
     });
 
     expect(deleteNodeQueueItemMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops an active node execution from the node accordion header", async () => {
+    mockedExecutions = runningExecutions;
+
+    renderInspector({ run: runningRun, selectedNodeId: "action-2" });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Stop" }).at(-1)!);
+
+    await waitFor(() => {
+      expect(cancelExecutionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: {
+            canvasId: "canvas-1",
+            executionId: "execution-running",
+          },
+        }),
+      );
+    });
+  });
+
+  it("shows approval actions for actionable pending approval records", async () => {
+    mockedExecutions = [
+      {
+        id: "execution-approval",
+        nodeId: "approval-1",
+        state: "STATE_STARTED",
+        result: "RESULT_UNKNOWN",
+        resultReason: "RESULT_REASON_OK",
+        resultMessage: "",
+        createdAt: "2026-05-01T12:00:03Z",
+        updatedAt: "2026-05-01T12:00:04Z",
+        outputs: {},
+        metadata: {
+          records: [{ index: 0, state: "pending", type: "user", user: { id: "account-1", email: "me@example.com" } }],
+        },
+        configuration: {},
+      },
+    ];
+
+    renderInspector({
+      run: runningRun,
+      selectedNodeId: "approval-1",
+      account: { id: "account-1", name: "Me", email: "me@example.com", avatar_url: "", installation_admin: false },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+
+    await waitFor(() => {
+      expect(invokeExecutionHookMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: {
+            canvasId: "canvas-1",
+            executionId: "execution-approval",
+            hookName: "approve",
+          },
+          body: {
+            parameters: { index: 0, comment: "" },
+          },
+        }),
+      );
+    });
+  });
+
+  it("shows approval nodes from run execution refs when the current user cannot approve", () => {
+    mockedExecutions = [];
+
+    renderInspector({
+      run: {
+        ...runningRun,
+        executions: [
+          {
+            id: "execution-approval",
+            nodeId: "approval-1",
+            state: "STATE_STARTED",
+            result: "RESULT_UNKNOWN",
+            resultReason: "RESULT_REASON_OK",
+            createdAt: "2026-05-01T12:00:03Z",
+            updatedAt: "2026-05-01T12:00:04Z",
+          },
+        ],
+      },
+      selectedNodeId: "approval-1",
+      account: {
+        id: "account-other",
+        name: "Other user",
+        email: "other@example.com",
+        avatar_url: "",
+        installation_admin: false,
+      },
+    });
+
+    expect(screen.getByRole("button", { name: /Await Approval/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
   it("keeps the stop action disabled while executions are loading", () => {
@@ -321,132 +419,3 @@ describe("RunInspectorPanel", () => {
     expect(localStorage.getItem("superplane.runInspector.width.v3")).toBe("520");
   });
 });
-
-function renderInspector({
-  selectedNodeId = null,
-  onSelectNode = vi.fn(),
-  onClose = vi.fn(),
-  run: inspectedRun = run,
-}: {
-  selectedNodeId?: string | null;
-  onSelectNode?: (nodeId: string) => void;
-  onClose?: () => void;
-  run?: CanvasesCanvasRun;
-} = {}) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <RunInspectorPanel
-          canvasId="canvas-1"
-          run={inspectedRun}
-          workflowNodes={workflowNodes}
-          selectedNodeId={selectedNodeId}
-          onSelectNode={onSelectNode}
-          onClose={onClose}
-        />
-      </ThemeProvider>
-    </QueryClientProvider>,
-  );
-}
-
-function renderInteractiveInspector() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  function InteractiveInspector() {
-    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-
-    return (
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <RunInspectorPanel
-            canvasId="canvas-1"
-            run={run}
-            workflowNodes={workflowNodes}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
-            onClearSelectedNode={() => setSelectedNodeId(null)}
-            onClose={vi.fn()}
-          />
-        </ThemeProvider>
-      </QueryClientProvider>
-    );
-  }
-
-  return render(<InteractiveInspector />);
-}
-
-function firePointerEvent(
-  target: Window | Element,
-  eventName: "pointerDown" | "pointerMove" | "pointerUp",
-  clientX: number,
-) {
-  const event = createEvent[eventName](target, {});
-  Object.defineProperty(event, "pointerId", { value: 1 });
-  Object.defineProperty(event, "clientX", { value: clientX });
-  fireEvent(target, event);
-}
-
-const run: CanvasesCanvasRun = {
-  id: "run-1",
-  canvasId: "canvas-1",
-  state: "STATE_FINISHED",
-  result: "RESULT_FAILED",
-  createdAt: "2026-05-01T12:00:00Z",
-  updatedAt: "2026-05-01T12:00:05Z",
-  rootEvent: {
-    id: "event-1",
-    nodeId: "trigger-1",
-    customName: "Deploy main",
-    createdAt: "2026-05-01T12:00:00Z",
-    data: { repository: "superplane" },
-  },
-};
-
-const runningRun: CanvasesCanvasRun = {
-  id: "run-running",
-  canvasId: "canvas-1",
-  state: "STATE_STARTED",
-  result: "RESULT_UNKNOWN",
-  createdAt: "2026-05-01T12:00:00Z",
-  updatedAt: "2026-05-01T12:00:05Z",
-  rootEvent: {
-    id: "event-running",
-    nodeId: "trigger-1",
-    customName: "Deploy main",
-    createdAt: "2026-05-01T12:00:00Z",
-    data: { repository: "superplane" },
-  },
-};
-
-const workflowNodes: SuperplaneComponentsNode[] = [
-  {
-    id: "trigger-1",
-    name: "On Pull Request",
-    type: "TYPE_TRIGGER",
-    component: "github.onPullRequest",
-  },
-  {
-    id: "action-1",
-    name: "Add Grade Label",
-    type: "TYPE_ACTION",
-    component: "github.addLabel",
-  },
-  {
-    id: "action-2",
-    name: "Save Assessment",
-    type: "TYPE_ACTION",
-    component: "upsertMemory",
-  },
-];

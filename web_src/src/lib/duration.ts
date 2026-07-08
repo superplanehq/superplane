@@ -65,3 +65,15 @@ export function formatDuration(durationMs: number): string {
 
   return formatDurationFallback(duration);
 }
+
+export function formatMinutesSecondsDuration(durationMs: number): string {
+  if (durationMs < 1000) return "<1s";
+
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0 && seconds > 0) return `${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
+}
