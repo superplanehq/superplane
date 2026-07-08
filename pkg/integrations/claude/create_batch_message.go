@@ -23,11 +23,18 @@ const (
 	maxBatchRequests = 1000
 
 	batchStatusEnded = "ended"
+
+	// modeSingle sends exactly one request, built from Prompt/CustomID.
+	modeSingle = "single"
+	// modeMultiple sends one request per element of Items, built from
+	// PromptTemplate/CustomIDExpression.
+	modeMultiple = "multiple"
 )
 
 type CreateBatchMessage struct{}
 
-// BatchMessageItemSpec is a single prompt configured as part of the batch.
+// BatchMessageItemSpec is a single resolved request in the batch: one entry
+// per element when Mode is "multiple", or the sole entry when Mode is "single".
 type BatchMessageItemSpec struct {
 	CustomID string `json:"customId" mapstructure:"customId"`
 	Prompt   string `json:"prompt" mapstructure:"prompt"`
@@ -35,17 +42,26 @@ type BatchMessageItemSpec struct {
 
 // BatchMessageSpec is the workflow node configuration for claude.createBatchMessage.
 type BatchMessageSpec struct {
-	Model         string                 `json:"model" mapstructure:"model"`
-	SystemMessage string                 `json:"systemMessage" mapstructure:"systemMessage"`
-	MaxTokens     int                    `json:"maxTokens" mapstructure:"maxTokens"`
-	Temperature   *float64               `json:"temperature" mapstructure:"temperature"`
-	OutputSchema  string                 `json:"outputSchema" mapstructure:"outputSchema"`
-	Requests      []BatchMessageItemSpec `json:"requests" mapstructure:"requests"`
-	// RequestsExpression, when set, is evaluated at execution time and replaces
-	// Requests entirely. It lets a batch be built from a dynamic-length
-	// upstream array (e.g. every open GitHub issue) instead of a manually
-	// authored, fixed list.
-	RequestsExpression string `json:"requestsExpression" mapstructure:"requestsExpression"`
+	Model         string   `json:"model" mapstructure:"model"`
+	SystemMessage string   `json:"systemMessage" mapstructure:"systemMessage"`
+	MaxTokens     int      `json:"maxTokens" mapstructure:"maxTokens"`
+	Temperature   *float64 `json:"temperature" mapstructure:"temperature"`
+	OutputSchema  string   `json:"outputSchema" mapstructure:"outputSchema"`
+
+	// Mode selects how the batch's requests are built. See modeSingle / modeMultiple.
+	Mode string `json:"mode" mapstructure:"mode"`
+
+	// Single mode: one request, built directly from these two fields.
+	Prompt   string `json:"prompt" mapstructure:"prompt"`
+	CustomID string `json:"customId" mapstructure:"customId"`
+
+	// Multiple mode: Items is a bare expression evaluating to an array; for
+	// each element, PromptTemplate (and optionally CustomIDExpression) is
+	// evaluated with `item` (the element) and `index` (its position) bound
+	// as extra variables, one request per element.
+	Items              string `json:"items" mapstructure:"items"`
+	PromptTemplate     string `json:"promptTemplate" mapstructure:"promptTemplate"`
+	CustomIDExpression string `json:"customIdExpression" mapstructure:"customIdExpression"`
 }
 
 // BatchMessageNodeMetadata is node-level metadata surfaced in the UI, mirroring
@@ -56,10 +72,12 @@ type BatchMessageNodeMetadata struct {
 	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
 }
 
-// BatchExecutionMetadata is persisted for the run so poll() can find the batch again.
+// BatchExecutionMetadata is persisted for the run so poll() can find the batch
+// again, and to surface live progress (RequestCounts) while it's still processing.
 type BatchExecutionMetadata struct {
-	BatchID string `json:"batchId,omitempty" mapstructure:"batchId,omitempty"`
-	Status  string `json:"status,omitempty" mapstructure:"status,omitempty"`
+	BatchID       string                     `json:"batchId,omitempty" mapstructure:"batchId,omitempty"`
+	Status        string                     `json:"status,omitempty" mapstructure:"status,omitempty"`
+	RequestCounts *MessageBatchRequestCounts `json:"requestCounts,omitempty" mapstructure:"requestCounts,omitempty"`
 }
 
 // BatchItemResult is the per-request outcome surfaced in the emitted payload.
@@ -95,31 +113,42 @@ func (c *CreateBatchMessage) Description() string {
 }
 
 func (c *CreateBatchMessage) Documentation() string {
-	return `The Create Batch Message component uses [Anthropic's Message Batches API](https://platform.claude.com/docs/en/build-with-claude/batch-processing) to process many prompts asynchronously in one request, at a lower cost than issuing them individually.
+	return `The Create Batch Message component uses [Anthropic's Message Batches API](https://platform.claude.com/docs/en/build-with-claude/batch-processing) to process one or many prompts asynchronously in one request, at a lower cost than issuing them individually.
 
 ## Use Cases
 
+- **Update the same kind of resource, one at a time or many at once**: e.g. rewrite a single pull request's title and description with one node, and reuse the same node for every open pull request by switching its Mode.
 - **Bulk classification or extraction**: Run the same prompt template over many inputs.
-- **Large-scale content generation**: Draft many summaries, descriptions, or messages at once.
-- **Cost-sensitive workloads**: Batches are billed at a discount versus the equivalent individual requests.
+- **Cost-sensitive workloads**: Batches are billed at a discount versus the equivalent individual requests, even for a single request.
 
 ## How It Works
 
-1. Submits all configured requests as a single batch (` + "`POST /v1/messages/batches`" + `).
-2. Polls the batch status until it reaches a terminal state.
-3. Downloads the results and emits one entry per request, matched by **Custom ID**.
+1. Builds the batch's requests according to **Mode** (see Configuration below).
+2. Submits them as a single batch (` + "`POST /v1/messages/batches`" + `).
+3. Polls the batch status until it reaches a terminal state.
+4. Downloads the results and emits one entry per request, matched by **Custom ID**.
 
 Batches typically complete within an hour, but can take up to 24 hours. This component polls with increasing backoff and keeps the execution open (without emitting) until the batch ends.
 
 ## Configuration
 
+- **Mode**: How the batch's requests are built.
+  - **Single Prompt**: sends exactly one request, built from **Prompt** and **Custom ID**.
+  - **One Prompt Per Item**: sends one request per element of **Items**, built from **Prompt Template** and (optionally) **Custom ID Expression**.
 - **Model**: The Claude model used for every request in the batch.
 - **System Message**: (Optional) Context applied to every request in the batch.
 - **Max Tokens**: (Optional) Limit the length of each generated response.
 - **Temperature**: (Optional) Control randomness (0.0 to 1.0), applied to every request.
 - **Structured Output**: (Optional) A JSON Schema every response must conform to.
-- **Requests**: The list of prompts to send. Each has a **Custom ID** (unique within the batch, used to match it to its result) and a **Prompt**.
-- **Requests From Expression**: (Optional, advanced) Build the batch from a dynamic-length array produced by an upstream node instead of manually adding requests above.` + " e.g. `map($['Fetch Issues'].body, { {customId: string(#.number), prompt: 'Triage: ' + #.title} })` to batch every issue an HTTP Request node just fetched. Each array element is either a plain string (used as the prompt, with an auto-numbered Custom ID) or an object with `customId`/`prompt`. Takes precedence over the manually-added Requests when set. Note the spaced-out braces: `map`'s closure argument is itself `{...}`, so returning an object literal needs its own inner `{...}` around the fields — write it as `{ {...} }` with a space, not `{{...}}`. A tight `{{...}}` is parsed identically by the expression engine, but is also read by this platform as `{{ }}` template-placeholder framing (the syntax used by plain text fields), which mangles it before it reaches this field. Keep the space to avoid that." + `
+
+**Single Prompt mode:**
+- **Prompt**: The user message for the request. A regular text field, like any other — write plain text and drop in ` + "`{{ }}`" + ` placeholders to reference upstream data, e.g. ` + "`Update the title and description for PR #{{ $['Get Pull Request'].body.number }}: {{ $['Get Pull Request'].body.title }}`" + `.
+- **Custom ID**: (Optional, advanced) Defaults to ` + "`request-1`" + `.
+
+**One Prompt Per Item mode:**
+- **Items**: An expression that evaluates to the array to build one request per element from, e.g. ` + "`$['List Open Pull Requests'].body`" + `.
+- **Prompt Template**: An expression evaluated once per element of Items to build that element's prompt, with ` + "`item`" + ` (the element) and ` + "`index`" + ` (its zero-based position) available, e.g. ` + "`\"Update the title and description for PR #\" + string(item.number) + \": \" + item.title`" + `. Unlike Prompt above, this is a bare expression rather than a ` + "`{{ }}`" + ` template — wrap string literals in quotes and use ` + "`+`" + ` to build up the text, since it needs to run once per item rather than once for the whole field.
+- **Custom ID Expression**: (Optional, advanced) Same idea as Prompt Template — an expression with ` + "`item`" + `/` + "`index`" + ` available, evaluated per element to compute its Custom ID. Defaults to auto-numbered IDs (` + "`request-1`" + `, ` + "`request-2`" + `, ...).
 
 ## Output
 
@@ -133,6 +162,7 @@ Emits a single payload once the batch ends, containing:
 
 - Requires a valid Claude API key configured in the integration.
 - Custom IDs must be unique within the batch (max 64 characters).
+- A batch can contain up to ` + fmt.Sprintf("%d", maxBatchRequests) + ` requests.
 - Cancelling the workflow execution requests cancellation of the batch on Anthropic's side; requests already completed are unaffected.`
 }
 
@@ -183,7 +213,28 @@ func (c *CreateBatchMessage) OutputChannels(config any) []core.OutputChannel {
 }
 
 func (c *CreateBatchMessage) Configuration() []configuration.Field {
+	singleVisible := []configuration.VisibilityCondition{{Field: "mode", Values: []string{modeSingle}}}
+	singleRequired := []configuration.RequiredCondition{{Field: "mode", Values: []string{modeSingle}}}
+	multipleVisible := []configuration.VisibilityCondition{{Field: "mode", Values: []string{modeMultiple}}}
+	multipleRequired := []configuration.RequiredCondition{{Field: "mode", Values: []string{modeMultiple}}}
+
 	return []configuration.Field{
+		{
+			Name:        "mode",
+			Label:       "Mode",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Default:     modeSingle,
+			Description: "Single Prompt sends one request. One Prompt Per Item sends one request per element of an array, built from a shared prompt template.",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Single Prompt", Value: modeSingle, Description: "Send exactly one request"},
+						{Label: "One Prompt Per Item", Value: modeMultiple, Description: "Send one request per element of an array"},
+					},
+				},
+			},
+		},
 		{
 			Name:        "model",
 			Label:       "Model",
@@ -228,56 +279,53 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 			"A JSON Schema describing every response. Claude is constrained to return JSON matching it (available on each result's `parsed` field). Every object gets `additionalProperties: false`.",
 		),
 		{
-			Name:        "requests",
-			Label:       "Requests",
-			Type:        configuration.FieldTypeList,
-			Required:    false,
-			Description: fmt.Sprintf("Prompts to send as one batch (up to %d). Each needs a unique Custom ID used to match it to its result. Ignored when Requests From Expression (below) is set.", maxBatchRequests),
-			Default: []map[string]any{
-				{"customId": "request-1", "prompt": ""},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel:   "Request",
-					Reorderable: true,
-					MaxItems:    intPtr(maxBatchRequests),
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeObject,
-						Schema: []configuration.Field{
-							{
-								Name:        "customId",
-								Label:       "Custom ID",
-								Type:        configuration.FieldTypeString,
-								Required:    true,
-								Placeholder: "request-1",
-								Description: "Unique identifier for this request within the batch (max 64 characters). Used to match it to its result.",
-							},
-							{
-								Name:        "prompt",
-								Label:       "Prompt",
-								Type:        configuration.FieldTypeText,
-								Required:    true,
-								Placeholder: "Enter the user prompt",
-								Description: "The user message for this request",
-							},
-						},
-					},
-				},
-			},
+			Name:                 "prompt",
+			Label:                "Prompt",
+			Type:                 configuration.FieldTypeText,
+			Placeholder:          `Update the title and description for PR #{{ $['Get Pull Request'].body.number }}: {{ $['Get Pull Request'].body.title }}`,
+			Description:          "The user message for the single request in this batch. A regular text field: write plain text and drop in `{{ }}` expressions to reference upstream data.",
+			VisibilityConditions: singleVisible,
+			RequiredConditions:   singleRequired,
 		},
 		{
-			Name:        "requestsExpression",
-			Label:       "Requests From Expression",
-			Type:        configuration.FieldTypeExpression,
-			Required:    false,
-			Togglable:   true,
-			Placeholder: `map($['Fetch Issues'].body, { {customId: string(#.number), prompt: "Triage: " + #.title} })`,
-			Description: fmt.Sprintf("Advanced: build the batch from a dynamic-length upstream array instead of the manually-added Requests above. Must evaluate to an array of up to %d items, each either a plain string (used as the prompt; Custom IDs are auto-numbered) or an object with `customId` and `prompt`. When set, this replaces Requests entirely. Note the spaced braces in the example: map()'s closure is itself `{...}`, so returning an object literal needs its own inner `{...}` around the fields — keep a space between them (`{ {...} }`), since a tight `{{...}}` is also read as {{ }} template-placeholder framing and gets mangled before reaching this field.", maxBatchRequests),
+			Name:                 "customId",
+			Label:                "Custom ID",
+			Type:                 configuration.FieldTypeString,
+			Togglable:            true,
+			Default:              "request-1",
+			Placeholder:          "request-1",
+			Description:          "Unique identifier for this request (max 64 characters). Used to match it to its result. Defaults to \"request-1\".",
+			VisibilityConditions: singleVisible,
+		},
+		{
+			Name:                 "items",
+			Label:                "Items",
+			Type:                 configuration.FieldTypeExpression,
+			Placeholder:          `$['List Open Pull Requests'].body`,
+			Description:          "Expression that evaluates to the array to build one request per element from.",
+			VisibilityConditions: multipleVisible,
+			RequiredConditions:   multipleRequired,
+		},
+		{
+			Name:                 "promptTemplate",
+			Label:                "Prompt Template",
+			Type:                 configuration.FieldTypeExpression,
+			Placeholder:          `"Update the title and description for PR #" + string(item.number) + ": " + item.title + "\n\n" + item.body`,
+			Description:          "Expression evaluated once per element of Items to build that request's prompt, with `item` (the element) and `index` (its zero-based position) available. This is a bare expression, not a `{{ }}` template: wrap string literals in quotes and use `+` to build up the text.",
+			VisibilityConditions: multipleVisible,
+			RequiredConditions:   multipleRequired,
+		},
+		{
+			Name:                 "customIdExpression",
+			Label:                "Custom ID Expression",
+			Type:                 configuration.FieldTypeExpression,
+			Togglable:            true,
+			Placeholder:          `string(item.number)`,
+			Description:          fmt.Sprintf("Optional: expression evaluated once per element of Items (with the same `item`/`index` variables as Prompt Template) to compute its Custom ID. Defaults to auto-numbered IDs (request-1, request-2, ...). A batch can contain up to %d requests.", maxBatchRequests),
+			VisibilityConditions: multipleVisible,
 		},
 	}
 }
-
-func intPtr(v int) *int { return &v }
 
 func (c *CreateBatchMessage) Setup(ctx core.SetupContext) error {
 	spec, err := decodeBatchMessageSpec(ctx.Configuration)
@@ -317,15 +365,12 @@ func (c *CreateBatchMessage) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	if strings.TrimSpace(spec.RequestsExpression) != "" {
-		items, err := resolveRequestsFromExpression(ctx.Expressions, spec.RequestsExpression)
-		if err != nil {
-			return fmt.Errorf("requestsExpression: %w", err)
-		}
-		if err := validateRequestItems(items); err != nil {
-			return fmt.Errorf("requestsExpression result: %w", err)
-		}
-		spec.Requests = items
+	items, err := resolveBatchRequests(ctx.Expressions, spec)
+	if err != nil {
+		return err
+	}
+	if err := validateRequestItems(items); err != nil {
+		return err
 	}
 
 	if spec.MaxTokens == 0 {
@@ -342,16 +387,16 @@ func (c *CreateBatchMessage) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	items := buildBatchRequestItems(spec, schema)
+	requestItems := buildBatchRequestItems(items, spec, schema)
 
-	batch, err := client.CreateMessageBatch(items)
+	batch, err := client.CreateMessageBatch(requestItems)
 	if err != nil {
 		return fmt.Errorf("failed to create message batch: %w", err)
 	}
 
-	ctx.Logger.Infof("Created Claude message batch %s with %d requests", batch.ID, len(items))
+	ctx.Logger.Infof("Created Claude message batch %s with %d requests", batch.ID, len(requestItems))
 
-	metadata := BatchExecutionMetadata{BatchID: batch.ID, Status: batch.ProcessingStatus}
+	metadata := BatchExecutionMetadata{BatchID: batch.ID, Status: batch.ProcessingStatus, RequestCounts: &batch.RequestCounts}
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
@@ -406,7 +451,7 @@ func (c *CreateBatchMessage) finishBatch(client *Client, state core.ExecutionSta
 		return err
 	}
 
-	_ = metadataWriter.Set(BatchExecutionMetadata{BatchID: batch.ID, Status: batch.ProcessingStatus})
+	_ = metadataWriter.Set(BatchExecutionMetadata{BatchID: batch.ID, Status: batch.ProcessingStatus, RequestCounts: &batch.RequestCounts})
 	return nil
 }
 
@@ -419,9 +464,9 @@ func decodeBatchMessageSpec(config any) (BatchMessageSpec, error) {
 }
 
 // validateBatchMessageSpec validates everything that's known at design time.
-// When RequestsExpression is set, the manually-authored Requests list is
-// unused, so it's not validated here — its resolved contents are validated by
-// validateRequestItems once the expression has been evaluated in Execute.
+// The mode-specific expression fields (Items/PromptTemplate/CustomIDExpression
+// in multiple mode) are only fully validated once evaluated, in
+// resolveBatchRequests / validateRequestItems.
 func validateBatchMessageSpec(spec BatchMessageSpec) error {
 	if strings.TrimSpace(spec.Model) == "" {
 		return fmt.Errorf("model is required")
@@ -431,9 +476,17 @@ func validateBatchMessageSpec(spec BatchMessageSpec) error {
 		return fmt.Errorf("maxTokens must be at least 1")
 	}
 
-	if strings.TrimSpace(spec.RequestsExpression) == "" {
-		if err := validateRequestItems(spec.Requests); err != nil {
-			return err
+	switch spec.Mode {
+	case modeMultiple:
+		if strings.TrimSpace(spec.Items) == "" {
+			return fmt.Errorf("items is required in \"One Prompt Per Item\" mode")
+		}
+		if strings.TrimSpace(spec.PromptTemplate) == "" {
+			return fmt.Errorf("promptTemplate is required in \"One Prompt Per Item\" mode")
+		}
+	default:
+		if strings.TrimSpace(spec.Prompt) == "" {
+			return fmt.Errorf("prompt is required in \"Single Prompt\" mode")
 		}
 	}
 
@@ -447,9 +500,8 @@ func validateBatchMessageSpec(spec BatchMessageSpec) error {
 	return nil
 }
 
-// validateRequestItems validates a resolved list of batch requests, whether it
-// came from the manually-authored Requests field or from evaluating
-// RequestsExpression.
+// validateRequestItems validates the resolved list of batch requests, whether
+// it came from single mode (one item) or multiple mode (one per array element).
 func validateRequestItems(items []BatchMessageItemSpec) error {
 	if len(items) == 0 {
 		return fmt.Errorf("at least one request is required")
@@ -480,40 +532,75 @@ func validateRequestItems(items []BatchMessageItemSpec) error {
 	return nil
 }
 
-// resolveRequestsFromExpression evaluates an expression that must return an
-// array. Each element is either a plain string (used as the prompt, with an
-// auto-numbered Custom ID) or an object with customId/prompt fields.
-func resolveRequestsFromExpression(expressions core.ExpressionContext, expression string) ([]BatchMessageItemSpec, error) {
-	result, err := expressions.Run(expression)
-	if err != nil {
-		return nil, fmt.Errorf("expression evaluation failed: %w", err)
+// resolveBatchRequests builds the batch's requests according to spec.Mode.
+func resolveBatchRequests(expressions core.ExpressionContext, spec BatchMessageSpec) ([]BatchMessageItemSpec, error) {
+	if spec.Mode == modeMultiple {
+		return resolveMultipleRequests(expressions, spec)
+	}
+	return resolveSingleRequest(spec)
+}
+
+// resolveSingleRequest builds the sole request from Prompt/CustomID. Prompt is
+// a FieldTypeText field, so by the time Execute runs, any `{{ }}` expressions
+// in it have already been resolved to their final values — no further
+// evaluation is needed here.
+func resolveSingleRequest(spec BatchMessageSpec) ([]BatchMessageItemSpec, error) {
+	if strings.TrimSpace(spec.Prompt) == "" {
+		return nil, fmt.Errorf("prompt is required")
 	}
 
-	raw, err := toAnySlice(result)
-	if err != nil {
-		return nil, fmt.Errorf("expression must evaluate to an array: %w", err)
+	customID := strings.TrimSpace(spec.CustomID)
+	if customID == "" {
+		customID = "request-1"
 	}
 
-	items := make([]BatchMessageItemSpec, 0, len(raw))
-	for i, entry := range raw {
-		switch v := entry.(type) {
-		case string:
-			items = append(items, BatchMessageItemSpec{
-				CustomID: fmt.Sprintf("request-%d", i+1),
-				Prompt:   v,
-			})
-		case map[string]any:
-			item := BatchMessageItemSpec{}
-			if err := mapstructure.Decode(v, &item); err != nil {
-				return nil, fmt.Errorf("item %d: %w", i, err)
-			}
-			if strings.TrimSpace(item.CustomID) == "" {
-				item.CustomID = fmt.Sprintf("request-%d", i+1)
-			}
-			items = append(items, item)
-		default:
-			return nil, fmt.Errorf("item %d: expected a string or an object with customId/prompt, got %T", i, entry)
+	return []BatchMessageItemSpec{{CustomID: customID, Prompt: spec.Prompt}}, nil
+}
+
+// resolveMultipleRequests evaluates Items to an array, then builds one
+// request per element by evaluating PromptTemplate (and, optionally,
+// CustomIDExpression) with `item`/`index` bound as extra variables.
+func resolveMultipleRequests(expressions core.ExpressionContext, spec BatchMessageSpec) ([]BatchMessageItemSpec, error) {
+	raw, err := expressions.Run(spec.Items)
+	if err != nil {
+		return nil, fmt.Errorf("items: %w", err)
+	}
+
+	elements, err := toAnySlice(raw)
+	if err != nil {
+		return nil, fmt.Errorf("items must evaluate to an array: %w", err)
+	}
+	if len(elements) > maxBatchRequests {
+		return nil, fmt.Errorf("items has %d elements; a batch cannot contain more than %d requests", len(elements), maxBatchRequests)
+	}
+
+	items := make([]BatchMessageItemSpec, 0, len(elements))
+	for i, element := range elements {
+		vars := map[string]any{"item": element, "index": i}
+
+		promptResult, err := expressions.RunWithExtraVariables(spec.PromptTemplate, vars)
+		if err != nil {
+			return nil, fmt.Errorf("promptTemplate (item %d): %w", i, err)
 		}
+		prompt, ok := promptResult.(string)
+		if !ok {
+			return nil, fmt.Errorf("promptTemplate must evaluate to a string, got %T (item %d)", promptResult, i)
+		}
+
+		customID := fmt.Sprintf("request-%d", i+1)
+		if strings.TrimSpace(spec.CustomIDExpression) != "" {
+			idResult, err := expressions.RunWithExtraVariables(spec.CustomIDExpression, vars)
+			if err != nil {
+				return nil, fmt.Errorf("customIdExpression (item %d): %w", i, err)
+			}
+			if idResult != nil {
+				if s := strings.TrimSpace(fmt.Sprintf("%v", idResult)); s != "" {
+					customID = s
+				}
+			}
+		}
+
+		items = append(items, BatchMessageItemSpec{CustomID: customID, Prompt: prompt})
 	}
 
 	return items, nil
@@ -539,9 +626,9 @@ func toAnySlice(v any) ([]any, error) {
 	return out, nil
 }
 
-func buildBatchRequestItems(spec BatchMessageSpec, schema map[string]any) []CreateMessageBatchRequestItem {
-	items := make([]CreateMessageBatchRequestItem, 0, len(spec.Requests))
-	for _, r := range spec.Requests {
+func buildBatchRequestItems(items []BatchMessageItemSpec, spec BatchMessageSpec, schema map[string]any) []CreateMessageBatchRequestItem {
+	out := make([]CreateMessageBatchRequestItem, 0, len(items))
+	for _, r := range items {
 		params := BatchRequestParams{
 			Model:       spec.Model,
 			MaxTokens:   spec.MaxTokens,
@@ -558,12 +645,12 @@ func buildBatchRequestItems(spec BatchMessageSpec, schema map[string]any) []Crea
 				Format: &OutputFormat{Type: "json_schema", Schema: structuredoutput.Prepare(schema, false)},
 			}
 		}
-		items = append(items, CreateMessageBatchRequestItem{
+		out = append(out, CreateMessageBatchRequestItem{
 			CustomID: strings.TrimSpace(r.CustomID),
 			Params:   params,
 		})
 	}
-	return items
+	return out
 }
 
 // buildBatchOutput assembles the emitted payload from a batch and its (possibly

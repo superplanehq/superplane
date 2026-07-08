@@ -71,6 +71,13 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 	}
 
 	if batch == nil || batch.ProcessingStatus != batchStatusEnded {
+		if batch != nil {
+			_ = ctx.Metadata.Set(BatchExecutionMetadata{
+				BatchID:       metadata.BatchID,
+				Status:        batch.ProcessingStatus,
+				RequestCounts: &batch.RequestCounts,
+			})
+		}
 		return c.scheduleNextPoll(ctx, attempt+1, 0)
 	}
 
@@ -91,7 +98,7 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 		return err
 	}
 
-	_ = ctx.Metadata.Set(BatchExecutionMetadata{BatchID: batch.ID, Status: batch.ProcessingStatus})
+	_ = ctx.Metadata.Set(BatchExecutionMetadata{BatchID: batch.ID, Status: batch.ProcessingStatus, RequestCounts: &batch.RequestCounts})
 	return nil
 }
 
