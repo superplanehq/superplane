@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  draftBranchStatusBadge,
-  resolveDraftBranchEditStatus,
-} from "./draft-branch-edit-status";
+import { draftBranchStatusBadge, resolveDraftBranchEditStatus } from "./draft-branch-edit-status";
 
 describe("draft-branch-edit-status", () => {
   it("maps staging and publishable state to edit status", () => {
