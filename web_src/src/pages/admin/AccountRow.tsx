@@ -22,32 +22,34 @@ interface AccountRowProps {
 
 export function AccountRow({ acc, isSelf, toggling, onPromoteDemote, impersonateButton }: AccountRowProps) {
   return (
-    <tr className="border-b border-slate-50 last:border-0">
-      <td className="px-4 py-2.5 text-gray-800">
+    <tr className="border-b border-slate-50 last:border-0 dark:border-gray-800/70">
+      <td className="px-4 py-2.5 text-gray-800 dark:text-gray-100">
         {acc.name || (
-          <span className="text-gray-400 italic" title={acc.id}>
+          <span className="text-gray-400 italic dark:text-gray-500" title={acc.id}>
             {acc.id.slice(0, 8)}...
           </span>
         )}
-        {isSelf && <span className="ml-1.5 text-xs text-gray-400">(you)</span>}
+        {isSelf && <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">(you)</span>}
       </td>
-      <td className="px-4 py-2.5 text-gray-500">{acc.email}</td>
+      <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">{acc.email}</td>
       <td className="px-4 py-2.5">
         {acc.installation_admin ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded dark:bg-amber-950/40 dark:text-amber-300">
             <Shield size={12} />
             Admin
           </span>
         ) : (
-          <span className="text-xs text-gray-400">User</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">User</span>
         )}
       </td>
-      <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(acc.created_at)}</td>
+      <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500">
+        {formatDate(acc.created_at)}
+      </td>
       <td className="px-4 py-2.5 text-right">
         <div className="flex items-center justify-end gap-2">
           {!isSelf && impersonateButton}
           {isSelf ? (
-            <Text className="text-xs text-gray-400">Cannot change own access</Text>
+            <Text className="text-xs text-gray-400 dark:text-gray-500">Cannot change own access</Text>
           ) : (
             <Button variant="outline" size="sm" onClick={onPromoteDemote} disabled={toggling}>
               {toggling ? (

@@ -21,7 +21,8 @@ func TestClaude_Configuration(t *testing.T) {
 		Type     string
 		Required bool
 	}{
-		"apiKey": {string(configuration.FieldTypeString), true},
+		"apiKey":   {string(configuration.FieldTypeString), true},
+		"adminKey": {string(configuration.FieldTypeString), false},
 	}
 
 	if len(configs) != len(expectedFields) {

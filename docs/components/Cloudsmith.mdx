@@ -16,10 +16,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Vulnerability Policy" href="#create-vulnerability-policy" description="Create an organization-scoped package vulnerability policy in Cloudsmith" />
   <LinkCard title="Delete Package" href="#delete-package" description="Delete a package from a Cloudsmith repository" />
+  <LinkCard title="Delete Vulnerability Policy" href="#delete-vulnerability-policy" description="Delete an organization-scoped package vulnerability policy from Cloudsmith" />
   <LinkCard title="Get Package" href="#get-package" description="Retrieve metadata for a specific Cloudsmith package" />
   <LinkCard title="Get Package Vulnerabilities" href="#get-package-vulnerabilities" description="Retrieve the latest vulnerability scan result for a specific Cloudsmith package" />
   <LinkCard title="Get Repository" href="#get-repository" description="Fetch details of a Cloudsmith repository" />
+  <LinkCard title="Get Vulnerability Policy" href="#get-vulnerability-policy" description="Retrieve an organization-scoped package vulnerability policy from Cloudsmith" />
   <LinkCard title="List Packages" href="#list-packages" description="List packages in a Cloudsmith repository with optional filtering by sync status, quarantine, and vulnerability" />
   <LinkCard title="Promote Package" href="#promote-package" description="Copy or move a package from one Cloudsmith repository to another" />
   <LinkCard title="Quarantine Package" href="#quarantine-package" description="Quarantine or release a Cloudsmith package" />
@@ -41,6 +44,8 @@ SuperPlane authenticates to Cloudsmith using a service account API key, which is
 5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**, and add the service with the **Admin** privilege.
 
 > **Note:** The **Promote Package** action (copy or move a package between repositories) requires **Admin** privilege on **both** the source and destination repositories. Make sure the service account has been granted Admin access to every repository it needs to promote packages to or from.
+
+> **Note:** The vulnerability policy actions (create, get, delete) are organization-scoped. The service account must have permission to manage policies in the target organization.
 
 <a id="on-package-created"></a>
 
@@ -139,6 +144,62 @@ Emits the package's identity (**namespace**, **repository**, **name**, **version
 }
 ```
 
+<a id="create-vulnerability-policy"></a>
+
+## Create Vulnerability Policy
+
+**Component key:** `cloudsmith.createVulnerabilityPolicy`
+
+The Create Vulnerability Policy component creates a package vulnerability policy for a Cloudsmith organization.
+A vulnerability policy quarantines packages whose security scan detects vulnerabilities at or above a minimum severity.
+
+### Use Cases
+
+- **Automated guardrails**: Provision a policy as part of bootstrapping a new organization or repository set
+- **Policy-as-code**: Manage vulnerability policies from a workflow instead of the Cloudsmith UI
+- **Severity gating**: Quarantine packages that introduce High or Critical vulnerabilities
+
+### Configuration
+
+- **Organization** (required): The organization the policy belongs to.
+- **Name** (required): A descriptive name for the policy (max 100 characters).
+- **Description**: An optional description (max 250 characters).
+- **Minimum Severity**: The lowest severity that triggers the policy (`Low`, `Medium`, `High`, `Critical`). Defaults to `Critical`.
+- **Package Query**: An optional Cloudsmith search query restricting which packages the policy applies to.
+- **Quarantine on Violation**: Whether matching packages are quarantined when the policy is violated.
+- **Allow Unknown Severity**: Whether vulnerabilities with an unknown severity are permitted.
+
+### Output
+
+Returns the created policy including:
+- **name** / **description**: Policy name and description
+- **min_severity**: Minimum severity that triggers the policy
+- **package_query_string**: The package query the policy applies to
+- **on_violation_quarantine**: Whether matching packages are quarantined
+- **allow_unknown_severity**: Whether unknown-severity vulnerabilities are allowed
+- **slug_perm**: Permanent identifier of the policy
+- **created_at** / **updated_at**: Policy timestamps
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allow_unknown_severity": false,
+    "created_at": "2026-01-15T10:00:00.000Z",
+    "description": "Quarantine packages with critical vulnerabilities",
+    "min_severity": "Critical",
+    "name": "Block critical vulnerabilities",
+    "on_violation_quarantine": true,
+    "package_query_string": "format:docker",
+    "slug_perm": "abc123def456",
+    "updated_at": "2026-01-15T10:00:00.000Z"
+  },
+  "timestamp": "2026-01-15T10:00:00.000Z",
+  "type": "cloudsmith.vulnerabilityPolicy.created"
+}
+```
+
 <a id="delete-package"></a>
 
 ## Delete Package
@@ -166,6 +227,47 @@ Emits the deleted package identifier on the default channel.
   },
   "timestamp": "2026-01-01T00:00:00Z",
   "type": "cloudsmith.package.deleted"
+}
+```
+
+<a id="delete-vulnerability-policy"></a>
+
+## Delete Vulnerability Policy
+
+**Component key:** `cloudsmith.deleteVulnerabilityPolicy`
+
+The Delete Vulnerability Policy component removes a package vulnerability policy from a Cloudsmith organization.
+Cloudsmith does not support deactivating a policy, so deleting it is the way to stop it from being enforced.
+
+### Use Cases
+
+- **Decommissioning**: Remove a policy that is no longer needed
+- **Policy rotation**: Delete an old policy before creating a replacement
+- **Cleanup**: Tear down policies created for short-lived environments
+
+### Configuration
+
+- **Organization** (required): The organization the policy belongs to.
+- **Policy** (required): The policy to delete (its permanent slug). Supports expressions.
+
+### Output
+
+Returns confirmation of the deletion including:
+- **organization**: The organization the policy belonged to
+- **slug_perm**: Permanent identifier of the deleted policy
+- **deleted**: Always `true` on success
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "organization": "acme",
+    "slug_perm": "abc123def456"
+  },
+  "timestamp": "2026-01-15T10:00:00.000Z",
+  "type": "cloudsmith.vulnerabilityPolicy.deleted"
 }
 ```
 
@@ -394,6 +496,56 @@ Returns the repository object including:
   },
   "timestamp": "2026-03-12T21:13:32.946693411Z",
   "type": "cloudsmith.repository.fetched"
+}
+```
+
+<a id="get-vulnerability-policy"></a>
+
+## Get Vulnerability Policy
+
+**Component key:** `cloudsmith.getVulnerabilityPolicy`
+
+The Get Vulnerability Policy component retrieves a single package vulnerability policy for a Cloudsmith organization.
+
+### Use Cases
+
+- **Drift detection**: Read a policy's current settings to confirm they match the intended configuration
+- **Auditing**: Record policy settings for compliance reporting
+- **Conditional workflows**: Branch downstream steps on a policy's minimum severity or quarantine behaviour
+
+### Configuration
+
+- **Organization** (required): The organization the policy belongs to.
+- **Policy** (required): The policy to retrieve (its permanent slug). Supports expressions.
+
+### Output
+
+Returns the policy including:
+- **name** / **description**: Policy name and description
+- **min_severity**: Minimum severity that triggers the policy
+- **package_query_string**: The package query the policy applies to
+- **on_violation_quarantine**: Whether matching packages are quarantined
+- **allow_unknown_severity**: Whether unknown-severity vulnerabilities are allowed
+- **slug_perm**: Permanent identifier of the policy
+- **created_at** / **updated_at**: Policy timestamps
+
+### Example Output
+
+```json
+{
+  "data": {
+    "allow_unknown_severity": false,
+    "created_at": "2026-01-15T10:00:00.000Z",
+    "description": "Quarantine packages with critical vulnerabilities",
+    "min_severity": "Critical",
+    "name": "Block critical vulnerabilities",
+    "on_violation_quarantine": true,
+    "package_query_string": "format:docker",
+    "slug_perm": "abc123def456",
+    "updated_at": "2026-01-20T14:30:00.000Z"
+  },
+  "timestamp": "2026-01-15T10:00:00.000Z",
+  "type": "cloudsmith.vulnerabilityPolicy.fetched"
 }
 ```
 

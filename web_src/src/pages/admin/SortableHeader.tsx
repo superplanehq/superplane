@@ -26,7 +26,7 @@ export function SortableHeader<TField extends string>({
     <th className={`px-4 py-2.5 ${className}`} aria-sort={ariaSort}>
       <button
         type="button"
-        className="inline-flex w-full items-center gap-1 text-left text-gray-500 font-medium select-none hover:text-gray-700 transition-colors"
+        className="inline-flex w-full items-center gap-1 text-left text-gray-500 font-medium select-none hover:text-gray-700 transition-colors dark:text-gray-400 dark:hover:text-gray-200"
         onClick={() => onSort(field)}
       >
         <span>{label}</span>
@@ -37,7 +37,7 @@ export function SortableHeader<TField extends string>({
             <ArrowDown size={12} />
           )
         ) : (
-          <ArrowUpDown size={12} className="text-gray-300" />
+          <ArrowUpDown size={12} className="text-gray-300 dark:text-gray-600" />
         )}
       </button>
     </th>

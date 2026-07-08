@@ -1,5 +1,5 @@
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
-import type { PackageData, PackageOperationResult, RepositoryData } from "./types";
+import type { PackageData, PackageOperationResult, RepositoryData, VulnerabilityPolicyData } from "./types";
 
 export function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
@@ -128,6 +128,21 @@ export function buildPackageOperationResult(overrides?: Partial<PackageOperation
         inactive: false,
       },
     },
+    ...overrides,
+  };
+}
+
+export function buildVulnerabilityPolicyData(overrides?: Partial<VulnerabilityPolicyData>): VulnerabilityPolicyData {
+  return {
+    name: "Block critical vulnerabilities",
+    description: "Quarantine packages with critical vulnerabilities",
+    min_severity: "Critical",
+    package_query_string: "format:docker",
+    on_violation_quarantine: true,
+    allow_unknown_severity: false,
+    slug_perm: "abc123def456",
+    created_at: "2026-01-15T10:00:00.000Z",
+    updated_at: "2026-01-20T14:30:00.000Z",
     ...overrides,
   };
 }

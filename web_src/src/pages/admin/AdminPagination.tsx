@@ -15,7 +15,7 @@ const AdminPagination: React.FC<AdminPaginationProps> = ({ offset, total, pageSi
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
+    <div className="flex items-center justify-between mt-4 text-sm text-gray-500 dark:text-gray-400">
       <Text>
         Showing {offset + 1}–{Math.min(offset + pageSize, total)} of {total}
       </Text>
@@ -23,14 +23,14 @@ const AdminPagination: React.FC<AdminPaginationProps> = ({ offset, total, pageSi
         <button
           onClick={() => onPageChange(offset - pageSize)}
           disabled={offset === 0}
-          className="px-3 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs"
+          className="px-3 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
         >
           Previous
         </button>
         <button
           onClick={() => onPageChange(offset + pageSize)}
           disabled={currentPage >= totalPages}
-          className="px-3 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs"
+          className="px-3 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
         >
           Next
         </button>
