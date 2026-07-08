@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyRunInspectionNavigationSearchParams,
   clearRunInspectionSearchParams,
+  getExitEditModeDisabledTooltip,
   getWorkflowViewPresentation,
 } from "./viewState";
 
@@ -56,5 +57,17 @@ describe("getWorkflowViewPresentation", () => {
 
     expect(editingAfterRunInspection.readOnlyViewModes).toBe(false);
     expect(editingAfterRunInspection.hideAddControls).toBe(false);
+  });
+});
+
+describe("getExitEditModeDisabledTooltip", () => {
+  it("prioritizes remote deletion over permission denial", () => {
+    expect(
+      getExitEditModeDisabledTooltip({
+        canUpdateCanvas: false,
+        canvasDeletedRemotely: true,
+        hasEditableVersion: true,
+      }),
+    ).toBe("This canvas was deleted in another session.");
   });
 });
