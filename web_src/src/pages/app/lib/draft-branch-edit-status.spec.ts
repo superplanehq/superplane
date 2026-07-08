@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   draftBranchStatusBadge,
-  draftEditTabToneFromStaging,
   resolveDraftBranchEditStatus,
 } from "./draft-branch-edit-status";
 
@@ -12,9 +11,6 @@ describe("draft-branch-edit-status", () => {
     expect(resolveDraftBranchEditStatus(true, false)).toBe("uncommitted");
     expect(resolveDraftBranchEditStatus(false, true)).toBe("ready");
     expect(resolveDraftBranchEditStatus(false, false)).toBe("no-changes");
-    expect(draftEditTabToneFromStaging(true, true)).toBe("uncommitted");
-    expect(draftEditTabToneFromStaging(false, true)).toBe("ready");
-    expect(draftEditTabToneFromStaging(false, false)).toBe("neutral");
   });
 
   it("uses orange badge styling for active uncommitted drafts", () => {
