@@ -842,9 +842,14 @@ function CanvasPage(props: CanvasPageProps) {
   });
   const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
   const showRunsSidebar = isCanvasWorkflowTab(props.headerMode) && props.toolSidebarRunsContent != null;
+  const runningRunsCount = useMemo(
+    () => (props.logRuns || []).filter((run) => run.state === "STATE_STARTED").length,
+    [props.logRuns],
+  );
   const runsSidebarState = {
     ...runsSidebarBaseState,
     showRunsSidebarToggle: showRunsSidebar,
+    runningRunsCount,
   };
   const isRunsSidebarOpen = showRunsSidebar && runsSidebarBaseState.isRunsSidebarOpen;
 
@@ -1561,9 +1566,12 @@ function CanvasPage(props: CanvasPageProps) {
         {runInspectorOpen && props.runNodeDetailRun ? (
           <RunInspectorPanel
             canvasId={props.runNodeDetailCanvasId!}
+            organizationId={props.organizationId}
             run={props.runNodeDetailRun!}
             workflowNodes={props.workflowNodes ?? []}
             workflowEdges={props.runNodeDetailEdges}
+            componentDefinitions={props.components}
+            triggerDefinitions={props.triggers}
             componentIconMap={props.runsComponentIconMap}
             selectedNodeId={props.runNodeDetailNodeId}
             onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
