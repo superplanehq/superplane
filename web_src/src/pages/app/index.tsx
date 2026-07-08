@@ -161,6 +161,68 @@ const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-e
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
 
+type DuplicatedNodesResult = {
+  newNodes: ComponentsNode[];
+  nodeIdMap: Record<string, string>;
+};
+
+function duplicateBaseName(node: ComponentsNode): string {
+  const trimmedName = node.name?.trim();
+  if (trimmedName) return trimmedName;
+  if ((node.type === "TYPE_TRIGGER" || node.type === "TYPE_ACTION") && node.component) return node.component;
+  return "node";
+}
+
+function buildDuplicatedNodes(specNodes: ComponentsNode[], nodeIds: string[]): DuplicatedNodesResult {
+  const existingNodeNames = specNodes.map((node) => node.name || "").filter(Boolean);
+  const newNodes: ComponentsNode[] = [];
+  const nodeIdMap: Record<string, string> = {};
+
+  for (const nodeId of nodeIds) {
+    const nodeToDuplicate = specNodes.find((node) => node.id === nodeId);
+    if (!nodeToDuplicate) continue;
+
+    const baseName = duplicateBaseName(nodeToDuplicate);
+    const allNames = [...existingNodeNames, ...newNodes.map((node) => node.name || "")];
+    const uniqueNodeName = generateUniqueNodeName(baseName, allNames);
+    const newNodeId = generateNodeId(baseName, uniqueNodeName);
+
+    nodeIdMap[nodeId] = newNodeId;
+    newNodes.push({
+      ...nodeToDuplicate,
+      id: newNodeId,
+      name: uniqueNodeName,
+      position: {
+        x: (nodeToDuplicate.position?.x || 0) + 50,
+        y: (nodeToDuplicate.position?.y || 0) + 50,
+      },
+      isCollapsed: false,
+    });
+  }
+
+  return { newNodes, nodeIdMap };
+}
+
+function buildDuplicatedEdges(
+  edges: ComponentsEdge[],
+  duplicatedNodeIds: Set<string>,
+  nodeIdMap: Record<string, string>,
+): ComponentsEdge[] {
+  return edges
+    .filter(
+      (edge) =>
+        edge.sourceId != null &&
+        edge.targetId != null &&
+        duplicatedNodeIds.has(edge.sourceId) &&
+        duplicatedNodeIds.has(edge.targetId),
+    )
+    .map((edge) => ({
+      ...edge,
+      sourceId: nodeIdMap[edge.sourceId!],
+      targetId: nodeIdMap[edge.targetId!],
+    }));
+}
+
 export function AppPage() {
   const { organizationId, appId } = useParams<{
     organizationId: string;
@@ -2817,60 +2879,11 @@ export function AppPage() {
       if (!canvas || !organizationId || !canvasId) return;
 
       const specNodes = canvas.spec?.nodes || [];
-
-      const existingNodeNames = specNodes.map((n) => n.name || "").filter(Boolean);
-      const newNodes: ComponentsNode[] = [];
-      const nodeIdMap: Record<string, string> = {};
-
-      for (const nodeId of nodeIds) {
-        const nodeToDuplicate = specNodes.find((node) => node.id === nodeId);
-        if (!nodeToDuplicate) continue;
-
-        let baseName = nodeToDuplicate.name?.trim() || "";
-        if (!baseName) {
-          if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.component) {
-            baseName = nodeToDuplicate.component;
-          } else if (nodeToDuplicate.type === "TYPE_ACTION" && nodeToDuplicate.component) {
-            baseName = nodeToDuplicate.component;
-          } else {
-            baseName = "node";
-          }
-        }
-
-        const allNames = [...existingNodeNames, ...newNodes.map((n) => n.name || "")];
-        const uniqueNodeName = generateUniqueNodeName(baseName, allNames);
-        const newNodeId = generateNodeId(baseName, uniqueNodeName);
-
-        nodeIdMap[nodeId] = newNodeId;
-
-        newNodes.push({
-          ...nodeToDuplicate,
-          id: newNodeId,
-          name: uniqueNodeName,
-          position: {
-            x: (nodeToDuplicate.position?.x || 0) + 50,
-            y: (nodeToDuplicate.position?.y || 0) + 50,
-          },
-          isCollapsed: false,
-        });
-      }
-
+      const { newNodes, nodeIdMap } = buildDuplicatedNodes(specNodes, nodeIds);
       if (newNodes.length === 0) return;
 
       const duplicatedNodeIds = new Set(nodeIds);
-      const newEdges = (canvas.spec?.edges || [])
-        .filter(
-          (edge) =>
-            edge.sourceId != null &&
-            edge.targetId != null &&
-            duplicatedNodeIds.has(edge.sourceId) &&
-            duplicatedNodeIds.has(edge.targetId),
-        )
-        .map((edge) => ({
-          ...edge,
-          sourceId: nodeIdMap[edge.sourceId!],
-          targetId: nodeIdMap[edge.targetId!],
-        }));
+      const newEdges = buildDuplicatedEdges(canvas.spec?.edges || [], duplicatedNodeIds, nodeIdMap);
 
       const updatedWorkflow = {
         ...canvas,

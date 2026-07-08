@@ -5,7 +5,7 @@
     "@typescript-eslint/no-explicit-any": 153,
     "@typescript-eslint/no-non-null-asserted-optional-chain": 78,
     "max-lines-per-function": 65,
-    "max-statements": 63,
+    "max-statements": 62,
     "max-lines": 15,
     "max-depth": 6,
     "max-params": 5,
