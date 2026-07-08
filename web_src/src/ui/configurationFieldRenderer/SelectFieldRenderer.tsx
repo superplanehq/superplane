@@ -3,11 +3,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
-export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, readOnly = false }) => {
   const selectOptions = field.typeOptions?.select?.options ?? [];
   const hasSetDefault = useRef(false);
 
   useEffect(() => {
+    if (readOnly) return;
+
     if (!hasSetDefault.current && (value === undefined || value === null) && field.defaultValue !== undefined) {
       const defaultVal = field.defaultValue as string;
       if (defaultVal && defaultVal !== "") {
@@ -15,7 +17,7 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
         hasSetDefault.current = true;
       }
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [readOnly, value, field.defaultValue, onChange]);
 
   const testId = field.name ? toTestId(`field-${field.name}-select`) : undefined;
 
@@ -23,6 +25,7 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
     <Select
       value={(value as string) ?? (field.defaultValue as string) ?? ""}
       onValueChange={(val) => onChange(val || undefined)}
+      disabled={readOnly}
     >
       <SelectTrigger className="w-full" data-testid={testId}>
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
