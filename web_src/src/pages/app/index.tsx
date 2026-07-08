@@ -951,7 +951,6 @@ export function AppPage() {
     handleEffectiveConsoleChange,
     handleLocalFilesStagingChange,
     hasStagingChanges,
-    editTabTone,
     hasUncommittedCanvasDraftChanges,
     hasUncommittedConsoleDraftChanges,
     hasUncommittedFilesDraftChanges,
@@ -4254,7 +4253,7 @@ export function AppPage() {
           {...draftChangeIndicators}
           hasStagingChanges={isEditSessionUiReady && hasStagingChanges}
           stagingStale={isEditing && stagingStale}
-          editTabTone={isEditSessionUiReady ? editTabTone : "neutral"}
+          editTabTone={isEditing ? "uncommitted" : "neutral"}
           hasUncommittedCanvasDraftChanges={isEditSessionUiReady && hasUncommittedCanvasDraftChanges}
           hasUncommittedConsoleDraftChanges={isEditSessionUiReady && hasUncommittedConsoleDraftChanges}
           hasUncommittedFilesDraftChanges={isEditSessionUiReady && hasUncommittedFilesDraftChanges}

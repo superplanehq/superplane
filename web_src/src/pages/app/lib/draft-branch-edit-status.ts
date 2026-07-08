@@ -57,10 +57,10 @@ export function draftBranchStatusBadge(editStatus: DraftBranchEditStatus, isActi
 
 export type DraftEditTabTone = "uncommitted" | "ready" | "neutral";
 
-export function draftEditTabToneFromStaging(hasUncommittedChanges: boolean, isEditing: boolean): DraftEditTabTone {
+export function draftEditTabToneFromStaging(isEditing: boolean): DraftEditTabTone {
   if (!isEditing) {
     return "neutral";
   }
 
-  return hasUncommittedChanges ? "uncommitted" : "ready";
+  return "uncommitted";
 }
