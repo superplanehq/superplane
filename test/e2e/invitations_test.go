@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"

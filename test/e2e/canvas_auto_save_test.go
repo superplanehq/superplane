@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/models"

@@ -25,9 +25,9 @@ require (
 	github.com/markbates/goth v1.81.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.4.3
+	github.com/mxschmitt/playwright-go v0.6100.0
 	github.com/nulab/autog v0.11.0
 	github.com/pierrecomputer/sdk/packages/code-storage-go v0.8.0
-	github.com/playwright-community/playwright-go v0.5200.1
 	github.com/renderedtext/go-tackle v0.0.0-20251117195301-3a303949d759
 	github.com/resend/resend-go/v3 v3.0.0
 	github.com/robfig/cron/v3 v3.0.1
@@ -83,7 +83,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/casbin/govaluate v1.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/deckarep/golang-set/v2 v2.7.0 // indirect
+	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/glebarez/go-sqlite v1.20.3 // indirect
