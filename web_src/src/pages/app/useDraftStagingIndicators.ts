@@ -82,7 +82,7 @@ function buildDraftChangeFlags({
   hasFilesStagingChanges: boolean;
 }) {
   return {
-    editTabTone: draftEditTabToneFromStaging(hasStagingChanges, isEditing),
+    editTabTone: draftEditTabToneFromStaging(isEditing),
     hasUncommittedCanvasDraftChanges: isEditing && hasCanvasStagingChanges,
     hasUncommittedConsoleDraftChanges: isEditing && hasConsoleStagingChanges,
     hasUncommittedFilesDraftChanges: isEditing && hasFilesStagingChanges,
