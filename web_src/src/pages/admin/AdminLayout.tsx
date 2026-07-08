@@ -10,10 +10,10 @@ const AdminLayout: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-gray-950">
         <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
-          <Text className="text-gray-500">Loading...</Text>
+          <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
+          <Text className="text-gray-500 dark:text-gray-400">Loading...</Text>
         </div>
       </div>
     );
@@ -25,26 +25,28 @@ const AdminLayout: React.FC = () => {
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition-colors ${
-      isActive ? "bg-slate-200/80 text-gray-800" : "text-gray-500 hover:text-gray-800 hover:bg-slate-100"
+      isActive
+        ? "bg-slate-200/80 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
+        : "text-gray-500 hover:text-gray-800 hover:bg-slate-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800"
     }`;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100">
-      <header className="bg-white border-b border-slate-950/15">
+    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-gray-950">
+      <header className="bg-white border-b border-slate-950/15 dark:bg-gray-900 dark:border-gray-700/70">
         <div className="px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center">
-              <img src={SuperplaneLogo} alt="SuperPlane" className="w-7 h-7" />
+              <img src={SuperplaneLogo} alt="SuperPlane" className="w-7 h-7 dark:brightness-0 dark:invert" />
             </Link>
 
-            <div className="h-5 w-px bg-slate-200" />
+            <div className="h-5 w-px bg-slate-200 dark:bg-gray-700" />
 
             <div className="flex items-center gap-1.5">
-              <Shield size={14} className="text-amber-600" />
-              <span className="text-sm font-medium text-gray-800">Installation Admin</span>
+              <Shield size={14} className="text-amber-600 dark:text-amber-400" />
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">Installation Admin</span>
             </div>
 
-            <div className="h-5 w-px bg-slate-200" />
+            <div className="h-5 w-px bg-slate-200 dark:bg-gray-700" />
 
             <nav className="flex items-center gap-1">
               <NavLink to="/admin" end className={navLinkClass}>
@@ -67,10 +69,10 @@ const AdminLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">{account.name}</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">{account.name}</span>
             <Link
               to="/"
-              className="group flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
+              className="group flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors dark:text-gray-400 dark:hover:text-gray-100"
             >
               <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
               Back to app
