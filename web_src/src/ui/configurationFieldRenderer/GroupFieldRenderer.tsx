@@ -8,9 +8,16 @@ interface GroupFieldRendererProps {
   onChange: (value: string | undefined) => void;
   domainId: string;
   allValues?: Record<string, unknown>;
+  readOnly?: boolean;
 }
 
-export const GroupFieldRenderer = ({ value, onChange, domainId, allValues }: GroupFieldRendererProps) => {
+export const GroupFieldRenderer = ({
+  value,
+  onChange,
+  domainId,
+  allValues,
+  readOnly = false,
+}: GroupFieldRendererProps) => {
   // Fetch groups from the organization
   const { data: groups, isLoading, error } = useOrganizationGroups(domainId);
   const approvalContext = getApprovalListContext(allValues);
@@ -56,7 +63,7 @@ export const GroupFieldRenderer = ({ value, onChange, domainId, allValues }: Gro
   }
 
   return (
-    <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)}>
+    <Select value={value ?? ""} onValueChange={(val) => onChange(val || undefined)} disabled={readOnly}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Select group" />
       </SelectTrigger>

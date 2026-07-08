@@ -2,7 +2,7 @@ import { Loader2, Square } from "lucide-react";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatDuration } from "@/lib/duration";
+import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { calculateRunDuration } from "./runNodeDetailModel";
 import { getRunStatus, RUN_STATUS_META } from "./runPresentation";
@@ -57,7 +57,7 @@ export function RunInspectorHeader({
                 <span className="text-gray-300" aria-hidden>
                   ·
                 </span>
-                <span>{formatDuration(duration)}</span>
+                <span>{formatMinutesSecondsDuration(duration)}</span>
               </>
             ) : null}
             <span className="text-gray-300" aria-hidden>
