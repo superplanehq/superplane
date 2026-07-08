@@ -65,15 +65,16 @@ func Test__Client__NewClient(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to get authType")
 	})
 
-	t.Run("missing groupId", func(t *testing.T) {
+	t.Run("missing groupId is allowed", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"authType": AuthTypePersonalAccessToken,
+				"authType":    AuthTypePersonalAccessToken,
+				"accessToken": "pat-123",
 			},
 		}
-		_, err := NewClient(mockClient, ctx)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "groupId is required")
+		client, err := NewClient(mockClient, ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "", client.groupID)
 	})
 
 	t.Run("missing personal access token", func(t *testing.T) {
@@ -122,6 +123,36 @@ func Test__Client__FetchIntegrationData(t *testing.T) {
 		require.Len(t, projects, 1)
 		assert.Equal(t, 1, projects[0].ID)
 		assert.Equal(t, "group/project1", projects[0].PathWithNamespace)
+	})
+
+	t.Run("personal projects when no group is configured", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 7, "username": "solo"}`),
+				GitlabMockResponse(http.StatusOK, `[{"id": 1, "path_with_namespace": "solo/project1", "web_url": "https://gitlab.com/solo/project1"}]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "",
+			httpClient: mockClient,
+		}
+
+		user, projects, err := client.FetchIntegrationData()
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 2)
+		assert.Equal(t, "https://gitlab.com/api/v4/user", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "https://gitlab.com/api/v4/users/7/projects?per_page=100&page=1", mockClient.Requests[1].URL.String())
+
+		require.NotNil(t, user)
+		assert.Equal(t, 7, user.ID)
+
+		require.Len(t, projects, 1)
+		assert.Equal(t, "solo/project1", projects[0].PathWithNamespace)
 	})
 
 	t.Run("pagination", func(t *testing.T) {

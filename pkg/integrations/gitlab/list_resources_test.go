@@ -52,6 +52,31 @@ func Test__GitLab__ListResources(t *testing.T) {
 		assert.Equal(t, "102", resources[1].ID)
 	})
 
+	t.Run("returns current user as member when no group is configured", func(t *testing.T) {
+		ctx := core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":     "https://gitlab.com",
+					"authType":    AuthTypePersonalAccessToken,
+					"accessToken": "token",
+				},
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					GitlabMockResponse(http.StatusOK, `{"id": 7, "name": "Solo User", "username": "solo"}`),
+				},
+			},
+		}
+
+		resources, err := g.ListResources("member", ctx)
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "7", resources[0].ID)
+		assert.Equal(t, "Solo User (@solo)", resources[0].Name)
+		assert.Equal(t, "member", resources[0].Type)
+	})
+
 	t.Run("returns list of projects from metadata", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			Metadata: Metadata{
