@@ -4,6 +4,7 @@ import { Accordion } from "@/ui/accordion";
 import { useTheme } from "@/contexts/useTheme";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
 import { InputChainMoreChip } from "./RunInspectorInputChainModal";
+import { RuntimeTimelineCard } from "./RunInspectorRuntimeConfig";
 import {
   DetailBox,
   EmptySectionText,
@@ -24,9 +25,11 @@ import { hasObjectValue, type RunInspectorNodeSection, type RunInspectorUpstream
 export function RunInspectorStepTimeline({
   section,
   componentIconMap,
+  organizationId,
 }: {
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
+  organizationId?: string;
 }) {
   const { resolvedTheme } = useTheme();
   const jsonViewStyle = getJsonViewStyle(resolvedTheme);
@@ -71,15 +74,7 @@ export function RunInspectorStepTimeline({
             {item.value === "input" ? (
               <InputTimelineCard section={section} jsonViewStyle={jsonViewStyle} componentIconMap={componentIconMap} />
             ) : item.value === "runtime" ? (
-              <TimelineAccordionCard
-                value="runtime"
-                status={{ dotClassName: "bg-blue-500", label: "Running" }}
-                title="Runtime Config"
-                trailing="JSON"
-                jsonViewStyle={jsonViewStyle}
-              >
-                <JsonPayload value={section.tabData?.configuration} jsonViewStyle={jsonViewStyle} />
-              </TimelineAccordionCard>
+              <RuntimeTimelineCard section={section} jsonViewStyle={jsonViewStyle} organizationId={organizationId} />
             ) : (
               <OutputTimelineCard section={section} jsonViewStyle={jsonViewStyle} />
             )}
