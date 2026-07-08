@@ -842,9 +842,14 @@ function CanvasPage(props: CanvasPageProps) {
   });
   const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
   const showRunsSidebar = isCanvasWorkflowTab(props.headerMode) && props.toolSidebarRunsContent != null;
+  const runningRunsCount = useMemo(
+    () => (props.logRuns || []).filter((run) => run.state === "STATE_STARTED").length,
+    [props.logRuns],
+  );
   const runsSidebarState = {
     ...runsSidebarBaseState,
     showRunsSidebarToggle: showRunsSidebar,
+    runningRunsCount,
   };
   const isRunsSidebarOpen = showRunsSidebar && runsSidebarBaseState.isRunsSidebarOpen;
 

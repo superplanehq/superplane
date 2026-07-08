@@ -128,6 +128,10 @@ describe("RunInspectorPanel", () => {
     expect(screen.getByText("Deploy main")).toBeInTheDocument();
     expect(screen.getAllByText("Save Assessment").length).toBeGreaterThan(0);
     expect(screen.getByText("OUTPUT · DEFAULT · 0.02 KB")).toBeInTheDocument();
+    expect(screen.queryByText(/"data":\{"ok":true\}/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Output · default/i }));
+
     expect(screen.getByText(/"data":\{"ok":true\}/)).toBeInTheDocument();
     expect(screen.queryByText(/\[\{"data":\{"ok":true\}\}\]/)).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Copy" }).length).toBeGreaterThanOrEqual(2);
@@ -141,6 +145,10 @@ describe("RunInspectorPanel", () => {
     expect(screen.queryByRole("button", { name: /Input/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Runtime config/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Output · default/i })).toBeInTheDocument();
+    expect(screen.queryByText(/"repository":"superplane"/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Output · default/i }));
+
     expect(screen.getByText(/"repository":"superplane"/)).toBeInTheDocument();
   });
 
@@ -189,10 +197,21 @@ describe("RunInspectorPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /Runtime config/i }));
 
     expect(JSON.parse(localStorage.getItem("superplane.runInspector.internalAccordions") || "{}")).toMatchObject({
-      input: true,
-      runtime: false,
-      output: true,
+      input: false,
+      runtime: true,
+      output: false,
     });
+  });
+
+  it("honors stored internal accordion preferences", () => {
+    localStorage.setItem(
+      "superplane.runInspector.internalAccordions",
+      JSON.stringify({ input: false, runtime: false, output: true }),
+    );
+
+    renderInspector({ selectedNodeId: "action-2" });
+
+    expect(screen.getByText(/"data":\{"ok":true\}/)).toBeInTheDocument();
   });
 
   it("opens the upstream input chain in a modal from the more chip", () => {
