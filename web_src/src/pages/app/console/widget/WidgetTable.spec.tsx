@@ -13,6 +13,7 @@ const START_NODE: SuperplaneComponentsNode = {
   id: "start-id",
   name: "start",
   type: "TYPE_TRIGGER",
+  component: "start",
   configuration: {
     templates: [{ name: "default", payload: { issue: { number: 0 } } }],
   },
@@ -257,6 +258,56 @@ describe("WidgetTable row actions — permission gating", () => {
   it("evaluates per-row show expressions", () => {
     renderTable({ canRunNodes: true });
     expect(screen.queryAllByTestId("widget-row-action-start")).toHaveLength(1);
+  });
+});
+
+describe("WidgetTable row actions — manual-run gating", () => {
+  const PR_NODE: SuperplaneComponentsNode = {
+    id: "pr-id",
+    name: "on-pr",
+    type: "TYPE_TRIGGER",
+    component: "github.onPullRequest",
+  };
+  const SCHEDULE_NODE: SuperplaneComponentsNode = {
+    id: "schedule-id",
+    name: "nightly",
+    type: "TYPE_TRIGGER",
+    component: "schedule",
+  };
+  const EVENT_ROW_RENDER: WidgetTableRender = {
+    kind: "table",
+    columns: [{ field: "service", label: "Service" }],
+    rowActions: [
+      { kind: "trigger", label: "Redeploy", node: "start" },
+      { kind: "trigger", label: "Reopen PR", node: "on-pr" },
+      { kind: "trigger", label: "Run now", node: "nightly" },
+    ],
+  };
+
+  function renderWithNodes(nodes: SuperplaneComponentsNode[]) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider
+            canvasId="canvas-1"
+            organizationId="org-1"
+            nodes={nodes}
+            canRunNodes
+            onTriggerNode={() => undefined}
+          >
+            <WidgetTable render={EVENT_ROW_RENDER} rows={ROWS} isLoading={false} />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("hides row actions whose trigger is event-driven (not start/schedule)", () => {
+    renderWithNodes([START_NODE, PR_NODE, SCHEDULE_NODE]);
+    expect(screen.queryAllByTestId("widget-row-action-start")).toHaveLength(2);
+    expect(screen.queryAllByTestId("widget-row-action-nightly")).toHaveLength(2);
+    expect(screen.queryByTestId("widget-row-action-on-pr")).toBeNull();
   });
 });
 
