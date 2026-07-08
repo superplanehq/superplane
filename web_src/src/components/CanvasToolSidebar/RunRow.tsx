@@ -2,7 +2,7 @@ import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } fr
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Timestamp } from "@/components/Timestamp";
 import { appPath } from "@/lib/appPaths";
-import { formatDuration } from "@/lib/duration";
+import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
@@ -258,7 +258,7 @@ function getRunDurationText(run: CanvasesCanvasRun, status: RunStatusKey, curren
   const endedAt = status === "running" ? currentTime : parseTimestamp(run.finishedAt);
   if (endedAt === null || endedAt < startedAt) return null;
 
-  return formatDuration(endedAt - startedAt) || null;
+  return formatMinutesSecondsDuration(endedAt - startedAt);
 }
 
 function parseTimestamp(value: string | undefined) {

@@ -48,6 +48,7 @@ import type {
   ConfigurationField,
   OrganizationsIntegration,
   TriggersTrigger,
+  SuperplaneMeUser,
 } from "@/api-client";
 import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
@@ -91,6 +92,7 @@ import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { RunInspectorLoadingPanel } from "../Runs/RunInspectorLoadingPanel";
 import { RunInspectorPanel } from "../Runs/RunInspectorPanel";
+import type { RunInspectorCurrentUser } from "../Runs/runNodeDetailModel";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -369,6 +371,7 @@ export interface CanvasPageProps {
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
   runNodeDetailEdges?: ComponentsEdge[];
+  runNodeDetailCurrentUser?: SuperplaneMeUser | null;
   onRunNodeDetailClose?: () => void;
   onRunNodeDetailClear?: () => void;
   onRunNodeDetailNavigate?: (nodeId: string) => void;
@@ -844,9 +847,14 @@ function CanvasPage(props: CanvasPageProps) {
   });
   const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
   const showRunsSidebar = isCanvasWorkflowTab(props.headerMode) && props.toolSidebarRunsContent != null;
+  const runningRunsCount = useMemo(
+    () => (props.logRuns || []).filter((run) => run.state === "STATE_STARTED").length,
+    [props.logRuns],
+  );
   const runsSidebarState = {
     ...runsSidebarBaseState,
     showRunsSidebarToggle: showRunsSidebar,
+    runningRunsCount,
   };
   const isRunsSidebarOpen = showRunsSidebar && runsSidebarBaseState.isRunsSidebarOpen;
 
@@ -1562,10 +1570,14 @@ function CanvasPage(props: CanvasPageProps) {
         {runInspectorOpen && props.runNodeDetailRun ? (
           <RunInspectorPanel
             canvasId={props.runNodeDetailCanvasId!}
+            organizationId={props.organizationId}
             run={props.runNodeDetailRun!}
             workflowNodes={props.workflowNodes ?? []}
             workflowEdges={props.runNodeDetailEdges}
+            componentDefinitions={props.components}
+            triggerDefinitions={props.triggers}
             componentIconMap={props.runsComponentIconMap}
+            currentUser={buildRunInspectorCurrentUser(props.runNodeDetailCurrentUser)}
             selectedNodeId={props.runNodeDetailNodeId}
             onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
             onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
@@ -1589,6 +1601,17 @@ function CanvasPage(props: CanvasPageProps) {
       </Dialog>
     </div>
   );
+}
+
+function buildRunInspectorCurrentUser(user?: SuperplaneMeUser | null): RunInspectorCurrentUser | undefined {
+  if (!user?.id || !user.email) return undefined;
+
+  return {
+    id: user.id,
+    email: user.email,
+    roles: user.roles ?? [],
+    groups: user.groups ?? [],
+  };
 }
 
 function Sidebar({
