@@ -21,7 +21,16 @@
       "id": "msg_002",
       "type": "assistant_message",
       "text": "Refactored login logic and added unit tests."
-    }
+    },
+    "artifacts": [
+      {
+        "path": "artifacts/report.md",
+        "sizeBytes": 1024,
+        "updatedAt": "2026-03-26T19:20:00Z",
+        "url": "https://storage.cursor.com/agents/agent_12345/artifacts/report.md?sig=abc123",
+        "expiresAt": "2026-03-26T20:29:35Z"
+      }
+    ]
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cursor.launchAgent.finished"

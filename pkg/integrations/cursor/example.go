@@ -20,17 +20,3 @@ func getLaunchAgentExampleOutput() map[string]any {
 		&exampleOutputLaunchAgent,
 	)
 }
-
-//go:embed example_output_download_artifact.json
-var exampleOutputDownloadArtifactBytes []byte
-
-var exampleOutputDownloadArtifactOnce sync.Once
-var exampleOutputDownloadArtifact map[string]any
-
-func getDownloadArtifactExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDownloadArtifactOnce,
-		exampleOutputDownloadArtifactBytes,
-		&exampleOutputDownloadArtifact,
-	)
-}

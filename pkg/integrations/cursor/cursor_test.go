@@ -177,7 +177,7 @@ func Test__Cursor__Components(t *testing.T) {
 	c := &Cursor{}
 	components := c.Actions()
 
-	assert.Len(t, components, 3)
+	assert.Len(t, components, 2)
 
 	names := make([]string, len(components))
 	for i, comp := range components {
@@ -186,7 +186,6 @@ func Test__Cursor__Components(t *testing.T) {
 
 	assert.Contains(t, names, "cursor.launchAgent")
 	assert.Contains(t, names, "cursor.getDailyUsageData")
-	assert.Contains(t, names, "cursor.downloadArtifact")
 }
 
 func Test__Cursor__ListResources(t *testing.T) {
@@ -220,102 +219,6 @@ func Test__Cursor__ListResources(t *testing.T) {
 		assert.Equal(t, "claude-3.5-sonnet", resources[1].ID)
 		assert.Equal(t, "gpt-4o", resources[2].ID)
 		assert.Equal(t, "o1-mini", resources[3].ID)
-	})
-
-	t.Run("list agents", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`{
-						"agents": [
-							{"id": "bc-1", "name": "Fix login bug", "status": "FINISHED"},
-							{"id": "bc-2", "status": "RUNNING"}
-						],
-						"nextCursor": "abc"
-					}`)),
-				},
-			},
-		}
-
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"launchAgentKey": "test-key",
-			},
-		}
-
-		resources, err := c.ListResources("agent", core.ListResourcesContext{
-			HTTP:        httpContext,
-			Integration: integrationCtx,
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, "https://api.cursor.com/v0/agents?limit=100", httpContext.Requests[0].URL.String())
-
-		require.Len(t, resources, 2)
-		assert.Equal(t, "agent", resources[0].Type)
-		assert.Equal(t, "bc-1", resources[0].ID)
-		assert.Equal(t, "Fix login bug", resources[0].Name)
-		assert.Equal(t, "bc-2", resources[1].ID)
-		assert.Equal(t, "bc-2", resources[1].Name)
-	})
-
-	t.Run("list artifacts", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`{
-						"items": [
-							{"path": "artifacts/screenshot.png", "sizeBytes": 12345, "updatedAt": "2026-04-13T18:45:00.000Z"},
-							{"path": "artifacts/report.pdf", "sizeBytes": 67890, "updatedAt": "2026-04-13T18:46:00.000Z"}
-						]
-					}`)),
-				},
-			},
-		}
-
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"launchAgentKey": "test-key",
-			},
-		}
-
-		resources, err := c.ListResources("artifact", core.ListResourcesContext{
-			HTTP:        httpContext,
-			Integration: integrationCtx,
-			Parameters:  map[string]string{"agent": "bc-1"},
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, "https://api.cursor.com/v1/agents/bc-1/artifacts", httpContext.Requests[0].URL.String())
-
-		require.Len(t, resources, 2)
-		assert.Equal(t, "artifact", resources[0].Type)
-		assert.Equal(t, "artifacts/screenshot.png", resources[0].ID)
-		assert.Equal(t, "artifacts/screenshot.png", resources[0].Name)
-		assert.Equal(t, "artifacts/report.pdf", resources[1].ID)
-	})
-
-	t.Run("list artifacts without agent parameter returns empty", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{}
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"launchAgentKey": "test-key",
-			},
-		}
-
-		resources, err := c.ListResources("artifact", core.ListResourcesContext{
-			HTTP:        httpContext,
-			Integration: integrationCtx,
-			Parameters:  map[string]string{},
-		})
-
-		require.NoError(t, err)
-		assert.Empty(t, resources)
-		assert.Empty(t, httpContext.Requests)
 	})
 
 	t.Run("list artifacts with expression agent returns empty", func(t *testing.T) {

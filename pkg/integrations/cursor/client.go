@@ -64,11 +64,6 @@ type ConversationResponse struct {
 	Messages []ConversationMessage `json:"messages"`
 }
 
-type ListAgentsResponse struct {
-	Agents     []LaunchAgentResponse `json:"agents"`
-	NextCursor string                `json:"nextCursor,omitempty"`
-}
-
 type DownloadArtifactResponse struct {
 	URL       string `json:"url"`
 	ExpiresAt string `json:"expiresAt"`
@@ -193,25 +188,6 @@ func (c *Client) CancelAgent(agentID string) error {
 	url := fmt.Sprintf("%s/v0/agents/%s/cancel", c.BaseURL, agentID)
 	_, err := c.execRequest(http.MethodPost, url, nil, c.LaunchAgentKey)
 	return err
-}
-
-func (c *Client) ListAgents(limit int) ([]LaunchAgentResponse, error) {
-	if c.LaunchAgentKey == "" {
-		return nil, fmt.Errorf("Cloud Agent API key is not configured")
-	}
-
-	url := fmt.Sprintf("%s/v0/agents?limit=%d", c.BaseURL, limit)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil, c.LaunchAgentKey)
-	if err != nil {
-		return nil, err
-	}
-
-	var response ListAgentsResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal agents response: %w", err)
-	}
-
-	return response.Agents, nil
 }
 
 func (c *Client) ListArtifacts(agentID string) ([]ArtifactItem, error) {
