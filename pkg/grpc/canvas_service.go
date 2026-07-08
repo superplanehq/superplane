@@ -308,7 +308,7 @@ func (s *CanvasService) PutCanvasStaging(ctx context.Context, req *pb.PutCanvasS
 	if err != nil {
 		return nil, err
 	}
-	return &pb.PutCanvasStagingResponse{StagingSummary: state}, nil
+	return &pb.PutCanvasStagingResponse{Staging: state}, nil
 }
 
 func (s *CanvasService) GetCanvasStaging(ctx context.Context, req *pb.GetCanvasStagingRequest) (*pb.GetCanvasStagingResponse, error) {
@@ -317,7 +317,7 @@ func (s *CanvasService) GetCanvasStaging(ctx context.Context, req *pb.GetCanvasS
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetCanvasStagingResponse{StagingSummary: state}, nil
+	return &pb.GetCanvasStagingResponse{Staging: state}, nil
 }
 
 func (s *CanvasService) DeleteCanvasStaging(ctx context.Context, req *pb.DeleteCanvasStagingRequest) (*pb.DeleteCanvasStagingResponse, error) {
@@ -326,7 +326,7 @@ func (s *CanvasService) DeleteCanvasStaging(ctx context.Context, req *pb.DeleteC
 	if err != nil {
 		return nil, err
 	}
-	return &pb.DeleteCanvasStagingResponse{StagingSummary: state}, nil
+	return &pb.DeleteCanvasStagingResponse{Staging: state}, nil
 }
 
 func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitCanvasStagingRequest) (*pb.CommitCanvasStagingResponse, error) {

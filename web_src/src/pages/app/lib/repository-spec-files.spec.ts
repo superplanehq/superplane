@@ -1,6 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchRepositorySpecFileContent, fetchStagedCanvasVersionWithSpec } from "./repository-spec-files";
+import { canvasesGetCanvasStaging } from "@/api-client";
+
+import { fetchRepositorySpecFileContent } from "./repository-spec-files";
+
+vi.mock("@/api-client", async () => {
+  const actual = await vi.importActual<typeof import("@/api-client")>("@/api-client");
+  return {
+    ...actual,
+    canvasesGetCanvasStaging: vi.fn(),
+    canvasesDescribeCanvasVersion: vi.fn(),
+    canvasesDescribeCanvas: vi.fn(),
+  };
+});
 
 describe("fetchRepositorySpecFileContent", () => {
   beforeEach(() => {
@@ -42,30 +54,14 @@ describe("fetchRepositorySpecFileContent", () => {
   });
 });
 
-describe("fetchStagedCanvasVersionWithSpec", () => {
-  beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response("nodes: []", { status: 200 })),
-    );
-  });
+describe("canvasesGetCanvasStaging", () => {
+  it("is the SDK entry point used by canvas staging queries", async () => {
+    vi.mocked(canvasesGetCanvasStaging).mockResolvedValue({
+      data: { staging: { hasStaging: true, stagedPaths: ["canvas.yaml"] } },
+    } as never);
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+    const response = await canvasesGetCanvasStaging({ path: { canvasId: "canvas-1" } });
 
-  it("only reads staged canvas.yaml and reuses provided version metadata", async () => {
-    const version = await fetchStagedCanvasVersionWithSpec("canvas-1", {
-      metadata: { id: "version-1" },
-      spec: { nodes: [], edges: [] },
-    });
-
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/v1/canvases/canvas-1/repository/file?path=canvas.yaml&stage=true",
-      expect.any(Object),
-    );
-    expect(version?.metadata?.id).toBe("version-1");
-    expect(version?.spec?.nodes).toEqual([]);
+    expect(response.data?.staging?.hasStaging).toBe(true);
   });
 });

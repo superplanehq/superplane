@@ -41,7 +41,7 @@ func Test__DescribeCanvasVersion(t *testing.T) {
 		assert.Equal(t, codes.NotFound, code)
 	})
 
-	t.Run("returns version metadata", func(t *testing.T) {
+	t.Run("returns version metadata and spec", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		liveVersion, err := models.FindLiveCanvasVersion(canvas.ID)
 		require.NoError(t, err)
@@ -49,5 +49,6 @@ func Test__DescribeCanvasVersion(t *testing.T) {
 		response, err := DescribeCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String(), liveVersion.ID.String())
 		require.NoError(t, err)
 		assert.Equal(t, liveVersion.ID.String(), response.GetVersion().GetMetadata().GetId())
+		require.NotNil(t, response.GetVersion().GetSpec())
 	})
 }

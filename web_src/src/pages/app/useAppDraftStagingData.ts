@@ -1,11 +1,12 @@
 import type { CanvasesCanvas } from "@/api-client";
-import { useCanvasStaging, useCommitCanvasStaging, useDiscardCanvasStaging } from "@/hooks/useCanvasData";
+import { useCommitCanvasStaging, useDiscardCanvasStaging, type useCanvasStaging } from "@/hooks/useCanvasData";
 
 import { useCanvasConsoleVersionDiff } from "./useCanvasConsoleVersionDiff";
 import type { useCommittedDraftBaselines } from "./useCommittedDraftBaselines";
 import { useDraftStagingIndicators } from "./useDraftStagingIndicators";
 
 type CommittedBaselines = ReturnType<typeof useCommittedDraftBaselines>;
+type CanvasStagingQuery = ReturnType<typeof useCanvasStaging>;
 
 type UseAppDraftStagingDataOptions = {
   canvasId: string;
@@ -19,6 +20,7 @@ type UseAppDraftStagingDataOptions = {
   getConsoleMutationGeneration: () => number;
   committedBaselines: CommittedBaselines;
   editBootstrapReady: boolean;
+  canvasStagingQuery: CanvasStagingQuery;
 };
 
 export function useAppDraftStagingData({
@@ -33,8 +35,8 @@ export function useAppDraftStagingData({
   getConsoleMutationGeneration,
   committedBaselines,
   editBootstrapReady,
+  canvasStagingQuery,
 }: UseAppDraftStagingDataOptions) {
-  const canvasStagingQuery = useCanvasStaging(canvasId, hasEditableVersion);
   const commitCanvasStagingMutation = useCommitCanvasStaging(canvasId);
   const discardCanvasStagingMutation = useDiscardCanvasStaging(canvasId);
 

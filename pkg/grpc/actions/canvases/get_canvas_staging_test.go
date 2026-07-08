@@ -29,6 +29,7 @@ func Test__GetCanvasStaging(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, state.GetHasStaging())
 	assert.Contains(t, state.GetStagedPaths(), CanvasYAMLRepositoryPath)
+	require.NotNil(t, state.GetSpec())
 }
 
 func Test__GetCanvasStaging__StagedReadIsPerUser(t *testing.T) {

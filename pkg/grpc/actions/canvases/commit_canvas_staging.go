@@ -200,9 +200,14 @@ func CommitCanvasStaging(
 
 	ownersByID, _ := ownersByIDForCanvasVersions(ctx, organizationID, []models.CanvasVersion{*newLiveVersion})
 
+	staging, err := buildStaging(ctx, canvas, []models.WorkflowStagedFile{})
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to build staging response")
+	}
+
 	return &pb.CommitCanvasStagingResponse{
-		Version:        SerializeCanvasVersionMetadata(newLiveVersion, organizationID, ownersByID),
-		StagingSummary: buildStagingSummary(canvas, []models.WorkflowStagedFile{}),
+		Version: SerializeCanvasVersion(newLiveVersion, organizationID, ownersByID),
+		Staging: staging,
 	}, nil
 }
 

@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetCanvasStaging(ctx context.Context, organizationID string, canvasID string) (*pb.StagingSummary, error) {
+func GetCanvasStaging(ctx context.Context, organizationID string, canvasID string) (*pb.Staging, error) {
 	db := database.DB(ctx)
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -46,32 +46,5 @@ func GetCanvasStaging(ctx context.Context, organizationID string, canvasID strin
 		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}
 
-	return buildStagingSummary(canvas, rows), nil
-}
-
-func buildStagingSummary(canvas *models.Canvas, rows []models.WorkflowStagedFile) *pb.StagingSummary {
-	state := &pb.StagingSummary{}
-	if len(rows) == 0 {
-		return state
-	}
-
-	paths := make([]string, 0, len(rows))
-	for _, row := range rows {
-		paths = append(paths, row.Path)
-	}
-
-	base := findStagingBaseVersionID(rows)
-	state.HasStaging = true
-	state.StagedPaths = paths
-	state.BaseVersionId = base.String()
-	state.Stale = canvas.LiveVersionID.String() != base.String()
-
-	return state
-}
-
-func findStagingBaseVersionID(rows []models.WorkflowStagedFile) uuid.UUID {
-	if len(rows) == 0 {
-		return uuid.Nil
-	}
-	return rows[0].BaseVersionID
+	return buildStaging(ctx, canvas, rows)
 }
