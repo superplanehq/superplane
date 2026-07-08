@@ -54,13 +54,3 @@ export function draftBranchStatusBadge(editStatus: DraftBranchEditStatus, isActi
     className: isActive ? activeBlueStatusBadgeClassName : grayStatusBadgeClassName,
   };
 }
-
-export type DraftEditTabTone = "uncommitted" | "ready" | "neutral";
-
-export function draftEditTabToneFromStaging(hasUncommittedChanges: boolean, isEditing: boolean): DraftEditTabTone {
-  if (!isEditing) {
-    return "neutral";
-  }
-
-  return hasUncommittedChanges ? "uncommitted" : "ready";
-}
