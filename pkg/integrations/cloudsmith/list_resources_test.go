@@ -110,4 +110,61 @@ func Test__Cloudsmith__ListResources(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "error listing repositories")
 	})
+
+	t.Run("organization lists resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(`[
+					{"name": "Acme Inc", "slug": "acme"},
+					{"name": "", "slug": "globex"}
+				]`),
+			},
+		}
+
+		resources, err := integration.ListResources("organization", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "organization", resources[0].Type)
+		assert.Equal(t, "Acme Inc", resources[0].Name)
+		assert.Equal(t, "acme", resources[0].ID)
+		assert.Equal(t, "globex", resources[1].Name)
+	})
+
+	t.Run("vulnerabilityPolicy returns empty without organization param", func(t *testing.T) {
+		resources, err := integration.ListResources("vulnerabilityPolicy", core.ListResourcesContext{
+			HTTP:        &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+	})
+
+	t.Run("vulnerabilityPolicy lists policies for organization", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(`[
+					{"name": "Block critical", "slug_perm": "abc123"},
+					{"name": "", "slug_perm": "def456"}
+				]`),
+			},
+		}
+
+		resources, err := integration.ListResources("vulnerabilityPolicy", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+			Parameters:  map[string]string{"organization": "acme"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "vulnerabilityPolicy", resources[0].Type)
+		assert.Equal(t, "Block critical", resources[0].Name)
+		assert.Equal(t, "abc123", resources[0].ID)
+		assert.Equal(t, "def456", resources[1].Name)
+	})
 }

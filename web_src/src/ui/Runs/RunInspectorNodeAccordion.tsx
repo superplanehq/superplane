@@ -1,7 +1,6 @@
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { useAccount } from "@/contexts/useAccount";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
 import { cn } from "@/lib/utils";
@@ -9,7 +8,11 @@ import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { AccordionContent, AccordionItem } from "@/ui/accordion";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
 import { RunInspectorStepTimeline } from "./RunInspectorStepTimeline";
-import type { RunInspectorApprovalRecord, RunInspectorNodeSection } from "./runNodeDetailModel";
+import type {
+  RunInspectorApprovalRecord,
+  RunInspectorCurrentUser,
+  RunInspectorNodeSection,
+} from "./runNodeDetailModel";
 import type { useRunInspectorActions } from "./useRunInspectorActions";
 
 export function RunInspectorNodeAccordion({
@@ -20,6 +23,7 @@ export function RunInspectorNodeAccordion({
   onRerun,
   rerunPending,
   actions,
+  currentUser,
 }: {
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
@@ -28,6 +32,7 @@ export function RunInspectorNodeAccordion({
   onRerun: () => void;
   rerunPending: boolean;
   actions: ReturnType<typeof useRunInspectorActions>;
+  currentUser?: RunInspectorCurrentUser;
 }) {
   const iconSrc = getHeaderIconSrc(section.workflowNode?.component);
   const iconSlug = section.workflowNode?.component ? componentIconMap[section.workflowNode.component] : undefined;
@@ -83,7 +88,7 @@ export function RunInspectorNodeAccordion({
             {section.nodeName}
           </span>
         </AccordionPrimitive.Trigger>
-        <NodeActions section={section} actions={actions} />
+        <NodeActions section={section} actions={actions} currentUser={currentUser} />
         <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
       </AccordionPrimitive.Header>
       <AccordionContent className="bg-slate-50 px-3 pb-3 pt-3 dark:bg-gray-950">
@@ -100,12 +105,13 @@ export function RunInspectorNodeAccordion({
 function NodeActions({
   section,
   actions,
+  currentUser,
 }: {
   section: RunInspectorNodeSection;
   actions: ReturnType<typeof useRunInspectorActions>;
+  currentUser?: RunInspectorCurrentUser;
 }) {
-  const { account } = useAccount();
-  const actionableApproval = findActionableApprovalRecord(section.actions.approvalRecords, account);
+  const actionableApproval = findActionableApprovalRecord(section.actions.approvalRecords, currentUser ?? null);
   const hasActions = section.actions.canStop || section.actions.canPushThrough || actionableApproval;
 
   if (!hasActions) return null;
@@ -188,25 +194,24 @@ function NodeActionButton({
 
 function findActionableApprovalRecord(
   records: RunInspectorApprovalRecord[],
-  account: { id: string; email: string } | null,
+  account: RunInspectorCurrentUser | null,
 ): RunInspectorApprovalRecord | null {
   if (!account || hasCurrentUserActed(records, account)) return null;
 
   return records.find((record) => record.state === "pending" && canCurrentUserActOnRecord(record, account)) ?? null;
 }
 
-function hasCurrentUserActed(records: RunInspectorApprovalRecord[], account: { id: string; email: string }): boolean {
+function hasCurrentUserActed(records: RunInspectorApprovalRecord[], account: RunInspectorCurrentUser): boolean {
   return records.some(
     (record) => record.state !== "pending" && (record.user?.id === account.id || record.user?.email === account.email),
   );
 }
 
-function canCurrentUserActOnRecord(
-  record: RunInspectorApprovalRecord,
-  account: { id: string; email: string },
-): boolean {
+function canCurrentUserActOnRecord(record: RunInspectorApprovalRecord, account: RunInspectorCurrentUser): boolean {
   if (record.type === "anyone") return true;
   if (record.type === "user") return record.user?.id === account.id || record.user?.email === account.email;
+  if (record.type === "role") return !!record.roleRef?.name && (account.roles ?? []).includes(record.roleRef.name);
+  if (record.type === "group") return !!record.groupRef?.name && (account.groups ?? []).includes(record.groupRef.name);
   return false;
 }
 

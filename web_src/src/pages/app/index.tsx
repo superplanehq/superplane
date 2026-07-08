@@ -224,6 +224,37 @@ function buildDuplicatedEdges(
     }));
 }
 
+function getCanvasVersionEditPermissionState({
+  canUpdateCanvasVersion,
+  canvasDeletedRemotely,
+}: {
+  canUpdateCanvasVersion: boolean;
+  canvasDeletedRemotely: boolean;
+}) {
+  if (canvasDeletedRemotely) {
+    return {
+      canStageCanvasVersion: false,
+      tooltip: "This canvas was deleted in another session.",
+    };
+  }
+
+  if (!canUpdateCanvasVersion) {
+    return {
+      canStageCanvasVersion: false,
+      tooltip: "You don't have permission to edit this canvas.",
+    };
+  }
+
+  return {
+    canStageCanvasVersion: true,
+    tooltip: undefined,
+  };
+}
+
+function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
+  return allowed ? value : undefined;
+}
+
 export function AppPage() {
   const { organizationId, appId } = useParams<{
     organizationId: string;
@@ -309,6 +340,7 @@ export function AppPage() {
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
   const canReadIntegrations = canAct("integrations", "read");
   const canUpdateIntegrations = canAct("integrations", "update");
+  const canUseAgents = canAct("agents", "create") && canAct("agents", "read");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const {
     data: liveCanvas,
@@ -538,12 +570,18 @@ export function AppPage() {
   const createCanvasMemoryNamespace = useCreateCanvasMemoryNamespace(canvasId!);
   const updateCanvasMemoryNamespace = useUpdateCanvasMemoryNamespace(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
+  const canUpdateCanvasVersion = canAct("canvases", "update_version");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const canvasAccess = { canUpdateCanvas, canvasDeletedRemotely };
   const canActOnCanvas = canUpdateCanvas && !canvasDeletedRemotely;
-  const isReadOnly = !canActOnCanvas || !hasEditableVersion;
+  const canvasVersionEditPermission = getCanvasVersionEditPermissionState({
+    canUpdateCanvasVersion,
+    canvasDeletedRemotely,
+  });
+  const canStageCanvasVersion = canvasVersionEditPermission.canStageCanvasVersion;
+  const isReadOnly = !canStageCanvasVersion || !hasEditableVersion;
   /**
    * Track if we've already done the initial fit to view.
    * This ref persists across re-renders to prevent viewport changes on save.
@@ -951,7 +989,6 @@ export function AppPage() {
     handleEffectiveConsoleChange,
     handleLocalFilesStagingChange,
     hasStagingChanges,
-    editTabTone,
     hasUncommittedCanvasDraftChanges,
     hasUncommittedConsoleDraftChanges,
     hasUncommittedFilesDraftChanges,
@@ -1875,9 +1912,9 @@ export function AppPage() {
     async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean; savingVersionId?: string }) => {
       const targetWorkflow = workflowToSave || canvasRef.current;
       if (!targetWorkflow || !organizationId || !canvasId) return;
-      if (!canUpdateCanvas) {
+      if (!canUpdateCanvasVersion) {
         if (options?.showToast !== false) {
-          showErrorToast("You don't have permission to update this canvas");
+          showErrorToast("You don't have permission to edit this canvas version");
         }
         return;
       }
@@ -1937,7 +1974,14 @@ export function AppPage() {
         }
       }
     },
-    [organizationId, canvasId, activeCanvasVersionId, canUpdateCanvas, enqueueCanvasSave, setLastSavedWorkflowSnapshot],
+    [
+      organizationId,
+      canvasId,
+      activeCanvasVersionId,
+      canUpdateCanvasVersion,
+      enqueueCanvasSave,
+      setLastSavedWorkflowSnapshot,
+    ],
   );
 
   const getNodeEditData = useCallback(
@@ -3361,7 +3405,7 @@ export function AppPage() {
   const { enterLiveEditSession } = useEnterLiveEditSession({
     organizationId,
     canvasId,
-    canUpdateCanvas,
+    canUpdateCanvas: canStageCanvasVersion,
     effectiveLiveCanvasVersionId,
     selectableVersionsById,
     handleUseVersion,
@@ -3421,7 +3465,7 @@ export function AppPage() {
       return;
     }
 
-    if (!canUpdateCanvas) {
+    if (!canStageCanvasVersion) {
       showErrorToast("You don't have permission to edit this canvas");
       return;
     }
@@ -3468,7 +3512,7 @@ export function AppPage() {
   }, [
     organizationId,
     canvasId,
-    canUpdateCanvas,
+    canStageCanvasVersion,
     editSessionActive,
     effectiveLiveCanvasVersionId,
     liveCanvasVersion,
@@ -3659,7 +3703,7 @@ export function AppPage() {
   } = useWorkflowViewModeActions({
     ...urlViewFlags,
     hasEditableVersion,
-    canUpdateCanvas,
+    canUpdateCanvas: canStageCanvasVersion,
     canvasDeletedRemotely,
     handleExitConsoleMode,
     handleExitMemoryMode,
@@ -3678,7 +3722,7 @@ export function AppPage() {
     setSearchParams,
     startup: {
       hasEditableVersion,
-      canUpdateCanvas,
+      canUpdateCanvas: canStageCanvasVersion,
       canvas,
       liveVersionLoading: isLiveVersionLoading,
       handlePlaceholderAdd,
@@ -4006,15 +4050,11 @@ export function AppPage() {
     ) : null;
   const headerBanners = [appBanner, remoteUpdateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
-  const enterEditModeDisabled = !canUpdateCanvas || canvasDeletedRemotely;
-  const enterEditModeDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to edit this canvas."
-    : canvasDeletedRemotely
-      ? "This canvas was deleted in another session."
-      : undefined;
-  const exitEditModeDisabled = !canUpdateCanvas || canvasDeletedRemotely;
+  const enterEditModeDisabled = !canStageCanvasVersion;
+  const enterEditModeDisabledTooltip = canvasVersionEditPermission.tooltip;
+  const exitEditModeDisabled = !canStageCanvasVersion;
   const exitEditModeDisabledTooltip = getExitEditModeDisabledTooltip({
-    canUpdateCanvas,
+    canUpdateCanvas: canStageCanvasVersion,
     canvasDeletedRemotely,
     hasEditableVersion,
   });
@@ -4070,7 +4110,7 @@ export function AppPage() {
     liveCanvasVersion,
     selectedCanvasVersion,
     liveVersions,
-    canUpdateCanvas,
+    canEditCanvasVersion: canStageCanvasVersion,
     canvasDeletedRemotely,
     onUseVersion: handleUseVersionFromVersionPanel,
     onLoadMoreLiveVersions: hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined,
@@ -4126,7 +4166,7 @@ export function AppPage() {
             canvasId: canvasId || undefined,
             organizationId,
             versionId: activeCanvasVersionId || undefined,
-            canWrite: canActOnCanvas,
+            canWrite: canStageCanvasVersion,
             files: appFiles,
             headerActionsSlotId: filesHeaderActionsSlotId,
             stagingResetNonce,
@@ -4188,7 +4228,7 @@ export function AppPage() {
           activeCanvasVersionId={activeCanvasVersionId}
           liveCanvasVersionId={effectiveLiveCanvasVersionId}
           onAgentStagingReady={handleAgentStagingReady}
-          onAgentStagingCommit={handleAgentSidebarStagingCommit}
+          onAgentStagingCommit={whenAllowed(canUpdateCanvas, handleAgentSidebarStagingCommit)}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
           onPlaceholderAdd={!isReadOnly ? handlePlaceholderAdd : undefined}
           onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
@@ -4196,6 +4236,7 @@ export function AppPage() {
           canReadIntegrations={canReadIntegrations}
           canCreateIntegrations={canAct("integrations", "create")}
           canUpdateIntegrations={canUpdateIntegrations}
+          canUseAgents={canUseAgents}
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly || readOnlyViewModes}
@@ -4229,6 +4270,7 @@ export function AppPage() {
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
           runNodeDetailEdges={selectedRunCanvas?.spec?.edges}
+          runNodeDetailCurrentUser={me}
           onRunNodeDetailClose={handleBackToRunList}
           onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
@@ -4254,18 +4296,17 @@ export function AppPage() {
           {...draftChangeIndicators}
           hasStagingChanges={isEditSessionUiReady && hasStagingChanges}
           stagingStale={isEditing && stagingStale}
-          editTabTone={isEditSessionUiReady ? editTabTone : "neutral"}
           hasUncommittedCanvasDraftChanges={isEditSessionUiReady && hasUncommittedCanvasDraftChanges}
           hasUncommittedConsoleDraftChanges={isEditSessionUiReady && hasUncommittedConsoleDraftChanges}
           hasUncommittedFilesDraftChanges={isEditSessionUiReady && hasUncommittedFilesDraftChanges}
           hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
           hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
           hasFilesStagingChanges={isEditSessionUiReady && hasFilesStagingChanges}
-          onCommitStaging={handleOpenCommitDialog}
+          onCommitStaging={whenAllowed(canUpdateCanvas, handleOpenCommitDialog)}
           commitStagingPending={commitStagingPending}
           resetStagingPending={resetStagingPending}
-          onResetStaging={handleResetStaging}
-          onDiscardStaleStaging={handleDiscardStaleStaging}
+          onResetStaging={whenAllowed(canUpdateCanvasVersion, handleResetStaging)}
+          onDiscardStaleStaging={whenAllowed(canUpdateCanvasVersion, handleDiscardStaleStaging)}
           discardStaleStagingPending={resetStagingPending}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}

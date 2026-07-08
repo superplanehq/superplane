@@ -48,6 +48,7 @@ import type {
   ConfigurationField,
   OrganizationsIntegration,
   TriggersTrigger,
+  SuperplaneMeUser,
 } from "@/api-client";
 import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
@@ -91,6 +92,7 @@ import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { RunInspectorLoadingPanel } from "../Runs/RunInspectorLoadingPanel";
 import { RunInspectorPanel } from "../Runs/RunInspectorPanel";
+import type { RunInspectorCurrentUser } from "../Runs/runNodeDetailModel";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -241,7 +243,6 @@ export interface CanvasPageProps {
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasCommittedFilesDraftChanges?: boolean;
-  editTabTone?: "uncommitted" | "ready" | "neutral";
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
@@ -256,6 +257,8 @@ export interface CanvasPageProps {
   hideAddControls?: boolean;
   /** Hide the Agent / Versions left panel toggle (templates only). */
   hideCanvasToolSidebar?: boolean;
+  /** Enables managed agent chat controls when the user has the required RBAC permissions. */
+  canUseAgents?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -368,6 +371,7 @@ export interface CanvasPageProps {
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
   runNodeDetailEdges?: ComponentsEdge[];
+  runNodeDetailCurrentUser?: SuperplaneMeUser | null;
   onRunNodeDetailClose?: () => void;
   onRunNodeDetailClear?: () => void;
   onRunNodeDetailNavigate?: (nodeId: string) => void;
@@ -831,6 +835,7 @@ function CanvasPage(props: CanvasPageProps) {
   const toolSidebarState = useCanvasToolSidebarState({
     isEditing: props.isEditing,
     hideCanvasToolSidebar: props.hideCanvasToolSidebar ?? false,
+    canUseAgents: props.canUseAgents ?? true,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
@@ -1421,7 +1426,6 @@ function CanvasPage(props: CanvasPageProps) {
           hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
           hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
           hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
-          editTabTone={props.editTabTone}
           activeDraftBranchLabel={props.activeDraftBranchLabel}
           activeDraftBranchShortSha={props.activeDraftBranchShortSha}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
@@ -1573,6 +1577,7 @@ function CanvasPage(props: CanvasPageProps) {
             componentDefinitions={props.components}
             triggerDefinitions={props.triggers}
             componentIconMap={props.runsComponentIconMap}
+            currentUser={buildRunInspectorCurrentUser(props.runNodeDetailCurrentUser)}
             selectedNodeId={props.runNodeDetailNodeId}
             onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
             onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
@@ -1596,6 +1601,17 @@ function CanvasPage(props: CanvasPageProps) {
       </Dialog>
     </div>
   );
+}
+
+function buildRunInspectorCurrentUser(user?: SuperplaneMeUser | null): RunInspectorCurrentUser | undefined {
+  if (!user?.id || !user.email) return undefined;
+
+  return {
+    id: user.id,
+    email: user.email,
+    roles: user.roles ?? [],
+    groups: user.groups ?? [],
+  };
 }
 
 function Sidebar({
@@ -1898,7 +1914,6 @@ function CanvasContentHeader({
   hasCommittedCanvasDraftChanges,
   hasCommittedConsoleDraftChanges,
   hasCommittedFilesDraftChanges,
-  editTabTone,
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
   showCanvasSettingsMenu,
@@ -1963,7 +1978,6 @@ function CanvasContentHeader({
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasCommittedFilesDraftChanges?: boolean;
-  editTabTone?: "uncommitted" | "ready" | "neutral";
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
@@ -2020,7 +2034,6 @@ function CanvasContentHeader({
       hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
       hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
       hasCommittedFilesDraftChanges={hasCommittedFilesDraftChanges}
-      editTabTone={editTabTone}
       activeDraftBranchLabel={activeDraftBranchLabel}
       activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}

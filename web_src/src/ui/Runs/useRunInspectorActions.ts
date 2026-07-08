@@ -39,131 +39,16 @@ export function useRunInspectorActions({
     await queryClient.invalidateQueries({ queryKey: ["canvases"] });
   }, [queryClient]);
 
-  const rerunMutation = useMutation({
-    mutationFn: async () => {
-      if (!run.rootEvent?.nodeId || !run.rootEvent?.id) {
-        throw new Error("Run root event is missing");
-      }
-
-      await canvasesReemitTriggerEvent(
-        withOrganizationHeader({
-          path: {
-            canvasId,
-            nodeId: run.rootEvent.nodeId,
-            eventId: run.rootEvent.id,
-          },
-        }),
-      );
-    },
-    onSuccess: async () => {
-      await refreshRunQueries();
-      showSuccessToast("Run restarted");
-    },
-    onError: (error) => {
-      console.error("Failed to restart run", error);
-      showErrorToast("Failed to restart run");
-    },
+  const rerunMutation = useRerunMutation({ canvasId, run, refreshRunQueries });
+  const stopMutation = useStopMutation({
+    canvasId,
+    runningExecutionIds,
+    stoppableNodeIds,
+    rootEventId: run.rootEvent?.id,
+    refreshRunQueries,
   });
-
-  const stopMutation = useMutation({
-    mutationFn: async () => {
-      const queuedItems = await listQueuedItemsForRun({
-        canvasId,
-        nodeIds: stoppableNodeIds,
-        rootEventId: run.rootEvent?.id,
-      });
-
-      if (runningExecutionIds.length === 0 && queuedItems.length === 0) {
-        throw new Error("No running or queued steps to stop");
-      }
-
-      await Promise.all([
-        ...runningExecutionIds.map((executionId) =>
-          canvasesCancelExecution(
-            withOrganizationHeader({
-              path: {
-                canvasId,
-                executionId,
-              },
-            }),
-          ),
-        ),
-        ...queuedItems.map((item) =>
-          canvasesDeleteNodeQueueItem(
-            withOrganizationHeader({
-              path: {
-                canvasId,
-                nodeId: item.nodeId,
-                itemId: item.itemId,
-              },
-            }),
-          ),
-        ),
-      ]);
-    },
-    onSuccess: async () => {
-      await refreshRunQueries();
-      showSuccessToast("Run stopped");
-    },
-    onError: (error) => {
-      console.error("Failed to stop run", error);
-      showErrorToast("Failed to stop run");
-    },
-  });
-
-  const stopNodeMutation = useMutation({
-    mutationFn: async (executionId: string) => {
-      await canvasesCancelExecution(
-        withOrganizationHeader({
-          path: {
-            canvasId,
-            executionId,
-          },
-        }),
-      );
-    },
-    onSuccess: async () => {
-      await refreshRunQueries();
-      showSuccessToast("Step stopped");
-    },
-    onError: (error) => {
-      console.error("Failed to stop step", error);
-      showErrorToast("Failed to stop step");
-    },
-  });
-
-  const executionHookMutation = useMutation({
-    mutationFn: async ({
-      executionId,
-      hookName,
-      parameters,
-    }: {
-      executionId: string;
-      hookName: string;
-      parameters?: Record<string, unknown> | null;
-    }) => {
-      await canvasesInvokeNodeExecutionHook(
-        withOrganizationHeader({
-          path: {
-            canvasId,
-            executionId,
-            hookName,
-          },
-          body: {
-            parameters: parameters ?? undefined,
-          },
-        }),
-      );
-    },
-    onSuccess: async (_data, variables) => {
-      await refreshRunQueries();
-      showSuccessToast(successMessageForHook(variables.hookName));
-    },
-    onError: (error, variables) => {
-      console.error(`Failed to invoke ${variables.hookName} hook`, error);
-      showErrorToast(errorMessageForHook(variables.hookName));
-    },
-  });
+  const stopNodeMutation = useStopNodeMutation({ canvasId, refreshRunQueries });
+  const executionHookMutation = useExecutionHookMutation({ canvasId, refreshRunQueries });
 
   return {
     rerun: () => rerunMutation.mutate(),
@@ -191,6 +76,123 @@ export function useRunInspectorActions({
   };
 }
 
+function useRerunMutation({
+  canvasId,
+  run,
+  refreshRunQueries,
+}: {
+  canvasId: string;
+  run: CanvasesCanvasRun;
+  refreshRunQueries: () => Promise<void>;
+}) {
+  return useMutation({
+    mutationFn: async () => {
+      if (!run.rootEvent?.nodeId || !run.rootEvent?.id) {
+        throw new Error("Run root event is missing");
+      }
+
+      await canvasesReemitTriggerEvent(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            nodeId: run.rootEvent.nodeId,
+            eventId: run.rootEvent.id,
+          },
+        }),
+      );
+    },
+    onSuccess: async () => {
+      await refreshRunQueries();
+      showSuccessToast("Run restarted");
+    },
+    onError: (error) => {
+      console.error("Failed to restart run", error);
+      showErrorToast("Failed to restart run");
+    },
+  });
+}
+
+function useStopMutation({
+  canvasId,
+  runningExecutionIds,
+  stoppableNodeIds,
+  rootEventId,
+  refreshRunQueries,
+}: {
+  canvasId: string;
+  runningExecutionIds: string[];
+  stoppableNodeIds: string[];
+  rootEventId?: string;
+  refreshRunQueries: () => Promise<void>;
+}) {
+  return useMutation({
+    mutationFn: async () => {
+      const queuedItems = await listQueuedItemsForRun({
+        canvasId,
+        nodeIds: stoppableNodeIds,
+        rootEventId,
+      });
+
+      if (runningExecutionIds.length === 0 && queuedItems.length === 0) {
+        throw new Error("No running or queued steps to stop");
+      }
+
+      await Promise.all([
+        ...runningExecutionIds.map((executionId) => cancelExecution(canvasId, executionId)),
+        ...queuedItems.map((item) => deleteQueuedItem(canvasId, item.nodeId, item.itemId)),
+      ]);
+    },
+    onSuccess: async () => {
+      await refreshRunQueries();
+      showSuccessToast("Run stopped");
+    },
+    onError: (error) => {
+      console.error("Failed to stop run", error);
+      showErrorToast("Failed to stop run");
+    },
+  });
+}
+
+function useStopNodeMutation({
+  canvasId,
+  refreshRunQueries,
+}: {
+  canvasId: string;
+  refreshRunQueries: () => Promise<void>;
+}) {
+  return useMutation({
+    mutationFn: (executionId: string) => cancelExecution(canvasId, executionId),
+    onSuccess: async () => {
+      await refreshRunQueries();
+      showSuccessToast("Step stopped");
+    },
+    onError: (error) => {
+      console.error("Failed to stop step", error);
+      showErrorToast("Failed to stop step");
+    },
+  });
+}
+
+function useExecutionHookMutation({
+  canvasId,
+  refreshRunQueries,
+}: {
+  canvasId: string;
+  refreshRunQueries: () => Promise<void>;
+}) {
+  return useMutation({
+    mutationFn: invokeExecutionHook(canvasId),
+    onSuccess: async (_data, variables) => {
+      await refreshRunQueries();
+      showSuccessToast(successMessageForHook(variables.hookName));
+    },
+    onError: (error, variables) => {
+      console.error(`Failed to invoke ${variables.hookName} hook`, error);
+      showErrorToast(errorMessageForHook(variables.hookName));
+    },
+  });
+}
+
 function successMessageForHook(hookName: string): string {
   if (hookName === "approve") return "Approval submitted";
   if (hookName === "reject") return "Rejection submitted";
@@ -203,6 +205,54 @@ function errorMessageForHook(hookName: string): string {
   if (hookName === "reject") return "Failed to reject";
   if (hookName === "pushThrough") return "Failed to push through";
   return "Failed to run action";
+}
+
+async function cancelExecution(canvasId: string, executionId: string) {
+  await canvasesCancelExecution(
+    withOrganizationHeader({
+      path: {
+        canvasId,
+        executionId,
+      },
+    }),
+  );
+}
+
+async function deleteQueuedItem(canvasId: string, nodeId: string, itemId: string) {
+  await canvasesDeleteNodeQueueItem(
+    withOrganizationHeader({
+      path: {
+        canvasId,
+        nodeId,
+        itemId,
+      },
+    }),
+  );
+}
+
+function invokeExecutionHook(canvasId: string) {
+  return async ({
+    executionId,
+    hookName,
+    parameters,
+  }: {
+    executionId: string;
+    hookName: string;
+    parameters?: Record<string, unknown> | null;
+  }) => {
+    await canvasesInvokeNodeExecutionHook(
+      withOrganizationHeader({
+        path: {
+          canvasId,
+          executionId,
+          hookName,
+        },
+        body: {
+          parameters: parameters ?? undefined,
+        },
+      }),
+    );
+  };
 }
 
 async function listQueuedItemsForRun({

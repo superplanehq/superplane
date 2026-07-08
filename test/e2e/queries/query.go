@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 )
 
 type Runner interface {

@@ -13,7 +13,7 @@ This document explains how to write and run E2E tests for SuperPlane.
 
 ## Overview
 
-Tests are written in Go and use Playwright via the `playwright-go` bindings to
+Tests are written in Go and use Playwright via the `mxschmitt/playwright-go` bindings to
 drive the UI against a locally started application server.
 
 All e2e tests live under the `test/e2e` directory.
