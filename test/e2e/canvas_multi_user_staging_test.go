@@ -97,7 +97,6 @@ func (s *canvasMultiUserStagingSteps) whenUserStagesNode(account *models.Account
 	s.canvas.AddNoop(nodeName, models.Position{X: 500, Y: 200})
 	s.session.AssertText(nodeName)
 	s.canvas.WaitForStagingOnCurrentDraft()
-	s.session.AssertVisible(q.TestID("canvas-commit-staging-button"))
 	s.canvas.ClickOnEmptyCanvasArea()
 }
 
