@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetCanvasStaging(ctx context.Context, organizationID string, canvasID string) (*pb.StagingSummary, error) {
+func GetCanvasStaging(ctx context.Context, organizationID string, canvasID string) (*pb.Staging, error) {
 	db := database.DB(ctx)
 
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -46,14 +46,38 @@ func GetCanvasStaging(ctx context.Context, organizationID string, canvasID strin
 		return nil, grpcerrors.Internal(err, "failed to load staging")
 	}
 
-	return buildStagingSummary(canvas, rows), nil
+	return buildStaging(ctx, canvas, rows)
 }
 
-func buildStagingSummary(canvas *models.Canvas, rows []models.WorkflowStagedFile) *pb.StagingSummary {
-	state := &pb.StagingSummary{}
-	if len(rows) == 0 {
-		return state
+func buildStaging(ctx context.Context, canvas *models.Canvas, rows []models.WorkflowStagedFile) (*pb.Staging, error) {
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.DB(ctx), canvas.ID)
+	if err != nil {
+		return nil, err
 	}
+
+	state := &pb.Staging{}
+
+	//
+	// If nothing is staged, just use what is in the live version
+	//
+	if len(rows) == 0 {
+		spec, err := SerializeCanvasSpecFromVersion(liveVersion)
+		if err != nil {
+			return nil, err
+		}
+		state.Spec = spec
+		return state, nil
+	}
+
+	//
+	// Otherwise, combine the live version with the staged changes
+	//
+	spec, err := effectiveCanvasSpec(canvas, liveVersion, canvas.OrganizationID.String(), rows)
+	if err != nil {
+		return nil, err
+	}
+
+	state.Spec = spec
 
 	paths := make([]string, 0, len(rows))
 	for _, row := range rows {
@@ -66,7 +90,7 @@ func buildStagingSummary(canvas *models.Canvas, rows []models.WorkflowStagedFile
 	state.BaseVersionId = base.String()
 	state.Stale = canvas.LiveVersionID.String() != base.String()
 
-	return state
+	return state, nil
 }
 
 func findStagingBaseVersionID(rows []models.WorkflowStagedFile) uuid.UUID {

@@ -30,36 +30,33 @@ func ResolveLiveVersionID(ctx core.CommandContext, appID, versionID string) (str
 		return strings.TrimSpace(version.Metadata.GetId()), nil
 	}
 
-	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesListCanvasVersions(ctx.Context, appID).
-		Limit(1).
+	response, _, err := ctx.API.CanvasAPI.
+		CanvasesDescribeCanvas(ctx.Context, appID).
 		Execute()
 	if err != nil {
 		return "", err
 	}
-
-	versions := response.GetVersions()
-	if len(versions) == 0 || versions[0].Metadata == nil {
-		return "", fmt.Errorf("app %q has no committed versions", appID)
+	if response.Canvas == nil || response.Canvas.Metadata == nil {
+		return "", fmt.Errorf("app %q was not found", appID)
 	}
 
-	liveVersionID := strings.TrimSpace(versions[0].Metadata.GetId())
+	liveVersionID := strings.TrimSpace(response.Canvas.Metadata.GetVersionId())
 	if liveVersionID == "" {
-		return "", fmt.Errorf("live version id was not returned by the API")
+		return "", fmt.Errorf("app %q has no committed versions", appID)
 	}
 
 	return liveVersionID, nil
 }
 
-// GetCanvasStaging loads the current user's staging summary for an app.
-func GetCanvasStaging(ctx core.CommandContext, appID string) (openapi_client.CanvasesStagingSummary, error) {
+// GetCanvasStaging loads the current user's staging state for an app.
+func GetCanvasStaging(ctx core.CommandContext, appID string) (openapi_client.CanvasesStaging, error) {
 	response, _, err := ctx.API.CanvasStagingAPI.
 		CanvasesGetCanvasStaging(ctx.Context, appID).
 		Execute()
 	if err != nil {
-		return openapi_client.CanvasesStagingSummary{}, err
+		return openapi_client.CanvasesStaging{}, err
 	}
-	return response.GetStagingSummary(), nil
+	return response.GetStaging(), nil
 }
 
 // NormalizeRepositoryPath returns a repository-relative path.
