@@ -120,6 +120,13 @@ func (s *TestSession) Sleep(ms int) {
 }
 
 func (s *TestSession) resetDatabase() {
+	// Guard against truncating a developer's database: the E2E bootstrap
+	// points DB_NAME at superplane_test, but if that ever regresses we want
+	// a loud failure here instead of silently wiping superplane_dev.
+	if err := database.VerifyTestDatabase(database.Conn()); err != nil {
+		s.t.Fatalf("reset database: %v", err)
+	}
+
 	sql := `DO $$
     DECLARE r RECORD;
     BEGIN
