@@ -54,7 +54,6 @@ func (s *canvasStagingLiveViewSteps) whenIEnterEditMode() {
 func (s *canvasStagingLiveViewSteps) whenIStageNode(name string) {
 	s.canvas.AddNoop(name, models.Position{X: 500, Y: 200})
 	s.canvas.WaitForStagingOnCurrentDraft()
-	s.session.AssertVisible(q.TestID("canvas-commit-staging-button"))
 	s.canvas.ClickOnEmptyCanvasArea()
 }
 

@@ -220,3 +220,45 @@ export interface VulnerabilityScanResult {
   num_vulnerabilities?: number;
   max_severity?: string;
 }
+
+// Vulnerability policy types
+
+export interface VulnerabilityPolicyNodeMetadata {
+  organizationSlug?: string;
+  organizationName?: string;
+  policyId?: string;
+  policyName?: string;
+}
+
+export interface VulnerabilityPolicyData {
+  name?: string;
+  description?: string;
+  min_severity?: string;
+  package_query_string?: string;
+  on_violation_quarantine?: boolean;
+  allow_unknown_severity?: boolean;
+  slug_perm?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DeleteVulnerabilityPolicyData {
+  organization?: string;
+  slug_perm?: string;
+  deleted?: boolean;
+}
+
+export interface CreateVulnerabilityPolicyConfiguration {
+  organization?: string;
+  name?: string;
+  description?: string;
+  minSeverity?: string;
+  packageQueryString?: string;
+  onViolationQuarantine?: boolean;
+  allowUnknownSeverity?: boolean;
+}
+
+export interface VulnerabilityPolicyConfiguration {
+  organization?: string;
+  policy?: string;
+}

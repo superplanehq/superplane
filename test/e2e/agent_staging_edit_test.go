@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -42,6 +42,8 @@ func TestAgentStagingEditTransition(t *testing.T) {
 		steps.assertAssistantMessage("Added agent noop node")
 		steps.assertAutoEnteredEditModeWithoutManualEdit()
 		steps.assertStagedNodeVisibleInEditor(agentStagedNoopName)
+		steps.canvas.AssertEditModeTabChrome()
+		steps.canvas.AssertStagingActionsVisibleAndEnabled()
 		steps.canvas.AssertLiveCanvasLacksNode(agentStagedNoopName)
 		steps.canvas.AssertHasStaging(uuid.Nil)
 	})
@@ -53,6 +55,8 @@ func TestAgentStagingEditTransition(t *testing.T) {
 		steps.canvas.EnterEditMode()
 		steps.canvas.StageNoopNodeViaAgentPatch(agentStagedNoopName, models.Position{X: 500, Y: 200})
 		steps.assertStagedNodeVisibleInEditor(agentStagedNoopName)
+		steps.canvas.AssertEditModeTabChrome()
+		steps.canvas.AssertStagingActionsVisibleAndEnabled()
 		steps.canvas.AssertLiveCanvasLacksNode(agentStagedNoopName)
 		steps.canvas.AssertHasStaging(uuid.Nil)
 	})

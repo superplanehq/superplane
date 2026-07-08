@@ -87,7 +87,6 @@ export interface HeaderProps {
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasCommittedFilesDraftChanges?: boolean;
-  editTabTone?: "uncommitted" | "ready" | "neutral";
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
@@ -222,7 +221,6 @@ function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle = shouldShowCanvasViewModeToggle(props);
   const canvasViewMode = getCanvasViewMode(props.mode);
   const editing = props.isEditing ?? false;
-  const editTabTone = props.editTabTone ?? (editing ? (props.hasStagingChanges ? "uncommitted" : "ready") : "neutral");
 
   return (
     <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3 dark:border-gray-700/70 dark:bg-gray-900">
@@ -248,7 +246,6 @@ function SecondaryHeader(props: HeaderProps) {
               hasConsoleCommitted={!!props.hasCommittedConsoleDraftChanges}
               hasFilesUncommitted={!!props.hasUncommittedFilesDraftChanges}
               hasFilesCommitted={!!props.hasCommittedFilesDraftChanges}
-              editTabTone={editTabTone}
             />
           ) : null}
         </div>
