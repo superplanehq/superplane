@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	postgres "gorm.io/driver/postgres"
@@ -166,7 +167,31 @@ func connect() *gorm.DB {
 	return db
 }
 
+// VerifyTestDatabase returns an error unless the connection points at a test
+// database (name ending in _test). Call it before destructive test helpers so
+// a misconfigured DB_NAME fails loudly instead of wiping a developer database.
+func VerifyTestDatabase(db *gorm.DB) error {
+	var name string
+	if err := db.Raw("SELECT current_database()").Scan(&name).Error; err != nil {
+		return fmt.Errorf("resolve current database: %w", err)
+	}
+
+	if !isTestDatabaseName(name) {
+		return fmt.Errorf("refusing to touch database %q: test helpers only run against a database ending in _test", name)
+	}
+
+	return nil
+}
+
+func isTestDatabaseName(name string) bool {
+	return strings.HasSuffix(name, "_test")
+}
+
 func TruncateTables() error {
+	if err := VerifyTestDatabase(Conn()); err != nil {
+		return err
+	}
+
 	return Conn().Exec(`
 		truncate table
 			secrets,
