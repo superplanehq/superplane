@@ -106,18 +106,21 @@ describe("CanvasModeToggle", () => {
         editing
         hasCanvasUncommitted
         hasConsoleUncommitted
-        editTabTone="uncommitted"
       />,
       { wrapper: routerWrapper },
     );
 
     const tabList = screen.getByRole("navigation", { name: "Canvas view" });
-    expect(tabList.className).toContain("bg-orange-50");
+    expect(tabList.className).toContain("bg-orange-200");
+    const activeTab = screen.getByRole("link", { name: "Canvas (editing)" });
+    expect(activeTab.className).toContain("bg-orange-100");
+    expect(activeTab.className).toContain("font-bold");
+    expect(activeTab.className).not.toContain("bg-white");
     expect(screen.getByTestId("canvas-view-mode-live-uncommitted-dot")).toHaveClass("bg-orange-500");
     expect(screen.getByTestId("canvas-view-mode-console-uncommitted-dot")).toHaveClass("bg-orange-500");
   });
 
-  it("shows blue committed dots and blue tab styling when ready to publish", () => {
+  it("uses orange tab styling in edit mode regardless of committed draft dots", () => {
     render(
       <CanvasModeToggle
         mode="version-live"
@@ -125,17 +128,16 @@ describe("CanvasModeToggle", () => {
         onSelectConsole={vi.fn()}
         editing
         hasCanvasCommitted
-        editTabTone="ready"
       />,
       { wrapper: routerWrapper },
     );
 
     const tabList = screen.getByRole("navigation", { name: "Canvas view" });
-    expect(tabList.className).toContain("bg-blue-50");
-    expect(tabList.className).not.toContain("bg-slate-100");
+    expect(tabList.className).toContain("bg-orange-200");
+    expect(tabList.className).not.toContain("bg-blue-50");
 
     const consoleTab = screen.getByRole("link", { name: "Console" });
-    expect(consoleTab.className).toContain("text-blue-800/80");
+    expect(consoleTab.className).toContain("text-orange-800/80");
 
     expect(screen.getByTestId("canvas-view-mode-live-committed-dot")).toHaveClass("bg-blue-500");
   });
