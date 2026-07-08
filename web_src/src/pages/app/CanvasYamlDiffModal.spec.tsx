@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MultiFileDiffProps } from "@pierre/diffs/react";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { CanvasYamlDiffModal } from "./CanvasYamlDiffModal";
 
 type TestMultiFileDiffProps = MultiFileDiffProps<never>;
@@ -23,13 +24,15 @@ describe("CanvasYamlDiffModal", () => {
 
   it("renders YAML diffs with neutral context rows and inline word highlights", () => {
     render(
-      <CanvasYamlDiffModal
-        open
-        onOpenChange={() => undefined}
-        liveYamlText={"name: old\nshared: same\n"}
-        draftYamlText={"name: new\nshared: same\n"}
-        filename="canvas.yaml"
-      />,
+      <ThemeProvider>
+        <CanvasYamlDiffModal
+          open
+          onOpenChange={() => undefined}
+          liveYamlText={"name: old\nshared: same\n"}
+          draftYamlText={"name: new\nshared: same\n"}
+          filename="canvas.yaml"
+        />
+      </ThemeProvider>,
     );
 
     expect(screen.getByTestId("multi-file-diff")).toBeInTheDocument();
