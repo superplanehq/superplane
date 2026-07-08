@@ -128,7 +128,9 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 import { HomePage } from "./index";
+import { InstallProgressPanel } from "./InstallProgressPanel";
 import { NewAppPage } from "./NewAppPage";
+import type { AppEntry } from "./AppDetailModal";
 
 function makeCanvas(
   id: string,
@@ -178,6 +180,30 @@ function renderHome(initialEntries = ["/org-123"]) {
             <Route path="apps/:canvasId" element={<div>Canvas editor</div>} />
           </Route>
         </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function renderInstallProgressPanel(app: AppEntry) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/org-123/apps/new"]}>
+        <InstallProgressPanel
+          app={app}
+          organizationId="org-123"
+          skipPreviewFetch
+          preloadedIntegrations={[]}
+          preloadedParams={[]}
+          onClose={vi.fn()}
+        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -240,6 +266,53 @@ describe("HomePage canvas folders", () => {
         }),
       );
     });
+  });
+
+  it("does not redirect an empty home page to creation without create permission", () => {
+    permissionMocks.canAct.mockImplementation((_resource: string, action: string) => action !== "create");
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({ data: [], isLoading: false, error: null });
+
+    renderHome();
+
+    expect(screen.getByRole("heading", { name: "Apps" })).toBeInTheDocument();
+    expect(screen.getByText("No apps yet")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create new app" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /start from scratch/i })).not.toBeInTheDocument();
+  });
+
+  it("blocks direct navigation to the new app page without create permission", () => {
+    permissionMocks.canAct.mockImplementation((_resource: string, action: string) => action !== "create");
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({ data: [], isLoading: false, error: null });
+
+    renderHome(["/org-123/apps/new"]);
+
+    expect(screen.getByRole("heading", { name: "404" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start from scratch/i })).not.toBeInTheDocument();
+  });
+
+  it("does not install an app without create permission if the install action is invoked", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    permissionMocks.canAct.mockImplementation((_resource: string, action: string) => action !== "create");
+
+    renderInstallProgressPanel({
+      repo: "github.com/superplanehq/example-app",
+      icon: "",
+      title: "Example App",
+      description: "",
+      integrations: [],
+      tags: [],
+      requirements: [],
+      agentInstructions: "",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Just take me there" }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalledWith("You don't have permission to create canvases.");
   });
 
   it("renders folders before free canvases using the manual folder order", () => {
