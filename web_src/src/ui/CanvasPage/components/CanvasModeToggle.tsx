@@ -3,8 +3,6 @@ import { isNormalClick } from "@/lib/linkHelpers";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
 
-import type { DraftEditTabTone } from "@/pages/app/lib/draft-branch-edit-status";
-
 import { DraftChangeDots } from "./DraftChangeDots";
 
 export type CanvasMode = "version-live" | "console" | "memory" | "files";
@@ -22,8 +20,6 @@ interface CanvasModeToggleProps {
   hasConsoleCommitted?: boolean;
   hasFilesUncommitted?: boolean;
   hasFilesCommitted?: boolean;
-  /** Edit-mode tab bar color aligned with draft status badges. */
-  editTabTone?: DraftEditTabTone;
 }
 
 const CANVAS_TAB = "canvas";
@@ -36,8 +32,6 @@ const BASE_TAB_CLASSES =
 
 const ACTIVE_CLASSES = "bg-slate-300 text-slate-950 shadow-sm dark:bg-gray-400 dark:text-gray-950 dark:shadow-none";
 const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground dark:text-gray-400 dark:hover:text-gray-100";
-const EDITING_ACTIVE_CLASSES =
-  "rounded-full bg-white text-slate-900 shadow-sm dark:bg-gray-700 dark:text-gray-100 dark:shadow-none";
 
 const MODE_TO_TAB: Record<string, string> = {
   console: CONSOLE_TAB,
@@ -58,31 +52,30 @@ function modeToTab(mode: string): string {
 }
 
 /** Edit-mode nav background tinted to match the draft status badges. */
-function editingNavClassName(tone: DraftEditTabTone): string {
-  if (tone === "uncommitted") return "bg-orange-50 dark:bg-gray-800";
-  if (tone === "ready") return "bg-blue-50 dark:bg-gray-800";
-  return "bg-slate-100 dark:bg-gray-800";
+function editingNavClassName(): string {
+  return "bg-orange-200 dark:bg-orange-900/55";
 }
 
-/** Edit-mode inactive tab text — light tints match draft badges; dark mode stays gray. */
-function editingInactiveClassName(tone: DraftEditTabTone): string {
-  if (tone === "uncommitted")
-    return "bg-transparent text-orange-800/80 hover:text-orange-900 transition-none dark:text-gray-400 dark:hover:text-gray-100";
-  if (tone === "ready")
-    return "bg-transparent text-blue-800/80 hover:text-blue-900 transition-none dark:text-gray-400 dark:hover:text-gray-100";
-  return "bg-transparent text-slate-600 hover:text-slate-900 transition-none dark:text-gray-400 dark:hover:text-gray-100";
+/** Edit-mode inactive tab text — light tints match draft badges; dark mode keeps orange cues. */
+function editingInactiveClassName(): string {
+  return "bg-transparent text-orange-800/80 hover:text-orange-900 transition-none dark:text-orange-300/80 dark:hover:text-orange-200";
 }
 
-function tabClasses(selected: string, value: string, editing: boolean, tone: DraftEditTabTone) {
+/** Active edit tab — lighter orange pill on the orange nav track. */
+function editingActiveClassName(): string {
+  return "rounded-full bg-orange-100 text-orange-950 dark:bg-orange-700/60 dark:text-orange-50 dark:shadow-none";
+}
+
+function tabClasses(selected: string, value: string, editing: boolean) {
   const isActive = selected === value;
   const stateClass = isActive
     ? editing
-      ? EDITING_ACTIVE_CLASSES
+      ? editingActiveClassName()
       : ACTIVE_CLASSES
     : editing
-      ? editingInactiveClassName(tone)
+      ? editingInactiveClassName()
       : INACTIVE_CLASSES;
-  return cn(BASE_TAB_CLASSES, stateClass);
+  return cn(BASE_TAB_CLASSES, stateClass, isActive && "font-bold");
 }
 
 export function CanvasModeToggle({
@@ -98,7 +91,6 @@ export function CanvasModeToggle({
   hasConsoleCommitted = false,
   hasFilesUncommitted = false,
   hasFilesCommitted = false,
-  editTabTone = "neutral",
 }: CanvasModeToggleProps) {
   const { organizationId, appId } = useParams<{ organizationId: string; appId: string }>();
   const showConsole = Boolean(onSelectConsole);
@@ -113,13 +105,13 @@ export function CanvasModeToggle({
       aria-label="Canvas view"
       className={cn(
         "inline-flex h-7 min-h-7 items-center justify-center gap-0 rounded-full p-1",
-        editing ? editingNavClassName(editTabTone) : "bg-slate-100 dark:bg-gray-800",
+        editing ? editingNavClassName() : "bg-slate-100 dark:bg-gray-800",
       )}
     >
       <Link
         to={tabHref()}
         onClick={(e) => handleTabClick(e, selected === CANVAS_TAB, () => void onSelectLive())}
-        className={tabClasses(selected, CANVAS_TAB, editing, editTabTone)}
+        className={tabClasses(selected, CANVAS_TAB, editing)}
         data-testid="canvas-view-mode-live"
         aria-label={editing ? "Canvas (editing)" : "Canvas"}
         aria-current={selected === CANVAS_TAB ? "page" : undefined}
@@ -137,7 +129,7 @@ export function CanvasModeToggle({
         <Link
           to={tabHref("console")}
           onClick={(e) => handleTabClick(e, selected === CONSOLE_TAB, () => void onSelectConsole?.())}
-          className={tabClasses(selected, CONSOLE_TAB, editing, editTabTone)}
+          className={tabClasses(selected, CONSOLE_TAB, editing)}
           data-testid="canvas-view-mode-console"
           aria-label="Console"
           aria-current={selected === CONSOLE_TAB ? "page" : undefined}
@@ -156,7 +148,7 @@ export function CanvasModeToggle({
         <Link
           to={tabHref("memory")}
           onClick={(e) => handleTabClick(e, selected === MEMORY_TAB, () => void onSelectMemory?.())}
-          className={tabClasses(selected, MEMORY_TAB, editing, editTabTone)}
+          className={tabClasses(selected, MEMORY_TAB, editing)}
           data-testid="canvas-view-mode-memory"
           aria-label="Memory"
           aria-current={selected === MEMORY_TAB ? "page" : undefined}
@@ -168,7 +160,7 @@ export function CanvasModeToggle({
         <Link
           to={tabHref("files")}
           onClick={(e) => handleTabClick(e, selected === FILES_TAB, () => void onSelectFiles?.())}
-          className={tabClasses(selected, FILES_TAB, editing, editTabTone)}
+          className={tabClasses(selected, FILES_TAB, editing)}
           data-testid="canvas-view-mode-files"
           aria-label="Files"
           aria-current={selected === FILES_TAB ? "page" : undefined}

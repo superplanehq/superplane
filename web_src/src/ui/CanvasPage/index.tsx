@@ -241,7 +241,6 @@ export interface CanvasPageProps {
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasCommittedFilesDraftChanges?: boolean;
-  editTabTone?: "uncommitted" | "ready" | "neutral";
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   isAutoLayoutOnUpdateEnabled?: boolean;
@@ -256,6 +255,8 @@ export interface CanvasPageProps {
   hideAddControls?: boolean;
   /** Hide the Agent / Versions left panel toggle (templates only). */
   hideCanvasToolSidebar?: boolean;
+  /** Enables managed agent chat controls when the user has the required RBAC permissions. */
+  canUseAgents?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -831,6 +832,7 @@ function CanvasPage(props: CanvasPageProps) {
   const toolSidebarState = useCanvasToolSidebarState({
     isEditing: props.isEditing,
     hideCanvasToolSidebar: props.hideCanvasToolSidebar ?? false,
+    canUseAgents: props.canUseAgents ?? true,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
@@ -1416,7 +1418,6 @@ function CanvasPage(props: CanvasPageProps) {
           hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
           hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
           hasCommittedFilesDraftChanges={props.hasCommittedFilesDraftChanges}
-          editTabTone={props.editTabTone}
           activeDraftBranchLabel={props.activeDraftBranchLabel}
           activeDraftBranchShortSha={props.activeDraftBranchShortSha}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
@@ -1890,7 +1891,6 @@ function CanvasContentHeader({
   hasCommittedCanvasDraftChanges,
   hasCommittedConsoleDraftChanges,
   hasCommittedFilesDraftChanges,
-  editTabTone,
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
   showCanvasSettingsMenu,
@@ -1955,7 +1955,6 @@ function CanvasContentHeader({
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasCommittedFilesDraftChanges?: boolean;
-  editTabTone?: "uncommitted" | "ready" | "neutral";
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
@@ -2012,7 +2011,6 @@ function CanvasContentHeader({
       hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
       hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
       hasCommittedFilesDraftChanges={hasCommittedFilesDraftChanges}
-      editTabTone={editTabTone}
       activeDraftBranchLabel={activeDraftBranchLabel}
       activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
