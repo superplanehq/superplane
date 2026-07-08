@@ -99,7 +99,7 @@ export function ConsoleGrid({
 
   return (
     <div className="flex h-full w-full flex-col overflow-auto">
-      <div className="px-4 py-3">
+      <div className="px-4 py-3.5">
         <div ref={gridWrapperRef} className="relative" style={{ minHeight: gridMinHeight }}>
           <RemovedPanelGhostLayer ghosts={removedGhosts} gridWidth={gridWidth} onSelectDiffItem={setSelectedDiffItem} />
           <ConsoleGridLayout

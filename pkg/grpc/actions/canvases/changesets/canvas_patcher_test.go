@@ -438,6 +438,102 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "true"})
 	})
 
+	t.Run("update node -> assigns first implementation to placeholder component", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		errorMessage := "component name is required"
+		steps.givenCanvasVersion(
+			[]models.Node{{
+				ID:            "node-a",
+				Name:          "New Component",
+				Type:          models.NodeTypeComponent,
+				Configuration: map[string]any{},
+				ErrorMessage:  &errorMessage,
+			}},
+			nil,
+		)
+
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
+				{
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
+						Name:          "No-op",
+						Block:         "noop",
+						Configuration: structFromMap(t, map[string]any{}),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertNoError()
+		steps.assertHasNode("node-a", "No-op", map[string]any{})
+		steps.assertHasNodeBlock("node-a", "noop")
+		steps.assertNodeHasNoError("node-a")
+	})
+
+	t.Run("update node -> rejects implementation changes for implemented component", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{{
+				ID:            "node-a",
+				Name:          "Node A",
+				Type:          models.NodeTypeComponent,
+				Configuration: map[string]any{},
+				Ref: models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				},
+			}},
+			nil,
+		)
+
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
+				{
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{ID: "node-a", Name: "Node A", Block: "if"},
+				},
+			},
+		}, nil)
+
+		steps.assertHasError()
+		steps.assertErrorContains("cannot change node node-a implementation; delete the node and add a new one instead")
+	})
+
+	t.Run("update node -> allows repeated implementation for implemented component", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(
+			[]models.Node{{
+				ID:            "node-a",
+				Name:          "Node A",
+				Type:          models.NodeTypeComponent,
+				Configuration: map[string]any{"expression": "true"},
+				Ref: models.NodeRef{
+					Component: &models.ComponentRef{Name: "if"},
+				},
+			}},
+			nil,
+		)
+
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
+				{
+					Type: ChangeTypeUpdateNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
+						Name:          "Node A Updated",
+						Block:         "if",
+						Configuration: structFromMap(t, map[string]any{"expression": "false"}),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertNoError()
+		steps.assertHasNode("node-a", "Node A Updated", map[string]any{"expression": "false"})
+		steps.assertHasNodeBlock("node-a", "if")
+	})
+
 	t.Run("update node -> no collapsed change provided, previous collapsed state is preserved", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(
@@ -989,6 +1085,15 @@ func (s *CanvasPatcherSteps) assertNodeErrorContains(nodeID string, text string)
 	require.True(s.t, i != -1, "expected node %s", nodeID)
 	require.NotNil(s.t, s.finalVersion.Nodes[i].ErrorMessage)
 	require.Contains(s.t, *s.finalVersion.Nodes[i].ErrorMessage, text)
+}
+
+func (s *CanvasPatcherSteps) assertNodeHasNoError(nodeID string) {
+	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
+		return node.ID == nodeID
+	})
+
+	require.True(s.t, i != -1, "expected node %s", nodeID)
+	require.Nil(s.t, s.finalVersion.Nodes[i].ErrorMessage)
 }
 
 func (s *CanvasPatcherSteps) assertNodePosition(nodeID string, x int, y int) {

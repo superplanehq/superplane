@@ -26,8 +26,8 @@ export function CanvasVersionsSidebarTrigger({ versionsSidebarState }: CanvasVer
           className={cn(
             "size-7 rounded-full border-0 shadow-none transition-colors",
             isVersionsSidebarOpen
-              ? "bg-slate-200 text-foreground hover:bg-slate-200 focus-visible:bg-slate-200"
-              : "bg-slate-100 text-slate-500 hover:bg-slate-100 hover:text-foreground focus-visible:bg-slate-100",
+              ? "bg-slate-300 text-slate-950 hover:bg-slate-300 hover:text-slate-950 focus-visible:bg-slate-300 dark:bg-gray-300 dark:text-gray-950 dark:hover:bg-gray-300 dark:hover:text-gray-950 dark:focus-visible:bg-gray-300"
+              : "bg-slate-100 text-slate-500 hover:bg-slate-100 hover:text-foreground focus-visible:bg-slate-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus-visible:bg-gray-700",
           )}
           aria-label={label}
           aria-pressed={isVersionsSidebarOpen}

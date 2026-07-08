@@ -121,7 +121,7 @@ export function MentionTextarea({
           composerTextMetrics,
           "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
           "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-          "text-transparent caret-slate-900 selection:bg-blue-200/50",
+          "text-transparent caret-slate-900 selection:bg-blue-200/50 dark:caret-gray-100 dark:selection:bg-blue-500/30",
           "dark:bg-transparent",
         )}
         onKeyDown={onKeyDown}

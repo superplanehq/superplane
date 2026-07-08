@@ -1,5 +1,5 @@
 {
-  "maxAllowedInTransactionDefinitions": 169,
+  "maxAllowedInTransactionDefinitions": 168,
   "maxAllowedDatabaseConnCalls": 192,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
@@ -103,7 +103,6 @@
     "pkg/models/canvas_version.go:ListCanvasVersionHistoryInTransaction",
     "pkg/models/canvas_version.go:CountCanvasVersionsInTransaction",
     "pkg/models/canvas_version.go:FindLatestCanvasVersionInTransaction",
-    "pkg/models/canvas_version.go:CreateCommitVersionFromLiveInTransaction",
     "pkg/models/canvas_version.go:CreateCommitVersionWithSpecInTransaction",
     "pkg/models/canvas_version.go:PromoteToLiveInTransaction",
     "pkg/models/canvas_version.go:FindLiveCanvasVersionInTransaction",
@@ -366,5 +365,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-07-04T19:54:36Z"
+  "updatedAt": "2026-07-06T20:09:19Z"
 }

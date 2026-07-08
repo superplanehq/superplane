@@ -4,6 +4,7 @@ import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponen
 import type { QueryClient } from "@tanstack/react-query";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { CanvasSaveResult } from "./canvasSaveTypes";
+import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
 
 function applyPositionUpdates(
   nodes: ComponentsNode[],
@@ -46,6 +47,7 @@ export type RunPositionAutoSaveOptions = {
   canvasId?: string;
   pendingPositionUpdatesRef: MutableRefObject<Map<string, { x: number; y: number }>>;
   isReadOnly: boolean;
+  isEditing: boolean;
   canvasRef: MutableRefObject<CanvasesCanvas | null>;
   queryClient: QueryClient;
   activeCanvasVersionIdRef: MutableRefObject<string>;
@@ -63,6 +65,7 @@ export async function runPositionAutoSave({
   canvasId,
   pendingPositionUpdatesRef,
   isReadOnly,
+  isEditing,
   canvasRef,
   queryClient,
   activeCanvasVersionIdRef,
@@ -85,8 +88,11 @@ export async function runPositionAutoSave({
       return;
     }
 
-    const latestWorkflow =
-      canvasRef.current || queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+    const latestWorkflow = resolveEditableWorkflowSnapshot({
+      isEditing,
+      renderedWorkflow: canvasRef.current,
+      detailWorkflow: queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)),
+    });
 
     if (!latestWorkflow?.spec?.nodes) return;
 
@@ -117,7 +123,11 @@ export async function runPositionAutoSave({
       }
     });
 
-    const currentWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
+    const currentWorkflow = resolveEditableWorkflowSnapshot({
+      isEditing,
+      renderedWorkflow: canvasRef.current,
+      detailWorkflow: queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)),
+    });
 
     if (currentWorkflow?.spec?.nodes && pendingPositionUpdatesRef.current.size > 0) {
       applyLocalWorkflowUpdate(mergePendingPositionUpdates(currentWorkflow, pendingPositionUpdatesRef.current));

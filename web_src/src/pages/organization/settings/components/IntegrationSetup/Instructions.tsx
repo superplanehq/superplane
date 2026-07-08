@@ -51,7 +51,7 @@ export function Instructions({ description, onContinue, className = "" }: Instru
                 );
               },
               blockquote: ({ children }) => (
-                <blockquote className="mb-2 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm last:mb-0 dark:border-gray-700 dark:bg-gray-900/60">
+                <blockquote className="mb-2 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm last:mb-0 dark:border-gray-600 dark:bg-gray-900/60">
                   {children}
                 </blockquote>
               ),
@@ -93,13 +93,13 @@ export function Instructions({ description, onContinue, className = "" }: Instru
               em: ({ children }) => <em className="italic">{children}</em>,
               table: ({ children }) => (
                 <div
-                  className={`my-3 overflow-x-auto rounded-md border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900/50 ${MARKDOWN_TABLE_SCROLL_CLASSES}`}
+                  className={`my-3 overflow-x-auto rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900/50 ${MARKDOWN_TABLE_SCROLL_CLASSES}`}
                 >
                   <table className="w-full min-w-max border-collapse text-left text-sm">{children}</table>
                 </div>
               ),
               thead: ({ children }) => (
-                <thead className="border-b border-gray-200 dark:border-gray-700">{children}</thead>
+                <thead className="border-b border-gray-200 dark:border-gray-600">{children}</thead>
               ),
               tbody: ({ children }) => (
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">{children}</tbody>

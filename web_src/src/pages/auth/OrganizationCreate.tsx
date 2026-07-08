@@ -10,6 +10,8 @@ import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { getResponseErrorMessage } from "@/lib/errors";
 import { analytics } from "@/lib/analytics";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { cn } from "@/lib/utils";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -56,17 +58,26 @@ const OrganizationCreate: React.FC = () => {
   const usageLimitNotice = error ? getUsageLimitNotice(error) : null;
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="p-6 flex items-center">
-        <Link to="/" className="text-sm font-medium text-gray-500 px-2 py-1 hover:bg-gray-950/5 rounded">
+    <div className={cn("min-h-screen bg-slate-100", appDarkModeClasses.surface)}>
+      <div className="flex items-center p-6">
+        <Link
+          to="/?select=true"
+          className="rounded px-2 py-1 text-sm font-medium text-gray-500 hover:bg-gray-950/5 dark:text-gray-400 dark:hover:bg-white/5"
+        >
           ← Back to Organizations
         </Link>
       </div>
       <div className="flex items-center justify-center p-8">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8 outline outline-slate-950/10">
-          <div className="text-center mb-8">
-            <h4 className="text-xl font-semibold text-gray-800 mb-1">Create Organization</h4>
-            <Text className="text-gray-800">Set up a new SuperPlane organization</Text>
+        <div
+          className={cn(
+            "w-full max-w-md rounded-lg bg-white p-8 shadow-sm",
+            appDarkModeClasses.modalEdge,
+            appDarkModeClasses.surfaceRaised,
+          )}
+        >
+          <div className="mb-8 text-center">
+            <h4 className="mb-1 text-xl font-semibold text-gray-800 dark:text-gray-100">Create Organization</h4>
+            <Text className="text-gray-800 dark:text-gray-300">Set up a new SuperPlane organization</Text>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">

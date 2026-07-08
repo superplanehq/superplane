@@ -59,3 +59,16 @@ export function shouldApplyPreservedDraftSpec(
 
   return getWorkflowSpecSignature(preservedDraftSpec) === getWorkflowSpecSignature(selectedDraftSpec);
 }
+
+// When local draft state is ahead of a stale loaded version query, keep the
+// local draft instead of overwriting it with older server/cache data.
+export function shouldSkipDraftSpecSyncFromLoadedVersion(
+  currentDraftSpec: CanvasesCanvas["spec"] | null | undefined,
+  nextDraftSpec: CanvasesCanvasVersion["spec"] | null | undefined,
+): boolean {
+  if (!currentDraftSpec || !nextDraftSpec) {
+    return false;
+  }
+
+  return getWorkflowSpecSignature(currentDraftSpec) !== getWorkflowSpecSignature(nextDraftSpec);
+}

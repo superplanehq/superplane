@@ -11,18 +11,6 @@ interface CustomEdgeData {
   onDelete?: (edgeId: string) => void;
 }
 
-function getEdgeStroke(style: CSSProperties, selected: boolean | undefined, isHovered: boolean) {
-  if (style.stroke && style.stroke !== "#C9D5E1") {
-    return style.stroke;
-  }
-
-  if (selected || isHovered) {
-    return "#A1AEC0";
-  }
-
-  return style.stroke || "#DEF3FE";
-}
-
 function DeleteEdgeControls({
   canDelete,
   edgePath,
@@ -67,8 +55,8 @@ function DeleteEdgeControls({
           }}
           className="edge-label nodrag nopan flex items-center justify-center"
         >
-          <div className="rounded-full bg-slate-100 p-1" data-testid="edge-delete-icon">
-            <CircleX size={18} className="text-slate-500" />
+          <div className="rounded-full bg-slate-100 p-1 dark:bg-gray-800" data-testid="edge-delete-icon">
+            <CircleX size={18} className="text-slate-500 dark:text-gray-400" />
           </div>
         </div>
       </EdgeLabelRenderer>
@@ -113,10 +101,9 @@ export const CustomEdge = React.memo(function CustomEdge({
   }, [id, onDeleteEdge, setEdges]);
 
   const edgeStyle: CSSProperties = {
-    ...style,
-    stroke: getEdgeStroke(style, selected, isHovered),
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
     pointerEvents: "visibleStroke",
+    ...(style.strokeDasharray ? { strokeDasharray: style.strokeDasharray } : {}),
     ...(selected || isHovered ? { strokeOpacity: 1 } : {}),
   };
   const shouldShowIcon = canDelete && (isHovered || selected === true);
@@ -131,7 +118,7 @@ export const CustomEdge = React.memo(function CustomEdge({
 
   return (
     <>
-      <BaseEdge path={edgePath} style={edgeStyle} interactionWidth={20} className={isHovered ? "hovered" : undefined} />
+      <BaseEdge path={edgePath} style={edgeStyle} interactionWidth={20} />
       <DeleteEdgeControls
         canDelete={canDelete}
         edgePath={edgePath}

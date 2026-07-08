@@ -19,7 +19,7 @@ describe("VersionsTabPanel", () => {
     render(
       <VersionsTabPanel
         liveVersions={[]}
-        canUpdateCanvas={true}
+        canEditCanvasVersion={true}
         canvasDeletedRemotely={false}
         onUseVersion={vi.fn()}
       />,
@@ -35,7 +35,7 @@ describe("VersionsTabPanel", () => {
       <VersionsTabPanel
         liveCanvasVersionId="version-2"
         liveVersions={[makeVersion("version-2", "Latest"), makeVersion("version-1", "Earlier")]}
-        canUpdateCanvas={true}
+        canEditCanvasVersion={true}
         canvasDeletedRemotely={false}
         onUseVersion={onUseVersion}
       />,

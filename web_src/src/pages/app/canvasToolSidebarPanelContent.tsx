@@ -41,7 +41,7 @@ export interface CanvasVersionsSidebarPanelConfig {
   liveCanvasVersion?: CanvasesCanvasVersion | null;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   liveVersions: CanvasesCanvasVersion[];
-  canUpdateCanvas: boolean;
+  canEditCanvasVersion: boolean;
   canvasDeletedRemotely: boolean;
   onUseVersion: (versionID: string) => void;
   onLoadMoreLiveVersions?: () => void;
@@ -57,6 +57,6 @@ export function renderCanvasRunsSidebarPanel(config: CanvasRunsSidebarPanelConfi
 
 export function renderCanvasVersionsSidebarPanel(config: CanvasVersionsSidebarPanelConfig): ReactNode {
   if (!config.isOpen) return null;
-  const { isOpen: _isOpen, ...props } = config;
-  return <VersionsTabPanel {...props} />;
+  const { isOpen: _isOpen, canEditCanvasVersion, ...props } = config;
+  return <VersionsTabPanel {...props} canEditCanvasVersion={canEditCanvasVersion} />;
 }

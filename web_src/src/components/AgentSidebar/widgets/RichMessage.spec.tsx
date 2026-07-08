@@ -8,6 +8,10 @@ vi.mock("@monaco-editor/react", () => ({
   default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
 }));
 
+vi.mock("@/contexts/useTheme", () => ({
+  useTheme: () => ({ preference: "light", resolvedTheme: "light", setPreference: () => undefined }),
+}));
+
 describe("RichMessage", () => {
   it("constrains its root so wide widgets can't expand a narrow parent", () => {
     const { container } = render(<RichMessage content="hello world" />);

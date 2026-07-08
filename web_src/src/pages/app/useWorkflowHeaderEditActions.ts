@@ -6,6 +6,7 @@ import {
   markAgentBootReady,
   PLACEHOLDER_NODE_CONTEXT_KEY,
 } from "@/lib/agentBootContext";
+import { clearRunInspectionSearchParams } from "./viewState";
 
 type PlaceholderAddHandler = (data: { position: { x: number; y: number } }) => Promise<string>;
 
@@ -27,12 +28,6 @@ interface WorkflowHeaderEditActionsConfig {
   startup?: WorkflowStartupActionsConfig;
 }
 
-function clearRunInspectionSearchParams(current: URLSearchParams): URLSearchParams {
-  const next = new URLSearchParams(current);
-  next.delete("run");
-  return next;
-}
-
 export function useWorkflowHeaderEditActions({
   isRunInspectionMode,
   handleClearRunInspection,
@@ -43,13 +38,16 @@ export function useWorkflowHeaderEditActions({
 }: WorkflowHeaderEditActionsConfig) {
   const handleEnterEditModeFromHeader = useCallback(async () => {
     if (isRunInspectionMode) {
-      setRunDetailNodeId(null);
-      setSearchParams(clearRunInspectionSearchParams, { replace: true });
+      handleClearRunInspection();
       await Promise.resolve();
     }
 
     await handleToggleEditMode();
-  }, [handleToggleEditMode, isRunInspectionMode, setRunDetailNodeId, setSearchParams]);
+
+    if (isRunInspectionMode) {
+      handleClearRunInspection();
+    }
+  }, [handleClearRunInspection, handleToggleEditMode, isRunInspectionMode]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
     if (isRunInspectionMode) {
@@ -66,9 +64,8 @@ export function useWorkflowHeaderEditActions({
       return;
     }
 
-    setRunDetailNodeId(null);
-    setSearchParams(clearRunInspectionSearchParams, { replace: true });
-  }, [isRunInspectionMode, setRunDetailNodeId, setSearchParams]);
+    handleClearRunInspection();
+  }, [handleClearRunInspection, isRunInspectionMode]);
 
   return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader, clearRunInspectionForEdit };
 }
@@ -104,6 +101,10 @@ function useAutoEditMode(
       }
 
       await handleToggleEditMode();
+      if (searchParams.get("run")) {
+        setRunDetailNodeId(null);
+        setSearchParams(clearRunInspectionSearchParams, { replace: true });
+      }
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);

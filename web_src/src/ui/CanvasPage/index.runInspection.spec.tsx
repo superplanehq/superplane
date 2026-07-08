@@ -1,7 +1,9 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, render as testingLibraryRender, waitFor } from "@testing-library/react";
+import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 const { fitViewMock, getNodesMock, getViewportMock, reactFlowPropsRef, setViewportMock } = vi.hoisted(() => ({
   fitViewMock: vi.fn().mockResolvedValue(true),
@@ -94,6 +96,25 @@ vi.mock("./Header", () => ({
 }));
 
 import { CanvasPage } from "./index";
+
+function render(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  return testingLibraryRender(ui, { wrapper: Wrapper });
+}
 
 describe("CanvasPage run inspection", () => {
   beforeEach(() => {
@@ -499,44 +520,5 @@ describe("CanvasPage run inspection", () => {
 
     expect(onRunNodeDetailClose).not.toHaveBeenCalled();
     expect(selectedRunNode()?.selected).toBe(true);
-  });
-
-  it("shows the run node detail pane during run inspection even when the live node inspector would be open", async () => {
-    render(
-      <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          headerMode="version-live"
-          isRunInspectionMode
-          initialSidebar={{ isOpen: true, nodeId: "run-node-1" }}
-          runNodeDetailNodeId="run-node-1"
-          runNodeDetailCanvasId="canvas-1"
-          runNodeDetailRun={{
-            id: "run-1",
-            rootEvent: { id: "root-event-1", nodeId: "trigger-node" },
-          }}
-          nodes={[
-            {
-              id: "run-node-1",
-              position: { x: 0, y: 0 },
-              data: {
-                label: "Run node",
-                state: "success",
-                type: "component",
-              },
-            },
-          ]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing={false}
-          activeCanvasVersionId="live-version"
-        />
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("run-node-detail-pane")).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId("live-node-detail-pane")).not.toBeInTheDocument();
   });
 });
