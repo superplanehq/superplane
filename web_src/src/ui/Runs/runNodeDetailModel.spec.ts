@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import {
+  buildRunInspectorNodeSections,
   buildTriggerTabData,
   getAdjacentRunNodeId,
   isRunNodeDetailTabAvailable,
@@ -101,6 +102,233 @@ describe("buildTriggerTabData", () => {
       Name: "Manual run",
       "Triggered at": run.rootEvent?.createdAt,
     });
+  });
+});
+
+describe("buildRunInspectorNodeSections", () => {
+  it("uses the root event payload as trigger output", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: new Date().toISOString(),
+        data: { repository: "superplane" },
+      },
+    };
+
+    const [triggerSection] = buildRunInspectorNodeSections({
+      run,
+      executions: [],
+      workflowNodes: [
+        {
+          id: "trigger",
+          name: "On Pull Request",
+          type: "TYPE_TRIGGER",
+          component: "github.onPullRequest",
+        },
+      ],
+    });
+
+    expect(triggerSection.isTrigger).toBe(true);
+    expect(triggerSection.upstreamSections).toEqual([]);
+    expect(triggerSection.outputSections).toEqual([
+      {
+        channel: "default",
+        value: { repository: "superplane" },
+        sizeKb: expect.any(String),
+      },
+    ]);
+  });
+
+  it("includes earlier inputs in topological order and marks the immediate previous step as primary", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: new Date().toISOString(),
+        data: { trigger: true },
+      },
+    };
+
+    const sections = buildRunInspectorNodeSections({
+      run,
+      executions: [
+        {
+          id: "execution-1",
+          nodeId: "first-action",
+          outputs: { default: [{ first: true }] },
+          metadata: {},
+        },
+        {
+          id: "execution-2",
+          nodeId: "second-action",
+          outputs: { default: [{ second: true }] },
+          metadata: {},
+        },
+      ],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "first-action", name: "First Action", type: "TYPE_ACTION", component: "test.first" },
+        { id: "second-action", name: "Second Action", type: "TYPE_ACTION", component: "test.second" },
+      ],
+    });
+
+    const secondAction = sections.find((section) => section.nodeId === "second-action");
+
+    expect(secondAction?.upstreamSections.map((section) => section.nodeName)).toEqual(["Trigger", "First Action"]);
+    expect(secondAction?.upstreamSections.map((section) => section.output)).toEqual([
+      { trigger: true },
+      { first: true },
+    ]);
+    expect(secondAction?.primaryInputNodeId).toBe("first-action");
+    expect(secondAction?.outputSections).toEqual([
+      {
+        channel: "default",
+        value: { second: true },
+        sizeKb: expect.any(String),
+      },
+    ]);
+  });
+
+  it("falls back to execution-chain inputs when workflow edges are empty", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: new Date().toISOString(),
+        data: { trigger: true },
+      },
+    };
+
+    const sections = buildRunInspectorNodeSections({
+      run,
+      executions: [
+        {
+          id: "execution-1",
+          nodeId: "first-action",
+          outputs: { default: [{ first: true }] },
+          metadata: {},
+        },
+        {
+          id: "execution-2",
+          nodeId: "second-action",
+          outputs: { default: [{ second: true }] },
+          metadata: {},
+        },
+      ],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "first-action", name: "First Action", type: "TYPE_ACTION", component: "test.first" },
+        { id: "second-action", name: "Second Action", type: "TYPE_ACTION", component: "test.second" },
+      ],
+      workflowEdges: [],
+    });
+
+    const secondAction = sections.find((section) => section.nodeId === "second-action");
+
+    expect(secondAction?.upstreamSections.map((section) => section.nodeName)).toEqual(["Trigger", "First Action"]);
+    expect(secondAction?.primaryInputNodeId).toBe("first-action");
+  });
+
+  it("uses edges to include only accessible upstream nodes ordered by creation time", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: "2026-05-01T12:00:00Z",
+        data: { trigger: true },
+      },
+    };
+
+    const sections = buildRunInspectorNodeSections({
+      run,
+      executions: [
+        {
+          id: "execution-1",
+          nodeId: "first-action",
+          createdAt: "2026-05-01T12:00:03Z",
+          outputs: { default: [{ first: true }] },
+          metadata: {},
+        },
+        {
+          id: "execution-2",
+          nodeId: "independent-action",
+          createdAt: "2026-05-01T12:00:01Z",
+          outputs: { default: [{ independent: true }] },
+          metadata: {},
+        },
+        {
+          id: "execution-3",
+          nodeId: "second-action",
+          createdAt: "2026-05-01T12:00:04Z",
+          outputs: { default: [{ second: true }] },
+          metadata: {},
+        },
+      ],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "first-action", name: "First Action", type: "TYPE_ACTION", component: "test.first" },
+        { id: "independent-action", name: "Independent Action", type: "TYPE_ACTION", component: "test.independent" },
+        { id: "second-action", name: "Second Action", type: "TYPE_ACTION", component: "test.second" },
+      ],
+      workflowEdges: [
+        { sourceId: "trigger", targetId: "first-action" },
+        { sourceId: "first-action", targetId: "second-action" },
+        { sourceId: "trigger", targetId: "independent-action" },
+      ],
+    });
+
+    const secondAction = sections.find((section) => section.nodeId === "second-action");
+
+    expect(secondAction?.upstreamSections.map((section) => section.nodeName)).toEqual(["Trigger", "First Action"]);
+    expect(secondAction?.upstreamSections.map((section) => section.output)).toEqual([
+      { trigger: true },
+      { first: true },
+    ]);
+    expect(secondAction?.primaryInputNodeId).toBe("first-action");
+  });
+
+  it("keeps channel names when displaying multiple execution output channels", () => {
+    const run: CanvasesCanvasRun = {
+      rootEvent: {
+        id: "event-1",
+        nodeId: "trigger",
+        createdAt: new Date().toISOString(),
+        data: { trigger: true },
+      },
+    };
+
+    const [, actionSection] = buildRunInspectorNodeSections({
+      run,
+      executions: [
+        {
+          id: "execution-1",
+          nodeId: "action",
+          outputs: {
+            default: [{ status: "ok" }],
+            report: [{ url: "https://example.com/report" }],
+          },
+          metadata: {},
+        },
+      ],
+      workflowNodes: [
+        { id: "trigger", name: "Trigger", type: "TYPE_TRIGGER", component: "github.onPullRequest" },
+        { id: "action", name: "Action", type: "TYPE_ACTION", component: "test.action" },
+      ],
+    });
+
+    expect(actionSection.outputSections).toEqual([
+      {
+        channel: "default",
+        value: { status: "ok" },
+        sizeKb: expect.any(String),
+      },
+      {
+        channel: "report",
+        value: { url: "https://example.com/report" },
+        sizeKb: expect.any(String),
+      },
+    ]);
   });
 });
 

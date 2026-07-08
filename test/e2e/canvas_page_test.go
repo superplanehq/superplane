@@ -450,7 +450,7 @@ func (s *CanvasPageSteps) findNodeByName(nodeName string) (*models.CanvasNode, e
 
 func (s *CanvasPageSteps) openSidebarForNode(node string) {
 	s.session.Click(q.TestID("node", node, "header"))
-	s.session.TakeScreenshot()
+	s.session.AssertVisible(q.TestID("run-inspector-panel"))
 }
 
 func (s *CanvasPageSteps) openNodeSettings(node string) {
@@ -543,30 +543,20 @@ func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int)
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
-	s.session.AssertText("Queued")
+	s.session.AssertVisible(q.TestID("run-inspector-panel"))
+	s.session.AssertVisible(q.Locator(`[data-testid="run-inspector-panel"] button:has-text("Stop")`))
 }
 
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
-	eventItem := q.Locator("h2:has-text('Queued') ~ div")
-	s.session.HoverOver(eventItem)
-	s.session.Sleep(300) // Wait for hover to register and actions button to appear
-	s.session.Click(q.Locator("h2:has-text('Queued') ~ div button[aria-label='Open actions']"))
-	s.session.TakeScreenshot()
-	s.session.Sleep(300)
-	s.session.Click(q.TestID("cancel-queue-item"))
-	s.session.TakeScreenshot()
-	s.session.Sleep(500) // wait for the cancellation to be processed
+	s.stopRunFromInspector()
 }
 
 func (s *CanvasPageSteps) cancelRunningExecutionFromSidebar() {
-	eventItem := q.Locator("h2:has-text('Latest') ~ div")
-	s.session.HoverOver(eventItem)
-	s.session.Sleep(300) // Wait for hover to register and actions button to appear
-	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
-	s.session.TakeScreenshot()
-	s.session.Sleep(300)
-	s.session.Click(q.TestID("cancel-queue-item"))
-	s.session.TakeScreenshot()
+	s.stopRunFromInspector()
+}
+
+func (s *CanvasPageSteps) stopRunFromInspector() {
+	s.session.Click(q.Locator(`[data-testid="run-inspector-panel"] button:has-text("Stop")`))
 	s.session.Sleep(500) // wait for the cancellation to be processed
 }
 
