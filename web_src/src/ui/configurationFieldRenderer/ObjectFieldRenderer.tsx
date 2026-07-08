@@ -21,6 +21,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   organizationId,
   autocompleteExampleObj,
   allowExpressions = false,
+  readOnly = false,
 }) => {
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const hasInitialized = React.useRef(false);
@@ -76,6 +77,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   const hasPushedSchemaDefaults = React.useRef(false);
 
   React.useEffect(() => {
+    if (readOnly) return;
+
     if (value !== undefined && value !== null) {
       hasInitialized.current = true;
     }
@@ -87,9 +90,10 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
       setEditorValue(serializeValueForEditor(defaultValue));
       setJsonError(null);
     }
-  }, [value, field.defaultValue, onChange, coerceDefaultValue, serializeValueForEditor]);
+  }, [readOnly, value, field.defaultValue, onChange, coerceDefaultValue, serializeValueForEditor]);
 
   React.useEffect(() => {
+    if (readOnly) return;
     if (!hasSchema) return;
     if (hasPushedSchemaDefaults.current) return;
     const isEmpty =
@@ -99,7 +103,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     if (!isEmpty || Object.keys(schemaDefaults).length === 0) return;
     hasPushedSchemaDefaults.current = true;
     onChange(schemaDefaults);
-  }, [hasSchema, value, schemaDefaults, onChange]);
+  }, [readOnly, hasSchema, value, schemaDefaults, onChange]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(editorValue);
@@ -112,6 +116,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     const handleEditorChange = (newValue: string | undefined) => {
       const valueToUse = newValue ?? "";
       setEditorValue(valueToUse);
+      if (readOnly) return;
+
       const trimmedValue = valueToUse.trim();
       if (trimmedValue.length === 0) {
         onChange(undefined);
@@ -158,6 +164,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
       scrollBeyondLastLine: false,
       renderWhitespace: "boundary" as const,
       smoothScrolling: true,
+      readOnly,
+      domReadOnly: readOnly,
       cursorBlinking: "smooth" as const,
       contextmenu: true,
       selectOnLineNumbers: true,
@@ -278,6 +286,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
           field={schemaField}
           value={objValue[schemaField.name!]}
           onChange={(val) => {
+            if (readOnly) return;
             const newValue: Record<string, unknown> = { ...objValue, [schemaField.name!]: val };
             onChange(newValue);
           }}
@@ -287,6 +296,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
           integrationId={integrationId}
           organizationId={organizationId}
           autocompleteExampleObj={autocompleteExampleObj}
+          readOnly={readOnly}
         />
       ))}
     </div>
