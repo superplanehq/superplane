@@ -325,6 +325,29 @@ type UseCanvasOptions = {
   refetchOnMount?: boolean;
 };
 
+// DescribeCanvas returns both the canvas payload and the caller's canvas
+// preference, but `useCanvas` and `useCanvasPreference` cache the two slices
+// under different query keys, so React Query cannot dedupe their fetches.
+// Share one in-flight request per canvas so mounting both hooks together (as
+// the app page does) issues a single describe call instead of two.
+type DescribeCanvasResult = Awaited<ReturnType<typeof canvasesDescribeCanvas>>;
+
+const describeCanvasInFlight = new Map<string, Promise<DescribeCanvasResult>>();
+
+function describeCanvasDeduped(canvasId: string): Promise<DescribeCanvasResult> {
+  const existing = describeCanvasInFlight.get(canvasId);
+  if (existing) return existing;
+  const request = Promise.resolve(
+    canvasesDescribeCanvas(
+      withOrganizationHeader({
+        path: { id: canvasId },
+      }),
+    ),
+  ).finally(() => describeCanvasInFlight.delete(canvasId));
+  describeCanvasInFlight.set(canvasId, request);
+  return request;
+}
+
 export const useCanvas = (organizationId: string, canvasId: string, options: UseCanvasOptions = {}) => {
   const {
     enabled = true,
@@ -333,14 +356,17 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
     refetchOnReconnect = true,
     refetchOnMount = true,
   } = options;
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: canvasKeys.detail(organizationId, canvasId),
     queryFn: async () => {
-      const response = await canvasesDescribeCanvas(
-        withOrganizationHeader({
-          path: { id: canvasId },
-        }),
+      const response = await describeCanvasDeduped(canvasId);
+      // The preference query never refetches on its own (staleTime Infinity),
+      // so reseed it from the same payload whenever the detail query fetches.
+      queryClient.setQueryData<CanvasesCanvasPreference | null>(
+        canvasKeys.preference(organizationId, canvasId),
+        response.data?.preference ?? null,
       );
       return response.data?.canvas;
     },
@@ -356,11 +382,7 @@ export const useCanvasPreference = (organizationId: string, canvasId: string) =>
   return useQuery({
     queryKey: canvasKeys.preference(organizationId, canvasId),
     queryFn: async (): Promise<CanvasesCanvasPreference | null> => {
-      const response = await canvasesDescribeCanvas(
-        withOrganizationHeader({
-          path: { id: canvasId },
-        }),
-      );
+      const response = await describeCanvasDeduped(canvasId);
       return response.data?.preference ?? null;
     },
     enabled: !!organizationId && !!canvasId,

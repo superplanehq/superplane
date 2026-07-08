@@ -64,6 +64,10 @@ export function useDefaultAppTab({
   const currentTab = urlViewFlagsToTab(urlViewFlags);
   const lastRecordedTabRef = useRef<AppTabId | null>(null);
   const redirectResolvedRef = useRef<boolean | null>(null);
+  // Tab a just-scheduled redirect is navigating to. `setSearchParams` only
+  // lands on the next render, so between scheduling and landing the URL still
+  // reports the pre-redirect tab; the record effect must not persist it.
+  const pendingRedirectTabRef = useRef<AppTabId | null>(null);
 
   // Snapshot on mount whether the URL already selected a tab or a run; if it
   // did, the default-tab redirect is skipped for this app instance. Deriving
@@ -84,6 +88,7 @@ export function useDefaultAppTab({
     const storedTab = preferenceQuery.data?.lastVisitedTab;
     if (isAppTabId(storedTab)) {
       redirectResolvedRef.current = true;
+      pendingRedirectTabRef.current = storedTab;
       applyTabToSearchParams(storedTab, setSearchParams);
       return;
     }
@@ -98,6 +103,7 @@ export function useDefaultAppTab({
     redirectResolvedRef.current = true;
     const panels = consoleQuery.data?.panels ?? [];
     if (panels.length > 0) {
+      pendingRedirectTabRef.current = "console";
       applyTabToSearchParams("console", setSearchParams);
     }
   }, [organizationId, canvasId, preferenceQuery.isPending, preferenceQuery.data, consoleQuery, setSearchParams]);
@@ -107,6 +113,16 @@ export function useDefaultAppTab({
     if (!organizationId || !canvasId) return;
     if (currentTab === null) return;
     if (!redirectResolvedRef.current) return;
+
+    // A redirect was scheduled but the URL hasn't caught up yet — this effect
+    // can run in the same commit that scheduled it, with `currentTab` still
+    // reporting the pre-redirect tab. Recording now would overwrite the
+    // stored tab with the tab we are navigating away from.
+    if (pendingRedirectTabRef.current !== null) {
+      if (currentTab !== pendingRedirectTabRef.current) return;
+      pendingRedirectTabRef.current = null;
+    }
+
     if (lastRecordedTabRef.current === currentTab) return;
 
     // Avoid writing an identical value back to the server on first render.
