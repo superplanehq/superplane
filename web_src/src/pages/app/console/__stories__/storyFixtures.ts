@@ -3,6 +3,7 @@ import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
 import type { ConsoleContextValue, ConsoleNodeStatus } from "../ConsoleContext";
 import type { WidgetChartRender, WidgetNumberRender, WidgetTableRender } from "../widget/types";
+import type { ScorecardThreshold } from "../widget/WidgetScorecard";
 
 /**
  * Shared fixtures for console panel Storybook stories. Panel renderers take
@@ -119,6 +120,58 @@ export const metricRows: Record<string, unknown>[] = timeseriesRows.map((row, id
   total: (row.passed as number) + (row.failed as number),
   passed: row.passed,
 }));
+
+/**
+ * Fixtures for the prototype `WidgetScorecard` panel. Sparkline series trend
+ * up / down / flat, and the band sets cover both goal directions.
+ */
+export const scorecardSparklineUp = [62, 65, 61, 70, 74, 78, 84, 91];
+export const scorecardSparklineDown = [140, 132, 128, 121, 118, 96, 88, 74];
+export const scorecardSparklineFlat = [50, 51, 49, 50, 52, 49, 50, 51];
+
+/**
+ * Real data behind the scorecard editor examples. Each series stands in for
+ * `rows.map(seriesField)` in the preview (chronological oldest -> newest where
+ * the metric is time-based), sampled from live canvases in the org so the
+ * fields, sources, and values all make sense together.
+ */
+
+/** "Papercut Analysis" canvas — `Format Message` node output `total_open`, last week of daily runs (Runs source). */
+export const papercutTotalOpen = [127, 127, 118, 125, 111, 108, 92, 98];
+
+/** Lower-is-better bands for the open-papercut count: good <= 80, warn <= 120, else bad. */
+export const papercutOpenBands: ScorecardThreshold[] = [
+  { at: 80, status: "good" },
+  { at: 120, status: "warn" },
+  { at: 100000, status: "bad" },
+];
+
+/** "LLM Cost Tracker 2" — per-account daily `cost_usd` from the `aws_costs_by_account` memory namespace (Memory source). */
+export const cloudSpendByAccount = [29.6283, 0.0693, 9.8003, 3.8124, 2.3818, 2.0191, 0.6986, 23.5465, 2.7158, 2.5305];
+
+/** "Papercut Analysis" — real `Fetch GitHub Stats` execution durations in ms, oldest -> newest (Executions source). */
+export const fetchDurationsMs = [120463, 120112, 120100, 121065, 120632, 120692];
+
+/** Lower-is-better duration bands (ms): good <= 90s, warn <= 150s, else bad. */
+export const fetchTimeBands: ScorecardThreshold[] = [
+  { at: 90000, status: "good" },
+  { at: 150000, status: "warn" },
+  { at: 100000000, status: "bad" },
+];
+
+/** Higher-is-better bands (e.g. success rate %): good >= 95, warn >= 85, else bad. */
+export const scorecardHigherBands: ScorecardThreshold[] = [
+  { at: 0, status: "bad" },
+  { at: 85, status: "warn" },
+  { at: 95, status: "good" },
+];
+
+/** Lower-is-better bands (e.g. error rate %): good <= 1, warn <= 5, else bad. */
+export const scorecardLowerBands: ScorecardThreshold[] = [
+  { at: 1, status: "good" },
+  { at: 5, status: "warn" },
+  { at: 100, status: "bad" },
+];
 
 /** Memory entries for the composite (multi-source) number widget. */
 export const memoryEntries: CanvasMemoryEntry[] = [
