@@ -169,18 +169,14 @@ func Test__OnMergeComment__HandleWebhook__NonMergeRequestComment(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
-func Test__OnMergeComment__HandleWebhook__EditedCommentIgnored(t *testing.T) {
+func Test__OnMergeComment__HandleWebhook__SystemNote(t *testing.T) {
 	trigger := &OnMergeComment{}
 
 	body, _ := json.Marshal(map[string]any{
 		"object_attributes": map[string]any{
-			"note":          "This looks good to me",
+			"note":          "assigned to @agarcia",
 			"noteable_type": "MergeRequest",
-			"action":        "update",
-		},
-		"merge_request": map[string]any{
-			"iid":   12,
-			"title": "Add merge request trigger",
+			"system":        true,
 		},
 	})
 
@@ -197,37 +193,6 @@ func Test__OnMergeComment__HandleWebhook__EditedCommentIgnored(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.NoError(t, err)
 	assert.Zero(t, events.Count())
-}
-
-func Test__OnMergeComment__HandleWebhook__CreatedCommentEmitted(t *testing.T) {
-	trigger := &OnMergeComment{}
-
-	body, _ := json.Marshal(map[string]any{
-		"object_attributes": map[string]any{
-			"note":          "This looks good to me",
-			"noteable_type": "MergeRequest",
-			"action":        "create",
-		},
-		"merge_request": map[string]any{
-			"iid":   12,
-			"title": "Add merge request trigger",
-		},
-	})
-
-	events := &contexts.EventContext{}
-	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
-		Headers:       gitlabHeaders("Note Hook", "token"),
-		Body:          body,
-		Configuration: map[string]any{"project": "123"},
-		Webhook:       &contexts.NodeWebhookContext{Secret: "token"},
-		Events:        events,
-		Logger:        log.NewEntry(log.New()),
-	})
-
-	assert.Equal(t, http.StatusOK, code)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, events.Count())
-	assert.Equal(t, "gitlab.mergeComment", events.Payloads[0].Type)
 }
 
 func Test__OnMergeComment__HandleWebhook__ContentFilterMatch(t *testing.T) {

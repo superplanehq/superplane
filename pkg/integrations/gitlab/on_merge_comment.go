@@ -155,11 +155,6 @@ func (m *OnMergeComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusOK, nil, nil
 	}
 
-	if !isNewNote(data) {
-		ctx.Logger.Info("Comment is not a newly created note - ignoring")
-		return http.StatusOK, nil, nil
-	}
-
 	matched, err := m.matchesContentFilter(config.ContentFilter, data)
 	if err != nil {
 		return http.StatusBadRequest, nil, err
@@ -184,6 +179,11 @@ func (m *OnMergeComment) Cleanup(ctx core.TriggerContext) error {
 func (m *OnMergeComment) isMergeRequestComment(logger *log.Entry, data map[string]any) bool {
 	attrs, ok := data["object_attributes"].(map[string]any)
 	if !ok {
+		return false
+	}
+
+	if system, ok := attrs["system"].(bool); ok && system {
+		logger.Info("Comment is a system-generated note - ignoring")
 		return false
 	}
 
@@ -221,23 +221,4 @@ func (m *OnMergeComment) matchesContentFilter(filter string, data map[string]any
 	}
 
 	return matched, nil
-}
-
-// isNewNote reports whether the note event is for a newly created comment.
-// GitLab emits note hooks on comment creation, but we guard against any explicit
-// non-create action (e.g. edits) so comment edits don't start duplicate runs.
-// Older GitLab versions omit the action field on notes, so a missing action is
-// treated as a new comment for backward compatibility.
-func isNewNote(data map[string]any) bool {
-	attrs, ok := data["object_attributes"].(map[string]any)
-	if !ok {
-		return true
-	}
-
-	action, ok := attrs["action"].(string)
-	if !ok || action == "" {
-		return true
-	}
-
-	return action == "create"
 }
