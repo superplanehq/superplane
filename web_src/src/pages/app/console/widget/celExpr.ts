@@ -286,12 +286,60 @@ const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
     const needle = coerceToString(sub);
     return text.indexOf(needle);
   },
+  // First letter of a display name, uppercased. Skips leading whitespace and
+  // prefers the first alphanumeric character so values like "cloud-robot"
+  // render as "C". Returns "" for missing / empty input.
+  initial: (value: unknown): string => initialLetter(value),
+  // Walks the provided values in order and returns the first non-empty
+  // initial. Authors use this for avatar fallbacks when a GitHub username is
+  // unavailable but a human/bot display name is still present.
+  firstInitial: (a: unknown, b?: unknown, c?: unknown, d?: unknown): string => firstInitialFromValues(a, b, c, d),
+  // Renders a deployer avatar for GitHub webhook author/committer maps.
+  // Uses the GitHub avatar image when `author.username` is present; otherwise
+  // falls back to an initial-letter badge derived from the available names.
+  githubAvatarOrInitial: (author: unknown, committer?: unknown): string => {
+    const authorRecord = asRecord(author);
+    const committerRecord = asRecord(committer);
+    const username = coerceToString(authorRecord?.username).trim();
+    if (username) {
+      return `<img class="avatar avatar-image" src="https://github.com/${username}.png" alt="" />`;
+    }
+    const letter = firstInitialFromValues(
+      authorRecord?.name,
+      committerRecord?.name,
+      authorRecord?.username,
+      committerRecord?.username,
+    );
+    if (!letter) return "";
+    return `<div class="avatar avatar-fallback">${letter}</div>`;
+  },
 };
 
 function coerceToString(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value;
   return String(value);
+}
+
+function initialLetter(value: unknown): string {
+  const text = coerceToString(value).trim();
+  if (text === "") return "";
+  const match = text.match(/[A-Za-z0-9]/);
+  return match ? match[0].toUpperCase() : text.charAt(0).toUpperCase();
+}
+
+function firstInitialFromValues(a: unknown, b?: unknown, c?: unknown, d?: unknown): string {
+  for (const candidate of [a, b, c, d]) {
+    if (candidate === undefined) continue;
+    const letter = initialLetter(candidate);
+    if (letter) return letter;
+  }
+  return "";
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
 }
 
 function clampIndex(value: unknown, length: number): number {

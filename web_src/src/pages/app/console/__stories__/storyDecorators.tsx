@@ -29,7 +29,7 @@ export function PanelFrame({
   height?: number;
 }) {
   return (
-    <div className="bg-slate-100 p-4">
+    <div className="bg-slate-100 p-4 dark:bg-gray-900">
       <div style={{ width, height }}>{children}</div>
     </div>
   );

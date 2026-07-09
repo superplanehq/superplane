@@ -30,7 +30,7 @@ const FILES_TAB = "files";
 const BASE_TAB_CLASSES =
   "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50";
 
-const ACTIVE_CLASSES = "bg-slate-300 text-slate-950 shadow-sm dark:bg-gray-400 dark:text-gray-950 dark:shadow-none";
+const ACTIVE_CLASSES = "bg-white text-slate-900 shadow-sm dark:bg-gray-400 dark:text-gray-950 dark:shadow-none";
 const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground dark:text-gray-400 dark:hover:text-gray-100";
 
 const MODE_TO_TAB: Record<string, string> = {
