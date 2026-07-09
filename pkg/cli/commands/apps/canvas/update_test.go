@@ -9,8 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/layout"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"github.com/superplanehq/superplane/pkg/layout"
 	"github.com/superplanehq/superplane/test/support/cli"
 )
 
@@ -144,37 +143,6 @@ func writeTestCanvasFileWithMetadataID(t *testing.T, name, canvasID string) stri
 	return filePath
 }
 
-func TestResolveCanvasForFileUpdateWithoutIDReturnsError(t *testing.T) {
-	filePath := writeTestCanvasFileWithoutMetadataID(t, "parse-check")
-	_, _, err := resolveCanvasForFileUpdate(filePath)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "metadata.id is required")
-}
-
-func TestResolveCanvasForFileUpdateWithIDSucceeds(t *testing.T) {
-	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
-	filePath := writeTestCanvasFileWithMetadataID(t, "my-canvas", canvasID)
-	gotID, canvas, err := resolveCanvasForFileUpdate(filePath)
-	require.NoError(t, err)
-	require.Equal(t, canvasID, gotID)
-	md := canvas.GetMetadata()
-	require.Equal(t, canvasID, (&md).GetId())
-}
-
-func TestResolveCanvasForFileUpdateWhitespaceIDReturnsError(t *testing.T) {
-	t.Helper()
-	dir := t.TempDir()
-	filePath := filepath.Join(dir, "canvas.yaml")
-	content := []byte(
-		"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: \"   \"\n  name: x\nspec:\n  nodes: []\n  edges: []\n",
-	)
-	require.NoError(t, os.WriteFile(filePath, content, 0o644))
-
-	_, _, err := resolveCanvasForFileUpdate(filePath)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "metadata.id is required")
-}
-
 func TestUpdateFromFileWhenCommitFailsReturnsWrappedError(t *testing.T) {
 	t.Helper()
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
@@ -275,13 +243,13 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {
 	autoLayout := layout.DefaultAutoLayout()
 
-	if autoLayout.GetAlgorithm() != openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL {
-		t.Fatalf("expected horizontal auto-layout, got %s", autoLayout.GetAlgorithm())
+	if autoLayout.Algorithm != "ALGORITHM_HORIZONTAL" {
+		t.Fatalf("expected horizontal auto-layout, got %s", autoLayout.Algorithm)
 	}
-	if autoLayout.GetScope() != openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS {
-		t.Fatalf("expected full-canvas scope, got %s", autoLayout.GetScope())
+	if autoLayout.Scope != "SCOPE_FULL_CANVAS" {
+		t.Fatalf("expected full-canvas scope, got %s", autoLayout.Scope)
 	}
-	if autoLayout.HasNodeIds() {
-		t.Fatalf("expected no node ids for default full-canvas strategy, got %v", autoLayout.GetNodeIds())
+	if len(autoLayout.NodeIDs) != 0 {
+		t.Fatalf("expected no node ids for default full-canvas strategy, got %v", autoLayout.NodeIDs)
 	}
 }

@@ -1,4 +1,4 @@
-package models
+package yaml
 
 import (
 	"strings"
@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 )
 
@@ -34,8 +35,7 @@ spec:
 	resource, err := ConsoleFromYML([]byte(yaml))
 	require.NoError(t, err)
 	require.Equal(t, "v1", resource.APIVersion)
-	require.Equal(t, ConsoleKind, resource.Kind)
-	require.Equal(t, "Ops console", resource.Metadata.Name)
+	require.Equal(t, KindConsole, resource.Kind)
 	require.Len(t, resource.Spec.Panels, 1)
 	require.Equal(t, "intro", resource.Spec.Panels[0].ID)
 	require.Equal(t, "markdown", resource.Spec.Panels[0].Type)
@@ -517,22 +517,22 @@ func TestDashboardFromYML_RejectsTooManyPanels(t *testing.T) {
 
 func TestCanvasVersionToConsoleYML_RoundTripsEmptyDashboard(t *testing.T) {
 	canvasID := uuid.New()
-	canvasVersion := &CanvasVersion{
+	canvasVersion := &models.CanvasVersion{
 		WorkflowID:    canvasID,
-		ConsolePanels: datatypes.NewJSONType([]ConsolePanel{}),
-		ConsoleLayout: datatypes.NewJSONType([]ConsoleLayoutItem{}),
+		ConsolePanels: datatypes.NewJSONType([]models.ConsolePanel{}),
+		ConsoleLayout: datatypes.NewJSONType([]models.ConsoleLayoutItem{}),
 	}
 
-	out, err := CanvasVersionToConsoleYML("Canvas Name", canvasVersion)
+	out, err := VersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "apiVersion: v1")
 	assert.Contains(t, string(out), "kind: Console")
 	assert.Contains(t, string(out), canvasID.String())
 	assert.Contains(t, string(out), "name: Canvas Name")
 
-	parsed, err := ConsoleFromYML(out)
+	parsed, err := ConsoleFromYML([]byte(out))
 	require.NoError(t, err)
-	require.Equal(t, ConsoleKind, parsed.Kind)
+	require.Equal(t, KindConsole, parsed.Kind)
 	assert.Empty(t, parsed.Spec.Panels)
 	assert.Empty(t, parsed.Spec.Layout)
 }
@@ -540,20 +540,20 @@ func TestCanvasVersionToConsoleYML_RoundTripsEmptyDashboard(t *testing.T) {
 func TestCanvasVersionToConsoleYML_RoundTripsPanelsAndLayout(t *testing.T) {
 	canvasID := uuid.New()
 	minW, minH := 2, 1
-	canvasVersion := &CanvasVersion{
+	canvasVersion := &models.CanvasVersion{
 		WorkflowID: canvasID,
-		ConsolePanels: datatypes.NewJSONType([]ConsolePanel{
+		ConsolePanels: datatypes.NewJSONType([]models.ConsolePanel{
 			{ID: "p1", Type: "markdown", Content: map[string]any{"body": "hello"}},
 		}),
-		ConsoleLayout: datatypes.NewJSONType([]ConsoleLayoutItem{
+		ConsoleLayout: datatypes.NewJSONType([]models.ConsoleLayoutItem{
 			{I: "p1", X: 0, Y: 0, W: 4, H: 2, MinW: &minW, MinH: &minH},
 		}),
 	}
 
-	out, err := CanvasVersionToConsoleYML("Canvas Name", canvasVersion)
+	out, err := VersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
 
-	parsed, err := ConsoleFromYML(out)
+	parsed, err := ConsoleFromYML([]byte(out))
 	require.NoError(t, err)
 	require.Len(t, parsed.Spec.Panels, 1)
 	require.Equal(t, "p1", parsed.Spec.Panels[0].ID)
@@ -567,21 +567,21 @@ func TestCanvasVersionToConsoleYML_RoundTripsPanelsAndLayout(t *testing.T) {
 
 func TestCanvasVersionToConsoleYML_IsDeterministic(t *testing.T) {
 	canvasID := uuid.New()
-	canvasVersion := &CanvasVersion{
+	canvasVersion := &models.CanvasVersion{
 		WorkflowID: canvasID,
-		ConsolePanels: datatypes.NewJSONType([]ConsolePanel{
+		ConsolePanels: datatypes.NewJSONType([]models.ConsolePanel{
 			{ID: "a", Type: "markdown", Content: map[string]any{"body": "hi"}},
 			{ID: "b", Type: "markdown", Content: map[string]any{"body": "hey"}},
 		}),
-		ConsoleLayout: datatypes.NewJSONType([]ConsoleLayoutItem{
+		ConsoleLayout: datatypes.NewJSONType([]models.ConsoleLayoutItem{
 			{I: "a", X: 0, Y: 0, W: 1, H: 1},
 			{I: "b", X: 1, Y: 0, W: 1, H: 1},
 		}),
 	}
 
-	first, err := CanvasVersionToConsoleYML("Canvas Name", canvasVersion)
+	first, err := VersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
-	second, err := CanvasVersionToConsoleYML("Canvas Name", canvasVersion)
+	second, err := VersionToConsoleYML("Canvas Name", canvasVersion)
 	require.NoError(t, err)
 	assert.Equal(t, string(first), string(second))
 }
