@@ -14,6 +14,7 @@ import {
   scorecardHasGoalLine,
   type ScorecardPanelContent,
   type ScorecardStatusMode,
+  type ScorecardTrendDisplay,
 } from "./scorecardContent";
 import type { ScorecardGoalDirection, ScorecardThreshold } from "./widget/WidgetScorecard";
 import type { WidgetDataSource, WidgetDataSourceKind, WidgetNumberAggregation } from "./widget/types";
@@ -43,9 +44,8 @@ const AGGREGATION_LABELS: Record<WidgetNumberAggregation, string> = {
 };
 
 function numberOrUndefined(raw: string): number | undefined {
-  if (raw.trim() === "") return undefined;
   const n = Number(raw);
-  return Number.isFinite(n) ? n : undefined;
+  return raw.trim() !== "" && Number.isFinite(n) ? n : undefined;
 }
 
 /** Reset kind-specific fields to sensible defaults, mirroring `DataSourceForm`. */
@@ -93,6 +93,29 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
       {hint ? <p className="text-[11px] text-slate-400 dark:text-gray-500">{hint}</p> : null}
     </div>
+  );
+}
+
+function LabeledSelect<T extends string>(props: {
+  value: T;
+  onValueChange: (next: T) => void;
+  options: readonly T[];
+  renderOption?: (option: T) => ReactNode;
+}) {
+  const render = props.renderOption ?? ((option: T) => option);
+  return (
+    <Select value={props.value} onValueChange={(v) => props.onValueChange(v as T)}>
+      <SelectTrigger className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {props.options.map((option) => (
+          <SelectItem key={option} value={option}>
+            {render(option)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -156,21 +179,12 @@ function DataSourceSection({ value, onChange }: SectionProps) {
   return (
     <Section title="Data source" hint="Where the rows come from — the same sources every data panel uses.">
       <Field label="Source" hint={activeHint}>
-        <Select
+        <LabeledSelect
           value={source.kind}
-          onValueChange={(kind) => onChange({ ...value, dataSource: dataSourceForKind(kind as WidgetDataSourceKind) })}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SOURCE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onValueChange={(kind) => onChange({ ...value, dataSource: dataSourceForKind(kind) })}
+          options={SOURCE_OPTIONS.map((option) => option.value)}
+          renderOption={(kind) => SOURCE_OPTIONS.find((option) => option.value === kind)?.label ?? kind}
+        />
       </Field>
       <DataSourceFields value={value} onChange={onChange} />
     </Section>
@@ -237,38 +251,19 @@ function ValueSection({ value, onChange }: SectionProps) {
     <Section title="Value" hint="How the rows are reduced to the single number shown.">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Calculation">
-          <Select
+          <LabeledSelect
             value={value.aggregation}
-            onValueChange={(v) => onChange({ ...value, aggregation: v as WidgetNumberAggregation })}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SCORECARD_AGGREGATIONS.map((aggregation) => (
-                <SelectItem key={aggregation} value={aggregation}>
-                  {AGGREGATION_LABELS[aggregation]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onValueChange={(aggregation) => onChange({ ...value, aggregation })}
+            options={SCORECARD_AGGREGATIONS}
+            renderOption={(aggregation) => AGGREGATION_LABELS[aggregation]}
+          />
         </Field>
         <Field label="Value format">
-          <Select
+          <LabeledSelect
             value={value.format ?? "number"}
-            onValueChange={(v) => onChange({ ...value, format: v as ScorecardPanelContent["format"] })}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SCORECARD_FORMATS.map((format) => (
-                <SelectItem key={format} value={format}>
-                  {format}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onValueChange={(format) => onChange({ ...value, format })}
+            options={SCORECARD_FORMATS}
+          />
         </Field>
       </div>
       {needsField ? (
@@ -488,13 +483,26 @@ function TrendSection({ value, onChange }: SectionProps) {
         onCheckedChange={(on) => onChange({ ...value, showTrend: on })}
       />
       {value.showTrend ? (
-        <Field label="Change caption" hint="Text shown next to the change indicator.">
-          <Input
-            value={value.trendLabel ?? ""}
-            onChange={(e) => onChange({ ...value, trendLabel: e.target.value })}
-            placeholder="vs start of range"
-          />
-        </Field>
+        <>
+          <Field label="Show change as" hint="Percent, an absolute number (formatted like the value), or both.">
+            <SegmentedToggle<ScorecardTrendDisplay>
+              options={[
+                { value: "percent", label: "Percent" },
+                { value: "absolute", label: "Number" },
+                { value: "both", label: "Both" },
+              ]}
+              value={value.trendDisplay ?? "percent"}
+              onChange={(trendDisplay) => onChange({ ...value, trendDisplay })}
+            />
+          </Field>
+          <Field label="Change caption" hint="Text shown next to the change indicator.">
+            <Input
+              value={value.trendLabel ?? ""}
+              onChange={(e) => onChange({ ...value, trendLabel: e.target.value })}
+              placeholder="vs start of range"
+            />
+          </Field>
+        </>
       ) : null}
     </Section>
   );

@@ -88,6 +88,7 @@ export const OpenPapercuts: Story = {
         seriesField: `${FMT}.total_open`,
         showSparkline: true,
         showTrend: true,
+        trendDisplay: "both",
       }}
     />
   ),

@@ -36,8 +36,13 @@ export interface ScorecardPanelContent {
   /** Change vs the start of the range (first vs latest point of the series). */
   showTrend?: boolean;
   trendLabel?: string;
+  /** How the change is rendered: percent, an absolute number, or both. */
+  trendDisplay?: ScorecardTrendDisplay;
   showProgress?: boolean;
 }
+
+/** How the trend change chip renders the delta. */
+export type ScorecardTrendDisplay = "percent" | "absolute" | "both";
 
 /** Calculations offered in the editor (matches the Number panel vocabulary). */
 export const SCORECARD_AGGREGATIONS: WidgetNumberAggregation[] = ["last", "first", "count", "sum", "avg", "min", "max"];
@@ -68,6 +73,7 @@ export const DEFAULT_SCORECARD_CONTENT: ScorecardPanelContent = {
   showSparkline: true,
   showTrend: true,
   trendLabel: DEFAULT_TREND_LABEL,
+  trendDisplay: "percent",
   showProgress: false,
 };
 
@@ -121,6 +127,7 @@ export function scorecardPropsFromContent(
     target: content.statusMode === "target" ? content.target : undefined,
     thresholds: content.statusMode === "thresholds" ? content.thresholds : undefined,
     comparison,
+    trendDisplay: content.trendDisplay ?? "percent",
     sparkline,
     showProgress: content.showProgress,
   };
@@ -190,7 +197,12 @@ export function scorecardContentToYaml(content: ScorecardPanelContent): string {
   }
   if (content.seriesField) render.seriesField = content.seriesField;
   if (content.showSparkline) render.sparkline = true;
-  if (content.showTrend) render.trend = { compare: "range-start", label: content.trendLabel || undefined };
+  if (content.showTrend)
+    render.trend = {
+      compare: "range-start",
+      display: content.trendDisplay ?? "percent",
+      label: content.trendLabel || undefined,
+    };
   if (content.showProgress) render.showProgress = true;
 
   return yaml.dump(

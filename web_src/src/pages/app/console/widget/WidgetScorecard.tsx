@@ -20,6 +20,8 @@ import type { WidgetColumnFormat } from "./types";
  */
 export type ScorecardGoalDirection = "higher" | "lower";
 export type ScorecardStatus = "good" | "warn" | "bad" | "neutral";
+/** How the change chip renders the delta: percent, an absolute number, or both. */
+export type ScorecardTrendDisplay = "percent" | "absolute" | "both";
 
 /** One threshold boundary. `at` is the value where `status` begins to apply. */
 export interface ScorecardThreshold {
@@ -46,6 +48,8 @@ interface WidgetScorecardProps {
   /** Multi-band mode: good / warn / bad ranges. Takes precedence over `target`. */
   thresholds?: ScorecardThreshold[];
   comparison?: ScorecardComparison;
+  /** How the change chip renders the delta. Defaults to `"percent"`. */
+  trendDisplay?: ScorecardTrendDisplay;
   sparkline?: number[];
   showProgress?: boolean;
   isLoading?: boolean;
@@ -176,6 +180,7 @@ interface ScorecardBodyProps {
   status: ScorecardStatus;
   delta: Delta | null;
   comparison?: ScorecardComparison;
+  trendDisplay?: ScorecardTrendDisplay;
 }
 
 function ScorecardBody({
@@ -190,6 +195,7 @@ function ScorecardBody({
   status,
   delta,
   comparison,
+  trendDisplay = "percent",
 }: ScorecardBodyProps) {
   const hasSparkline = sparkline != null && sparkline.length > 1;
 
@@ -203,7 +209,16 @@ function ScorecardBody({
           {formatValue(value, format)}
           {suffix ? <span className="text-xl font-medium">{suffix}</span> : null}
         </span>
-        {delta ? <DeltaChip delta={delta} comparison={comparison} /> : null}
+        {delta ? (
+          <DeltaChip
+            delta={delta}
+            comparison={comparison}
+            display={trendDisplay}
+            format={format}
+            prefix={prefix}
+            suffix={suffix}
+          />
+        ) : null}
       </div>
 
       {hasSparkline ? <Sparkline values={sparkline} className={STATUS_SPARK_CLASS[status]} /> : null}
@@ -268,7 +283,21 @@ function ScorecardProgress({
   );
 }
 
-function DeltaChip({ delta, comparison }: { delta: Delta; comparison?: ScorecardComparison }) {
+function DeltaChip({
+  delta,
+  comparison,
+  display = "percent",
+  format = "number",
+  prefix,
+  suffix,
+}: {
+  delta: Delta;
+  comparison?: ScorecardComparison;
+  display?: ScorecardTrendDisplay;
+  format?: WidgetColumnFormat;
+  prefix?: string;
+  suffix?: string;
+}) {
   const toneClass =
     delta.trend === "flat"
       ? "text-slate-500 dark:text-gray-400"
@@ -276,11 +305,15 @@ function DeltaChip({ delta, comparison }: { delta: Delta; comparison?: Scorecard
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-red-600 dark:text-red-400";
   const Icon = delta.trend === "up" ? ArrowUpRight : delta.trend === "down" ? ArrowDownRight : Minus;
-  const pctLabel = `${delta.raw > 0 ? "+" : delta.raw < 0 ? "-" : ""}${Math.abs(delta.pct * 100).toFixed(1)}%`;
+  const sign = delta.raw > 0 ? "+" : delta.raw < 0 ? "-" : "";
+  const pctLabel = `${sign}${Math.abs(delta.pct * 100).toFixed(1)}%`;
+  const absLabel = `${sign}${prefix ?? ""}${formatValue(Math.abs(delta.raw), format)}${suffix ?? ""}`;
+  const changeLabel =
+    display === "percent" ? pctLabel : display === "absolute" ? absLabel : `${absLabel} (${pctLabel})`;
   return (
     <span className={cn("inline-flex items-center gap-1 text-sm font-medium", toneClass)}>
       <Icon className="size-4" aria-hidden />
-      {pctLabel}
+      {changeLabel}
       {comparison?.label ? (
         <span className="text-[11px] font-normal text-slate-400 dark:text-gray-500">{comparison.label}</span>
       ) : null}
