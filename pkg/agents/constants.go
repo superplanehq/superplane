@@ -18,7 +18,7 @@ func AgentTokenPermissions(canvasID string) []jwt.Permission {
 		{ResourceType: "org", Action: "read"},
 		{ResourceType: "integrations", Action: "read"},
 		{ResourceType: "canvases", Action: "read", Resources: []string{canvasID}},
-		{ResourceType: "canvases", Action: "update_version", Resources: []string{canvasID}},
+		{ResourceType: "canvases", Action: "update", Resources: []string{canvasID}},
 	}
 }
 
@@ -43,12 +43,12 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"  - org:read\n" +
 	"  - integrations:read\n" +
 	"  - canvases:read:%s\n" +
-	"  - canvases:update_version:%s\n" +
+	"  - canvases:update:%s\n" +
 	"\n" +
-	"The canvases:update_version permission is limited to staging app\n" +
-	"version editing. Staging edits include app graph updates, Console\n" +
-	"updates, and repository file staging. It does not grant permission to\n" +
-	"commit staging, delete the app, or perform live-app operational actions.\n" +
+	"The scoped canvases:update permission allows staging app edits on this\n" +
+	"app, including graph updates, Console updates, repository file staging,\n" +
+	"and committing staging. It does not grant permission to delete the app\n" +
+	"or perform live-app operational actions.\n" +
 	"\n" +
 	"SuperPlane has no separate `events` permission. The canvases:read\n" +
 	"permission grants every read scoped to this app: describe the app,\n" +

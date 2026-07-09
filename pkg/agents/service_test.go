@@ -724,9 +724,8 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "[Canvas Snapshot]")
 	assert.Contains(t, provider.lastPreamble, "node_count:")
-	assert.Contains(t, provider.lastPreamble, "  - canvases:update_version:"+canvas.ID.String())
+	assert.Contains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "All SuperPlane access goes through the agent tools.")
-	assert.NotContains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:publish:"+canvas.ID.String())
 	// The agent must never receive a usable API/CLI credential; everything
 	// goes through the server-side tools.
