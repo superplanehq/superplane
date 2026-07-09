@@ -1,4 +1,9 @@
-import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
+import type {
+  CanvasesCanvasEvent,
+  CanvasesCanvasNodeExecution,
+  SuperplaneComponentsNode as ComponentsNode,
+} from "@/api-client";
+import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 type NodeActivityData = {
@@ -77,4 +82,19 @@ export function resolveRunLookupEventForNodeActivity(
 
   const latestExecution = newestByTimestamp(nodeData.executions, executionTimestamp);
   return latestExecution ? runLookupEventFromExecution(nodeId, latestExecution) : null;
+}
+
+export function resolveCachedNodeRunId(
+  nodeId: string,
+  workflowNode: ComponentsNode | undefined,
+  resolveRunId: (event: SidebarEvent) => string | null,
+): string | null {
+  if (!workflowNode) {
+    return null;
+  }
+
+  const nodeType = workflowNode.type || "TYPE_ACTION";
+  const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
+  const lookupEvent = resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
+  return lookupEvent ? resolveRunId(lookupEvent) : null;
 }
