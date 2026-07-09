@@ -111,7 +111,7 @@ function requestsMetadata(node: NodeInfo, lastExecution: ExecutionInfo | null): 
 
   items.push(
     config?.mode === "multiple"
-      ? { icon: "layers", label: "One prompt per item" }
+      ? { icon: "layers", label: "Multiple prompts" }
       : { icon: "layers", label: "Single prompt" },
   );
 

@@ -26,17 +26,20 @@ To get new Claude API key, go to [platform.claude.com](https://platform.claude.c
 
 **Component key:** `claude.createBatchMessage`
 
-The Create Batch Message component uses [Anthropic's Message Batches API](https://platform.claude.com/docs/en/build-with-claude/batch-processing) to process one or many prompts asynchronously in one request, at a lower cost than issuing them individually.
+The Create Batch Message component uses [Anthropic's Message Batches API](https://platform.claude.com/docs/en/build-with-claude/batch-processing) to run one or more prompts over an array of inputs in a single batch, at a lower cost than issuing them individually.
+
+Every batch is built from a matrix: an array of **Items** (the N data points, e.g. a list of pull requests) crossed with one or more prompt templates. **Mode** controls whether that's a single template (1 x N) or several (M x N).
 
 ### Use Cases
 
-- **Update the same kind of resource, one at a time or many at once**: e.g. rewrite a single pull request's title and description with one node, and reuse the same node for every open pull request by switching its Mode.
+- **Update the same kind of resource, one at a time or many at once**: pass a one-element array to update a single pull request's title and description, or the full list to update every open pull request, with the same node.
+- **Multiple derived outputs per item**: e.g. generate a title suggestion, a description suggestion, and a risk assessment for every pull request in one batch (Multiple Prompts mode).
 - **Bulk classification or extraction**: Run the same prompt template over many inputs.
-- **Cost-sensitive workloads**: Batches are billed at a discount versus the equivalent individual requests, even for a single request.
+- **Cost-sensitive workloads**: Batches are billed at a discount versus the equivalent individual requests.
 
 ### How It Works
 
-1. Builds the batch's requests according to **Mode** (see Configuration below).
+1. Evaluates **Items** to an array, then builds the batch's requests according to **Mode** (see Configuration below): one request per item (Single Prompt), or one request per (prompt, item) pair (Multiple Prompts).
 2. Submits them as a single batch (`POST /v1/messages/batches`).
 3. Polls the batch status until it reaches a terminal state.
 4. Downloads the results and emits one entry per request, matched by **Custom ID**.
@@ -45,9 +48,10 @@ Batches typically complete within an hour, but can take up to 24 hours. This com
 
 ### Configuration
 
-- **Mode**: How the batch's requests are built.
-  - **Single Prompt**: sends exactly one request, built from **Prompt** and **Custom ID**.
-  - **One Prompt Per Item**: sends one request per element of **Items**, built from **Prompt Template** and (optionally) **Custom ID Expression**.
+- **Items**: An expression that evaluates to the array of data points to run over, e.g. `$['List Open Pull Requests'].body` for many, or a one-element array (e.g. `[$['Get Pull Request'].body]`) to run over just one.
+- **Mode**: How many prompt templates are applied to each item.
+  - **Single Prompt**: one prompt template, applied to every element of Items (1 x N requests).
+  - **Multiple Prompts**: several prompt templates, each applied to every element of Items (M x N requests).
 - **Model**: The Claude model used for every request in the batch.
 - **System Message**: (Optional) Context applied to every request in the batch.
 - **Max Tokens**: (Optional) Limit the length of each generated response.
@@ -55,13 +59,11 @@ Batches typically complete within an hour, but can take up to 24 hours. This com
 - **Structured Output**: (Optional) A JSON Schema every response must conform to.
 
 **Single Prompt mode:**
-- **Prompt**: The user message for the request. A regular text field, like any other — write plain text and drop in `{{ }}` placeholders to reference upstream data, e.g. `Update the title and description for PR #{{ $['Get Pull Request'].body.number }}: {{ $['Get Pull Request'].body.title }}`.
-- **Custom ID**: (Optional, advanced) Defaults to `request-1`.
-
-**One Prompt Per Item mode:**
-- **Items**: An expression that evaluates to the array to build one request per element from, e.g. `$['List Open Pull Requests'].body`.
-- **Prompt Template**: An expression evaluated once per element of Items to build that element's prompt, with `item` (the element) and `index` (its zero-based position) available, e.g. `"Update the title and description for PR #" + string(item.number) + ": " + item.title`. Unlike Prompt above, this is a bare expression rather than a `{{ }}` template — wrap string literals in quotes and use `+` to build up the text, since it needs to run once per item rather than once for the whole field.
+- **Prompt Template**: An expression evaluated once per element of Items to build that element's prompt, with `item` (the element) and `index` (its zero-based position) available, e.g. `"Update the title and description for PR #" + string(item.number) + ": " + item.title`. This is a bare expression, not a `{{ }}` template — wrap string literals in quotes and use `+` to build up the text, since it needs to run once per item.
 - **Custom ID Expression**: (Optional, advanced) Same idea as Prompt Template — an expression with `item`/`index` available, evaluated per element to compute its Custom ID. Defaults to auto-numbered IDs (`request-1`, `request-2`, ...).
+
+**Multiple Prompts mode:**
+- **Prompts**: A short, manually-authored list of prompt templates (each with an **ID** and a **Prompt Template** expression, using `item`/`index` the same way as Single Prompt mode above). Each one is evaluated once per element of Items. A request's Custom ID defaults to `{id}-{index+1}`, e.g. `title-suggestion-1`.
 
 ### Output
 
@@ -75,7 +77,7 @@ Emits a single payload once the batch ends, containing:
 
 - Requires a valid Claude API key configured in the integration.
 - Custom IDs must be unique within the batch (max 64 characters).
-- A batch can contain up to 1000 requests.
+- A batch can contain up to 1000 requests (prompts x items, in Multiple Prompts mode).
 - Cancelling the workflow execution requests cancellation of the batch on Anthropic's side; requests already completed are unaffected.
 
 ### Example Output
