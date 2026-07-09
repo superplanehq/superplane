@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   canvasFoldersUpdateCanvasFolder,
+  canvasesDescribeCanvas,
   canvasesListRuns,
   canvasesDescribeRun,
   canvasesPutCanvasStaging,
@@ -16,6 +17,7 @@ const {
   canvasesGetCanvasStaging,
 } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
+  canvasesDescribeCanvas: vi.fn(),
   canvasesListRuns: vi.fn(),
   canvasesDescribeRun: vi.fn(),
   canvasesPutCanvasStaging: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
   return {
     ...(actual as Record<string, unknown>),
     canvasFoldersUpdateCanvasFolder,
+    canvasesDescribeCanvas,
     canvasesListRuns,
     canvasesDescribeRun,
     canvasesPutCanvasStaging,
@@ -44,6 +47,8 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
 
 import {
   canvasKeys,
+  useCanvas,
+  useCanvasPreference,
   useDescribeRun,
   useInfiniteCanvasRuns,
   useUpdateCanvasConsole,
@@ -166,6 +171,59 @@ describe("useInfiniteCanvasRuns", () => {
           },
         }),
       );
+    });
+  });
+});
+
+describe("useCanvas + useCanvasPreference fetch sharing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("issues a single describe request when both hooks mount together", async () => {
+    const queryClient = createQueryClient();
+    canvasesDescribeCanvas.mockResolvedValue({
+      data: {
+        canvas: { metadata: { id: "canvas-1", name: "My canvas" } },
+        preference: { lastVisitedTab: "console" },
+      },
+    });
+
+    const { result } = renderHook(
+      () => ({
+        canvas: useCanvas("org-1", "canvas-1"),
+        preference: useCanvasPreference("org-1", "canvas-1"),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => {
+      expect(result.current.canvas.data?.metadata?.id).toBe("canvas-1");
+      expect(result.current.preference.data?.lastVisitedTab).toBe("console");
+    });
+
+    expect(canvasesDescribeCanvas).toHaveBeenCalledTimes(1);
+  });
+
+  it("seeds the preference cache from a canvas detail fetch", async () => {
+    const queryClient = createQueryClient();
+    canvasesDescribeCanvas.mockResolvedValue({
+      data: {
+        canvas: { metadata: { id: "canvas-1", name: "My canvas" } },
+        preference: { lastVisitedTab: "memory" },
+      },
+    });
+
+    const { result } = renderHook(() => useCanvas("org-1", "canvas-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data?.metadata?.id).toBe("canvas-1");
+    });
+
+    expect(queryClient.getQueryData(canvasKeys.preference("org-1", "canvas-1"))).toEqual({
+      lastVisitedTab: "memory",
     });
   });
 });
