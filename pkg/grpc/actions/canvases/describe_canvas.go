@@ -21,7 +21,7 @@ func loadCanvasCreator(ctx context.Context, db *gorm.DB, canvas *models.Canvas) 
 	return models.FindMaybeDeletedUserByIDInTransaction(db.WithContext(ctx), canvas.OrganizationID.String(), canvas.CreatedBy.String())
 }
 
-func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizationID string, id string) (*pb.DescribeCanvasResponse, error) {
+func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizationID string, userID string, id string) (*pb.DescribeCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, "invalid canvas id")
@@ -59,7 +59,44 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		return nil, grpcerrors.Internal(err, "failed to serialize workflow")
 	}
 
-	return &pb.DescribeCanvasResponse{
+	response := &pb.DescribeCanvasResponse{
 		Canvas: proto,
-	}, nil
+	}
+
+	// A missing preference must reliably mean "the user has no stored
+	// preference": the client uses it to decide whether writing a default tab
+	// is safe. Swallowing a load failure here would make the client overwrite
+	// a preference that actually exists.
+	preference, err := loadUserCanvasPreference(db, orgID, userID, canvasID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load canvas preference")
+	}
+	if preference != nil {
+		response.Preference = serializeCanvasPreference(preference)
+	}
+
+	return response, nil
+}
+
+func loadUserCanvasPreference(db *gorm.DB, organizationID uuid.UUID, userID string, canvasID uuid.UUID) (*models.UserCanvasPreference, error) {
+	if userID == "" {
+		return nil, nil
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, nil
+	}
+
+	preferences, err := models.FindUserCanvasPreferencesForCanvases(db, organizationID, userUUID, []uuid.UUID{canvasID})
+	if err != nil {
+		return nil, err
+	}
+
+	preference, ok := preferences[canvasID]
+	if !ok {
+		return nil, nil
+	}
+
+	return &preference, nil
 }
