@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events from GitLab" />
+  <LinkCard title="On Merge Comment" href="#on-merge-comment" description="Listen to merge request comment events from GitLab" />
   <LinkCard title="On Merge Request" href="#on-merge-request" description="Listen to merge request events from GitLab" />
   <LinkCard title="On Milestone" href="#on-milestone" description="Listen to milestone events from GitLab" />
   <LinkCard title="On Pipeline" href="#on-pipeline" description="Listen to pipeline events from GitLab" />
@@ -40,6 +41,8 @@ To connect with **App OAuth**:
 To connect with a **Personal Access Token**:
 1. [Create a personal access token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=api,read_user,read_api,write_repository,read_repository) — the link prefills the name and scopes (api, read_user, read_api, write_repository, read_repository), so you only need to click **Create personal access token**. On a self-managed instance, use the same path on your GitLab URL.
 2. Paste the token into the **Access Token** field and click **Save**.
+
+**Note:** Triggers (On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor.
 
 <a id="on-issue"></a>
 
@@ -141,6 +144,129 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
 }
 ```
 
+<a id="on-merge-comment"></a>
+
+## On Merge Comment
+
+**Trigger key:** `gitlab.onMergeComment`
+
+The On Merge Comment trigger starts a workflow execution when a comment is added to a merge request in a GitLab project.
+
+### Use Cases
+
+- **Command processing**: Process slash commands in merge request comments (e.g., /deploy, /test)
+- **Bot interactions**: Respond to merge request comments with automated actions
+- **Notification systems**: Notify teams when important merge request comments are added
+
+### Configuration
+
+- **Project** (required): GitLab project to monitor
+- **Content Filter** (optional): Regex pattern to filter comments by content (e.g., `/deploy` to only trigger on comments containing "/deploy")
+
+### Event Data
+
+Each comment event includes:
+- **object_attributes**: Comment information including note body, author, and URL
+- **merge_request**: Merge request the comment was added to
+- **user**: User who added the comment
+- **project**: Project information
+
+Common expression paths:
+- Merge request IID: `root().data.merge_request.iid`
+- Merge request title: `root().data.merge_request.title`
+- Comment body: `root().data.object_attributes.note`
+- Comment URL: `root().data.object_attributes.url`
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event_type": "note",
+    "merge_request": {
+      "author_id": 1,
+      "created_at": "2026-02-12 18:30:00 UTC",
+      "description": "Adds support for additional GitLab webhook trigger types.",
+      "draft": false,
+      "id": 93,
+      "iid": 12,
+      "last_commit": {
+        "author": {
+          "email": "agarcia@example.com",
+          "name": "Alex Garcia"
+        },
+        "id": "372fa8f809fe161ee0f22e04d1a4074e0be6ac47",
+        "message": "Add merge request trigger",
+        "timestamp": "2026-02-12T18:25:00Z",
+        "url": "https://gitlab.example.com/group/example/-/commit/372fa8f809fe161ee0f22e04d1a4074e0be6ac47"
+      },
+      "merge_status": "can_be_merged",
+      "source_branch": "feature/merge-request-trigger",
+      "source_project_id": 1,
+      "state": "opened",
+      "target_branch": "main",
+      "target_project_id": 1,
+      "title": "Add merge request trigger",
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12",
+      "work_in_progress": false
+    },
+    "object_attributes": {
+      "action": "create",
+      "attachment": null,
+      "author_id": 1,
+      "commit_id": "",
+      "created_at": "2026-02-12 20:40:00 UTC",
+      "discussion_id": "6c2bb44bdc7f5c8f21b9ff8422f3d60cc0e5e719",
+      "id": 1244,
+      "line_code": null,
+      "note": "This looks good, but please update the docs before merging.",
+      "noteable_id": 93,
+      "noteable_type": "MergeRequest",
+      "project_id": 1,
+      "system": false,
+      "updated_at": "2026-02-12 20:40:00 UTC",
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12#note_1244"
+    },
+    "object_kind": "note",
+    "project": {
+      "avatar_url": null,
+      "ci_config_path": null,
+      "default_branch": "main",
+      "description": "Project used to demonstrate merge request comment webhook payloads.",
+      "git_http_url": "https://gitlab.example.com/group/example.git",
+      "git_ssh_url": "ssh://git@gitlab.example.com:group/example.git",
+      "id": 1,
+      "name": "Example Project",
+      "namespace": "group",
+      "path_with_namespace": "group/example",
+      "visibility_level": 20,
+      "web_url": "https://gitlab.example.com/group/example"
+    },
+    "project_id": 1,
+    "repository": {
+      "description": "Project used to demonstrate merge request comment webhook payloads.",
+      "homepage": "https://gitlab.example.com/group/example",
+      "name": "Example Project",
+      "url": "ssh://git@gitlab.example.com/group/example.git"
+    },
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/1a29da0ccd099482194440fac762f5ccb4ec53227761d1859979367644a889a5?s=80\u0026d=identicon",
+      "email": "agarcia@example.com",
+      "id": 1,
+      "name": "Alex Garcia",
+      "username": "agarcia"
+    }
+  },
+  "timestamp": "2026-02-12T20:40:00.000000000Z",
+  "type": "gitlab.mergeComment"
+}
+```
+
 <a id="on-merge-request"></a>
 
 ## On Merge Request
@@ -149,14 +275,42 @@ This trigger automatically sets up a GitLab webhook when configured. The webhook
 
 The On Merge Request trigger starts a workflow execution when merge request events occur in a GitLab project.
 
+### Use Cases
+
+- **MR automation**: Automate actions when merge requests are opened, merged, or closed
+- **Code review workflows**: Trigger review processes or notifications
+- **CI/CD integration**: Run tests, builds, or preview environments on merge request events
+- **Status updates**: Update systems when merge request status changes
+
 ### Configuration
 
 - **Project** (required): GitLab project to monitor
-- **Actions** (required): Select which merge request actions to listen for (open, close, merge, etc.). Default: open.
+- **Actions** (required): Select which merge request actions to listen for (open, close, reopen, update, approved, merge, etc.). Default: open.
 
-### Outputs
+### Event Data
 
-- **Default channel**: Emits merge request payload data with action, project, and object attributes
+Each merge request event includes:
+- **object_attributes**: Complete merge request information including title, description, state, action, source/target branches, and URL
+- **changes**: When the merge request is updated, includes what changed (title, description, labels, etc.)
+- **assignees**: Users assigned to the merge request
+- **reviewers**: Users requested to review the merge request
+- **labels**: Labels applied to the merge request
+- **project**: Project information
+- **repository**: Repository information
+- **user**: User who triggered the event
+
+Common expression paths:
+- Merge request IID: `root().data.object_attributes.iid`
+- Merge request title: `root().data.object_attributes.title`
+- Action: `root().data.object_attributes.action`
+- State: `root().data.object_attributes.state`
+- Source branch: `root().data.object_attributes.source_branch`
+- Target branch: `root().data.object_attributes.target_branch`
+- Merge request URL: `root().data.object_attributes.url`
+
+### Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
 
 ### Example Data
 
@@ -188,10 +342,16 @@ The On Merge Request trigger starts a workflow execution when merge request even
     "object_attributes": {
       "action": "open",
       "description": "Adds support for additional GitLab webhook trigger types.",
+      "draft": false,
       "id": 93,
       "iid": 12,
+      "merge_status": "can_be_merged",
+      "source_branch": "feature/merge-request-trigger",
       "state": "opened",
-      "title": "Add merge request trigger"
+      "target_branch": "main",
+      "title": "Add merge request trigger",
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12",
+      "work_in_progress": false
     },
     "object_kind": "merge_request",
     "project": {
