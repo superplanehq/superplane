@@ -60,7 +60,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 		CanvasID:          session.CanvasID,
 		Source:            "staging",
 		VersionID:         versionID,
-		Summary:           a.summarize(session.OrganizationID, canvas, liveVersion, canvasYAML),
+		Summary:           a.summarize(canvas, liveVersion, canvasYAML),
 		CanvasYAMLBytes:   len(canvasYAML),
 		CanvasYAMLOmitted: !input.IncludeCanvasYAML,
 	}
@@ -93,7 +93,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 	return result, nil
 }
 
-func (a readAction) summarize(organizationID string, canvas *models.Canvas, version *models.CanvasVersion, canvasYAML string) summary {
+func (a readAction) summarize(canvas *models.Canvas, version *models.CanvasVersion, canvasYAML string) summary {
 	c, err := yaml.CanvasFromYAML([]byte(canvasYAML))
 	if err != nil {
 		return summarizeCanvasVersion(canvas, version)

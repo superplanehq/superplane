@@ -143,37 +143,6 @@ func writeTestCanvasFileWithMetadataID(t *testing.T, name, canvasID string) stri
 	return filePath
 }
 
-func TestResolveCanvasForFileUpdateWithoutIDReturnsError(t *testing.T) {
-	filePath := writeTestCanvasFileWithoutMetadataID(t, "parse-check")
-	_, _, err := resolveCanvasForFileUpdate(filePath)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "metadata.id is required")
-}
-
-func TestResolveCanvasForFileUpdateWithIDSucceeds(t *testing.T) {
-	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
-	filePath := writeTestCanvasFileWithMetadataID(t, "my-canvas", canvasID)
-	gotID, canvas, err := resolveCanvasForFileUpdate(filePath)
-	require.NoError(t, err)
-	require.Equal(t, canvasID, gotID)
-	md := canvas.GetMetadata()
-	require.Equal(t, canvasID, (&md).GetId())
-}
-
-func TestResolveCanvasForFileUpdateWhitespaceIDReturnsError(t *testing.T) {
-	t.Helper()
-	dir := t.TempDir()
-	filePath := filepath.Join(dir, "canvas.yaml")
-	content := []byte(
-		"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: \"   \"\n  name: x\nspec:\n  nodes: []\n  edges: []\n",
-	)
-	require.NoError(t, os.WriteFile(filePath, content, 0o644))
-
-	_, _, err := resolveCanvasForFileUpdate(filePath)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "metadata.id is required")
-}
-
 func TestUpdateFromFileWhenCommitFailsReturnsWrappedError(t *testing.T) {
 	t.Helper()
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"

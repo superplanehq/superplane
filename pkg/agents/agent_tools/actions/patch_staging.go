@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -166,13 +167,44 @@ func (a patchStagingAction) applyPatchToStagedCanvas(
 	}
 
 	autoLayout := resolvePatchStagingAutoLayout(target.autoLayoutInput, target.changeset, stagedCanvas.edges, patched.Nodes)
-	if autoLayout != nil {
-		nodes, edges, err := layout.ApplyLayout(patched.Nodes, patched.Edges, autoLayout)
-		if err != nil {
-			return nil, fmt.Errorf("apply patch auto-layout: %w", err)
+	if autoLayout == nil {
+		return patched, nil
+	}
+
+	nodes := []layout.N{}
+	for _, node := range patched.Nodes {
+		nodes = append(nodes, layout.N{
+			ID:       node.ID,
+			Type:     node.Type,
+			Position: layout.Position{X: node.Position.X, Y: node.Position.Y},
+		})
+	}
+
+	edges := []layout.E{}
+	for _, edge := range patched.Edges {
+		edges = append(edges, layout.E{
+			SourceID: edge.SourceID,
+			TargetID: edge.TargetID,
+			Channel:  edge.Channel,
+		})
+	}
+
+	positionedNodes, _, err := layout.ApplyLayout(nodes, edges, autoLayout)
+	if err != nil {
+		return nil, fmt.Errorf("apply patch auto-layout: %w", err)
+	}
+
+	for _, positionedNode := range positionedNodes {
+		i := slices.IndexFunc(patched.Nodes, func(node models.Node) bool {
+			return node.ID == positionedNode.ID
+		})
+
+		if i == -1 {
+			continue
 		}
-		patched.Nodes = nodes
-		patched.Edges = edges
+
+		patched.Nodes[i].Position.X = positionedNode.Position.X
+		patched.Nodes[i].Position.Y = positionedNode.Position.Y
 	}
 
 	return patched, nil

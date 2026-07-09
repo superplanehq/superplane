@@ -5,17 +5,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/models"
 )
 
 func TestApplyCanvasAutoLayoutStacksDisconnectedComponentsVertically(t *testing.T) {
-	nodes := []models.Node{
-		{ID: "component-a-1", Type: models.NodeTypeComponent, Position: models.Position{X: 0, Y: 0}},
-		{ID: "component-a-2", Type: models.NodeTypeComponent, Position: models.Position{X: 300, Y: 0}},
-		{ID: "component-b-1", Type: models.NodeTypeComponent, Position: models.Position{X: 0, Y: 500}},
-		{ID: "component-b-2", Type: models.NodeTypeComponent, Position: models.Position{X: 300, Y: 500}},
+	nodes := []N{
+		{ID: "component-a-1", Type: "component", Position: Position{X: 0, Y: 0}},
+		{ID: "component-a-2", Type: "component", Position: Position{X: 300, Y: 0}},
+		{ID: "component-b-1", Type: "component", Position: Position{X: 0, Y: 500}},
+		{ID: "component-b-2", Type: "component", Position: Position{X: 300, Y: 500}},
 	}
-	edges := []models.Edge{
+	edges := []E{
 		{SourceID: "component-a-1", TargetID: "component-a-2", Channel: "default"},
 		{SourceID: "component-b-1", TargetID: "component-b-2", Channel: "default"},
 	}
@@ -45,12 +44,12 @@ func TestApplyCanvasAutoLayoutStacksDisconnectedComponentsVertically(t *testing.
 }
 
 func TestApplyCanvasAutoLayoutPacksIsolatedNodesBelowConnectedComponent(t *testing.T) {
-	nodes := []models.Node{
-		{ID: "component-a-1", Type: models.NodeTypeComponent, Position: models.Position{X: 0, Y: 0}},
-		{ID: "component-a-2", Type: models.NodeTypeComponent, Position: models.Position{X: 300, Y: 0}},
-		{ID: "isolated", Type: models.NodeTypeComponent, Position: models.Position{X: 0, Y: 500}},
+	nodes := []N{
+		{ID: "component-a-1", Type: "component", Position: Position{X: 0, Y: 0}},
+		{ID: "component-a-2", Type: "component", Position: Position{X: 300, Y: 0}},
+		{ID: "isolated", Type: "component", Position: Position{X: 0, Y: 500}},
 	}
-	edges := []models.Edge{
+	edges := []E{
 		{SourceID: "component-a-1", TargetID: "component-a-2", Channel: "default"},
 	}
 
@@ -75,16 +74,16 @@ func TestApplyCanvasAutoLayoutPacksIsolatedNodesBelowConnectedComponent(t *testi
 }
 
 func TestApplyCanvasAutoLayoutDoesNotPushTerminalNodeBackWithParallelEdges(t *testing.T) {
-	nodes := []models.Node{
-		{ID: "github-onpullrequest-on-pr-closed-cleanup-irrew6", Type: models.NodeTypeTrigger, Position: models.Position{X: -48, Y: -448}},
-		{ID: "readmemory-read-machine-by-pr--cleanup--o50tk6", Type: models.NodeTypeComponent, Position: models.Position{X: 552, Y: -448}},
-		{ID: "hetzner-deleteserver-terminate-hetzner-server--cleanup--bsc35t", Type: models.NodeTypeComponent, Position: models.Position{X: 1152, Y: -448}},
-		{ID: "component-node-uu1k5g", Type: models.NodeTypeComponent, Position: models.Position{X: 1752, Y: -588}},
-		{ID: "deletememory-delete-machine-mapping--cleanup--xo61py", Type: models.NodeTypeComponent, Position: models.Position{X: 2352, Y: -448}},
-		{ID: "trigger-creation-of-new-machine-trigger-creation-of-new-machine-2-9w7rn9", Type: models.NodeTypeComponent, Position: models.Position{X: 1752, Y: -308}},
+	nodes := []N{
+		{ID: "github-onpullrequest-on-pr-closed-cleanup-irrew6", Type: "trigger", Position: Position{X: -48, Y: -448}},
+		{ID: "readmemory-read-machine-by-pr--cleanup--o50tk6", Type: "component", Position: Position{X: 552, Y: -448}},
+		{ID: "hetzner-deleteserver-terminate-hetzner-server--cleanup--bsc35t", Type: "component", Position: Position{X: 1152, Y: -448}},
+		{ID: "component-node-uu1k5g", Type: "component", Position: Position{X: 1752, Y: -588}},
+		{ID: "deletememory-delete-machine-mapping--cleanup--xo61py", Type: "component", Position: Position{X: 2352, Y: -448}},
+		{ID: "trigger-creation-of-new-machine-trigger-creation-of-new-machine-2-9w7rn9", Type: "component", Position: Position{X: 1752, Y: -308}},
 	}
 
-	edges := []models.Edge{
+	edges := []E{
 		{SourceID: "github-onpullrequest-on-pr-closed-cleanup-irrew6", TargetID: "readmemory-read-machine-by-pr--cleanup--o50tk6", Channel: "default"},
 		{SourceID: "readmemory-read-machine-by-pr--cleanup--o50tk6", TargetID: "hetzner-deleteserver-terminate-hetzner-server--cleanup--bsc35t", Channel: "found"},
 		{SourceID: "hetzner-deleteserver-terminate-hetzner-server--cleanup--bsc35t", TargetID: "component-node-uu1k5g", Channel: "default"},
@@ -108,8 +107,8 @@ func TestApplyCanvasAutoLayoutDoesNotPushTerminalNodeBackWithParallelEdges(t *te
 	require.Greater(t, target.Position.X, source.Position.X)
 }
 
-func mapLayoutNodesByID(nodes []models.Node) map[string]models.Node {
-	result := make(map[string]models.Node, len(nodes))
+func mapLayoutNodesByID(nodes []N) map[string]N {
+	result := make(map[string]N, len(nodes))
 	for _, node := range nodes {
 		result[node.ID] = node
 	}

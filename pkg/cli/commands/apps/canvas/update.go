@@ -3,13 +3,14 @@ package canvas
 import (
 	"fmt"
 	"io"
+	"os"
+	"slices"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/layout"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
+	appyaml "github.com/superplanehq/superplane/pkg/yaml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -21,29 +22,6 @@ type updateCommand struct {
 	autoLayoutNodes *[]string
 }
 
-func resolveCanvasForFileUpdate(filePath string) (string, openapi_client.CanvasesCanvas, error) {
-	resource, err := models.ParseCanvasResourceFromFile(filePath, "update")
-	if err != nil {
-		return "", openapi_client.CanvasesCanvas{}, err
-	}
-
-	if resource.Metadata == nil {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata is required")
-	}
-
-	fileID := ""
-	if resource.Metadata.Id != nil {
-		fileID = strings.TrimSpace(resource.Metadata.GetId())
-	}
-
-	if fileID == "" {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata.id is required in the YAML file")
-	}
-
-	canvas := models.CanvasFromCanvas(*resource)
-	return fileID, canvas, nil
-}
-
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	filePath := ""
 	if c.file != nil {
@@ -53,17 +31,9 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("canvas file is required")
 	}
 
-	autoLayoutValue := ""
-	if c.autoLayout != nil {
-		autoLayoutValue = strings.TrimSpace(*c.autoLayout)
-	}
-	autoLayoutScopeValue := ""
-	if c.autoLayoutScope != nil {
-		autoLayoutScopeValue = strings.TrimSpace(*c.autoLayoutScope)
-	}
-	autoLayoutNodeIDs := []string{}
-	if c.autoLayoutNodes != nil {
-		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
+	canvasID, err := common.ResolveAppNameOrIDArg(ctx, filePath)
+	if err != nil {
+		return err
 	}
 
 	commitMessage, err := common.RequireCommitMessage(messageValue(c.message))
@@ -71,32 +41,19 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("%w; use \"superplane apps staging update\" and \"superplane apps staging commit\" to stage changes first", err)
 	}
 
-	resource, err := models.ParseCanvasResourceFromFile(filePath, "update")
+	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read %s: %w", filePath, err)
 	}
-	if resource.Metadata == nil || strings.TrimSpace(resource.Metadata.GetId()) == "" {
-		return fmt.Errorf("canvas metadata.id is required in the YAML file")
-	}
-	canvasID := strings.TrimSpace(resource.Metadata.GetId())
 
-	autoLayout, err := layout.ResolveUpdateAutoLayout(
-		layout.HasFlags(ctx),
-		resource.AutoLayout,
-		autoLayoutValue,
-		autoLayoutScopeValue,
-		autoLayoutNodeIDs,
-	)
+	resource, err := appyaml.CanvasFromYAML(content)
+	if err != nil {
+		return fmt.Errorf("invalid canvas yaml in %s: %w", filePath, err)
+	}
+
+	resource, err = c.applyLayout(ctx, resource)
 	if err != nil {
 		return err
-	}
-	if autoLayout != nil {
-		if resource.Spec == nil {
-			return fmt.Errorf("canvas spec is required when auto-layout is enabled")
-		}
-		if err := layout.ApplyToCanvasSpec(resource.Spec, autoLayout); err != nil {
-			return fmt.Errorf("apply auto-layout: %w", err)
-		}
 	}
 
 	yamlBytes, err := yaml.Marshal(resource)
@@ -132,8 +89,12 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("canvas updated but failed to read canvas.yaml: %w", err)
 	}
 
-	versionForValidation := versionWithSpecFromYAML(version, string(canvasYAML))
-	if errText := formatNodeSpecErrorsForCLI(versionForValidation); errText != "" {
+	resource, err = appyaml.CanvasFromYAML(canvasYAML)
+	if err != nil {
+		return fmt.Errorf("invalid canvas yaml in %s: %w", filePath, err)
+	}
+
+	if errText := formatNodeSpecErrorsForCLI(resource.Spec.Nodes); errText != "" {
 		return fmt.Errorf("%s", errText)
 	}
 
@@ -143,13 +104,11 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		metadata := version.GetMetadata()
-		versionForOutput := versionWithSpecFromYAML(version, string(canvasYAML))
-		spec, ok := versionForOutput.GetSpecOk()
 		nodeCount := 0
 		edgeCount := 0
-		if ok && spec != nil {
-			nodeCount = len(spec.GetNodes())
-			edgeCount = len(spec.GetEdges())
+		if resource.Spec != nil {
+			nodeCount = len(resource.Spec.Nodes)
+			edgeCount = len(resource.Spec.Edges)
 		}
 
 		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
@@ -158,10 +117,10 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", edgeCount)
 
 		integrations := make(map[string]struct{})
-		if ok && spec != nil {
-			for _, node := range spec.GetNodes() {
-				if ref, refOk := node.GetIntegrationOk(); refOk && ref != nil {
-					if id := ref.GetId(); id != "" {
+		if resource.Spec != nil {
+			for _, node := range resource.Spec.Nodes {
+				if node.Integration != nil {
+					if id := node.Integration.ID; id != "" {
 						integrations[id] = struct{}{}
 					}
 				}
@@ -171,11 +130,78 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		if err != nil {
 			return err
 		}
-		if warnText := formatNodeSpecWarningsForCLI(versionForOutput); warnText != "" {
+		if warnText := formatNodeSpecWarningsForCLI(resource.Spec.Nodes); warnText != "" {
 			_, err = fmt.Fprint(stdout, warnText)
 		}
 		return err
 	})
+}
+
+func (c *updateCommand) applyLayout(ctx core.CommandContext, resource *appyaml.Canvas) (*appyaml.Canvas, error) {
+	autoLayoutValue := ""
+	if c.autoLayout != nil {
+		autoLayoutValue = strings.TrimSpace(*c.autoLayout)
+	}
+
+	autoLayoutScopeValue := ""
+	if c.autoLayoutScope != nil {
+		autoLayoutScopeValue = strings.TrimSpace(*c.autoLayoutScope)
+	}
+	autoLayoutNodeIDs := []string{}
+	if c.autoLayoutNodes != nil {
+		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
+	}
+
+	autoLayout, err := ResolveUpdateAutoLayout(ctx, autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	if autoLayout == nil {
+		return resource, nil
+	}
+
+	if resource.Spec == nil {
+		return resource, nil
+	}
+
+	nodes := []layout.N{}
+	for _, node := range resource.Spec.Nodes {
+		nodes = append(nodes, layout.N{
+			ID:       node.ID,
+			Type:     node.Type,
+			Position: layout.Position{X: node.Position.X, Y: node.Position.Y},
+		})
+	}
+
+	edges := []layout.E{}
+	for _, edge := range resource.Spec.Edges {
+		edges = append(edges, layout.E{
+			SourceID: edge.SourceID,
+			TargetID: edge.TargetID,
+			Channel:  edge.Channel,
+		})
+	}
+
+	positionedNodes, _, err := layout.ApplyLayout(nodes, edges, autoLayout)
+	if err != nil {
+		return nil, fmt.Errorf("error applying auto-layout: %w", err)
+	}
+
+	for _, positionedNode := range positionedNodes {
+		i := slices.IndexFunc(resource.Spec.Nodes, func(node appyaml.Node) bool {
+			return node.ID == positionedNode.ID
+		})
+
+		if i == -1 {
+			continue
+		}
+
+		resource.Spec.Nodes[i].Position.X = positionedNode.Position.X
+		resource.Spec.Nodes[i].Position.Y = positionedNode.Position.Y
+	}
+
+	return resource, nil
 }
 
 func messageValue(message *string) string {
@@ -185,44 +211,26 @@ func messageValue(message *string) string {
 	return *message
 }
 
-func versionWithSpecFromYAML(version openapi_client.CanvasesCanvasVersion, canvasYAML string) openapi_client.CanvasesCanvasVersion {
-	trimmed := strings.TrimSpace(canvasYAML)
-	if trimmed == "" {
-		return version
-	}
-
-	resource, err := models.ParseCanvas([]byte(trimmed))
-	if err != nil || resource.Spec == nil {
-		return version
-	}
-
-	version.SetSpec(*resource.Spec)
-	return version
-}
-
 // formatNodeSpecErrorsForCLI summarizes node error_message from the API response (blocks execution until fixed).
-func formatNodeSpecErrorsForCLI(version openapi_client.CanvasesCanvasVersion) string {
-	spec, ok := version.GetSpecOk()
-	if !ok || spec == nil {
-		return ""
-	}
-
+func formatNodeSpecErrorsForCLI(nodes []appyaml.Node) string {
 	var lines []string
-	for _, node := range spec.GetNodes() {
-		if !node.HasErrorMessage() {
+	for _, node := range nodes {
+		if node.ErrorMessage == nil || *node.ErrorMessage == "" {
 			continue
 		}
-		msg := strings.TrimSpace(node.GetErrorMessage())
+
+		msg := strings.TrimSpace(*node.ErrorMessage)
 		if msg == "" {
 			continue
 		}
-		id := node.GetId()
-		name := strings.TrimSpace(node.GetName())
+
+		name := strings.TrimSpace(node.Name)
 		if name == "" {
-			name = id
+			name = node.ID
 		}
-		lines = append(lines, fmt.Sprintf("node %s (%s): %s", id, name, msg))
+		lines = append(lines, fmt.Sprintf("node %s (%s): %s", node.ID, name, msg))
 	}
+
 	if len(lines) == 0 {
 		return ""
 	}
@@ -237,28 +245,26 @@ func formatNodeSpecErrorsForCLI(version openapi_client.CanvasesCanvasVersion) st
 	return b.String()
 }
 
-func formatNodeSpecWarningsForCLI(version openapi_client.CanvasesCanvasVersion) string {
-	spec, ok := version.GetSpecOk()
-	if !ok || spec == nil {
-		return ""
-	}
-
+func formatNodeSpecWarningsForCLI(nodes []appyaml.Node) string {
 	var lines []string
-	for _, node := range spec.GetNodes() {
-		if !node.HasWarningMessage() {
+	for _, node := range nodes {
+		if node.WarningMessage == nil || *node.WarningMessage == "" {
 			continue
 		}
-		msg := strings.TrimSpace(node.GetWarningMessage())
+
+		msg := strings.TrimSpace(*node.WarningMessage)
 		if msg == "" {
 			continue
 		}
-		id := node.GetId()
-		name := strings.TrimSpace(node.GetName())
+
+		name := strings.TrimSpace(node.Name)
 		if name == "" {
-			name = id
+			name = node.ID
 		}
-		lines = append(lines, fmt.Sprintf("node %s (%s): %s", id, name, msg))
+
+		lines = append(lines, fmt.Sprintf("node %s (%s): %s", node.ID, name, msg))
 	}
+
 	if len(lines) == 0 {
 		return ""
 	}
@@ -271,4 +277,28 @@ func formatNodeSpecWarningsForCLI(version openapi_client.CanvasesCanvasVersion) 
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+// ResolveUpdateAutoLayout picks the auto-layout settings for canvas update.
+// Flags take precedence; otherwise a file-level autoLayout field is used.
+// When neither is set, horizontal full-canvas layout is applied.
+func ResolveUpdateAutoLayout(ctx core.CommandContext, value string, scopeValue string, nodeIDs []string) (*layout.AutoLayout, error) {
+	if HasFlags(ctx) {
+		return layout.ParseAutoLayout(value, scopeValue, nodeIDs)
+	}
+	defaultLayout := layout.DefaultAutoLayout()
+	return &defaultLayout, nil
+}
+
+func HasFlags(ctx core.CommandContext) bool {
+	if ctx.Cmd == nil {
+		return false
+	}
+
+	flags := ctx.Cmd.Flags()
+	if flags == nil {
+		return false
+	}
+
+	return flags.Changed("auto-layout") || flags.Changed("auto-layout-scope") || flags.Changed("auto-layout-node")
 }
