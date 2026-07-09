@@ -85,6 +85,29 @@ export function findRunIdInLookupIndex(index: RunLookupIndex, event: SidebarEven
   return null;
 }
 
+export function findLatestRunIdForNode(runs: CanvasesCanvasRun[], nodeId: string): string | null {
+  let latestRunId: string | null = null;
+  let latestTimestamp = Number.NEGATIVE_INFINITY;
+
+  for (const run of runs) {
+    if (!run.id) {
+      continue;
+    }
+
+    const timestamp = getRunNodeTimestamp(run, nodeId);
+    if (timestamp === null) {
+      continue;
+    }
+
+    if (latestRunId === null || timestamp > latestTimestamp) {
+      latestRunId = run.id;
+      latestTimestamp = timestamp;
+    }
+  }
+
+  return latestRunId;
+}
+
 export function getSidebarEventLookupKey(event: SidebarEvent): string | null {
   return getSidebarEventRootEventId(event) ?? getSidebarEventExecutionId(event) ?? null;
 }
@@ -175,4 +198,34 @@ export function shouldContinueRunLookupPagination(options: {
   }
 
   return true;
+}
+
+function getRunNodeTimestamp(run: CanvasesCanvasRun, nodeId: string): number | null {
+  let timestamp: number | null = null;
+
+  if (run.rootEvent?.nodeId === nodeId) {
+    timestamp = parseTimestamp(run.rootEvent.createdAt);
+  }
+
+  for (const execution of run.executions ?? []) {
+    if (execution.nodeId !== nodeId) {
+      continue;
+    }
+
+    const executionTimestamp = parseTimestamp(execution.updatedAt) || parseTimestamp(execution.createdAt);
+    if (timestamp === null || executionTimestamp > timestamp) {
+      timestamp = executionTimestamp;
+    }
+  }
+
+  return timestamp;
+}
+
+function parseTimestamp(value: string | undefined): number {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
