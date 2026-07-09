@@ -65,6 +65,7 @@ func (i *Claude) Actions() []core.Action {
 		&runagent.RunAgent{},
 		&runcodeagent.RunCodeAgent{},
 		&GetDailyUsage{},
+		&CreateBatchMessage{},
 	}
 }
 
