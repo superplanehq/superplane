@@ -1,4 +1,4 @@
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvas, CanvasesStaging } from "@/api-client";
 
 export type CanvasSaveResult = {
   status: "saved" | "replaced" | "stale";
@@ -8,7 +8,7 @@ export type CanvasSaveResult = {
   hasQueuedFollowUp: boolean;
   response?: {
     data?: {
-      version?: CanvasesCanvasVersion;
+      staging?: CanvasesStaging;
     };
   };
 };

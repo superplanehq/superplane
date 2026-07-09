@@ -33,7 +33,7 @@ func Test__CommitCanvasStaging__AppliesStagedCanvas(t *testing.T) {
 
 	resp, err := CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvas.ID.String(), "Update canvas", "", r.AuthService)
 	require.NoError(t, err)
-	assert.False(t, resp.GetStagingSummary().GetHasStaging())
+	assert.False(t, resp.GetStaging().GetHasStaging())
 	require.NotNil(t, resp.GetVersion().GetMetadata())
 
 	updatedCanvas, err := models.FindCanvas(r.Organization.ID, canvas.ID)
@@ -103,7 +103,7 @@ func Test__CommitCanvasStaging__StageArbitraryRepositoryFileCommitsToGit(t *test
 
 	resp, err := CommitCanvasStaging(ctx, r.GitProvider, nil, r.Encryptor, r.Registry, orgID, canvasID, "Add readme", "", r.AuthService)
 	require.NoError(t, err)
-	assert.False(t, resp.GetStagingSummary().GetHasStaging())
+	assert.False(t, resp.GetStaging().GetHasStaging())
 
 	reader, err = r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", "")
 	require.NoError(t, err)

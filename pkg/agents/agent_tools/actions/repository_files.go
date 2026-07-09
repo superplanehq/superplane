@@ -343,13 +343,13 @@ func parseSessionIDs(session agents.AgentSessionContext) (uuid.UUID, uuid.UUID, 
 	return orgID, canvasID, nil
 }
 
-func serializeStagingSummary(summary *pb.StagingSummary) stagingSummary {
-	if summary == nil {
+func serializeStagingSummary(staging *pb.Staging) stagingSummary {
+	if staging == nil {
 		return stagingSummary{}
 	}
 	return stagingSummary{
-		HasStaging:  summary.GetHasStaging(),
-		StagedPaths: append([]string(nil), summary.GetStagedPaths()...),
+		HasStaging:  staging.GetHasStaging(),
+		StagedPaths: append([]string(nil), staging.GetStagedPaths()...),
 	}
 }
 
