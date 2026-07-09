@@ -62,8 +62,8 @@ type BatchMessageItemSpec struct {
 // BatchMessagePromptSpec is one prompt in "multiple" mode. It's combined with
 // every element of Items to produce one request per (prompt, item) pair.
 type BatchMessagePromptSpec struct {
-	ID             string `json:"id" mapstructure:"id"`
-	PromptTemplate string `json:"promptTemplate" mapstructure:"promptTemplate"`
+	ID     string `json:"id" mapstructure:"id"`
+	Prompt string `json:"prompt" mapstructure:"prompt"`
 }
 
 // BatchMessageSpec is the workflow node configuration for claude.createBatchMessage.
@@ -307,7 +307,7 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 			VisibilityConditions: multipleVisible,
 			RequiredConditions:   multipleRequired,
 			Default: []map[string]any{
-				{"id": "prompt-1", "promptTemplate": ""},
+				{"id": "prompt-1", "prompt": ""},
 			},
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
@@ -325,9 +325,9 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 								Description: "Short name for this prompt (letters, digits, hyphens, underscores). Keys its result on each item, e.g. `results[i].prompts.title`.",
 							},
 							{
-								Name:        "promptTemplate",
-								Label:       "Prompt Template",
-								Type:        configuration.FieldTypeExpression,
+								Name:        "prompt",
+								Label:       "Prompt",
+								Type:        configuration.FieldTypeText,
 								Required:    true,
 								Placeholder: `"Suggest a title for PR #" + string(item.number) + ": " + item.body`,
 								Description: "Expression evaluated per item to build this prompt's text, with `item`/`index` available.",
@@ -483,7 +483,7 @@ func decodeBatchMessageSpec(config any) (BatchMessageSpec, error) {
 }
 
 // validateBatchMessageSpec validates everything that's known at design time.
-// The expression fields themselves (Items/Prompt/Prompts[].PromptTemplate)
+// The expression fields themselves (Items/Prompt/Prompts[].Prompt)
 // are only fully validated once evaluated, in resolveBatchRequests /
 // validateRequestItems.
 func validateBatchMessageSpec(spec BatchMessageSpec) error {
@@ -504,8 +504,8 @@ func validateBatchMessageSpec(spec BatchMessageSpec) error {
 			if strings.TrimSpace(p.ID) == "" {
 				return fmt.Errorf("prompts[%d].id is required", i)
 			}
-			if strings.TrimSpace(p.PromptTemplate) == "" {
-				return fmt.Errorf("prompts[%d].promptTemplate is required", i)
+			if strings.TrimSpace(p.Prompt) == "" {
+				return fmt.Errorf("prompts[%d].prompt is required", i)
 			}
 		}
 	default:
@@ -617,7 +617,7 @@ func resolveMultiplePrompts(expressions core.ExpressionContext, prompts []BatchM
 		for i, element := range elements {
 			vars := map[string]any{"item": element, "index": i}
 
-			prompt, err := evalPromptTemplate(expressions, p.PromptTemplate, vars, i)
+			prompt, err := evalPromptTemplate(expressions, p.Prompt, vars, i)
 			if err != nil {
 				return nil, fmt.Errorf("prompts[%s]: %w", id, err)
 			}

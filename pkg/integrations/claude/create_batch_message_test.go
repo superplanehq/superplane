@@ -91,7 +91,7 @@ func Test__CreateBatchMessage__Setup(t *testing.T) {
 			"model":   "claude-opus-4-6",
 			"mode":    modeMultiple,
 			"items":   `$['Fetch'].body`,
-			"prompts": []map[string]any{{"promptTemplate": "item"}},
+			"prompts": []map[string]any{{"prompt": "item"}},
 		}
 		ctx := core.SetupContext{Configuration: cfg}
 		err := c.Setup(ctx)
@@ -99,7 +99,7 @@ func Test__CreateBatchMessage__Setup(t *testing.T) {
 		assert.Contains(t, err.Error(), "prompts[0].id is required")
 	})
 
-	t.Run("multiple mode prompt missing promptTemplate", func(t *testing.T) {
+	t.Run("multiple mode prompt missing prompt", func(t *testing.T) {
 		cfg := map[string]any{
 			"model":   "claude-opus-4-6",
 			"mode":    modeMultiple,
@@ -109,7 +109,7 @@ func Test__CreateBatchMessage__Setup(t *testing.T) {
 		ctx := core.SetupContext{Configuration: cfg}
 		err := c.Setup(ctx)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "prompts[0].promptTemplate is required")
+		assert.Contains(t, err.Error(), "prompts[0].prompt is required")
 	})
 
 	t.Run("multiple mode does not require prompt", func(t *testing.T) {
@@ -117,7 +117,7 @@ func Test__CreateBatchMessage__Setup(t *testing.T) {
 			"model":   "claude-opus-4-6",
 			"mode":    modeMultiple,
 			"items":   `$['Fetch'].body`,
-			"prompts": []map[string]any{{"id": "title", "promptTemplate": "item"}},
+			"prompts": []map[string]any{{"id": "title", "prompt": "item"}},
 		}
 		ctx := core.SetupContext{Configuration: cfg, Metadata: &contexts.MetadataContext{}}
 		require.NoError(t, c.Setup(ctx))
@@ -270,8 +270,8 @@ func Test__CreateBatchMessage__Execute__multipleMode_groupsByItemNotByPrompt(t *
 			"mode":  modeMultiple,
 			"items": `dummy`,
 			"prompts": []map[string]any{
-				{"id": "title", "promptTemplate": "dummy"},
-				{"id": "description", "promptTemplate": "dummy"},
+				{"id": "title", "prompt": "dummy"},
+				{"id": "description", "prompt": "dummy"},
 			},
 		},
 		HTTP:           httpContext,
@@ -321,8 +321,8 @@ func Test__CreateBatchMessage__Execute__multipleMode_tooManyRequests(t *testing.
 			"mode":  modeMultiple,
 			"items": `dummy`,
 			"prompts": []map[string]any{
-				{"id": "title", "promptTemplate": "dummy"},
-				{"id": "description", "promptTemplate": "dummy"},
+				{"id": "title", "prompt": "dummy"},
+				{"id": "description", "prompt": "dummy"},
 			},
 		},
 		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
@@ -347,7 +347,7 @@ func Test__CreateBatchMessage__Execute__multipleMode_invalidPromptID(t *testing.
 			"mode":  modeMultiple,
 			"items": `dummy`,
 			"prompts": []map[string]any{
-				{"id": "title suggestion", "promptTemplate": "dummy"},
+				{"id": "title suggestion", "prompt": "dummy"},
 			},
 		},
 		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
