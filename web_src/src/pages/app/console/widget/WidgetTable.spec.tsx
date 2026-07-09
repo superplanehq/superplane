@@ -184,6 +184,42 @@ describe("WidgetTable link column href", () => {
   });
 });
 
+describe("WidgetTable avatar column", () => {
+  function renderAvatar(rows: unknown[]) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
+            <WidgetTable
+              render={{ kind: "table", columns: [{ field: "avatarUrl", label: "Avatar", format: "avatar" }] }}
+              rows={rows}
+              isLoading={false}
+            />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("renders an <img> with the resolved URL as its src", () => {
+    const view = renderAvatar([{ id: "row-1", avatarUrl: "https://github.com/torvalds.png" }]);
+    const img = view.container.querySelector("table tbody tr img");
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("src")).toBe("https://github.com/torvalds.png");
+    expect(img!.getAttribute("alt")).toBe("Avatar");
+    view.unmount();
+  });
+
+  it("renders the icon fallback (no <img>) when the value is empty", () => {
+    const view = renderAvatar([{ id: "row-1", avatarUrl: "" }]);
+    expect(view.container.querySelector("table tbody tr img")).toBeNull();
+    const fallback = view.getByTestId("widget-table-avatar");
+    expect(fallback.querySelector("svg")).not.toBeNull();
+    view.unmount();
+  });
+});
+
 describe("WidgetTable column formatting", () => {
   it("renders status columns as colored pills and badge columns as neutral tags", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

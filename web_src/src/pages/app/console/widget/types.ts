@@ -34,7 +34,14 @@ export type WidgetColumnFormat =
   | "status"
   | "badge"
   | "code"
-  | "link";
+  | "link"
+  | "progress"
+  | "trend"
+  | "avatar";
+
+/** Which movement direction is "good" for a `trend` column (drives color). */
+export type WidgetTrendGoodDirection = "up" | "down";
+export const WIDGET_TREND_GOOD_DIRECTIONS: WidgetTrendGoodDirection[] = ["up", "down"];
 
 export interface WidgetTableColumn {
   field: string;
@@ -42,6 +49,14 @@ export interface WidgetTableColumn {
   format?: WidgetColumnFormat;
   show?: string;
   href?: string;
+  /**
+   * For `format: "trend"` only. Declares which direction counts as an
+   * improvement so the arrow color reflects intent: `"up"` (default) paints a
+   * rising value green, `"down"` paints a falling value green (e.g. open
+   * issues, errors, latency). The arrow itself always follows the real
+   * movement; only the color changes.
+   */
+  goodDirection?: WidgetTrendGoodDirection;
 }
 
 export type WidgetFilterOp = "eq" | "neq" | "contains" | "not_contains" | "gt" | "lt" | "exists" | "not_exists";

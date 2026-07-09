@@ -67,9 +67,15 @@ export function useMemoryCatalog(canvasId: string | undefined, namespace?: strin
   };
 }
 
-export function suggestColumnFormat(field: string): "status" | "relative" | "datetime" | "link" | "duration" | "text" {
+/** Substrings that mark a field as an image/avatar URL (`gravatar` matches via `avatar`). */
+const AVATAR_FIELD_KEYWORDS = ["avatar", "icon", "image", "photo", "picture"];
+
+export function suggestColumnFormat(
+  field: string,
+): "status" | "relative" | "datetime" | "link" | "duration" | "avatar" | "text" {
   const lower = field.toLowerCase();
   if (lower === "status" || lower === "state" || lower === "health") return "status";
+  if (AVATAR_FIELD_KEYWORDS.some((keyword) => lower.includes(keyword))) return "avatar";
   if (lower.endsWith("_at") || lower.includes("created") || lower.includes("updated")) return "relative";
   if (lower === "url" || lower === "link" || lower === "href") return "link";
   // `durationMs` (and any `*Ms` numeric field) renders best with the duration

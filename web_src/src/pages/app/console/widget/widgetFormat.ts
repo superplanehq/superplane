@@ -13,6 +13,7 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case "number":
       return formatNumber(value);
     case "percent":
+    case "progress":
       return formatPercent(value);
     case "date":
       return formatDate(value, false);
@@ -47,6 +48,23 @@ function formatPercent(value: unknown): string {
   // Values between 0 and 1 are treated as fractions; otherwise displayed as-is.
   const scaled = n > 0 && n <= 1 ? n * 100 : n;
   return `${scaled.toFixed(scaled % 1 === 0 ? 0 : 1)}%`;
+}
+
+/**
+ * Format a signed change value for the `trend` format. The magnitude drives the
+ * unit the same way `percent`/`progress` do: a fractional value (|n| <= 1) is
+ * rendered as a percentage (`-0.125` -> `-12.5%`), otherwise as a plain number
+ * (`-5` -> `-5`). The sign is always preserved so the arrow/color and the label
+ * agree. Kept out of `formatValue`'s switch so the trend cell owns its label
+ * without inflating the shared formatter's branch count.
+ */
+export function formatTrend(value: unknown): string {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  const sign = n > 0 ? "+" : n < 0 ? "-" : "";
+  const magnitude = Math.abs(n);
+  const label = magnitude > 0 && magnitude <= 1 ? formatPercent(magnitude) : formatNumber(magnitude);
+  return `${sign}${label}`;
 }
 
 function formatRelative(value: unknown): string {

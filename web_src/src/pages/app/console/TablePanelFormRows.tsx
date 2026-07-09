@@ -13,6 +13,7 @@ import {
   type WidgetRowStyleTone,
   type WidgetTableColumn,
   type WidgetTableFilter,
+  type WidgetTrendGoodDirection,
 } from "./widget/types";
 import { suggestColumnFormat } from "./widget/useMemoryCatalog";
 
@@ -28,6 +29,9 @@ const COLUMN_FORMATS: WidgetColumnFormat[] = [
   "badge",
   "code",
   "link",
+  "progress",
+  "trend",
+  "avatar",
 ];
 
 export function ColumnRow({
@@ -70,7 +74,11 @@ export function ColumnRow({
           value={col.format ?? "__none__"}
           onValueChange={(v) => {
             const format = v === "__none__" ? undefined : (v as WidgetColumnFormat);
-            onChange({ format, ...(format === "link" ? {} : { href: undefined }) });
+            onChange({
+              format,
+              ...(format === "link" ? {} : { href: undefined }),
+              ...(format === "trend" ? {} : { goodDirection: undefined }),
+            });
           }}
         >
           <SelectTrigger className="col-span-4 h-8">
@@ -94,6 +102,20 @@ export function ColumnRow({
             list={fieldOptions.length > 0 ? "table-href-field-options" : undefined}
             data-testid="table-column-href"
           />
+        ) : null}
+        {col.format === "trend" ? (
+          <Select
+            value={col.goodDirection ?? "up"}
+            onValueChange={(v) => onChange({ goodDirection: v as WidgetTrendGoodDirection })}
+          >
+            <SelectTrigger className="col-span-12 h-8" data-testid="table-column-good-direction">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="up">Higher is better (up = green)</SelectItem>
+              <SelectItem value="down">Lower is better (down = green)</SelectItem>
+            </SelectContent>
+          </Select>
         ) : null}
       </div>
       <div className="flex shrink-0 items-start justify-end">
