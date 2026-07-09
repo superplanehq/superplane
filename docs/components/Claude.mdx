@@ -52,8 +52,8 @@ Batches typically complete within an hour, but can take up to 24 hours. This com
 - **Mode**: Whether one prompt or several are applied to each item.
   - **Single Prompt**: one prompt, applied to every element of Items.
   - **Multiple Prompts**: several prompts, each applied to every element of Items.
-- **Prompt** (Single Prompt mode): An expression evaluated per item to build its prompt, with `item` and `index` available, e.g. `"Suggest a title for PR #" + string(item.number) + ": " + item.body`.
-- **Prompts** (Multiple Prompts mode): A short list of prompts (each with an **ID** and its own expression, using `item`/`index` the same way). Each one is evaluated per element of Items.
+- **Prompt** (Single Prompt mode): The prompt sent for every item. Plain text is sent verbatim; use `{{ item }}` and `{{ index }}` to reference the current item and its position, e.g. `Suggest a title for PR #{{ item.number }}: {{ item.body }}`.
+- **Prompts** (Multiple Prompts mode): A short list of prompts (each with an **ID** and its own text, using `{{ item }}`/`{{ index }}` the same way). Each one is sent for every element of Items.
 - **Structured Output**: (Optional) A JSON Schema every response must conform to.
 
 ### Output

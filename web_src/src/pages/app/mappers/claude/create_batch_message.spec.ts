@@ -160,7 +160,13 @@ describe("createBatchMessageMapper.props", () => {
       outputs: {
         default: [buildOutput({ requestCounts: { processing: 1, succeeded: 2, errored: 0, canceled: 0, expired: 0 } })],
       },
-      rootEvent: { id: "event-1", createdAt: new Date().toISOString(), data: {}, nodeId: "trigger-1", type: "manual.run" },
+      rootEvent: {
+        id: "event-1",
+        createdAt: new Date().toISOString(),
+        data: {},
+        nodeId: "trigger-1",
+        type: "manual.run",
+      },
     });
     const props = createBatchMessageMapper.props(
       buildPropsContext({
@@ -178,7 +184,13 @@ describe("createBatchMessageMapper.props", () => {
   it("marks includeEmptyState when there is no last execution, and not when there is one", () => {
     expect(createBatchMessageMapper.props(buildPropsContext({ lastExecutions: [] })).includeEmptyState).toBe(true);
     const lastExecution = buildExecution({
-      rootEvent: { id: "event-1", createdAt: new Date().toISOString(), data: {}, nodeId: "trigger-1", type: "manual.run" },
+      rootEvent: {
+        id: "event-1",
+        createdAt: new Date().toISOString(),
+        data: {},
+        nodeId: "trigger-1",
+        type: "manual.run",
+      },
     });
     expect(
       createBatchMessageMapper.props(buildPropsContext({ lastExecutions: [lastExecution] })).includeEmptyState,

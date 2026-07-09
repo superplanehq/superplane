@@ -173,8 +173,8 @@ Batches typically complete within an hour, but can take up to 24 hours. This com
 - **Mode**: Whether one prompt or several are applied to each item.
   - **Single Prompt**: one prompt, applied to every element of Items.
   - **Multiple Prompts**: several prompts, each applied to every element of Items.
-- **Prompt** (Single Prompt mode): An expression evaluated per item to build its prompt, with ` + "`item`" + ` and ` + "`index`" + ` available, e.g. ` + "`\"Suggest a title for PR #\" + string(item.number) + \": \" + item.body`" + `.
-- **Prompts** (Multiple Prompts mode): A short list of prompts (each with an **ID** and its own expression, using ` + "`item`" + `/` + "`index`" + ` the same way). Each one is evaluated per element of Items.
+- **Prompt** (Single Prompt mode): The prompt sent for every item. Plain text is sent verbatim; use ` + "`{{ item }}`" + ` and ` + "`{{ index }}`" + ` to reference the current item and its position, e.g. ` + "`Suggest a title for PR #{{ item.number }}: {{ item.body }}`" + `.
+- **Prompts** (Multiple Prompts mode): A short list of prompts (each with an **ID** and its own text, using ` + "`{{ item }}`" + `/` + "`{{ index }}`" + ` the same way). Each one is sent for every element of Items.
 - **Structured Output**: (Optional) A JSON Schema every response must conform to.
 
 ## Output
@@ -261,8 +261,8 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 			Name:                 "prompt",
 			Label:                "Prompt",
 			Type:                 configuration.FieldTypeText,
-			Placeholder:          `"Suggest a title for PR #" + string(item.number) + ": " + item.body`,
-			Description:          "Expression evaluated per item to build its prompt, with `item` and `index` available.",
+			Placeholder:          "Suggest a title for PR #{{ item.number }}: {{ item.body }}",
+			Description:          "The prompt sent for every item. Use `{{ item }}` and `{{ index }}` to reference the current item and its position.",
 			VisibilityConditions: singleVisible,
 			RequiredConditions:   singleRequired,
 		},
@@ -296,8 +296,8 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 								Label:       "Prompt",
 								Type:        configuration.FieldTypeText,
 								Required:    true,
-								Placeholder: `"Suggest a title for PR #" + string(item.number) + ": " + item.body`,
-								Description: "Expression evaluated per item to build this prompt's text, with `item`/`index` available.",
+								Placeholder: "Suggest a title for PR #{{ item.number }}: {{ item.body }}",
+								Description: "This prompt's text, sent for every item. Use `{{ item }}` and `{{ index }}` to reference the current item and its position.",
 							},
 						},
 					},
@@ -613,18 +613,58 @@ func resolveMultiplePrompts(expressions core.ExpressionContext, prompts []BatchM
 	return items, nil
 }
 
-// evalPromptTemplate evaluates a prompt expression for one element, with
-// `item`/`index` bound as extra variables.
+// promptTemplateExpressionRegex matches `{{ expr }}` placeholders within a
+// prompt template, mirroring the `{{ }}` interpolation every other
+// FieldTypeText field in the app supports.
+var promptTemplateExpressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
+
+// evalPromptTemplate resolves a prompt template for one element: any `{{ expr
+// }}` placeholders are evaluated with `item`/`index` bound as extra variables
+// and substituted in; text with no placeholders is sent verbatim. This keeps
+// a plain, static prompt working the same way as claude.textPrompt's Prompt
+// field, while still allowing per-item expressions.
 func evalPromptTemplate(expressions core.ExpressionContext, template string, vars map[string]any, index int) (string, error) {
-	result, err := expressions.RunWithExtraVariables(template, vars)
-	if err != nil {
-		return "", fmt.Errorf("prompt (item %d): %w", index, err)
+	if !promptTemplateExpressionRegex.MatchString(template) {
+		return template, nil
 	}
-	prompt, ok := result.(string)
-	if !ok {
-		return "", fmt.Errorf("prompt must evaluate to a string, got %T (item %d)", result, index)
+
+	var evalErr error
+	result := promptTemplateExpressionRegex.ReplaceAllStringFunc(template, func(match string) string {
+		if evalErr != nil {
+			return match
+		}
+		sub := promptTemplateExpressionRegex.FindStringSubmatch(match)
+		if len(sub) != 2 {
+			return match
+		}
+		value, err := expressions.RunWithExtraVariables(sub[1], vars)
+		if err != nil {
+			evalErr = fmt.Errorf("prompt (item %d): %w", index, err)
+			return ""
+		}
+		return formatPromptTemplateValue(value)
+	})
+	if evalErr != nil {
+		return "", evalErr
 	}
-	return prompt, nil
+	return result, nil
+}
+
+// formatPromptTemplateValue stringifies an evaluated `{{ }}` placeholder's
+// value for embedding into a prompt template.
+func formatPromptTemplateValue(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return "null"
+	case string:
+		return v
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 // itemCustomID builds the batch's internal (never user-facing) custom ID for

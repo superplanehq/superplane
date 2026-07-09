@@ -1,6 +1,8 @@
 package claude
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -467,29 +469,89 @@ func Test__CreateBatchMessage__Execute__itemsNotAnArray(t *testing.T) {
 	assert.Contains(t, err.Error(), "must evaluate to an array")
 }
 
-func Test__CreateBatchMessage__Execute__promptNotString(t *testing.T) {
+// A plain prompt with no `{{ }}` placeholders must be sent to Claude verbatim,
+// the same way claude.textPrompt's Prompt field works, rather than being
+// compiled as a whole expr-lang expression (which would fail on static text
+// like "Summarize this PR" that isn't valid expression syntax).
+func Test__CreateBatchMessage__Execute__singleMode_plainPromptSentVerbatim(t *testing.T) {
 	c := &CreateBatchMessage{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":1}}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				`{"custom_id":"item-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
+			))},
+		},
+	}
 	execCtx := core.ExecutionContext{
+		ID: uuid.New(),
 		Configuration: map[string]any{
 			"model":  "claude-opus-4-6",
 			"mode":   modeSingle,
 			"items":  `dummy`,
-			"prompt": `dummy`,
+			"prompt": "Summarize this pull request.",
 		},
-		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
-		Metadata:    &contexts.MetadataContext{},
-		Expressions: &contexts.ExpressionContext{
-			Output: []any{map[string]any{"number": float64(1)}},
-			WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
-				return 42, nil // not a string
-			},
-		},
-		Logger: logrus.NewEntry(logrus.New()),
+		HTTP:           httpContext,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
+		Metadata:       &contexts.MetadataContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+		Expressions:    &contexts.ExpressionContext{Output: []any{map[string]any{"number": float64(1)}}},
+		Logger:         logrus.NewEntry(logrus.New()),
 	}
 
 	err := c.Execute(execCtx)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must evaluate to a string")
+	require.NoError(t, err)
+
+	require.Len(t, httpContext.Requests, 2)
+	var body createMessageBatchBody
+	require.NoError(t, json.NewDecoder(httpContext.Requests[0].Body).Decode(&body))
+	require.Len(t, body.Requests, 1)
+	assert.Equal(t, "Summarize this pull request.", body.Requests[0].Params.Messages[0].Content)
+}
+
+func Test__evalPromptTemplate(t *testing.T) {
+	t.Run("no placeholders is sent verbatim", func(t *testing.T) {
+		expr := &contexts.ExpressionContext{
+			WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+				t.Fatalf("expressions should not be evaluated for a template with no placeholders")
+				return nil, nil
+			},
+		}
+		prompt, err := evalPromptTemplate(expr, "Summarize this pull request.", map[string]any{}, 0)
+		require.NoError(t, err)
+		assert.Equal(t, "Summarize this pull request.", prompt)
+	})
+
+	t.Run("substitutes placeholders and stringifies non-string values", func(t *testing.T) {
+		expr := &contexts.ExpressionContext{
+			WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+				switch strings.TrimSpace(expression) {
+				case "item.number":
+					return float64(42), nil
+				case "item.title":
+					return "Fix bug", nil
+				}
+				return nil, fmt.Errorf("unexpected expression %q", expression)
+			},
+		}
+		vars := map[string]any{"item": map[string]any{"number": float64(42), "title": "Fix bug"}, "index": 0}
+		prompt, err := evalPromptTemplate(expr, "PR #{{ item.number }}: {{ item.title }}", vars, 0)
+		require.NoError(t, err)
+		assert.Equal(t, "PR #42: Fix bug", prompt)
+	})
+
+	t.Run("propagates an error from a placeholder expression", func(t *testing.T) {
+		expr := &contexts.ExpressionContext{
+			WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+				return nil, fmt.Errorf("boom")
+			},
+		}
+		_, err := evalPromptTemplate(expr, "PR #{{ item.number }}", map[string]any{}, 3)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "prompt (item 3)")
+		assert.Contains(t, err.Error(), "boom")
+	})
 }
 
 func Test__CreateBatchMessage__Execute__schedulesPoll(t *testing.T) {
