@@ -631,20 +631,44 @@ type UpdateCanvasPreferenceInput = {
   lastVisitedTab?: string;
 };
 
+// Preference writes for the same canvas must reach the server in the order
+// the user made them: rapid tab switches otherwise race, and a slower older
+// request can land last, persisting a stale preference on the server and in
+// the React Query cache (onSuccess applies whichever response settles last).
+// Chain each write behind the previous one for its canvas.
+const preferenceWriteQueues = new Map<string, Promise<unknown>>();
+
+function enqueuePreferenceWrite<T>(canvasId: string, write: () => Promise<T>): Promise<T> {
+  const previous = preferenceWriteQueues.get(canvasId) ?? Promise.resolve();
+  // Run regardless of the previous write's outcome; a failed write must not
+  // block the ones queued behind it.
+  const next = previous.then(write, write);
+  const settled = next.catch(() => {});
+  preferenceWriteQueues.set(canvasId, settled);
+  settled.finally(() => {
+    if (preferenceWriteQueues.get(canvasId) === settled) {
+      preferenceWriteQueues.delete(canvasId);
+    }
+  });
+  return next;
+}
+
 export const useUpdateCanvasPreference = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ canvasId, pinned, starred, lastVisitedTab }: UpdateCanvasPreferenceInput) => {
-      return await canvasesUpdateCanvasPreference(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: {
-            pinned,
-            starred,
-            lastVisitedTab,
-          },
-        }),
+      return await enqueuePreferenceWrite(canvasId, () =>
+        canvasesUpdateCanvasPreference(
+          withOrganizationHeader({
+            path: { canvasId },
+            body: {
+              pinned,
+              starred,
+              lastVisitedTab,
+            },
+          }),
+        ),
       );
     },
     onMutate: async (preference) => {

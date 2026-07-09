@@ -112,6 +112,43 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
   });
 
+  it("persists a tab the user picked after the redirect was scheduled but before it applied", () => {
+    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+
+    const { rerender, setSearchParams } = renderDefaultAppTab();
+    // The redirect to the stored Console tab was scheduled from Canvas…
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
+
+    // …but the user switches to Memory before it applies. Their explicit
+    // choice must be recorded; bailing until the URL reports the redirect
+    // target would block tab recording indefinitely.
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1", liveConsoleQuery: undefined });
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+
+    // Recording keeps working for later tab changes too.
+    rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1", liveConsoleQuery: undefined });
+    expect(mutate).toHaveBeenCalledTimes(2);
+    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+  });
+
+  it("turns a late-applying redirect into a no-op once the user picked a different tab", () => {
+    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+
+    const { rerender, setSearchParams } = renderDefaultAppTab();
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
+    const updater = setSearchParams.mock.calls[0][0] as (prev: URLSearchParams) => URLSearchParams;
+
+    // The user lands on Memory before the router applies the redirect.
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1", liveConsoleQuery: undefined });
+
+    // When the queued redirect finally runs, it must not replace the user's
+    // choice with the stored tab.
+    const current = new URLSearchParams("view=memory");
+    expect(updater(current)).toBe(current);
+  });
+
   it("skips the redirect when the stored tab already matches the current tab, preserving other params", () => {
     mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "canvas" });
 

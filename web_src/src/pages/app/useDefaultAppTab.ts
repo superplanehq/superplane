@@ -95,10 +95,13 @@ export function useDefaultAppTab({
   // (e.g. a console read that errors or reports no panels), and the record
   // effect below must re-run when that happens.
   const [redirectResolved, setRedirectResolved] = useState(() => urlSelectsTabExplicitly(searchParams));
-  // Tab a just-scheduled redirect is navigating to. `setSearchParams` only
-  // lands on the next render, so between scheduling and landing the URL still
-  // reports the pre-redirect tab; the record effect must not persist it.
-  const pendingRedirectTabRef = useRef<AppTabId | null>(null);
+  // A just-scheduled redirect: the tab it navigates to and the tab it
+  // navigates away from. `setSearchParams` only lands on the next render, so
+  // between scheduling and landing the URL still reports the pre-redirect
+  // (`from`) tab; the record effect must not persist it. Tracking `from` lets
+  // the record effect tell that window apart from the user switching to a
+  // third tab before the redirect applies — that choice must be recorded.
+  const pendingRedirectRef = useRef<{ from: AppTabId | null; to: AppTabId } | null>(null);
   // Whether the previous render was in run inspection (`?run=`). Closing a
   // run lands the user on Canvas without them picking a tab, so that landing
   // must not be persisted as a tab change.
@@ -117,7 +120,7 @@ export function useDefaultAppTab({
   const refsOwnerCanvasIdRef = useRef(canvasId);
   if (refsOwnerCanvasIdRef.current !== canvasId) {
     refsOwnerCanvasIdRef.current = canvasId;
-    pendingRedirectTabRef.current = null;
+    pendingRedirectRef.current = null;
     inRunInspectionRef.current = false;
     mountTabRef.current = currentTab;
     writeAttemptsRef.current = { tab: null, count: 0 };
@@ -146,8 +149,16 @@ export function useDefaultAppTab({
     // Canvas with a stored "canvas" preference): rewriting the URL would only
     // strip unrelated params like `node`/`sidebar`/`file`, losing selection.
     if (resolution.redirectTo !== null && resolution.redirectTo !== currentTab) {
-      pendingRedirectTabRef.current = resolution.redirectTo;
-      applyTabToSearchParams(resolution.redirectTo, setSearchParams);
+      const redirect = { from: currentTab, to: resolution.redirectTo };
+      pendingRedirectRef.current = redirect;
+      applyTabToSearchParams(
+        resolution.redirectTo,
+        setSearchParams,
+        // The router can apply this update after the user already picked a
+        // different tab; by then the record effect has cleared the pending
+        // redirect, and rewriting the URL would replace the user's choice.
+        () => pendingRedirectRef.current === redirect,
+      );
     }
   }, [
     redirectResolved,
@@ -183,13 +194,18 @@ export function useDefaultAppTab({
       return;
     }
 
-    // A redirect was scheduled but the URL hasn't caught up yet — this effect
-    // can run in the same commit that scheduled it, with `currentTab` still
-    // reporting the pre-redirect tab. Recording now would overwrite the
-    // stored tab with the tab we are navigating away from.
-    if (pendingRedirectTabRef.current !== null) {
-      if (currentTab !== pendingRedirectTabRef.current) return;
-      pendingRedirectTabRef.current = null;
+    const pendingRedirect = pendingRedirectRef.current;
+    if (pendingRedirect !== null) {
+      // The URL hasn't caught up with the scheduled redirect yet — this
+      // effect can run in the same commit that scheduled it, with
+      // `currentTab` still reporting the pre-redirect tab. Recording now
+      // would overwrite the stored tab with the tab we are navigating away
+      // from.
+      if (currentTab === pendingRedirect.from) return;
+      // Any other tab means the redirect is no longer pending: either it
+      // landed on its target, or the user switched to a different tab first —
+      // an explicit choice that must be recorded like any other tab change.
+      pendingRedirectRef.current = null;
     }
 
     if (recordedTab === currentTab) return;
@@ -299,9 +315,10 @@ function persistTabWithRetryBudget({ canvasId, tab, writeAttemptsRef, setRecorde
   );
 }
 
-function applyTabToSearchParams(tab: AppTabId, setSearchParams: SetSearchParams) {
+function applyTabToSearchParams(tab: AppTabId, setSearchParams: SetSearchParams, redirectStillPending: () => boolean) {
   setSearchParams(
     (current) => {
+      if (!redirectStillPending()) return current;
       const next = new URLSearchParams(current);
       if (tab === "canvas") {
         next.delete("view");
