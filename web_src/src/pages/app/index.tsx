@@ -86,8 +86,7 @@ import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
-import { resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
-import { findLatestRunIdForNode } from "./sidebarRunLookup";
+import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -3795,8 +3794,8 @@ export function AppPage() {
       const lookupId = liveCanvasNodeClickLookupRef.current + 1;
       liveCanvasNodeClickLookupRef.current = lookupId;
 
-      const latestCachedRunId = findLatestRunIdForNode(logRunsData.runs, nodeId);
-      if (latestCachedRunId) return handleSelectRunFromSidebarEvent(latestCachedRunId, { nodeId });
+      const cachedRunId = resolveCachedNodeRunId(nodeId, canvasNodesById.get(nodeId), resolveRunIdForSidebarEvent);
+      if (cachedRunId) return handleSelectRunFromSidebarEvent(cachedRunId, { nodeId });
 
       void (async () => {
         try {
@@ -3813,13 +3812,14 @@ export function AppPage() {
       })();
     },
     [
+      canvasNodesById,
       fetchRunIdForSidebarEvent,
       handleSelectRunFromSidebarEvent,
       isEditing,
       isRunInspectionMode,
       liveSidebarRunLookupEnabled,
-      logRunsData.runs,
       resolveLatestNodeRunLookupEvent,
+      resolveRunIdForSidebarEvent,
     ],
   );
 

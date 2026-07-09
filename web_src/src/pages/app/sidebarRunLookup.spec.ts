@@ -5,7 +5,6 @@ import {
   buildRunLookupIndex,
   buildRunLookupFingerprint,
   collectCachedCanvasRuns,
-  findLatestRunIdForNode,
   findRunIdInLookupIndex,
   getSidebarEventLookupKey,
   resolveRunIdsForSidebarEvents,
@@ -66,55 +65,6 @@ describe("sidebarRunLookup", () => {
   it("uses a stable lookup key for fetch dedupe", () => {
     expect(getSidebarEventLookupKey(triggerEvent)).toBe("root-1");
     expect(getSidebarEventLookupKey(executionEvent)).toBe("root-1");
-  });
-
-  it("finds the latest cached run that includes a node", () => {
-    const latestRunId = findLatestRunIdForNode(
-      [
-        {
-          id: "older-run",
-          rootEvent: { id: "older-root", nodeId: "trigger-1" },
-          createdAt: "2026-07-07T10:00:00Z",
-        },
-        {
-          id: "latest-run",
-          executions: [{ id: "execution-2", nodeId: "action-1" }],
-          createdAt: "2026-07-07T10:05:00Z",
-        },
-        {
-          id: "other-node-run",
-          executions: [{ id: "execution-3", nodeId: "action-2" }],
-          createdAt: "2026-07-07T10:10:00Z",
-        },
-      ],
-      "action-1",
-    );
-
-    expect(latestRunId).toBe("latest-run");
-  });
-
-  it("uses node activity timestamps instead of run timestamps", () => {
-    const latestRunId = findLatestRunIdForNode(
-      [
-        {
-          id: "run-with-latest-node-activity",
-          createdAt: "2026-07-07T10:00:00Z",
-          executions: [{ id: "execution-1", nodeId: "action-1", createdAt: "2026-07-07T10:20:00Z" }],
-        },
-        {
-          id: "newer-run-with-older-node-activity",
-          createdAt: "2026-07-07T10:30:00Z",
-          executions: [{ id: "execution-2", nodeId: "action-1", createdAt: "2026-07-07T10:10:00Z" }],
-        },
-      ],
-      "action-1",
-    );
-
-    expect(latestRunId).toBe("run-with-latest-node-activity");
-  });
-
-  it("matches trigger nodes through the run root event", () => {
-    expect(findLatestRunIdForNode(runs, "trigger-1")).toBe("run-1");
   });
 
   it("ignores run state-only updates in the lookup fingerprint", () => {
