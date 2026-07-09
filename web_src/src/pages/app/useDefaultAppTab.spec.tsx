@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The hook only needs the preference query result and the mutation's
@@ -329,24 +329,46 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
   });
 
-  it("retries a failed tab write on a later effect run instead of treating it as recorded", () => {
+  it("retries a failed tab write immediately instead of treating it as recorded", () => {
+    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+
+    renderDefaultAppTab({
+      urlViewFlags: MEMORY_FLAGS,
+      searchParams: new URLSearchParams("view=memory"),
+    });
+    expect(mutate).toHaveBeenCalledTimes(1);
+
+    // The PUT fails; clearing the recorded-tab guard must re-run the record
+    // effect and retry the write without any further user interaction.
+    const mutateOptions = mutate.mock.calls[0][1] as { onError: () => void };
+    act(() => mutateOptions.onError());
+
+    expect(mutate).toHaveBeenCalledTimes(2);
+    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+  });
+
+  it("stops retrying a persistently failing tab write after the attempt budget is exhausted", () => {
     mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
 
     const { rerender } = renderDefaultAppTab({
       urlViewFlags: MEMORY_FLAGS,
       searchParams: new URLSearchParams("view=memory"),
     });
-    expect(mutate).toHaveBeenCalledTimes(1);
 
-    // The PUT fails; "memory" must no longer count as recorded.
-    const mutateOptions = mutate.mock.calls[0][1] as { onError: () => void };
-    mutateOptions.onError();
+    // Every write fails: initial attempt plus retries, capped at 3 total.
+    const failLatestWrite = () => {
+      const call = mutate.mock.calls[mutate.mock.calls.length - 1];
+      const options = call[1] as { onError: () => void };
+      act(() => options.onError());
+    };
+    failLatestWrite();
+    failLatestWrite();
+    failLatestWrite();
+    expect(mutate).toHaveBeenCalledTimes(3);
 
-    // A preference cache update re-runs the record effect, which retries.
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
-    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1", consoleQuery: undefined });
-
-    expect(mutate).toHaveBeenCalledTimes(2);
-    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+    // A genuine tab switch grants a fresh budget.
+    rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1", consoleQuery: undefined });
+    expect(mutate).toHaveBeenCalledTimes(4);
+    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
   });
 });

@@ -7,6 +7,10 @@ export type AppTabId = "canvas" | "console" | "memory" | "files";
 
 const APP_TAB_VALUES: readonly AppTabId[] = ["canvas", "console", "memory", "files"] as const;
 
+// Total write attempts allowed per tab value (initial write + retries) before
+// giving up until the user switches tabs again.
+const MAX_TAB_WRITE_ATTEMPTS = 3;
+
 function isAppTabId(value: string | undefined | null): value is AppTabId {
   return typeof value === "string" && (APP_TAB_VALUES as readonly string[]).includes(value);
 }
@@ -71,7 +75,14 @@ export function useDefaultAppTab({
   const recordTab = updatePreferenceMutation.mutate;
 
   const currentTab = urlViewFlagsToTab(urlViewFlags);
-  const lastRecordedTabRef = useRef<AppTabId | null>(null);
+  // Tab most recently persisted (or adopted as baseline). Held in state
+  // rather than a ref: a failed write clears it, and that alone must re-run
+  // the record effect so the write is retried without waiting for the user
+  // to switch tabs.
+  const [recordedTab, setRecordedTab] = useState<AppTabId | null>(null);
+  // Bounds retries of failed writes for a given tab value; without a cap,
+  // clearing the guard on error would retry a permanently failing PUT forever.
+  const writeAttemptsRef = useRef<{ tab: AppTabId | null; count: number }>({ tab: null, count: 0 });
   // Whether the default-tab redirect is settled for this app instance. Held
   // in state rather than a ref: resolution can settle without a URL change
   // (e.g. a console read that errors or reports no panels), and the record
@@ -99,10 +110,11 @@ export function useDefaultAppTab({
   const refsOwnerCanvasIdRef = useRef(canvasId);
   if (refsOwnerCanvasIdRef.current !== canvasId) {
     refsOwnerCanvasIdRef.current = canvasId;
-    lastRecordedTabRef.current = null;
     pendingRedirectTabRef.current = null;
     inRunInspectionRef.current = false;
     mountTabRef.current = currentTab;
+    writeAttemptsRef.current = { tab: null, count: 0 };
+    setRecordedTab(null);
     setRedirectResolved(urlSelectsTabExplicitly(searchParams));
   }
 
@@ -194,7 +206,7 @@ export function useDefaultAppTab({
     // adopt it as the recording baseline without overwriting the stored tab.
     if (inRunInspectionRef.current) {
       inRunInspectionRef.current = false;
-      lastRecordedTabRef.current = currentTab;
+      setRecordedTab(currentTab);
       return;
     }
 
@@ -207,31 +219,41 @@ export function useDefaultAppTab({
       pendingRedirectTabRef.current = null;
     }
 
-    if (lastRecordedTabRef.current === currentTab) return;
+    if (recordedTab === currentTab) return;
 
     // Avoid writing an identical value back to the server on first render.
     const storedTab = preferenceQuery.data?.lastVisitedTab;
-    if (lastRecordedTabRef.current === null && storedTab === currentTab) {
-      lastRecordedTabRef.current = currentTab;
+    if (recordedTab === null && storedTab === currentTab) {
+      setRecordedTab(currentTab);
       return;
     }
 
-    lastRecordedTabRef.current = currentTab;
+    // A fresh tab value gets a fresh attempt budget; retries of the same
+    // failing value keep consuming it until the cap is hit.
+    if (writeAttemptsRef.current.tab !== currentTab) {
+      writeAttemptsRef.current = { tab: currentTab, count: 0 };
+    }
+    if (writeAttemptsRef.current.count >= MAX_TAB_WRITE_ATTEMPTS) return;
+    writeAttemptsRef.current.count += 1;
+
+    setRecordedTab(currentTab);
     recordTab(
       { canvasId, lastVisitedTab: currentTab },
       {
         onError: () => {
-          // Treating a failed write as recorded would suppress every retry
-          // until the user switches tabs again; clearing the guard lets the
-          // next effect run re-attempt the write.
-          if (lastRecordedTabRef.current === currentTab) {
-            lastRecordedTabRef.current = null;
-          }
+          // Treating a failed write as recorded would suppress every retry;
+          // clearing the guard re-runs this effect (state change), which
+          // retries the write until the attempt budget runs out.
+          setRecordedTab((recorded) => (recorded === currentTab ? null : recorded));
+        },
+        onSuccess: () => {
+          writeAttemptsRef.current = { tab: null, count: 0 };
         },
       },
     );
   }, [
     redirectResolved,
+    recordedTab,
     canvasId,
     currentTab,
     organizationId,
