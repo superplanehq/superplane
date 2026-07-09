@@ -3792,11 +3792,11 @@ export function AppPage() {
     (nodeId: string) => {
       if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
 
-      const latestCachedRunId = findLatestRunIdForNode(logRunsData.runs, nodeId);
-      if (latestCachedRunId) return handleSelectRunFromSidebarEvent(latestCachedRunId, { nodeId });
-
       const lookupId = liveCanvasNodeClickLookupRef.current + 1;
       liveCanvasNodeClickLookupRef.current = lookupId;
+
+      const latestCachedRunId = findLatestRunIdForNode(logRunsData.runs, nodeId);
+      if (latestCachedRunId) return handleSelectRunFromSidebarEvent(latestCachedRunId, { nodeId });
 
       void (async () => {
         try {

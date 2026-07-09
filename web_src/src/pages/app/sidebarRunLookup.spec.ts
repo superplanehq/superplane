@@ -93,6 +93,26 @@ describe("sidebarRunLookup", () => {
     expect(latestRunId).toBe("latest-run");
   });
 
+  it("uses node activity timestamps instead of run timestamps", () => {
+    const latestRunId = findLatestRunIdForNode(
+      [
+        {
+          id: "run-with-latest-node-activity",
+          createdAt: "2026-07-07T10:00:00Z",
+          executions: [{ id: "execution-1", nodeId: "action-1", createdAt: "2026-07-07T10:20:00Z" }],
+        },
+        {
+          id: "newer-run-with-older-node-activity",
+          createdAt: "2026-07-07T10:30:00Z",
+          executions: [{ id: "execution-2", nodeId: "action-1", createdAt: "2026-07-07T10:10:00Z" }],
+        },
+      ],
+      "action-1",
+    );
+
+    expect(latestRunId).toBe("run-with-latest-node-activity");
+  });
+
   it("matches trigger nodes through the run root event", () => {
     expect(findLatestRunIdForNode(runs, "trigger-1")).toBe("run-1");
   });

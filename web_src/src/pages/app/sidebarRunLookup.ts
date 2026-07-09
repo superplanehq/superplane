@@ -90,11 +90,15 @@ export function findLatestRunIdForNode(runs: CanvasesCanvasRun[], nodeId: string
   let latestTimestamp = Number.NEGATIVE_INFINITY;
 
   for (const run of runs) {
-    if (!run.id || !runIncludesNode(run, nodeId)) {
+    if (!run.id) {
       continue;
     }
 
-    const timestamp = getRunTimestamp(run);
+    const timestamp = getRunNodeTimestamp(run, nodeId);
+    if (timestamp === null) {
+      continue;
+    }
+
     if (latestRunId === null || timestamp > latestTimestamp) {
       latestRunId = run.id;
       latestTimestamp = timestamp;
@@ -196,21 +200,25 @@ export function shouldContinueRunLookupPagination(options: {
   return true;
 }
 
-function runIncludesNode(run: CanvasesCanvasRun, nodeId: string): boolean {
+function getRunNodeTimestamp(run: CanvasesCanvasRun, nodeId: string): number | null {
+  let timestamp: number | null = null;
+
   if (run.rootEvent?.nodeId === nodeId) {
-    return true;
+    timestamp = parseTimestamp(run.rootEvent.createdAt);
   }
 
-  return (run.executions ?? []).some((execution) => execution.nodeId === nodeId);
-}
+  for (const execution of run.executions ?? []) {
+    if (execution.nodeId !== nodeId) {
+      continue;
+    }
 
-function getRunTimestamp(run: CanvasesCanvasRun): number {
-  return (
-    parseTimestamp(run.createdAt) ||
-    parseTimestamp(run.updatedAt) ||
-    parseTimestamp(run.finishedAt) ||
-    Number.NEGATIVE_INFINITY
-  );
+    const executionTimestamp = parseTimestamp(execution.updatedAt) || parseTimestamp(execution.createdAt);
+    if (timestamp === null || executionTimestamp > timestamp) {
+      timestamp = executionTimestamp;
+    }
+  }
+
+  return timestamp;
 }
 
 function parseTimestamp(value: string | undefined): number {
