@@ -2739,6 +2739,9 @@ function CanvasContent({
       lastFitAllRequestRef.current = null;
       return;
     }
+    const expectedTargetMode = isRunInspectionMode ? "runs" : "live";
+    if (focusRequest?.targetMode === expectedTargetMode) return;
+
     const last = lastFitAllRequestRef.current;
     if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
     if (!hasFitToViewRef.current) return;
@@ -2749,14 +2752,32 @@ function CanvasContent({
       const nodeSubset =
         focusIds && focusIds.size > 0 ? renderedNodes.filter((n) => n.id && focusIds.has(n.id)) : undefined;
       const fitOptions = isRunInspectionMode ? RUN_CANVAS_FIT_VIEW_OPTIONS : LIVE_CANVAS_FIT_VIEW_OPTIONS;
-      fitView({
+      void fitView({
         ...(nodeSubset && nodeSubset.length > 0 ? { nodes: nodeSubset } : {}),
         ...fitOptions,
         duration: 500,
-      });
+      }).then(
+        () => {
+          const nextViewport = getViewport();
+          viewportRef.current = nextViewport;
+          reportZoom(nextViewport.zoom);
+        },
+        () => undefined,
+      );
     }, 0);
     return () => window.clearTimeout(id);
-  }, [fitAllRequest, fitAllFocusNodeIds, fitView, getNodes, hasFitToViewRef, isRunInspectionMode]);
+  }, [
+    fitAllRequest,
+    fitAllFocusNodeIds,
+    fitView,
+    focusRequest?.targetMode,
+    getNodes,
+    getViewport,
+    hasFitToViewRef,
+    isRunInspectionMode,
+    reportZoom,
+    viewportRef,
+  ]);
 
   const showHeader = !isReadOnly;
 
