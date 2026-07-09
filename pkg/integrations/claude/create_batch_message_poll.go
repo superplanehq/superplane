@@ -96,6 +96,17 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 		ItemCount:     metadata.ItemCount,
 	})
 
+	// Downloading results is a distinct step from status polling, with its own
+	// error budget. Reset the counter only on the poll that first observes the
+	// batch as ended (its previously persisted status wasn't "ended" yet), so
+	// status-poll failures accumulated before that don't carry over and trip
+	// the results-fetch threshold prematurely; on later polls, still within
+	// the results-fetch step, the counter must keep accumulating consecutive
+	// download failures as before.
+	if metadata.Status != batchStatusEnded {
+		errs = 0
+	}
+
 	spec, err := decodeBatchMessageSpec(ctx.Configuration)
 	if err != nil {
 		ctx.Logger.Errorf("Message batch %s ended but failed to decode configuration: %v", batch.ID, err)
