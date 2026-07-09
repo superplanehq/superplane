@@ -20,6 +20,7 @@ import (
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
+	canvaslayout "github.com/superplanehq/superplane/pkg/layout"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -31,24 +32,24 @@ import (
 )
 
 func TestResolveToolAutoLayoutInput_DefaultsNodeIDsToConnectedComponent(t *testing.T) {
-	layout := resolveToolAutoLayoutInput(&AutoLayoutInput{NodeIDs: []string{"node-1"}})
+	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{NodeIDs: []string{"node-1"}})
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
-	assert.Equal(t, []string{"node-1"}, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
+	assert.Equal(t, []string{"node-1"}, autoLayout.NodeIDs)
 }
 
 func TestResolveToolAutoLayoutInput_PreservesExplicitSettings(t *testing.T) {
-	layout := resolveToolAutoLayoutInput(&AutoLayoutInput{
+	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{
 		Scope:   "connected_component",
 		NodeIDs: []string{"node-1"},
 	})
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
-	assert.Equal(t, []string{"node-1"}, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
+	assert.Equal(t, []string{"node-1"}, autoLayout.NodeIDs)
 }
 
 func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *testing.T) {
@@ -67,31 +68,31 @@ func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *te
 		},
 	})
 
-	layout := resolvePatchStagingAutoLayout(
+	autoLayout := resolvePatchStagingAutoLayout(
 		nil,
 		changeset,
 		[]models.Edge{{SourceID: "kept-node", TargetID: "deleted-node", Channel: "default"}},
 		[]models.Node{{ID: "new-node"}, {ID: "kept-node"}},
 	)
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
-	assert.Equal(t, []string{"kept-node", "new-node"}, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
+	assert.Equal(t, []string{"kept-node", "new-node"}, autoLayout.NodeIDs)
 }
 
 func TestResolvePatchDraftAutoLayout_PreservesExplicitSettings(t *testing.T) {
-	layout := resolvePatchStagingAutoLayout(
+	autoLayout := resolvePatchStagingAutoLayout(
 		&AutoLayoutInput{Scope: "full_canvas"},
 		nil,
 		nil,
 		nil,
 	)
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_FULL_CANVAS, layout.Scope)
-	assert.Empty(t, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeFullCanvas, autoLayout.Scope)
+	assert.Empty(t, autoLayout.NodeIDs)
 }
 
 func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
@@ -106,25 +107,25 @@ func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
 		},
 	})
 
-	layout := resolvePatchStagingAutoLayout(
+	autoLayout := resolvePatchStagingAutoLayout(
 		&AutoLayoutInput{},
 		changeset,
 		nil,
 		[]models.Node{{ID: "new-node"}},
 	)
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
-	assert.Equal(t, []string{"new-node"}, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
+	assert.Equal(t, []string{"new-node"}, autoLayout.NodeIDs)
 }
 
 func TestResolvePatchDraftAutoLayout_DefaultsLayoutOnlyUpdatesToFullCanvas(t *testing.T) {
-	layout := resolvePatchStagingAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}})
+	autoLayout := resolvePatchStagingAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}})
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_FULL_CANVAS, layout.Scope)
-	assert.Empty(t, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeFullCanvas, autoLayout.Scope)
+	assert.Empty(t, autoLayout.NodeIDs)
 }
 
 func TestResolveLiveCanvasVersion_ResolvesLiveVersion(t *testing.T) {

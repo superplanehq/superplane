@@ -8,8 +8,8 @@ import (
 
 	canvasmodels "github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/console"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 type updateCommand struct {
@@ -63,7 +63,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 				)
 			}
 		case common.ConsoleYAMLRepositoryPath:
-			if _, err := console.ParseConsoleYAML(content); err != nil {
+			if _, err := yaml.ConsoleFromYML(content); err != nil {
 				return fmt.Errorf("invalid console yaml in %s: %w", trimmedPath, err)
 			}
 		}

@@ -11,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
-	canvasLayout "github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
+	"github.com/superplanehq/superplane/pkg/layout"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -159,7 +159,7 @@ func (a patchStagingAction) applyPatchToStagedCanvas(
 	patched := &patchedDraft
 	if target.changeset != nil {
 		patcher := changesets.NewCanvasPatcher(database.Conn(), target.organizationID, a.deps.Registry, &patchedDraft)
-		if err := patcher.ApplyChangeset(target.changeset, nil); err != nil {
+		if err := patcher.ApplyChangeset(target.changeset); err != nil {
 			return nil, fmt.Errorf("apply patch changeset: %w", err)
 		}
 		patched = patcher.GetVersion()
@@ -167,7 +167,7 @@ func (a patchStagingAction) applyPatchToStagedCanvas(
 
 	autoLayout := resolvePatchStagingAutoLayout(target.autoLayoutInput, target.changeset, stagedCanvas.edges, patched.Nodes)
 	if autoLayout != nil {
-		nodes, edges, err := canvasLayout.ApplyLayout(patched.Nodes, patched.Edges, autoLayout)
+		nodes, edges, err := layout.ApplyLayout(patched.Nodes, patched.Edges, autoLayout)
 		if err != nil {
 			return nil, fmt.Errorf("apply patch auto-layout: %w", err)
 		}
@@ -361,31 +361,31 @@ func resolvePatchStagingAutoLayout(
 	changeset *changesets.CanvasChangeset,
 	originalEdges []models.Edge,
 	finalNodes []models.Node,
-) *pb.CanvasAutoLayout {
+) *layout.AutoLayout {
 	if input == nil {
 		nodeIDs := defaultPatchStagingAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
 		if len(nodeIDs) == 0 {
 			return nil
 		}
-		return &pb.CanvasAutoLayout{
-			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-			Scope:     pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT,
-			NodeIds:   nodeIDs,
+		return &layout.AutoLayout{
+			Algorithm: layout.AlgorithmHorizontal,
+			Scope:     layout.ScopeConnectedComponent,
+			NodeIDs:   nodeIDs,
 		}
 	}
 
 	if isEmptyAutoLayoutInput(input) {
 		nodeIDs := defaultPatchStagingAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
 		if len(nodeIDs) > 0 {
-			return &pb.CanvasAutoLayout{
-				Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-				Scope:     pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT,
-				NodeIds:   nodeIDs,
+			return &layout.AutoLayout{
+				Algorithm: layout.AlgorithmHorizontal,
+				Scope:     layout.ScopeConnectedComponent,
+				NodeIDs:   nodeIDs,
 			}
 		}
-		return &pb.CanvasAutoLayout{
-			Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-			Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
+		return &layout.AutoLayout{
+			Algorithm: layout.AlgorithmHorizontal,
+			Scope:     layout.ScopeFullCanvas,
 		}
 	}
 
@@ -468,26 +468,26 @@ func defaultPatchStagingAutoLayoutNodeIDs(
 	return nodeIDs
 }
 
-func resolveToolAutoLayoutInput(input *AutoLayoutInput) *pb.CanvasAutoLayout {
+func resolveToolAutoLayoutInput(input *AutoLayoutInput) *layout.AutoLayout {
 	if input == nil {
 		return nil
 	}
 
-	layout := &pb.CanvasAutoLayout{
-		Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-		NodeIds:   append([]string(nil), input.NodeIDs...),
+	autoLayout := &layout.AutoLayout{
+		Algorithm: layout.AlgorithmHorizontal,
+		NodeIDs:   append([]string(nil), input.NodeIDs...),
 	}
 
 	switch strings.TrimSpace(input.Scope) {
 	case "full_canvas", "full-canvas":
-		layout.Scope = pb.CanvasAutoLayout_SCOPE_FULL_CANVAS
+		autoLayout.Scope = layout.ScopeFullCanvas
 	case "connected_component", "connected-component":
-		layout.Scope = pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT
+		autoLayout.Scope = layout.ScopeConnectedComponent
 	default:
-		if len(layout.NodeIds) > 0 {
-			layout.Scope = pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT
+		if len(autoLayout.NodeIDs) > 0 {
+			autoLayout.Scope = layout.ScopeConnectedComponent
 		}
 	}
 
-	return layout
+	return autoLayout
 }

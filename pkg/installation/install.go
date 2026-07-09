@@ -216,7 +216,6 @@ func (s *Service) createCanvas(ctx context.Context, organizationID uuid.UUID, ca
 		canvas.Metadata.Description,
 		nodes,
 		edges,
-		nil,
 		s.UsageService,
 		seedFiles,
 	)
@@ -304,8 +303,8 @@ func persistInstalledConsole(canvasID string, console *yaml.Console) error {
 		_, err := models.UpdateCanvasVersionConsoleInTransaction(
 			tx,
 			version,
-			console.Spec.Panels,
-			console.Spec.Layout,
+			console.Panels(),
+			console.Layout(),
 		)
 		return err
 	})

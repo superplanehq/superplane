@@ -485,8 +485,8 @@ func createNewCanvasVersionFromLive(
 				return nil, err
 			}
 
-			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(console.Spec.Panels))
-			newVersion.ConsoleLayout = datatypes.NewJSONType(slices.Clone(console.Spec.Layout))
+			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(console.Panels()))
+			newVersion.ConsoleLayout = datatypes.NewJSONType(slices.Clone(console.Layout()))
 		default:
 			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", operation.GetPath()))
 		}

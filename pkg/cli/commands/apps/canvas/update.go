@@ -8,7 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/cli/layout"
+	"github.com/superplanehq/superplane/pkg/layout"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 	"gopkg.in/yaml.v3"
 )

@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 func Test__HasFlags(t *testing.T) {
@@ -66,7 +65,7 @@ func Test__ParseAutoLayoutScopeFullAlias(t *testing.T) {
 	autoLayout, err := ParseAutoLayout("horizontal", "full", nil)
 	require.NoError(t, err)
 	require.NotNil(t, autoLayout)
-	require.Equal(t, openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS, autoLayout.GetScope())
+	require.Equal(t, "SCOPE_FULL_CANVAS", autoLayout.Scope)
 }
 
 func Test__ParseAutoLayoutDisableAcceptsOffAndNone(t *testing.T) {
@@ -87,14 +86,14 @@ func Test__ParseAutoLayoutDefaultsAlgorithmToHorizontal(t *testing.T) {
 	if autoLayout == nil {
 		t.Fatalf("expected autoLayout to be set")
 	}
-	if autoLayout.GetAlgorithm() != openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL {
-		t.Fatalf("expected horizontal auto-layout, got %s", autoLayout.GetAlgorithm())
+	if autoLayout.Algorithm != "ALGORITHM_HORIZONTAL" {
+		t.Fatalf("expected horizontal auto-layout, got %s", autoLayout.Algorithm)
 	}
-	if autoLayout.GetScope() != openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_CONNECTED_COMPONENT {
-		t.Fatalf("expected connected-component scope, got %s", autoLayout.GetScope())
+	if autoLayout.Scope != "SCOPE_CONNECTED_COMPONENT" {
+		t.Fatalf("expected connected-component scope, got %s", autoLayout.Scope)
 	}
-	if !reflect.DeepEqual(autoLayout.GetNodeIds(), []string{"node-1", "node-2"}) {
-		t.Fatalf("expected node ids [node-1 node-2], got %v", autoLayout.GetNodeIds())
+	if !reflect.DeepEqual(autoLayout.NodeIDs, []string{"node-1", "node-2"}) {
+		t.Fatalf("expected node ids [node-1 node-2], got %v", autoLayout.NodeIDs)
 	}
 }
 

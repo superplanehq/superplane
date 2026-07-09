@@ -9,8 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/layout"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"github.com/superplanehq/superplane/pkg/layout"
 	"github.com/superplanehq/superplane/test/support/cli"
 )
 
@@ -275,13 +274,13 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {
 	autoLayout := layout.DefaultAutoLayout()
 
-	if autoLayout.GetAlgorithm() != openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL {
-		t.Fatalf("expected horizontal auto-layout, got %s", autoLayout.GetAlgorithm())
+	if autoLayout.Algorithm != "ALGORITHM_HORIZONTAL" {
+		t.Fatalf("expected horizontal auto-layout, got %s", autoLayout.Algorithm)
 	}
-	if autoLayout.GetScope() != openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS {
-		t.Fatalf("expected full-canvas scope, got %s", autoLayout.GetScope())
+	if autoLayout.Scope != "SCOPE_FULL_CANVAS" {
+		t.Fatalf("expected full-canvas scope, got %s", autoLayout.Scope)
 	}
-	if autoLayout.HasNodeIds() {
-		t.Fatalf("expected no node ids for default full-canvas strategy, got %v", autoLayout.GetNodeIds())
+	if len(autoLayout.NodeIDs) != 0 {
+		t.Fatalf("expected no node ids for default full-canvas strategy, got %v", autoLayout.NodeIDs)
 	}
 }

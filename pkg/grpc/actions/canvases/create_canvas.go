@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -34,28 +33,14 @@ func CreateCanvas(
 	gitProvider git.Provider,
 	webhookBaseURL string,
 	organizationID uuid.UUID,
-	pbCanvas *pb.Canvas,
-	autoLayout *pb.CanvasAutoLayout,
+	name string,
+	description string,
 	usageService usage.Service,
 ) (*pb.CreateCanvasResponse, error) {
-	if pbCanvas == nil {
-		return nil, grpcerrors.InvalidArgument(nil, "canvas is required")
-	}
-
-	if pbCanvas.GetMetadata() == nil {
-		return nil, grpcerrors.InvalidArgument(nil, "canvas metadata is required")
-	}
-
-	name := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
 	}
-
-	// TODO: figure out what to do here
-	// nodes, edges, err := ParseCanvas(registry, organizationID.String(), pbCanvas)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	return CreateCanvasWithSeedFiles(
 		ctx,
@@ -66,10 +51,9 @@ func CreateCanvas(
 		webhookBaseURL,
 		organizationID,
 		name,
-		pbCanvas.Metadata.Description,
+		description,
 		[]models.Node{},
 		[]models.Edge{},
-		autoLayout,
 		usageService,
 		nil,
 	)
@@ -91,18 +75,12 @@ func CreateCanvasWithSeedFiles(
 	description string,
 	nodes []models.Node,
 	edges []models.Edge,
-	autoLayout *pb.CanvasAutoLayout,
 	usageService usage.Service,
 	seedFiles []models.RepositorySeedFile,
 ) (*pb.CreateCanvasResponse, error) {
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-
-	nodes, edges, err := layout.ApplyLayout(nodes, edges, autoLayout)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "failed to apply layout")
 	}
 
 	createdBy := uuid.MustParse(userID)
@@ -196,7 +174,7 @@ func CreateCanvasWithSeedFiles(
 		}
 
 		patcher := changesets.NewCanvasPatcher(tx, organizationID, registry, &emptyVersion)
-		if err := patcher.ApplyChangeset(changeset, nil); err != nil {
+		if err := patcher.ApplyChangeset(changeset); err != nil {
 			return err
 		}
 

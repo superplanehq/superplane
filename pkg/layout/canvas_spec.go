@@ -3,55 +3,26 @@ package layout
 import (
 	"fmt"
 
-	canvaslayout "github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
-// ApplyToCanvasSpec rearranges node positions in place using the server layout engine.
-func ApplyToCanvasSpec(spec *openapi_client.CanvasesCanvasSpec, autoLayout *openapi_client.CanvasesCanvasAutoLayout) error {
+// ApplyToCanvasSpec rearranges node positions in place.
+func ApplyToCanvasSpec(spec *openapi_client.CanvasesCanvasSpec, autoLayout *AutoLayout) error {
 	if spec == nil || autoLayout == nil {
 		return nil
 	}
 
 	nodes := openAPINodesToModels(spec.GetNodes())
 	edges := openAPIEdgesToModels(spec.GetEdges())
-	layoutedNodes, _, err := canvaslayout.ApplyLayout(nodes, edges, protoAutoLayoutFromOpenAPI(autoLayout))
+	layoutedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
 		return err
 	}
 
 	spec.SetNodes(applyLayoutPositions(spec.GetNodes(), layoutedNodes))
 	return nil
-}
-
-func protoAutoLayoutFromOpenAPI(autoLayout *openapi_client.CanvasesCanvasAutoLayout) *pb.CanvasAutoLayout {
-	if autoLayout == nil {
-		return nil
-	}
-
-	layout := &pb.CanvasAutoLayout{
-		NodeIds: append([]string(nil), autoLayout.GetNodeIds()...),
-	}
-
-	switch autoLayout.GetAlgorithm() {
-	case openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL:
-		layout.Algorithm = pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL
-	default:
-		layout.Algorithm = pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED
-	}
-
-	switch autoLayout.GetScope() {
-	case openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS:
-		layout.Scope = pb.CanvasAutoLayout_SCOPE_FULL_CANVAS
-	case openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_CONNECTED_COMPONENT:
-		layout.Scope = pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT
-	default:
-		layout.Scope = pb.CanvasAutoLayout_SCOPE_UNSPECIFIED
-	}
-
-	return layout
 }
 
 func openAPINodesToModels(nodes []openapi_client.SuperplaneComponentsNode) []models.Node {
@@ -146,14 +117,14 @@ func applyLayoutPositions(
 
 // ResolveUpdateAutoLayout picks the auto-layout settings for canvas update.
 // Flags take precedence; otherwise a file-level autoLayout field is used.
-// When neither is set, horizontal full-canvas layout is applied (same as create).
+// When neither is set, horizontal full-canvas layout is applied.
 func ResolveUpdateAutoLayout(
 	hasFlags bool,
-	fileAutoLayout *openapi_client.CanvasesCanvasAutoLayout,
+	fileAutoLayout *AutoLayout,
 	value string,
 	scopeValue string,
 	nodeIDs []string,
-) (*openapi_client.CanvasesCanvasAutoLayout, error) {
+) (*AutoLayout, error) {
 	if hasFlags {
 		if fileAutoLayout != nil {
 			return nil, fmt.Errorf("cannot use auto-layout flags with --file when file already defines autoLayout")
@@ -165,4 +136,17 @@ func ResolveUpdateAutoLayout(
 	}
 	defaultLayout := DefaultAutoLayout()
 	return &defaultLayout, nil
+}
+
+func HasFlags(ctx core.CommandContext) bool {
+	if ctx.Cmd == nil {
+		return false
+	}
+
+	flags := ctx.Cmd.Flags()
+	if flags == nil {
+		return false
+	}
+
+	return flags.Changed("auto-layout") || flags.Changed("auto-layout-scope") || flags.Changed("auto-layout-node")
 }

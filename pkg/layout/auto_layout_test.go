@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
 func TestApplyCanvasAutoLayoutStacksDisconnectedComponentsVertically(t *testing.T) {
@@ -21,9 +20,9 @@ func TestApplyCanvasAutoLayoutStacksDisconnectedComponentsVertically(t *testing.
 		{SourceID: "component-b-1", TargetID: "component-b-2", Channel: "default"},
 	}
 
-	autoLayout := &pb.CanvasAutoLayout{
-		Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-		Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
+	autoLayout := &AutoLayout{
+		Algorithm: AlgorithmHorizontal,
+		Scope:     ScopeFullCanvas,
 	}
 
 	updatedNodes, updatedEdges, err := ApplyLayout(nodes, edges, autoLayout)
@@ -55,9 +54,9 @@ func TestApplyCanvasAutoLayoutPacksIsolatedNodesBelowConnectedComponent(t *testi
 		{SourceID: "component-a-1", TargetID: "component-a-2", Channel: "default"},
 	}
 
-	autoLayout := &pb.CanvasAutoLayout{
-		Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-		Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
+	autoLayout := &AutoLayout{
+		Algorithm: AlgorithmHorizontal,
+		Scope:     ScopeFullCanvas,
 	}
 
 	updatedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)
@@ -94,9 +93,9 @@ func TestApplyCanvasAutoLayoutDoesNotPushTerminalNodeBackWithParallelEdges(t *te
 		{SourceID: "deletememory-delete-machine-mapping--cleanup--xo61py", TargetID: "trigger-creation-of-new-machine-trigger-creation-of-new-machine-2-9w7rn9", Channel: "notFound"},
 	}
 
-	autoLayout := &pb.CanvasAutoLayout{
-		Algorithm: pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL,
-		Scope:     pb.CanvasAutoLayout_SCOPE_FULL_CANVAS,
+	autoLayout := &AutoLayout{
+		Algorithm: AlgorithmHorizontal,
+		Scope:     ScopeFullCanvas,
 	}
 
 	updatedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)

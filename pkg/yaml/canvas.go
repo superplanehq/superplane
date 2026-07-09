@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -212,7 +213,7 @@ func VersionToCanvasYAML(name string, description string, canvasVersion *models.
 			ID:             node.ID,
 			Name:           node.Name,
 			Type:           ModelTypeToYamlType(node.Type),
-			Component:      NodeComponentName(node.Ref),
+			Component:      node.ComponentName(),
 			Configuration:  node.Configuration,
 			Metadata:       node.Metadata,
 			IsCollapsed:    node.IsCollapsed,
@@ -278,29 +279,16 @@ func ModelTypeToYamlType(t string) string {
 	}
 }
 
-func NodeComponentName(ref models.NodeRef) string {
-	if ref.Component != nil && ref.Component.Name != "" {
-		return ref.Component.Name
-	}
-
-	if ref.Trigger != nil && ref.Trigger.Name != "" {
-		return ref.Trigger.Name
-	}
-
-	if ref.Widget != nil && ref.Widget.Name != "" {
-		return ref.Widget.Name
-	}
-
-	return ""
-}
-
 func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node, []models.Edge, error) {
 
 	//
 	// Allow empty canvases
 	//
 	if len(c.Spec.Nodes) == 0 {
-		return []models.Node{}, []models.Edge{}, errors.New("canvas has no nodes")
+		if len(c.Spec.Edges) > 0 {
+			return nil, nil, fmt.Errorf("canvas has edges but no nodes")
+		}
+		return []models.Node{}, []models.Edge{}, nil
 	}
 
 	nodeIDs := make(map[string]bool)
@@ -336,20 +324,20 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 	}
 
 	//
-	// TODO: this uses componentpb for validation
+	// Validate expressions
 	//
-	// for nodeID, errs := range expressionvalidation.ValidateCanvasExpressions(registry, c.Spec.Nodes) {
-	// 	msgs := make([]string, 0, len(errs))
-	// 	for _, e := range errs {
-	// 		msgs = append(msgs, e.Error())
-	// 	}
-	// 	joined := strings.Join(msgs, "\n")
-	// 	if existing, ok := nodeValidationErrors[nodeID]; ok {
-	// 		nodeValidationErrors[nodeID] = existing + "\n" + joined
-	// 	} else {
-	// 		nodeValidationErrors[nodeID] = joined
-	// 	}
-	// }
+	for nodeID, errs := range expressionvalidation.ValidateCanvasExpressions(registry, c.Nodes()) {
+		msgs := make([]string, 0, len(errs))
+		for _, e := range errs {
+			msgs = append(msgs, e.Error())
+		}
+		joined := strings.Join(msgs, "\n")
+		if existing, ok := nodeValidationErrors[nodeID]; ok {
+			nodeValidationErrors[nodeID] = existing + "\n" + joined
+		} else {
+			nodeValidationErrors[nodeID] = joined
+		}
+	}
 
 	//
 	// Validate edges

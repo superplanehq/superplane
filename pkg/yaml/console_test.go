@@ -182,7 +182,7 @@ spec:
 }
 
 func TestValidateMarkdownVariables_AcceptsValidShapes(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "p1",
 		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
@@ -215,7 +215,7 @@ func TestValidateMarkdownVariables_AcceptsValidShapes(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsBadName(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "p1",
 		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
@@ -233,7 +233,7 @@ func TestValidateMarkdownVariables_RejectsBadName(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsDuplicateName(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "p1",
 		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
@@ -249,7 +249,7 @@ func TestValidateMarkdownVariables_RejectsDuplicateName(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsUnknownKind(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "p1",
 		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
@@ -264,7 +264,7 @@ func TestValidateMarkdownVariables_RejectsUnknownKind(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsUnknownRunSelect(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "p1",
 		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
@@ -279,7 +279,7 @@ func TestValidateMarkdownVariables_RejectsUnknownRunSelect(t *testing.T) {
 }
 
 func TestValidateMarkdownVariables_RejectsEmptyNamespace(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "p1",
 		Type: ConsolePanelTypeMarkdown,
 		Content: map[string]any{
@@ -298,8 +298,8 @@ func TestValidateMarkdownVariables_MemoryListMode(t *testing.T) {
 	// matching memory row so authors can use CEL list macros. We exercise
 	// the validator across the documented happy/sad paths so YAML diffs and
 	// the FE editor surface the same errors.
-	build := func(source map[string]any) models.ConsolePanel {
-		return models.ConsolePanel{
+	build := func(source map[string]any) ConsolePanel {
+		return ConsolePanel{
 			ID:   "p1",
 			Type: ConsolePanelTypeMarkdown,
 			Content: map[string]any{
@@ -371,7 +371,7 @@ func TestValidateMarkdownVariables_MemoryListMode(t *testing.T) {
 }
 
 func TestValidateHTMLContent_AcceptsWellFormed(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "p1",
 		Type: ConsolePanelTypeHTML,
 		Content: map[string]any{
@@ -389,7 +389,7 @@ func TestValidateHTMLContent_AcceptsWellFormed(t *testing.T) {
 }
 
 func TestValidateHTMLContent_RejectsNonStringBody(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:      "p1",
 		Type:    ConsolePanelTypeHTML,
 		Content: map[string]any{"body": 42},
@@ -400,7 +400,7 @@ func TestValidateHTMLContent_RejectsNonStringBody(t *testing.T) {
 }
 
 func TestValidateHTMLContent_RejectsNonStringTitle(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:      "p1",
 		Type:    ConsolePanelTypeHTML,
 		Content: map[string]any{"title": 42},
@@ -411,7 +411,7 @@ func TestValidateHTMLContent_RejectsNonStringTitle(t *testing.T) {
 }
 
 func TestValidateHTMLContent_PropagatesVariableValidation(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "p1",
 		Type: ConsolePanelTypeHTML,
 		Content: map[string]any{
@@ -587,14 +587,14 @@ func TestCanvasVersionToConsoleYML_IsDeterministic(t *testing.T) {
 }
 
 func TestValidateConsoleContent_RejectsInvalidLayout(t *testing.T) {
-	panels := []models.ConsolePanel{{ID: "p", Type: "markdown", Content: map[string]any{}}}
-	err := ValidateConsoleContent(panels, []models.ConsoleLayoutItem{
+	panels := []ConsolePanel{{ID: "p", Type: "markdown", Content: map[string]any{}}}
+	err := ValidateConsoleContent(panels, []ConsoleLayoutItem{
 		{I: "p", X: -1, Y: 0, W: 1, H: 1},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "non-negative")
 
-	err = ValidateConsoleContent(panels, []models.ConsoleLayoutItem{
+	err = ValidateConsoleContent(panels, []ConsoleLayoutItem{
 		{I: "p", X: 0, Y: 0, W: 0, H: 1},
 	})
 	require.Error(t, err)
@@ -602,7 +602,7 @@ func TestValidateConsoleContent_RejectsInvalidLayout(t *testing.T) {
 }
 
 func TestValidateDashboardContent_AcceptsDraftTablePanel(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "table",
 			Type: ConsolePanelTypeTable,
@@ -620,12 +620,12 @@ func TestValidateDashboardContent_AcceptsDraftTablePanel(t *testing.T) {
 func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 	tests := []struct {
 		name     string
-		panel    models.ConsolePanel
+		panel    ConsolePanel
 		contains string
 	}{
 		{
 			name: "memory source without namespace",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "table",
 				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
@@ -637,7 +637,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "table column without field",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "table",
 				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
@@ -652,7 +652,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "table filter with unsupported op",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "table",
 				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
@@ -668,7 +668,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "trigger row action without node",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "table",
 				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
@@ -684,7 +684,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "row style with unknown tone",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "table",
 				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
@@ -702,7 +702,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "row style with unsupported op",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "table",
 				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
@@ -720,7 +720,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "row style with empty field",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "table",
 				Type: ConsolePanelTypeTable,
 				Content: map[string]any{
@@ -738,7 +738,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart with unsupported type",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "chart",
 				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
@@ -755,7 +755,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "data source limit with wrong type",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "chart",
 				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
@@ -772,7 +772,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "number render prefix must be string",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -784,7 +784,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel rejects render.aggregation",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -802,7 +802,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel rejects render.field",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -820,7 +820,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel rejects unknown combine",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -838,7 +838,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel requires field for non-count source",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -856,7 +856,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "composite number panel rejects empty sources",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -872,7 +872,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "multi-number panel rejects empty metrics",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:      "n",
 				Type:    ConsolePanelTypeNumber,
 				Content: map[string]any{"metrics": []any{}},
@@ -881,7 +881,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "multi-number metric rejects unknown aggregation",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -897,7 +897,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "multi-number metric requires field for non-count aggregation",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -913,7 +913,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "multi-number metric rejects composite data source",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -933,7 +933,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "multi-number metric rejects non-number render kind",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "n",
 				Type: ConsolePanelTypeNumber,
 				Content: map[string]any{
@@ -949,7 +949,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart series prefix must be a string",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "chart",
 				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
@@ -966,7 +966,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart legend mode must be auto/show/hide",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "chart",
 				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
@@ -984,7 +984,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart seriesField must be a string",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "chart",
 				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
@@ -1002,7 +1002,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart xFormat must be a string",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "chart",
 				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
@@ -1020,7 +1020,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart yLabel must be a string",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "chart",
 				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
@@ -1038,7 +1038,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 		},
 		{
 			name: "chart yFormat must be a string",
-			panel: models.ConsolePanel{
+			panel: ConsolePanel{
 				ID:   "chart",
 				Type: ConsolePanelTypeChart,
 				Content: map[string]any{
@@ -1058,7 +1058,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateConsoleContent([]models.ConsolePanel{tt.panel}, nil)
+			err := ValidateConsoleContent([]ConsolePanel{tt.panel}, nil)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.contains)
 		})
@@ -1066,7 +1066,7 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 }
 
 func TestValidateConsoleContent_AcceptsChartSeriesFormatAndLegend(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "chart",
 			Type: ConsolePanelTypeChart,
@@ -1090,7 +1090,7 @@ func TestValidateConsoleContent_AcceptsChartSeriesFormatAndLegend(t *testing.T) 
 }
 
 func TestValidateConsoleContent_AcceptsChartAxisFormatting(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "chart",
 			Type: ConsolePanelTypeChart,
@@ -1114,7 +1114,7 @@ func TestValidateConsoleContent_AcceptsChartAxisFormatting(t *testing.T) {
 }
 
 func TestValidateConsoleContent_AcceptsTableRowStyles(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "table",
 			Type: ConsolePanelTypeTable,
@@ -1138,7 +1138,7 @@ func TestValidateConsoleContent_AcceptsTableRowStyles(t *testing.T) {
 }
 
 func TestValidateConsoleContent_AcceptsWidgetSort(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "runs",
 			Type: ConsolePanelTypeTable,
@@ -1172,7 +1172,7 @@ func TestValidateConsoleContent_AcceptsWidgetSort(t *testing.T) {
 }
 
 func TestValidateConsoleContent_RejectsSortWithoutField(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "runs",
 		Type: ConsolePanelTypeTable,
 		Content: map[string]any{
@@ -1185,13 +1185,13 @@ func TestValidateConsoleContent_RejectsSortWithoutField(t *testing.T) {
 		},
 	}
 
-	err := ValidateConsoleContent([]models.ConsolePanel{panel}, nil)
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `render.sort.field must be a non-empty string`)
 }
 
 func TestValidateConsoleContent_RejectsSortWithBlankField(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "runs",
 		Type: ConsolePanelTypeTable,
 		Content: map[string]any{
@@ -1204,13 +1204,13 @@ func TestValidateConsoleContent_RejectsSortWithBlankField(t *testing.T) {
 		},
 	}
 
-	err := ValidateConsoleContent([]models.ConsolePanel{panel}, nil)
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `render.sort.field must be a non-empty string`)
 }
 
 func TestValidateConsoleContent_RejectsUnknownSortOrder(t *testing.T) {
-	panel := models.ConsolePanel{
+	panel := ConsolePanel{
 		ID:   "perf",
 		Type: ConsolePanelTypeChart,
 		Content: map[string]any{
@@ -1225,13 +1225,13 @@ func TestValidateConsoleContent_RejectsUnknownSortOrder(t *testing.T) {
 		},
 	}
 
-	err := ValidateConsoleContent([]models.ConsolePanel{panel}, nil)
+	err := ValidateConsoleContent([]ConsolePanel{panel}, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `render.sort.order must be one of asc/desc`)
 }
 
 func TestValidateConsoleContent_AcceptsNodesPanel(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "key-nodes",
 			Type: ConsolePanelTypeNodes,
@@ -1257,7 +1257,7 @@ func TestValidateConsoleContent_AcceptsNodesPanel(t *testing.T) {
 }
 
 func TestValidateConsoleContent_AcceptsDraftNodesPanel(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:      "key-nodes",
 			Type:    ConsolePanelTypeNodes,
@@ -1270,7 +1270,7 @@ func TestValidateConsoleContent_AcceptsDraftNodesPanel(t *testing.T) {
 }
 
 func TestValidateConsoleContent_RejectsNodesPanelMissingNodeRef(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "key-nodes",
 			Type: ConsolePanelTypeNodes,
@@ -1288,7 +1288,7 @@ func TestValidateConsoleContent_RejectsNodesPanelMissingNodeRef(t *testing.T) {
 }
 
 func TestValidateConsoleContent_RejectsNodesPanelWithNonArrayNodes(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:      "key-nodes",
 			Type:    ConsolePanelTypeNodes,
@@ -1302,7 +1302,7 @@ func TestValidateConsoleContent_RejectsNodesPanelWithNonArrayNodes(t *testing.T)
 }
 
 func TestValidateConsoleContent_RejectsNodesPanelWithBadShowRun(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "key-nodes",
 			Type: ConsolePanelTypeNodes,
@@ -1320,7 +1320,7 @@ func TestValidateConsoleContent_RejectsNodesPanelWithBadShowRun(t *testing.T) {
 }
 
 func TestValidateConsoleContent_RejectsNodesPanelWithBadPromptConfirmation(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "key-nodes",
 			Type: ConsolePanelTypeNodes,
@@ -1338,7 +1338,7 @@ func TestValidateConsoleContent_RejectsNodesPanelWithBadPromptConfirmation(t *te
 }
 
 func TestValidateConsoleContent_RejectsNodePanelWithBadPromptConfirmation(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "deploy",
 			Type: ConsolePanelTypeNode,
@@ -1355,7 +1355,7 @@ func TestValidateConsoleContent_RejectsNodePanelWithBadPromptConfirmation(t *tes
 }
 
 func TestValidateConsoleContent_AcceptsNodePanelWithLabel(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "deploy",
 			Type: ConsolePanelTypeNode,
@@ -1371,7 +1371,7 @@ func TestValidateConsoleContent_AcceptsNodePanelWithLabel(t *testing.T) {
 }
 
 func TestValidateConsoleContent_RejectsNodePanelWithBadLabel(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "deploy",
 			Type: ConsolePanelTypeNode,
@@ -1388,7 +1388,7 @@ func TestValidateConsoleContent_RejectsNodePanelWithBadLabel(t *testing.T) {
 }
 
 func TestValidateConsoleContent_AcceptsCompositeNumberPanel(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "score",
 			Type: ConsolePanelTypeNumber,
@@ -1411,7 +1411,7 @@ func TestValidateConsoleContent_AcceptsCompositeNumberPanel(t *testing.T) {
 }
 
 func TestValidateConsoleContent_AcceptsMultiNumberPanel(t *testing.T) {
-	panels := []models.ConsolePanel{
+	panels := []ConsolePanel{
 		{
 			ID:   "kpis",
 			Type: ConsolePanelTypeNumber,

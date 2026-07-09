@@ -9,7 +9,6 @@ import (
 	"github.com/nulab/autog"
 	"github.com/nulab/autog/graph"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
 const (
@@ -20,26 +19,29 @@ const (
 	autoLayoutDisconnectedComponentVerticalGap = 280
 )
 
-func ApplyLayout(nodes []models.Node, edges []models.Edge, layout *pb.CanvasAutoLayout) ([]models.Node, []models.Edge, error) {
+func ApplyLayout(nodes []models.Node, edges []models.Edge, layout *AutoLayout) ([]models.Node, []models.Edge, error) {
 	if layout == nil {
 		return nodes, edges, nil
 	}
 
-	switch layout.Algorithm {
-	case pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED:
-		return nil, nil, fmt.Errorf("layout algorithm is required")
-	case pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL:
+	algorithm, err := layout.resolvedAlgorithm()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	switch algorithm {
+	case AlgorithmHorizontal:
 		layoutedNodes, err := applyHorizontalLayout(nodes, edges, layout)
 		if err != nil {
 			return nil, nil, err
 		}
 		return layoutedNodes, edges, nil
 	default:
-		return nil, nil, fmt.Errorf("unsupported layout algorithm: %s", layout.Algorithm.String())
+		return nil, nil, fmt.Errorf("unsupported layout algorithm: %s", layout.Algorithm)
 	}
 }
 
-func applyHorizontalLayout(nodes []models.Node, edges []models.Edge, layout *pb.CanvasAutoLayout) ([]models.Node, error) {
+func applyHorizontalLayout(nodes []models.Node, edges []models.Edge, layout *AutoLayout) ([]models.Node, error) {
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
@@ -511,14 +513,14 @@ func applyPositionOffset(positions *layoutPositions, offset models.Position) {
 	}
 }
 
-func resolveLayoutSeedNodeIDs(autoLayout *pb.CanvasAutoLayout, flowNodeSet map[string]struct{}) ([]string, error) {
-	if autoLayout == nil || len(autoLayout.NodeIds) == 0 {
+func resolveLayoutSeedNodeIDs(autoLayout *AutoLayout, flowNodeSet map[string]struct{}) ([]string, error) {
+	if autoLayout == nil || len(autoLayout.NodeIDs) == 0 {
 		return []string{}, nil
 	}
 
-	seen := make(map[string]struct{}, len(autoLayout.NodeIds))
-	seedNodeIDs := make([]string, 0, len(autoLayout.NodeIds))
-	for _, nodeID := range autoLayout.NodeIds {
+	seen := make(map[string]struct{}, len(autoLayout.NodeIDs))
+	seedNodeIDs := make([]string, 0, len(autoLayout.NodeIDs))
+	for _, nodeID := range autoLayout.NodeIDs {
 		if _, exists := flowNodeSet[nodeID]; !exists {
 			return nil, fmt.Errorf("auto layout node ids contains unknown node: %s", nodeID)
 		}
@@ -534,35 +536,41 @@ func resolveLayoutSeedNodeIDs(autoLayout *pb.CanvasAutoLayout, flowNodeSet map[s
 	return seedNodeIDs, nil
 }
 
-func resolveLayoutScope(layout *pb.CanvasAutoLayout, hasSeedNodeIDs bool) pb.CanvasAutoLayout_Scope {
+func resolveLayoutScope(layout *AutoLayout, hasSeedNodeIDs bool) string {
 	if layout == nil {
-		return pb.CanvasAutoLayout_SCOPE_FULL_CANVAS
+		return ScopeFullCanvas
 	}
 
-	if layout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED {
+	scope := strings.ToUpper(strings.TrimSpace(layout.Scope))
+	switch scope {
+	case "", "SCOPE_UNSPECIFIED":
 		if hasSeedNodeIDs {
-			return pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT
+			return ScopeConnectedComponent
 		}
-		return pb.CanvasAutoLayout_SCOPE_FULL_CANVAS
+		return ScopeFullCanvas
+	case ScopeFullCanvas, "FULL_CANVAS", "FULL":
+		return ScopeFullCanvas
+	case ScopeConnectedComponent, "CONNECTED_COMPONENT", "CONNECTED":
+		return ScopeConnectedComponent
+	default:
+		return scope
 	}
-
-	return layout.Scope
 }
 
 func resolveScopedNodeIDs(
-	scope pb.CanvasAutoLayout_Scope,
+	scope string,
 	seedNodeIDs []string,
 	flowNodeIDs []string,
 	flowNodeSet map[string]struct{},
 	edges []models.Edge,
 ) ([]string, error) {
 	switch scope {
-	case pb.CanvasAutoLayout_SCOPE_FULL_CANVAS:
+	case ScopeFullCanvas:
 		return cloneNodeIDs(flowNodeIDs), nil
-	case pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT:
+	case ScopeConnectedComponent:
 		return resolveConnectedComponentNodeIDs(seedNodeIDs, flowNodeIDs, flowNodeSet, edges), nil
 	default:
-		return nil, fmt.Errorf("unsupported auto layout scope: %s", scope.String())
+		return nil, fmt.Errorf("unsupported auto layout scope: %s", scope)
 	}
 }
 

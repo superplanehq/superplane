@@ -47,14 +47,58 @@ type Console struct {
 	Spec       ConsoleSpec     `json:"spec" yaml:"spec"`
 }
 
+func (c *Console) Panels() []models.ConsolePanel {
+	out := make([]models.ConsolePanel, len(c.Spec.Panels))
+	for i, panel := range c.Spec.Panels {
+		out[i] = models.ConsolePanel{
+			ID:      panel.ID,
+			Type:    panel.Type,
+			Content: panel.Content,
+		}
+	}
+	return out
+}
+
+func (c *Console) Layout() []models.ConsoleLayoutItem {
+	out := make([]models.ConsoleLayoutItem, len(c.Spec.Layout))
+	for i, item := range c.Spec.Layout {
+		out[i] = models.ConsoleLayoutItem{
+			I:    item.I,
+			X:    item.X,
+			Y:    item.Y,
+			W:    item.W,
+			H:    item.H,
+			MinW: item.MinW,
+			MinH: item.MinH,
+		}
+	}
+	return out
+}
+
 type ConsoleMetadata struct {
 	CanvasID string `json:"canvasId" yaml:"canvasId"`
 	Name     string `json:"name" yaml:"name"`
 }
 
 type ConsoleSpec struct {
-	Panels []models.ConsolePanel      `json:"panels" yaml:"panels"`
-	Layout []models.ConsoleLayoutItem `json:"layout" yaml:"layout"`
+	Panels []ConsolePanel      `json:"panels" yaml:"panels"`
+	Layout []ConsoleLayoutItem `json:"layout" yaml:"layout"`
+}
+
+type ConsolePanel struct {
+	ID      string         `json:"id" yaml:"id"`
+	Type    string         `json:"type" yaml:"type"`
+	Content map[string]any `json:"content" yaml:"content"`
+}
+
+type ConsoleLayoutItem struct {
+	I    string `json:"i" yaml:"i"`
+	X    int    `json:"x" yaml:"x"`
+	Y    int    `json:"y" yaml:"y"`
+	W    int    `json:"w" yaml:"w"`
+	H    int    `json:"h" yaml:"h"`
+	MinW *int   `json:"minW,omitempty" yaml:"minW,omitempty"`
+	MinH *int   `json:"minH,omitempty" yaml:"minH,omitempty"`
 }
 
 func ConsoleFromYML(raw []byte) (*Console, error) {
@@ -143,7 +187,7 @@ func (d *Console) Validate() error {
 	return ValidateConsoleContent(d.Spec.Panels, d.Spec.Layout)
 }
 
-func ValidateConsoleContent(panels []models.ConsolePanel, layout []models.ConsoleLayoutItem) error {
+func ValidateConsoleContent(panels []ConsolePanel, layout []ConsoleLayoutItem) error {
 	if len(panels) > MaxConsolePanels {
 		return fmt.Errorf("too many panels (max %d)", MaxConsolePanels)
 	}
@@ -209,7 +253,7 @@ func isAllowedDashboardPanelType(panelType string) bool {
 	return false
 }
 
-func validatePanelContent(panel models.ConsolePanel) error {
+func validatePanelContent(panel ConsolePanel) error {
 	switch panel.Type {
 	case ConsolePanelTypeMarkdown:
 		return validateMarkdownContent(panel)
@@ -245,7 +289,7 @@ var AllowedMarkdownVariableDirections = []string{"asc", "desc"}
 // variable to every matching row so authors can use CEL list macros.
 var AllowedMarkdownVariableModes = []string{"single", "list"}
 
-func validateMarkdownContent(panel models.ConsolePanel) error {
+func validateMarkdownContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return nil
 	}
@@ -271,7 +315,7 @@ func validateMarkdownContent(panel models.ConsolePanel) error {
 // is stored raw and sanitized client-side at render time (same trust model as
 // markdown), so the backend only checks structure: title and body are optional
 // strings and the shared variable system rules apply.
-func validateHTMLContent(panel models.ConsolePanel) error {
+func validateHTMLContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return nil
 	}
@@ -435,7 +479,7 @@ func validateMarkdownRunSource(panelID string, index int, source map[string]any)
 	return nil
 }
 
-func validateNodePanelContent(panel models.ConsolePanel) error {
+func validateNodePanelContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -470,7 +514,7 @@ func validateNodePanelContent(panel models.ConsolePanel) error {
 // `nodes` is an array (possibly empty for newly created panels). Each entry
 // must reference a canvas node by id or name; optional fields tighten the
 // rendered row (label, purpose description, manual-run button).
-func validateNodesPanelContent(panel models.ConsolePanel) error {
+func validateNodesPanelContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -578,7 +622,7 @@ func validateRenderField(panelID, fieldPrefix string, raw any, expectedKind stri
 	return render, nil
 }
 
-func validateTablePanelContent(panel models.ConsolePanel) error {
+func validateTablePanelContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -668,7 +712,7 @@ func validateTableRowStyles(panelID string, raw any) error {
 	return nil
 }
 
-func validateChartPanelContent(panel models.ConsolePanel) error {
+func validateChartPanelContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -844,7 +888,7 @@ func validateTableRowActions(panelID string, raw any) error {
 	return nil
 }
 
-func validateNumberPanelContent(panel models.ConsolePanel) error {
+func validateNumberPanelContent(panel ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -1026,14 +1070,14 @@ func validateMemoryNumberSource(panelID string, index int, raw any) error {
 
 // normalizeDashboardPanelsForExport ensures stable field order in panel
 // content maps so YAML output is deterministic across runs.
-func normalizeConsolePanelsForExport(panels []models.ConsolePanel) []models.ConsolePanel {
+func normalizeConsolePanelsForExport(panels []models.ConsolePanel) []ConsolePanel {
 	if panels == nil {
-		return []models.ConsolePanel{}
+		return []ConsolePanel{}
 	}
 
-	out := make([]models.ConsolePanel, len(panels))
+	out := make([]ConsolePanel, len(panels))
 	for i, panel := range panels {
-		out[i] = models.ConsolePanel{
+		out[i] = ConsolePanel{
 			ID:      panel.ID,
 			Type:    panel.Type,
 			Content: panel.Content,
@@ -1042,17 +1086,28 @@ func normalizeConsolePanelsForExport(panels []models.ConsolePanel) []models.Cons
 	return out
 }
 
-func normalizeConsoleLayoutForExport(layout []models.ConsoleLayoutItem) []models.ConsoleLayoutItem {
+func normalizeConsoleLayoutForExport(layout []models.ConsoleLayoutItem) []ConsoleLayoutItem {
 	if layout == nil {
-		return []models.ConsoleLayoutItem{}
+		return []ConsoleLayoutItem{}
 	}
 
-	out := make([]models.ConsoleLayoutItem, len(layout))
-	copy(out, layout)
+	out := make([]ConsoleLayoutItem, len(layout))
+	for i, item := range layout {
+		out[i] = ConsoleLayoutItem{
+			I:    item.I,
+			X:    item.X,
+			Y:    item.Y,
+			W:    item.W,
+			H:    item.H,
+			MinW: item.MinW,
+			MinH: item.MinH,
+		}
+	}
+
 	return out
 }
 
-func encodedConsolePanelsSize(panels []models.ConsolePanel) (int, error) {
+func encodedConsolePanelsSize(panels []ConsolePanel) (int, error) {
 	encoded, err := json.Marshal(panels)
 	if err != nil {
 		return 0, err
