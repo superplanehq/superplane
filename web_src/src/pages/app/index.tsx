@@ -124,6 +124,7 @@ import { buildAppFiles } from "./files/lib/app-files";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
+import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
 import { useRunsDetailState } from "./useRunsDetailState";
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
@@ -3407,7 +3408,14 @@ export function AppPage() {
   );
 
   const runInspectionChromeActive = isRunInspectionMode && !editSessionActive && !isEnteringEditSession;
-
+  const runParticipantFit = useRunParticipantFitRequest({
+    isRunInspectionMode: runInspectionChromeActive,
+    selectedRunId,
+    runCanvasLoading,
+    runCanvasData,
+  });
+  const requestRunFitRef = useRef(runParticipantFit.requestParticipantFit);
+  requestRunFitRef.current = runParticipantFit.requestParticipantFit;
   const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
     getWorkflowViewPresentation({
       ...urlViewFlags,
@@ -3556,11 +3564,12 @@ export function AppPage() {
       clearDismissedRunDetail();
       setRunDetailNodeId(null);
       setFocusRequest(null);
+      requestRunFitRef.current(runId);
       startTransition(() => {
         setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
       });
     },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setSearchParams, setRunDetailNodeId],
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
   );
 
   const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
@@ -3578,6 +3587,7 @@ export function AppPage() {
       clearDismissedRunDetail();
       const inspectorNodeId =
         options?.nodeId ?? (searchParams.get("sidebar") === "1" ? searchParams.get("node") : null);
+      if (!inspectorNodeId) requestRunFitRef.current(runId);
       if (inspectorNodeId) {
         preserveRunDetailNodeOnNextRunChangeRef.current = true;
         setRunDetailNodeId(inspectorNodeId);
@@ -3624,6 +3634,8 @@ export function AppPage() {
       const preservedNodeId = runDetailNodeId;
       preserveRunDetailNodeOnNextRunChangeRef.current = Boolean(preservedNodeId);
       clearDismissedRunDetail();
+      setFocusRequest(null);
+      requestRunFitRef.current(runId);
       setSearchParams(
         (current) =>
           applyRunInspectionNavigationSearchParams(current, {
@@ -3633,14 +3645,15 @@ export function AppPage() {
         { replace: true },
       );
     },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, runDetailNodeId, setSearchParams],
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, runDetailNodeId, setFocusRequest, setSearchParams],
   );
 
   const handleClearRunInspection = useCallback(() => {
     setRunDetailNodeId(null);
     setFocusRequest(null);
+    runParticipantFit.clearParticipantFit();
     setSearchParams((current) => clearRunInspectionSearchParams(current), { replace: true });
-  }, [setSearchParams, setRunDetailNodeId]);
+  }, [runParticipantFit, setSearchParams, setRunDetailNodeId]);
 
   const handleRunNodeDetailSelection = useCallback(
     (nodeId: string | null) => {
@@ -4262,16 +4275,7 @@ export function AppPage() {
           fitViewContentKey={`${canvasId}:${resolveFitViewVersionId({ liveCanvasVersionId, activeCanvasVersionId, isViewingDraftVersion: isEditing, draftSpec: draftSpecToRender, selectedVersion: selectedCanvasVersion })}`}
           lastFittedContentKeyRef={lastFittedContentKeyRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          fitAllFocusNodeIds={
-            runInspectionChromeActive && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
-              ? runCanvasData.participantNodeIds
-              : undefined
-          }
-          runParticipantNodeIds={
-            runInspectionChromeActive && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
-              ? runCanvasData.participantNodeIds
-              : undefined
-          }
+          {...runParticipantFit.canvasFitProps}
           runCanvasLoading={
             runInspectionChromeActive &&
             selectedRunId !== null &&
