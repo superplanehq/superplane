@@ -36,7 +36,9 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 	if metadata.BatchID == "" {
-		return nil
+		ctx.Logger.Errorf("Message batch poll invoked without a batch id in execution metadata")
+		out := buildBatchOutput("error", nil, nil, false)
+		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
 	}
 
 	attempt := 1
@@ -92,7 +94,9 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 
 	spec, err := decodeBatchMessageSpec(ctx.Configuration)
 	if err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+		ctx.Logger.Errorf("Message batch %s ended but failed to decode configuration: %v", batch.ID, err)
+		out := buildBatchOutput("error", batch, nil, false)
+		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
 	}
 	hasSchema := strings.TrimSpace(spec.OutputSchema) != ""
 
