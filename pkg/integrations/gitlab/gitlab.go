@@ -177,6 +177,8 @@ func (g *GitLab) Actions() []core.Action {
 		&GetPipeline{},
 		&GetLatestPipeline{},
 		&GetTestReportSummary{},
+		&CreateMergeComment{},
+		&AddReaction{},
 	}
 }
 
