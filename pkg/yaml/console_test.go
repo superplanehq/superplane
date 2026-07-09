@@ -1,9 +1,12 @@
 package yaml
 
 import (
+	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
+	ghodssyaml "github.com/ghodss/yaml"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,6 +47,69 @@ spec:
 	require.Equal(t, 12, resource.Spec.Layout[0].W)
 	require.NotNil(t, resource.Spec.Layout[0].MinW)
 	assert.Equal(t, 2, *resource.Spec.Layout[0].MinW)
+}
+
+func TestConsoleFromYML_ReadsUnquotedLayoutY(t *testing.T) {
+	yaml := `apiVersion: v1
+kind: Console
+metadata:
+  name: Ops console
+spec:
+  panels:
+    - id: intro
+      type: markdown
+      content:
+        body: "# Hello"
+  layout:
+    - i: intro
+      x: 0
+      y: 12
+      w: 12
+      h: 6
+`
+
+	resource, err := ConsoleFromYML([]byte(yaml))
+	require.NoError(t, err)
+	require.Len(t, resource.Spec.Layout, 1)
+	assert.Equal(t, 12, resource.Spec.Layout[0].Y)
+}
+
+func TestConsoleFromYML_NormalizesLegacyYAML11LayoutYKey(t *testing.T) {
+	raw := []byte(`apiVersion: v1
+kind: Console
+metadata:
+  name: Ops console
+spec:
+  panels:
+    - id: intro
+      type: markdown
+      content:
+        body: "# Hello"
+  layout:
+    - i: intro
+      x: 0
+      y: 12
+      w: 12
+      h: 6
+`)
+
+	jsonBytes, err := ghodssyaml.YAMLToJSON(raw)
+	require.NoError(t, err)
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(jsonBytes, &doc))
+	normalizeConsoleDocument(doc)
+
+	normalizedJSON, err := json.Marshal(doc)
+	require.NoError(t, err)
+
+	var resource Console
+	decoder := json.NewDecoder(bytes.NewReader(normalizedJSON))
+	decoder.DisallowUnknownFields()
+	require.NoError(t, decoder.Decode(&resource))
+
+	require.Len(t, resource.Spec.Layout, 1)
+	assert.Equal(t, 12, resource.Spec.Layout[0].Y)
 }
 
 func TestConsoleFromYML_RejectsLegacyDashboardKind(t *testing.T) {

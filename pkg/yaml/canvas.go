@@ -167,11 +167,14 @@ func CanvasFromYAML(raw []byte) (*Canvas, error) {
 	if err := yaml.Unmarshal(raw, &asAny); err != nil {
 		return nil, fmt.Errorf("invalid yaml: %w", err)
 	}
-	if _, ok := asAny.(map[string]any); !ok {
+	doc, ok := asAny.(map[string]any)
+	if !ok {
 		return nil, errors.New("canvas yaml must be an object")
 	}
 
-	jsonBytes, err := json.Marshal(asAny)
+	normalizeCanvasDocument(doc)
+
+	jsonBytes, err := json.Marshal(doc)
 	if err != nil {
 		return nil, fmt.Errorf("invalid yaml: %w", err)
 	}
@@ -182,6 +185,22 @@ func CanvasFromYAML(raw []byte) (*Canvas, error) {
 	var resource Canvas
 	if err := decoder.Decode(&resource); err != nil {
 		return nil, fmt.Errorf("invalid canvas yaml: %w", err)
+	}
+
+	if resource.APIVersion == "" {
+		return nil, errors.New("canvas yaml must include an apiVersion")
+	}
+
+	if resource.APIVersion != APIVersion {
+		return nil, fmt.Errorf("unsupported apiVersion %q (expected %q)", resource.APIVersion, APIVersion)
+	}
+
+	if resource.Kind == "" {
+		return nil, errors.New("canvas yaml must include a kind")
+	}
+
+	if resource.Kind != KindCanvas {
+		return nil, errors.New("canvas yaml must include a kind of canvas")
 	}
 
 	if resource.Spec == nil {
@@ -352,7 +371,7 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 		}
 
 		if edge.Channel == "" {
-			edge.Channel = "default"
+			c.Spec.Edges[i].Channel = "default"
 		}
 
 		if !nodeIDs[edge.SourceID] {
@@ -374,7 +393,7 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 		if err := changesets.ValidateSourceNodeOutputChannel(
 			registry,
 			nodesByID[edge.SourceID],
-			edge.Channel,
+			c.Spec.Edges[i].Channel,
 		); err != nil {
 			return nil, nil, fmt.Errorf("edge %d: %v", i, err)
 		}

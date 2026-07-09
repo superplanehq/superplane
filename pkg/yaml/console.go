@@ -110,11 +110,14 @@ func ConsoleFromYML(raw []byte) (*Console, error) {
 	if err := yaml.Unmarshal(raw, &asAny); err != nil {
 		return nil, fmt.Errorf("invalid yaml: %w", err)
 	}
-	if _, ok := asAny.(map[string]any); !ok {
+	doc, ok := asAny.(map[string]any)
+	if !ok {
 		return nil, errors.New("console yaml must be an object")
 	}
 
-	jsonBytes, err := json.Marshal(asAny)
+	normalizeConsoleDocument(doc)
+
+	jsonBytes, err := json.Marshal(doc)
 	if err != nil {
 		return nil, fmt.Errorf("invalid yaml: %w", err)
 	}
