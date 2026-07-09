@@ -28,6 +28,19 @@ import {
 
 export const NO_INCOMING_CONNECTIONS_WARNING = "This node has no incoming connections and will never be triggered.";
 
+type CanvasRunsPage = {
+  totalCount?: number;
+};
+
+type InfiniteCanvasRunsData = {
+  pages?: CanvasRunsPage[];
+};
+
+export function getRunningRunsCount(data: InfiniteCanvasRunsData | undefined, visible: boolean): number {
+  if (!visible) return 0;
+  return data?.pages?.[0]?.totalCount ?? 0;
+}
+
 export function getNodeAnalyticsProps(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],

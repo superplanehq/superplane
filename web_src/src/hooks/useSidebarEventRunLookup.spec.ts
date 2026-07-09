@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasRun } from "@/api-client";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 const { canvasesListRuns } = vi.hoisted(() => ({
@@ -136,6 +137,72 @@ describe("useSidebarEventRunLookup", () => {
     });
 
     expect(canvasesListRuns).toHaveBeenCalledTimes(4);
+  });
+
+  it("can cap paginated lookup to the newest page", async () => {
+    const queryClient = new QueryClient();
+    const fillerRuns = Array.from({ length: 25 }, (_, index) => ({
+      id: `run-filler-${index}`,
+      rootEvent: { id: `root-filler-${index}` },
+    }));
+
+    canvasesListRuns.mockResolvedValueOnce({
+      data: {
+        runs: fillerRuns,
+        totalCount: 50,
+        hasNextPage: true,
+        lastTimestamp: "2026-02-06T14:00:00.000Z",
+      },
+    });
+
+    const { result } = renderHook(
+      () =>
+        useSidebarEventRunLookup({
+          enabled: true,
+          canvasId: "canvas-1",
+          organizationId: "org-1",
+          queryClient,
+          runs: [],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    await act(async () => {
+      expect(await result.current.fetchRunIdForSidebarEvent(triggerEvent, { maxPages: 1 })).toBeNull();
+    });
+
+    expect(canvasesListRuns).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks the current infinite runs cache before capped pagination", async () => {
+    const queryClient = new QueryClient();
+
+    const { result } = renderHook(
+      () =>
+        useSidebarEventRunLookup({
+          enabled: true,
+          canvasId: "canvas-1",
+          organizationId: "org-1",
+          queryClient,
+          runs: [],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    queryClient.setQueryData(canvasKeys.infiniteRuns("canvas-1", { states: ["STATE_STARTED"] }), {
+      pages: [{ runs: [{ id: "run-1", rootEvent: { id: "root-1" } }] }],
+      pageParams: [],
+    });
+
+    await act(async () => {
+      expect(await result.current.fetchRunIdForSidebarEvent(triggerEvent, { maxPages: 1 })).toBe("run-1");
+    });
+
+    expect(canvasesListRuns).not.toHaveBeenCalled();
   });
 
   it("starts paginated lookup from the newest runs", async () => {

@@ -4,6 +4,7 @@ import { Accordion } from "@/ui/accordion";
 import { useTheme } from "@/contexts/useTheme";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
 import { InputChainMoreChip } from "./RunInspectorInputChainModal";
+import { RuntimeTimelineCard } from "./RunInspectorRuntimeConfig";
 import {
   DetailBox,
   EmptySectionText,
@@ -21,12 +22,19 @@ import {
 } from "./RunInspectorTimelineTypes";
 import { hasObjectValue, type RunInspectorNodeSection, type RunInspectorUpstreamSection } from "./runNodeDetailModel";
 
+const INPUT_TRIGGERED_STATUS: StatusPill = {
+  dotClassName: "bg-violet-400",
+  label: "Triggered",
+};
+
 export function RunInspectorStepTimeline({
   section,
   componentIconMap,
+  organizationId,
 }: {
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
+  organizationId?: string;
 }) {
   const { resolvedTheme } = useTheme();
   const jsonViewStyle = getJsonViewStyle(resolvedTheme);
@@ -71,15 +79,7 @@ export function RunInspectorStepTimeline({
             {item.value === "input" ? (
               <InputTimelineCard section={section} jsonViewStyle={jsonViewStyle} componentIconMap={componentIconMap} />
             ) : item.value === "runtime" ? (
-              <TimelineAccordionCard
-                value="runtime"
-                status={{ dotClassName: "bg-blue-500", label: "Running" }}
-                title="Runtime Config"
-                trailing="JSON"
-                jsonViewStyle={jsonViewStyle}
-              >
-                <JsonPayload value={section.tabData?.configuration} jsonViewStyle={jsonViewStyle} />
-              </TimelineAccordionCard>
+              <RuntimeTimelineCard section={section} jsonViewStyle={jsonViewStyle} organizationId={organizationId} />
             ) : (
               <OutputTimelineCard section={section} jsonViewStyle={jsonViewStyle} />
             )}
@@ -107,7 +107,7 @@ function InputTimelineCard({
   return (
     <TimelineAccordionCard
       value="input"
-      status={inputStatus(leadInput)}
+      status={INPUT_TRIGGERED_STATUS}
       title="Input"
       sourceName={leadInput?.nodeName}
       actionPayload={leadInput ? (leadInput.output ?? {}) : undefined}
@@ -201,13 +201,6 @@ function outputActionPayload(section: RunInspectorNodeSection): unknown {
   }
 
   return section.errorMessage ? { error: section.errorMessage } : undefined;
-}
-
-function inputStatus(section?: RunInspectorUpstreamSection): StatusPill {
-  return {
-    dotClassName: section?.badge?.badgeColor ?? "bg-violet-400",
-    label: section?.badge?.label ?? "Triggered",
-  };
 }
 
 function outputStatus(section: RunInspectorNodeSection): StatusPill {

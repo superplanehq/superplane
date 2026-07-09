@@ -74,8 +74,8 @@ func (s *CanvasService) UpdateCanvasPreference(
 }
 
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
-	if req.Canvas == nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas is required")
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
 	}
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
@@ -88,8 +88,8 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		s.gitProvider,
 		s.webhookBaseURL,
 		uuid.MustParse(organizationID),
-		req.Canvas,
-		req.AutoLayout,
+		req.GetName(),
+		req.GetDescription(),
 		s.usageService,
 	)
 }

@@ -7,9 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
@@ -57,7 +55,7 @@ func (p *CanvasPatcher) GetVersion() *models.CanvasVersion {
 	return p.finalVersion
 }
 
-func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*models.CanvasVersion, error) {
+func (p *CanvasPatcher) buildFinalVersion() (*models.CanvasVersion, error) {
 	v := &models.CanvasVersion{
 		ID:            p.originalVersion.ID,
 		WorkflowID:    p.originalVersion.WorkflowID,
@@ -91,21 +89,10 @@ func (p *CanvasPatcher) buildFinalVersion(autoLayout *pb.CanvasAutoLayout) (*mod
 		v.Edges = append(v.Edges, p.edges[edgeKey])
 	}
 
-	if autoLayout == nil {
-		return v, nil
-	}
-
-	nodes, edges, err := layout.ApplyLayout(v.Nodes, v.Edges, autoLayout)
-	if err != nil {
-		return nil, err
-	}
-
-	v.Nodes = nodes
-	v.Edges = edges
 	return v, nil
 }
 
-func (p *CanvasPatcher) ApplyChangeset(changeset *CanvasChangeset, autoLayout *pb.CanvasAutoLayout) error {
+func (p *CanvasPatcher) ApplyChangeset(changeset *CanvasChangeset) error {
 	if changeset == nil || len(changeset.Changes) == 0 {
 		return fmt.Errorf("changeset is required")
 	}
@@ -116,7 +103,7 @@ func (p *CanvasPatcher) ApplyChangeset(changeset *CanvasChangeset, autoLayout *p
 		}
 	}
 
-	finalVersion, err := p.buildFinalVersion(autoLayout)
+	finalVersion, err := p.buildFinalVersion()
 	if err != nil {
 		return err
 	}

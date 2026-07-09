@@ -9,9 +9,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/layout"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"github.com/superplanehq/superplane/pkg/layout"
+	appyaml "github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support/cli"
+	"slices"
 )
 
 type requestExpectation struct {
@@ -107,7 +108,9 @@ func TestUpdateWithoutMessageReturnsError(t *testing.T) {
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 	filePath := writeTestCanvasFileWithMetadataID(t, "needs-message", canvasID)
 	file := filePath
-	ctx, _ := cli.NewCommandContext(t, newAPITestServer(t).server, "text")
+	ctx, _ := cli.NewCommandContextWithConfig(t, newAPITestServer(t).server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
 
 	err := (&updateCommand{file: &file}).Execute(ctx)
 	require.Error(t, err)
@@ -144,37 +147,6 @@ func writeTestCanvasFileWithMetadataID(t *testing.T, name, canvasID string) stri
 	return filePath
 }
 
-func TestResolveCanvasForFileUpdateWithoutIDReturnsError(t *testing.T) {
-	filePath := writeTestCanvasFileWithoutMetadataID(t, "parse-check")
-	_, _, err := resolveCanvasForFileUpdate(filePath)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "metadata.id is required")
-}
-
-func TestResolveCanvasForFileUpdateWithIDSucceeds(t *testing.T) {
-	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
-	filePath := writeTestCanvasFileWithMetadataID(t, "my-canvas", canvasID)
-	gotID, canvas, err := resolveCanvasForFileUpdate(filePath)
-	require.NoError(t, err)
-	require.Equal(t, canvasID, gotID)
-	md := canvas.GetMetadata()
-	require.Equal(t, canvasID, (&md).GetId())
-}
-
-func TestResolveCanvasForFileUpdateWhitespaceIDReturnsError(t *testing.T) {
-	t.Helper()
-	dir := t.TempDir()
-	filePath := filepath.Join(dir, "canvas.yaml")
-	content := []byte(
-		"apiVersion: v1\nkind: Canvas\nmetadata:\n  id: \"   \"\n  name: x\nspec:\n  nodes: []\n  edges: []\n",
-	)
-	require.NoError(t, os.WriteFile(filePath, content, 0o644))
-
-	_, _, err := resolveCanvasForFileUpdate(filePath)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "metadata.id is required")
-}
-
 func TestUpdateFromFileWhenCommitFailsReturnsWrappedError(t *testing.T) {
 	t.Helper()
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
@@ -195,7 +167,9 @@ func TestUpdateFromFileWhenCommitFailsReturnsWrappedError(t *testing.T) {
 	filePath := writeTestCanvasFileWithMetadataID(t, "pub-fail", canvasID)
 	file := filePath
 	message := "Update canvas"
-	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+	ctx, _ := cli.NewCommandContextWithConfig(t, server.server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
 
 	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
 	require.Error(t, err)
@@ -226,7 +200,9 @@ func TestUpdateFromFileWhenStageFailsReturnsError(t *testing.T) {
 	filePath := writeTestCanvasFileWithMetadataID(t, "put-fail", canvasID)
 	file := filePath
 	message := "Update canvas"
-	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+	ctx, _ := cli.NewCommandContextWithConfig(t, server.server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
 
 	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
 	require.Error(t, err)
@@ -259,7 +235,9 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 
 	file := filePath
 	message := "Update canvas"
-	ctx, stdout := cli.NewCommandContext(t, server.server, "text")
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server.server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
 
 	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
 	require.NoError(t, err)
@@ -275,13 +253,106 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {
 	autoLayout := layout.DefaultAutoLayout()
 
-	if autoLayout.GetAlgorithm() != openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL {
-		t.Fatalf("expected horizontal auto-layout, got %s", autoLayout.GetAlgorithm())
+	if autoLayout.Algorithm != "ALGORITHM_HORIZONTAL" {
+		t.Fatalf("expected horizontal auto-layout, got %s", autoLayout.Algorithm)
 	}
-	if autoLayout.GetScope() != openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS {
-		t.Fatalf("expected full-canvas scope, got %s", autoLayout.GetScope())
+	if autoLayout.Scope != "SCOPE_FULL_CANVAS" {
+		t.Fatalf("expected full-canvas scope, got %s", autoLayout.Scope)
 	}
-	if autoLayout.HasNodeIds() {
-		t.Fatalf("expected no node ids for default full-canvas strategy, got %v", autoLayout.GetNodeIds())
+	if len(autoLayout.NodeIDs) != 0 {
+		t.Fatalf("expected no node ids for default full-canvas strategy, got %v", autoLayout.NodeIDs)
 	}
+}
+
+func TestUpdateUsesActiveAppWhenNoArg(t *testing.T) {
+	t.Helper()
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	server := newAPITestServer(
+		t,
+		expectStageCanvasYAML(canvasID),
+		expectCommitStaging(canvasID, "version-1"),
+		expectFetchCanvasYAML(canvasID, "version-1", "apiVersion: v1\nkind: Canvas\nmetadata:\n  id: "+canvasID+"\n  name: active\nspec:\n  nodes: []\n  edges: []\n"),
+	)
+
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "active")
+	file := filePath
+	message := "Update canvas"
+	ctx, _ := cli.NewCommandContextWithConfig(t, server.server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
+
+	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
+	require.NoError(t, err)
+
+	server.AssertCalls(t, []string{
+		http.MethodPut + " " + stagingPath(canvasID),
+		http.MethodPost + " " + stagingPath(canvasID) + "/commit",
+		http.MethodGet + " " + repositoryCanvasFilePath(canvasID),
+	})
+}
+
+func TestUpdateUsesPositionalArg(t *testing.T) {
+	t.Helper()
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	server := newAPITestServer(
+		t,
+		expectStageCanvasYAML(canvasID),
+		expectCommitStaging(canvasID, "version-1"),
+		expectFetchCanvasYAML(canvasID, "version-1", "apiVersion: v1\nkind: Canvas\nmetadata:\n  id: "+canvasID+"\n  name: explicit\nspec:\n  nodes: []\n  edges: []\n"),
+	)
+
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "explicit")
+	file := filePath
+	message := "Update canvas"
+	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+	ctx.Args = []string{canvasID}
+
+	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
+	require.NoError(t, err)
+
+	server.AssertCalls(t, []string{
+		http.MethodPut + " " + stagingPath(canvasID),
+		http.MethodPost + " " + stagingPath(canvasID) + "/commit",
+		http.MethodGet + " " + repositoryCanvasFilePath(canvasID),
+	})
+}
+
+func TestUpdateErrorsWhenNoAppAndNoActive(t *testing.T) {
+	server := newAPITestServer(t)
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "no-app")
+	file := filePath
+	message := "Update canvas"
+	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+
+	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "app-name-or-id")
+}
+
+func TestApplyLayoutDoesNotRepositionWidgetNodes(t *testing.T) {
+	const widgetY = 999
+	resource := &appyaml.Canvas{
+		Spec: &appyaml.CanvasSpec{
+			Nodes: []appyaml.Node{
+				{ID: "flow-1", Type: appyaml.NodeTypeAction, Component: "noop", Position: appyaml.Position{X: 10, Y: 10}},
+				{ID: "flow-2", Type: appyaml.NodeTypeAction, Component: "noop", Position: appyaml.Position{X: 300, Y: 10}},
+				{ID: "widget-1", Type: appyaml.NodeTypeWidget, Component: "note", Position: appyaml.Position{X: 100, Y: widgetY}},
+			},
+			Edges: []appyaml.Edge{
+				{SourceID: "flow-1", TargetID: "flow-2", Channel: "default"},
+			},
+		},
+	}
+
+	ctx, _ := cli.NewCommandContext(t, nil, "text")
+	updated, err := (&updateCommand{}).applyLayout(ctx, resource)
+	require.NoError(t, err)
+
+	widgetIndex := slices.IndexFunc(updated.Spec.Nodes, func(node appyaml.Node) bool {
+		return node.ID == "widget-1"
+	})
+	require.NotEqual(t, -1, widgetIndex)
+	require.Equal(t, widgetY, updated.Spec.Nodes[widgetIndex].Position.Y)
 }

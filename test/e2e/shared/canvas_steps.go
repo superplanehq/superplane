@@ -11,12 +11,11 @@ import (
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
-	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/pkg/yaml"
 
 	"github.com/superplanehq/superplane/test/e2e/queries"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -376,11 +375,11 @@ func (s *CanvasSteps) DraftEffectiveSpec() ([]models.Node, []models.Edge) {
 
 	for _, row := range rows {
 		if row.Path == canvasYAMLRepositoryPath && !row.Deleted && row.Content != "" {
-			pbCanvas, err := canvasyaml.ParseCanvasResource([]byte(row.Content))
+			canvas, err := yaml.CanvasFromYAML([]byte(row.Content))
 			if err != nil {
 				break
 			}
-			return actions.ProtoToNodes(pbCanvas.GetSpec().GetNodes()), actions.ProtoToEdges(pbCanvas.GetSpec().GetEdges())
+			return canvas.Nodes(), canvas.Edges()
 		}
 	}
 
