@@ -8,12 +8,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/canvas/yaml"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
-	grpcactions "github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
 
@@ -106,20 +104,14 @@ func (r *AppFileReader) readSpecFromVersion(ctx context.Context, path string, ve
 	var content string
 	switch path {
 	case CanvasYAMLPath:
-		pbVersion := &pb.CanvasVersion{
-			Spec: &pb.Canvas_Spec{
-				Nodes: grpcactions.NodesToProto(version.Nodes),
-				Edges: grpcactions.EdgesToProto(version.Edges),
-			},
-		}
-		raw, err := yaml.CanvasResourceYAML(pbVersion, r.app.ID.String(), r.app.Name, r.app.Description)
+		raw, err := yaml.VersionToCanvasYAML(r.app.Name, r.app.Description, version)
 		if err != nil {
 			return nil, err
 		}
 
 		content = string(raw)
 	default:
-		raw, err := models.CanvasVersionToConsoleYML(r.app.Name, version)
+		raw, err := yaml.VersionToConsoleYML(r.app.Name, version)
 		if err != nil {
 			return nil, err
 		}

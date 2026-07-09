@@ -1,4 +1,4 @@
-package models
+package yaml
 
 import (
 	"bytes"
@@ -10,14 +10,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/models"
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	// ConsoleKind is the canonical YAML kind for canvas consoles (product name).
-	ConsoleKind         = "Console"
-	DashboardAPIVersion = "v1"
-
 	ConsolePanelTypeMarkdown = "markdown"
 	ConsolePanelTypeHTML     = "html"
 	ConsolePanelTypeNode     = "node"
@@ -43,36 +40,18 @@ var AllowedConsolePanelTypes = []string{
 	ConsolePanelTypeNumber,
 }
 
-// ConsoleYAMLMetadata is informational only. `canvasId` is ignored on
-// import; `name` is used solely for display/filename purposes.
-type ConsoleYAMLMetadata struct {
-	CanvasID string `json:"canvasId,omitempty" yaml:"canvasId,omitempty"`
-	Name     string `json:"name,omitempty" yaml:"name,omitempty"`
+type Console struct {
+	APIVersion string      `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string      `json:"kind" yaml:"kind"`
+	Spec       ConsoleSpec `json:"spec" yaml:"spec"`
 }
 
-// DashboardYAMLSpec carries the persisted dashboard shape (panels + layout)
-// while keeping a stable, deterministic field ordering on export.
-type ConsoleYAMLSpec struct {
-	Panels []ConsolePanel      `json:"panels" yaml:"panels"`
-	Layout []ConsoleLayoutItem `json:"layout" yaml:"layout"`
+type ConsoleSpec struct {
+	Panels []models.ConsolePanel      `json:"panels" yaml:"panels"`
+	Layout []models.ConsoleLayoutItem `json:"layout" yaml:"layout"`
 }
 
-// ConsoleYAML is the canonical YAML representation of a console.
-//
-// Import is replace-all: it overwrites every panel and layout entry for the
-// console. Export is deterministic: identical consoles produce identical
-// YAML bytes regardless of how the underlying maps were ordered in memory.
-type ConsoleYAML struct {
-	APIVersion string              `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string              `json:"kind" yaml:"kind"`
-	Metadata   ConsoleYAMLMetadata `json:"metadata" yaml:"metadata"`
-	Spec       ConsoleYAMLSpec     `json:"spec" yaml:"spec"`
-}
-
-// ConsoleFromYML parses raw YAML bytes into a validated ConsoleYAML. The
-// parser is strict: unknown top-level fields are rejected, panel content must
-// be an object, and the configured limits apply.
-func ConsoleFromYML(raw []byte) (*ConsoleYAML, error) {
+func ConsoleFromYML(raw []byte) (*Console, error) {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return nil, errors.New("console yaml is empty")
 	}
@@ -93,9 +72,9 @@ func ConsoleFromYML(raw []byte) (*ConsoleYAML, error) {
 	decoder := json.NewDecoder(bytes.NewReader(jsonBytes))
 	decoder.DisallowUnknownFields()
 
-	var resource ConsoleYAML
+	var resource Console
 	if err := decoder.Decode(&resource); err != nil {
-		return nil, fmt.Errorf("invalid dashboard yaml: %w", err)
+		return nil, fmt.Errorf("invalid console yaml: %w", err)
 	}
 
 	if err := resource.Validate(); err != nil {
@@ -105,22 +84,15 @@ func ConsoleFromYML(raw []byte) (*ConsoleYAML, error) {
 	return &resource, nil
 }
 
-// CanvasVersionToConsoleYML serializes a stored dashboard into the canonical YAML
-// representation with stable field ordering. Empty dashboards produce a
-// valid empty spec.
-func CanvasVersionToConsoleYML(canvasName string, canvasVersion *CanvasVersion) ([]byte, error) {
+func VersionToConsoleYML(canvasName string, canvasVersion *models.CanvasVersion) (string, error) {
 	if canvasVersion == nil {
-		return nil, errors.New("canvas version is required")
+		return "", errors.New("canvas version is required")
 	}
 
-	resource := ConsoleYAML{
-		APIVersion: DashboardAPIVersion,
-		Kind:       ConsoleKind,
-		Metadata: ConsoleYAMLMetadata{
-			CanvasID: canvasVersion.WorkflowID.String(),
-			Name:     canvasName,
-		},
-		Spec: ConsoleYAMLSpec{
+	resource := Console{
+		APIVersion: APIVersion,
+		Kind:       KindConsole,
+		Spec: ConsoleSpec{
 			Panels: normalizeConsolePanelsForExport(canvasVersion.ConsolePanels.Data()),
 			Layout: normalizeConsoleLayoutForExport(canvasVersion.ConsoleLayout.Data()),
 		},
@@ -128,48 +100,44 @@ func CanvasVersionToConsoleYML(canvasName string, canvasVersion *CanvasVersion) 
 
 	jsonBytes, err := json.Marshal(resource)
 	if err != nil {
-		return nil, fmt.Errorf("failed to serialize dashboard: %w", err)
+		return "", fmt.Errorf("failed to serialize console: %w", err)
 	}
 
 	var generic any
 	if err := json.Unmarshal(jsonBytes, &generic); err != nil {
-		return nil, fmt.Errorf("failed to serialize dashboard: %w", err)
+		return "", fmt.Errorf("failed to serialize console: %w", err)
 	}
 
 	var buf bytes.Buffer
 	encoder := yaml.NewEncoder(&buf)
 	encoder.SetIndent(2)
 	if err := encoder.Encode(generic); err != nil {
-		return nil, fmt.Errorf("failed to encode dashboard yaml: %w", err)
+		return "", fmt.Errorf("failed to encode console yaml: %w", err)
 	}
 	if err := encoder.Close(); err != nil {
-		return nil, fmt.Errorf("failed to encode dashboard yaml: %w", err)
+		return "", fmt.Errorf("failed to encode console yaml: %w", err)
 	}
-	return buf.Bytes(), nil
+	return buf.String(), nil
 }
 
-// Validate enforces the structural and size invariants of a dashboard import.
-func (d *ConsoleYAML) Validate() error {
+func (d *Console) Validate() error {
 	if d.APIVersion == "" {
 		return errors.New("apiVersion is required")
 	}
-	if d.APIVersion != DashboardAPIVersion {
-		return fmt.Errorf("unsupported apiVersion %q (expected %q)", d.APIVersion, DashboardAPIVersion)
+	if d.APIVersion != APIVersion {
+		return fmt.Errorf("unsupported apiVersion %q (expected %q)", d.APIVersion, APIVersion)
 	}
 	if d.Kind == "" {
 		return errors.New("kind is required")
 	}
-	if d.Kind != ConsoleKind {
-		return fmt.Errorf("unsupported kind %q (expected %q)", d.Kind, ConsoleKind)
+	if d.Kind != KindConsole {
+		return fmt.Errorf("unsupported kind %q (expected %q)", d.Kind, KindConsole)
 	}
 
 	return ValidateConsoleContent(d.Spec.Panels, d.Spec.Layout)
 }
 
-// ValidateDashboardContent enforces the shared validation rules used by both
-// YAML import and the gRPC update endpoint. Keeping this in models means the
-// rules live next to the persisted shape and stay consistent across surfaces.
-func ValidateConsoleContent(panels []ConsolePanel, layout []ConsoleLayoutItem) error {
+func ValidateConsoleContent(panels []models.ConsolePanel, layout []models.ConsoleLayoutItem) error {
 	if len(panels) > MaxConsolePanels {
 		return fmt.Errorf("too many panels (max %d)", MaxConsolePanels)
 	}
@@ -235,7 +203,7 @@ func isAllowedDashboardPanelType(panelType string) bool {
 	return false
 }
 
-func validatePanelContent(panel ConsolePanel) error {
+func validatePanelContent(panel models.ConsolePanel) error {
 	switch panel.Type {
 	case ConsolePanelTypeMarkdown:
 		return validateMarkdownContent(panel)
@@ -271,7 +239,7 @@ var AllowedMarkdownVariableDirections = []string{"asc", "desc"}
 // variable to every matching row so authors can use CEL list macros.
 var AllowedMarkdownVariableModes = []string{"single", "list"}
 
-func validateMarkdownContent(panel ConsolePanel) error {
+func validateMarkdownContent(panel models.ConsolePanel) error {
 	if panel.Content == nil {
 		return nil
 	}
@@ -297,7 +265,7 @@ func validateMarkdownContent(panel ConsolePanel) error {
 // is stored raw and sanitized client-side at render time (same trust model as
 // markdown), so the backend only checks structure: title and body are optional
 // strings and the shared variable system rules apply.
-func validateHTMLContent(panel ConsolePanel) error {
+func validateHTMLContent(panel models.ConsolePanel) error {
 	if panel.Content == nil {
 		return nil
 	}
@@ -461,7 +429,7 @@ func validateMarkdownRunSource(panelID string, index int, source map[string]any)
 	return nil
 }
 
-func validateNodePanelContent(panel ConsolePanel) error {
+func validateNodePanelContent(panel models.ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -496,7 +464,7 @@ func validateNodePanelContent(panel ConsolePanel) error {
 // `nodes` is an array (possibly empty for newly created panels). Each entry
 // must reference a canvas node by id or name; optional fields tighten the
 // rendered row (label, purpose description, manual-run button).
-func validateNodesPanelContent(panel ConsolePanel) error {
+func validateNodesPanelContent(panel models.ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -604,7 +572,7 @@ func validateRenderField(panelID, fieldPrefix string, raw any, expectedKind stri
 	return render, nil
 }
 
-func validateTablePanelContent(panel ConsolePanel) error {
+func validateTablePanelContent(panel models.ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -694,7 +662,7 @@ func validateTableRowStyles(panelID string, raw any) error {
 	return nil
 }
 
-func validateChartPanelContent(panel ConsolePanel) error {
+func validateChartPanelContent(panel models.ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -870,7 +838,7 @@ func validateTableRowActions(panelID string, raw any) error {
 	return nil
 }
 
-func validateNumberPanelContent(panel ConsolePanel) error {
+func validateNumberPanelContent(panel models.ConsolePanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
@@ -1052,14 +1020,14 @@ func validateMemoryNumberSource(panelID string, index int, raw any) error {
 
 // normalizeDashboardPanelsForExport ensures stable field order in panel
 // content maps so YAML output is deterministic across runs.
-func normalizeConsolePanelsForExport(panels []ConsolePanel) []ConsolePanel {
+func normalizeConsolePanelsForExport(panels []models.ConsolePanel) []models.ConsolePanel {
 	if panels == nil {
-		return []ConsolePanel{}
+		return []models.ConsolePanel{}
 	}
 
-	out := make([]ConsolePanel, len(panels))
+	out := make([]models.ConsolePanel, len(panels))
 	for i, panel := range panels {
-		out[i] = ConsolePanel{
+		out[i] = models.ConsolePanel{
 			ID:      panel.ID,
 			Type:    panel.Type,
 			Content: panel.Content,
@@ -1068,17 +1036,17 @@ func normalizeConsolePanelsForExport(panels []ConsolePanel) []ConsolePanel {
 	return out
 }
 
-func normalizeConsoleLayoutForExport(layout []ConsoleLayoutItem) []ConsoleLayoutItem {
+func normalizeConsoleLayoutForExport(layout []models.ConsoleLayoutItem) []models.ConsoleLayoutItem {
 	if layout == nil {
-		return []ConsoleLayoutItem{}
+		return []models.ConsoleLayoutItem{}
 	}
 
-	out := make([]ConsoleLayoutItem, len(layout))
+	out := make([]models.ConsoleLayoutItem, len(layout))
 	copy(out, layout)
 	return out
 }
 
-func encodedConsolePanelsSize(panels []ConsolePanel) (int, error) {
+func encodedConsolePanelsSize(panels []models.ConsolePanel) (int, error) {
 	encoded, err := json.Marshal(panels)
 	if err != nil {
 		return 0, err

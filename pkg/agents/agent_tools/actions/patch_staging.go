@@ -8,15 +8,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/agents"
-	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	"github.com/superplanehq/superplane/pkg/database"
-	grpcactions "github.com/superplanehq/superplane/pkg/grpc/actions"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	canvasLayout "github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -107,7 +106,8 @@ func resolvePatchStagingTarget(session agents.AgentSessionContext, input Input) 
 		return patchStagingTarget{}, fmt.Errorf("patch_operations, console_yaml, or auto_layout is required for patch_staging")
 	}
 	if consoleYAML != "" {
-		if err := canvasRepository.ValidateConsoleYAML(input.ConsoleYAML); err != nil {
+		_, err := yaml.ConsoleFromYML([]byte(consoleYAML))
+		if err != nil {
 			return patchStagingTarget{}, err
 		}
 	}
@@ -132,19 +132,14 @@ func (a patchStagingAction) readStagedCanvas(ctx context.Context, session agents
 		return stagedDraftCanvas{}, fmt.Errorf("read staged canvas yaml: %w", err)
 	}
 
-	pbCanvas, err := canvasyaml.ParseCanvasResource([]byte(strings.TrimSpace(canvasYAML)))
+	c, err := yaml.CanvasFromYAML([]byte(strings.TrimSpace(canvasYAML)))
 	if err != nil {
 		return stagedDraftCanvas{}, fmt.Errorf("parse staged canvas yaml: %w", err)
 	}
 
-	nodes, edges, err := canvasRepository.ParseCanvas(a.deps.Registry, session.OrganizationID, pbCanvas)
-	if err != nil {
-		return stagedDraftCanvas{}, fmt.Errorf("validate staged canvas yaml: %w", err)
-	}
-
 	return stagedDraftCanvas{
-		nodes: nodes,
-		edges: edges,
+		nodes: c.Nodes(),
+		edges: c.Edges(),
 	}, nil
 }
 
@@ -181,7 +176,7 @@ func (a patchStagingAction) applyPatchToStagedCanvas(
 func stagePatchedDraftFiles(ctx context.Context, session agents.AgentSessionContext, target patchStagingTarget, canvas *models.Canvas, patched *models.CanvasVersion) error {
 	operations := make([]*pb.CanvasRepositoryFileOperation, 0, 2)
 	if target.changeset != nil || target.autoLayoutInput != nil {
-		patchedYAML, err := serializePatchedDraftYAML(canvas, patched, session.CanvasID)
+		patchedYAML, err := yaml.VersionToCanvasYAML(canvas.Name, canvas.Description, patched)
 		if err != nil {
 			return fmt.Errorf("serialize patched canvas yaml: %w", err)
 		}
@@ -490,14 +485,4 @@ func resolveToolAutoLayoutInput(input *AutoLayoutInput) *pb.CanvasAutoLayout {
 	}
 
 	return layout
-}
-
-func serializePatchedDraftYAML(canvas *models.Canvas, version *models.CanvasVersion, canvasID string) (string, error) {
-	positioned := &pb.CanvasVersion{
-		Spec: &pb.Canvas_Spec{
-			Nodes: grpcactions.NodesToProto(version.Nodes),
-			Edges: grpcactions.EdgesToProto(version.Edges),
-		},
-	}
-	return canvasyaml.CanvasResourceYAML(positioned, canvasID, canvas.Name, canvas.Description)
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
@@ -38,6 +38,24 @@ func CreateCanvas(
 	autoLayout *pb.CanvasAutoLayout,
 	usageService usage.Service,
 ) (*pb.CreateCanvasResponse, error) {
+	if pbCanvas == nil {
+		return nil, grpcerrors.InvalidArgument(nil, "canvas is required")
+	}
+
+	if pbCanvas.GetMetadata() == nil {
+		return nil, grpcerrors.InvalidArgument(nil, "canvas metadata is required")
+	}
+
+	name := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
+	if name == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
+	}
+
+	nodes, edges, err := ParseCanvas(registry, organizationID.String(), pbCanvas)
+	if err != nil {
+		return nil, err
+	}
+
 	return CreateCanvasWithSeedFiles(
 		ctx,
 		registry,
@@ -46,7 +64,10 @@ func CreateCanvas(
 		gitProvider,
 		webhookBaseURL,
 		organizationID,
-		pbCanvas,
+		name,
+		pbCanvas.Metadata.Description,
+		nodes,
+		edges,
 		autoLayout,
 		usageService,
 		nil,
@@ -65,36 +86,20 @@ func CreateCanvasWithSeedFiles(
 	gitProvider git.Provider,
 	webhookBaseURL string,
 	organizationID uuid.UUID,
-	pbCanvas *pb.Canvas,
+	name string,
+	description string,
+	nodes []models.Node,
+	edges []models.Edge,
 	autoLayout *pb.CanvasAutoLayout,
 	usageService usage.Service,
 	seedFiles []models.RepositorySeedFile,
 ) (*pb.CreateCanvasResponse, error) {
-	if pbCanvas == nil {
-		return nil, grpcerrors.InvalidArgument(nil, "canvas is required")
-	}
-
-	if pbCanvas.GetMetadata() == nil {
-		return nil, grpcerrors.InvalidArgument(nil, "canvas metadata is required")
-	}
-
-	name := strings.TrimSpace(pbCanvas.GetMetadata().GetName())
-	if name == "" {
-		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
-	}
-	pbCanvas.Metadata.Name = name
-
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	nodes, edges, err := ParseCanvas(registry, organizationID.String(), pbCanvas)
-	if err != nil {
-		return nil, err
-	}
-
-	nodes, edges, err = layout.ApplyLayout(nodes, edges, autoLayout)
+	nodes, edges, err := layout.ApplyLayout(nodes, edges, autoLayout)
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, "failed to apply layout")
 	}
@@ -126,7 +131,7 @@ func CreateCanvasWithSeedFiles(
 		OrganizationID: organizationID,
 		LiveVersionID:  &versionID,
 		Name:           name,
-		Description:    pbCanvas.Metadata.Description,
+		Description:    description,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
@@ -225,8 +230,6 @@ func CreateCanvasWithSeedFiles(
 	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
-
-	canvas.Description = pbCanvas.Metadata.Description
 
 	var user *models.User
 	if canvas.CreatedBy != nil {

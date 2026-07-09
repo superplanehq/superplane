@@ -25,6 +25,7 @@ import (
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -450,15 +451,16 @@ func createNewCanvasVersionFromLive(
 
 		switch normalized {
 		case CanvasYAMLRepositoryPath:
-			pbCanvas, err := canvasFromYAMLText(content)
+			canvas, err := yaml.CanvasFromYAML([]byte(content))
 			if err != nil {
 				return nil, err
 			}
 
-			nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
-			if err != nil {
-				return nil, err
-			}
+			// TODO: move logic from here to CanvasFromYAML()
+			// nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+			// if err != nil {
+			// 	return nil, err
+			// }
 
 			err = usage.EnsureOrganizationWithinLimits(
 				ctx,
@@ -466,7 +468,7 @@ func createNewCanvasVersionFromLive(
 				organizationID,
 				&usagepb.OrganizationState{},
 				&usagepb.CanvasState{
-					Nodes: int32(len(nodes)),
+					Nodes: int32(len(canvas.Spec.Nodes)),
 				},
 			)
 
@@ -474,17 +476,17 @@ func createNewCanvasVersionFromLive(
 				return nil, err
 			}
 
-			newNodes := injectMetadataIntoNodes(liveVersion.Nodes, nodes)
+			newNodes := injectMetadataIntoNodes(liveVersion.Nodes, canvas.Nodes())
 			newVersion.Nodes = datatypes.NewJSONSlice(slices.Clone(newNodes))
-			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(edges))
+			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(canvas.Edges()))
 		case ConsoleYAMLRepositoryPath:
-			panels, layout, err := consolePanelsLayoutFromYAMLText(content)
+			console, err := yaml.ConsoleFromYML([]byte(content))
 			if err != nil {
 				return nil, err
 			}
 
-			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(panels))
-			newVersion.ConsoleLayout = datatypes.NewJSONType(slices.Clone(layout))
+			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(console.Spec.Panels))
+			newVersion.ConsoleLayout = datatypes.NewJSONType(slices.Clone(console.Spec.Layout))
 		default:
 			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", operation.GetPath()))
 		}

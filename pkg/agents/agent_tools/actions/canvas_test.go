@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -24,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
@@ -264,13 +264,13 @@ func TestAppAgentTool_PatchStagingStagesSmallGraphEdits(t *testing.T) {
 	staged, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, &liveVersion, canvasRepository.CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
+	patched, err := yaml.CanvasFromYAML([]byte(staged))
 	require.NoError(t, err)
-	require.Len(t, patched.GetSpec().GetNodes(), 2)
-	require.Len(t, patched.GetSpec().GetEdges(), 1)
-	assert.Equal(t, "first-node", patched.GetSpec().GetNodes()[0].GetId())
-	assert.Equal(t, "second-node", patched.GetSpec().GetNodes()[1].GetId())
-	assert.Equal(t, "default", patched.GetSpec().GetEdges()[0].GetChannel())
+	require.Len(t, patched.Nodes(), 2)
+	require.Len(t, patched.Edges(), 1)
+	assert.Equal(t, "first-node", patched.Nodes()[0].ID)
+	assert.Equal(t, "second-node", patched.Nodes()[1].ID)
+	assert.Equal(t, "default", patched.Edges()[0].Channel)
 }
 
 func TestAppAgentTool_PatchStagingAddsIntegrationBackedNode(t *testing.T) {
@@ -324,13 +324,13 @@ func TestAppAgentTool_PatchStagingAddsIntegrationBackedNode(t *testing.T) {
 	staged, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, &liveVersion, canvasRepository.CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
+	patched, err := yaml.CanvasFromYAML([]byte(staged))
 	require.NoError(t, err)
-	require.Len(t, patched.GetSpec().GetNodes(), 1)
-	node := patched.GetSpec().GetNodes()[0]
-	assert.Equal(t, "github.createIssue", node.GetComponent())
-	require.NotNil(t, node.GetIntegration())
-	assert.Equal(t, integration.ID.String(), *node.GetIntegration().Id)
+	require.Len(t, patched.Spec.Nodes, 1)
+	node := patched.Spec.Nodes[0]
+	assert.Equal(t, "github.createIssue", node.Component)
+	require.NotNil(t, node.IntegrationID)
+	assert.Equal(t, integration.ID.String(), *node.IntegrationID)
 }
 
 func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 const readActionName = "read"
@@ -93,7 +94,7 @@ func (a readAction) Execute(ctx context.Context, session agents.AgentSessionCont
 }
 
 func (a readAction) summarize(organizationID string, canvas *models.Canvas, version *models.CanvasVersion, canvasYAML string) summary {
-	nodes, edges, err := canvasRepository.ParseAndValidateCanvasYAML(a.deps.Registry, organizationID, canvasYAML)
+	c, err := yaml.CanvasFromYAML([]byte(canvasYAML))
 	if err != nil {
 		return summarizeCanvasVersion(canvas, version)
 	}
@@ -102,5 +103,6 @@ func (a readAction) summarize(organizationID string, canvas *models.Canvas, vers
 	if canvas != nil {
 		name = canvas.Name
 	}
-	return summarizeParsedCanvas(name, nodes, edges)
+
+	return summarizeParsedCanvas(name, c.Nodes(), c.Edges())
 }

@@ -15,10 +15,10 @@ import (
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -143,13 +143,13 @@ func (s *Service) prepareCanvasForInstall(
 	userParams map[string]string,
 	integrations map[string]IntegrationMapping,
 	organizationID uuid.UUID,
-) (*pb.Canvas, map[string]string, error) {
+) (*yaml.Canvas, map[string]string, error) {
 	canvasBody, resolvedParams, err := fetchAndSubstituteParams(repo, userParams, organizationID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	canvas, err := parseCanvasYAML(canvasBody)
+	canvas, err := yaml.CanvasFromYAML(canvasBody)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -198,12 +198,7 @@ func fetchAndSubstituteParams(repo *Repository, userParams map[string]string, or
 	return SubstituteInstallParams(canvasBody, resolved), resolved, nil
 }
 
-func (s *Service) createCanvas(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	canvas *pb.Canvas,
-	seedFiles []models.RepositorySeedFile,
-) (string, error) {
+func (s *Service) createCanvas(ctx context.Context, organizationID uuid.UUID, canvas *yaml.Canvas, seedFiles []models.RepositorySeedFile) (string, error) {
 	response, err := canvases.CreateCanvasWithSeedFiles(
 		ctx,
 		s.Registry,
@@ -212,7 +207,10 @@ func (s *Service) createCanvas(
 		s.GitProvider,
 		s.WebhooksBaseURL,
 		organizationID,
-		canvas,
+		canvas.Metadata.Name,
+		canvas.Metadata.Description,
+		canvas.Nodes(),
+		canvas.Edges(),
 		nil,
 		s.UsageService,
 		seedFiles,
@@ -282,7 +280,7 @@ func fetchSeedFiles(repo *Repository, resolvedParams map[string]string) ([]model
 
 // ─── Console persistence ─────────────────────────────────────────────────────
 
-func persistInstalledConsole(canvasID string, console *models.ConsoleYAML) error {
+func persistInstalledConsole(canvasID string, console *yaml.Console) error {
 	if console == nil {
 		return nil
 	}
@@ -310,25 +308,28 @@ func persistInstalledConsole(canvasID string, console *models.ConsoleYAML) error
 
 // ─── Integration wiring ──────────────────────────────────────────────────────
 
-func wireIntegrations(canvas *pb.Canvas, mappings map[string]IntegrationMapping, reg *registry.Registry) {
+func wireIntegrations(canvas *yaml.Canvas, mappings map[string]IntegrationMapping, reg *registry.Registry) {
 	if canvas.Spec == nil || len(mappings) == 0 {
 		return
 	}
 
 	componentToIntegration := buildComponentIntegrationMap(reg)
 
-	for _, node := range canvas.Spec.Nodes {
+	newNodes := make([]yaml.Node, len(canvas.Nodes()))
+	for i, node := range canvas.Spec.Nodes {
+		n := node
 		integrationName := componentToIntegration[node.Component]
 		mapping, ok := mappings[integrationName]
 		if !ok {
+			newNodes[i] = n
 			continue
 		}
 
-		node.Integration = &componentpb.IntegrationRef{
-			Id:   &mapping.ID,
-			Name: &mapping.Name,
-		}
+		n.IntegrationID = &mapping.ID
+		newNodes[i] = n
 	}
+
+	canvas.Spec.Nodes = newNodes
 }
 
 func buildComponentIntegrationMap(reg *registry.Registry) map[string]string {
