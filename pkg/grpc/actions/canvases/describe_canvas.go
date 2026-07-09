@@ -63,11 +63,13 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		Canvas: proto,
 	}
 
-	// The preference is auxiliary data (pin/star/last visited tab); a failure
-	// to load it must not prevent the canvas itself from being described.
+	// A missing preference must reliably mean "the user has no stored
+	// preference": the client uses it to decide whether writing a default tab
+	// is safe. Swallowing a load failure here would make the client overwrite
+	// a preference that actually exists.
 	preference, err := loadUserCanvasPreference(db, orgID, userID, canvasID)
 	if err != nil {
-		log.Errorf("failed to load canvas preference for canvas %s: %v", canvas.ID.String(), err)
+		return nil, grpcerrors.Internal(err, "failed to load canvas preference")
 	}
 	if preference != nil {
 		response.Preference = serializeCanvasPreference(preference)

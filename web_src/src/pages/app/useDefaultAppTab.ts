@@ -27,7 +27,7 @@ function urlViewFlagsToTab(flags: UrlViewFlags): AppTabId | null {
   return "canvas";
 }
 
-type ConsoleQueryLike = Pick<UseQueryResult<CanvasConsoleData | undefined>, "data" | "isPending" | "isLoading">;
+type ConsoleQueryLike = Pick<UseQueryResult<CanvasConsoleData | undefined>, "data" | "isSuccess">;
 
 type SetSearchParams = (
   next: URLSearchParams | ((prev: URLSearchParams) => URLSearchParams),
@@ -60,6 +60,10 @@ export function useDefaultAppTab({
 }: UseDefaultAppTabOptions) {
   const preferenceQuery = useCanvasPreference(organizationId ?? "", canvasId ?? "");
   const updatePreferenceMutation = useUpdateCanvasPreference(organizationId ?? "");
+  // `mutate` is referentially stable, unlike the mutation result object, so
+  // depending on it keeps the record effect from re-running on every mutation
+  // state change (which could turn a failed write into a retry loop).
+  const recordTab = updatePreferenceMutation.mutate;
 
   const currentTab = urlViewFlagsToTab(urlViewFlags);
   const lastRecordedTabRef = useRef<AppTabId | null>(null);
@@ -116,6 +120,13 @@ export function useDefaultAppTab({
 
     if (preferenceQuery.isPending) return;
 
+    // A failed preference load leaves the stored tab unknown; redirecting
+    // (including the Console fallback) could contradict it. Stay put.
+    if (preferenceQuery.isError) {
+      redirectResolvedRef.current = true;
+      return;
+    }
+
     const storedTab = preferenceQuery.data?.lastVisitedTab;
     if (isAppTabId(storedTab)) {
       redirectResolvedRef.current = true;
@@ -134,7 +145,11 @@ export function useDefaultAppTab({
       redirectResolvedRef.current = true;
       return;
     }
-    if (consoleQuery.isPending || consoleQuery.isLoading) return;
+    // Only a successful console read can settle the fallback: resolving on a
+    // failed fetch would lock in Canvas even if a retry later shows panels.
+    // While we wait, an explicit tab switch still resolves the redirect via
+    // the user-choice branch above.
+    if (!consoleQuery.isSuccess) return;
 
     redirectResolvedRef.current = true;
     const panels = consoleQuery.data?.panels ?? [];
@@ -147,6 +162,7 @@ export function useDefaultAppTab({
     canvasId,
     currentTab,
     preferenceQuery.isPending,
+    preferenceQuery.isError,
     preferenceQuery.data,
     consoleQuery,
     setSearchParams,
@@ -160,6 +176,11 @@ export function useDefaultAppTab({
       return;
     }
     if (!redirectResolvedRef.current) return;
+
+    // Recording requires knowing the stored tab: a preference query that is
+    // still loading or failed reports no data, which is indistinguishable
+    // from "no stored tab", and writing then could overwrite a real one.
+    if (!preferenceQuery.isSuccess) return;
 
     // Closing run inspection lands on a tab the user did not actively pick;
     // adopt it as the recording baseline without overwriting the stored tab.
@@ -188,8 +209,20 @@ export function useDefaultAppTab({
     }
 
     lastRecordedTabRef.current = currentTab;
-    updatePreferenceMutation.mutate({ canvasId, lastVisitedTab: currentTab });
-  }, [canvasId, currentTab, organizationId, preferenceQuery.data, updatePreferenceMutation]);
+    recordTab(
+      { canvasId, lastVisitedTab: currentTab },
+      {
+        onError: () => {
+          // Treating a failed write as recorded would suppress every retry
+          // until the user switches tabs again; clearing the guard lets the
+          // next effect run re-attempt the write.
+          if (lastRecordedTabRef.current === currentTab) {
+            lastRecordedTabRef.current = null;
+          }
+        },
+      },
+    );
+  }, [canvasId, currentTab, organizationId, preferenceQuery.data, preferenceQuery.isSuccess, recordTab]);
 }
 
 function applyTabToSearchParams(tab: AppTabId, setSearchParams: SetSearchParams) {
