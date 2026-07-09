@@ -35,6 +35,14 @@ interface NodeRunConfirmDialogProps {
    * any failure via a toast — the dialog does not stay open on error.
    */
   onConfirm: (parameters: Record<string, unknown>) => void;
+  /**
+   * Disables the submit button — wire the caller's run-button `disabled`
+   * signal here so a dialog left open while a run starts elsewhere (or a
+   * submission is already in flight) cannot confirm a duplicate run.
+   */
+  confirmDisabled?: boolean;
+  /** Tooltip explaining a disabled submit button. */
+  confirmDisabledTitle?: string;
   /** Test id prefix; falls back to a stable default. */
   testId?: string;
 }
@@ -58,6 +66,8 @@ export function NodeRunConfirmDialog({
   resolved,
   templateName,
   onConfirm,
+  confirmDisabled = false,
+  confirmDisabledTitle,
   testId = "node-run-confirm",
 }: NodeRunConfirmDialogProps) {
   const template = useMemo(() => resolveStartTemplate(resolved?.node, templateName), [resolved?.node, templateName]);
@@ -140,7 +150,8 @@ export function NodeRunConfirmDialog({
             type="button"
             size="xs"
             onClick={handleConfirm}
-            disabled={!template || !resolved?.node?.id}
+            disabled={!template || !resolved?.node?.id || confirmDisabled}
+            title={confirmDisabled ? confirmDisabledTitle : undefined}
             data-testid={`${testId}-submit`}
           >
             Run
