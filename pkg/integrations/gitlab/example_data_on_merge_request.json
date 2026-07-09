@@ -29,7 +29,13 @@
       "title": "Add merge request trigger",
       "description": "Adds support for additional GitLab webhook trigger types.",
       "state": "opened",
-      "action": "open"
+      "action": "open",
+      "source_branch": "feature/merge-request-trigger",
+      "target_branch": "main",
+      "merge_status": "can_be_merged",
+      "work_in_progress": false,
+      "draft": false,
+      "url": "https://gitlab.example.com/group/example/-/merge_requests/12"
     },
     "changes": {
       "title": {
