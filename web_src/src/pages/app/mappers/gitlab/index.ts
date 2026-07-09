@@ -2,6 +2,7 @@ import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from ".
 import { buildActionStateRegistry } from "../utils";
 import { createIssueMapper } from "./create_issue";
 import { onIssueTriggerRenderer } from "./on_issue";
+import { onMergeCommentTriggerRenderer } from "./on_merge_comment";
 import { onMergeRequestTriggerRenderer } from "./on_merge_request";
 import { onMilestoneTriggerRenderer } from "./on_milestone";
 import { onPipelineTriggerRenderer } from "./on_pipeline";
@@ -29,6 +30,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onIssue: onIssueTriggerRenderer,
+  onMergeComment: onMergeCommentTriggerRenderer,
   onMergeRequest: onMergeRequestTriggerRenderer,
   onMilestone: onMilestoneTriggerRenderer,
   onPipeline: onPipelineTriggerRenderer,
