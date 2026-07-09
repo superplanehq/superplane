@@ -1,6 +1,8 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { buildActionStateRegistry } from "../utils";
+import { addReactionMapper } from "./add_reaction";
 import { createIssueMapper } from "./create_issue";
+import { createMergeCommentMapper } from "./create_merge_comment";
 import { onIssueTriggerRenderer } from "./on_issue";
 import { onMergeRequestTriggerRenderer } from "./on_merge_request";
 import { onMilestoneTriggerRenderer } from "./on_milestone";
@@ -17,6 +19,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getPipeline: buildActionStateRegistry("retrieved"),
   getLatestPipeline: buildActionStateRegistry("retrieved"),
   getTestReportSummary: buildActionStateRegistry("retrieved"),
+  createMergeComment: buildActionStateRegistry("created"),
+  addReaction: buildActionStateRegistry("added"),
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -25,6 +29,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getPipeline: pipelineLookupMapper,
   getLatestPipeline: pipelineLookupMapper,
   getTestReportSummary: testReportSummaryMapper,
+  createMergeComment: createMergeCommentMapper,
+  addReaction: addReactionMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
