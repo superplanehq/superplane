@@ -115,7 +115,9 @@ spec:
 	require.Contains(t, stdout.String(), "Committed version: version-1")
 	require.Contains(t, stagedBody, "canvas.yaml")
 	require.Contains(t, stagedBody, "README.md")
-	require.Contains(t, decodeStagingPayload(t, stagedBody), "id: canvas-1")
+	stagedCanvasYAML := decodeStagingPayload(t, stagedBody)
+	require.Contains(t, stagedCanvasYAML, "name: Source Name")
+	require.NotContains(t, stagedCanvasYAML, "id:")
 	require.Contains(t, commitBody, `Create \"My App\"`)
 }
 

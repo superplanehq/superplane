@@ -184,6 +184,10 @@ func CanvasFromYAML(raw []byte) (*Canvas, error) {
 		return nil, fmt.Errorf("invalid canvas yaml: %w", err)
 	}
 
+	if resource.Spec == nil {
+		return nil, errors.New("canvas yaml must include a spec block")
+	}
+
 	return &resource, nil
 }
 

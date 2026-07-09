@@ -8,7 +8,6 @@ import (
 
 	"github.com/nulab/autog"
 	"github.com/nulab/autog/graph"
-	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
@@ -67,7 +66,7 @@ func applyHorizontalLayout(nodes []N, edges []E, layout *AutoLayout) ([]N, error
 	flowNodeIDs := make([]string, 0, len(nodes))
 	flowNodeSet := make(map[string]struct{}, len(nodes))
 	for i, node := range nodes {
-		if node.ID == "" || node.Type == models.NodeTypeWidget {
+		if node.ID == "" {
 			continue
 		}
 

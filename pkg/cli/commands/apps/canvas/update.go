@@ -23,6 +23,10 @@ type updateCommand struct {
 }
 
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
+	if len(ctx.Args) > 1 {
+		return fmt.Errorf("update accepts at most one positional argument")
+	}
+
 	filePath := ""
 	if c.file != nil {
 		filePath = *c.file
@@ -31,7 +35,12 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("canvas file is required")
 	}
 
-	canvasID, err := common.ResolveAppNameOrIDArg(ctx, filePath)
+	appArg := ""
+	if len(ctx.Args) == 1 {
+		appArg = strings.TrimSpace(ctx.Args[0])
+	}
+
+	canvasID, err := common.ResolveAppNameOrIDArg(ctx, appArg)
 	if err != nil {
 		return err
 	}
@@ -167,6 +176,9 @@ func (c *updateCommand) applyLayout(ctx core.CommandContext, resource *appyaml.C
 
 	nodes := []layout.N{}
 	for _, node := range resource.Spec.Nodes {
+		if node.Type == appyaml.NodeTypeWidget {
+			continue
+		}
 		nodes = append(nodes, layout.N{
 			ID:       node.ID,
 			Type:     node.Type,

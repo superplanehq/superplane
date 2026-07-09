@@ -527,8 +527,8 @@ func TestCanvasVersionToConsoleYML_RoundTripsEmptyDashboard(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "apiVersion: v1")
 	assert.Contains(t, string(out), "kind: Console")
-	assert.Contains(t, string(out), canvasID.String())
-	assert.Contains(t, string(out), "name: Canvas Name")
+	assert.NotContains(t, string(out), canvasID.String())
+	assert.NotContains(t, string(out), "name: Canvas Name")
 
 	parsed, err := ConsoleFromYML([]byte(out))
 	require.NoError(t, err)

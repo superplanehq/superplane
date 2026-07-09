@@ -173,6 +173,9 @@ func (a patchStagingAction) applyPatchToStagedCanvas(
 
 	nodes := []layout.N{}
 	for _, node := range patched.Nodes {
+		if node.Type == models.NodeTypeWidget {
+			continue
+		}
 		nodes = append(nodes, layout.N{
 			ID:       node.ID,
 			Type:     node.Type,

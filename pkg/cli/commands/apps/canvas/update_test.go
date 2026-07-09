@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/layout"
+	appyaml "github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support/cli"
 )
 
@@ -106,7 +107,9 @@ func TestUpdateWithoutMessageReturnsError(t *testing.T) {
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 	filePath := writeTestCanvasFileWithMetadataID(t, "needs-message", canvasID)
 	file := filePath
-	ctx, _ := cli.NewCommandContext(t, newAPITestServer(t).server, "text")
+	ctx, _ := cli.NewCommandContextWithConfig(t, newAPITestServer(t).server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
 
 	err := (&updateCommand{file: &file}).Execute(ctx)
 	require.Error(t, err)
@@ -163,7 +166,9 @@ func TestUpdateFromFileWhenCommitFailsReturnsWrappedError(t *testing.T) {
 	filePath := writeTestCanvasFileWithMetadataID(t, "pub-fail", canvasID)
 	file := filePath
 	message := "Update canvas"
-	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+	ctx, _ := cli.NewCommandContextWithConfig(t, server.server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
 
 	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
 	require.Error(t, err)
@@ -194,7 +199,9 @@ func TestUpdateFromFileWhenStageFailsReturnsError(t *testing.T) {
 	filePath := writeTestCanvasFileWithMetadataID(t, "put-fail", canvasID)
 	file := filePath
 	message := "Update canvas"
-	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+	ctx, _ := cli.NewCommandContextWithConfig(t, server.server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
 
 	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
 	require.Error(t, err)
@@ -227,7 +234,9 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 
 	file := filePath
 	message := "Update canvas"
-	ctx, stdout := cli.NewCommandContext(t, server.server, "text")
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server.server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
 
 	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
 	require.NoError(t, err)
@@ -252,4 +261,95 @@ func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {
 	if len(autoLayout.NodeIDs) != 0 {
 		t.Fatalf("expected no node ids for default full-canvas strategy, got %v", autoLayout.NodeIDs)
 	}
+}
+
+func TestUpdateUsesActiveAppWhenNoArg(t *testing.T) {
+	t.Helper()
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	server := newAPITestServer(
+		t,
+		expectStageCanvasYAML(canvasID),
+		expectCommitStaging(canvasID, "version-1"),
+		expectFetchCanvasYAML(canvasID, "version-1", "apiVersion: v1\nkind: Canvas\nmetadata:\n  id: "+canvasID+"\n  name: active\nspec:\n  nodes: []\n  edges: []\n"),
+	)
+
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "active")
+	file := filePath
+	message := "Update canvas"
+	ctx, _ := cli.NewCommandContextWithConfig(t, server.server, "text", &cli.FakeConfig{
+		ActiveApp: canvasID,
+	})
+
+	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
+	require.NoError(t, err)
+
+	server.AssertCalls(t, []string{
+		http.MethodPut + " " + stagingPath(canvasID),
+		http.MethodPost + " " + stagingPath(canvasID) + "/commit",
+		http.MethodGet + " " + repositoryCanvasFilePath(canvasID),
+	})
+}
+
+func TestUpdateUsesPositionalArg(t *testing.T) {
+	t.Helper()
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	server := newAPITestServer(
+		t,
+		expectStageCanvasYAML(canvasID),
+		expectCommitStaging(canvasID, "version-1"),
+		expectFetchCanvasYAML(canvasID, "version-1", "apiVersion: v1\nkind: Canvas\nmetadata:\n  id: "+canvasID+"\n  name: explicit\nspec:\n  nodes: []\n  edges: []\n"),
+	)
+
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "explicit")
+	file := filePath
+	message := "Update canvas"
+	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+	ctx.Args = []string{canvasID}
+
+	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
+	require.NoError(t, err)
+
+	server.AssertCalls(t, []string{
+		http.MethodPut + " " + stagingPath(canvasID),
+		http.MethodPost + " " + stagingPath(canvasID) + "/commit",
+		http.MethodGet + " " + repositoryCanvasFilePath(canvasID),
+	})
+}
+
+func TestUpdateErrorsWhenNoAppAndNoActive(t *testing.T) {
+	server := newAPITestServer(t)
+	filePath := writeTestCanvasFileWithoutMetadataID(t, "no-app")
+	file := filePath
+	message := "Update canvas"
+	ctx, _ := cli.NewCommandContext(t, server.server, "text")
+
+	err := (&updateCommand{file: &file, message: &message}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "app-name-or-id")
+}
+
+func TestApplyLayoutDoesNotRepositionWidgetNodes(t *testing.T) {
+	const widgetY = 999
+	resource := &appyaml.Canvas{
+		Spec: &appyaml.CanvasSpec{
+			Nodes: []appyaml.Node{
+				{ID: "flow-1", Type: appyaml.NodeTypeComponent, Component: "noop", Position: appyaml.Position{X: 10, Y: 10}},
+				{ID: "flow-2", Type: appyaml.NodeTypeComponent, Component: "noop", Position: appyaml.Position{X: 300, Y: 10}},
+				{ID: "widget-1", Type: appyaml.NodeTypeWidget, Component: "note", Position: appyaml.Position{X: 100, Y: widgetY}},
+			},
+			Edges: []appyaml.Edge{
+				{SourceID: "flow-1", TargetID: "flow-2", Channel: "default"},
+			},
+		},
+	}
+
+	ctx, _ := cli.NewCommandContext(t, nil, "text")
+	updated, err := (&updateCommand{}).applyLayout(ctx, resource)
+	require.NoError(t, err)
+
+	widgetNode := updated.Spec.Nodes[2]
+	require.Equal(t, appyaml.NodeTypeWidget, widgetNode.Type)
+	require.Equal(t, widgetY, widgetNode.Position.Y)
 }

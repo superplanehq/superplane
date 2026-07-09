@@ -170,21 +170,21 @@ func VersionToConsoleYML(canvasName string, canvasVersion *models.CanvasVersion)
 	return buf.String(), nil
 }
 
-func (d *Console) Validate() error {
-	if d.APIVersion == "" {
+func (c *Console) Validate() error {
+	if c.APIVersion == "" {
 		return errors.New("apiVersion is required")
 	}
-	if d.APIVersion != APIVersion {
-		return fmt.Errorf("unsupported apiVersion %q (expected %q)", d.APIVersion, APIVersion)
+	if c.APIVersion != APIVersion {
+		return fmt.Errorf("unsupported apiVersion %q (expected %q)", c.APIVersion, APIVersion)
 	}
-	if d.Kind == "" {
+	if c.Kind == "" {
 		return errors.New("kind is required")
 	}
-	if d.Kind != KindConsole {
-		return fmt.Errorf("unsupported kind %q (expected %q)", d.Kind, KindConsole)
+	if c.Kind != KindConsole {
+		return fmt.Errorf("unsupported kind %q (expected %q)", c.Kind, KindConsole)
 	}
 
-	return ValidateConsoleContent(d.Spec.Panels, d.Spec.Layout)
+	return ValidateConsoleContent(c.Spec.Panels, c.Spec.Layout)
 }
 
 func ValidateConsoleContent(panels []ConsolePanel, layout []ConsoleLayoutItem) error {
