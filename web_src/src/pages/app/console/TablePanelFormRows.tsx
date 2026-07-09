@@ -28,6 +28,7 @@ const COLUMN_FORMATS: WidgetColumnFormat[] = [
   "badge",
   "code",
   "link",
+  "avatar",
 ];
 
 export function ColumnRow({

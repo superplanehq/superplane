@@ -218,10 +218,10 @@ export const prRiskChecksTableRender: WidgetTableRender = {
       format: "link",
       href: "https://github.com/{repository}/pull/{pr_number}",
     },
-    { field: "author", label: "Author" },
+    { field: "author", label: "Author", format: "avatar" },
     { field: '{{ string(int(risk_score)) + "/100" }}', label: "Risk" },
     { field: "risk_level", label: "Level", format: "status" },
-    { field: "last_checked_at", label: "Last check", format: "relative" },
+    { field: "last_checked_at", label: "When", format: "relative" },
   ],
   rowActions: [
     {

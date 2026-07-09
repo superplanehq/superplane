@@ -4,6 +4,7 @@ import { Hash, Loader2 } from "lucide-react";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
 import { WidgetEmptyState } from "../WidgetEmptyState";
+import { CONSOLE_WIDGET_LABEL_CLASSES } from "../consoleTableStyles";
 
 import { aggregateNumber, aggregateNumberPerSource, applyFilters, combinePartials } from "./widgetData";
 import { formatValue } from "./widgetFormat";
@@ -120,7 +121,7 @@ function NumberDisplay({ render, value, sparkline, variant }: NumberDisplayProps
   return (
     <div className={className} data-testid="widget-number">
       {render.label ? (
-        <span className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-gray-400">
+        <span className={CONSOLE_WIDGET_LABEL_CLASSES} data-testid="widget-number-label">
           {render.label}
         </span>
       ) : null}
@@ -165,7 +166,7 @@ function Sparkline({ values }: { values: number[] }) {
     <svg
       width={width}
       height={height}
-      className="block text-sky-500 dark:text-gray-400"
+      className="block text-sky-500 dark:text-indigo-400"
       viewBox={`0 0 ${width} ${height}`}
       aria-hidden
     >

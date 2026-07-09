@@ -2,11 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { AppPage } from "./index";
 import { AppPageHarness } from "./__fixtures__/AppPageHarness";
-import docsReviewerFixture from "./__fixtures__/console/docsReviewer.json";
-import prRiskReviewFixture from "./__fixtures__/console/prRiskReview.json";
-import superplaneReleaseFixture from "./__fixtures__/console/superplaneRelease.json";
-import superplaneSaasFixture from "./__fixtures__/console/superplaneSaas.json";
-import type { CanvasAppFixture } from "./__fixtures__/handlers";
+import { consoleFixtures } from "./__fixtures__/consoleFixtures";
 
 /**
  * Full-`AppPage` stories that render the **console tab** of four production
@@ -41,13 +37,7 @@ type Story = StoryObj<typeof meta>;
 
 const consoleQuery = "view=console";
 
-// The canvasAppResponses.json fixture is typed loosely (unknown[]) because it
-// captures raw API bodies verbatim; cast each imported JSON to the shared
-// fixture interface so TypeScript checks the fields we actually read.
-const superplaneSaas = superplaneSaasFixture as CanvasAppFixture;
-const prRiskReview = prRiskReviewFixture as CanvasAppFixture;
-const docsReviewer = docsReviewerFixture as CanvasAppFixture;
-const superplaneRelease = superplaneReleaseFixture as CanvasAppFixture;
+const { superplaneSaas, prRiskReview, docsReviewer, superplaneRelease } = consoleFixtures;
 
 /**
  * SuperPlane SaaS — production deployment pipeline console.

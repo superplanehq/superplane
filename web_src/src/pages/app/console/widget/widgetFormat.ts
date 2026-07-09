@@ -28,6 +28,7 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case "code":
     case "text":
     case "link":
+    case "avatar":
     case undefined:
       return String(value);
     default:
@@ -50,16 +51,17 @@ function formatPercent(value: unknown): string {
 }
 
 function formatRelative(value: unknown): string {
+  const format = (iso: string) => formatRelativeTime(iso, true).replace(" ago", "");
   if (typeof value === "string" && value.trim() !== "") {
     const parsed = Date.parse(value);
     if (Number.isFinite(parsed)) {
-      return formatRelativeTime(new Date(parsed).toISOString(), true);
+      return format(new Date(parsed).toISOString());
     }
   }
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return String(value ?? "");
   const ms = n > 1e12 ? n : n * 1000;
-  return formatRelativeTime(new Date(ms).toISOString(), true);
+  return format(new Date(ms).toISOString());
 }
 
 function formatDate(value: unknown, includeTime: boolean): string {

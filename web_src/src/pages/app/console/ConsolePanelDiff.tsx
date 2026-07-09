@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { DraftConsoleDiffItem } from "../draftConsoleDiff";
 import type { DraftDiffStatus } from "../draftNodeDiff";
 import { UnifiedDiffView } from "../UnifiedDiffView";
+import { consoleBadgeClassName } from "./consoleBadgeStyles";
 import { PANEL_DIFF_BADGE } from "./consolePanelDiffPresentation";
 
 export function ConsolePanelDiffBadge({
@@ -23,8 +24,8 @@ export function ConsolePanelDiffBadge({
       aria-label={`See ${panelTitle} diff`}
       title={`See ${panelTitle} diff`}
       className={cn(
-        "console-grid-no-drag absolute bottom-2 left-2 z-10 inline-flex w-fit max-w-max items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-sm outline-none hover:brightness-95 focus-visible:ring-2",
-        badge.className,
+        "console-grid-no-drag absolute bottom-2 left-2 z-10 inline-flex w-fit max-w-max items-center gap-1 whitespace-nowrap shadow-sm outline-none hover:brightness-95 focus-visible:ring-2",
+        consoleBadgeClassName(badge.label, badge.colorClass),
       )}
       onClick={(event) => {
         event.stopPropagation();
