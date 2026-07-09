@@ -34,14 +34,42 @@ func (m *OnMergeRequest) Description() string {
 func (m *OnMergeRequest) Documentation() string {
 	return `The On Merge Request trigger starts a workflow execution when merge request events occur in a GitLab project.
 
+## Use Cases
+
+- **MR automation**: Automate actions when merge requests are opened, merged, or closed
+- **Code review workflows**: Trigger review processes or notifications
+- **CI/CD integration**: Run tests, builds, or preview environments on merge request events
+- **Status updates**: Update systems when merge request status changes
+
 ## Configuration
 
 - **Project** (required): GitLab project to monitor
-- **Actions** (required): Select which merge request actions to listen for (open, close, merge, etc.). Default: open.
+- **Actions** (required): Select which merge request actions to listen for (open, close, reopen, update, approved, merge, etc.). Default: open.
 
-## Outputs
+## Event Data
 
-- **Default channel**: Emits merge request payload data with action, project, and object attributes`
+Each merge request event includes:
+- **object_attributes**: Complete merge request information including title, description, state, action, source/target branches, and URL
+- **changes**: When the merge request is updated, includes what changed (title, description, labels, etc.)
+- **assignees**: Users assigned to the merge request
+- **reviewers**: Users requested to review the merge request
+- **labels**: Labels applied to the merge request
+- **project**: Project information
+- **repository**: Repository information
+- **user**: User who triggered the event
+
+Common expression paths:
+- Merge request IID: ` + "`root().data.object_attributes.iid`" + `
+- Merge request title: ` + "`root().data.object_attributes.title`" + `
+- Action: ` + "`root().data.object_attributes.action`" + `
+- State: ` + "`root().data.object_attributes.state`" + `
+- Source branch: ` + "`root().data.object_attributes.source_branch`" + `
+- Target branch: ` + "`root().data.object_attributes.target_branch`" + `
+- Merge request URL: ` + "`root().data.object_attributes.url`" + `
+
+## Webhook Setup
+
+This trigger automatically sets up a GitLab webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
 }
 
 func (m *OnMergeRequest) Icon() string {
