@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
-import { resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
+import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
 
 function execution(overrides: Partial<CanvasesCanvasNodeExecution>): CanvasesCanvasNodeExecution {
   return overrides as CanvasesCanvasNodeExecution;
@@ -43,5 +44,21 @@ describe("resolveRunLookupEventForNodeActivity", () => {
       kind: "trigger",
       nodeId: "trigger-1",
     });
+  });
+
+  it("resolves cached runs from the current node activity store", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore
+      .getState()
+      .updateNodeExecution(
+        "action-1",
+        execution({ id: "latest-execution", nodeId: "action-1", createdAt: "2026-07-07T10:20:00Z" }),
+      );
+
+    const runId = resolveCachedNodeRunId("action-1", { id: "action-1", type: "TYPE_ACTION" }, (event) =>
+      event.executionId === "latest-execution" ? "run-from-latest-execution" : null,
+    );
+
+    expect(runId).toBe("run-from-latest-execution");
   });
 });
