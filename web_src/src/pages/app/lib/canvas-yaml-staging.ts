@@ -88,18 +88,7 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
 
   return {
     nodes: (spec.nodes ?? []).map(normalizeCanvasYamlNode),
-    edges: (spec.edges ?? []).map(normalizeCanvasYamlEdge),
-  };
-}
-
-function normalizeCanvasYamlEdge(edge: ComponentsEdge): ComponentsEdge {
-  const raw = edge as ComponentsEdge & { source_id?: string; target_id?: string };
-  const { source_id: sourceIdSnake, target_id: targetIdSnake, ...rest } = raw;
-  return {
-    ...rest,
-    sourceId: edge.sourceId || sourceIdSnake || "",
-    targetId: edge.targetId || targetIdSnake || "",
-    channel: edge.channel || "default",
+    edges: spec.edges ?? [],
   };
 }
 
@@ -162,7 +151,7 @@ export function buildCanvasYamlFromWorkflow(workflow: CanvasesCanvas): string {
     },
     spec: {
       nodes: (workflow.spec?.nodes ?? []).map(normalizeCanvasYamlNode),
-      edges: (workflow.spec?.edges ?? []).map(normalizeCanvasYamlEdge),
+      edges: workflow.spec?.edges ?? [],
     },
   };
 
