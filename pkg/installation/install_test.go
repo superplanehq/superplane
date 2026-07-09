@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 func TestFetchRawCanvasFile(t *testing.T) {
@@ -85,20 +85,6 @@ func TestFetchRawCanvasFile(t *testing.T) {
 }
 
 func TestWireIntegrations(t *testing.T) {
-	t.Run("sets integration ref on nodes", func(t *testing.T) {
-		id := "int-123"
-		name := "my-do"
-		nodeA := &componentpb.Node{Component: "digitalocean.createDroplet"}
-		nodeB := &componentpb.Node{Component: "start"}
-
-		// wireIntegrations needs a registry to match components to integration names.
-		// Without a real registry, verify the proto manipulation directly.
-		nodeA.Integration = &componentpb.IntegrationRef{Id: &id, Name: &name}
-
-		assert.Equal(t, "int-123", *nodeA.Integration.Id)
-		assert.Equal(t, "my-do", *nodeA.Integration.Name)
-		assert.Nil(t, nodeB.Integration)
-	})
 
 	t.Run("skips nodes without component", func(t *testing.T) {
 		node := &componentpb.Node{Component: ""}
@@ -107,7 +93,7 @@ func TestWireIntegrations(t *testing.T) {
 	})
 
 	t.Run("skips nil spec", func(t *testing.T) {
-		canvas := &pb.Canvas{}
+		canvas := &yaml.Canvas{}
 		// Should not panic
 		wireIntegrations(canvas, map[string]IntegrationMapping{"test": {ID: "1", Name: "t"}}, nil)
 		assert.Nil(t, canvas.Spec)

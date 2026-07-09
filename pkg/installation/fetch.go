@@ -6,12 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
-	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
-	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 const (
@@ -59,42 +56,13 @@ func fetchRawCanvasFile(repo *Repository) ([]byte, string, error) {
 	return body, repo.Ref, nil
 }
 
-// FetchCanvas loads and parses canvas.yaml from a public GitHub repository.
-func FetchCanvas(repo *Repository) (*pb.Canvas, string, error) {
-	if repo.Ref == "" {
-		var lastErr error
-		for _, ref := range defaultRefs {
-			canvas, err := fetchCanvasAtRef(repo, ref)
-			if err == nil {
-				repo.Ref = ref
-				return canvas, ref, nil
-			}
-
-			lastErr = err
-		}
-
-		if lastErr != nil && strings.Contains(lastErr.Error(), "not found") {
-			return nil, "", fmt.Errorf("canvas.yaml not found on main or master branch")
-		}
-
-		if lastErr != nil {
-			return nil, "", lastErr
-		}
-
-		return nil, "", fmt.Errorf("canvas.yaml not found on main or master branch")
-	}
-
-	canvas, err := fetchCanvasAtRef(repo, repo.Ref)
-	return canvas, repo.Ref, err
-}
-
-func fetchCanvasAtRef(repo *Repository, ref string) (*pb.Canvas, error) {
+func fetchCanvasAtRef(repo *Repository, ref string) (*yaml.Canvas, error) {
 	body, err := fetchURL(rawFileURL(repo, ref, canvasFileName))
 	if err != nil {
 		return nil, err
 	}
 
-	return parseCanvasYAML(body)
+	return yaml.CanvasFromYAML(body)
 }
 
 // FetchConsole loads and parses an optional console.yaml from a public GitHub
@@ -104,7 +72,7 @@ func fetchCanvasAtRef(repo *Repository, ref string) (*pb.Canvas, error) {
 //
 // Callers must pass a non-empty ref. Resolve it via FetchCanvas first so the
 // canvas and console are read from the same commit.
-func FetchConsole(repo *Repository, ref string) (*models.ConsoleYAML, error) {
+func FetchConsole(repo *Repository, ref string) (*yaml.Console, error) {
 	if ref == "" {
 		return nil, fmt.Errorf("console fetch requires a resolved ref")
 	}
@@ -117,7 +85,7 @@ func FetchConsole(repo *Repository, ref string) (*models.ConsoleYAML, error) {
 		return nil, err
 	}
 
-	console, err := models.ConsoleFromYML(body)
+	console, err := yaml.ConsoleFromYML(body)
 	if err != nil {
 		return nil, fmt.Errorf("parse console yaml: %w", err)
 	}
@@ -165,15 +133,4 @@ func fetchURL(rawURL string) ([]byte, error) {
 	}
 
 	return body, nil
-}
-
-func parseCanvasYAML(data []byte) (*pb.Canvas, error) {
-	canvas, err := canvasyaml.ParseCanvasResource(data)
-	if err != nil {
-		return nil, err
-	}
-
-	canvas.Metadata.Id = ""
-
-	return canvas, nil
 }

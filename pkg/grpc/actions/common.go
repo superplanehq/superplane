@@ -3,10 +3,12 @@ package actions
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
@@ -16,9 +18,7 @@ import (
 	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	triggerpb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	widgetpb "github.com/superplanehq/superplane/pkg/protos/widgets"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/protobuf/types/known/structpb"
-	"slices"
 )
 
 func ValidateUUIDs(ids ...string) error {
@@ -843,93 +843,6 @@ func EdgesToProto(edges []models.Edge) []*componentpb.Edge {
 		}
 	}
 	return result
-}
-
-// FindShadowedNameWarnings detects nodes with duplicate names within connected components.
-// Only nodes that are connected (directly or transitively) and share the same name will be flagged.
-// Returns a map of node ID -> warning message.
-func FindShadowedNameWarnings(registry *registry.Registry, nodes []*componentpb.Node, edges []*componentpb.Edge) map[string]string {
-	warnings := make(map[string]string)
-
-	if len(nodes) == 0 {
-		return warnings
-	}
-
-	// Build maps for node names and IDs
-	nodeIDs := make(map[string]bool)
-	nodeNameByID := make(map[string]string)
-
-	for _, node := range nodes {
-		nodeType, err := registry.ComponentType(node.Component)
-		if err != nil {
-			continue
-		}
-
-		if nodeType == models.NodeTypeWidget {
-			continue // Skip widgets
-		}
-
-		nodeIDs[node.Id] = true
-		nodeNameByID[node.Id] = node.Name
-	}
-
-	// Find connected components using union-find
-	parent := make(map[string]string)
-	for id := range nodeIDs {
-		parent[id] = id
-	}
-
-	var find func(x string) string
-	find = func(x string) string {
-		if parent[x] != x {
-			parent[x] = find(parent[x])
-		}
-		return parent[x]
-	}
-
-	union := func(x, y string) {
-		px, py := find(x), find(y)
-		if px != py {
-			parent[px] = py
-		}
-	}
-
-	// Union nodes connected by edges
-	for _, edge := range edges {
-		if edge.SourceId != "" && edge.TargetId != "" {
-			// Only union if both nodes are tracked (non-widgets)
-			if nodeIDs[edge.SourceId] && nodeIDs[edge.TargetId] {
-				union(edge.SourceId, edge.TargetId)
-			}
-		}
-	}
-
-	// Group nodes by connected component
-	componentNodes := make(map[string][]string)
-	for id := range nodeIDs {
-		root := find(id)
-		componentNodes[root] = append(componentNodes[root], id)
-	}
-
-	// Check for shadowed names within each connected component
-	for _, nodeIDsInComponent := range componentNodes {
-		nameToIDs := make(map[string][]string)
-		for _, nodeID := range nodeIDsInComponent {
-			name := nodeNameByID[nodeID]
-			nameToIDs[name] = append(nameToIDs[name], nodeID)
-		}
-
-		for name, ids := range nameToIDs {
-			if len(ids) > 1 {
-				warningMsg := "Multiple components named \"" + name + "\""
-				for _, nodeID := range ids {
-					warnings[nodeID] = warningMsg
-				}
-			}
-		}
-	}
-
-	return warnings
 }
 
 func PositionToProto(position models.Position) *componentpb.Position {
