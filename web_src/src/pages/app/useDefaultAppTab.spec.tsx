@@ -61,15 +61,16 @@ function renderDefaultAppTab({
   canvasId?: string;
 } = {}) {
   const setSearchParams = vi.fn();
+  type HookProps = { urlViewFlags: UrlViewFlags; canvasId: string; searchParams?: URLSearchParams };
   const view = renderHook(
-    (props: { urlViewFlags: UrlViewFlags; canvasId: string }) =>
+    (props: HookProps) =>
       useDefaultAppTab({
         canvasId: props.canvasId,
         urlViewFlags: props.urlViewFlags,
-        searchParams,
+        searchParams: props.searchParams ?? searchParams,
         setSearchParams,
       }),
-    { initialProps: { urlViewFlags, canvasId } },
+    { initialProps: { urlViewFlags, canvasId } as HookProps },
   );
   return { ...view, setSearchParams };
 }
@@ -364,6 +365,66 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     expect(readLastVisitedAppTab("canvas-1")).toBe("canvas");
 
     // …so a later tab change is recorded without the user having to switch twice.
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
+
+    expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
+  });
+
+  it("yields the Console fallback to a node selection made while the console query was still loading", () => {
+    mockLiveConsoleQuery = consoleLoading();
+    const { rerender, setSearchParams } = renderDefaultAppTab();
+
+    // User opens a node on Canvas (no tab change) before the query resolves.
+    rerender({
+      urlViewFlags: CANVAS_FLAGS,
+      canvasId: "canvas-1",
+      searchParams: new URLSearchParams("node=node-1&sidebar=1"),
+    });
+
+    // The console query resolves late and would have redirected to Console —
+    // stripping the `node`/`sidebar` selection in the process.
+    mockLiveConsoleQuery = consoleLoaded([{ id: "p1", type: "markdown", content: {} }]);
+    rerender({
+      urlViewFlags: CANVAS_FLAGS,
+      canvasId: "canvas-1",
+      searchParams: new URLSearchParams("node=node-1&sidebar=1"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+  });
+
+  it("yields the Console fallback to a version preview opened while the console query was still loading", () => {
+    mockLiveConsoleQuery = consoleLoading();
+    const { rerender, setSearchParams } = renderDefaultAppTab();
+
+    rerender({
+      urlViewFlags: CANVAS_FLAGS,
+      canvasId: "canvas-1",
+      searchParams: new URLSearchParams("version=version-1"),
+    });
+
+    mockLiveConsoleQuery = consoleLoaded([{ id: "p1", type: "markdown", content: {} }]);
+    rerender({
+      urlViewFlags: CANVAS_FLAGS,
+      canvasId: "canvas-1",
+      searchParams: new URLSearchParams("version=version-1"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+  });
+
+  it("settles when a pinning param appears mid-resolution, so tab recording is not blocked", () => {
+    mockLiveConsoleQuery = consoleLoading();
+    const { rerender } = renderDefaultAppTab();
+
+    rerender({
+      urlViewFlags: CANVAS_FLAGS,
+      canvasId: "canvas-1",
+      searchParams: new URLSearchParams("node=node-1"),
+    });
+
+    // A later deliberate tab change is recorded even though the console query
+    // never resolved.
     rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
     expect(readLastVisitedAppTab("canvas-1")).toBe("memory");

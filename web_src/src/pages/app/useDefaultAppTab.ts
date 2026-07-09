@@ -123,6 +123,16 @@ export function useDefaultAppTab({ canvasId, urlViewFlags, searchParams, setSear
     if (redirectResolved) return;
     if (!canvasId) return;
 
+    // A pinning param can appear while the console read is still in flight
+    // (e.g. the user opens a node, a version preview, or an edit session on
+    // Canvas — none of which change the tab). Redirecting after that would
+    // pull the user away and strip the selection params, so settle without a
+    // redirect instead.
+    if (urlPinsNavigation(searchParams)) {
+      setRedirectResolved(true);
+      return;
+    }
+
     const storedTab = readLastVisitedAppTab(canvasId);
     const resolution = resolveDefaultTab({
       // The user already navigated to another tab while the Console fallback
@@ -149,7 +159,7 @@ export function useDefaultAppTab({ canvasId, urlViewFlags, searchParams, setSear
         () => pendingRedirectRef.current === redirect,
       );
     }
-  }, [redirectResolved, canvasId, currentTab, liveConsoleQuery, setSearchParams]);
+  }, [redirectResolved, canvasId, currentTab, liveConsoleQuery, searchParams, setSearchParams]);
 
   // Record tab changes to localStorage once the initial redirect has settled.
   useEffect(() => {
