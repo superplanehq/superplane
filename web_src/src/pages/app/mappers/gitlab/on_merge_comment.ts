@@ -5,24 +5,28 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import { buildGitlabSubtitle } from "./utils";
 import type { GitLabNodeMetadata } from "./types";
 
-interface OnMergeRequestConfiguration {
-  actions: string[];
+interface OnMergeCommentConfiguration {
+  contentFilter?: string;
 }
 
-interface MergeRequestObjectAttributes {
+interface MergeCommentObjectAttributes {
   id?: number;
-  iid?: number;
-  title?: string;
-  description?: string;
-  state?: string;
-  action?: string;
+  note?: string;
+  noteable_type?: string;
   url?: string;
 }
 
-interface OnMergeRequestEventData {
+interface OnMergeCommentEventData {
   object_kind?: string;
   event_type?: string;
-  object_attributes?: MergeRequestObjectAttributes;
+  object_attributes?: MergeCommentObjectAttributes;
+  merge_request?: {
+    id?: number;
+    iid?: number;
+    title?: string;
+    state?: string;
+    url?: string;
+  };
   user?: {
     id: number;
     name: string;
@@ -40,16 +44,25 @@ function formatReceivedAt(createdAt?: string): string {
   return createdAt ? new Date(createdAt).toLocaleString() : "-";
 }
 
-function mergeRequestEventTitle(eventData?: OnMergeRequestEventData): string {
-  const mr = eventData?.object_attributes;
-  return `!${mr?.iid ?? ""} - ${mr?.title || "Merge Request"}`;
+function mergeRequestRef(mr?: OnMergeCommentEventData["merge_request"]): string {
+  if (!mr?.iid) {
+    return "-";
+  }
+
+  return `!${mr.iid} - ${mr.title || ""}`;
 }
 
-function mergeRequestEventSubtitle(eventData?: OnMergeRequestEventData, createdAt?: string) {
-  return buildGitlabSubtitle(eventData?.object_attributes?.action || "", createdAt);
+function commentEventTitle(eventData?: OnMergeCommentEventData): string {
+  const mr = eventData?.merge_request;
+  return `!${mr?.iid ?? ""} - ${mr?.title || "Merge Comment"}`;
 }
 
-function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnMergeRequestConfiguration) {
+function commentEventSubtitle(eventData?: OnMergeCommentEventData, createdAt?: string) {
+  const author = eventData?.user?.username;
+  return buildGitlabSubtitle(author ? `By ${author}` : "", createdAt);
+}
+
+function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnMergeCommentConfiguration) {
   const metadataItems = [];
 
   if (metadata?.project?.name) {
@@ -59,44 +72,44 @@ function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnMer
     });
   }
 
-  if (configuration?.actions) {
+  if (configuration?.contentFilter) {
     metadataItems.push({
       icon: "funnel",
-      label: configuration.actions.join(", "),
+      label: `Filter: ${configuration.contentFilter}`,
     });
   }
 
   return metadataItems;
 }
 
-export const onMergeRequestTriggerRenderer: TriggerRenderer = {
+export const onMergeCommentTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
-    const eventData = context.event?.data as OnMergeRequestEventData;
+    const eventData = context.event?.data as OnMergeCommentEventData;
 
     return {
-      title: mergeRequestEventTitle(eventData),
-      subtitle: mergeRequestEventSubtitle(eventData, context.event?.createdAt),
+      title: commentEventTitle(eventData),
+      subtitle: commentEventSubtitle(eventData, context.event?.createdAt),
     };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnMergeRequestEventData;
-    const mr = eventData?.object_attributes;
+    const eventData = context.event?.data as OnMergeCommentEventData;
+    const comment = eventData?.object_attributes;
 
     return {
       "Received At": formatReceivedAt(context.event?.createdAt),
-      Title: mr?.title || "-",
-      URL: mr?.url || "-",
-      Action: mr?.action || "-",
-      State: mr?.state || "-",
+      Comment: comment?.note || "-",
+      "Comment URL": comment?.url || "-",
       Author: eventData?.user?.username || "-",
+      "Merge Request": mergeRequestRef(eventData?.merge_request),
+      Project: eventData?.project?.path_with_namespace || "-",
     };
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as GitLabNodeMetadata;
-    const configuration = node.configuration as unknown as OnMergeRequestConfiguration;
+    const configuration = node.configuration as unknown as OnMergeCommentConfiguration;
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
@@ -107,11 +120,11 @@ export const onMergeRequestTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnMergeRequestEventData;
+      const eventData = lastEvent.data as OnMergeCommentEventData;
 
       props.lastEventData = {
-        title: mergeRequestEventTitle(eventData),
-        subtitle: mergeRequestEventSubtitle(eventData, lastEvent.createdAt),
+        title: commentEventTitle(eventData),
+        subtitle: commentEventSubtitle(eventData, lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id!,
