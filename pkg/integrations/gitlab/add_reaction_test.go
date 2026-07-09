@@ -168,7 +168,7 @@ func Test__AddReaction__Execute(t *testing.T) {
 		require.Len(t, executionState.Payloads, 1)
 		payload := executionState.Payloads[0].(map[string]any)
 		assert.Equal(t, core.DefaultOutputChannel.Name, executionState.Channel)
-		assert.Equal(t, "gitlab.awardEmoji", executionState.Type)
+		assert.Equal(t, "gitlab.addReaction", executionState.Type)
 
 		var awardEmoji AwardEmoji
 		awardEmojiPayload := payload["data"]
@@ -213,7 +213,7 @@ func Test__AddReaction__Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, executionState.Payloads, 1)
-		assert.Equal(t, "gitlab.awardEmoji", executionState.Type)
+		assert.Equal(t, "gitlab.addReaction", executionState.Type)
 	})
 
 	t.Run("failure", func(t *testing.T) {

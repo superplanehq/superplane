@@ -18,5 +18,5 @@
     "noteable_type": "MergeRequest"
   },
   "timestamp": "2023-01-01T10:00:00.000Z",
-  "type": "gitlab.mergeRequestNote"
+  "type": "gitlab.createMergeComment"
 }

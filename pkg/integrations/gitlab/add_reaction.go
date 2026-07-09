@@ -224,7 +224,7 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"gitlab.awardEmoji",
+		"gitlab.addReaction",
 		[]any{awardEmoji},
 	)
 }

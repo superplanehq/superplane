@@ -154,7 +154,7 @@ func (c *CreateMergeComment) Execute(ctx core.ExecutionContext) error {
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"gitlab.mergeRequestNote",
+		"gitlab.createMergeComment",
 		[]any{note},
 	)
 }

@@ -15,5 +15,5 @@
     "awardable_id": 1
   },
   "timestamp": "2023-01-01T10:00:00.000Z",
-  "type": "gitlab.awardEmoji"
+  "type": "gitlab.addReaction"
 }

@@ -111,7 +111,7 @@ func Test__CreateMergeComment__Execute(t *testing.T) {
 		require.Len(t, executionState.Payloads, 1)
 		payload := executionState.Payloads[0].(map[string]any)
 		assert.Equal(t, core.DefaultOutputChannel.Name, executionState.Channel)
-		assert.Equal(t, "gitlab.mergeRequestNote", executionState.Type)
+		assert.Equal(t, "gitlab.createMergeComment", executionState.Type)
 
 		var note Note
 		notePayload := payload["data"]
