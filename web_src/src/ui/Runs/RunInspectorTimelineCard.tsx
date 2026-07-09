@@ -109,7 +109,7 @@ export function TimelineAccordionCard({
             </span>
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-3">
-            <JsonPayload value={actionPayload} jsonViewStyle={jsonViewStyle} />
+            <JsonPayload value={actionPayload} jsonViewStyle={jsonViewStyle} collapsed={false} />
           </div>
         </DialogContent>
       </Dialog>
@@ -154,11 +154,19 @@ export function HeaderIconButton({
   );
 }
 
-export function JsonPayload({ value, jsonViewStyle }: { value: unknown; jsonViewStyle: CSSProperties }) {
+export function JsonPayload({
+  value,
+  jsonViewStyle,
+  collapsed = 2,
+}: {
+  value: unknown;
+  jsonViewStyle: CSSProperties;
+  collapsed?: boolean | number;
+}) {
   return (
     <JsonView
       value={(value ?? {}) as object}
-      collapsed={2}
+      collapsed={collapsed}
       style={jsonViewStyle}
       className={jsonViewClassName}
       displayObjectSize={false}

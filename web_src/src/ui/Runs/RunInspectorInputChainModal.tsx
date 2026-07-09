@@ -137,7 +137,7 @@ function InputChainModal({
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-auto p-3">
-              <JsonPayload value={selected?.output} jsonViewStyle={jsonViewStyle} />
+              <JsonPayload value={selected?.output} jsonViewStyle={jsonViewStyle} collapsed={false} />
             </div>
           </div>
         </div>
