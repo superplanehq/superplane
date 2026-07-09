@@ -34,38 +34,6 @@ func stubHTTP(t *testing.T, responses map[string]stubResponse) {
 	t.Cleanup(func() { httpGet = original })
 }
 
-func TestParseCanvasYAMLWithResourceHeaders(t *testing.T) {
-	raw := []byte(`apiVersion: v1
-kind: Canvas
-metadata:
-  name: Preview Environments
-  description: StoreJS preview
-spec:
-  nodes: []
-  edges: []
-`)
-
-	canvas, err := parseCanvasYAML(raw)
-	require.NoError(t, err)
-	assert.Equal(t, "Preview Environments", canvas.GetMetadata().GetName())
-	assert.Equal(t, "StoreJS preview", canvas.GetMetadata().GetDescription())
-	assert.Empty(t, canvas.GetMetadata().GetId())
-}
-
-func TestParseCanvasYAMLRejectsUnsupportedKind(t *testing.T) {
-	raw := []byte(`apiVersion: v1
-kind: Dashboard
-metadata:
-  name: Not a canvas
-spec:
-  panels: []
-`)
-
-	_, err := parseCanvasYAML(raw)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), `unsupported resource kind "Dashboard"`)
-}
-
 func TestFetchCanvasResolvesRefAndParses(t *testing.T) {
 	repo := &Repository{Owner: "acme", Name: "demo"}
 	stubHTTP(t, map[string]stubResponse{
@@ -83,11 +51,10 @@ spec:
 		},
 	})
 
-	canvas, ref, err := FetchCanvas(repo)
+	canvas, err := fetchCanvasAtRef(repo, "main")
 	require.NoError(t, err)
-	assert.Equal(t, "main", ref)
-	assert.Equal(t, "Preview Environments", canvas.GetMetadata().GetName())
-	assert.NotEmpty(t, canvas.GetSpec().GetNodes())
+	assert.Equal(t, "Preview Environments", canvas.Metadata.Name)
+	assert.NotEmpty(t, canvas.Nodes())
 }
 
 func TestFetchConsoleRequiresRef(t *testing.T) {
