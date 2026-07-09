@@ -20,9 +20,15 @@ function urlViewFlagsToTab(flags: UrlViewFlags): AppTabId | null {
   return "canvas";
 }
 
-/** An explicit `view` or `run` param means there is no default tab to resolve. */
+// Query params that pin the URL to a destination: `view` and `run` select a
+// tab directly, while `version` (version preview) and `edit` (edit-session
+// entry) deep-link into the canvas view. A default-tab redirect would pull
+// the user away from any of them.
+const EXPLICIT_NAVIGATION_PARAMS = ["view", "run", "version", "edit"] as const;
+
+/** An explicit navigation param means there is no default tab to resolve. */
 function urlSelectsTabExplicitly(searchParams: URLSearchParams): boolean {
-  return (searchParams.get("view") ?? "") !== "" || (searchParams.get("run") ?? "") !== "";
+  return EXPLICIT_NAVIGATION_PARAMS.some((param) => (searchParams.get(param) ?? "") !== "");
 }
 
 type ConsoleQueryLike = Pick<UseQueryResult<CanvasConsoleData | undefined>, "data" | "isSuccess" | "isError">;

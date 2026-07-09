@@ -243,6 +243,40 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
 
+  it("skips the redirect when the URL deep-links to a version preview", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+
+    // A `?version=` link lands on the canvas view of that version; redirecting
+    // to the stored Console tab would pull the user off the previewed version.
+    const { setSearchParams } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("version=version-1"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+  });
+
+  it("skips the redirect when the URL requests an edit session", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+
+    // A `?edit=1` link enters an edit session on the canvas view; redirecting
+    // to the stored Console tab would break the edit-session entry.
+    const { setSearchParams } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("edit=1"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+  });
+
+  it("skips the Console fallback when the URL deep-links to a version preview", () => {
+    mockLiveConsoleQuery = consoleLoaded([{ id: "p1", type: "markdown", content: {} }]);
+
+    const { setSearchParams } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("version=version-1"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+  });
+
   it("applies the Console fallback once an in-flight console query succeeds", () => {
     mockLiveConsoleQuery = consoleLoading();
     const { rerender, setSearchParams } = renderDefaultAppTab();
