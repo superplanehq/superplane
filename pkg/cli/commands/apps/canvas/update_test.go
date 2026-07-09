@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/layout"
 	appyaml "github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support/cli"
+	"slices"
 )
 
 type requestExpectation struct {
@@ -335,8 +336,8 @@ func TestApplyLayoutDoesNotRepositionWidgetNodes(t *testing.T) {
 	resource := &appyaml.Canvas{
 		Spec: &appyaml.CanvasSpec{
 			Nodes: []appyaml.Node{
-				{ID: "flow-1", Type: appyaml.NodeTypeComponent, Component: "noop", Position: appyaml.Position{X: 10, Y: 10}},
-				{ID: "flow-2", Type: appyaml.NodeTypeComponent, Component: "noop", Position: appyaml.Position{X: 300, Y: 10}},
+				{ID: "flow-1", Type: appyaml.NodeTypeAction, Component: "noop", Position: appyaml.Position{X: 10, Y: 10}},
+				{ID: "flow-2", Type: appyaml.NodeTypeAction, Component: "noop", Position: appyaml.Position{X: 300, Y: 10}},
 				{ID: "widget-1", Type: appyaml.NodeTypeWidget, Component: "note", Position: appyaml.Position{X: 100, Y: widgetY}},
 			},
 			Edges: []appyaml.Edge{
@@ -349,7 +350,9 @@ func TestApplyLayoutDoesNotRepositionWidgetNodes(t *testing.T) {
 	updated, err := (&updateCommand{}).applyLayout(ctx, resource)
 	require.NoError(t, err)
 
-	widgetNode := updated.Spec.Nodes[2]
-	require.Equal(t, appyaml.NodeTypeWidget, widgetNode.Type)
-	require.Equal(t, widgetY, widgetNode.Position.Y)
+	widgetIndex := slices.IndexFunc(updated.Spec.Nodes, func(node appyaml.Node) bool {
+		return node.ID == "widget-1"
+	})
+	require.NotEqual(t, -1, widgetIndex)
+	require.Equal(t, widgetY, updated.Spec.Nodes[widgetIndex].Position.Y)
 }
