@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useUpdateCanvasPreference, useCanvasPreference } from "@/hooks/useCanvasData";
 import type { CanvasConsoleData } from "@/hooks/useCanvasData";
@@ -25,6 +25,11 @@ function urlViewFlagsToTab(flags: UrlViewFlags): AppTabId | null {
   if (flags.isMemoryMode) return "memory";
   if (flags.isFilesMode) return "files";
   return "canvas";
+}
+
+/** An explicit `view` or `run` param means there is no default tab to resolve. */
+function urlSelectsTabExplicitly(searchParams: URLSearchParams): boolean {
+  return (searchParams.get("view") ?? "") !== "" || (searchParams.get("run") ?? "") !== "";
 }
 
 type ConsoleQueryLike = Pick<UseQueryResult<CanvasConsoleData | undefined>, "data" | "isSuccess" | "isError">;
@@ -67,7 +72,11 @@ export function useDefaultAppTab({
 
   const currentTab = urlViewFlagsToTab(urlViewFlags);
   const lastRecordedTabRef = useRef<AppTabId | null>(null);
-  const redirectResolvedRef = useRef<boolean | null>(null);
+  // Whether the default-tab redirect is settled for this app instance. Held
+  // in state rather than a ref: resolution can settle without a URL change
+  // (e.g. a console read that errors or reports no panels), and the record
+  // effect below must re-run when that happens.
+  const [redirectResolved, setRedirectResolved] = useState(() => urlSelectsTabExplicitly(searchParams));
   // Tab a just-scheduled redirect is navigating to. `setSearchParams` only
   // lands on the next render, so between scheduling and landing the URL still
   // reports the pre-redirect tab; the record effect must not persist it.
@@ -85,36 +94,27 @@ export function useDefaultAppTab({
   // AppPage instance when navigating between apps (e.g. via the command
   // palette), so reset them whenever the canvas changes; otherwise the new
   // app would skip its default-tab redirect and could record the previous
-  // app's tab against the wrong canvas.
+  // app's tab against the wrong canvas. The render-phase setState is React's
+  // sanctioned way to reset state when a prop changes.
   const refsOwnerCanvasIdRef = useRef(canvasId);
   if (refsOwnerCanvasIdRef.current !== canvasId) {
     refsOwnerCanvasIdRef.current = canvasId;
     lastRecordedTabRef.current = null;
-    redirectResolvedRef.current = null;
     pendingRedirectTabRef.current = null;
     inRunInspectionRef.current = false;
     mountTabRef.current = currentTab;
-  }
-
-  // Snapshot on mount whether the URL already selected a tab or a run; if it
-  // did, the default-tab redirect is skipped for this app instance. Deriving
-  // the initial value lazily keeps this a single mount-time check without
-  // needing to watch `searchParams` changes.
-  if (redirectResolvedRef.current === null) {
-    const hasView = (searchParams.get("view") ?? "") !== "";
-    const hasRun = (searchParams.get("run") ?? "") !== "";
-    redirectResolvedRef.current = hasView || hasRun;
+    setRedirectResolved(urlSelectsTabExplicitly(searchParams));
   }
 
   // Default-tab resolution: applied at most once per mount.
   useEffect(() => {
-    if (redirectResolvedRef.current) return;
+    if (redirectResolved) return;
     if (!organizationId || !canvasId) return;
 
     // The user already navigated to another tab while the stored preference
     // was loading; their explicit choice wins over the default-tab redirect.
     if (currentTab !== mountTabRef.current) {
-      redirectResolvedRef.current = true;
+      setRedirectResolved(true);
       return;
     }
 
@@ -123,13 +123,13 @@ export function useDefaultAppTab({
     // A failed preference load leaves the stored tab unknown; redirecting
     // (including the Console fallback) could contradict it. Stay put.
     if (preferenceQuery.isError) {
-      redirectResolvedRef.current = true;
+      setRedirectResolved(true);
       return;
     }
 
     const storedTab = preferenceQuery.data?.lastVisitedTab;
     if (isAppTabId(storedTab)) {
-      redirectResolvedRef.current = true;
+      setRedirectResolved(true);
       // Already on the stored tab (e.g. a refresh landing on Canvas with a
       // stored "canvas" preference): rewriting the URL would only strip
       // unrelated params like `node`/`sidebar`/`file`, losing selection state.
@@ -142,7 +142,7 @@ export function useDefaultAppTab({
 
     // No stored tab yet: fall back to Console if the app has panels.
     if (!consoleQuery) {
-      redirectResolvedRef.current = true;
+      setRedirectResolved(true);
       return;
     }
     // A console read that ended in error settles the fallback on the current
@@ -150,7 +150,7 @@ export function useDefaultAppTab({
     // resolution pending forever, blocking tab recording below. Skipping the
     // Console fallback for this visit is the lesser cost.
     if (consoleQuery.isError) {
-      redirectResolvedRef.current = true;
+      setRedirectResolved(true);
       return;
     }
     // While the console read is still in flight, keep waiting; resolving now
@@ -158,13 +158,14 @@ export function useDefaultAppTab({
     // tab switch still resolves the redirect via the user-choice branch above.
     if (!consoleQuery.isSuccess) return;
 
-    redirectResolvedRef.current = true;
+    setRedirectResolved(true);
     const panels = consoleQuery.data?.panels ?? [];
     if (panels.length > 0) {
       pendingRedirectTabRef.current = "console";
       applyTabToSearchParams("console", setSearchParams);
     }
   }, [
+    redirectResolved,
     organizationId,
     canvasId,
     currentTab,
@@ -182,7 +183,7 @@ export function useDefaultAppTab({
       inRunInspectionRef.current = true;
       return;
     }
-    if (!redirectResolvedRef.current) return;
+    if (!redirectResolved) return;
 
     // Recording requires knowing the stored tab: a preference query that is
     // still loading or failed reports no data, which is indistinguishable
@@ -229,7 +230,15 @@ export function useDefaultAppTab({
         },
       },
     );
-  }, [canvasId, currentTab, organizationId, preferenceQuery.data, preferenceQuery.isSuccess, recordTab]);
+  }, [
+    redirectResolved,
+    canvasId,
+    currentTab,
+    organizationId,
+    preferenceQuery.data,
+    preferenceQuery.isSuccess,
+    recordTab,
+  ]);
 }
 
 function applyTabToSearchParams(tab: AppTabId, setSearchParams: SetSearchParams) {

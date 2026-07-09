@@ -270,6 +270,47 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     expect(setSearchParams).toHaveBeenCalledTimes(1);
   });
 
+  it("records the current tab when resolution settles on a later render without a URL change", () => {
+    mockPreferenceQuery = preferenceLoaded(null);
+
+    // Mount while the console read is still in flight: nothing settles yet.
+    const pendingConsoleQuery: ConsoleQueryLike = { isSuccess: false, isError: false, data: undefined };
+    const { rerender } = renderDefaultAppTab({ consoleQuery: pendingConsoleQuery });
+    expect(mutate).not.toHaveBeenCalled();
+
+    // The read succeeds with no panels: resolution settles on Canvas without
+    // touching the URL, and that alone must unblock tab recording.
+    rerender({
+      urlViewFlags: CANVAS_FLAGS,
+      canvasId: "canvas-1",
+      consoleQuery: {
+        isSuccess: true,
+        isError: false,
+        data: { canvasId: "canvas-1", panels: [], layout: [], consoleYaml: "" },
+      },
+    });
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+  });
+
+  it("records the current tab when the console query errors on a later render", () => {
+    mockPreferenceQuery = preferenceLoaded(null);
+
+    const pendingConsoleQuery: ConsoleQueryLike = { isSuccess: false, isError: false, data: undefined };
+    const { rerender } = renderDefaultAppTab({ consoleQuery: pendingConsoleQuery });
+    expect(mutate).not.toHaveBeenCalled();
+
+    rerender({
+      urlViewFlags: CANVAS_FLAGS,
+      canvasId: "canvas-1",
+      consoleQuery: { isSuccess: false, isError: true, data: undefined },
+    });
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+  });
+
   it("settles without a redirect when the console query errors, so tab recording is not blocked", () => {
     mockPreferenceQuery = preferenceLoaded(null);
 
