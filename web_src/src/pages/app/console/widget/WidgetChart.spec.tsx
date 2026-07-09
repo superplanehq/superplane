@@ -160,13 +160,13 @@ describe("WidgetChart bar variants", () => {
     );
 
     const style = container.querySelector("style")?.textContent ?? "";
-    expect(style).toContain("--color-claude-haiku-4-5: #2563eb");
-    expect(style).toContain("--color-claude-sonnet-4-6: #3b82f6");
+    expect(style).toContain("--color-claude-haiku-4-5: #0284c7");
+    expect(style).toContain("--color-claude-sonnet-4-6: #0ea5e9");
 
     const paths = [...container.querySelectorAll(".recharts-bar-rectangle path")];
     const fills = paths.map((el) => el.getAttribute("fill"));
-    expect(fills).toContain("#2563eb");
-    expect(fills).toContain("#3b82f6");
+    expect(fills).toContain("#0284c7");
+    expect(fills).toContain("#0ea5e9");
     expect(fills.every((fill) => !fill?.startsWith("var("))).toBe(true);
     // Theme fallback seen in DevTools when palette colors fail to apply.
     expect(fills.every((fill) => fill?.toLowerCase() !== "#c4627d")).toBe(true);
@@ -201,9 +201,9 @@ describe("WidgetChart bar variants", () => {
     const fills = [...container.querySelectorAll(".recharts-bar-rectangle path")].map((el) =>
       el.getAttribute("fill")?.toLowerCase(),
     );
-    expect(fills).toContain("#2563eb");
-    expect(fills).toContain("#3b82f6");
-    expect(fills).toContain("#60a5fa");
+    expect(fills).toContain("#0284c7");
+    expect(fills).toContain("#0ea5e9");
+    expect(fills).toContain("#38bdf8");
     expect(fills.every((fill) => fill !== "#c4627d")).toBe(true);
   });
 
@@ -297,7 +297,7 @@ describe("WidgetChart axis formatting", () => {
     expect(ticks.some((text) => text.includes("T00:00:00Z"))).toBe(false);
   });
 
-  it("falls back to raw stringification when xFormat is omitted", () => {
+  it("formats ISO timestamp X values as dates on the axis", () => {
     const TIME_ROWS = [
       { day: "2026-05-26T00:00:00Z", cost: 10 },
       { day: "2026-05-27T00:00:00Z", cost: 12 },
@@ -307,7 +307,9 @@ describe("WidgetChart axis formatting", () => {
       { rows: TIME_ROWS },
     );
     const ticks = tickTexts(container, "xAxis");
-    expect(ticks.some((text) => text.includes("2026-05-"))).toBe(true);
+    expect(ticks.some((text) => text.includes("T00:00:00Z"))).toBe(false);
+    expect(ticks.some((text) => /May/.test(text))).toBe(true);
+    expect(ticks.every((text) => !/AM|PM/.test(text))).toBe(true);
   });
 
   it("renders a Y-axis title when yLabel is set", () => {
@@ -346,7 +348,52 @@ describe("WidgetChart axis formatting", () => {
     expect(container.querySelector(".recharts-label")).toBeNull();
   });
 
-  it("passes a labelFormatter to the tooltip that mirrors xFormat", () => {
+  it("shows date-only axis ticks but datetime tooltip labels for xFormat datetime", () => {
+    tooltipContentProps.value = null as Record<string, unknown> | null;
+    const TIME_ROWS = [{ day: "2026-05-26T16:10:00Z", cost: 10 }];
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "bar",
+        xField: "day",
+        xFormat: "datetime",
+        series: [{ field: "cost", label: "Cost" }],
+      },
+      { rows: TIME_ROWS },
+    );
+    const ticks = tickTexts(container, "xAxis");
+    expect(ticks.every((text) => !/AM|PM/.test(text))).toBe(true);
+    const props: Record<string, unknown> | null = tooltipContentProps.value;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
+    const formatted = labelFormatter?.("2026-05-26T16:10:00Z", []);
+    expect(formatted).toMatch(/AM|PM/);
+  });
+
+  it("shows a date axis label only on the first bar of each calendar day", () => {
+    const TIME_ROWS = [
+      { day: "2026-07-05T10:00:00Z", cost: 10 },
+      { day: "2026-07-05T14:00:00Z", cost: 11 },
+      { day: "2026-07-05T18:00:00Z", cost: 12 },
+      { day: "2026-07-06T10:00:00Z", cost: 13 },
+      { day: "2026-07-06T14:00:00Z", cost: 14 },
+      { day: "2026-07-06T18:00:00Z", cost: 15 },
+    ];
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "bar",
+        xField: "day",
+        xFormat: "datetime",
+        series: [{ field: "cost", label: "Cost" }],
+      },
+      { rows: TIME_ROWS },
+    );
+    const ticks = tickTexts(container, "xAxis");
+    const visible = ticks.filter((text) => text.trim() !== "");
+    expect(visible).toEqual(["Jul 5", "Jul 6"]);
+  });
+
+  it("passes a labelFormatter to the tooltip that mirrors xFormat date", () => {
     tooltipContentProps.value = null as Record<string, unknown> | null;
     renderChart(
       { kind: "chart", type: "bar", xField: "day", xFormat: "date", series: [{ field: "cost", label: "Cost" }] },
@@ -358,7 +405,7 @@ describe("WidgetChart axis formatting", () => {
     expect(labelFormatter).toBeTypeOf("function");
     const formatted = labelFormatter?.("2026-05-26T00:00:00Z", []);
     expect(formatted).not.toContain("T00:00:00Z");
-    expect(formatted).toMatch(/\d{1,2}\/\d{1,2}\/\d{4}/);
+    expect(formatted).toMatch(/May/);
   });
 
   it("omits the tooltip labelFormatter when xFormat is unset (raw category text)", () => {
@@ -389,10 +436,30 @@ describe("WidgetChart axis formatting", () => {
       },
     );
     const ticks = tickTexts(container, "yAxis");
-    // yFormat=duration converts ms tick values into a "ms" or "s" suffix.
     expect(ticks.some((text) => /(ms|s)$/.test(text))).toBe(true);
-    // No tick should be a bare integer like "1000" or locale-formatted "1,000".
+    expect(ticks.every((text) => !/\s/.test(text))).toBe(true);
     expect(ticks.every((text) => text !== "1000" && text !== "1,000")).toBe(true);
+  });
+
+  it("inherits a single series format for Y-axis ticks when yFormat is omitted", () => {
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "bar",
+        xField: "service",
+        series: [{ field: "ms", label: "Latency", format: "duration" }],
+      },
+      {
+        rows: [
+          { service: "ec2", ms: 1_111_256 },
+          { service: "s3", ms: 45_000 },
+        ],
+      },
+    );
+    const ticks = tickTexts(container, "yAxis");
+    expect(ticks.some((text) => /(m|h)/.test(text))).toBe(true);
+    expect(ticks.every((text) => !/\s/.test(text))).toBe(true);
+    expect(ticks.every((text) => !/^\d{1,3}(,\d{3})+$/.test(text))).toBe(true);
   });
 });
 

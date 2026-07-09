@@ -377,6 +377,49 @@ describe("celExpr", () => {
         expect(result).toBe("Summary:   long");
       });
     });
+
+    describe("initial / firstInitial / githubAvatarOrInitial", () => {
+      it("returns the first alphanumeric letter uppercased", () => {
+        const compiled = compileExpr('initial("cloud-robot")');
+        expect(evalExpr(compiled, {}, buildEnv())).toBe("C");
+      });
+
+      it("returns empty string for missing values", () => {
+        const compiled = compileExpr("initial(value)");
+        expect(evalExpr(compiled, { value: null }, buildEnv())).toBe("");
+      });
+
+      it("walks fallback values until it finds a usable initial", () => {
+        const compiled = compileExpr('firstInitial("", " ", "", "Pedro Leão")');
+        expect(evalExpr(compiled, {}, buildEnv())).toBe("P");
+      });
+
+      it("renders a github avatar when author.username is present", () => {
+        const compiled = compileExpr("githubAvatarOrInitial(author, committer)");
+        const out = evalExpr(
+          compiled,
+          {
+            author: { name: "Pedro Leão", username: "forestileao" },
+            committer: { name: "Pedro Leão" },
+          },
+          buildEnv(),
+        );
+        expect(out).toContain('src="https://github.com/forestileao.png"');
+      });
+
+      it("renders an initial badge when author.username is missing", () => {
+        const compiled = compileExpr("githubAvatarOrInitial(author, committer)");
+        const out = evalExpr(
+          compiled,
+          {
+            author: { name: "cloud-robot" },
+            committer: { name: "cloud-robot" },
+          },
+          buildEnv(),
+        );
+        expect(out).toBe('<div class="avatar avatar-fallback">C</div>');
+      });
+    });
   });
 
   describe("join builtin", () => {

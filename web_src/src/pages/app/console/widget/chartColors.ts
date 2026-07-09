@@ -1,19 +1,19 @@
 /** Tailwind default hex literals for Recharts fill/stroke props. */
 export const CHART_COLOR = {
-  blue600: "#2563eb",
-  blue500: "#3b82f6",
-  blue400: "#60a5fa",
+  sky600: "#0284c7",
+  sky500: "#0ea5e9",
+  sky400: "#38bdf8",
   emerald600: "#059669",
   emerald500: "#10b981",
   emerald400: "#34d399",
   red500: "#ef4444",
 } as const;
 
-/** Softer palette for dark mode — slightly lighter blues/greens for contrast on gray-900 panels. */
+/** Softer palette for dark mode — lighter indigos/greens for contrast on gray-900 panels. */
 export const DARK_CHART_COLOR = {
-  blue500: "#60a5fa",
-  blue400: "#93c5fd",
-  blue300: "#bfdbfe",
+  indigo500: "#818cf8",
+  indigo400: "#a5b4fc",
+  indigo300: "#c7d2fe",
   emerald500: "#34d399",
   emerald400: "#6ee7b7",
   emerald300: "#86efac",
@@ -21,18 +21,18 @@ export const DARK_CHART_COLOR = {
 } as const;
 
 export const DEFAULT_CHART_PALETTE = [
-  CHART_COLOR.blue600,
-  CHART_COLOR.blue500,
-  CHART_COLOR.blue400,
+  CHART_COLOR.sky600,
+  CHART_COLOR.sky500,
+  CHART_COLOR.sky400,
   CHART_COLOR.emerald600,
   CHART_COLOR.emerald500,
   CHART_COLOR.emerald400,
 ];
 
 export const DEFAULT_DARK_CHART_PALETTE = [
-  DARK_CHART_COLOR.blue500,
-  DARK_CHART_COLOR.blue400,
-  DARK_CHART_COLOR.blue300,
+  DARK_CHART_COLOR.indigo500,
+  DARK_CHART_COLOR.indigo400,
+  DARK_CHART_COLOR.indigo300,
   DARK_CHART_COLOR.emerald500,
   DARK_CHART_COLOR.emerald400,
   DARK_CHART_COLOR.emerald300,
