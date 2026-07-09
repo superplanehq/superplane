@@ -149,6 +149,41 @@ export interface NodeEditData {
   integrationRef?: ComponentsIntegrationRef;
 }
 
+type CreatedRerunSelectionOptions = {
+  eventId: string;
+  triggerNodeId?: string;
+  selectedNodeId?: string | null;
+  fetchRunId?: (event: SidebarEvent, options?: { maxPages?: number }) => Promise<string | null>;
+  selectRun?: (runId: string, options?: { nodeId?: string }) => void;
+};
+
+async function selectCreatedRerun({
+  eventId,
+  triggerNodeId,
+  selectedNodeId,
+  fetchRunId,
+  selectRun,
+}: CreatedRerunSelectionOptions) {
+  if (!eventId || !triggerNodeId || !fetchRunId || !selectRun) return;
+
+  const runId = await fetchRunId(buildRerunLookupEvent(eventId, triggerNodeId), { maxPages: 1 });
+  if (!runId) return;
+
+  selectRun(runId, { nodeId: selectedNodeId ?? triggerNodeId });
+}
+
+function buildRerunLookupEvent(eventId: string, triggerNodeId: string): SidebarEvent {
+  return {
+    id: eventId,
+    title: "Re-emitted event",
+    state: "running",
+    isOpen: false,
+    nodeId: triggerNodeId,
+    triggerEventId: eventId,
+    kind: "trigger",
+  };
+}
+
 export interface NewNodeData {
   icon?: string;
   buildingBlock: BuildingBlock;
@@ -307,7 +342,7 @@ export interface CanvasPageProps {
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
   resolveRunIdForSidebarEvent?: (event: SidebarEvent) => string | null;
-  fetchRunIdForSidebarEvent?: (event: SidebarEvent) => Promise<string | null>;
+  fetchRunIdForSidebarEvent?: (event: SidebarEvent, options?: { maxPages?: number }) => Promise<string | null>;
   onSelectRunFromSidebarEvent?: (runId: string, options?: { nodeId?: string }) => void;
 
   // Building blocks for adding new nodes
@@ -1578,6 +1613,24 @@ function CanvasPage(props: CanvasPageProps) {
             selectedNodeId={props.runNodeDetailNodeId}
             onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
             onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
+            onEditNode={
+              readOnly
+                ? undefined
+                : (nodeId) => {
+                    props.onBackToLiveCanvas?.();
+                    state.componentSidebar.open(nodeId);
+                    setCurrentTab("settings");
+                  }
+            }
+            onRerunCreated={(eventId) =>
+              selectCreatedRerun({
+                eventId,
+                triggerNodeId: props.runNodeDetailRun?.rootEvent?.nodeId,
+                selectedNodeId: props.runNodeDetailNodeId,
+                fetchRunId: props.fetchRunIdForSidebarEvent,
+                selectRun: props.onSelectRunFromSidebarEvent,
+              })
+            }
             onClose={() => props.onRunNodeDetailClose?.()}
           />
         ) : runInspectorOpen ? (
