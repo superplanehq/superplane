@@ -235,6 +235,11 @@ describe("NodesPanelCard — single-entry layout", () => {
     expect(screen.getByTestId("node-panel-name").textContent).toBe("Ship to prod");
   });
 
+  it("renders the entry description in the compact layout", () => {
+    renderPanel({ canRunNodes: true });
+    expect(screen.getByText("Deploys production")).toBeInTheDocument();
+  });
+
   it("renders a legacy type: 'node' panel via the same compact layout", () => {
     const legacyPanel: ConsolePanel = {
       id: "legacy-deploy",

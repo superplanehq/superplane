@@ -126,6 +126,14 @@ function SingleNodeBody({ entry, lock }: { entry: NodesPanelNode; lock: ConsoleT
       <div className="text-[13px] font-semibold text-slate-800 dark:text-gray-100" data-testid="node-panel-name">
         {displayName}
       </div>
+      {entry.description ? (
+        <p
+          className="max-w-full truncate text-center text-[13px] text-slate-500 dark:text-gray-400"
+          title={entry.description}
+        >
+          {entry.description}
+        </p>
+      ) : null}
       {entry.showRun && canManualRun ? (
         <NodesPanelRunControl
           entry={entry}
@@ -242,7 +250,7 @@ function NodesPanelRunControl({
         size="xs"
         variant="outline"
         loading={running || disabledReason === "run-in-flight"}
-        loadingText={disabledReason === "run-in-flight" ? "Running…" : "Running…"}
+        loadingText="Running…"
         onClick={handleClick}
         disabled={disabled}
         title={disabledTitleFor(disabledReason)}
