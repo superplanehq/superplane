@@ -2743,11 +2743,21 @@ function CanvasContent({
     if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
     if (!hasFitToViewRef.current) return;
     lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
-    const id = window.setTimeout(() => {
+    let timeoutId: number | null = null;
+    const runFit = (attempt: number) => {
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
-      const renderedNodes = getNodes();
-      const nodeSubset =
-        focusIds && focusIds.size > 0 ? renderedNodes.filter((n) => n.id && focusIds.has(n.id)) : undefined;
+      const nodesById = new Map(stateRef.current.nodes.map((node) => [node.id, node]));
+      getNodes().forEach((node) => nodesById.set(node.id, node));
+      const nodeSubset = focusIds
+        ? Array.from(focusIds)
+            .map((nodeId) => nodesById.get(nodeId))
+            .filter((node) => node !== undefined)
+        : undefined;
+      if (focusIds && nodeSubset && nodeSubset.length < focusIds.size && attempt < 10) {
+        timeoutId = window.setTimeout(() => runFit(attempt + 1), 50);
+        return;
+      }
+
       const fitOptions = isRunInspectionMode ? RUN_CANVAS_FIT_VIEW_OPTIONS : LIVE_CANVAS_FIT_VIEW_OPTIONS;
       void fitView({
         ...(nodeSubset && nodeSubset.length > 0 ? { nodes: nodeSubset } : {}),
@@ -2761,8 +2771,12 @@ function CanvasContent({
         },
         () => undefined,
       );
-    }, 0);
-    return () => window.clearTimeout(id);
+    };
+
+    timeoutId = window.setTimeout(() => runFit(0), 0);
+    return () => {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
   }, [
     fitAllRequest,
     fitAllFocusNodeIds,
