@@ -25,6 +25,7 @@ import (
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -187,6 +188,7 @@ func CommitCanvasStaging(
 			return nil, err
 		}
 
+		log.Errorf("failed to commit staging: %v", err)
 		return nil, grpcerrors.Internal(err, "failed to commit staging")
 	}
 
@@ -450,14 +452,14 @@ func createNewCanvasVersionFromLive(
 
 		switch normalized {
 		case CanvasYAMLRepositoryPath:
-			pbCanvas, err := canvasFromYAMLText(content)
+			canvas, err := yaml.CanvasFromYAML([]byte(content))
 			if err != nil {
-				return nil, err
+				return nil, grpcerrors.InvalidArgument(err, "invalid canvas yaml")
 			}
 
-			nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
+			nodes, edges, err := canvas.Parse(registry, organizationID)
 			if err != nil {
-				return nil, err
+				return nil, grpcerrors.InvalidArgument(err, "invalid canvas yaml")
 			}
 
 			err = usage.EnsureOrganizationWithinLimits(
@@ -478,13 +480,13 @@ func createNewCanvasVersionFromLive(
 			newVersion.Nodes = datatypes.NewJSONSlice(slices.Clone(newNodes))
 			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(edges))
 		case ConsoleYAMLRepositoryPath:
-			panels, layout, err := consolePanelsLayoutFromYAMLText(content)
+			console, err := yaml.ConsoleFromYML([]byte(content))
 			if err != nil {
 				return nil, err
 			}
 
-			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(panels))
-			newVersion.ConsoleLayout = datatypes.NewJSONType(slices.Clone(layout))
+			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(console.Panels()))
+			newVersion.ConsoleLayout = datatypes.NewJSONType(slices.Clone(console.Layout()))
 		default:
 			return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", operation.GetPath()))
 		}
