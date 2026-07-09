@@ -22,6 +22,11 @@ import {
 } from "./RunInspectorTimelineTypes";
 import { hasObjectValue, type RunInspectorNodeSection, type RunInspectorUpstreamSection } from "./runNodeDetailModel";
 
+const INPUT_TRIGGERED_STATUS: StatusPill = {
+  dotClassName: "bg-violet-400",
+  label: "Triggered",
+};
+
 export function RunInspectorStepTimeline({
   section,
   componentIconMap,
@@ -102,7 +107,7 @@ function InputTimelineCard({
   return (
     <TimelineAccordionCard
       value="input"
-      status={inputStatus(leadInput)}
+      status={INPUT_TRIGGERED_STATUS}
       title="Input"
       sourceName={leadInput?.nodeName}
       actionPayload={leadInput ? (leadInput.output ?? {}) : undefined}
@@ -196,13 +201,6 @@ function outputActionPayload(section: RunInspectorNodeSection): unknown {
   }
 
   return section.errorMessage ? { error: section.errorMessage } : undefined;
-}
-
-function inputStatus(section?: RunInspectorUpstreamSection): StatusPill {
-  return {
-    dotClassName: section?.badge?.badgeColor ?? "bg-violet-400",
-    label: section?.badge?.label ?? "Triggered",
-  };
 }
 
 function outputStatus(section: RunInspectorNodeSection): StatusPill {
