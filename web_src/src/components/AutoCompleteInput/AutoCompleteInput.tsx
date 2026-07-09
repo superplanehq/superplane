@@ -5,6 +5,7 @@ import type { Suggestion } from "./core";
 import { getSuggestions } from "./core";
 import { Eye, EyeOff } from "lucide-react";
 import { evaluateExpr, formatExprResult } from "@/lib/exprEvaluator";
+import { calculateDropdownPosition } from "./dropdownPosition";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
@@ -157,7 +158,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const suggestionsListRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
-    const mirrorRef = useRef<HTMLSpanElement>(null);
+    const mirrorRef = useRef<HTMLDivElement>(null);
     const isInteractingWithSuggestionsRef = useRef(false);
     const suppressSuggestionsRef = useRef(false);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
@@ -458,14 +459,6 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
       return parts;
     };
-
-    // Sync scroll between textarea and backdrop
-    const handleScroll = useCallback(() => {
-      if (inputRef.current && backdropRef.current) {
-        backdropRef.current.scrollTop = inputRef.current.scrollTop;
-        backdropRef.current.scrollLeft = inputRef.current.scrollLeft;
-      }
-    }, []);
 
     const getWordAtCursor = (text: string, position: number) => {
       const beforeCursor = text.substring(0, position);
@@ -882,64 +875,63 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       const input = inputRef.current;
       const mirror = mirrorRef.current;
       const computed = getComputedStyle(input);
+      const inputRect = input.getBoundingClientRect();
+      const containerRect = containerRef.current?.getBoundingClientRect();
 
-      // Copy relevant styles to mirror element
       mirror.style.font = computed.font;
       mirror.style.fontSize = computed.fontSize;
       mirror.style.fontFamily = computed.fontFamily;
       mirror.style.fontWeight = computed.fontWeight;
       mirror.style.letterSpacing = computed.letterSpacing;
       mirror.style.textTransform = computed.textTransform;
+      mirror.style.lineHeight = computed.lineHeight;
+      mirror.style.padding = computed.padding;
+      mirror.style.border = computed.border;
+      mirror.style.boxSizing = computed.boxSizing;
+      mirror.style.width = `${inputRect.width}px`;
+      mirror.style.top = containerRect ? `${inputRect.top - containerRect.top}px` : "0";
+      mirror.style.left = containerRect ? `${inputRect.left - containerRect.left}px` : "0";
+      mirror.style.whiteSpace = "pre-wrap";
+      mirror.style.overflowWrap = "break-word";
+      mirror.style.wordBreak = computed.wordBreak;
+      mirror.style.overflow = "hidden";
 
-      // Set content to text before cursor
-      const textBeforeCursor = inputValue.substring(0, cursorPosition);
-      mirror.textContent = textBeforeCursor || "\u200b"; // Use zero-width space if empty
+      mirror.replaceChildren(document.createTextNode(inputValue.substring(0, cursorPosition)));
 
-      // Measure the width and account for input's left padding
-      const paddingLeft = parseFloat(computed.paddingLeft) || 0;
-      const cursorOffset = mirror.offsetWidth + paddingLeft;
+      const cursorMarker = document.createElement("span");
+      cursorMarker.textContent = "\u200b";
+      mirror.appendChild(cursorMarker);
 
-      // Calculate cursor position relative to viewport
-      const inputRect = input.getBoundingClientRect();
-      const cursorScreenX = inputRect.left + cursorOffset;
-      const viewportWidth = window.innerWidth;
-      const edgePadding = 16; // Padding from screen edge
+      const markerRect = cursorMarker.getBoundingClientRect();
+      const cursor = {
+        x: markerRect.left - input.scrollLeft,
+        y: markerRect.bottom - input.scrollTop,
+      };
 
-      // Space available on each side of cursor
-      const spaceOnRight = viewportWidth - cursorScreenX - edgePadding;
-      const spaceOnLeft = cursorScreenX - edgePadding;
-
-      // Determine if we should flip based on available space
-      // Normal: suggestions start at cursor (need dropdownWidth on right)
-      // Flipped: suggestions end at cursor (need dropdownWidth on left)
-      const shouldFlipLeft = spaceOnRight < dropdownWidth && spaceOnLeft >= dropdownWidth;
-
-      // Calculate absolute position for portal
-      const dropdownTop = inputRect.bottom + 4; // 4px gap below input
-      let dropdownLeft: number;
-
-      if (shouldFlipLeft) {
-        // Flipped: suggestions end at cursor, Value Preview extends further left
-        dropdownLeft = showValuePreview
-          ? cursorScreenX - dropdownWidth - valuePreviewWidth
-          : cursorScreenX - dropdownWidth;
-      } else {
-        // Normal: suggestions start at cursor, Value Preview is to the left of cursor
-        dropdownLeft = showValuePreview ? cursorScreenX - valuePreviewWidth : cursorScreenX;
-      }
-
-      // Clamp to screen edges to prevent overflow
-      const totalWidth = showValuePreview ? dropdownWidth + valuePreviewWidth : dropdownWidth;
-      dropdownLeft = Math.max(edgePadding, Math.min(dropdownLeft, viewportWidth - totalWidth - edgePadding));
-
-      setDropdownPosition({
-        top: dropdownTop,
-        left: dropdownLeft,
-      });
+      setDropdownPosition(
+        calculateDropdownPosition({
+          cursor,
+          viewportWidth: window.innerWidth,
+          dropdownWidth,
+          valuePreviewWidth,
+          showValuePreview,
+        }),
+      );
     }, [inputValue, cursorPosition, dropdownWidth, showValuePreview]);
 
     // Measure cursor pixel position when cursor or input changes
     useEffect(() => {
+      measureCursorPixelPosition();
+    }, [measureCursorPixelPosition]);
+
+    // Sync scroll between textarea and backdrop, then keep the fixed-position
+    // suggestions portal anchored to the scrolled caret.
+    const handleScroll = useCallback(() => {
+      if (inputRef.current && backdropRef.current) {
+        backdropRef.current.scrollTop = inputRef.current.scrollTop;
+        backdropRef.current.scrollLeft = inputRef.current.scrollLeft;
+      }
+
       measureCursorPixelPosition();
     }, [measureCursorPixelPosition]);
 
@@ -1240,13 +1232,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     return (
       <div ref={containerRef} className="relative w-full">
         {/* Hidden mirror element for measuring cursor position */}
-        <span
+        <div
           ref={mirrorRef}
           aria-hidden="true"
           style={{
             position: "absolute",
             visibility: "hidden",
-            whiteSpace: "pre",
+            whiteSpace: "pre-wrap",
             pointerEvents: "none",
             top: 0,
             left: 0,
