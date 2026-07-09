@@ -22,11 +22,28 @@ type BatchRequestCounts = {
   expired?: number;
 };
 
+type BatchResultOutcome = {
+  type?: string;
+  text?: string;
+  parsed?: unknown;
+  stopReason?: string;
+  errorType?: string;
+  errorMessage?: string;
+};
+
+// One entry per element of Items (see BatchItemResult in create_batch_message.go):
+// Single Prompt mode sets the outcome fields directly; Multiple Prompts mode
+// nests one outcome per configured prompt under `prompts`, keyed by prompt ID.
+type BatchItemResult = BatchResultOutcome & {
+  index: number;
+  prompts?: Record<string, BatchResultOutcome>;
+};
+
 type CreateBatchMessagePayload = {
   status?: string;
   batchId?: string;
   requestCounts?: BatchRequestCounts;
-  results?: { customId?: string }[];
+  results?: BatchItemResult[];
 };
 
 // Shape of the execution metadata claude.createBatchMessage keeps updated on

@@ -17,16 +17,16 @@ import (
 
 func validBatchConfig() map[string]any {
 	return map[string]any{
-		"model":          "claude-opus-4-6",
-		"mode":           modeSingle,
-		"items":          `$['Fetch'].body`,
-		"promptTemplate": `"Capital of " + item.country + "?"`,
+		"model":  "claude-opus-4-6",
+		"mode":   modeSingle,
+		"items":  `$['Fetch'].body`,
+		"prompt": `"Capital of " + item.country + "?"`,
 	}
 }
 
 // singleItemExpressions builds an Expression context resolving Items to a
-// single element and PromptTemplate to a fixed prompt, regardless of the
-// bound item/index variables.
+// single element and Prompt to a fixed prompt, regardless of the bound
+// item/index variables.
 func singleItemExpressions(prompt string) *contexts.ExpressionContext {
 	return &contexts.ExpressionContext{
 		Output: []any{map[string]any{"country": "France"}},
@@ -65,13 +65,13 @@ func Test__CreateBatchMessage__Setup(t *testing.T) {
 		assert.Contains(t, err.Error(), "items is required")
 	})
 
-	t.Run("single mode missing promptTemplate", func(t *testing.T) {
+	t.Run("single mode missing prompt", func(t *testing.T) {
 		cfg := validBatchConfig()
-		delete(cfg, "promptTemplate")
+		delete(cfg, "prompt")
 		ctx := core.SetupContext{Configuration: cfg}
 		err := c.Setup(ctx)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "promptTemplate is required")
+		assert.Contains(t, err.Error(), "prompt is required")
 	})
 
 	t.Run("multiple mode missing prompts", func(t *testing.T) {
@@ -112,7 +112,7 @@ func Test__CreateBatchMessage__Setup(t *testing.T) {
 		assert.Contains(t, err.Error(), "prompts[0].promptTemplate is required")
 	})
 
-	t.Run("multiple mode does not require promptTemplate/customIdExpression", func(t *testing.T) {
+	t.Run("multiple mode does not require prompt", func(t *testing.T) {
 		cfg := map[string]any{
 			"model":   "claude-opus-4-6",
 			"mode":    modeMultiple,
@@ -132,7 +132,6 @@ func Test__CreateBatchMessage__Setup(t *testing.T) {
 		require.NoError(t, c.Setup(ctx))
 		meta := metadataCtx.Metadata.(BatchMessageNodeMetadata)
 		assert.Equal(t, "claude-opus-4-6", meta.Model)
-		assert.Equal(t, 4096, meta.MaxTokens)
 		assert.False(t, meta.StructuredOutput)
 	})
 }
@@ -143,7 +142,7 @@ func Test__CreateBatchMessage__Execute__endsImmediately(t *testing.T) {
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","type":"message_batch","processing_status":"ended","request_counts":{"succeeded":1}}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
-				`{"custom_id":"request-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"Paris"}],"stop_reason":"end_turn","usage":{"input_tokens":5,"output_tokens":3}}}}`,
+				`{"custom_id":"item-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"Paris"}],"stop_reason":"end_turn","usage":{"input_tokens":5,"output_tokens":3}}}}`,
 			))},
 		},
 	}
@@ -174,6 +173,7 @@ func Test__CreateBatchMessage__Execute__endsImmediately(t *testing.T) {
 	assert.Equal(t, batchStatusEnded, out.Status)
 	assert.Equal(t, "msgbatch_1", out.BatchID)
 	require.Len(t, out.Results, 1)
+	assert.Equal(t, 0, out.Results[0].Index)
 	assert.Equal(t, "succeeded", out.Results[0].Type)
 	assert.Equal(t, "Paris", out.Results[0].Text)
 
@@ -183,52 +183,15 @@ func Test__CreateBatchMessage__Execute__endsImmediately(t *testing.T) {
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/results")
 }
 
-func Test__CreateBatchMessage__Execute__singleMode_defaultCustomId(t *testing.T) {
-	c := &CreateBatchMessage{}
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended"}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
-				`{"custom_id":"request-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"Paris"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
-			))},
-		},
-	}
-	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
-	metadataCtx := &contexts.MetadataContext{}
-	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-	execCtx := core.ExecutionContext{
-		ID: uuid.New(),
-		Configuration: map[string]any{
-			"model":          "claude-opus-4-6",
-			"mode":           modeSingle,
-			"items":          `$['Fetch'].body`,
-			"promptTemplate": `"Capital of " + item.country + "?"`,
-			// customIdExpression intentionally omitted
-		},
-		HTTP:           httpContext,
-		Integration:    integrationCtx,
-		Metadata:       metadataCtx,
-		ExecutionState: executionState,
-		Requests:       &contexts.RequestContext{},
-		Expressions:    singleItemExpressions("Capital of France?"),
-		Logger:         logrus.NewEntry(logrus.New()),
-	}
-
-	err := c.Execute(execCtx)
-	require.NoError(t, err)
-
-	require.Len(t, httpContext.Requests, 2)
-}
-
-func Test__CreateBatchMessage__Execute__singleMode_oneRequestPerItem(t *testing.T) {
+func Test__CreateBatchMessage__Execute__singleMode_oneResultPerItem(t *testing.T) {
 	c := &CreateBatchMessage{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":2}}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
-				`{"custom_id":"pr-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"A"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
-					`{"custom_id":"pr-2","result":{"type":"succeeded","message":{"id":"msg_2","content":[{"type":"text","text":"B"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
+				// Results come back out of order and must be regrouped by item index.
+				`{"custom_id":"item-2","result":{"type":"succeeded","message":{"id":"msg_2","content":[{"type":"text","text":"B"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
+					`{"custom_id":"item-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"A"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
 			))},
 		},
 	}
@@ -245,11 +208,10 @@ func Test__CreateBatchMessage__Execute__singleMode_oneRequestPerItem(t *testing.
 	execCtx := core.ExecutionContext{
 		ID: uuid.New(),
 		Configuration: map[string]any{
-			"model":              "claude-opus-4-6",
-			"mode":               modeSingle,
-			"items":              `dummy`,
-			"promptTemplate":     `dummy`,
-			"customIdExpression": `dummy`,
+			"model":  "claude-opus-4-6",
+			"mode":   modeSingle,
+			"items":  `dummy`,
+			"prompt": `dummy`,
 		},
 		HTTP:           httpContext,
 		Integration:    integrationCtx,
@@ -272,20 +234,22 @@ func Test__CreateBatchMessage__Execute__singleMode_oneRequestPerItem(t *testing.
 
 	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
 	require.Len(t, out.Results, 2)
-	assert.Equal(t, "pr-1", out.Results[0].CustomID)
-	assert.Equal(t, "pr-2", out.Results[1].CustomID)
+	assert.Equal(t, 0, out.Results[0].Index)
+	assert.Equal(t, "A", out.Results[0].Text)
+	assert.Equal(t, 1, out.Results[1].Index)
+	assert.Equal(t, "B", out.Results[1].Text)
 }
 
-func Test__CreateBatchMessage__Execute__multipleMode_crossProduct(t *testing.T) {
+func Test__CreateBatchMessage__Execute__multipleMode_groupsByItemNotByPrompt(t *testing.T) {
 	c := &CreateBatchMessage{}
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":4}}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
-				`{"custom_id":"title-1","result":{"type":"succeeded","message":{"id":"m1","content":[{"type":"text","text":"T1"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
-					`{"custom_id":"title-2","result":{"type":"succeeded","message":{"id":"m2","content":[{"type":"text","text":"T2"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
-					`{"custom_id":"description-1","result":{"type":"succeeded","message":{"id":"m3","content":[{"type":"text","text":"D1"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
-					`{"custom_id":"description-2","result":{"type":"succeeded","message":{"id":"m4","content":[{"type":"text","text":"D2"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
+				`{"custom_id":"item-1-title","result":{"type":"succeeded","message":{"id":"m1","content":[{"type":"text","text":"T1"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
+					`{"custom_id":"item-2-title","result":{"type":"succeeded","message":{"id":"m2","content":[{"type":"text","text":"T2"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
+					`{"custom_id":"item-1-description","result":{"type":"succeeded","message":{"id":"m3","content":[{"type":"text","text":"D1"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
+					`{"custom_id":"item-2-description","result":{"type":"succeeded","message":{"id":"m4","content":[{"type":"text","text":"D2"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
 			))},
 		},
 	}
@@ -330,13 +294,18 @@ func Test__CreateBatchMessage__Execute__multipleMode_crossProduct(t *testing.T) 
 
 	require.Len(t, httpContext.Requests, 2)
 	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
-	require.Len(t, out.Results, 4)
+	// Exactly one result per item, not one per (prompt, item) request.
+	require.Len(t, out.Results, 2)
 
-	customIDs := make([]string, 0, 4)
-	for _, r := range out.Results {
-		customIDs = append(customIDs, r.CustomID)
-	}
-	assert.ElementsMatch(t, []string{"title-1", "title-2", "description-1", "description-2"}, customIDs)
+	assert.Equal(t, 0, out.Results[0].Index)
+	require.Contains(t, out.Results[0].Prompts, "title")
+	require.Contains(t, out.Results[0].Prompts, "description")
+	assert.Equal(t, "T1", out.Results[0].Prompts["title"].Text)
+	assert.Equal(t, "D1", out.Results[0].Prompts["description"].Text)
+
+	assert.Equal(t, 1, out.Results[1].Index)
+	assert.Equal(t, "T2", out.Results[1].Prompts["title"].Text)
+	assert.Equal(t, "D2", out.Results[1].Prompts["description"].Text)
 }
 
 func Test__CreateBatchMessage__Execute__multipleMode_tooManyRequests(t *testing.T) {
@@ -367,14 +336,39 @@ func Test__CreateBatchMessage__Execute__multipleMode_tooManyRequests(t *testing.
 	assert.Contains(t, err.Error(), "cannot contain more than")
 }
 
+// Anthropic's batch API requires custom_id to match ^[a-zA-Z0-9_-]{1,64}$;
+// since prompt IDs are embedded into the batch's internal custom IDs, they
+// must be rejected up front rather than surfacing a cryptic API 400.
+func Test__CreateBatchMessage__Execute__multipleMode_invalidPromptID(t *testing.T) {
+	c := &CreateBatchMessage{}
+	execCtx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"model": "claude-opus-4-6",
+			"mode":  modeMultiple,
+			"items": `dummy`,
+			"prompts": []map[string]any{
+				{"id": "title suggestion", "promptTemplate": "dummy"},
+			},
+		},
+		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
+		Metadata:    &contexts.MetadataContext{},
+		Expressions: &contexts.ExpressionContext{Output: []any{map[string]any{"number": float64(1)}}},
+		Logger:      logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.Execute(execCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "letters, digits, hyphens, and underscores")
+}
+
 func Test__CreateBatchMessage__Execute__itemsNotAnArray(t *testing.T) {
 	c := &CreateBatchMessage{}
 	execCtx := core.ExecutionContext{
 		Configuration: map[string]any{
-			"model":          "claude-opus-4-6",
-			"mode":           modeSingle,
-			"items":          `dummy`,
-			"promptTemplate": `dummy`,
+			"model":  "claude-opus-4-6",
+			"mode":   modeSingle,
+			"items":  `dummy`,
+			"prompt": `dummy`,
 		},
 		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
 		Metadata:    &contexts.MetadataContext{},
@@ -387,14 +381,14 @@ func Test__CreateBatchMessage__Execute__itemsNotAnArray(t *testing.T) {
 	assert.Contains(t, err.Error(), "must evaluate to an array")
 }
 
-func Test__CreateBatchMessage__Execute__promptTemplateNotString(t *testing.T) {
+func Test__CreateBatchMessage__Execute__promptNotString(t *testing.T) {
 	c := &CreateBatchMessage{}
 	execCtx := core.ExecutionContext{
 		Configuration: map[string]any{
-			"model":          "claude-opus-4-6",
-			"mode":           modeSingle,
-			"items":          `dummy`,
-			"promptTemplate": `dummy`,
+			"model":  "claude-opus-4-6",
+			"mode":   modeSingle,
+			"items":  `dummy`,
+			"prompt": `dummy`,
 		},
 		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
 		Metadata:    &contexts.MetadataContext{},
@@ -485,7 +479,7 @@ func Test__CreateBatchMessage__poll__terminal(t *testing.T) {
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":1}}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
-				`{"custom_id":"request-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"Done"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
+				`{"custom_id":"item-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"Done"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
 			))},
 		},
 	}
@@ -688,8 +682,8 @@ func Test__CreateBatchMessage__poll__endedButConfigurationDecodeFails_emitsError
 
 	hookCtx := core.ActionHookContext{
 		Name: "poll",
-		// maxTokens is a number field; a string value fails mapstructure decoding.
-		Configuration:  map[string]any{"model": "claude-opus-4-6", "mode": modeSingle, "maxTokens": "not-a-number"},
+		// prompts must decode as a list of objects; a plain string fails mapstructure decoding.
+		Configuration:  map[string]any{"model": "claude-opus-4-6", "mode": modeMultiple, "prompts": "not-a-list"},
 		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(0)},
 		HTTP:           httpContext,
 		Integration:    integrationCtx,
@@ -727,4 +721,27 @@ func Test__CreateBatchMessage__Cancel(t *testing.T) {
 	require.NoError(t, c.Cancel(execCtx))
 	require.Len(t, httpContext.Requests, 1)
 	assert.Contains(t, httpContext.Requests[0].URL.Path, "/messages/batches/msgbatch_1/cancel")
+}
+
+func Test__itemCustomID_parseItemCustomID(t *testing.T) {
+	t.Run("single mode roundtrip", func(t *testing.T) {
+		id := itemCustomID(0, "")
+		index, promptID, ok := parseItemCustomID(id)
+		require.True(t, ok)
+		assert.Equal(t, 0, index)
+		assert.Equal(t, "", promptID)
+	})
+
+	t.Run("multiple mode roundtrip", func(t *testing.T) {
+		id := itemCustomID(4, "title")
+		index, promptID, ok := parseItemCustomID(id)
+		require.True(t, ok)
+		assert.Equal(t, 4, index)
+		assert.Equal(t, "title", promptID)
+	})
+
+	t.Run("unrecognized custom id", func(t *testing.T) {
+		_, _, ok := parseItemCustomID("something-else")
+		assert.False(t, ok)
+	})
 }
