@@ -243,20 +243,21 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("applies the Console fallback once a previously failing console query succeeds", () => {
+  it("applies the Console fallback once an in-flight console query succeeds", () => {
     mockPreferenceQuery = preferenceLoaded(null);
 
-    const failedConsoleQuery: ConsoleQueryLike = { isSuccess: false, data: undefined };
-    const { rerender, setSearchParams } = renderDefaultAppTab({ consoleQuery: failedConsoleQuery });
-    // A failed first read must not lock in Canvas.
+    const pendingConsoleQuery: ConsoleQueryLike = { isSuccess: false, isError: false, data: undefined };
+    const { rerender, setSearchParams } = renderDefaultAppTab({ consoleQuery: pendingConsoleQuery });
+    // An unfinished read must not lock in Canvas.
     expect(setSearchParams).not.toHaveBeenCalled();
 
-    // A retry succeeds and reports panels: the fallback still applies.
+    // The read succeeds and reports panels: the fallback still applies.
     rerender({
       urlViewFlags: CANVAS_FLAGS,
       canvasId: "canvas-1",
       consoleQuery: {
         isSuccess: true,
+        isError: false,
         data: {
           canvasId: "canvas-1",
           panels: [{ id: "p1", type: "markdown", content: {} }],
@@ -267,6 +268,24 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     });
 
     expect(setSearchParams).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles without a redirect when the console query errors, so tab recording is not blocked", () => {
+    mockPreferenceQuery = preferenceLoaded(null);
+
+    const erroredConsoleQuery: ConsoleQueryLike = { isSuccess: false, isError: true, data: undefined };
+    const { rerender, setSearchParams } = renderDefaultAppTab({ consoleQuery: erroredConsoleQuery });
+
+    // No Console fallback on error, but the resolution settles on Canvas…
+    expect(setSearchParams).not.toHaveBeenCalled();
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+
+    // …so a later tab change is recorded without the user having to switch twice.
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1", consoleQuery: erroredConsoleQuery });
+
+    expect(mutate).toHaveBeenCalledTimes(2);
+    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
   });
 
   it("retries a failed tab write on a later effect run instead of treating it as recorded", () => {

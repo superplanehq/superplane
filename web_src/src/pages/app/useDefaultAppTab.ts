@@ -27,7 +27,7 @@ function urlViewFlagsToTab(flags: UrlViewFlags): AppTabId | null {
   return "canvas";
 }
 
-type ConsoleQueryLike = Pick<UseQueryResult<CanvasConsoleData | undefined>, "data" | "isSuccess">;
+type ConsoleQueryLike = Pick<UseQueryResult<CanvasConsoleData | undefined>, "data" | "isSuccess" | "isError">;
 
 type SetSearchParams = (
   next: URLSearchParams | ((prev: URLSearchParams) => URLSearchParams),
@@ -145,10 +145,17 @@ export function useDefaultAppTab({
       redirectResolvedRef.current = true;
       return;
     }
-    // Only a successful console read can settle the fallback: resolving on a
-    // failed fetch would lock in Canvas even if a retry later shows panels.
-    // While we wait, an explicit tab switch still resolves the redirect via
-    // the user-choice branch above.
+    // A console read that ended in error settles the fallback on the current
+    // tab: waiting for a success that may never come would leave the
+    // resolution pending forever, blocking tab recording below. Skipping the
+    // Console fallback for this visit is the lesser cost.
+    if (consoleQuery.isError) {
+      redirectResolvedRef.current = true;
+      return;
+    }
+    // While the console read is still in flight, keep waiting; resolving now
+    // would lock in Canvas even if the read later shows panels. An explicit
+    // tab switch still resolves the redirect via the user-choice branch above.
     if (!consoleQuery.isSuccess) return;
 
     redirectResolvedRef.current = true;
