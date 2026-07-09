@@ -207,6 +207,10 @@ func CanvasFromYAML(raw []byte) (*Canvas, error) {
 		return nil, errors.New("canvas yaml must include a spec block")
 	}
 
+	if resource.Metadata == nil {
+		return nil, errors.New("canvas yaml must include a metadata block")
+	}
+
 	return &resource, nil
 }
 
