@@ -32,6 +32,7 @@ import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
   useCanvas,
+  useCanvasConsole,
   useCanvasMemoryEntries,
   useCanvasVersions,
   useCreateCanvasMemoryNamespace,
@@ -100,6 +101,7 @@ import {
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
 import { sortVersionsDesc } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
+import { useDefaultAppTab } from "./useDefaultAppTab";
 import { useCanvasEditVersionState } from "./useCanvasEditVersionState";
 import { useEditSessionBootstrap } from "./useEditSessionBootstrap";
 import { useDraftCanvasSpecSync } from "./useDraftCanvasSpecSync";
@@ -1013,6 +1015,13 @@ export function AppPage() {
     committedBaselines: committedBaselinesForEdit,
     editBootstrapReady: isEditBootstrapReady,
   });
+
+  // First-visit Console defaulting must consult the live console, not
+  // `consoleQuery`: that one tracks the active version (possibly a draft from
+  // `?version=`), whose console can be empty while the live app has widgets.
+  // Same query key as other live-console reads, so this usually dedupes.
+  const liveConsoleQuery = useCanvasConsole(canvasId, undefined);
+  useDefaultAppTab({ organizationId, canvasId, urlViewFlags, searchParams, setSearchParams, liveConsoleQuery });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
