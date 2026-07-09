@@ -454,12 +454,12 @@ func createNewCanvasVersionFromLive(
 		case CanvasYAMLRepositoryPath:
 			canvas, err := yaml.CanvasFromYAML([]byte(content))
 			if err != nil {
-				return nil, err
+				return nil, grpcerrors.InvalidArgument(err, "invalid canvas yaml")
 			}
 
 			nodes, edges, err := canvas.Parse(registry, organizationID)
 			if err != nil {
-				return nil, err
+				return nil, grpcerrors.InvalidArgument(err, "invalid canvas yaml")
 			}
 
 			err = usage.EnsureOrganizationWithinLimits(

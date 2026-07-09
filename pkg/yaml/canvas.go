@@ -331,6 +331,14 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 			return nil, nil, fmt.Errorf("node %s: duplicate node id", node.ID)
 		}
 
+		if node.Type == "" {
+			return nil, nil, fmt.Errorf("node %s: type is required", node.ID)
+		}
+
+		if node.Type != NodeTypeTrigger && node.Type != NodeTypeWidget && node.Type != NodeTypeAction {
+			return nil, nil, fmt.Errorf("node %s: invalid type %q", node.ID, node.Type)
+		}
+
 		nodeIDs[node.ID] = true
 		nodeTypeByID[node.ID] = node.Type
 		if err := c.validateNodeRef(registry, orgID, node); err != nil {
