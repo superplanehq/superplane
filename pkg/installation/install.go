@@ -325,7 +325,10 @@ func wireIntegrations(canvas *yaml.Canvas, mappings map[string]IntegrationMappin
 			continue
 		}
 
-		n.IntegrationID = &mapping.ID
+		n.Integration = &yaml.IntegrationRef{
+			ID:   mapping.ID,
+			Name: mapping.Name,
+		}
 		newNodes[i] = n
 	}
 

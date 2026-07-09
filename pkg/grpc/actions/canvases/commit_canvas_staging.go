@@ -188,6 +188,7 @@ func CommitCanvasStaging(
 			return nil, err
 		}
 
+		log.Errorf("failed to commit staging: %v", err)
 		return nil, grpcerrors.Internal(err, "failed to commit staging")
 	}
 

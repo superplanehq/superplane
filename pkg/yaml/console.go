@@ -41,9 +41,15 @@ var AllowedConsolePanelTypes = []string{
 }
 
 type Console struct {
-	APIVersion string      `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string      `json:"kind" yaml:"kind"`
-	Spec       ConsoleSpec `json:"spec" yaml:"spec"`
+	APIVersion string          `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string          `json:"kind" yaml:"kind"`
+	Metadata   ConsoleMetadata `json:"metadata" yaml:"metadata"`
+	Spec       ConsoleSpec     `json:"spec" yaml:"spec"`
+}
+
+type ConsoleMetadata struct {
+	CanvasID string `json:"canvasId" yaml:"canvasId"`
+	Name     string `json:"name" yaml:"name"`
 }
 
 type ConsoleSpec struct {

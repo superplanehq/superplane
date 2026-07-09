@@ -10,6 +10,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	//
+	// Using the previously defined API types
+	// for backwards compatibility.
+	//
+	NodeTypeTrigger = "TYPE_TRIGGER"
+	NodeTypeWidget  = "TYPE_WIDGET"
+	NodeTypeAction  = "TYPE_ACTION"
+)
+
 type Canvas struct {
 	APIVersion string          `json:"apiVersion" yaml:"apiVersion"`
 	Kind       string          `json:"kind" yaml:"kind"`
@@ -34,6 +44,7 @@ func (c *Canvas) Edges() []models.Edge {
 }
 
 type CanvasMetadata struct {
+	ID          string `json:"id" yaml:"id"`
 	Name        string `json:"name" yaml:"name"`
 	Description string `json:"description" yaml:"description"`
 }
@@ -58,28 +69,45 @@ func (e *Edge) Model() models.Edge {
 }
 
 type Node struct {
-	ID             string         `json:"id" yaml:"id"`
-	Name           string         `json:"name" yaml:"name"`
-	Type           string         `json:"type" yaml:"type"`
-	Component      string         `json:"component" yaml:"component"`
-	Configuration  map[string]any `json:"configuration" yaml:"configuration"`
-	Metadata       map[string]any `json:"metadata" yaml:"metadata"`
-	Position       Position       `json:"position" yaml:"position"`
-	IsCollapsed    bool           `json:"isCollapsed" yaml:"isCollapsed"`
-	IntegrationID  *string        `json:"integrationId,omitempty" yaml:"integrationId,omitempty"`
-	ErrorMessage   *string        `json:"errorMessage,omitempty" yaml:"errorMessage,omitempty"`
-	WarningMessage *string        `json:"warningMessage,omitempty" yaml:"warningMessage,omitempty"`
+	ID             string          `json:"id" yaml:"id"`
+	Name           string          `json:"name" yaml:"name"`
+	Type           string          `json:"type" yaml:"type"`
+	Component      string          `json:"component" yaml:"component"`
+	Configuration  map[string]any  `json:"configuration" yaml:"configuration"`
+	Position       Position        `json:"position" yaml:"position"`
+	IsCollapsed    bool            `json:"isCollapsed" yaml:"isCollapsed"`
+	Metadata       map[string]any  `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Integration    *IntegrationRef `json:"integration,omitempty" yaml:"integration,omitempty"`
+	ErrorMessage   *string         `json:"errorMessage,omitempty" yaml:"errorMessage,omitempty"`
+	WarningMessage *string         `json:"warningMessage,omitempty" yaml:"warningMessage,omitempty"`
+}
+
+type IntegrationRef struct {
+	ID   string `json:"id" yaml:"id"`
+	Name string `json:"name" yaml:"name"`
+}
+
+func (n *Node) NodeTypeForModel() string {
+	switch n.Type {
+	case NodeTypeTrigger:
+		return models.NodeTypeTrigger
+	case NodeTypeWidget:
+		return models.NodeTypeWidget
+	case NodeTypeAction:
+		return models.NodeTypeComponent
+	default:
+		return ""
+	}
 }
 
 func (n *Node) Model() models.Node {
 	model := models.Node{
 		ID:             n.ID,
 		Name:           n.Name,
-		Type:           n.Type,
+		Type:           n.NodeTypeForModel(),
 		Configuration:  n.Configuration,
 		Metadata:       n.Metadata,
 		IsCollapsed:    n.IsCollapsed,
-		IntegrationID:  n.IntegrationID,
 		ErrorMessage:   n.ErrorMessage,
 		WarningMessage: n.WarningMessage,
 		Position: models.Position{
@@ -88,7 +116,11 @@ func (n *Node) Model() models.Node {
 		},
 	}
 
-	if n.Type == models.NodeTypeComponent {
+	if n.Integration != nil {
+		model.IntegrationID = &n.Integration.ID
+	}
+
+	if n.Type == NodeTypeAction {
 		model.Ref = models.NodeRef{
 			Component: &models.ComponentRef{
 				Name: n.Component,
@@ -96,7 +128,7 @@ func (n *Node) Model() models.Node {
 		}
 	}
 
-	if n.Type == models.NodeTypeTrigger {
+	if n.Type == NodeTypeTrigger {
 		model.Ref = models.NodeRef{
 			Trigger: &models.TriggerRef{
 				Name: n.Component,
@@ -104,7 +136,7 @@ func (n *Node) Model() models.Node {
 		}
 	}
 
-	if n.Type == models.NodeTypeWidget {
+	if n.Type == NodeTypeWidget {
 		model.Ref = models.NodeRef{
 			Widget: &models.WidgetRef{
 				Name: n.Component,
@@ -176,22 +208,29 @@ func VersionToCanvasYAML(name string, description string, canvasVersion *models.
 	}
 
 	for _, node := range canvasVersion.Nodes {
-		resource.Spec.Nodes = append(resource.Spec.Nodes, Node{
+		n := Node{
 			ID:             node.ID,
 			Name:           node.Name,
-			Type:           node.Type,
-			Component:      node.ComponentName(),
+			Type:           ModelTypeToYamlType(node.Type),
+			Component:      NodeComponentName(node.Ref),
 			Configuration:  node.Configuration,
 			Metadata:       node.Metadata,
 			IsCollapsed:    node.IsCollapsed,
-			IntegrationID:  node.IntegrationID,
 			ErrorMessage:   node.ErrorMessage,
 			WarningMessage: node.WarningMessage,
 			Position: Position{
 				X: node.Position.X,
 				Y: node.Position.Y,
 			},
-		})
+		}
+
+		if node.IntegrationID != nil {
+			n.Integration = &IntegrationRef{
+				ID: *node.IntegrationID,
+			}
+		}
+
+		resource.Spec.Nodes = append(resource.Spec.Nodes, n)
 	}
 
 	for _, edge := range canvasVersion.Edges {
@@ -224,4 +263,33 @@ func VersionToCanvasYAML(name string, description string, canvasVersion *models.
 	}
 
 	return buf.String(), nil
+}
+
+func ModelTypeToYamlType(t string) string {
+	switch t {
+	case models.NodeTypeTrigger:
+		return NodeTypeTrigger
+	case models.NodeTypeWidget:
+		return NodeTypeWidget
+	case models.NodeTypeComponent:
+		return NodeTypeAction
+	default:
+		return ""
+	}
+}
+
+func NodeComponentName(ref models.NodeRef) string {
+	if ref.Component != nil && ref.Component.Name != "" {
+		return ref.Component.Name
+	}
+
+	if ref.Trigger != nil && ref.Trigger.Name != "" {
+		return ref.Trigger.Name
+	}
+
+	if ref.Widget != nil && ref.Widget.Name != "" {
+		return ref.Widget.Name
+	}
+
+	return ""
 }

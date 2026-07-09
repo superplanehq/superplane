@@ -329,8 +329,8 @@ func TestAppAgentTool_PatchStagingAddsIntegrationBackedNode(t *testing.T) {
 	require.Len(t, patched.Spec.Nodes, 1)
 	node := patched.Spec.Nodes[0]
 	assert.Equal(t, "github.createIssue", node.Component)
-	require.NotNil(t, node.IntegrationID)
-	assert.Equal(t, integration.ID.String(), *node.IntegrationID)
+	require.NotNil(t, node.Integration)
+	assert.Equal(t, integration.ID.String(), node.Integration.ID)
 }
 
 func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
