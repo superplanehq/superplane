@@ -293,7 +293,7 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 		{
 			Name:                 "prompt",
 			Label:                "Prompt",
-			Type:                 configuration.FieldTypeExpression,
+			Type:                 configuration.FieldTypeText,
 			Placeholder:          `"Suggest a title for PR #" + string(item.number) + ": " + item.body`,
 			Description:          "Expression evaluated per item to build its prompt, with `item` and `index` available.",
 			VisibilityConditions: singleVisible,
