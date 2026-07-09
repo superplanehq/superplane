@@ -649,6 +649,64 @@ func Test__CreateBatchMessage__poll__timeout(t *testing.T) {
 	assert.Equal(t, "timeout", out.Status)
 }
 
+// If the poll hook is ever invoked with no batch id in execution metadata
+// (e.g. metadata was cleared or corrupted), it must finish the run with an
+// "error" outcome rather than silently no-op and leave the run open forever.
+func Test__CreateBatchMessage__poll__noBatchId_emitsError(t *testing.T) {
+	c := &CreateBatchMessage{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{Metadata: BatchExecutionMetadata{}}
+
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(0)},
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.HandleHook(hookCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
+	assert.Equal(t, "error", out.Status)
+}
+
+// If the batch has ended but the node's own configuration fails to decode
+// (a permanent error that won't resolve by retrying), the run must finish
+// with the documented "error" output shape instead of a raw, unhandled error.
+func Test__CreateBatchMessage__poll__endedButConfigurationDecodeFails_emitsError(t *testing.T) {
+	c := &CreateBatchMessage{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":1}}`))},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{Metadata: BatchExecutionMetadata{BatchID: "msgbatch_1", Status: "in_progress"}}
+
+	hookCtx := core.ActionHookContext{
+		Name: "poll",
+		// maxTokens is a number field; a string value fails mapstructure decoding.
+		Configuration:  map[string]any{"model": "claude-opus-4-6", "mode": modeSingle, "maxTokens": "not-a-number"},
+		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(0)},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
+	}
+
+	err := c.HandleHook(hookCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
+	assert.Equal(t, "error", out.Status)
+	assert.Equal(t, "msgbatch_1", out.BatchID)
+}
+
 func Test__CreateBatchMessage__Cancel(t *testing.T) {
 	c := &CreateBatchMessage{}
 	httpContext := &contexts.HTTPContext{
