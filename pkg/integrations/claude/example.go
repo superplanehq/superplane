@@ -16,3 +16,13 @@ var exampleOutputTextPrompt map[string]any
 func (c *TextPrompt) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputTextPromptOnce, exampleOutputTextPromptBytes, &exampleOutputTextPrompt)
 }
+
+//go:embed example_output_create_batch_message.json
+var exampleOutputCreateBatchMessageBytes []byte
+
+var exampleOutputCreateBatchMessageOnce sync.Once
+var exampleOutputCreateBatchMessage map[string]any
+
+func (c *CreateBatchMessage) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateBatchMessageOnce, exampleOutputCreateBatchMessageBytes, &exampleOutputCreateBatchMessage)
+}
