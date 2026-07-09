@@ -15,7 +15,11 @@ let mockedExecutionsLoading = false;
 let mockedMe: SuperplaneMeUser | null = null;
 
 vi.mock("@uiw/react-json-view", () => ({
-  default: ({ value }: { value: unknown }) => <pre data-testid="json-view">{JSON.stringify(value)}</pre>,
+  default: ({ value, collapsed }: { value: unknown; collapsed?: boolean | number }) => (
+    <pre data-testid="json-view" data-collapsed={String(collapsed)}>
+      {JSON.stringify(value)}
+    </pre>
+  ),
 }));
 
 const reemitTriggerEventMock = vi.fn();
@@ -105,6 +109,14 @@ describe("RunInspectorPanel", () => {
     expect(screen.getAllByRole("button", { name: "Copy" }).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByRole("button", { name: "Open fullscreen" }).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("Add Grade Label").length).toBeGreaterThan(0);
+  });
+
+  it("shows input as the fixed triggered event for the selected node", () => {
+    renderInspector({ selectedNodeId: "action-2" });
+
+    const inputHeader = screen.getByRole("button", { name: /Triggered\s+Input\s+Add Grade Label/i });
+    expect(within(inputHeader).getByText("Triggered")).toBeInTheDocument();
+    expect(within(inputHeader).queryByText("error")).not.toBeInTheDocument();
   });
 
   it("does not show trigger input and shows the root event payload as trigger output", () => {
@@ -213,6 +225,20 @@ describe("RunInspectorPanel", () => {
     expect(within(dialog).getByRole("button", { name: /On Pull Request/i })).toBeInTheDocument();
     expect(within(dialog).getAllByText("Add Grade Label").length).toBeGreaterThanOrEqual(2);
     expect(within(dialog).getByTestId("json-view")).toHaveTextContent("{}");
+    expect(within(dialog).getByTestId("json-view")).toHaveAttribute("data-collapsed", "false");
+  });
+
+  it("expands timeline JSON by default in fullscreen modals only", () => {
+    renderInspector({ selectedNodeId: "action-2" });
+
+    fireEvent.click(screen.getByRole("button", { name: /Output · default/i }));
+
+    expect(screen.getByTestId("json-view")).toHaveAttribute("data-collapsed", "2");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Open fullscreen" })[0]);
+
+    const dialog = screen.getByRole("dialog", { name: "Input" });
+    expect(within(dialog).getByTestId("json-view")).toHaveAttribute("data-collapsed", "false");
   });
 
   it("renders a single close button that closes the inspector", () => {
