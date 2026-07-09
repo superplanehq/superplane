@@ -179,6 +179,48 @@ func Test__AddReaction__Execute(t *testing.T) {
 		assert.Equal(t, "eyes", awardEmoji.Name)
 	})
 
+	t.Run("merge request target - already exists - returns existing reaction", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":         "123",
+				"mergeRequestIid": "1",
+				"target":          ReactionTargetMergeRequest,
+				"content":         "eyes",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+				},
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					GitlabMockResponse(http.StatusNotFound, `{"message":"404 Award Emoji Name has already been taken"}`),
+					GitlabMockResponse(http.StatusOK, `{"id": 42}`),
+					GitlabMockResponse(http.StatusOK, `[{"id": 25, "name": "eyes", "user": {"id": 42}}]`),
+				},
+			},
+			ExecutionState: executionState,
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+
+		require.Len(t, executionState.Payloads, 1)
+		assert.Equal(t, "gitlab.addReaction", executionState.Type)
+
+		var awardEmoji AwardEmoji
+		payload := executionState.Payloads[0].(map[string]any)
+		payloadBytes, _ := json.Marshal(payload["data"])
+		json.Unmarshal(payloadBytes, &awardEmoji)
+
+		assert.Equal(t, 25, awardEmoji.ID)
+		assert.Equal(t, "eyes", awardEmoji.Name)
+	})
+
 	t.Run("note target - success", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{}
 		ctx := core.ExecutionContext{

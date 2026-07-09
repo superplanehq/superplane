@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -515,16 +517,73 @@ type CreateAwardEmojiRequest struct {
 	Name string `json:"name"`
 }
 
+// errAwardEmojiAlreadyExists is returned when the authenticated user has already
+// awarded the given emoji to the target - GitLab reports this as a 404 with an
+// "Award Emoji Name has already been taken" message rather than a 409 Conflict.
+var errAwardEmojiAlreadyExists = errors.New("award emoji already exists")
+
 // CreateMergeRequestAwardEmoji adds an award emoji to the merge request itself.
+// If the authenticated user has already awarded this emoji, it returns the
+// existing award emoji instead of failing, making the operation idempotent.
 func (c *Client) CreateMergeRequestAwardEmoji(ctx context.Context, projectID, mergeRequestIID string, req *CreateAwardEmojiRequest) (*AwardEmoji, error) {
 	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/award_emoji", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
-	return c.createAwardEmoji(ctx, apiURL, req)
+	awardEmoji, err := c.createAwardEmoji(ctx, apiURL, req)
+	if errors.Is(err, errAwardEmojiAlreadyExists) {
+		return c.findExistingAwardEmoji(req.Name, func() ([]AwardEmoji, error) {
+			return c.ListMergeRequestAwardEmoji(projectID, mergeRequestIID)
+		})
+	}
+	return awardEmoji, err
 }
 
 // CreateMergeRequestNoteAwardEmoji adds an award emoji to a note on a merge request.
+// If the authenticated user has already awarded this emoji, it returns the
+// existing award emoji instead of failing, making the operation idempotent.
 func (c *Client) CreateMergeRequestNoteAwardEmoji(ctx context.Context, projectID, mergeRequestIID, noteID string, req *CreateAwardEmojiRequest) (*AwardEmoji, error) {
 	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/notes/%s/award_emoji", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID), url.PathEscape(noteID))
-	return c.createAwardEmoji(ctx, apiURL, req)
+	awardEmoji, err := c.createAwardEmoji(ctx, apiURL, req)
+	if errors.Is(err, errAwardEmojiAlreadyExists) {
+		return c.findExistingAwardEmoji(req.Name, func() ([]AwardEmoji, error) {
+			return c.ListMergeRequestNoteAwardEmoji(projectID, mergeRequestIID, noteID)
+		})
+	}
+	return awardEmoji, err
+}
+
+// ListMergeRequestAwardEmoji lists the award emoji on a merge request.
+func (c *Client) ListMergeRequestAwardEmoji(projectID, mergeRequestIID string) ([]AwardEmoji, error) {
+	return fetchAllResources[AwardEmoji](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/award_emoji?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID), page)
+	})
+}
+
+// ListMergeRequestNoteAwardEmoji lists the award emoji on a note of a merge request.
+func (c *Client) ListMergeRequestNoteAwardEmoji(projectID, mergeRequestIID, noteID string) ([]AwardEmoji, error) {
+	return fetchAllResources[AwardEmoji](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/notes/%s/award_emoji?per_page=100&page=%d", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID), url.PathEscape(noteID), page)
+	})
+}
+
+// findExistingAwardEmoji locates the authenticated user's award emoji with the given
+// name among the results of listFn, used to recover from errAwardEmojiAlreadyExists.
+func (c *Client) findExistingAwardEmoji(name string, listFn func() ([]AwardEmoji, error)) (*AwardEmoji, error) {
+	user, err := c.getCurrentUser()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current user: %v", err)
+	}
+
+	awardEmoji, err := listFn()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list existing award emoji: %v", err)
+	}
+
+	for _, e := range awardEmoji {
+		if e.Name == name && e.User.ID == user.ID {
+			return &e, nil
+		}
+	}
+
+	return nil, fmt.Errorf("award emoji %q reported as already existing but could not be found", name)
 }
 
 func (c *Client) createAwardEmoji(ctx context.Context, apiURL string, req *CreateAwardEmojiRequest) (*AwardEmoji, error) {
@@ -546,7 +605,11 @@ func (c *Client) createAwardEmoji(ctx context.Context, apiURL string, req *Creat
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("failed to create award emoji: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+		responseBody := readResponseBody(resp)
+		if resp.StatusCode == http.StatusNotFound && strings.Contains(parseGitlabErrorMessage(responseBody), "already been taken") {
+			return nil, errAwardEmojiAlreadyExists
+		}
+		return nil, fmt.Errorf("failed to create award emoji: status %d, response: %s", resp.StatusCode, responseBody)
 	}
 
 	var awardEmoji AwardEmoji
@@ -555,6 +618,19 @@ func (c *Client) createAwardEmoji(ctx context.Context, apiURL string, req *Creat
 	}
 
 	return &awardEmoji, nil
+}
+
+// parseGitlabErrorMessage extracts the "message" field from a GitLab JSON error
+// body (e.g. {"message":"404 Award Emoji Name has already been taken"}),
+// falling back to the raw body if it isn't in that shape.
+func parseGitlabErrorMessage(body string) string {
+	var errResp struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(body), &errResp); err == nil && errResp.Message != "" {
+		return errResp.Message
+	}
+	return body
 }
 
 func readResponseBody(resp *http.Response) string {
