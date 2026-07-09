@@ -81,6 +81,15 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 		return c.scheduleNextPoll(ctx, attempt+1, 0)
 	}
 
+	// The batch itself has ended even if fetching its results below fails;
+	// refresh metadata with its terminal status/counts now so the UI doesn't
+	// keep showing stale in-progress state while results are retried.
+	_ = ctx.Metadata.Set(BatchExecutionMetadata{
+		BatchID:       batch.ID,
+		Status:        batch.ProcessingStatus,
+		RequestCounts: &batch.RequestCounts,
+	})
+
 	spec, err := decodeBatchMessageSpec(ctx.Configuration)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -89,17 +98,18 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 
 	results, err := client.GetMessageBatchResults(batch.ID)
 	if err != nil {
+		errs++
+		if errs >= batchMaxPollErrors {
+			ctx.Logger.Errorf("Message batch %s ended but fetching results failed repeatedly: %v", batch.ID, err)
+			out := buildBatchOutput("error", batch, nil, false)
+			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
+		}
 		ctx.Logger.Warnf("Failed to fetch results for batch %s: %v. Retrying poll.", batch.ID, err)
-		return c.scheduleNextPoll(ctx, attempt+1, errs+1)
+		return c.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
 	out := buildBatchOutput(batchStatusEnded, batch, results, hasSchema)
-	if err := ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out}); err != nil {
-		return err
-	}
-
-	_ = ctx.Metadata.Set(BatchExecutionMetadata{BatchID: batch.ID, Status: batch.ProcessingStatus, RequestCounts: &batch.RequestCounts})
-	return nil
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
 }
 
 func (c *CreateBatchMessage) scheduleNextPoll(ctx core.ActionHookContext, nextAttempt, errors int) error {

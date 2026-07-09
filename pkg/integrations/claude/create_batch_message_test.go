@@ -448,6 +448,37 @@ func Test__CreateBatchMessage__Execute__schedulesPoll(t *testing.T) {
 	assert.Equal(t, 1, meta.RequestCounts.Processing)
 }
 
+// If Execute is retried after a batch was already submitted for this
+// execution (e.g. the run didn't finish before the first poll could be
+// scheduled/handled), it must resume polling the existing batch rather than
+// submitting a duplicate one.
+func Test__CreateBatchMessage__Execute__resumesExistingBatchInsteadOfCreatingDuplicate(t *testing.T) {
+	c := &CreateBatchMessage{}
+	httpContext := &contexts.HTTPContext{}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	metadataCtx := &contexts.MetadataContext{Metadata: BatchExecutionMetadata{BatchID: "msgbatch_existing", Status: "in_progress"}}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	requestsCtx := &contexts.RequestContext{}
+
+	execCtx := core.ExecutionContext{
+		ID:             uuid.New(),
+		Configuration:  validBatchConfig(),
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Requests:       requestsCtx,
+		Expressions:    singleItemExpressions("Capital of France?"),
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.Execute(execCtx)
+	require.NoError(t, err)
+	assert.Empty(t, httpContext.Requests, "must not submit a new batch when one already exists for this execution")
+	assert.Equal(t, "poll", requestsCtx.Action)
+	assert.Equal(t, batchInitialPoll, requestsCtx.Duration)
+}
+
 func Test__CreateBatchMessage__poll__terminal(t *testing.T) {
 	c := &CreateBatchMessage{}
 	httpContext := &contexts.HTTPContext{
@@ -519,6 +550,80 @@ func Test__CreateBatchMessage__poll__stillProcessing(t *testing.T) {
 	require.NotNil(t, meta.RequestCounts)
 	assert.Equal(t, 18, meta.RequestCounts.Processing)
 	assert.Equal(t, 5, meta.RequestCounts.Succeeded)
+}
+
+// Once the batch has ended, metadata must be refreshed with its terminal
+// status/counts even if downloading results fails and a retry is scheduled,
+// so the UI doesn't keep showing stale in-progress state.
+func Test__CreateBatchMessage__poll__endedButResultsFetchFails_refreshesMetadataAndRetries(t *testing.T) {
+	c := &CreateBatchMessage{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":2}}`))},
+			{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":"boom"}`))},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{Metadata: BatchExecutionMetadata{BatchID: "msgbatch_1", Status: "in_progress"}}
+	requestsCtx := &contexts.RequestContext{}
+
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Configuration:  validBatchConfig(),
+		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(0)},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       requestsCtx,
+	}
+
+	err := c.HandleHook(hookCtx)
+	require.NoError(t, err)
+	assert.False(t, executionState.Finished)
+	assert.Equal(t, "poll", requestsCtx.Action)
+
+	meta := metadataCtx.Metadata.(BatchExecutionMetadata)
+	assert.Equal(t, batchStatusEnded, meta.Status)
+	require.NotNil(t, meta.RequestCounts)
+	assert.Equal(t, 2, meta.RequestCounts.Succeeded)
+}
+
+// After enough consecutive results-fetch failures for an ended batch, the
+// run must finish with an "error" outcome (not silently retry until it hits
+// the unrelated max-attempts timeout).
+func Test__CreateBatchMessage__poll__endedButResultsFetchFailsRepeatedly_emitsError(t *testing.T) {
+	c := &CreateBatchMessage{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":2}}`))},
+			{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":"boom"}`))},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{Metadata: BatchExecutionMetadata{BatchID: "msgbatch_1", Status: "in_progress"}}
+
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Configuration:  validBatchConfig(),
+		Parameters:     map[string]any{"attempt": float64(5), "errors": float64(batchMaxPollErrors - 1)},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
+	}
+
+	err := c.HandleHook(hookCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
+	assert.Equal(t, "error", out.Status)
+	assert.Equal(t, "msgbatch_1", out.BatchID)
 }
 
 func Test__CreateBatchMessage__poll__timeout(t *testing.T) {

@@ -394,6 +394,16 @@ func (c *CreateBatchMessage) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// If a batch was already submitted for this execution (Execute is being
+	// retried after the batch was created but the run didn't finish, e.g. the
+	// process crashed before scheduling/handling the first poll), resume
+	// polling it instead of submitting a duplicate batch.
+	existing := BatchExecutionMetadata{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil && existing.BatchID != "" {
+		ctx.Logger.Infof("Message batch %s was already created for this execution; resuming instead of creating a new one", existing.BatchID)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, batchInitialPoll)
+	}
+
 	items, err := resolveBatchRequests(ctx.Expressions, spec)
 	if err != nil {
 		return err
