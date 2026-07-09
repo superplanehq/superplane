@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useUpdateCanvasPreference, useCanvasPreference } from "@/hooks/useCanvasData";
 import type { CanvasConsoleData } from "@/hooks/useCanvasData";
@@ -123,58 +124,24 @@ export function useDefaultAppTab({
     if (redirectResolved) return;
     if (!organizationId || !canvasId) return;
 
-    // The user already navigated to another tab while the stored preference
-    // was loading; their explicit choice wins over the default-tab redirect.
-    if (currentTab !== mountTabRef.current) {
-      setRedirectResolved(true);
-      return;
-    }
-
-    if (preferenceQuery.isPending) return;
-
-    // A failed preference load leaves the stored tab unknown; redirecting
-    // (including the Console fallback) could contradict it. Stay put.
-    if (preferenceQuery.isError) {
-      setRedirectResolved(true);
-      return;
-    }
-
-    const storedTab = preferenceQuery.data?.lastVisitedTab;
-    if (isAppTabId(storedTab)) {
-      setRedirectResolved(true);
-      // Already on the stored tab (e.g. a refresh landing on Canvas with a
-      // stored "canvas" preference): rewriting the URL would only strip
-      // unrelated params like `node`/`sidebar`/`file`, losing selection state.
-      if (storedTab !== currentTab) {
-        pendingRedirectTabRef.current = storedTab;
-        applyTabToSearchParams(storedTab, setSearchParams);
-      }
-      return;
-    }
-
-    // No stored tab yet: fall back to Console if the app has panels.
-    if (!consoleQuery) {
-      setRedirectResolved(true);
-      return;
-    }
-    // A console read that ended in error settles the fallback on the current
-    // tab: waiting for a success that may never come would leave the
-    // resolution pending forever, blocking tab recording below. Skipping the
-    // Console fallback for this visit is the lesser cost.
-    if (consoleQuery.isError) {
-      setRedirectResolved(true);
-      return;
-    }
-    // While the console read is still in flight, keep waiting; resolving now
-    // would lock in Canvas even if the read later shows panels. An explicit
-    // tab switch still resolves the redirect via the user-choice branch above.
-    if (!consoleQuery.isSuccess) return;
+    const resolution = resolveDefaultTab({
+      // The user already navigated to another tab while the stored preference
+      // was loading; their explicit choice wins over the default-tab redirect.
+      userSwitchedTabs: currentTab !== mountTabRef.current,
+      preferenceIsPending: preferenceQuery.isPending,
+      preferenceIsError: preferenceQuery.isError,
+      storedTab: preferenceQuery.data?.lastVisitedTab,
+      consoleQuery,
+    });
+    if (!resolution.settled) return;
 
     setRedirectResolved(true);
-    const panels = consoleQuery.data?.panels ?? [];
-    if (panels.length > 0) {
-      pendingRedirectTabRef.current = "console";
-      applyTabToSearchParams("console", setSearchParams);
+    // No redirect when already on the target tab (e.g. a refresh landing on
+    // Canvas with a stored "canvas" preference): rewriting the URL would only
+    // strip unrelated params like `node`/`sidebar`/`file`, losing selection.
+    if (resolution.redirectTo !== null && resolution.redirectTo !== currentTab) {
+      pendingRedirectTabRef.current = resolution.redirectTo;
+      applyTabToSearchParams(resolution.redirectTo, setSearchParams);
     }
   }, [
     redirectResolved,
@@ -228,29 +195,7 @@ export function useDefaultAppTab({
       return;
     }
 
-    // A fresh tab value gets a fresh attempt budget; retries of the same
-    // failing value keep consuming it until the cap is hit.
-    if (writeAttemptsRef.current.tab !== currentTab) {
-      writeAttemptsRef.current = { tab: currentTab, count: 0 };
-    }
-    if (writeAttemptsRef.current.count >= MAX_TAB_WRITE_ATTEMPTS) return;
-    writeAttemptsRef.current.count += 1;
-
-    setRecordedTab(currentTab);
-    recordTab(
-      { canvasId, lastVisitedTab: currentTab },
-      {
-        onError: () => {
-          // Treating a failed write as recorded would suppress every retry;
-          // clearing the guard re-runs this effect (state change), which
-          // retries the write until the attempt budget runs out.
-          setRecordedTab((recorded) => (recorded === currentTab ? null : recorded));
-        },
-        onSuccess: () => {
-          writeAttemptsRef.current = { tab: null, count: 0 };
-        },
-      },
-    );
+    persistTabWithRetryBudget({ canvasId, tab: currentTab, writeAttemptsRef, setRecordedTab, recordTab });
   }, [
     redirectResolved,
     recordedTab,
@@ -261,6 +206,91 @@ export function useDefaultAppTab({
     preferenceQuery.isSuccess,
     recordTab,
   ]);
+}
+
+type DefaultTabResolution = { settled: false } | { settled: true; redirectTo: AppTabId | null };
+
+type ResolveDefaultTabInput = {
+  userSwitchedTabs: boolean;
+  preferenceIsPending: boolean;
+  preferenceIsError: boolean;
+  storedTab: string | undefined;
+  consoleQuery: ConsoleQueryLike | undefined;
+};
+
+/**
+ * Decides whether default-tab resolution can settle and, if so, which tab (if
+ * any) to redirect to. Pure decision logic; the caller applies the redirect.
+ */
+function resolveDefaultTab({
+  userSwitchedTabs,
+  preferenceIsPending,
+  preferenceIsError,
+  storedTab,
+  consoleQuery,
+}: ResolveDefaultTabInput): DefaultTabResolution {
+  if (userSwitchedTabs) return { settled: true, redirectTo: null };
+
+  if (preferenceIsPending) return { settled: false };
+
+  // A failed preference load leaves the stored tab unknown; redirecting
+  // (including the Console fallback) could contradict it. Stay put.
+  if (preferenceIsError) return { settled: true, redirectTo: null };
+
+  if (isAppTabId(storedTab)) return { settled: true, redirectTo: storedTab };
+
+  // No stored tab yet: fall back to Console if the app has panels.
+  if (!consoleQuery) return { settled: true, redirectTo: null };
+
+  // A console read that ended in error settles the fallback on the current
+  // tab: waiting for a success that may never come would leave the resolution
+  // pending forever, blocking tab recording. Skipping the Console fallback
+  // for this visit is the lesser cost.
+  if (consoleQuery.isError) return { settled: true, redirectTo: null };
+
+  // While the console read is still in flight, keep waiting; settling now
+  // would lock in Canvas even if the read later shows panels. An explicit tab
+  // switch still settles the resolution via the user-choice branch above.
+  if (!consoleQuery.isSuccess) return { settled: false };
+
+  const panels = consoleQuery.data?.panels ?? [];
+  return { settled: true, redirectTo: panels.length > 0 ? "console" : null };
+}
+
+type WriteAttempts = { tab: AppTabId | null; count: number };
+
+type PersistTabOptions = {
+  canvasId: string;
+  tab: AppTabId;
+  writeAttemptsRef: { current: WriteAttempts };
+  setRecordedTab: Dispatch<SetStateAction<AppTabId | null>>;
+  recordTab: ReturnType<typeof useUpdateCanvasPreference>["mutate"];
+};
+
+function persistTabWithRetryBudget({ canvasId, tab, writeAttemptsRef, setRecordedTab, recordTab }: PersistTabOptions) {
+  // A fresh tab value gets a fresh attempt budget; retries of the same
+  // failing value keep consuming it until the cap is hit.
+  if (writeAttemptsRef.current.tab !== tab) {
+    writeAttemptsRef.current = { tab, count: 0 };
+  }
+  if (writeAttemptsRef.current.count >= MAX_TAB_WRITE_ATTEMPTS) return;
+  writeAttemptsRef.current.count += 1;
+
+  setRecordedTab(tab);
+  recordTab(
+    { canvasId, lastVisitedTab: tab },
+    {
+      onError: () => {
+        // Treating a failed write as recorded would suppress every retry;
+        // clearing the guard re-runs the record effect (state change), which
+        // retries the write until the attempt budget runs out.
+        setRecordedTab((recorded) => (recorded === tab ? null : recorded));
+      },
+      onSuccess: () => {
+        writeAttemptsRef.current = { tab: null, count: 0 };
+      },
+    },
+  );
 }
 
 function applyTabToSearchParams(tab: AppTabId, setSearchParams: SetSearchParams) {
