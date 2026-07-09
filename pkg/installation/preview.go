@@ -25,7 +25,7 @@ type Preview struct {
 
 // BuildPreview loads app metadata from GitHub and prepares install defaults.
 // If reg is non-nil, it also detects which integrations the canvas needs.
-func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
+func BuildPreview(repoParam string, registry *registry.Registry) (*Preview, error) {
 	repo, err := ParseRepository(repoParam)
 	if err != nil {
 		return nil, err
@@ -54,21 +54,18 @@ func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
 		preview.InstallParams = params.InstallParams
 	}
 
-	if reg != nil {
-		preview.Integrations = detectIntegrations(canvas, reg)
-	}
-
+	preview.Integrations = detectIntegrations(canvas, registry)
 	return preview, nil
 }
 
 // detectIntegrations returns a deduplicated list of integration type names
 // required by the canvas nodes.
-func detectIntegrations(canvas *yaml.Canvas, reg *registry.Registry) []string {
+func detectIntegrations(canvas *yaml.Canvas, registry *registry.Registry) []string {
 	if canvas.Spec == nil {
 		return nil
 	}
 
-	componentToIntegration := buildComponentIntegrationMap(reg)
+	componentToIntegration := buildComponentIntegrationMap(registry)
 	seen := make(map[string]bool)
 	var result []string
 

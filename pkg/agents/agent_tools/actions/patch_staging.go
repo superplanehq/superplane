@@ -137,9 +137,14 @@ func (a patchStagingAction) readStagedCanvas(ctx context.Context, session agents
 		return stagedDraftCanvas{}, fmt.Errorf("parse staged canvas yaml: %w", err)
 	}
 
+	nodes, edges, err := c.Parse(a.deps.Registry, session.OrganizationID)
+	if err != nil {
+		return stagedDraftCanvas{}, fmt.Errorf("parse staged canvas yaml: %w", err)
+	}
+
 	return stagedDraftCanvas{
-		nodes: c.Nodes(),
-		edges: c.Edges(),
+		nodes: nodes,
+		edges: edges,
 	}, nil
 }
 

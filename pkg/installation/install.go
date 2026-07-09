@@ -199,6 +199,11 @@ func fetchAndSubstituteParams(repo *Repository, userParams map[string]string, or
 }
 
 func (s *Service) createCanvas(ctx context.Context, organizationID uuid.UUID, canvas *yaml.Canvas, seedFiles []models.RepositorySeedFile) (string, error) {
+	nodes, edges, err := canvas.Parse(s.Registry, organizationID.String())
+	if err != nil {
+		return "", err
+	}
+
 	response, err := canvases.CreateCanvasWithSeedFiles(
 		ctx,
 		s.Registry,
@@ -209,8 +214,8 @@ func (s *Service) createCanvas(ctx context.Context, organizationID uuid.UUID, ca
 		organizationID,
 		canvas.Metadata.Name,
 		canvas.Metadata.Description,
-		canvas.Nodes(),
-		canvas.Edges(),
+		nodes,
+		edges,
 		nil,
 		s.UsageService,
 		seedFiles,

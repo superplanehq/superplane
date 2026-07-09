@@ -457,11 +457,10 @@ func createNewCanvasVersionFromLive(
 				return nil, err
 			}
 
-			// TODO: move logic from here to CanvasFromYAML()
-			// nodes, edges, err := ParseCanvas(registry, organizationID, pbCanvas)
-			// if err != nil {
-			// 	return nil, err
-			// }
+			nodes, edges, err := canvas.Parse(registry, organizationID)
+			if err != nil {
+				return nil, err
+			}
 
 			err = usage.EnsureOrganizationWithinLimits(
 				ctx,
@@ -469,7 +468,7 @@ func createNewCanvasVersionFromLive(
 				organizationID,
 				&usagepb.OrganizationState{},
 				&usagepb.CanvasState{
-					Nodes: int32(len(canvas.Spec.Nodes)),
+					Nodes: int32(len(nodes)),
 				},
 			)
 
@@ -477,9 +476,9 @@ func createNewCanvasVersionFromLive(
 				return nil, err
 			}
 
-			newNodes := injectMetadataIntoNodes(liveVersion.Nodes, canvas.Nodes())
+			newNodes := injectMetadataIntoNodes(liveVersion.Nodes, nodes)
 			newVersion.Nodes = datatypes.NewJSONSlice(slices.Clone(newNodes))
-			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(canvas.Edges()))
+			newVersion.Edges = datatypes.NewJSONSlice(slices.Clone(edges))
 		case ConsoleYAMLRepositoryPath:
 			console, err := yaml.ConsoleFromYML([]byte(content))
 			if err != nil {

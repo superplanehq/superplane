@@ -51,10 +51,11 @@ func CreateCanvas(
 		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
 	}
 
-	nodes, edges, err := ParseCanvas(registry, organizationID.String(), pbCanvas)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: figure out what to do here
+	// nodes, edges, err := ParseCanvas(registry, organizationID.String(), pbCanvas)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return CreateCanvasWithSeedFiles(
 		ctx,
@@ -66,8 +67,8 @@ func CreateCanvas(
 		organizationID,
 		name,
 		pbCanvas.Metadata.Description,
-		nodes,
-		edges,
+		[]models.Node{},
+		[]models.Edge{},
 		autoLayout,
 		usageService,
 		nil,

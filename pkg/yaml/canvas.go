@@ -5,8 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gopkg.in/yaml.v3"
 )
 
@@ -178,11 +183,6 @@ func CanvasFromYAML(raw []byte) (*Canvas, error) {
 		return nil, fmt.Errorf("invalid canvas yaml: %w", err)
 	}
 
-	// TODO: put validation from ParseCanvas() here
-	// if err := resource.Validate(); err != nil {
-	// 	return nil, err
-	// }
-
 	return &resource, nil
 }
 
@@ -292,4 +292,270 @@ func NodeComponentName(ref models.NodeRef) string {
 	}
 
 	return ""
+}
+
+func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node, []models.Edge, error) {
+
+	//
+	// Allow empty canvases
+	//
+	if len(c.Spec.Nodes) == 0 {
+		return []models.Node{}, []models.Edge{}, errors.New("canvas has no nodes")
+	}
+
+	nodeIDs := make(map[string]bool)
+	nodeTypeByID := make(map[string]string)
+	nodeValidationErrors := make(map[string]string)
+
+	for i, node := range c.Spec.Nodes {
+		if node.ID == "" {
+			return nil, nil, fmt.Errorf("node %d: id is required", i)
+		}
+
+		if node.Name == "" {
+			return nil, nil, fmt.Errorf("node %s: name is required", node.ID)
+		}
+
+		if nodeIDs[node.ID] {
+			return nil, nil, fmt.Errorf("node %s: duplicate node id", node.ID)
+		}
+
+		nodeIDs[node.ID] = true
+		nodeTypeByID[node.ID] = node.Type
+		if err := c.validateNodeRef(registry, orgID, node); err != nil {
+			nodeValidationErrors[node.ID] = err.Error()
+		}
+	}
+
+	// Find shadowed names within connected components
+	nodeWarnings := c.FindShadowedNameWarnings(registry)
+
+	nodesByID := make(map[string]models.Node, len(c.Spec.Nodes))
+	for _, node := range c.Spec.Nodes {
+		nodesByID[node.ID] = node.Model()
+	}
+
+	//
+	// TODO: this uses componentpb for validation
+	//
+	// for nodeID, errs := range expressionvalidation.ValidateCanvasExpressions(registry, c.Spec.Nodes) {
+	// 	msgs := make([]string, 0, len(errs))
+	// 	for _, e := range errs {
+	// 		msgs = append(msgs, e.Error())
+	// 	}
+	// 	joined := strings.Join(msgs, "\n")
+	// 	if existing, ok := nodeValidationErrors[nodeID]; ok {
+	// 		nodeValidationErrors[nodeID] = existing + "\n" + joined
+	// 	} else {
+	// 		nodeValidationErrors[nodeID] = joined
+	// 	}
+	// }
+
+	//
+	// Validate edges
+	//
+	for i, edge := range c.Spec.Edges {
+		if edge.SourceID == "" || edge.TargetID == "" {
+			return nil, nil, fmt.Errorf("edge %d: source and target are required", i)
+		}
+
+		if edge.Channel == "" {
+			edge.Channel = "default"
+		}
+
+		if !nodeIDs[edge.SourceID] {
+			return nil, nil, fmt.Errorf("edge %d: source node %s not found", i, edge.SourceID)
+		}
+
+		if !nodeIDs[edge.TargetID] {
+			return nil, nil, fmt.Errorf("edge %d: target node %s not found", i, edge.TargetID)
+		}
+
+		if nodeTypeByID[edge.SourceID] == NodeTypeWidget {
+			return nil, nil, fmt.Errorf("edge %d: widget nodes cannot be used as source nodes", i)
+		}
+
+		if nodeTypeByID[edge.TargetID] == NodeTypeWidget {
+			return nil, nil, fmt.Errorf("edge %d: widget nodes cannot be used as target nodes", i)
+		}
+
+		if err := changesets.ValidateSourceNodeOutputChannel(
+			registry,
+			nodesByID[edge.SourceID],
+			edge.Channel,
+		); err != nil {
+			return nil, nil, fmt.Errorf("edge %d: %v", i, err)
+		}
+	}
+
+	//
+	// Check for cycles in the canvas
+	//
+	if err := changesets.CheckForCycles(c.Nodes(), c.Edges()); err != nil {
+		return nil, nil, fmt.Errorf("invalid canvas graph: %v", err)
+	}
+
+	//
+	// Return nodes enriched with errors and warnings found during validation
+	//
+
+	nodes := make([]models.Node, 0, len(c.Spec.Nodes))
+	for _, node := range c.Spec.Nodes {
+		n := node.Model()
+
+		if errorMsg, hasError := nodeValidationErrors[node.ID]; hasError {
+			n.ErrorMessage = &errorMsg
+		} else {
+			n.ErrorMessage = nil
+		}
+
+		if warningMsg, hasWarning := nodeWarnings[node.ID]; hasWarning {
+			n.WarningMessage = &warningMsg
+		} else {
+			n.WarningMessage = nil
+		}
+
+		nodes = append(nodes, n)
+	}
+
+	return nodes, c.Edges(), nil
+}
+
+func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID string, node Node) error {
+	if node.Component == "" {
+		return fmt.Errorf("component name is required")
+	}
+
+	parts := strings.SplitN(node.Component, ".", 2)
+	if len(parts) > 2 {
+		return fmt.Errorf("invalid component name: %s", node.Component)
+	}
+
+	configurable, err := registry.FindConfigurableComponent(node.Component)
+	if err != nil {
+		return err
+	}
+
+	if len(parts) > 1 {
+		err := c.validateIntegration(organizationID, node.Integration, node.Component)
+		if err != nil {
+			return err
+		}
+	}
+
+	return configuration.ValidateConfiguration(configurable.Configuration(), node.Configuration)
+}
+
+func (c *Canvas) validateIntegration(organizationID string, ref *IntegrationRef, component string) error {
+	if ref == nil || ref.ID == "" {
+		return fmt.Errorf("integration is required")
+	}
+
+	integrationID, err := uuid.Parse(ref.ID)
+	if err != nil {
+		return fmt.Errorf("invalid integration ID: %v", err)
+	}
+
+	orgID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return fmt.Errorf("invalid organization ID: %v", err)
+	}
+
+	integration, err := models.FindIntegration(orgID, integrationID)
+	if err != nil {
+		return fmt.Errorf("integration not found or does not belong to this organization")
+	}
+
+	if !integration.HasCapabilityEnabled(component) {
+		return fmt.Errorf("%s is not enabled for integration %s", component, integration.InstallationName)
+	}
+
+	return nil
+}
+
+// FindShadowedNameWarnings detects nodes with duplicate names within connected components.
+// Only nodes that are connected (directly or transitively) and share the same name will be flagged.
+// Returns a map of node ID -> warning message.
+func (c *Canvas) FindShadowedNameWarnings(registry *registry.Registry) map[string]string {
+	warnings := make(map[string]string)
+
+	if len(c.Spec.Nodes) == 0 {
+		return warnings
+	}
+
+	// Build maps for node names and IDs
+	nodeIDs := make(map[string]bool)
+	nodeNameByID := make(map[string]string)
+
+	for _, node := range c.Spec.Nodes {
+		nodeType, err := registry.ComponentType(node.Component)
+		if err != nil {
+			continue
+		}
+
+		if nodeType == models.NodeTypeWidget {
+			continue // Skip widgets
+		}
+
+		nodeIDs[node.ID] = true
+		nodeNameByID[node.ID] = node.Name
+	}
+
+	// Find connected components using union-find
+	parent := make(map[string]string)
+	for id := range nodeIDs {
+		parent[id] = id
+	}
+
+	var find func(x string) string
+	find = func(x string) string {
+		if parent[x] != x {
+			parent[x] = find(parent[x])
+		}
+		return parent[x]
+	}
+
+	union := func(x, y string) {
+		px, py := find(x), find(y)
+		if px != py {
+			parent[px] = py
+		}
+	}
+
+	// Union nodes connected by edges
+	for _, edge := range c.Spec.Edges {
+		if edge.SourceID != "" && edge.TargetID != "" {
+			// Only union if both nodes are tracked (non-widgets)
+			if nodeIDs[edge.SourceID] && nodeIDs[edge.TargetID] {
+				union(edge.SourceID, edge.TargetID)
+			}
+		}
+	}
+
+	// Group nodes by connected component
+	componentNodes := make(map[string][]string)
+	for id := range nodeIDs {
+		root := find(id)
+		componentNodes[root] = append(componentNodes[root], id)
+	}
+
+	// Check for shadowed names within each connected component
+	for _, nodeIDsInComponent := range componentNodes {
+		nameToIDs := make(map[string][]string)
+		for _, nodeID := range nodeIDsInComponent {
+			name := nodeNameByID[nodeID]
+			nameToIDs[name] = append(nameToIDs[name], nodeID)
+		}
+
+		for name, ids := range nameToIDs {
+			if len(ids) > 1 {
+				warningMsg := "Multiple components named \"" + name + "\""
+				for _, nodeID := range ids {
+					warnings[nodeID] = warningMsg
+				}
+			}
+		}
+	}
+
+	return warnings
 }
