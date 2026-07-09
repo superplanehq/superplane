@@ -32,6 +32,7 @@ import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
   useCanvas,
+  useCanvasConsole,
   useCanvasMemoryEntries,
   useCanvasVersions,
   useCreateCanvasMemoryNamespace,
@@ -1015,7 +1016,12 @@ export function AppPage() {
     editBootstrapReady: isEditBootstrapReady,
   });
 
-  useDefaultAppTab({ organizationId, canvasId, urlViewFlags, searchParams, setSearchParams, consoleQuery });
+  // First-visit Console defaulting must consult the live console, not
+  // `consoleQuery`: that one tracks the active version (possibly a draft from
+  // `?version=`), whose console can be empty while the live app has widgets.
+  // Same query key as other live-console reads, so this usually dedupes.
+  const liveConsoleQuery = useCanvasConsole(canvasId, undefined);
+  useDefaultAppTab({ organizationId, canvasId, urlViewFlags, searchParams, setSearchParams, liveConsoleQuery });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {

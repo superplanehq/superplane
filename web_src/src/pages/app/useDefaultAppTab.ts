@@ -50,8 +50,14 @@ type UseDefaultAppTabOptions = {
   urlViewFlags: UrlViewFlags;
   searchParams: URLSearchParams;
   setSearchParams: SetSearchParams;
-  /** Console query result, used only when there is no stored preference yet to fall back to Console when panels exist. */
-  consoleQuery: ConsoleQueryLike | undefined;
+  /**
+   * Live console query result, used only when there is no stored preference
+   * yet to fall back to Console when panels exist. This must read the live
+   * console, not the active version's: the active version can be a draft
+   * (e.g. from `?version=`) whose console is empty while the live app has
+   * widgets, and first-visit defaulting is about what the app publishes.
+   */
+  liveConsoleQuery: ConsoleQueryLike | undefined;
 };
 
 /**
@@ -66,7 +72,7 @@ export function useDefaultAppTab({
   urlViewFlags,
   searchParams,
   setSearchParams,
-  consoleQuery,
+  liveConsoleQuery,
 }: UseDefaultAppTabOptions) {
   const preferenceQuery = useCanvasPreference(organizationId ?? "", canvasId ?? "");
   const updatePreferenceMutation = useUpdateCanvasPreference(organizationId ?? "");
@@ -131,7 +137,7 @@ export function useDefaultAppTab({
       preferenceIsPending: preferenceQuery.isPending,
       preferenceIsError: preferenceQuery.isError,
       storedTab: preferenceQuery.data?.lastVisitedTab,
-      consoleQuery,
+      liveConsoleQuery,
     });
     if (!resolution.settled) return;
 
@@ -151,7 +157,7 @@ export function useDefaultAppTab({
     preferenceQuery.isPending,
     preferenceQuery.isError,
     preferenceQuery.data,
-    consoleQuery,
+    liveConsoleQuery,
     setSearchParams,
   ]);
 
@@ -215,7 +221,7 @@ type ResolveDefaultTabInput = {
   preferenceIsPending: boolean;
   preferenceIsError: boolean;
   storedTab: string | undefined;
-  consoleQuery: ConsoleQueryLike | undefined;
+  liveConsoleQuery: ConsoleQueryLike | undefined;
 };
 
 /**
@@ -227,7 +233,7 @@ function resolveDefaultTab({
   preferenceIsPending,
   preferenceIsError,
   storedTab,
-  consoleQuery,
+  liveConsoleQuery,
 }: ResolveDefaultTabInput): DefaultTabResolution {
   if (userSwitchedTabs) return { settled: true, redirectTo: null };
 
@@ -239,21 +245,21 @@ function resolveDefaultTab({
 
   if (isAppTabId(storedTab)) return { settled: true, redirectTo: storedTab };
 
-  // No stored tab yet: fall back to Console if the app has panels.
-  if (!consoleQuery) return { settled: true, redirectTo: null };
+  // No stored tab yet: fall back to Console if the live app has panels.
+  if (!liveConsoleQuery) return { settled: true, redirectTo: null };
 
   // A console read that ended in error settles the fallback on the current
   // tab: waiting for a success that may never come would leave the resolution
   // pending forever, blocking tab recording. Skipping the Console fallback
   // for this visit is the lesser cost.
-  if (consoleQuery.isError) return { settled: true, redirectTo: null };
+  if (liveConsoleQuery.isError) return { settled: true, redirectTo: null };
 
   // While the console read is still in flight, keep waiting; settling now
   // would lock in Canvas even if the read later shows panels. An explicit tab
   // switch still settles the resolution via the user-choice branch above.
-  if (!consoleQuery.isSuccess) return { settled: false };
+  if (!liveConsoleQuery.isSuccess) return { settled: false };
 
-  const panels = consoleQuery.data?.panels ?? [];
+  const panels = liveConsoleQuery.data?.panels ?? [];
   return { settled: true, redirectTo: panels.length > 0 ? "console" : null };
 }
 
