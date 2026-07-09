@@ -22,7 +22,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Reaction" href="#add-reaction" description="Add an award emoji reaction to a GitLab merge request or comment" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitLab project" />
+  <LinkCard title="Create Merge Request Comment" href="#create-merge-request-comment" description="Add a comment to a GitLab merge request" />
   <LinkCard title="Get Latest Pipeline" href="#get-latest-pipeline" description="Get the latest GitLab pipeline for a project" />
   <LinkCard title="Get Pipeline" href="#get-pipeline" description="Get a GitLab pipeline" />
   <LinkCard title="Get Test Report Summary" href="#get-test-report-summary" description="Get GitLab pipeline test report summary" />
@@ -758,6 +760,56 @@ The On Vulnerability trigger starts a workflow execution when vulnerability even
 }
 ```
 
+<a id="add-reaction"></a>
+
+## Add Reaction
+
+**Component key:** `gitlab.addReaction`
+
+The Add Reaction component adds an award emoji reaction to a GitLab merge request or to a comment (note) on a merge request.
+
+### Use Cases
+
+- **Acknowledge commands**: Add eyes to merge request comments to indicate automation saw them
+- **Workflow feedback**: React with thumbsup or rocket on success paths
+- **Fast triage signals**: Use reactions to show status without posting extra comments
+
+### Configuration
+
+- **Project**: Select the GitLab project
+- **Merge Request IID**: The internal ID (IID) of the merge request (supports expressions)
+- **Target**: Choose whether to react to the merge request itself or to a comment on it
+- **Note ID**: The comment (note) ID to react to. Required when the target is a comment.
+- **Reaction**: The award emoji name
+
+### Output
+
+Returns the created GitLab award emoji object, including id, name, user, and timestamp.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "awardable_id": 1,
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "id": 25,
+    "name": "eyes",
+    "updated_at": "2023-01-01T10:00:00.000Z",
+    "user": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    }
+  },
+  "timestamp": "2023-01-01T10:00:00.000Z",
+  "type": "gitlab.addReaction"
+}
+```
+
 <a id="create-issue"></a>
 
 ## Create Issue
@@ -873,6 +925,61 @@ The component outputs the created issue object, including:
   },
   "timestamp": "2023-01-01T10:00:00.000Z",
   "type": "gitlab.issue"
+}
+```
+
+<a id="create-merge-request-comment"></a>
+
+## Create Merge Request Comment
+
+**Component key:** `gitlab.createMergeComment`
+
+The Create Merge Request Comment component adds a comment (note) to an existing GitLab merge request.
+
+### Use Cases
+
+- **Deployment updates**: Post deployment status or remediation updates to a merge request
+- **Automated feedback**: Add automated review notes based on pipeline or workflow results
+- **Cross-platform sync**: Sync Slack or PagerDuty notes into GitLab as merge request comments
+
+### Configuration
+
+- **Project** (required): The GitLab project containing the merge request
+- **Merge Request IID** (required): The internal ID (IID) of the merge request to comment on (supports expressions)
+- **Body** (required): The comment text. Supports Markdown formatting.
+
+### Output
+
+Returns the created note object, including:
+- Note ID
+- Note body
+- Author information
+- Created timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80\u0026d=identicon",
+      "id": 1,
+      "name": "Administrator",
+      "state": "active",
+      "username": "root",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "body": "This is an example comment created via SuperPlane",
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "id": 302,
+    "noteable_id": 3,
+    "noteable_iid": 1,
+    "noteable_type": "MergeRequest",
+    "system": false,
+    "updated_at": "2023-01-01T10:00:00.000Z"
+  },
+  "timestamp": "2023-01-01T10:00:00.000Z",
+  "type": "gitlab.createMergeComment"
 }
 ```
 
