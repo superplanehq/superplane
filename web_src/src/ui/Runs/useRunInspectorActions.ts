@@ -17,11 +17,13 @@ export function useRunInspectorActions({
   run,
   sections,
   executionsLoading,
+  onRerunCreated,
 }: {
   canvasId: string;
   run: CanvasesCanvasRun;
   sections: RunInspectorNodeSection[];
   executionsLoading: boolean;
+  onRerunCreated?: (eventId: string) => void | Promise<void>;
 }) {
   const queryClient = useQueryClient();
   const runningExecutionIds = useMemo(
@@ -42,7 +44,7 @@ export function useRunInspectorActions({
     await queryClient.invalidateQueries({ queryKey: ["canvases"] });
   }, [queryClient]);
 
-  const rerunMutation = useRerunMutation({ canvasId, run, refreshRunQueries });
+  const rerunMutation = useRerunMutation({ canvasId, run, refreshRunQueries, onRerunCreated });
   const stopMutation = useStopMutation({
     canvasId,
     runningExecutionIds,
@@ -83,10 +85,12 @@ function useRerunMutation({
   canvasId,
   run,
   refreshRunQueries,
+  onRerunCreated,
 }: {
   canvasId: string;
   run: CanvasesCanvasRun;
   refreshRunQueries: () => Promise<void>;
+  onRerunCreated?: (eventId: string) => void | Promise<void>;
 }) {
   return useMutation({
     mutationFn: async () => {
@@ -94,7 +98,7 @@ function useRerunMutation({
         throw new Error("Run root event is missing");
       }
 
-      await canvasesReemitTriggerEvent(
+      const response = await canvasesReemitTriggerEvent(
         withOrganizationHeader({
           path: {
             canvasId,
@@ -103,9 +107,14 @@ function useRerunMutation({
           },
         }),
       );
+
+      return response.data?.eventId;
     },
-    onSuccess: async () => {
+    onSuccess: async (eventId) => {
       await refreshRunQueries();
+      if (eventId) {
+        await onRerunCreated?.(eventId);
+      }
       showSuccessToast("Run restarted");
     },
     onError: (error) => {

@@ -18,6 +18,7 @@ export function TimelineAccordionCard({
   trailing,
   actionPayload,
   jsonViewStyle,
+  errorOutputNodeId,
   children,
 }: {
   value: InternalAccordionKey;
@@ -28,6 +29,7 @@ export function TimelineAccordionCard({
   trailing?: ReactNode;
   actionPayload?: unknown;
   jsonViewStyle: CSSProperties;
+  errorOutputNodeId?: string;
   children: ReactNode;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -85,7 +87,9 @@ export function TimelineAccordionCard({
             <ChevronDown className="h-4 w-4 transition-transform duration-200" />
           </AccordionPrimitive.Trigger>
         </AccordionPrimitive.Header>
-        <AccordionContent className="px-3 py-2.5">{children}</AccordionContent>
+        <AccordionContent className="px-3 py-2.5">
+          <div data-run-error-output-node-id={errorOutputNodeId}>{children}</div>
+        </AccordionContent>
       </AccordionItem>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { cn } from "@/lib/utils";
 import { EmptySectionText, JsonPayload, TimelineAccordionCard } from "./RunInspectorTimelineCard";
@@ -164,15 +165,26 @@ function RuntimeFallbackConfigField({
   }
 
   if (typeof value === "string" || typeof value === "number" || value === null) {
+    const displayValue = value === null ? "" : String(value);
+
     return (
       <label className="block space-y-1.5">
         <span className="text-sm font-medium text-slate-800 dark:text-gray-100">{label}</span>
-        <Input
-          aria-label={label}
-          readOnly
-          value={value === null ? "" : String(value)}
-          className="h-9 border-slate-300 bg-white text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-        />
+        {displayValue.includes("\n") ? (
+          <Textarea
+            aria-label={label}
+            readOnly
+            value={displayValue}
+            className="min-h-24 resize-y border-slate-300 bg-white text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+          />
+        ) : (
+          <Input
+            aria-label={label}
+            readOnly
+            value={displayValue}
+            className="h-9 border-slate-300 bg-white text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+          />
+        )}
       </label>
     );
   }
