@@ -7,6 +7,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 type setCommand struct {
@@ -43,7 +44,8 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	if _, err := ParseConsoleYAML(yamlBytes); err != nil {
+	_, err = yaml.ConsoleFromYML(yamlBytes)
+	if err != nil {
 		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
 	}
 
@@ -77,7 +79,7 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("console updated but failed to read console.yaml: %w", err)
 	}
 
-	updatedResource, err := ParseConsoleYAML(updatedYAML)
+	updatedResource, err := yaml.ConsoleFromYML(updatedYAML)
 	if err != nil {
 		return fmt.Errorf("invalid console yaml from server: %w", err)
 	}

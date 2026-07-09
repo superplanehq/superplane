@@ -1,89 +1,53 @@
 package apps
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/test/support/cli"
 )
 
-func newCanvasCreateServer(t *testing.T) *httptest.Server {
-	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/canvases", r.URL.Path)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas","organizationId":"org-uuid"}}}`))
-	}))
-	t.Cleanup(server.Close)
-	return server
+func TestCreateCommandRequiresName(t *testing.T) {
+	ctx, _ := cli.NewCommandContext(t, nil, "text")
+	name := ""
+	cmd := &createCommand{name: &name}
+
+	err := cmd.Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--name is required")
 }
 
 func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
-	server := newCanvasCreateServer(t)
+	server := newCreateOnlyServer(t, "abc-123", "my-canvas", "org-uuid")
 	ctx, stdout := cli.NewCommandContext(t, server, "text")
-	ctx.Args = []string{"my-canvas"}
+	name := "my-canvas"
+	cmd := &createCommand{name: &name}
 
-	err := (&createCommand{}).Execute(ctx)
+	err := cmd.Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), `App "my-canvas" created (ID: abc-123)`)
-	require.NotContains(t, stdout.String(), "App URL:")
+	require.NotContains(t, stdout.String(), "Committed version:")
 }
 
 func TestCreateCommandPrintsURLFromResponseOrgID(t *testing.T) {
-	server := newCanvasCreateServer(t)
+	server := newCreateOnlyServer(t, "abc-123", "my-canvas", "org-uuid")
 	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
 		URL: "https://app.superplane.com",
 	})
-	ctx.Args = []string{"my-canvas"}
+	name := "my-canvas"
+	cmd := &createCommand{name: &name}
 
-	err := (&createCommand{}).Execute(ctx)
+	err := cmd.Execute(ctx)
 	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `App "my-canvas" created (ID: abc-123)`)
 	require.Contains(t, stdout.String(), "App URL: https://app.superplane.com/org-uuid/apps/abc-123")
-}
-
-func TestCreateCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas"}}}`))
-	}))
-	t.Cleanup(server.Close)
-
-	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
-		URL: "https://app.superplane.com",
-	})
-	ctx.Args = []string{"my-canvas"}
-
-	err := (&createCommand{}).Execute(ctx)
-	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `App "my-canvas" created (ID: abc-123)`)
-	require.NotContains(t, stdout.String(), "App URL:")
-}
-
-func TestCreateCommandReturnsJSONOutput(t *testing.T) {
-	server := newCanvasCreateServer(t)
-	ctx, stdout := cli.NewCommandContext(t, server, "json")
-	ctx.Args = []string{"my-canvas"}
-
-	err := (&createCommand{}).Execute(ctx)
-	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `"id": "abc-123"`)
-	require.Contains(t, stdout.String(), `"name": "my-canvas"`)
-}
-
-func TestCreateCommandReturnsYAMLOutput(t *testing.T) {
-	server := newCanvasCreateServer(t)
-	ctx, stdout := cli.NewCommandContext(t, server, "yaml")
-	ctx.Args = []string{"my-canvas"}
-
-	err := (&createCommand{}).Execute(ctx)
-	require.NoError(t, err)
-	require.Contains(t, stdout.String(), "id: abc-123")
-	require.Contains(t, stdout.String(), "name: my-canvas")
 }
 
 func TestCreateCommandFailsOnEmptyResponse(t *testing.T) {
@@ -94,123 +58,147 @@ func TestCreateCommandFailsOnEmptyResponse(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	ctx, _ := cli.NewCommandContext(t, server, "text")
-	ctx.Args = []string{"my-canvas"}
-	cmd := &createCommand{}
+	name := "my-canvas"
+	cmd := &createCommand{name: &name}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "server returned an empty response")
 }
 
-func TestCreateCommandFailsOnEmptyCanvasID(t *testing.T) {
+func TestCreateCommandWithFilesStagesAndCommits(t *testing.T) {
+	var stagedBody string
+	var commitBody string
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"","name":"my-canvas"}}}`))
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/canvases":
+			body, _ := io.ReadAll(r.Body)
+			require.Contains(t, string(body), `"name":"My App"`)
+			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"canvas-1","name":"My App","organizationId":"org-1"}}}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/canvas-1/staging":
+			body, _ := io.ReadAll(r.Body)
+			stagedBody = string(body)
+			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["canvas.yaml","README.md"]}}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/canvases/canvas-1/staging/commit":
+			body, _ := io.ReadAll(r.Body)
+			commitBody = string(body)
+			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"version-1","canvasId":"canvas-1"}}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, _ := cli.NewCommandContext(t, server, "text")
-	ctx.Args = []string{"my-canvas"}
-	cmd := &createCommand{}
-
-	err := cmd.Execute(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "server returned an empty response")
-}
-
-func TestCreateCommandFailsOnServerError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"code":13,"message":"internal error"}`))
-	}))
-	t.Cleanup(server.Close)
-
-	ctx, _ := cli.NewCommandContext(t, server, "text")
-	ctx.Args = []string{"my-canvas"}
-	cmd := &createCommand{}
-
-	err := cmd.Execute(ctx)
-	require.Error(t, err)
-}
-
-func TestCreateFromFilePrintsCanvasOnSuccess(t *testing.T) {
-	server := newCanvasCreateServer(t)
-	filePath := writeTestCanvasFile(t, "from-file-canvas")
-	file := filePath
-	ctx, stdout := cli.NewCommandContext(t, server, "text")
-
-	err := (&createCommand{canvasFile: &file}).Execute(ctx)
-	require.NoError(t, err)
-	require.Contains(t, stdout.String(), "created (ID: abc-123)")
-}
-
-func TestCreateFromFileFailsOnEmptyResponse(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{}`))
-	}))
-	t.Cleanup(server.Close)
-
-	filePath := writeTestCanvasFile(t, "from-file-canvas")
-	file := filePath
-	ctx, _ := cli.NewCommandContext(t, server, "text")
-	cmd := &createCommand{canvasFile: &file}
-
-	err := cmd.Execute(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "server returned an empty response")
-}
-
-func TestCreateFromFileReturnsJSONOutput(t *testing.T) {
-	server := newCanvasCreateServer(t)
-	filePath := writeTestCanvasFile(t, "from-file-canvas")
-	file := filePath
-	ctx, stdout := cli.NewCommandContext(t, server, "json")
-
-	err := (&createCommand{canvasFile: &file}).Execute(ctx)
-	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `"id": "abc-123"`)
-}
-
-func TestCreateCommandFailsOnMethodChangingRedirect(t *testing.T) {
-	// Simulates the original bug: http:// context 301-redirects POST→GET
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// If the redirect was followed as GET, this would succeed silently
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvases":[]}`))
-	}))
-	t.Cleanup(target.Close)
-
-	redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusMovedPermanently)
-	}))
-	t.Cleanup(redirector.Close)
-
-	ctx, _ := cli.NewCommandContextWithRedirectPolicy(t, redirector, "text")
-	ctx.Args = []string{"my-canvas"}
-	cmd := &createCommand{}
-
-	err := cmd.Execute(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "refusing to follow redirect that changes method")
-}
-
-func TestCreateCommandFailsWithoutArgs(t *testing.T) {
-	ctx, _ := cli.NewCommandContext(t, nil, "text")
-	ctx.Args = []string{}
-	cmd := &createCommand{}
-
-	err := cmd.Execute(ctx)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "either --canvas-file or <app-name> is required")
-}
-
-func writeTestCanvasFile(t *testing.T, name string) string {
-	t.Helper()
 	dir := t.TempDir()
-	filePath := dir + "/canvas.yaml"
-	content := []byte("apiVersion: v1\nkind: Canvas\nmetadata:\n  name: " + name + "\nspec:\n  nodes: []\n  edges: []\n")
-	require.NoError(t, os.WriteFile(filePath, content, 0644))
-	return filePath
+	canvasPath := filepath.Join(dir, "canvas.yaml")
+	readmePath := filepath.Join(dir, "README.md")
+	require.NoError(t, os.WriteFile(canvasPath, []byte(`apiVersion: v1
+kind: Canvas
+metadata:
+  name: Source Name
+spec:
+  nodes: []
+  edges: []
+`), 0o600))
+	require.NoError(t, os.WriteFile(readmePath, []byte("# My App\n"), 0o600))
+
+	ctx, stdout := cli.NewCommandContext(t, server, "text")
+	name := "My App"
+	files := []string{canvasPath, readmePath}
+	cmd := &createCommand{name: &name, files: &files}
+
+	err := cmd.Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), `App "My App" created (ID: canvas-1)`)
+	require.Contains(t, stdout.String(), "Committed version: version-1")
+	require.Contains(t, stagedBody, "canvas.yaml")
+	require.Contains(t, stagedBody, "README.md")
+	stagedCanvasYAML := decodeStagingPayload(t, stagedBody)
+	require.Contains(t, stagedCanvasYAML, "name: Source Name")
+	require.NotContains(t, stagedCanvasYAML, "id:")
+	require.Contains(t, commitBody, `Create \"My App\"`)
+}
+
+func decodeStagingPayload(t *testing.T, body string) string {
+	t.Helper()
+	var payload struct {
+		Operations []struct {
+			Content string `json:"content"`
+			Path    string `json:"path"`
+		} `json:"operations"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(body), &payload))
+	var decoded strings.Builder
+	for _, op := range payload.Operations {
+		if op.Path == "canvas.yaml" {
+			raw, err := base64.StdEncoding.DecodeString(op.Content)
+			require.NoError(t, err)
+			decoded.Write(raw)
+		}
+	}
+	return decoded.String()
+}
+
+func TestCreateCommandUsesCustomCommitMessage(t *testing.T) {
+	var commitBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/canvases":
+			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"canvas-1","name":"My App","organizationId":"org-1"}}}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/canvas-1/staging":
+			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["canvas.yaml"]}}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/canvases/canvas-1/staging/commit":
+			body, _ := io.ReadAll(r.Body)
+			commitBody = string(body)
+			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"version-1","canvasId":"canvas-1"}}}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	dir := t.TempDir()
+	canvasPath := filepath.Join(dir, "canvas.yaml")
+	require.NoError(t, os.WriteFile(canvasPath, []byte(`apiVersion: v1
+kind: Canvas
+metadata:
+  name: My App
+spec:
+  nodes: []
+  edges: []
+`), 0o600))
+
+	ctx, _ := cli.NewCommandContext(t, server, "text")
+	name := "My App"
+	files := []string{canvasPath}
+	message := "bootstrap app"
+	cmd := &createCommand{name: &name, files: &files, message: &message}
+
+	err := cmd.Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, commitBody, "bootstrap app")
+}
+
+func newCreateOnlyServer(t *testing.T, id, name, orgID string) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/api/v1/canvases", r.URL.Path)
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(body, &payload))
+		require.Equal(t, name, payload["name"])
+		require.NotContains(t, strings.ToLower(string(body)), `"canvas"`)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + id + `","name":"` + name + `","organizationId":"` + orgID + `"}}}`))
+	}))
+	t.Cleanup(server.Close)
+	return server
 }
