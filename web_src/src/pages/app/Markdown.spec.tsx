@@ -75,4 +75,29 @@ describe("MarkdownContent", () => {
     expect(screen.getByTestId("markdown-code")).toHaveTextContent("raw output");
     expect(screen.getByTestId("markdown-code").closest("pre")).toBeInTheDocument();
   });
+
+  it("renders bold markdown with semibold weight", () => {
+    const { container } = render(<MarkdownContent content={"**Claude Managed Agent**"} />);
+    expect(container.firstChild).toHaveClass("[&_strong]:font-semibold");
+    expect(screen.getByText("Claude Managed Agent").tagName).toBe("STRONG");
+  });
+
+  it("applies section spacing classes directly on headings", () => {
+    render(<MarkdownContent content={"Intro\n\n## Section title\n\nBody copy."} />);
+    const h2 = screen.getByRole("heading", { level: 2, name: "Section title" });
+    expect(h2.className).toContain("my-4");
+    expect(h2.className).toContain("first:mt-0");
+  });
+
+  it("uses matching borders and semibold headers in tables", () => {
+    render(<MarkdownContent content={"| Stage | Note |\n| --- | --- |\n| Build | **Failed** |\n"} />);
+    const th = screen.getByRole("columnheader", { name: "Stage" });
+    const td = screen.getByRole("cell", { name: "Failed" });
+    expect(th.className).toContain("border-slate-200");
+    expect(th.className).toContain("font-semibold");
+    expect(td.className).toContain("border-slate-200");
+    expect(td.className).not.toContain("border-slate-100");
+    expect(screen.getByText("Failed").tagName).toBe("STRONG");
+    expect(screen.getByText("Failed").className).toContain("font-semibold");
+  });
 });
