@@ -249,6 +249,29 @@ describe("normalizeTablePanelContent — data source limits", () => {
 });
 
 describe("normalizeTablePanelContent — rowStyles round-trip", () => {
+  it("preserves avatar column options", () => {
+    const normalized = normalizeTablePanelContent({
+      dataSource: { kind: "memory", namespace: "checks" },
+      render: {
+        kind: "table",
+        columns: [
+          {
+            field: "author",
+            label: "Author",
+            format: "avatar",
+            avatarCommitterField: "committer",
+          },
+        ],
+      },
+    });
+    expect(normalized.render.columns[0]).toEqual({
+      field: "author",
+      label: "Author",
+      format: "avatar",
+      avatarCommitterField: "committer",
+    });
+  });
+
   it("preserves valid rowStyles entries verbatim", () => {
     const normalized = normalizeTablePanelContent({
       title: "Envs",

@@ -213,16 +213,80 @@ describe("WidgetTable column formatting", () => {
     expect(statusPill).not.toBeNull();
     expect(statusPill!.textContent).toBe("failed");
     expect(statusPill!.className).toContain("bg-red-500");
-    expect(statusPill!.className).toContain("text-white");
+    expect(statusPill!.className).toContain("uppercase");
+    expect(statusPill!.className).toContain("tracking-wide");
     statusView.unmount();
 
     const badgeView = renderWithFormat("badge");
     const badgePill = badgeView.container.querySelector("table tbody tr td:nth-child(2) span");
     expect(badgePill).not.toBeNull();
     expect(badgePill!.textContent).toBe("failed");
-    expect(badgePill!.className).toContain("bg-transparent");
-    expect(badgePill!.className).toContain("outline-slate-950/15");
-    expect(badgePill!.className).toContain("text-slate-700");
+    expect(badgePill!.className).toContain("bg-red-500");
+    expect(badgePill!.className).toContain("text-[10px]");
+    expect(badgePill!.className).toContain("font-semibold");
+  });
+
+  it("renders avatar columns with the deployer name in a tooltip", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
+            <WidgetTable
+              render={{
+                kind: "table",
+                columns: [
+                  {
+                    field: "author",
+                    format: "avatar",
+                    avatarCommitterField: "committer",
+                    label: "Who",
+                  },
+                ],
+              }}
+              rows={[
+                {
+                  author: { name: "Pedro Leão", username: "forestileao" },
+                  committer: { name: "Pedro Leão" },
+                },
+              ]}
+              isLoading={false}
+            />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    const avatar = view.container.querySelector('[data-slot="avatar"] img');
+    expect(avatar).not.toBeNull();
+    expect(avatar!.getAttribute("src")).toBe("https://github.com/forestileao.png");
+    expect(screen.queryByText("Pedro Leão")).not.toBeInTheDocument();
+    view.unmount();
+  });
+
+  it("renders avatar columns for plain username strings", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConsoleContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
+            <WidgetTable
+              render={{
+                kind: "table",
+                columns: [{ field: "author", label: "Author", format: "avatar" }],
+              }}
+              rows={[{ author: "forestileao" }]}
+              isLoading={false}
+            />
+          </ConsoleContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    const avatar = view.container.querySelector('[data-slot="avatar"] img');
+    expect(avatar).not.toBeNull();
+    expect(avatar!.getAttribute("src")).toBe("https://github.com/forestileao.png");
+    view.unmount();
   });
 });
 

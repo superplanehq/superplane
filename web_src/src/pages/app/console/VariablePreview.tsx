@@ -2,6 +2,9 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+import { CONSOLE_LINK_CLASSES } from "./consoleLinkStyles";
 
 /**
  * Show the resolved value for a variable as a compact field/value list with a
@@ -144,7 +147,7 @@ function ListVariablePreviewBody({
         <button
           type="button"
           onClick={() => onInsertSnippet(joinSnippet)}
-          className="truncate text-left font-mono text-[11px] text-sky-700 underline-offset-2 hover:underline dark:text-gray-300"
+          className={cn("truncate text-left font-mono text-[11px]", CONSOLE_LINK_CLASSES)}
           title={`Insert ${joinSnippet}`}
         >
           {joinSnippet}
@@ -162,7 +165,7 @@ function ListVariablePreviewBody({
             <button
               type="button"
               onClick={() => onInsertSnippet(snippet)}
-              className="max-w-[55%] shrink-0 truncate text-left font-mono text-[11px] text-sky-700 underline-offset-2 hover:underline dark:text-gray-300"
+              className={cn("max-w-[55%] shrink-0 truncate text-left font-mono text-[11px]", CONSOLE_LINK_CLASSES)}
               title={`Insert ${snippet}`}
             >
               {key}
@@ -254,7 +257,7 @@ function VariablePreviewBlock({
                 <button
                   type="button"
                   onClick={() => onInsertSnippet(insertable(field.accessor))}
-                  className="max-w-[55%] shrink-0 truncate text-left font-mono text-[11px] text-sky-700 underline-offset-2 hover:underline dark:text-gray-300"
+                  className={cn("max-w-[55%] shrink-0 truncate text-left font-mono text-[11px]", CONSOLE_LINK_CLASSES)}
                   title={`Insert ${insertable(field.accessor)}`}
                 >
                   {field.key}

@@ -457,6 +457,7 @@ function normalizeTableColumns(raw: unknown): WidgetTableColumn[] {
       format: typeof c.format === "string" ? (c.format as WidgetTableColumn["format"]) : undefined,
       show: typeof c.show === "string" ? c.show : undefined,
       href: typeof c.href === "string" ? c.href : undefined,
+      avatarCommitterField: typeof c.avatarCommitterField === "string" ? c.avatarCommitterField : undefined,
     };
   });
 }

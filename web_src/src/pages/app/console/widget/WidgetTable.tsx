@@ -3,9 +3,16 @@ import { ExternalLink, Loader2, Play, Plus, RefreshCw, Square, Table2, Trash2 } 
 
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/Avatar/avatar";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
+import { ConsoleBadge } from "../ConsoleBadge";
+import { CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES } from "../consoleTableStyles";
+import { resolveConsoleAvatar } from "../consoleAvatar";
+import { CONSOLE_CODE_BADGE_CLASSES } from "../consoleCodeStyles";
+import { CONSOLE_LINK_CLASSES } from "../consoleLinkStyles";
 import { applyTableWhere } from "./evalTableWhere";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
@@ -34,27 +41,6 @@ interface WidgetTableProps {
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
 }
-
-const STATUS_PILL_CLASS: Record<string, string> = {
-  passed: "bg-emerald-500 text-white",
-  ready: "bg-emerald-500 text-white",
-  active: "bg-emerald-500 text-white",
-  "very low": "bg-emerald-500 text-white",
-  low: "bg-emerald-500 text-white",
-  failed: "bg-red-500 text-white",
-  critical: "bg-red-500 text-white",
-  high: "bg-orange-500 text-white",
-  running: "bg-blue-500 text-white",
-  medium: "bg-yellow-500 text-white",
-  cancelled: "bg-gray-500 text-white",
-  pending: "bg-gray-500 text-white",
-  idle: "bg-gray-500 text-white",
-};
-
-const STATUS_PILL_BASE_CLASS = "inline-flex rounded-full border-none px-2 py-0.5 text-[11px] font-medium";
-
-const BADGE_PILL_CLASS =
-  "inline-flex rounded-full bg-transparent px-2 py-0.5 text-[11px] font-medium text-slate-700 outline outline-1 -outline-offset-1 outline-slate-950/15 dark:text-gray-300 dark:outline-gray-600";
 
 const ACTION_ICONS = {
   play: Play,
@@ -192,13 +178,15 @@ function WidgetTableGrid({
             {render.columns.map((col, i) => (
               <th
                 key={`${col.field}-${i}`}
-                className="border-b border-slate-200 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-gray-600 dark:text-gray-400"
+                className={cn(CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES, "text-left")}
               >
                 {col.label ?? col.field}
               </th>
             ))}
             {hasActions ? (
-              <th className="border-b border-slate-200 px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-gray-600 dark:text-gray-400">
+              <th
+                className={cn(CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES, "text-right")}
+              >
                 Actions
               </th>
             ) : null}
@@ -275,21 +263,10 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
   }
   const value = resolveCellValue(col.field, row);
   const formatted = formatValue(value, col.format);
-  // `status` renders semantic values (passed, failed, risk levels) as colored
-  // pills. `badge` is for neutral tags (service names, categories) with a
-  // lighter outlined treatment.
-  if (col.format === "badge") {
+  if (col.format === "badge" || col.format === "status") {
     return (
       <td className="px-3 py-1.5">
-        <span className={BADGE_PILL_CLASS}>{formatted}</span>
-      </td>
-    );
-  }
-  if (col.format === "status") {
-    const toneClass = STATUS_PILL_CLASS[formatted.toLowerCase()] ?? "bg-gray-500 text-white";
-    return (
-      <td className="px-3 py-1.5">
-        <span className={cn(STATUS_PILL_BASE_CLASS, toneClass)}>{formatted}</span>
+        <ConsoleBadge label={formatted} />
       </td>
     );
   }
@@ -301,16 +278,34 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
       </td>
     );
   }
+  if (col.format === "avatar") {
+    const committer = col.avatarCommitterField ? resolveCellValue(col.avatarCommitterField, row) : undefined;
+    const { src, initials, name } = resolveConsoleAvatar(value, committer);
+    if (!name && !src && !initials) {
+      return <td className="px-3 py-1.5 text-slate-300 dark:text-gray-600">—</td>;
+    }
+    return (
+      <td className="px-3 py-1.5 align-middle">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex cursor-default">
+              <Avatar
+                src={src ?? null}
+                initials={initials}
+                className="size-6 bg-slate-200 text-slate-600 dark:bg-gray-700 dark:text-gray-200"
+              />
+            </span>
+          </TooltipTrigger>
+          {name ? <TooltipContent side="top">{name}</TooltipContent> : null}
+        </Tooltip>
+      </td>
+    );
+  }
   if (col.format === "link" || col.href) {
     const href = col.href ? resolveHref(col.href, row) : String(value ?? "");
     return (
       <td className="px-3 py-1.5">
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sky-600 no-underline hover:!underline underline-offset-2 decoration-current dark:text-gray-300 dark:hover:text-gray-100"
-        >
+        <a href={href} target="_blank" rel="noopener noreferrer" className={CONSOLE_LINK_CLASSES}>
           {formatted || href}
         </a>
       </td>
@@ -319,9 +314,7 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
   if (col.format === "code") {
     return (
       <td className="px-3 py-1.5">
-        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[13px] text-slate-800 dark:bg-gray-800 dark:text-gray-100">
-          {formatted}
-        </code>
+        <code className={CONSOLE_CODE_BADGE_CLASSES}>{formatted}</code>
       </td>
     );
   }
