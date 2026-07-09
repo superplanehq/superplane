@@ -53,8 +53,7 @@ func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRe
 
 func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, _ := userIDFromContext(ctx)
-	return canvases.DescribeCanvas(ctx, s.registry, organizationID, userID, req.Id)
+	return canvases.DescribeCanvas(ctx, s.registry, organizationID, req.Id)
 }
 
 func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRequest) (*pb.UpdateCanvasResponse, error) {

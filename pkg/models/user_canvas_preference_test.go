@@ -22,7 +22,6 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		canvas.ID,
 		boolPointer(true),
 		nil,
-		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, preference.PinnedAt)
@@ -35,7 +34,6 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		canvas.ID,
 		nil,
 		boolPointer(true),
-		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, preference.PinnedAt)
@@ -47,7 +45,6 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		r.User,
 		canvas.ID,
 		boolPointer(false),
-		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -61,7 +58,6 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		canvas.ID,
 		nil,
 		boolPointer(false),
-		nil,
 	)
 	require.NoError(t, err)
 	assert.Nil(t, preference.PinnedAt)
@@ -80,7 +76,6 @@ func Test__SetUserCanvasPreference__DoesNotCreateEmptyPreference(t *testing.T) {
 		canvas.ID,
 		boolPointer(false),
 		boolPointer(false),
-		nil,
 	)
 	require.NoError(t, err)
 	assert.Nil(t, preference.PinnedAt)
@@ -94,7 +89,6 @@ func Test__SetUserCanvasPreference__DoesNotCreateEmptyPreference(t *testing.T) {
 		canvas.ID,
 		nil,
 		nil,
-		nil,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, r.Organization.ID, preference.OrganizationID)
@@ -102,7 +96,6 @@ func Test__SetUserCanvasPreference__DoesNotCreateEmptyPreference(t *testing.T) {
 	assert.Equal(t, canvas.ID, preference.CanvasID)
 	assert.Nil(t, preference.PinnedAt)
 	assert.Nil(t, preference.StarredAt)
-	assert.Nil(t, preference.LastVisitedTab)
 }
 
 func Test__SetUserCanvasPreference__RequiresExistingCanvas(t *testing.T) {
@@ -115,85 +108,8 @@ func Test__SetUserCanvasPreference__RequiresExistingCanvas(t *testing.T) {
 		uuid.New(),
 		boolPointer(true),
 		nil,
-		nil,
 	)
 	require.Error(t, err)
-}
-
-func Test__SetUserCanvasPreference__StoresAndClearsLastVisitedTab(t *testing.T) {
-	r := support.Setup(t)
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-
-	preference, err := models.SetUserCanvasPreference(
-		database.Conn(),
-		r.Organization.ID,
-		r.User,
-		canvas.ID,
-		nil,
-		nil,
-		stringPointer("console"),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, preference.LastVisitedTab)
-	assert.Equal(t, "console", *preference.LastVisitedTab)
-	assertUserCanvasPreferenceCount(t, canvas.ID, 1)
-
-	preference, err = models.SetUserCanvasPreference(
-		database.Conn(),
-		r.Organization.ID,
-		r.User,
-		canvas.ID,
-		nil,
-		nil,
-		stringPointer("memory"),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, preference.LastVisitedTab)
-	assert.Equal(t, "memory", *preference.LastVisitedTab)
-
-	preference, err = models.SetUserCanvasPreference(
-		database.Conn(),
-		r.Organization.ID,
-		r.User,
-		canvas.ID,
-		nil,
-		nil,
-		stringPointer(""),
-	)
-	require.NoError(t, err)
-	assert.Nil(t, preference.LastVisitedTab)
-	assertUserCanvasPreferenceCount(t, canvas.ID, 0)
-}
-
-func Test__SetUserCanvasPreference__RetainsLastVisitedTabWhenClearingPinAndStar(t *testing.T) {
-	r := support.Setup(t)
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-
-	_, err := models.SetUserCanvasPreference(
-		database.Conn(),
-		r.Organization.ID,
-		r.User,
-		canvas.ID,
-		boolPointer(true),
-		nil,
-		stringPointer("files"),
-	)
-	require.NoError(t, err)
-
-	preference, err := models.SetUserCanvasPreference(
-		database.Conn(),
-		r.Organization.ID,
-		r.User,
-		canvas.ID,
-		boolPointer(false),
-		nil,
-		nil,
-	)
-	require.NoError(t, err)
-	assert.Nil(t, preference.PinnedAt)
-	require.NotNil(t, preference.LastVisitedTab)
-	assert.Equal(t, "files", *preference.LastVisitedTab)
-	assertUserCanvasPreferenceCount(t, canvas.ID, 1)
 }
 
 func Test__FindUserCanvasPreferencesForCanvases(t *testing.T) {
@@ -217,7 +133,6 @@ func Test__FindUserCanvasPreferencesForCanvases(t *testing.T) {
 		canvas.ID,
 		boolPointer(true),
 		boolPointer(true),
-		nil,
 	)
 	require.NoError(t, err)
 
@@ -249,9 +164,5 @@ func assertUserCanvasPreferenceCount(t *testing.T, canvasID uuid.UUID, expected 
 }
 
 func boolPointer(value bool) *bool {
-	return &value
-}
-
-func stringPointer(value string) *string {
 	return &value
 }

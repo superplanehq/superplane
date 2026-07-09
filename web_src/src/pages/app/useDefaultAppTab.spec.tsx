@@ -1,36 +1,15 @@
-import { act, renderHook } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The hook only needs the preference/console query results and the mutation's
-// `mutate`; mocking the data hooks keeps the spec free of QueryClient and
-// network plumbing.
-const mutate = vi.fn();
-type MockPreferenceQuery = {
-  isPending: boolean;
-  isError: boolean;
-  isSuccess: boolean;
-  data: { lastVisitedTab?: string } | null;
-};
-let mockPreferenceQuery: MockPreferenceQuery;
-
+// The hook only needs the live-console query result; mocking the data hook
+// keeps the spec free of QueryClient and network plumbing. The stored tab is
+// persisted to localStorage, which vitest resets per test file via jsdom.
 type ConsoleQueryLike = {
   isSuccess: boolean;
   isError: boolean;
   data: { canvasId: string; panels: object[]; layout: object[]; consoleYaml: string } | undefined;
 };
 let mockLiveConsoleQuery: ConsoleQueryLike;
-
-function preferenceLoaded(data: { lastVisitedTab?: string } | null): MockPreferenceQuery {
-  return { isPending: false, isError: false, isSuccess: true, data };
-}
-
-function preferenceLoading(): MockPreferenceQuery {
-  return { isPending: true, isError: false, isSuccess: false, data: null };
-}
-
-function preferenceErrored(): MockPreferenceQuery {
-  return { isPending: false, isError: true, isSuccess: false, data: null };
-}
 
 function consoleLoaded(panels: object[]): ConsoleQueryLike {
   return {
@@ -49,12 +28,15 @@ function consoleErrored(): ConsoleQueryLike {
 }
 
 vi.mock("@/hooks/useCanvasData", () => ({
-  useCanvasPreference: () => mockPreferenceQuery,
-  useUpdateCanvasPreference: () => ({ mutate }),
   useCanvasConsole: () => mockLiveConsoleQuery,
 }));
 
 import { useDefaultAppTab } from "./useDefaultAppTab";
+import {
+  LAST_VISITED_APP_TAB_STORAGE_KEY,
+  readLastVisitedAppTab,
+  recordLastVisitedAppTab,
+} from "@/lib/lastVisitedAppTab";
 
 type UrlViewFlags = Parameters<typeof useDefaultAppTab>[0]["urlViewFlags"];
 
@@ -82,7 +64,6 @@ function renderDefaultAppTab({
   const view = renderHook(
     (props: { urlViewFlags: UrlViewFlags; canvasId: string }) =>
       useDefaultAppTab({
-        organizationId: "org-1",
         canvasId: props.canvasId,
         urlViewFlags: props.urlViewFlags,
         searchParams,
@@ -94,74 +75,68 @@ function renderDefaultAppTab({
 }
 
 beforeEach(() => {
-  mutate.mockClear();
-  mockPreferenceQuery = preferenceLoaded(null);
+  window.localStorage.clear();
   mockLiveConsoleQuery = consoleLoaded([]);
 });
 
 describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
   it("does not persist the pre-redirect tab while the redirect to the stored tab is still pending", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+    recordLastVisitedAppTab("canvas-1", "console");
 
     const { setSearchParams } = renderDefaultAppTab();
 
-    // The redirect to the stored tab was scheduled…
     expect(setSearchParams).toHaveBeenCalledTimes(1);
-    // …and the record effect, which runs in the same commit while the URL
-    // still reports Canvas, must not overwrite the stored tab with "canvas".
-    expect(mutate).not.toHaveBeenCalled();
+    // The record effect runs in the same commit while the URL still reports
+    // Canvas; it must not overwrite the stored "console" tab with "canvas".
+    expect(readLastVisitedAppTab("canvas-1")).toBe("console");
   });
 
-  it("does not write the stored tab back to the server once the redirect lands", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+  it("does not rewrite the stored tab once the redirect lands on it", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+    const setSpy = vi.spyOn(Storage.prototype, "setItem");
 
     const { rerender } = renderDefaultAppTab();
-    // URL catches up with the redirect on the next render.
     rerender({ urlViewFlags: CONSOLE_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).not.toHaveBeenCalled();
+    expect(setSpy).not.toHaveBeenCalled();
+    setSpy.mockRestore();
   });
 
   it("records a genuine tab change after the redirect has settled", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+    recordLastVisitedAppTab("canvas-1", "console");
 
     const { rerender } = renderDefaultAppTab();
     rerender({ urlViewFlags: CONSOLE_FLAGS, canvasId: "canvas-1" });
     rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
 
   it("persists a tab the user picked after the redirect was scheduled but before it applied", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+    recordLastVisitedAppTab("canvas-1", "console");
 
     const { rerender, setSearchParams } = renderDefaultAppTab();
-    // The redirect to the stored Console tab was scheduled from Canvas…
     expect(setSearchParams).toHaveBeenCalledTimes(1);
 
-    // …but the user switches to Memory before it applies. Their explicit
+    // User switches to Memory before the redirect applies. Their explicit
     // choice must be recorded; bailing until the URL reports the redirect
     // target would block tab recording indefinitely.
     rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
 
     // Recording keeps working for later tab changes too.
     rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1" });
-    expect(mutate).toHaveBeenCalledTimes(2);
-    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("canvas");
   });
 
   it("turns a late-applying redirect into a no-op once the user picked a different tab", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+    recordLastVisitedAppTab("canvas-1", "console");
 
     const { rerender, setSearchParams } = renderDefaultAppTab();
     expect(setSearchParams).toHaveBeenCalledTimes(1);
     const updater = setSearchParams.mock.calls[0][0] as (prev: URLSearchParams) => URLSearchParams;
 
-    // The user lands on Memory before the router applies the redirect.
     rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
     // When the queued redirect finally runs, it must not replace the user's
@@ -171,8 +146,9 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
   });
 
   it("skips the redirect when the stored tab already matches the current tab, preserving other params", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "canvas" });
+    recordLastVisitedAppTab("canvas-1", "canvas");
 
+    const setSpy = vi.spyOn(Storage.prototype, "setItem");
     const { setSearchParams } = renderDefaultAppTab({
       // Refresh on the Canvas tab with node selection + sidebar state in the
       // URL (no `view` param). Rewriting the URL here would delete
@@ -182,74 +158,54 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
 
     expect(setSearchParams).not.toHaveBeenCalled();
     // Identical stored value — nothing to write back either.
-    expect(mutate).not.toHaveBeenCalled();
+    expect(setSpy).not.toHaveBeenCalled();
+    setSpy.mockRestore();
   });
 
   it("still records a later tab change after the redirect was skipped as already-on-tab", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "canvas" });
+    recordLastVisitedAppTab("canvas-1", "canvas");
 
     const { rerender } = renderDefaultAppTab({
       searchParams: new URLSearchParams("node=abc"),
     });
     rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
 
   it("records the current tab when there is no stored preference and no redirect", () => {
     renderDefaultAppTab();
 
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("canvas");
   });
 
   it("re-applies the stored-tab redirect for the next app when AppPage is reused across apps", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "canvas" });
+    recordLastVisitedAppTab("canvas-1", "canvas");
+    recordLastVisitedAppTab("canvas-2", "console");
 
     const { rerender, setSearchParams } = renderDefaultAppTab();
     // First app: already on the stored tab, so no redirect.
     expect(setSearchParams).not.toHaveBeenCalled();
 
     // Navigate to another app (same AppPage instance) whose stored tab is Console.
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
     rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-2" });
 
     expect(setSearchParams).toHaveBeenCalledTimes(1);
   });
 
-  it("records the tab for the next app even when it matches the previous app's last recorded tab", () => {
+  it("records the tab for the next app under its own canvas id", () => {
     const { rerender } = renderDefaultAppTab();
-    // First app: no stored preference, records "canvas".
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("canvas");
 
-    // Second app also lands on Canvas; the recording guard must not treat it
-    // as a duplicate of the previous app's write.
+    // Second app also lands on Canvas; recording must happen against the
+    // new canvas id, not skipped as "same as before".
     rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-2" });
 
-    expect(mutate).toHaveBeenCalledTimes(2);
-    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-2", lastVisitedTab: "canvas" }, expect.anything());
-  });
-
-  it("yields to a tab the user picked while the stored preference was still loading", () => {
-    mockPreferenceQuery = preferenceLoading();
-
-    const { rerender, setSearchParams } = renderDefaultAppTab();
-    // User opens Memory before the preference query resolves.
-    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
-
-    // The stored preference arrives late and points elsewhere.
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
-    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
-
-    // No redirect: the user's explicit choice wins and is recorded.
-    expect(setSearchParams).not.toHaveBeenCalled();
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-2")).toBe("canvas");
   });
 
   it("does not overwrite the stored tab when closing run inspection lands on Canvas", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+    recordLastVisitedAppTab("canvas-1", "console");
 
     const { rerender } = renderDefaultAppTab({
       urlViewFlags: RUN_FLAGS,
@@ -258,11 +214,11 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     // Closing the run drops the `run` param and lands on Canvas.
     rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).not.toHaveBeenCalled();
+    expect(readLastVisitedAppTab("canvas-1")).toBe("console");
   });
 
   it("still records a deliberate tab change made after closing run inspection", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+    recordLastVisitedAppTab("canvas-1", "console");
 
     const { rerender } = renderDefaultAppTab({
       urlViewFlags: RUN_FLAGS,
@@ -271,12 +227,11 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1" });
     rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
 
   it("skips the redirect entirely when the URL already selects a view", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+    recordLastVisitedAppTab("canvas-1", "console");
 
     const { setSearchParams } = renderDefaultAppTab({
       urlViewFlags: MEMORY_FLAGS,
@@ -285,25 +240,10 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
 
     expect(setSearchParams).not.toHaveBeenCalled();
     // The explicitly selected tab is recorded as usual.
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
-  });
-
-  it("neither redirects nor records when the preference failed to load", () => {
-    mockPreferenceQuery = preferenceErrored();
-
-    const { rerender, setSearchParams } = renderDefaultAppTab();
-    // Even an explicit tab switch is not persisted: without the stored tab we
-    // cannot tell "no preference" from "failed to load", and writing could
-    // overwrite a preference that actually exists.
-    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
-
-    expect(setSearchParams).not.toHaveBeenCalled();
-    expect(mutate).not.toHaveBeenCalled();
+    expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
 
   it("applies the Console fallback once an in-flight console query succeeds", () => {
-    mockPreferenceQuery = preferenceLoaded(null);
-
     mockLiveConsoleQuery = consoleLoading();
     const { rerender, setSearchParams } = renderDefaultAppTab();
     // An unfinished read must not lock in Canvas.
@@ -317,94 +257,66 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
   });
 
   it("records the current tab when resolution settles on a later render without a URL change", () => {
-    mockPreferenceQuery = preferenceLoaded(null);
-
     // Mount while the console read is still in flight: nothing settles yet.
     mockLiveConsoleQuery = consoleLoading();
     const { rerender } = renderDefaultAppTab();
-    expect(mutate).not.toHaveBeenCalled();
+    expect(readLastVisitedAppTab("canvas-1")).toBeNull();
 
     // The read succeeds with no panels: resolution settles on Canvas without
     // touching the URL, and that alone must unblock tab recording.
     mockLiveConsoleQuery = consoleLoaded([]);
     rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("canvas");
   });
 
   it("records the current tab when the console query errors on a later render", () => {
-    mockPreferenceQuery = preferenceLoaded(null);
-
     mockLiveConsoleQuery = consoleLoading();
     const { rerender } = renderDefaultAppTab();
-    expect(mutate).not.toHaveBeenCalled();
+    expect(readLastVisitedAppTab("canvas-1")).toBeNull();
 
     mockLiveConsoleQuery = consoleErrored();
     rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("canvas");
   });
 
   it("settles without a redirect when the console query errors, so tab recording is not blocked", () => {
-    mockPreferenceQuery = preferenceLoaded(null);
-
     mockLiveConsoleQuery = consoleErrored();
     const { rerender, setSearchParams } = renderDefaultAppTab();
 
     // No Console fallback on error, but the resolution settles on Canvas…
     expect(setSearchParams).not.toHaveBeenCalled();
-    expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("canvas");
 
     // …so a later tab change is recorded without the user having to switch twice.
     rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).toHaveBeenCalledTimes(2);
-    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+    expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
 
-  it("retries a failed tab write immediately instead of treating it as recorded", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+  it("yields the Console fallback to a tab the user picked while the console query was still loading", () => {
+    mockLiveConsoleQuery = consoleLoading();
+    const { rerender, setSearchParams } = renderDefaultAppTab();
 
-    renderDefaultAppTab({
-      urlViewFlags: MEMORY_FLAGS,
-      searchParams: new URLSearchParams("view=memory"),
-    });
-    expect(mutate).toHaveBeenCalledTimes(1);
+    // User opens Memory before the console query resolves.
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
-    // The PUT fails; clearing the recorded-tab guard must re-run the record
-    // effect and retry the write without any further user interaction.
-    const mutateOptions = mutate.mock.calls[0][1] as { onError: () => void };
-    act(() => mutateOptions.onError());
+    // The console query resolves late and would have redirected to Console.
+    mockLiveConsoleQuery = consoleLoaded([{ id: "p1", type: "markdown", content: {} }]);
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
-    expect(mutate).toHaveBeenCalledTimes(2);
-    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" }, expect.anything());
+    // No redirect: the user's explicit choice wins and is recorded.
+    expect(setSearchParams).not.toHaveBeenCalled();
+    expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
 
-  it("stops retrying a persistently failing tab write after the attempt budget is exhausted", () => {
-    mockPreferenceQuery = preferenceLoaded({ lastVisitedTab: "console" });
+  it("ignores an invalid stored tab and falls through to the Console-fallback path", () => {
+    window.localStorage.setItem(LAST_VISITED_APP_TAB_STORAGE_KEY, JSON.stringify({ "canvas-1": "bogus" }));
+    mockLiveConsoleQuery = consoleLoaded([{ id: "p1", type: "markdown", content: {} }]);
 
-    const { rerender } = renderDefaultAppTab({
-      urlViewFlags: MEMORY_FLAGS,
-      searchParams: new URLSearchParams("view=memory"),
-    });
+    const { setSearchParams } = renderDefaultAppTab();
 
-    // Every write fails: initial attempt plus retries, capped at 3 total.
-    const failLatestWrite = () => {
-      const call = mutate.mock.calls[mutate.mock.calls.length - 1];
-      const options = call[1] as { onError: () => void };
-      act(() => options.onError());
-    };
-    failLatestWrite();
-    failLatestWrite();
-    failLatestWrite();
-    expect(mutate).toHaveBeenCalledTimes(3);
-
-    // A genuine tab switch grants a fresh budget.
-    rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1" });
-    expect(mutate).toHaveBeenCalledTimes(4);
-    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" }, expect.anything());
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
   });
 });

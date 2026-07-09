@@ -19,14 +19,14 @@ func Test__DescribeCanvas(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), uuid.New().String())
+		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), uuid.New().String())
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, code)
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
-		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), "invalid-id")
+		_, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), "invalid-id")
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
@@ -70,7 +70,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
@@ -162,7 +162,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -232,7 +232,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -282,7 +282,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -364,7 +364,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -447,7 +447,7 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		// Describe the canvas
 		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String())
+		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response.Canvas.Status)
 
@@ -467,52 +467,5 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.True(t, eventIDs[activeEvent1.ID.String()])
 		assert.True(t, eventIDs[activeEvent2.ID.String()])
 		assert.False(t, eventIDs[deletedEvent.ID.String()])
-	})
-
-	t.Run("returns user canvas preference when set", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String())
-		require.NoError(t, err)
-		assert.Nil(t, response.Preference)
-
-		tab := "console"
-		_, err = models.SetUserCanvasPreference(
-			database.Conn(),
-			r.Organization.ID,
-			r.User,
-			canvas.ID,
-			nil,
-			nil,
-			&tab,
-		)
-		require.NoError(t, err)
-
-		response, err = DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), canvas.ID.String())
-		require.NoError(t, err)
-		require.NotNil(t, response.Preference)
-		require.NotNil(t, response.Preference.LastVisitedTab)
-		assert.Equal(t, "console", *response.Preference.LastVisitedTab)
-		assert.False(t, response.Preference.Pinned)
-		assert.False(t, response.Preference.Starred)
-	})
-
-	t.Run("returns nil preference when user id is empty", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		tab := "memory"
-		_, err := models.SetUserCanvasPreference(
-			database.Conn(),
-			r.Organization.ID,
-			r.User,
-			canvas.ID,
-			nil,
-			nil,
-			&tab,
-		)
-		require.NoError(t, err)
-
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), "", canvas.ID.String())
-		require.NoError(t, err)
-		assert.Nil(t, response.Preference)
 	})
 }

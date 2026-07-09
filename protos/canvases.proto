@@ -383,7 +383,6 @@ message DescribeCanvasRequest {
 
 message DescribeCanvasResponse {
   Canvas canvas = 1;
-  CanvasPreference preference = 2;
 }
 
 message UpdateCanvasRequest {
@@ -400,7 +399,6 @@ message UpdateCanvasPreferenceRequest {
   string canvas_id = 1;
   optional bool pinned = 2;
   optional bool starred = 3;
-  optional string last_visited_tab = 4;
 }
 
 message UpdateCanvasPreferenceResponse {
@@ -586,7 +584,6 @@ message CanvasPreference {
   bool starred = 3;
   google.protobuf.Timestamp pinned_at = 4;
   google.protobuf.Timestamp starred_at = 5;
-  optional string last_visited_tab = 6;
 }
 
 message Canvas {
