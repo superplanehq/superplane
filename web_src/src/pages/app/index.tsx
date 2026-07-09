@@ -100,6 +100,7 @@ import {
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
 import { sortVersionsDesc } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
+import { useDefaultAppTab } from "./useDefaultAppTab";
 import { useCanvasEditVersionState } from "./useCanvasEditVersionState";
 import { useEditSessionBootstrap } from "./useEditSessionBootstrap";
 import { useDraftCanvasSpecSync } from "./useDraftCanvasSpecSync";
@@ -307,9 +308,7 @@ export function AppPage() {
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
-  useEffect(() => {
-    setCanvasStagingEchoUserId(currentUserId);
-  }, [currentUserId]);
+  useEffect(() => setCanvasStagingEchoUserId(currentUserId), [currentUserId]);
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
   // True while the user is in an edit session. The session keeps the versions
@@ -1014,6 +1013,8 @@ export function AppPage() {
     committedBaselines: committedBaselinesForEdit,
     editBootstrapReady: isEditBootstrapReady,
   });
+
+  useDefaultAppTab({ organizationId, canvasId, urlViewFlags, searchParams, setSearchParams });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
