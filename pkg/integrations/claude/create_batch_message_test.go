@@ -671,6 +671,44 @@ func Test__CreateBatchMessage__poll__endedButResultsFetchFails_refreshesMetadata
 	assert.Equal(t, 2, meta.RequestCounts.Succeeded)
 }
 
+// Status-poll failures accumulated while the batch was still processing must
+// not carry over once it's confirmed ended: a single results-fetch failure
+// right after should retry, not immediately trip the error threshold with
+// leftover count from an unrelated phase.
+func Test__CreateBatchMessage__poll__endedResetsErrorCountFromStatusPolls(t *testing.T) {
+	c := &CreateBatchMessage{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":2}}`))},
+			{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":"boom"}`))},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{Metadata: BatchExecutionMetadata{BatchID: "msgbatch_1", Status: "in_progress"}}
+	requestsCtx := &contexts.RequestContext{}
+
+	hookCtx := core.ActionHookContext{
+		Name:          "poll",
+		Configuration: validBatchConfig(),
+		// batchMaxPollErrors-1 status-poll errors already accumulated; a single
+		// results-fetch failure below must not immediately hit the threshold.
+		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(batchMaxPollErrors - 1)},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       requestsCtx,
+	}
+
+	err := c.HandleHook(hookCtx)
+	require.NoError(t, err)
+	assert.False(t, executionState.Finished)
+	assert.Equal(t, "poll", requestsCtx.Action)
+	assert.Equal(t, 1, requestsCtx.Params["errors"])
+}
+
 // After enough consecutive results-fetch failures for an ended batch, the
 // run must finish with an "error" outcome (not silently retry until it hits
 // the unrelated max-attempts timeout).
@@ -684,7 +722,10 @@ func Test__CreateBatchMessage__poll__endedButResultsFetchFailsRepeatedly_emitsEr
 	}
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
 	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-	metadataCtx := &contexts.MetadataContext{Metadata: BatchExecutionMetadata{BatchID: "msgbatch_1", Status: "in_progress"}}
+	// Status is already "ended" from an earlier poll that first discovered
+	// this: this call represents a later, consecutive results-fetch retry,
+	// so its accumulated "errors" must NOT be reset before the threshold check.
+	metadataCtx := &contexts.MetadataContext{Metadata: BatchExecutionMetadata{BatchID: "msgbatch_1", Status: batchStatusEnded}}
 
 	hookCtx := core.ActionHookContext{
 		Name:           "poll",
