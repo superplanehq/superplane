@@ -34,6 +34,10 @@ type FetchRunLookupOptions = {
   maxPages?: number;
 };
 
+type InfiniteRunsCacheData = {
+  pages?: Array<CanvasesListRunsResponse | undefined>;
+};
+
 export function useSidebarEventRunLookup({
   enabled = true,
   canvasId,
@@ -104,6 +108,14 @@ export function useSidebarEventRunLookup({
         return resolvedRunId;
       }
 
+      const freshCachedRunId = findRunIdInCurrentInfiniteRunsCache(queryClient, canvasId, event, {
+        primaryRuns: runs,
+        pages: infiniteRunsPages ?? [],
+      });
+      if (freshCachedRunId) {
+        return freshCachedRunId;
+      }
+
       const inFlight = inFlightRef.current.get(scopedLookupKey);
       if (inFlight) {
         return inFlight;
@@ -156,11 +168,32 @@ export function useSidebarEventRunLookup({
         inFlightRef.current.delete(scopedLookupKey);
       }
     },
-    [canvasId, enabled, lookupIndex, organizationId, queryClient],
+    [canvasId, enabled, infiniteRunsPages, lookupIndex, organizationId, queryClient, runs],
   );
 
   return {
     resolveRunIdForSidebarEvent,
     fetchRunIdForSidebarEvent,
   };
+}
+
+function findRunIdInCurrentInfiniteRunsCache(
+  queryClient: QueryClient,
+  canvasId: string,
+  event: SidebarEvent,
+  sources: {
+    primaryRuns: CanvasesCanvasRun[];
+    pages: Array<CanvasesListRunsResponse | undefined>;
+  },
+): string | null {
+  const currentPages = queryClient
+    .getQueriesData<InfiniteRunsCacheData>({ queryKey: canvasKeys.infiniteRuns(canvasId) })
+    .flatMap(([, data]) => data?.pages ?? []);
+
+  const cachedRuns = collectCachedCanvasRuns({
+    primaryRuns: sources.primaryRuns,
+    pages: [...sources.pages, ...currentPages],
+  });
+
+  return findRunIdInLookupIndex(buildRunLookupIndex(cachedRuns), event);
 }
