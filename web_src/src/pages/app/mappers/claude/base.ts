@@ -74,7 +74,6 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 
 type TextPromptNodeMetadata = {
   model?: string;
-  maxTokens?: number;
   structuredOutput?: boolean;
 };
 
