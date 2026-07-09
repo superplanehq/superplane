@@ -28,7 +28,7 @@
     "pkg/cli/commands/secrets": 9.5,
     "pkg/cli/commands/usage": 81.4,
     "pkg/cli/core": 50.2,
-    "pkg/layout": 70,
+    "pkg/layout": 80.9,
     "pkg/config": 46.2,
     "pkg/configuration": 30.3,
     "pkg/configuration/attachments": 91.1,

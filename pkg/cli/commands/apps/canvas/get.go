@@ -57,8 +57,8 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, _ = fmt.Fprintf(stdout, "ID: %s\n", canvas.Metadata.ID)
-		_, _ = fmt.Fprintf(stdout, "Name: %s\n", canvas.Metadata.Name)
+		_, _ = fmt.Fprintf(stdout, "ID: %s\n", described.Metadata.GetId())
+		_, _ = fmt.Fprintf(stdout, "Name: %s\n", described.Metadata.GetName())
 		if url := common.BuildAppURL(ctx, organizationID, canvasID); url != "" {
 			_, _ = fmt.Fprintf(stdout, "App URL: %s\n", url)
 		}
