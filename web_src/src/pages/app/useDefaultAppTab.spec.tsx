@@ -243,7 +243,7 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
 
-  it("skips the redirect when the URL deep-links to a version preview", () => {
+  it("skips the redirect and keeps the stored tab when the URL deep-links to a version preview", () => {
     recordLastVisitedAppTab("canvas-1", "console");
 
     // A `?version=` link lands on the canvas view of that version; redirecting
@@ -253,15 +253,42 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     });
 
     expect(setSearchParams).not.toHaveBeenCalled();
+    // The landing was not a tab pick; it must not replace the stored tab.
+    expect(readLastVisitedAppTab("canvas-1")).toBe("console");
   });
 
-  it("skips the redirect when the URL requests an edit session", () => {
+  it("skips the redirect and keeps the stored tab when the URL requests an edit session", () => {
     recordLastVisitedAppTab("canvas-1", "console");
 
     // A `?edit=1` link enters an edit session on the canvas view; redirecting
     // to the stored Console tab would break the edit-session entry.
     const { setSearchParams } = renderDefaultAppTab({
       searchParams: new URLSearchParams("edit=1"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+    expect(readLastVisitedAppTab("canvas-1")).toBe("console");
+  });
+
+  it("skips the redirect and keeps the stored tab when the URL deep-links to a node selection", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+
+    // A shared node link lands on the canvas with the node's sidebar open;
+    // redirecting to the stored Console tab would drop that selection (the
+    // redirect deletes `node`/`sidebar`) and open the wrong tab.
+    const { setSearchParams } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("node=node-1&sidebar=1"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+    expect(readLastVisitedAppTab("canvas-1")).toBe("console");
+  });
+
+  it("skips the redirect when the URL deep-links to a file", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+
+    const { setSearchParams } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("file=components/app.yaml"),
     });
 
     expect(setSearchParams).not.toHaveBeenCalled();
@@ -275,6 +302,19 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     });
 
     expect(setSearchParams).not.toHaveBeenCalled();
+  });
+
+  it("still records a deliberate tab change made after a deep-link landing", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+
+    const { rerender } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("version=version-1"),
+    });
+    // Only the landing itself is exempt from recording; a tab the user picks
+    // afterwards is persisted as usual.
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
+
+    expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
 
   it("applies the Console fallback once an in-flight console query succeeds", () => {

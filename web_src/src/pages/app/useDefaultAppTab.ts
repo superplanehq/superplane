@@ -20,15 +20,31 @@ function urlViewFlagsToTab(flags: UrlViewFlags): AppTabId | null {
   return "canvas";
 }
 
-// Query params that pin the URL to a destination: `view` and `run` select a
-// tab directly, while `version` (version preview) and `edit` (edit-session
-// entry) deep-link into the canvas view. A default-tab redirect would pull
-// the user away from any of them.
-const EXPLICIT_NAVIGATION_PARAMS = ["view", "run", "version", "edit"] as const;
+// Query params that pin the URL to a destination. `view` and `run` select a
+// tab directly; `version` (version preview), `edit` (edit-session entry),
+// `sidebar`/`node` (node selection), and `file` (file selection) deep-link
+// into a specific spot. A default-tab redirect would pull the user away from
+// any of them — and would even delete the selection params outright.
+const TAB_SELECTION_PARAMS = ["view", "run"] as const;
+const DEEP_LINK_PARAMS = ["version", "edit", "sidebar", "node", "file"] as const;
 
-/** An explicit navigation param means there is no default tab to resolve. */
-function urlSelectsTabExplicitly(searchParams: URLSearchParams): boolean {
-  return EXPLICIT_NAVIGATION_PARAMS.some((param) => (searchParams.get(param) ?? "") !== "");
+function hasAnyParam(searchParams: URLSearchParams, params: readonly string[]): boolean {
+  return params.some((param) => (searchParams.get(param) ?? "") !== "");
+}
+
+/** A tab-selecting or deep-link param means there is no default tab to resolve. */
+function urlPinsNavigation(searchParams: URLSearchParams): boolean {
+  return hasAnyParam(searchParams, TAB_SELECTION_PARAMS) || hasAnyParam(searchParams, DEEP_LINK_PARAMS);
+}
+
+/**
+ * A deep link without an explicit `view` lands on a tab the user did not
+ * actively pick, so that landing must not be persisted as a tab change.
+ * (`run` needs no handling here: it maps to no tab at all, and closing run
+ * inspection already skips recording via its own guard.)
+ */
+function urlDeepLinksWithoutTabPick(searchParams: URLSearchParams): boolean {
+  return hasAnyParam(searchParams, DEEP_LINK_PARAMS) && !hasAnyParam(searchParams, ["view"]);
 }
 
 type ConsoleQueryLike = Pick<UseQueryResult<CanvasConsoleData | undefined>, "data" | "isSuccess" | "isError">;
@@ -47,7 +63,7 @@ type UseDefaultAppTabOptions = {
 
 /**
  * Persists the current app tab to localStorage and, on initial navigation to
- * an app without an explicit `view` or `run` query param, redirects to the
+ * an app without a tab-selecting or deep-link query param, redirects to the
  * user's last visited tab, falling back to Console when the app has panels
  * and Canvas otherwise.
  */
@@ -64,7 +80,11 @@ export function useDefaultAppTab({ canvasId, urlViewFlags, searchParams, setSear
   // in state rather than a ref: resolution can settle without a URL change
   // (e.g. a console read that errors or reports no panels), and the record
   // effect below must re-run when that happens.
-  const [redirectResolved, setRedirectResolved] = useState(() => urlSelectsTabExplicitly(searchParams));
+  const [redirectResolved, setRedirectResolved] = useState(() => urlPinsNavigation(searchParams));
+  // Whether this app instance was entered through a deep link that lands on a
+  // tab without the user picking it (see urlDeepLinksWithoutTabPick). The
+  // record effect consumes this once to skip persisting that landing.
+  const deepLinkLandingRef = useRef(urlDeepLinksWithoutTabPick(searchParams));
   // A just-scheduled redirect: the tab it navigates to and the tab it
   // navigates away from. `setSearchParams` only lands on the next render, so
   // between scheduling and landing the URL still reports the pre-redirect
@@ -93,8 +113,9 @@ export function useDefaultAppTab({ canvasId, urlViewFlags, searchParams, setSear
     refsOwnerCanvasIdRef.current = canvasId;
     pendingRedirectRef.current = null;
     inRunInspectionRef.current = false;
+    deepLinkLandingRef.current = urlDeepLinksWithoutTabPick(searchParams);
     mountTabRef.current = currentTab;
-    setRedirectResolved(urlSelectsTabExplicitly(searchParams));
+    setRedirectResolved(urlPinsNavigation(searchParams));
   }
 
   // Default-tab resolution: applied at most once per mount.
@@ -143,6 +164,15 @@ export function useDefaultAppTab({ canvasId, urlViewFlags, searchParams, setSear
     // do not persist that landing as a tab change.
     if (inRunInspectionRef.current) {
       inRunInspectionRef.current = false;
+      return;
+    }
+
+    // Likewise for a deep-link landing (`version`/`edit`/`sidebar`/`node`/
+    // `file` without `view`): the user followed a link to a spot, not to a
+    // tab, so the landing must not replace their stored tab. Later deliberate
+    // tab changes are recorded as usual.
+    if (deepLinkLandingRef.current) {
+      deepLinkLandingRef.current = false;
       return;
     }
 
