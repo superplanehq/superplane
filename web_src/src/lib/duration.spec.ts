@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatDuration } from "@/lib/duration";
+import { formatDuration, formatMinutesSecondsDuration } from "@/lib/duration";
 
 describe("duration", () => {
   afterEach(() => {
@@ -54,5 +54,14 @@ describe("duration", () => {
     expect(formatDuration(125_000)).toBe("2m 5s");
     expect(formatDuration(5_400_000)).toBe("1h 30m");
     expect(formatDuration(0)).toBe("");
+  });
+
+  it("formats minutes and seconds without milliseconds", () => {
+    expect(formatMinutesSecondsDuration(0)).toBe("");
+    expect(formatMinutesSecondsDuration(250)).toBe("<1s");
+    expect(formatMinutesSecondsDuration(1_500)).toBe("1s");
+    expect(formatMinutesSecondsDuration(51_988)).toBe("51s");
+    expect(formatMinutesSecondsDuration(61_500)).toBe("1m 1s");
+    expect(formatMinutesSecondsDuration(5_400_000)).toBe("90m");
   });
 });

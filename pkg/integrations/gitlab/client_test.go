@@ -632,3 +632,106 @@ func Test__Client__ListPipelines(t *testing.T) {
 		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/pipelines?per_page=100&page=1", mockClient.Requests[0].URL.String())
 	})
 }
+
+func Test__Client__CreateMergeRequestAwardEmoji(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{"id": 25, "name": "eyes", "user": {"id": 42}}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateMergeRequestAwardEmoji(context.Background(), "1", "1", &CreateAwardEmojiRequest{Name: "eyes"})
+		require.NoError(t, err)
+		assert.Equal(t, 25, result.ID)
+		assert.Equal(t, "eyes", result.Name)
+
+		require.Len(t, mockClient.Requests, 1)
+	})
+
+	t.Run("already exists - returns the existing award emoji", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message":"404 Award Emoji Name has already been taken"}`),
+				GitlabMockResponse(http.StatusOK, `{"id": 42}`),
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 24, "name": "eyes", "user": {"id": 7}},
+					{"id": 25, "name": "eyes", "user": {"id": 42}},
+					{"id": 26, "name": "rocket", "user": {"id": 42}}
+				]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateMergeRequestAwardEmoji(context.Background(), "1", "1", &CreateAwardEmojiRequest{Name: "eyes"})
+		require.NoError(t, err)
+		assert.Equal(t, 25, result.ID)
+		assert.Equal(t, "eyes", result.Name)
+		assert.Equal(t, 42, result.User.ID)
+
+		require.Len(t, mockClient.Requests, 3)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[1].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/user", mockClient.Requests[1].URL.String())
+		assert.Equal(t, http.MethodGet, mockClient.Requests[2].Method)
+	})
+
+	t.Run("already exists but not found in listing - returns an error", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message":"404 Award Emoji Name has already been taken"}`),
+				GitlabMockResponse(http.StatusOK, `{"id": 42}`),
+				GitlabMockResponse(http.StatusOK, `[]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateMergeRequestAwardEmoji(context.Background(), "1", "1", &CreateAwardEmojiRequest{Name: "eyes"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "reported as already existing but could not be found")
+	})
+
+	t.Run("other error - not treated as already-exists", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message":"404 Project Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateMergeRequestAwardEmoji(context.Background(), "1", "1", &CreateAwardEmojiRequest{Name: "eyes"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create award emoji")
+
+		require.Len(t, mockClient.Requests, 1)
+	})
+}

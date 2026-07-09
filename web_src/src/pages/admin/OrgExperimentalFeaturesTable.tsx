@@ -36,24 +36,26 @@ export function OrgExperimentalFeaturesTable({ orgId }: { orgId: string }) {
   return (
     <div className="mb-8">
       <div className="flex items-center gap-2 mb-3">
-        <FlaskConical size={16} className="text-gray-600" />
-        <Heading level={2} className="text-gray-800 text-base">
+        <FlaskConical size={16} className="text-gray-600 dark:text-gray-400" />
+        <Heading level={2} className="text-gray-800 text-base dark:text-gray-100">
           Experimental Features ({visible.length})
         </Heading>
       </div>
 
       {isLoading ? (
-        <Text className="text-gray-500 text-sm">Loading...</Text>
+        <Text className="text-gray-500 text-sm dark:text-gray-400">Loading...</Text>
       ) : visible.length === 0 ? (
-        <Text className="text-gray-500 text-sm">No experimental features are available right now.</Text>
+        <Text className="text-gray-500 text-sm dark:text-gray-400">
+          No experimental features are available right now.
+        </Text>
       ) : (
-        <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden">
+        <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-100">
-                <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Feature</th>
-                <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Description</th>
-                <th className="text-right px-4 py-2.5 text-gray-500 font-medium w-32">Status</th>
+              <tr className="border-b border-slate-100 dark:border-gray-700/70">
+                <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Feature</th>
+                <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Description</th>
+                <th className="text-right px-4 py-2.5 text-gray-500 font-medium w-32 dark:text-gray-400">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -61,9 +63,9 @@ export function OrgExperimentalFeaturesTable({ orgId }: { orgId: string }) {
                 const isOn = enabled.has(feature.id);
                 const isBusy = pendingId === feature.id;
                 return (
-                  <tr key={feature.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-2.5 text-gray-800 font-medium">{feature.label}</td>
-                    <td className="px-4 py-2.5 text-gray-500">{feature.description || "—"}</td>
+                  <tr key={feature.id} className="border-b border-slate-50 last:border-0 dark:border-gray-800/70">
+                    <td className="px-4 py-2.5 text-gray-800 font-medium dark:text-gray-100">{feature.label}</td>
+                    <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">{feature.description || "—"}</td>
                     <td className="px-4 py-2.5 text-right">
                       <Switch
                         checked={isOn}
@@ -80,7 +82,7 @@ export function OrgExperimentalFeaturesTable({ orgId }: { orgId: string }) {
         </div>
       )}
 
-      {error ? <Text className="text-red-600 text-sm mt-2">{error}</Text> : null}
+      {error ? <Text className="text-red-600 text-sm mt-2 dark:text-red-400">{error}</Text> : null}
     </div>
   );
 }

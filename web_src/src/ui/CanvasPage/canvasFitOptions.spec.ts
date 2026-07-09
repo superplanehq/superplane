@@ -13,4 +13,8 @@ describe("canvasFitOptions", () => {
     expect(RUN_CANVAS_FIT_VIEW_OPTIONS.includeHiddenNodes).toBe(true);
     expect(CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS.includeHiddenNodes).toBe(true);
   });
+
+  it("does not clamp run participant fitting to a minimum zoom", () => {
+    expect(RUN_CANVAS_FIT_VIEW_OPTIONS).not.toHaveProperty("minZoom");
+  });
 });

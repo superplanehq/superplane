@@ -13,6 +13,7 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
+  CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   ActionsAction,
   ComponentsEdge,
@@ -85,7 +86,7 @@ import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
-import { resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -121,6 +122,7 @@ import { buildAppFiles } from "./files/lib/app-files";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
+import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
 import { useRunsDetailState } from "./useRunsDetailState";
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
@@ -150,6 +152,7 @@ import {
   buildCanvasLogEntries,
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
+  getRunningRunsCount,
   isCanvasLoadNotFoundError,
   isCanvasPrepLoading,
   isValidRunId,
@@ -161,6 +164,7 @@ import {
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
+const RUNNING_RUNS_FILTERS = { states: ["STATE_STARTED" as CanvasesCanvasRunState] };
 
 type DuplicatedNodesResult = {
   newNodes: ComponentsNode[];
@@ -491,6 +495,7 @@ export function AppPage() {
   );
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, showLiveActivity);
   const infiniteLogRunsQuery = useInfiniteCanvasRuns(canvasId!, {}, isViewingLiveVersion);
+  const infiniteRunningRunsQuery = useInfiniteCanvasRuns(canvasId!, RUNNING_RUNS_FILTERS, isViewingLiveVersion);
   const selectedRunIdIsValid = selectedRunId ? isValidRunId(selectedRunId) : false;
   const describedRunQuery = useDescribeRun(
     canvasId!,
@@ -522,6 +527,7 @@ export function AppPage() {
       });
     return { runs };
   }, [infiniteLogRunsQuery.data]);
+  const runningRunsCount = getRunningRunsCount(infiniteRunningRunsQuery.data, isViewingLiveVersion);
   const selectedRunFromList = useMemo(
     () => runsData.runs.find((run) => run.id === selectedRunId) || null,
     [runsData.runs, selectedRunId],
@@ -3393,7 +3399,14 @@ export function AppPage() {
   );
 
   const runInspectionChromeActive = isRunInspectionMode && !editSessionActive && !isEnteringEditSession;
-
+  const runParticipantFit = useRunParticipantFitRequest({
+    isRunInspectionMode: runInspectionChromeActive,
+    selectedRunId,
+    runCanvasLoading,
+    runCanvasData,
+  });
+  const requestRunFitRef = useRef(runParticipantFit.requestParticipantFit);
+  requestRunFitRef.current = runParticipantFit.requestParticipantFit;
   const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
     getWorkflowViewPresentation({
       ...urlViewFlags,
@@ -3542,11 +3555,12 @@ export function AppPage() {
       clearDismissedRunDetail();
       setRunDetailNodeId(null);
       setFocusRequest(null);
+      requestRunFitRef.current(runId);
       startTransition(() => {
         setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
       });
     },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setSearchParams, setRunDetailNodeId],
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
   );
 
   const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
@@ -3564,6 +3578,7 @@ export function AppPage() {
       clearDismissedRunDetail();
       const inspectorNodeId =
         options?.nodeId ?? (searchParams.get("sidebar") === "1" ? searchParams.get("node") : null);
+      if (!inspectorNodeId) requestRunFitRef.current(runId);
       if (inspectorNodeId) {
         preserveRunDetailNodeOnNextRunChangeRef.current = true;
         setRunDetailNodeId(inspectorNodeId);
@@ -3610,6 +3625,8 @@ export function AppPage() {
       const preservedNodeId = runDetailNodeId;
       preserveRunDetailNodeOnNextRunChangeRef.current = Boolean(preservedNodeId);
       clearDismissedRunDetail();
+      setFocusRequest(null);
+      requestRunFitRef.current(runId);
       setSearchParams(
         (current) =>
           applyRunInspectionNavigationSearchParams(current, {
@@ -3619,14 +3636,15 @@ export function AppPage() {
         { replace: true },
       );
     },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, runDetailNodeId, setSearchParams],
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, runDetailNodeId, setFocusRequest, setSearchParams],
   );
 
   const handleClearRunInspection = useCallback(() => {
     setRunDetailNodeId(null);
     setFocusRequest(null);
+    runParticipantFit.clearParticipantFit();
     setSearchParams((current) => clearRunInspectionSearchParams(current), { replace: true });
-  }, [setSearchParams, setRunDetailNodeId]);
+  }, [runParticipantFit, setSearchParams, setRunDetailNodeId]);
 
   const handleRunNodeDetailSelection = useCallback(
     (nodeId: string | null) => {
@@ -3771,24 +3789,21 @@ export function AppPage() {
 
   const handleLiveCanvasNodeClick = useCallback(
     (nodeId: string) => {
-      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) {
-        return;
-      }
+      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
 
       const lookupId = liveCanvasNodeClickLookupRef.current + 1;
       liveCanvasNodeClickLookupRef.current = lookupId;
 
+      const cachedRunId = resolveCachedNodeRunId(nodeId, canvasNodesById.get(nodeId), resolveRunIdForSidebarEvent);
+      if (cachedRunId) return handleSelectRunFromSidebarEvent(cachedRunId, { nodeId });
+
       void (async () => {
         try {
           const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
-          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) {
-            return;
-          }
+          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) return;
 
-          const runId = await fetchRunIdForSidebarEvent(lookupEvent);
-          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) {
-            return;
-          }
+          const runId = await fetchRunIdForSidebarEvent(lookupEvent, { maxPages: 1 });
+          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) return;
 
           handleSelectRunFromSidebarEvent(runId, { nodeId });
         } catch (error) {
@@ -3797,12 +3812,14 @@ export function AppPage() {
       })();
     },
     [
+      canvasNodesById,
       fetchRunIdForSidebarEvent,
       handleSelectRunFromSidebarEvent,
       isEditing,
       isRunInspectionMode,
       liveSidebarRunLookupEnabled,
       resolveLatestNodeRunLookupEvent,
+      resolveRunIdForSidebarEvent,
     ],
   );
 
@@ -4248,16 +4265,7 @@ export function AppPage() {
           fitViewContentKey={`${canvasId}:${resolveFitViewVersionId({ liveCanvasVersionId, activeCanvasVersionId, isViewingDraftVersion: isEditing, draftSpec: draftSpecToRender, selectedVersion: selectedCanvasVersion })}`}
           lastFittedContentKeyRef={lastFittedContentKeyRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          fitAllFocusNodeIds={
-            runInspectionChromeActive && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
-              ? runCanvasData.participantNodeIds
-              : undefined
-          }
-          runParticipantNodeIds={
-            runInspectionChromeActive && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
-              ? runCanvasData.participantNodeIds
-              : undefined
-          }
+          {...runParticipantFit.canvasFitProps}
           runCanvasLoading={
             runInspectionChromeActive &&
             selectedRunId !== null &&
@@ -4330,6 +4338,7 @@ export function AppPage() {
           triggers={allTriggers}
           logEntries={logEntries}
           logRuns={isViewingLiveVersion ? logRunsData.runs : []}
+          runningRunsCount={runningRunsCount}
           runsNodes={canvasNodes}
           runsComponentIconMap={componentIconMap}
           onRunNodeSelect={handleLogRunNodeSelect}
