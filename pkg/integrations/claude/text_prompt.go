@@ -22,10 +22,8 @@ type TextPrompt struct{}
 
 type TextPromptSpec struct {
 	Model         string   `json:"model"`
-	Prompt        string   `json:"prompt"`
 	SystemMessage string   `json:"systemMessage"`
-	MaxTokens     int      `json:"maxTokens"`
-	Temperature   *float64 `json:"temperature"`
+	Prompt        string   `json:"prompt"`
 	Files         []string `json:"files"`
 	OutputSchema  string   `json:"outputSchema"`
 }
@@ -44,7 +42,6 @@ type MessagePayload struct {
 // configured model and options are visible on the node without opening it.
 type TextPromptNodeMetadata struct {
 	Model            string `json:"model" mapstructure:"model"`
-	MaxTokens        int    `json:"maxTokens" mapstructure:"maxTokens"`
 	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
 }
 
@@ -71,13 +68,11 @@ func (c *TextPrompt) Documentation() string {
 
 ## Configuration
 
-- **Model**: The Claude model to use (e.g., claude-3-5-sonnet-latest).
-- **Prompt**: The main user message/instruction.
+- **Model**: The Claude model to use.
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
-- **Max Tokens**: (Optional) Limit the length of the generated response.
-- **Temperature**: (Optional) Control randomness (0.0 to 1.0).
-- **Files**: (Optional) Attach files from the Files tab (images, PDFs, or text). They are uploaded to the Files API and sent alongside the prompt.
-- **Structured Output**: (Optional) Provide a JSON Schema for the response. Claude is constrained to return JSON matching it, available on the parsed output. The schema is validated before the request; every object is sent with additionalProperties:false.
+- **Prompt**: The main user message or instruction.
+- **Files**: (Optional) Files from the Files tab (images, PDFs, or text) to attach alongside the prompt.
+- **Structured Output**: (Optional) A JSON Schema the response must match, available on the parsed output.
 
 ## Output
 
@@ -117,6 +112,7 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 			Required:    true,
 			Default:     "claude-opus-4-6",
 			Placeholder: "Select a Claude model",
+			Description: "Model used for this request.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "model",
@@ -124,43 +120,27 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "prompt",
-			Label:       "Prompt",
-			Type:        configuration.FieldTypeText,
-			Required:    true,
-			Placeholder: "Enter the user prompt",
-			Description: "The main instruction or question for Claude",
-		},
-		{
 			Name:        "systemMessage",
 			Label:       "System Message",
 			Type:        configuration.FieldTypeText,
 			Required:    false,
 			Placeholder: "e.g. You are a concise DevOps assistant",
-			Description: "Optional context to set behavior or persona",
+			Description: "Optional context to set the assistant's behavior or persona.",
 		},
 		{
-			Name:        "maxTokens",
-			Label:       "Max Tokens",
-			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Default:     "4096",
-			Description: "Maximum number of tokens to generate e.g. Defaults to 4096.",
-		},
-		{
-			Name:        "temperature",
-			Label:       "Temperature",
-			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Default:     "1.0",
-			Description: "Amount of randomness injected into the response (0.0 to 1.0)",
+			Name:        "prompt",
+			Label:       "Prompt",
+			Type:        configuration.FieldTypeText,
+			Required:    true,
+			Placeholder: "Enter the user prompt",
+			Description: "The main instruction or question for Claude.",
 		},
 		{
 			Name:        "files",
 			Label:       "Files",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "Files from the Files tab to attach to the prompt (images, PDFs, or text)",
+			Description: "Files from the Files tab to attach alongside the prompt (images, PDFs, or text).",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "File path",
@@ -173,7 +153,7 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 		structuredoutput.ConfigField(
 			"outputSchema",
 			"Structured Output",
-			"A JSON Schema describing the response. Claude is constrained to return JSON matching it (available on the `parsed` output). Edit the default schema; it is validated before the request. Every object gets `additionalProperties: false`.",
+			"A JSON Schema the response must match, available on the `parsed` output.",
 		),
 	}
 }
@@ -234,13 +214,8 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 	}
 
 	if ctx.Metadata != nil {
-		maxTokens := spec.MaxTokens
-		if maxTokens == 0 {
-			maxTokens = 4096
-		}
 		_ = ctx.Metadata.Set(TextPromptNodeMetadata{
 			Model:            spec.Model,
-			MaxTokens:        maxTokens,
 			StructuredOutput: hasSchema,
 		})
 	}
@@ -258,14 +233,6 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 	}
 	if spec.Prompt == "" {
 		return fmt.Errorf("prompt is required")
-	}
-
-	if spec.MaxTokens == 0 {
-		spec.MaxTokens = 4096
-	}
-
-	if spec.MaxTokens < 1 {
-		return fmt.Errorf("maxTokens must be at least 1")
 	}
 
 	schema, err := structuredoutput.Parse(spec.OutputSchema)
@@ -292,14 +259,13 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 
 	req := CreateMessageRequest{
 		Model:     spec.Model,
-		MaxTokens: spec.MaxTokens,
+		MaxTokens: defaultMaxTokens,
 		Messages: []Message{
 			{
 				Role:    "user",
 				Content: userContent,
 			},
 		},
-		Temperature: spec.Temperature,
 	}
 
 	if spec.SystemMessage != "" {
