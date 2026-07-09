@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { useUpdateCanvasPreference, useCanvasPreference } from "@/hooks/useCanvasData";
+import { useCanvasConsole, useUpdateCanvasPreference, useCanvasPreference } from "@/hooks/useCanvasData";
 import type { CanvasConsoleData } from "@/hooks/useCanvasData";
 
 export type AppTabId = "canvas" | "console" | "memory" | "files";
@@ -50,14 +50,6 @@ type UseDefaultAppTabOptions = {
   urlViewFlags: UrlViewFlags;
   searchParams: URLSearchParams;
   setSearchParams: SetSearchParams;
-  /**
-   * Live console query result, used only when there is no stored preference
-   * yet to fall back to Console when panels exist. This must read the live
-   * console, not the active version's: the active version can be a draft
-   * (e.g. from `?version=`) whose console is empty while the live app has
-   * widgets, and first-visit defaulting is about what the app publishes.
-   */
-  liveConsoleQuery: ConsoleQueryLike | undefined;
 };
 
 /**
@@ -72,9 +64,14 @@ export function useDefaultAppTab({
   urlViewFlags,
   searchParams,
   setSearchParams,
-  liveConsoleQuery,
 }: UseDefaultAppTabOptions) {
   const preferenceQuery = useCanvasPreference(organizationId ?? "", canvasId ?? "");
+  // First-visit Console defaulting must consult the live console (versionId
+  // undefined), not the active version's: the active version can be a draft
+  // (e.g. from `?version=`) whose console is empty while the live app has
+  // widgets, and first-visit defaulting is about what the app publishes. The
+  // query key matches other live-console reads, so this usually dedupes.
+  const liveConsoleQuery: ConsoleQueryLike = useCanvasConsole(canvasId ?? "", undefined);
   const updatePreferenceMutation = useUpdateCanvasPreference(organizationId ?? "");
   // `mutate` is referentially stable, unlike the mutation result object, so
   // depending on it keeps the record effect from re-running on every mutation
@@ -237,7 +234,7 @@ type ResolveDefaultTabInput = {
   preferenceIsPending: boolean;
   preferenceIsError: boolean;
   storedTab: string | undefined;
-  liveConsoleQuery: ConsoleQueryLike | undefined;
+  liveConsoleQuery: ConsoleQueryLike;
 };
 
 /**
@@ -262,8 +259,6 @@ function resolveDefaultTab({
   if (isAppTabId(storedTab)) return { settled: true, redirectTo: storedTab };
 
   // No stored tab yet: fall back to Console if the live app has panels.
-  if (!liveConsoleQuery) return { settled: true, redirectTo: null };
-
   // A console read that ended in error settles the fallback on the current
   // tab: waiting for a success that may never come would leave the resolution
   // pending forever, blocking tab recording. Skipping the Console fallback

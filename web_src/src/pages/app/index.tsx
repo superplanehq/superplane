@@ -32,7 +32,6 @@ import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
   useCanvas,
-  useCanvasConsole,
   useCanvasMemoryEntries,
   useCanvasVersions,
   useCreateCanvasMemoryNamespace,
@@ -309,9 +308,7 @@ export function AppPage() {
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
-  useEffect(() => {
-    setCanvasStagingEchoUserId(currentUserId);
-  }, [currentUserId]);
+  useEffect(() => setCanvasStagingEchoUserId(currentUserId), [currentUserId]);
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
   // True while the user is in an edit session. The session keeps the versions
@@ -1017,12 +1014,7 @@ export function AppPage() {
     editBootstrapReady: isEditBootstrapReady,
   });
 
-  // First-visit Console defaulting must consult the live console, not
-  // `consoleQuery`: that one tracks the active version (possibly a draft from
-  // `?version=`), whose console can be empty while the live app has widgets.
-  // Same query key as other live-console reads, so this usually dedupes.
-  const liveConsoleQuery = useCanvasConsole(canvasId, undefined);
-  useDefaultAppTab({ organizationId, canvasId, urlViewFlags, searchParams, setSearchParams, liveConsoleQuery });
+  useDefaultAppTab({ organizationId, canvasId, urlViewFlags, searchParams, setSearchParams });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
