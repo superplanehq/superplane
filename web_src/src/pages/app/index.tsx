@@ -87,6 +87,7 @@ import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
 import { resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import { findLatestRunIdForNode } from "./sidebarRunLookup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -3789,9 +3790,10 @@ export function AppPage() {
 
   const handleLiveCanvasNodeClick = useCallback(
     (nodeId: string) => {
-      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) {
-        return;
-      }
+      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
+
+      const latestCachedRunId = findLatestRunIdForNode(logRunsData.runs, nodeId);
+      if (latestCachedRunId) return handleSelectRunFromSidebarEvent(latestCachedRunId, { nodeId });
 
       const lookupId = liveCanvasNodeClickLookupRef.current + 1;
       liveCanvasNodeClickLookupRef.current = lookupId;
@@ -3799,14 +3801,10 @@ export function AppPage() {
       void (async () => {
         try {
           const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
-          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) {
-            return;
-          }
+          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) return;
 
-          const runId = await fetchRunIdForSidebarEvent(lookupEvent);
-          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) {
-            return;
-          }
+          const runId = await fetchRunIdForSidebarEvent(lookupEvent, { maxPages: 1 });
+          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) return;
 
           handleSelectRunFromSidebarEvent(runId, { nodeId });
         } catch (error) {
@@ -3820,6 +3818,7 @@ export function AppPage() {
       isEditing,
       isRunInspectionMode,
       liveSidebarRunLookupEnabled,
+      logRunsData.runs,
       resolveLatestNodeRunLookupEvent,
     ],
   );
