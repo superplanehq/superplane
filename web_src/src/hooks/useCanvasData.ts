@@ -456,21 +456,11 @@ export const useCreateCanvas = (organizationId: string) => {
         templateId?: string;
       } & CanvasGraphData,
     ) => {
-      const payload = {
-        metadata: {
-          name: data.name,
-          description: data.description || "",
-        },
-        spec: {
-          nodes: data.nodes || [],
-          edges: data.edges || [],
-        },
-      };
-
       return await canvasesCreateCanvas(
         withOrganizationHeader({
           body: {
-            canvas: payload,
+            name: data.name,
+            description: data.description || "",
           },
         }),
       );
