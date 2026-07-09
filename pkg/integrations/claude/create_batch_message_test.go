@@ -240,6 +240,66 @@ func Test__CreateBatchMessage__Execute__singleMode_oneResultPerItem(t *testing.T
 	assert.Equal(t, "B", out.Results[1].Text)
 }
 
+// If the results file is missing a trailing entry (e.g. a request that never
+// got a result line), Results must still have one entry per submitted item,
+// per the documented output shape, not just up to the highest index seen.
+func Test__CreateBatchMessage__Execute__singleMode_resultsPaddedToItemCount(t *testing.T) {
+	c := &CreateBatchMessage{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"msgbatch_1","processing_status":"ended","request_counts":{"succeeded":2}}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				// Only 2 result lines for 3 submitted items; item-3's line is missing.
+				`{"custom_id":"item-1","result":{"type":"succeeded","message":{"id":"msg_1","content":[{"type":"text","text":"A"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}` + "\n" +
+					`{"custom_id":"item-2","result":{"type":"succeeded","message":{"id":"msg_2","content":[{"type":"text","text":"B"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}}}`,
+			))},
+		},
+	}
+	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}}
+	metadataCtx := &contexts.MetadataContext{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	requestsCtx := &contexts.RequestContext{}
+
+	items := []any{
+		map[string]any{"number": float64(1)},
+		map[string]any{"number": float64(2)},
+		map[string]any{"number": float64(3)},
+	}
+
+	execCtx := core.ExecutionContext{
+		ID: uuid.New(),
+		Configuration: map[string]any{
+			"model":  "claude-opus-4-6",
+			"mode":   modeSingle,
+			"items":  `dummy`,
+			"prompt": `dummy`,
+		},
+		HTTP:           httpContext,
+		Integration:    integrationCtx,
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Requests:       requestsCtx,
+		Expressions: &contexts.ExpressionContext{
+			Output: items,
+			WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+				return "prompt text", nil
+			},
+		},
+		Logger: logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.Execute(execCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+
+	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
+	require.Len(t, out.Results, 3)
+	assert.Equal(t, "A", out.Results[0].Text)
+	assert.Equal(t, "B", out.Results[1].Text)
+	assert.Equal(t, 2, out.Results[2].Index)
+	assert.Empty(t, out.Results[2].Text)
+}
+
 func Test__CreateBatchMessage__Execute__multipleMode_groupsByItemNotByPrompt(t *testing.T) {
 	c := &CreateBatchMessage{}
 	httpContext := &contexts.HTTPContext{
@@ -359,6 +419,32 @@ func Test__CreateBatchMessage__Execute__multipleMode_invalidPromptID(t *testing.
 	err := c.Execute(execCtx)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "letters, digits, hyphens, and underscores")
+}
+
+// Two prompt rows sharing an ID would produce colliding internal custom IDs
+// for the same item, which must be rejected up front rather than failing
+// batch creation or silently dropping one prompt's results.
+func Test__CreateBatchMessage__Execute__multipleMode_duplicatePromptID(t *testing.T) {
+	c := &CreateBatchMessage{}
+	execCtx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"model": "claude-opus-4-6",
+			"mode":  modeMultiple,
+			"items": `dummy`,
+			"prompts": []map[string]any{
+				{"id": "title", "prompt": "dummy"},
+				{"id": "title", "prompt": "dummy-2"},
+			},
+		},
+		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
+		Metadata:    &contexts.MetadataContext{},
+		Expressions: &contexts.ExpressionContext{Output: []any{map[string]any{"number": float64(1)}}},
+		Logger:      logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.Execute(execCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate")
 }
 
 func Test__CreateBatchMessage__Execute__itemsNotAnArray(t *testing.T) {
@@ -641,6 +727,61 @@ func Test__CreateBatchMessage__poll__timeout(t *testing.T) {
 	require.True(t, executionState.Finished)
 	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
 	assert.Equal(t, "timeout", out.Status)
+}
+
+// A timeout must not zero out progress that earlier successful polls already
+// reported to the user in execution metadata.
+func Test__CreateBatchMessage__poll__timeout_preservesRequestCounts(t *testing.T) {
+	c := &CreateBatchMessage{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{Metadata: BatchExecutionMetadata{
+		BatchID:       "msgbatch_1",
+		Status:        "in_progress",
+		RequestCounts: &MessageBatchRequestCounts{Processing: 3, Succeeded: 7},
+	}}
+
+	hookCtx := core.ActionHookContext{
+		Name: "poll",
+		Parameters: map[string]any{
+			"attempt": float64(batchMaxPollAttempts + 1),
+			"errors":  float64(0),
+		},
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.HandleHook(hookCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
+	assert.Equal(t, "timeout", out.Status)
+	require.NotNil(t, out.RequestCounts)
+	assert.Equal(t, 7, out.RequestCounts.Succeeded)
+	assert.Equal(t, 3, out.RequestCounts.Processing)
+}
+
+// If execution metadata can't be decoded at all (e.g. a type mismatch from
+// corrupted storage), the poll hook must still finish the run with the
+// documented "error" output shape rather than returning a raw Go error.
+func Test__CreateBatchMessage__poll__corruptMetadata_emitsError(t *testing.T) {
+	c := &CreateBatchMessage{}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{Metadata: map[string]any{"itemCount": "not-a-number"}}
+
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(0)},
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := c.HandleHook(hookCtx)
+	require.NoError(t, err)
+	require.True(t, executionState.Finished)
+	out := executionState.Payloads[0].(map[string]any)["data"].(BatchOutput)
+	assert.Equal(t, "error", out.Status)
 }
 
 // If the poll hook is ever invoked with no batch id in execution metadata

@@ -33,11 +33,13 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 
 	metadata := BatchExecutionMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
+		ctx.Logger.Errorf("Message batch poll invoked with undecodable execution metadata: %v", err)
+		out := buildBatchOutput("error", nil, nil, false, 0)
+		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
 	}
 	if metadata.BatchID == "" {
 		ctx.Logger.Errorf("Message batch poll invoked without a batch id in execution metadata")
-		out := buildBatchOutput("error", nil, nil, false)
+		out := buildBatchOutput("error", nil, nil, false, 0)
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
 	}
 
@@ -52,7 +54,7 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 
 	if attempt > batchMaxPollAttempts {
 		ctx.Logger.Errorf("Message batch %s exceeded max poll attempts", metadata.BatchID)
-		out := buildBatchOutput("timeout", &MessageBatch{ID: metadata.BatchID}, nil, false)
+		out := buildBatchOutput("timeout", stubBatch(metadata), nil, false, metadata.ItemCount)
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
 	}
 
@@ -66,7 +68,7 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 		errs++
 		if errs >= batchMaxPollErrors {
 			ctx.Logger.Errorf("Message batch %s: polling failed repeatedly: %v", metadata.BatchID, err)
-			out := buildBatchOutput("error", &MessageBatch{ID: metadata.BatchID}, nil, false)
+			out := buildBatchOutput("error", stubBatch(metadata), nil, false, metadata.ItemCount)
 			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
 		}
 		return c.scheduleNextPoll(ctx, attempt+1, errs)
@@ -78,6 +80,7 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 				BatchID:       metadata.BatchID,
 				Status:        batch.ProcessingStatus,
 				RequestCounts: &batch.RequestCounts,
+				ItemCount:     metadata.ItemCount,
 			})
 		}
 		return c.scheduleNextPoll(ctx, attempt+1, 0)
@@ -90,12 +93,13 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 		BatchID:       batch.ID,
 		Status:        batch.ProcessingStatus,
 		RequestCounts: &batch.RequestCounts,
+		ItemCount:     metadata.ItemCount,
 	})
 
 	spec, err := decodeBatchMessageSpec(ctx.Configuration)
 	if err != nil {
 		ctx.Logger.Errorf("Message batch %s ended but failed to decode configuration: %v", batch.ID, err)
-		out := buildBatchOutput("error", batch, nil, false)
+		out := buildBatchOutput("error", batch, nil, false, metadata.ItemCount)
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
 	}
 	hasSchema := strings.TrimSpace(spec.OutputSchema) != ""
@@ -105,15 +109,26 @@ func (c *CreateBatchMessage) poll(ctx core.ActionHookContext) error {
 		errs++
 		if errs >= batchMaxPollErrors {
 			ctx.Logger.Errorf("Message batch %s ended but fetching results failed repeatedly: %v", batch.ID, err)
-			out := buildBatchOutput("error", batch, nil, false)
+			out := buildBatchOutput("error", batch, nil, false, metadata.ItemCount)
 			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
 		}
 		ctx.Logger.Warnf("Failed to fetch results for batch %s: %v. Retrying poll.", batch.ID, err)
 		return c.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
-	out := buildBatchOutput(batchStatusEnded, batch, results, hasSchema)
+	out := buildBatchOutput(batchStatusEnded, batch, results, hasSchema, metadata.ItemCount)
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out})
+}
+
+// stubBatch builds a placeholder MessageBatch carrying the last request counts
+// seen in execution metadata, so a terminal timeout/error output doesn't zero
+// out progress that was already reported to the user on an earlier poll.
+func stubBatch(metadata BatchExecutionMetadata) *MessageBatch {
+	batch := &MessageBatch{ID: metadata.BatchID}
+	if metadata.RequestCounts != nil {
+		batch.RequestCounts = *metadata.RequestCounts
+	}
+	return batch
 }
 
 func (c *CreateBatchMessage) scheduleNextPoll(ctx core.ActionHookContext, nextAttempt, errors int) error {

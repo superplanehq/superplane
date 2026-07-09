@@ -96,6 +96,10 @@ type BatchExecutionMetadata struct {
 	BatchID       string                     `json:"batchId,omitempty" mapstructure:"batchId,omitempty"`
 	Status        string                     `json:"status,omitempty" mapstructure:"status,omitempty"`
 	RequestCounts *MessageBatchRequestCounts `json:"requestCounts,omitempty" mapstructure:"requestCounts,omitempty"`
+	// ItemCount is the number of Items elements the batch was built from, so
+	// buildBatchOutput can size Results to it even if the results file is
+	// missing trailing entries.
+	ItemCount int `json:"itemCount,omitempty" mapstructure:"itemCount,omitempty"`
 }
 
 // BatchResultOutcome is one request's outcome: either a whole item's result
@@ -388,7 +392,7 @@ func (c *CreateBatchMessage) Execute(ctx core.ExecutionContext) error {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, batchInitialPoll)
 	}
 
-	items, err := resolveBatchRequests(ctx.Expressions, spec)
+	items, itemCount, err := resolveBatchRequests(ctx.Expressions, spec)
 	if err != nil {
 		return err
 	}
@@ -415,13 +419,13 @@ func (c *CreateBatchMessage) Execute(ctx core.ExecutionContext) error {
 
 	ctx.Logger.Infof("Created Claude message batch %s with %d requests", batch.ID, len(requestItems))
 
-	metadata := BatchExecutionMetadata{BatchID: batch.ID, Status: batch.ProcessingStatus, RequestCounts: &batch.RequestCounts}
+	metadata := BatchExecutionMetadata{BatchID: batch.ID, Status: batch.ProcessingStatus, RequestCounts: &batch.RequestCounts, ItemCount: itemCount}
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
 	if batch.ProcessingStatus == batchStatusEnded {
-		return c.finishBatch(client, ctx.ExecutionState, ctx.Metadata, batch, len(schema) > 0)
+		return c.finishBatch(client, ctx.ExecutionState, ctx.Metadata, batch, len(schema) > 0, itemCount)
 	}
 
 	ctx.Logger.Infof("Waiting for batch %s to complete (polling)...", batch.ID)
@@ -459,13 +463,13 @@ func (c *CreateBatchMessage) HandleWebhook(ctx core.WebhookRequestContext) (int,
 }
 
 // finishBatch fetches results for an already-ended batch and emits the payload.
-func (c *CreateBatchMessage) finishBatch(client *Client, state core.ExecutionStateContext, metadataWriter core.MetadataWriter, batch *MessageBatch, hasSchema bool) error {
+func (c *CreateBatchMessage) finishBatch(client *Client, state core.ExecutionStateContext, metadataWriter core.MetadataWriter, batch *MessageBatch, hasSchema bool, itemCount int) error {
 	results, err := client.GetMessageBatchResults(batch.ID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch batch results: %w", err)
 	}
 
-	out := buildBatchOutput(batchStatusEnded, batch, results, hasSchema)
+	out := buildBatchOutput(batchStatusEnded, batch, results, hasSchema, itemCount)
 	if err := state.Emit(core.DefaultOutputChannel.Name, CreateBatchMessagePayloadType, []any{out}); err != nil {
 		return err
 	}
@@ -500,10 +504,16 @@ func validateBatchMessageSpec(spec BatchMessageSpec) error {
 		if len(spec.Prompts) == 0 {
 			return fmt.Errorf("at least one prompt is required in \"Multiple Prompts\" mode")
 		}
+		seenIDs := make(map[string]bool, len(spec.Prompts))
 		for i, p := range spec.Prompts {
-			if strings.TrimSpace(p.ID) == "" {
+			id := strings.TrimSpace(p.ID)
+			if id == "" {
 				return fmt.Errorf("prompts[%d].id is required", i)
 			}
+			if seenIDs[id] {
+				return fmt.Errorf("prompts[%d].id %q is a duplicate; prompt ids must be unique", i, id)
+			}
+			seenIDs[id] = true
 			if strings.TrimSpace(p.Prompt) == "" {
 				return fmt.Errorf("prompts[%d].prompt is required", i)
 			}
@@ -547,16 +557,22 @@ func validateRequestItems(items []BatchMessageItemSpec) error {
 // resolveBatchRequests evaluates Items to an array, then builds the batch's
 // requests according to spec.Mode: one prompt applied to every element
 // (single, 1 x N), or several applied to every element (multiple, M x N).
-func resolveBatchRequests(expressions core.ExpressionContext, spec BatchMessageSpec) ([]BatchMessageItemSpec, error) {
+func resolveBatchRequests(expressions core.ExpressionContext, spec BatchMessageSpec) ([]BatchMessageItemSpec, int, error) {
 	elements, err := resolveItems(expressions, spec.Items)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
+	var items []BatchMessageItemSpec
 	if spec.Mode == modeMultiple {
-		return resolveMultiplePrompts(expressions, spec.Prompts, elements)
+		items, err = resolveMultiplePrompts(expressions, spec.Prompts, elements)
+	} else {
+		items, err = resolveSinglePrompt(expressions, spec, elements)
 	}
-	return resolveSinglePrompt(expressions, spec, elements)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, len(elements), nil
 }
 
 // resolveItems evaluates Items to an array of elements.
@@ -729,8 +745,11 @@ func buildBatchRequestItems(items []BatchMessageItemSpec, spec BatchMessageSpec,
 // (possibly nil, for timeout/error statuses) results. Results are regrouped
 // from the flat, customId-keyed API response into one entry per item, using
 // each result's internal Custom ID (see itemCustomID/parseItemCustomID) to
-// find its item index and (in multiple mode) its prompt ID.
-func buildBatchOutput(status string, batch *MessageBatch, results []MessageBatchResult, hasSchema bool) BatchOutput {
+// find its item index and (in multiple mode) its prompt ID. itemCount is the
+// number of Items elements the batch was built from (0 if unknown, e.g. an
+// execution started before this field existed); Results is sized to at least
+// that many entries even if the results file is missing trailing entries.
+func buildBatchOutput(status string, batch *MessageBatch, results []MessageBatchResult, hasSchema bool, itemCount int) BatchOutput {
 	out := BatchOutput{Status: status}
 	if batch != nil {
 		out.BatchID = batch.ID
@@ -769,8 +788,13 @@ func buildBatchOutput(status string, batch *MessageBatch, results []MessageBatch
 		}
 	}
 
-	out.Results = make([]BatchItemResult, maxIndex+1)
-	for i := 0; i <= maxIndex; i++ {
+	resultCount := maxIndex + 1
+	if itemCount > resultCount {
+		resultCount = itemCount
+	}
+
+	out.Results = make([]BatchItemResult, resultCount)
+	for i := 0; i < resultCount; i++ {
 		if item, ok := itemsByIndex[i]; ok {
 			out.Results[i] = *item
 		} else {
