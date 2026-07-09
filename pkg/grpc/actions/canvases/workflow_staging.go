@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
 
@@ -31,9 +32,9 @@ func effectiveSpecYAML(
 
 	switch path {
 	case CanvasYAMLRepositoryPath:
-		return canvasYAMLFromVersion(canvas, version, organizationID)
+		return yaml.VersionToCanvasYAML(canvas.Name, canvas.Description, version)
 	case ConsoleYAMLRepositoryPath:
-		return consoleYAMLFromVersion(canvas, version)
+		return yaml.VersionToConsoleYML(canvas.Name, version)
 	default:
 		return "", grpcerrors.InvalidArgument(nil, fmt.Sprintf("unsupported repository spec file %q", path))
 	}

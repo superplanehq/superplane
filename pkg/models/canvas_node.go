@@ -38,6 +38,22 @@ type Node struct {
 	WarningMessage *string        `json:"warningMessage,omitempty"`
 }
 
+func (c *Node) ComponentName() string {
+	if c.Ref.Component != nil && c.Ref.Component.Name != "" {
+		return c.Ref.Component.Name
+	}
+
+	if c.Ref.Trigger != nil && c.Ref.Trigger.Name != "" {
+		return c.Ref.Trigger.Name
+	}
+
+	if c.Ref.Widget != nil && c.Ref.Widget.Name != "" {
+		return c.Ref.Widget.Name
+	}
+
+	return ""
+}
+
 type Position struct {
 	X int `json:"x"`
 	Y int `json:"y"`

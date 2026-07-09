@@ -8,8 +8,6 @@ import (
 
 	"github.com/nulab/autog"
 	"github.com/nulab/autog/graph"
-	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
 const (
@@ -20,26 +18,46 @@ const (
 	autoLayoutDisconnectedComponentVerticalGap = 280
 )
 
-func ApplyLayout(nodes []models.Node, edges []models.Edge, layout *pb.CanvasAutoLayout) ([]models.Node, []models.Edge, error) {
+type N struct {
+	ID       string
+	Type     string
+	Position Position
+}
+
+type E struct {
+	SourceID string
+	TargetID string
+	Channel  string
+}
+
+type Position struct {
+	X int
+	Y int
+}
+
+func ApplyLayout(nodes []N, edges []E, layout *AutoLayout) ([]N, []E, error) {
 	if layout == nil {
 		return nodes, edges, nil
 	}
 
-	switch layout.Algorithm {
-	case pb.CanvasAutoLayout_ALGORITHM_UNSPECIFIED:
-		return nil, nil, fmt.Errorf("layout algorithm is required")
-	case pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL:
+	algorithm, err := layout.resolvedAlgorithm()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	switch algorithm {
+	case AlgorithmHorizontal:
 		layoutedNodes, err := applyHorizontalLayout(nodes, edges, layout)
 		if err != nil {
 			return nil, nil, err
 		}
 		return layoutedNodes, edges, nil
 	default:
-		return nil, nil, fmt.Errorf("unsupported layout algorithm: %s", layout.Algorithm.String())
+		return nil, nil, fmt.Errorf("unsupported layout algorithm: %s", layout.Algorithm)
 	}
 }
 
-func applyHorizontalLayout(nodes []models.Node, edges []models.Edge, layout *pb.CanvasAutoLayout) ([]models.Node, error) {
+func applyHorizontalLayout(nodes []N, edges []E, layout *AutoLayout) ([]N, error) {
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
@@ -48,7 +66,7 @@ func applyHorizontalLayout(nodes []models.Node, edges []models.Edge, layout *pb.
 	flowNodeIDs := make([]string, 0, len(nodes))
 	flowNodeSet := make(map[string]struct{}, len(nodes))
 	for i, node := range nodes {
-		if node.ID == "" || node.Type == models.NodeTypeWidget {
+		if node.ID == "" {
 			continue
 		}
 
@@ -99,7 +117,7 @@ func applyHorizontalLayout(nodes []models.Node, edges []models.Edge, layout *pb.
 
 	minCurrentPosition := resolveMinPositionFromNodes(layoutNodes)
 	minLayoutPosition := resolveMinPositionFromLayout(layoutedPositions)
-	applyPositionOffset(layoutedPositions, models.Position{
+	applyPositionOffset(layoutedPositions, Position{
 		X: minCurrentPosition.X - minLayoutPosition.X,
 		Y: minCurrentPosition.Y - minLayoutPosition.Y,
 	})
@@ -108,15 +126,15 @@ func applyHorizontalLayout(nodes []models.Node, edges []models.Edge, layout *pb.
 }
 
 type layoutPositions struct {
-	byNodeID map[string]models.Position
+	byNodeID map[string]Position
 }
 
 func newLayoutPositions(capacity int) *layoutPositions {
-	return &layoutPositions{byNodeID: make(map[string]models.Position, capacity)}
+	return &layoutPositions{byNodeID: make(map[string]Position, capacity)}
 }
 
-func (lp *layoutPositions) applyTo(nodes []models.Node, nodeIndexByID map[string]int) []models.Node {
-	updatedNodes := make([]models.Node, len(nodes))
+func (lp *layoutPositions) applyTo(nodes []N, nodeIndexByID map[string]int) []N {
+	updatedNodes := make([]N, len(nodes))
 	copy(updatedNodes, nodes)
 
 	for nodeID, position := range lp.byNodeID {
@@ -130,7 +148,7 @@ func (lp *layoutPositions) applyTo(nodes []models.Node, nodeIndexByID map[string
 	return updatedNodes
 }
 
-func (lp *layoutPositions) minPosition() models.Position {
+func (lp *layoutPositions) minPosition() Position {
 	minX := 0
 	minY := 0
 	first := true
@@ -150,11 +168,11 @@ func (lp *layoutPositions) minPosition() models.Position {
 		}
 	}
 
-	return models.Position{X: minX, Y: minY}
+	return Position{X: minX, Y: minY}
 }
 
-func resolveLayoutNodes(nodes []models.Node, nodeIndexByID map[string]int, scopedNodeIDs []string) []models.Node {
-	layoutNodes := make([]models.Node, 0, len(scopedNodeIDs))
+func resolveLayoutNodes(nodes []N, nodeIndexByID map[string]int, scopedNodeIDs []string) []N {
+	layoutNodes := make([]N, 0, len(scopedNodeIDs))
 	for _, nodeID := range scopedNodeIDs {
 		index, exists := nodeIndexByID[nodeID]
 		if !exists {
@@ -165,8 +183,8 @@ func resolveLayoutNodes(nodes []models.Node, nodeIndexByID map[string]int, scope
 	return layoutNodes
 }
 
-func resolveLayoutEdges(edges []models.Edge, nodeSet map[string]struct{}) []models.Edge {
-	layoutEdges := make([]models.Edge, 0, len(edges))
+func resolveLayoutEdges(edges []E, nodeSet map[string]struct{}) []E {
+	layoutEdges := make([]E, 0, len(edges))
 	for _, edge := range edges {
 		if _, ok := nodeSet[edge.SourceID]; !ok {
 			continue
@@ -179,12 +197,12 @@ func resolveLayoutEdges(edges []models.Edge, nodeSet map[string]struct{}) []mode
 	return layoutEdges
 }
 
-func resolveDisconnectedLayoutComponents(layoutNodes []models.Node, layoutEdges []models.Edge) [][]models.Node {
+func resolveDisconnectedLayoutComponents(layoutNodes []N, layoutEdges []E) [][]N {
 	if len(layoutNodes) == 0 {
-		return [][]models.Node{}
+		return [][]N{}
 	}
 
-	nodesByID := make(map[string]models.Node, len(layoutNodes))
+	nodesByID := make(map[string]N, len(layoutNodes))
 	adjacencyByNodeID := make(map[string][]string, len(layoutNodes))
 	layoutNodeSet := make(map[string]struct{}, len(layoutNodes))
 
@@ -207,7 +225,7 @@ func resolveDisconnectedLayoutComponents(layoutNodes []models.Node, layoutEdges 
 	}
 
 	visitedNodeIDs := make(map[string]struct{}, len(layoutNodes))
-	components := make([][]models.Node, 0)
+	components := make([][]N, 0)
 
 	for _, node := range layoutNodes {
 		seedNodeID := node.ID
@@ -216,7 +234,7 @@ func resolveDisconnectedLayoutComponents(layoutNodes []models.Node, layoutEdges 
 		}
 
 		queue := []string{seedNodeID}
-		componentNodes := make([]models.Node, 0)
+		componentNodes := make([]N, 0)
 
 		for len(queue) > 0 {
 			currentNodeID := queue[0]
@@ -249,8 +267,8 @@ func resolveDisconnectedLayoutComponents(layoutNodes []models.Node, layoutEdges 
 	return components
 }
 
-func sortComponentsByCurrentPosition(components [][]models.Node) [][]models.Node {
-	sorted := append([][]models.Node(nil), components...)
+func sortComponentsByCurrentPosition(components [][]N) [][]N {
+	sorted := append([][]N(nil), components...)
 
 	sort.SliceStable(sorted, func(i, j int) bool {
 		minA := resolveMinPositionFromNodes(sorted[i])
@@ -264,7 +282,7 @@ func sortComponentsByCurrentPosition(components [][]models.Node) [][]models.Node
 	return sorted
 }
 
-func resolvePackedLayoutedPositions(sortedComponents [][]models.Node, layoutEdges []models.Edge) *layoutPositions {
+func resolvePackedLayoutedPositions(sortedComponents [][]N, layoutEdges []E) *layoutPositions {
 	totalNodes := 0
 	for _, component := range sortedComponents {
 		totalNodes += len(component)
@@ -299,7 +317,7 @@ func resolvePackedLayoutedPositions(sortedComponents [][]models.Node, layoutEdge
 
 		bounds := resolveLayoutBounds(componentNodes, componentPositions)
 		for nodeID, position := range componentPositions.byNodeID {
-			packedPositions.byNodeID[nodeID] = models.Position{
+			packedPositions.byNodeID[nodeID] = Position{
 				X: position.X - bounds.minX,
 				Y: position.Y - bounds.minY + currentTopY,
 			}
@@ -320,7 +338,7 @@ type layoutBounds struct {
 	height int
 }
 
-func resolveLayoutBounds(componentNodes []models.Node, componentPositions *layoutPositions) layoutBounds {
+func resolveLayoutBounds(componentNodes []N, componentPositions *layoutPositions) layoutBounds {
 	bounds := layoutBounds{}
 	first := true
 
@@ -368,7 +386,7 @@ func resolveLayoutBounds(componentNodes []models.Node, componentPositions *layou
 // computeAutogPositions runs the Sugiyama layout via autog.
 // autog is top-to-bottom, so we swap W↔H on input and X↔Y on output
 // to produce a left-to-right horizontal layout.
-func computeAutogPositions(componentNodes []models.Node, componentEdges []models.Edge) *layoutPositions {
+func computeAutogPositions(componentNodes []N, componentEdges []E) *layoutPositions {
 	positions := newLayoutPositions(len(componentNodes))
 	if len(componentNodes) == 0 {
 		return positions
@@ -376,11 +394,11 @@ func computeAutogPositions(componentNodes []models.Node, componentEdges []models
 
 	if len(componentEdges) == 0 {
 		if len(componentNodes) == 1 {
-			positions.byNodeID[componentNodes[0].ID] = models.Position{X: 0, Y: 0}
+			positions.byNodeID[componentNodes[0].ID] = Position{X: 0, Y: 0}
 			return positions
 		}
 
-		nodes := append([]models.Node(nil), componentNodes...)
+		nodes := append([]N(nil), componentNodes...)
 		sort.SliceStable(nodes, func(i, j int) bool {
 			if nodes[i].Position.Y != nodes[j].Position.Y {
 				return nodes[i].Position.Y < nodes[j].Position.Y
@@ -393,7 +411,7 @@ func computeAutogPositions(componentNodes []models.Node, componentEdges []models
 
 		spacing := int(autoLayoutNodeHeight + autoLayoutNodeGap)
 		for i, node := range nodes {
-			positions.byNodeID[node.ID] = models.Position{X: 0, Y: i * spacing}
+			positions.byNodeID[node.ID] = Position{X: 0, Y: i * spacing}
 		}
 		return positions
 	}
@@ -419,7 +437,7 @@ func computeAutogPositions(componentNodes []models.Node, componentEdges []models
 	)
 
 	for _, n := range result.Nodes {
-		positions.byNodeID[n.ID] = models.Position{
+		positions.byNodeID[n.ID] = Position{
 			X: int(math.Round(n.Y)),
 			Y: int(math.Round(n.X)),
 		}
@@ -429,7 +447,7 @@ func computeAutogPositions(componentNodes []models.Node, componentEdges []models
 		return positions
 	}
 
-	missingNodes := make([]models.Node, 0)
+	missingNodes := make([]N, 0)
 	for _, node := range componentNodes {
 		if _, exists := positions.byNodeID[node.ID]; exists {
 			continue
@@ -465,13 +483,13 @@ func computeAutogPositions(componentNodes []models.Node, componentEdges []models
 	}
 
 	for i, node := range missingNodes {
-		positions.byNodeID[node.ID] = models.Position{X: 0, Y: startY + i*spacing}
+		positions.byNodeID[node.ID] = Position{X: 0, Y: startY + i*spacing}
 	}
 
 	return positions
 }
 
-func resolveMinPositionFromNodes(nodes []models.Node) models.Position {
+func resolveMinPositionFromNodes(nodes []N) Position {
 	minX := 0
 	minY := 0
 	first := true
@@ -492,33 +510,33 @@ func resolveMinPositionFromNodes(nodes []models.Node) models.Position {
 		}
 	}
 
-	return models.Position{X: minX, Y: minY}
+	return Position{X: minX, Y: minY}
 }
 
-func resolveMinPositionFromLayout(layoutedPositions *layoutPositions) models.Position {
+func resolveMinPositionFromLayout(layoutedPositions *layoutPositions) Position {
 	if len(layoutedPositions.byNodeID) == 0 {
-		return models.Position{}
+		return Position{}
 	}
 	return layoutedPositions.minPosition()
 }
 
-func applyPositionOffset(positions *layoutPositions, offset models.Position) {
+func applyPositionOffset(positions *layoutPositions, offset Position) {
 	for nodeID, pos := range positions.byNodeID {
-		positions.byNodeID[nodeID] = models.Position{
+		positions.byNodeID[nodeID] = Position{
 			X: pos.X + offset.X,
 			Y: pos.Y + offset.Y,
 		}
 	}
 }
 
-func resolveLayoutSeedNodeIDs(autoLayout *pb.CanvasAutoLayout, flowNodeSet map[string]struct{}) ([]string, error) {
-	if autoLayout == nil || len(autoLayout.NodeIds) == 0 {
+func resolveLayoutSeedNodeIDs(autoLayout *AutoLayout, flowNodeSet map[string]struct{}) ([]string, error) {
+	if autoLayout == nil || len(autoLayout.NodeIDs) == 0 {
 		return []string{}, nil
 	}
 
-	seen := make(map[string]struct{}, len(autoLayout.NodeIds))
-	seedNodeIDs := make([]string, 0, len(autoLayout.NodeIds))
-	for _, nodeID := range autoLayout.NodeIds {
+	seen := make(map[string]struct{}, len(autoLayout.NodeIDs))
+	seedNodeIDs := make([]string, 0, len(autoLayout.NodeIDs))
+	for _, nodeID := range autoLayout.NodeIDs {
 		if _, exists := flowNodeSet[nodeID]; !exists {
 			return nil, fmt.Errorf("auto layout node ids contains unknown node: %s", nodeID)
 		}
@@ -534,35 +552,41 @@ func resolveLayoutSeedNodeIDs(autoLayout *pb.CanvasAutoLayout, flowNodeSet map[s
 	return seedNodeIDs, nil
 }
 
-func resolveLayoutScope(layout *pb.CanvasAutoLayout, hasSeedNodeIDs bool) pb.CanvasAutoLayout_Scope {
+func resolveLayoutScope(layout *AutoLayout, hasSeedNodeIDs bool) string {
 	if layout == nil {
-		return pb.CanvasAutoLayout_SCOPE_FULL_CANVAS
+		return ScopeFullCanvas
 	}
 
-	if layout.Scope == pb.CanvasAutoLayout_SCOPE_UNSPECIFIED {
+	scope := strings.ToUpper(strings.TrimSpace(layout.Scope))
+	switch scope {
+	case "", "SCOPE_UNSPECIFIED":
 		if hasSeedNodeIDs {
-			return pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT
+			return ScopeConnectedComponent
 		}
-		return pb.CanvasAutoLayout_SCOPE_FULL_CANVAS
+		return ScopeFullCanvas
+	case ScopeFullCanvas, "FULL_CANVAS", "FULL":
+		return ScopeFullCanvas
+	case ScopeConnectedComponent, "CONNECTED_COMPONENT", "CONNECTED":
+		return ScopeConnectedComponent
+	default:
+		return scope
 	}
-
-	return layout.Scope
 }
 
 func resolveScopedNodeIDs(
-	scope pb.CanvasAutoLayout_Scope,
+	scope string,
 	seedNodeIDs []string,
 	flowNodeIDs []string,
 	flowNodeSet map[string]struct{},
-	edges []models.Edge,
+	edges []E,
 ) ([]string, error) {
 	switch scope {
-	case pb.CanvasAutoLayout_SCOPE_FULL_CANVAS:
+	case ScopeFullCanvas:
 		return cloneNodeIDs(flowNodeIDs), nil
-	case pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT:
+	case ScopeConnectedComponent:
 		return resolveConnectedComponentNodeIDs(seedNodeIDs, flowNodeIDs, flowNodeSet, edges), nil
 	default:
-		return nil, fmt.Errorf("unsupported auto layout scope: %s", scope.String())
+		return nil, fmt.Errorf("unsupported auto layout scope: %s", scope)
 	}
 }
 
@@ -574,7 +598,7 @@ func resolveConnectedComponentNodeIDs(
 	seedNodeIDs []string,
 	flowNodeIDs []string,
 	flowNodeSet map[string]struct{},
-	edges []models.Edge,
+	edges []E,
 ) []string {
 	if len(seedNodeIDs) == 0 {
 		return cloneNodeIDs(flowNodeIDs)
@@ -588,7 +612,7 @@ func resolveConnectedComponentNodeIDs(
 func buildFlowAdjacency(
 	flowNodeIDs []string,
 	flowNodeSet map[string]struct{},
-	edges []models.Edge,
+	edges []E,
 ) map[string][]string {
 	adjacencyByNodeID := make(map[string][]string, len(flowNodeIDs))
 	for _, nodeID := range flowNodeIDs {
