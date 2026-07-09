@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   canvasFoldersUpdateCanvasFolder,
+  canvasesDescribeCanvas,
   canvasesListRuns,
   canvasesDescribeRun,
   canvasesPutCanvasStaging,
@@ -14,8 +15,10 @@ const {
   canvasesDescribeCanvasVersion,
   canvasesListCanvasVersions,
   canvasesGetCanvasStaging,
+  canvasesUpdateCanvasPreference,
 } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
+  canvasesDescribeCanvas: vi.fn(),
   canvasesListRuns: vi.fn(),
   canvasesDescribeRun: vi.fn(),
   canvasesPutCanvasStaging: vi.fn(),
@@ -24,6 +27,7 @@ const {
   canvasesDescribeCanvasVersion: vi.fn(),
   canvasesListCanvasVersions: vi.fn(),
   canvasesGetCanvasStaging: vi.fn(),
+  canvasesUpdateCanvasPreference: vi.fn(),
 }));
 
 vi.mock("../api-client/sdk.gen", async (importOriginal) => {
@@ -31,6 +35,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
   return {
     ...(actual as Record<string, unknown>),
     canvasFoldersUpdateCanvasFolder,
+    canvasesDescribeCanvas,
     canvasesListRuns,
     canvasesDescribeRun,
     canvasesPutCanvasStaging,
@@ -39,15 +44,19 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     canvasesDescribeCanvasVersion,
     canvasesListCanvasVersions,
     canvasesGetCanvasStaging,
+    canvasesUpdateCanvasPreference,
   };
 });
 
 import {
   canvasKeys,
+  useCanvas,
+  useCanvasPreference,
   useDescribeRun,
   useInfiniteCanvasRuns,
   useUpdateCanvasConsole,
   useUpdateCanvasFolderMembership,
+  useUpdateCanvasPreference,
 } from "@/hooks/useCanvasData";
 
 type TestCanvasFolder = {
@@ -166,6 +175,139 @@ describe("useInfiniteCanvasRuns", () => {
           },
         }),
       );
+    });
+  });
+});
+
+describe("useCanvas + useCanvasPreference fetch sharing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("issues a single describe request when both hooks mount together", async () => {
+    const queryClient = createQueryClient();
+    canvasesDescribeCanvas.mockResolvedValue({
+      data: {
+        canvas: { metadata: { id: "canvas-1", name: "My canvas" } },
+        preference: { lastVisitedTab: "console" },
+      },
+    });
+
+    const { result } = renderHook(
+      () => ({
+        canvas: useCanvas("org-1", "canvas-1"),
+        preference: useCanvasPreference("org-1", "canvas-1"),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => {
+      expect(result.current.canvas.data?.metadata?.id).toBe("canvas-1");
+      expect(result.current.preference.data?.lastVisitedTab).toBe("console");
+    });
+
+    expect(canvasesDescribeCanvas).toHaveBeenCalledTimes(1);
+  });
+
+  it("seeds the preference cache from a canvas detail fetch", async () => {
+    const queryClient = createQueryClient();
+    canvasesDescribeCanvas.mockResolvedValue({
+      data: {
+        canvas: { metadata: { id: "canvas-1", name: "My canvas" } },
+        preference: { lastVisitedTab: "memory" },
+      },
+    });
+
+    const { result } = renderHook(() => useCanvas("org-1", "canvas-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data?.metadata?.id).toBe("canvas-1");
+    });
+
+    expect(queryClient.getQueryData(canvasKeys.preference("org-1", "canvas-1"))).toEqual({
+      lastVisitedTab: "memory",
+    });
+  });
+});
+
+describe("useUpdateCanvasPreference", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sequences writes for the same canvas so a slow older write cannot overwrite a newer one", async () => {
+    const queryClient = createQueryClient();
+    const firstWrite = createDeferred<unknown>();
+    const secondWrite = createDeferred<unknown>();
+    canvasesUpdateCanvasPreference.mockReturnValueOnce(firstWrite.promise).mockReturnValueOnce(secondWrite.promise);
+
+    const { result } = renderHook(() => useUpdateCanvasPreference("org-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    let firstMutation!: Promise<unknown>;
+    let secondMutation!: Promise<unknown>;
+    act(() => {
+      firstMutation = result.current.mutateAsync({ canvasId: "canvas-1", lastVisitedTab: "console" });
+      secondMutation = result.current.mutateAsync({ canvasId: "canvas-1", lastVisitedTab: "memory" });
+    });
+
+    // The second request must wait for the first to settle; issuing them
+    // concurrently is what allowed an older response to land last.
+    await waitFor(() => expect(canvasesUpdateCanvasPreference).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(canvasesUpdateCanvasPreference).toHaveBeenCalledTimes(1);
+
+    firstWrite.resolve({ data: { preference: { lastVisitedTab: "console" } } });
+    await act(() => firstMutation);
+
+    await waitFor(() => expect(canvasesUpdateCanvasPreference).toHaveBeenCalledTimes(2));
+    expect(canvasesUpdateCanvasPreference).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        path: { canvasId: "canvas-1" },
+        body: expect.objectContaining({ lastVisitedTab: "memory" }),
+      }),
+    );
+
+    secondWrite.resolve({ data: { preference: { lastVisitedTab: "memory" } } });
+    await act(() => secondMutation);
+
+    expect(queryClient.getQueryData(canvasKeys.preference("org-1", "canvas-1"))).toEqual({
+      lastVisitedTab: "memory",
+    });
+  });
+
+  it("still runs a queued write when the write before it fails", async () => {
+    const queryClient = createQueryClient();
+    const firstWrite = createDeferred<unknown>();
+    const secondWrite = createDeferred<unknown>();
+    canvasesUpdateCanvasPreference.mockReturnValueOnce(firstWrite.promise).mockReturnValueOnce(secondWrite.promise);
+
+    const { result } = renderHook(() => useUpdateCanvasPreference("org-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    let firstMutation!: Promise<unknown>;
+    let secondMutation!: Promise<unknown>;
+    act(() => {
+      firstMutation = result.current.mutateAsync({ canvasId: "canvas-1", lastVisitedTab: "console" });
+      secondMutation = result.current.mutateAsync({ canvasId: "canvas-1", lastVisitedTab: "memory" });
+    });
+
+    firstWrite.reject(new Error("request failed"));
+    await act(async () => {
+      await expect(firstMutation).rejects.toThrow("request failed");
+    });
+
+    await waitFor(() => expect(canvasesUpdateCanvasPreference).toHaveBeenCalledTimes(2));
+
+    secondWrite.resolve({ data: { preference: { lastVisitedTab: "memory" } } });
+    await act(() => secondMutation);
+
+    expect(queryClient.getQueryData(canvasKeys.preference("org-1", "canvas-1"))).toEqual({
+      lastVisitedTab: "memory",
     });
   });
 });
