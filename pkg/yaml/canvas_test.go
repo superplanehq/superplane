@@ -13,6 +13,8 @@ import (
 func TestCanvasFromYAML_ReadsUnquotedPositionY(t *testing.T) {
 	raw := []byte(`apiVersion: v1
 kind: Canvas
+metadata:
+  name: test
 spec:
   nodes:
     - id: node-1
