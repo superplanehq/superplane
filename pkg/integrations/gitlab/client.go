@@ -454,6 +454,109 @@ func (c *Client) ListPipelines(projectID string) ([]Pipeline, error) {
 	})
 }
 
+type Note struct {
+	ID           int    `json:"id"`
+	Body         string `json:"body"`
+	Author       User   `json:"author"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+	System       bool   `json:"system"`
+	NoteableID   int    `json:"noteable_id,omitempty"`
+	NoteableIID  int    `json:"noteable_iid,omitempty"`
+	NoteableType string `json:"noteable_type,omitempty"`
+}
+
+type CreateNoteRequest struct {
+	Body string `json:"body"`
+}
+
+func (c *Client) CreateMergeRequestNote(ctx context.Context, projectID, mergeRequestIID string, req *CreateNoteRequest) (*Note, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/notes", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create merge request note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var note Note
+	if err := json.NewDecoder(resp.Body).Decode(&note); err != nil {
+		return nil, fmt.Errorf("failed to decode note: %v", err)
+	}
+
+	return &note, nil
+}
+
+type AwardEmoji struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	User        User   `json:"user"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+	AwardableID int    `json:"awardable_id,omitempty"`
+}
+
+type CreateAwardEmojiRequest struct {
+	Name string `json:"name"`
+}
+
+// CreateMergeRequestAwardEmoji adds an award emoji to the merge request itself.
+func (c *Client) CreateMergeRequestAwardEmoji(ctx context.Context, projectID, mergeRequestIID string, req *CreateAwardEmojiRequest) (*AwardEmoji, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/award_emoji", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+	return c.createAwardEmoji(ctx, apiURL, req)
+}
+
+// CreateMergeRequestNoteAwardEmoji adds an award emoji to a note on a merge request.
+func (c *Client) CreateMergeRequestNoteAwardEmoji(ctx context.Context, projectID, mergeRequestIID, noteID string, req *CreateAwardEmojiRequest) (*AwardEmoji, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/notes/%s/award_emoji", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID), url.PathEscape(noteID))
+	return c.createAwardEmoji(ctx, apiURL, req)
+}
+
+func (c *Client) createAwardEmoji(ctx context.Context, apiURL string, req *CreateAwardEmojiRequest) (*AwardEmoji, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create award emoji: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var awardEmoji AwardEmoji
+	if err := json.NewDecoder(resp.Body).Decode(&awardEmoji); err != nil {
+		return nil, fmt.Errorf("failed to decode award emoji: %v", err)
+	}
+
+	return &awardEmoji, nil
+}
+
 func readResponseBody(resp *http.Response) string {
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if err != nil {
