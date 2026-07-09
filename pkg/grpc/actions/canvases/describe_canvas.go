@@ -63,9 +63,11 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		Canvas: proto,
 	}
 
+	// The preference is auxiliary data (pin/star/last visited tab); a failure
+	// to load it must not prevent the canvas itself from being described.
 	preference, err := loadUserCanvasPreference(db, orgID, userID, canvasID)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to load canvas preference")
+		log.Errorf("failed to load canvas preference for canvas %s: %v", canvas.ID.String(), err)
 	}
 	if preference != nil {
 		response.Preference = serializeCanvasPreference(preference)

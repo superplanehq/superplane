@@ -332,20 +332,33 @@ type UseCanvasOptions = {
 // the app page does) issues a single describe call instead of two.
 type DescribeCanvasResult = Awaited<ReturnType<typeof canvasesDescribeCanvas>>;
 
-const describeCanvasInFlight = new Map<string, Promise<DescribeCanvasResult>>();
+type DescribeCanvasFetch = { startedAt: number; response: Promise<DescribeCanvasResult> };
 
-function describeCanvasDeduped(canvasId: string): Promise<DescribeCanvasResult> {
+const describeCanvasInFlight = new Map<string, DescribeCanvasFetch>();
+
+// Millisecond timestamp of the last successful preference mutation per canvas.
+// A DescribeCanvas response only carries the preference as of when its fetch
+// started, so a fetch that was already in flight when a mutation succeeded
+// must not overwrite the fresher mutation-written preference cache.
+const preferenceWriteTimestamps = new Map<string, number>();
+
+function describeCanvasFetchIsFresherThanPreferenceWrite(canvasId: string, fetchStartedAt: number): boolean {
+  return (preferenceWriteTimestamps.get(canvasId) ?? 0) < fetchStartedAt;
+}
+
+function describeCanvasDeduped(canvasId: string): DescribeCanvasFetch {
   const existing = describeCanvasInFlight.get(canvasId);
   if (existing) return existing;
-  const request = Promise.resolve(
+  const response = Promise.resolve(
     canvasesDescribeCanvas(
       withOrganizationHeader({
         path: { id: canvasId },
       }),
     ),
   ).finally(() => describeCanvasInFlight.delete(canvasId));
-  describeCanvasInFlight.set(canvasId, request);
-  return request;
+  const fetch: DescribeCanvasFetch = { startedAt: Date.now(), response };
+  describeCanvasInFlight.set(canvasId, fetch);
+  return fetch;
 }
 
 export const useCanvas = (organizationId: string, canvasId: string, options: UseCanvasOptions = {}) => {
@@ -361,13 +374,18 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
   return useQuery({
     queryKey: canvasKeys.detail(organizationId, canvasId),
     queryFn: async () => {
-      const response = await describeCanvasDeduped(canvasId);
+      const fetch = describeCanvasDeduped(canvasId);
+      const response = await fetch.response;
       // The preference query never refetches on its own (staleTime Infinity),
-      // so reseed it from the same payload whenever the detail query fetches.
-      queryClient.setQueryData<CanvasesCanvasPreference | null>(
-        canvasKeys.preference(organizationId, canvasId),
-        response.data?.preference ?? null,
-      );
+      // so reseed it from the same payload whenever the detail query fetches —
+      // unless a preference mutation succeeded after this fetch started, in
+      // which case the mutation-written cache entry is fresher.
+      if (describeCanvasFetchIsFresherThanPreferenceWrite(canvasId, fetch.startedAt)) {
+        queryClient.setQueryData<CanvasesCanvasPreference | null>(
+          canvasKeys.preference(organizationId, canvasId),
+          response.data?.preference ?? null,
+        );
+      }
       return response.data?.canvas;
     },
     staleTime,
@@ -379,10 +397,20 @@ export const useCanvas = (organizationId: string, canvasId: string, options: Use
 };
 
 export const useCanvasPreference = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: canvasKeys.preference(organizationId, canvasId),
     queryFn: async (): Promise<CanvasesCanvasPreference | null> => {
-      const response = await describeCanvasDeduped(canvasId);
+      const fetch = describeCanvasDeduped(canvasId);
+      const response = await fetch.response;
+      // Keep the mutation-written cache entry when it is fresher than this fetch.
+      if (!describeCanvasFetchIsFresherThanPreferenceWrite(canvasId, fetch.startedAt)) {
+        const cached = queryClient.getQueryData<CanvasesCanvasPreference | null>(
+          canvasKeys.preference(organizationId, canvasId),
+        );
+        if (cached !== undefined) return cached;
+      }
       return response.data?.preference ?? null;
     },
     enabled: !!organizationId && !!canvasId,
@@ -638,6 +666,17 @@ export const useUpdateCanvasPreference = (organizationId: string) => {
     onError: (_error, _preference, context) => {
       if (context?.previousCanvases) {
         queryClient.setQueryData(canvasKeys.list(organizationId), context.previousCanvases);
+      }
+    },
+    onSuccess: (response, variables) => {
+      // The preference query never refetches on its own (staleTime Infinity),
+      // so reseed it from the mutation response; otherwise a remount would
+      // read a stale preference (e.g. an outdated lastVisitedTab) and run the
+      // wrong default-tab redirect.
+      const preference = response?.data?.preference;
+      if (preference) {
+        preferenceWriteTimestamps.set(variables.canvasId, Date.now());
+        queryClient.setQueryData(canvasKeys.preference(organizationId, variables.canvasId), preference);
       }
     },
     onSettled: (_data, _error, variables) => {

@@ -68,6 +68,29 @@ export function useDefaultAppTab({
   // lands on the next render, so between scheduling and landing the URL still
   // reports the pre-redirect tab; the record effect must not persist it.
   const pendingRedirectTabRef = useRef<AppTabId | null>(null);
+  // Whether the previous render was in run inspection (`?run=`). Closing a
+  // run lands the user on Canvas without them picking a tab, so that landing
+  // must not be persisted as a tab change.
+  const inRunInspectionRef = useRef(false);
+  // Tab the URL reported when this app instance started. If the user switches
+  // tabs while the stored preference is still loading, the redirect must
+  // yield to that explicit choice instead of forcing the stored tab later.
+  const mountTabRef = useRef(currentTab);
+
+  // The refs above hold state for a single app. React Router reuses the same
+  // AppPage instance when navigating between apps (e.g. via the command
+  // palette), so reset them whenever the canvas changes; otherwise the new
+  // app would skip its default-tab redirect and could record the previous
+  // app's tab against the wrong canvas.
+  const refsOwnerCanvasIdRef = useRef(canvasId);
+  if (refsOwnerCanvasIdRef.current !== canvasId) {
+    refsOwnerCanvasIdRef.current = canvasId;
+    lastRecordedTabRef.current = null;
+    redirectResolvedRef.current = null;
+    pendingRedirectTabRef.current = null;
+    inRunInspectionRef.current = false;
+    mountTabRef.current = currentTab;
+  }
 
   // Snapshot on mount whether the URL already selected a tab or a run; if it
   // did, the default-tab redirect is skipped for this app instance. Deriving
@@ -83,6 +106,14 @@ export function useDefaultAppTab({
   useEffect(() => {
     if (redirectResolvedRef.current) return;
     if (!organizationId || !canvasId) return;
+
+    // The user already navigated to another tab while the stored preference
+    // was loading; their explicit choice wins over the default-tab redirect.
+    if (currentTab !== mountTabRef.current) {
+      redirectResolvedRef.current = true;
+      return;
+    }
+
     if (preferenceQuery.isPending) return;
 
     const storedTab = preferenceQuery.data?.lastVisitedTab;
@@ -124,8 +155,19 @@ export function useDefaultAppTab({
   // Record tab changes to the backend once the initial redirect has settled.
   useEffect(() => {
     if (!organizationId || !canvasId) return;
-    if (currentTab === null) return;
+    if (currentTab === null) {
+      inRunInspectionRef.current = true;
+      return;
+    }
     if (!redirectResolvedRef.current) return;
+
+    // Closing run inspection lands on a tab the user did not actively pick;
+    // adopt it as the recording baseline without overwriting the stored tab.
+    if (inRunInspectionRef.current) {
+      inRunInspectionRef.current = false;
+      lastRecordedTabRef.current = currentTab;
+      return;
+    }
 
     // A redirect was scheduled but the URL hasn't caught up yet — this effect
     // can run in the same commit that scheduled it, with `currentTab` still

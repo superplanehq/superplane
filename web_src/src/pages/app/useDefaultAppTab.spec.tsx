@@ -24,26 +24,29 @@ const CANVAS_FLAGS: UrlViewFlags = {
 
 const CONSOLE_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isConsoleMode: true };
 const MEMORY_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isMemoryMode: true };
+const RUN_FLAGS: UrlViewFlags = { ...CANVAS_FLAGS, isRunInspectionMode: true };
 
 function renderDefaultAppTab({
   urlViewFlags = CANVAS_FLAGS,
   searchParams = new URLSearchParams(),
+  canvasId = "canvas-1",
 }: {
   urlViewFlags?: UrlViewFlags;
   searchParams?: URLSearchParams;
+  canvasId?: string;
 } = {}) {
   const setSearchParams = vi.fn();
   const view = renderHook(
-    (props: { urlViewFlags: UrlViewFlags }) =>
+    (props: { urlViewFlags: UrlViewFlags; canvasId: string }) =>
       useDefaultAppTab({
         organizationId: "org-1",
-        canvasId: "canvas-1",
+        canvasId: props.canvasId,
         urlViewFlags: props.urlViewFlags,
         searchParams,
         setSearchParams,
         consoleQuery: undefined,
       }),
-    { initialProps: { urlViewFlags } },
+    { initialProps: { urlViewFlags, canvasId } },
   );
   return { ...view, setSearchParams };
 }
@@ -71,7 +74,7 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
 
     const { rerender } = renderDefaultAppTab();
     // URL catches up with the redirect on the next render.
-    rerender({ urlViewFlags: CONSOLE_FLAGS });
+    rerender({ urlViewFlags: CONSOLE_FLAGS, canvasId: "canvas-1" });
 
     expect(mutate).not.toHaveBeenCalled();
   });
@@ -80,8 +83,8 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     mockPreferenceQuery = { isPending: false, data: { lastVisitedTab: "console" } };
 
     const { rerender } = renderDefaultAppTab();
-    rerender({ urlViewFlags: CONSOLE_FLAGS });
-    rerender({ urlViewFlags: MEMORY_FLAGS });
+    rerender({ urlViewFlags: CONSOLE_FLAGS, canvasId: "canvas-1" });
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
     expect(mutate).toHaveBeenCalledTimes(1);
     expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" });
@@ -108,7 +111,7 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
     const { rerender } = renderDefaultAppTab({
       searchParams: new URLSearchParams("node=abc"),
     });
-    rerender({ urlViewFlags: MEMORY_FLAGS });
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
 
     expect(mutate).toHaveBeenCalledTimes(1);
     expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" });
@@ -119,6 +122,77 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
 
     expect(mutate).toHaveBeenCalledTimes(1);
     expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" });
+  });
+
+  it("re-applies the stored-tab redirect for the next app when AppPage is reused across apps", () => {
+    mockPreferenceQuery = { isPending: false, data: { lastVisitedTab: "canvas" } };
+
+    const { rerender, setSearchParams } = renderDefaultAppTab();
+    // First app: already on the stored tab, so no redirect.
+    expect(setSearchParams).not.toHaveBeenCalled();
+
+    // Navigate to another app (same AppPage instance) whose stored tab is Console.
+    mockPreferenceQuery = { isPending: false, data: { lastVisitedTab: "console" } };
+    rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-2" });
+
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
+  });
+
+  it("records the tab for the next app even when it matches the previous app's last recorded tab", () => {
+    const { rerender } = renderDefaultAppTab();
+    // First app: no stored preference, records "canvas".
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "canvas" });
+
+    // Second app also lands on Canvas; the recording guard must not treat it
+    // as a duplicate of the previous app's write.
+    rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-2" });
+
+    expect(mutate).toHaveBeenCalledTimes(2);
+    expect(mutate).toHaveBeenLastCalledWith({ canvasId: "canvas-2", lastVisitedTab: "canvas" });
+  });
+
+  it("yields to a tab the user picked while the stored preference was still loading", () => {
+    mockPreferenceQuery = { isPending: true, data: null };
+
+    const { rerender, setSearchParams } = renderDefaultAppTab();
+    // User opens Memory before the preference query resolves.
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
+
+    // The stored preference arrives late and points elsewhere.
+    mockPreferenceQuery = { isPending: false, data: { lastVisitedTab: "console" } };
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
+
+    // No redirect: the user's explicit choice wins and is recorded.
+    expect(setSearchParams).not.toHaveBeenCalled();
+    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" });
+  });
+
+  it("does not overwrite the stored tab when closing run inspection lands on Canvas", () => {
+    mockPreferenceQuery = { isPending: false, data: { lastVisitedTab: "console" } };
+
+    const { rerender } = renderDefaultAppTab({
+      urlViewFlags: RUN_FLAGS,
+      searchParams: new URLSearchParams("run=run-1"),
+    });
+    // Closing the run drops the `run` param and lands on Canvas.
+    rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1" });
+
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("still records a deliberate tab change made after closing run inspection", () => {
+    mockPreferenceQuery = { isPending: false, data: { lastVisitedTab: "console" } };
+
+    const { rerender } = renderDefaultAppTab({
+      urlViewFlags: RUN_FLAGS,
+      searchParams: new URLSearchParams("run=run-1"),
+    });
+    rerender({ urlViewFlags: CANVAS_FLAGS, canvasId: "canvas-1" });
+    rerender({ urlViewFlags: MEMORY_FLAGS, canvasId: "canvas-1" });
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    expect(mutate).toHaveBeenCalledWith({ canvasId: "canvas-1", lastVisitedTab: "memory" });
   });
 
   it("skips the redirect entirely when the URL already selects a view", () => {
