@@ -15,6 +15,7 @@ type UserCanvasPreference struct {
 	CanvasID       uuid.UUID `gorm:"primaryKey"`
 	PinnedAt       *time.Time
 	StarredAt      *time.Time
+	LastVisitedTab *string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
@@ -59,26 +60,27 @@ func SetUserCanvasPreference(
 	canvasID uuid.UUID,
 	pinned *bool,
 	starred *bool,
+	lastVisitedTab *string,
 ) (*UserCanvasPreference, error) {
 	if err := ensureCanvasExistsForPreference(tx, organizationID, canvasID); err != nil {
 		return nil, err
 	}
 
-	if pinned == nil && starred == nil {
+	if pinned == nil && starred == nil && lastVisitedTab == nil {
 		return findUserCanvasPreference(tx, organizationID, userID, canvasID)
 	}
 
 	preference, err := lockUserCanvasPreference(tx, organizationID, userID, canvasID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return createUserCanvasPreference(tx, organizationID, userID, canvasID, pinned, starred)
+		return createUserCanvasPreference(tx, organizationID, userID, canvasID, pinned, starred, lastVisitedTab)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	applyUserCanvasPreferenceUpdate(preference, pinned, starred, time.Now())
-	if preference.PinnedAt == nil && preference.StarredAt == nil {
+	applyUserCanvasPreferenceUpdate(preference, pinned, starred, lastVisitedTab, time.Now())
+	if isEmptyUserCanvasPreference(preference) {
 		if err := tx.Delete(preference).Error; err != nil {
 			return nil, err
 		}
@@ -148,6 +150,7 @@ func createUserCanvasPreference(
 	canvasID uuid.UUID,
 	pinned *bool,
 	starred *bool,
+	lastVisitedTab *string,
 ) (*UserCanvasPreference, error) {
 	now := time.Now()
 	preference := &UserCanvasPreference{
@@ -157,8 +160,8 @@ func createUserCanvasPreference(
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	applyUserCanvasPreferenceUpdate(preference, pinned, starred, now)
-	if preference.PinnedAt == nil && preference.StarredAt == nil {
+	applyUserCanvasPreferenceUpdate(preference, pinned, starred, lastVisitedTab, now)
+	if isEmptyUserCanvasPreference(preference) {
 		return preference, nil
 	}
 
@@ -169,7 +172,7 @@ func createUserCanvasPreference(
 	return preference, nil
 }
 
-func applyUserCanvasPreferenceUpdate(preference *UserCanvasPreference, pinned *bool, starred *bool, now time.Time) {
+func applyUserCanvasPreferenceUpdate(preference *UserCanvasPreference, pinned *bool, starred *bool, lastVisitedTab *string, now time.Time) {
 	preference.UpdatedAt = now
 	if pinned != nil {
 		preference.PinnedAt = timestampIfEnabled(*pinned, now)
@@ -177,6 +180,18 @@ func applyUserCanvasPreferenceUpdate(preference *UserCanvasPreference, pinned *b
 	if starred != nil {
 		preference.StarredAt = timestampIfEnabled(*starred, now)
 	}
+	if lastVisitedTab != nil {
+		if *lastVisitedTab == "" {
+			preference.LastVisitedTab = nil
+		} else {
+			tab := *lastVisitedTab
+			preference.LastVisitedTab = &tab
+		}
+	}
+}
+
+func isEmptyUserCanvasPreference(preference *UserCanvasPreference) bool {
+	return preference.PinnedAt == nil && preference.StarredAt == nil && preference.LastVisitedTab == nil
 }
 
 func timestampIfEnabled(enabled bool, now time.Time) *time.Time {
