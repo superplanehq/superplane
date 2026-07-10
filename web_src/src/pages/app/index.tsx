@@ -100,6 +100,7 @@ import {
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
 import { sortVersionsDesc } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
+import { useDefaultAppTab } from "./useDefaultAppTab";
 import { useCanvasEditVersionState } from "./useCanvasEditVersionState";
 import { useEditSessionBootstrap } from "./useEditSessionBootstrap";
 import { useDraftCanvasSpecSync } from "./useDraftCanvasSpecSync";
@@ -1014,6 +1015,8 @@ export function AppPage() {
     committedBaselines: committedBaselinesForEdit,
     editBootstrapReady: isEditBootstrapReady,
   });
+
+  useDefaultAppTab({ canvasId, urlViewFlags, searchParams, setSearchParams });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
