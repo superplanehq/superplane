@@ -24,11 +24,19 @@ vi.mock("@/components/AgentSidebar/widgets/NodeChip", () => ({
   ),
 }));
 
+vi.mock("@/components/AgentSidebar/widgets/IntegrationButton", () => ({
+  IntegrationButton: ({ integrationRef, label }: { integrationRef: string; label?: string }) => (
+    <button type="button" data-testid="integration-chip">
+      {label}:{integrationRef}
+    </button>
+  ),
+}));
+
 vi.mock("@/components/AgentSidebar/widgets/MarkdownCode", () => ({
   MarkdownCode: ({ children, className }: { children?: string; className?: string }) => (
-    <div data-language={className?.replace("language-", "")} data-testid="markdown-code">
+    <code data-language={className?.replace("language-", "")} data-testid="markdown-code">
       {children}
-    </div>
+    </code>
   ),
 }));
 
@@ -53,12 +61,28 @@ describe("MarkdownContent", () => {
     expect(screen.getByTestId("node-chip")).toHaveTextContent("Deploy:deploy-node:canvas-1:org-1");
   });
 
+  it("renders integration links as chips", () => {
+    render(<MarkdownContent content={"Connect [GitHub](integration:github) to continue."} />);
+
+    expect(screen.getByTestId("integration-chip")).toHaveTextContent("GitHub:github");
+    expect(screen.queryByRole("link", { name: "GitHub" })).not.toBeInTheDocument();
+  });
+
   it("keeps regular markdown links on native anchors", () => {
     render(<MarkdownContent content={'Open [docs](../docs "Local docs").'} />);
 
     expect(screen.getByRole("link", { name: "docs" })).toHaveAttribute("href", "../docs");
     expect(screen.getByRole("link", { name: "docs" })).toHaveAttribute("title", "Local docs");
     expect(screen.getByRole("link", { name: "docs" })).not.toHaveAttribute("target");
+  });
+
+  it("applies shared console link and inline-code styles", () => {
+    const { container } = render(<MarkdownContent content={"See [docs](https://example.com) and `sha`."} />);
+
+    expect(container.firstChild).toHaveClass("[&_a]:text-sky-600");
+    expect(container.firstChild).toHaveClass("[&_a]:no-underline");
+    expect(container.firstChild).toHaveClass("[&_code]:bg-gray-950/5");
+    expect(container.firstChild).not.toHaveClass("[&_a]:underline");
   });
 
   it("keeps regular fenced code blocks as code", () => {

@@ -8,11 +8,14 @@ import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
+import { IntegrationButton } from "@/components/AgentSidebar/widgets/IntegrationButton";
 import { MarkdownCode } from "@/components/AgentSidebar/widgets/MarkdownCode";
 import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
 import { cn } from "@/lib/utils";
 
+import { CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES } from "./console/consoleCodeStyles";
+import { CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES } from "./console/consoleLinkStyles";
 import { markdownHeadingClassName } from "./markdownHeadingStyles";
 import {
   MARKDOWN_TABLE_CLASSES,
@@ -23,31 +26,34 @@ import {
 
 /**
  * Tailwind class string shared by every full-document markdown renderer in the
- * app. We deliberately do not use the official `prose` plugin so headings,
- * code blocks, tables, and `<details>` stay visually consistent with the
- * canvas chrome at small panel sizes.
+ * app (Console panels and Files `.md` preview). We deliberately do not use the
+ * official `prose` plugin so headings, code blocks, tables, and `<details>`
+ * stay visually consistent with the canvas chrome at small panel sizes.
+ *
+ * Link and inline-code colors come from the shared console tokens so Files and
+ * Console markdown match HTML panels and table cells.
  *
  * Heading spacing is applied on the rendered `<h1>`–`<h4>` elements (see
  * `markdownHeadingComponents`) because parent `[&_h2]:mt-*` utilities are not
  * reliably generated/applied in our Tailwind v4 setup.
  */
-const MARKDOWN_CONTENT_CLASSES =
+const MARKDOWN_CONTENT_CLASSES = cn(
   "max-w-none text-[13px] text-slate-800 dark:text-gray-100 " +
-  "[&_p]:mb-2 [&_p]:leading-relaxed " +
-  "[&_strong]:font-semibold [&_b]:font-semibold " +
-  "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal " +
-  "[&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1 " +
-  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 dark:[&_blockquote]:border-gray-600 " +
-  "[&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs dark:[&_code]:bg-gray-800 " +
-  "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 dark:[&_pre]:bg-gray-800 " +
-  "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
-  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
-  "[&_details]:my-3 [&_details]:rounded-md [&_details]:border [&_details]:border-slate-200 [&_details]:bg-slate-50/60 [&_details]:px-3 [&_details]:py-2 dark:[&_details]:border-gray-700 dark:[&_details]:bg-gray-800/60 " +
-  "[&_details>summary]:flex [&_details>summary]:items-center [&_details>summary]:cursor-pointer [&_details>summary]:select-none [&_details>summary]:text-[13px] [&_details>summary]:font-semibold [&_details>summary]:text-slate-900 [&_details>summary]:list-none [&_details>summary]:marker:hidden [&_details>summary]:hover:text-gray-600 dark:[&_details>summary]:text-gray-100 dark:[&_details>summary]:hover:text-gray-400 " +
-  "[&_details>summary]:before:content-['▸'] [&_details>summary]:before:mr-2 [&_details>summary]:before:text-slate-500 [&_details>summary]:before:transition-transform [&_details>summary]:before:duration-200 dark:[&_details>summary]:before:text-gray-400 " +
-  "[&_details[open]>summary]:mb-3 [&_details[open]>summary]:before:rotate-90 " +
-  "[&_details>*:last-child]:mb-0";
-
+    "[&_p]:mb-2 [&_p]:leading-relaxed " +
+    "[&_strong]:font-semibold [&_b]:font-semibold " +
+    "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal " +
+    "[&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1 " +
+    "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 dark:[&_blockquote]:border-gray-600 " +
+    "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 dark:[&_pre]:bg-gray-800 " +
+    "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
+    "[&_details]:my-3 [&_details]:rounded-md [&_details]:border [&_details]:border-slate-200 [&_details]:bg-slate-50/60 [&_details]:px-3 [&_details]:py-2 dark:[&_details]:border-gray-700 dark:[&_details]:bg-gray-800/60 " +
+    "[&_details>summary]:flex [&_details>summary]:items-center [&_details>summary]:cursor-pointer [&_details>summary]:select-none [&_details>summary]:text-[13px] [&_details>summary]:font-semibold [&_details>summary]:text-slate-900 [&_details>summary]:list-none [&_details>summary]:marker:hidden [&_details>summary]:hover:text-gray-600 dark:[&_details>summary]:text-gray-100 dark:[&_details>summary]:hover:text-gray-400 " +
+    "[&_details>summary]:before:content-['▸'] [&_details>summary]:before:mr-2 [&_details>summary]:before:text-slate-500 [&_details>summary]:before:transition-transform [&_details>summary]:before:duration-200 dark:[&_details>summary]:before:text-gray-400 " +
+    "[&_details[open]>summary]:mb-3 [&_details[open]>summary]:before:rotate-90 " +
+    "[&_details>*:last-child]:mb-0",
+  CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES,
+  CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES,
+);
 /**
  * Sanitize schema extending the rehype-sanitize defaults with `<details>` /
  * `<summary>` (plus the `open` attribute) so collapsible sections can be
@@ -64,7 +70,7 @@ const MARKDOWN_SANITIZE_SCHEMA = {
   },
   protocols: {
     ...(defaultSchema.protocols ?? {}),
-    href: [...(defaultSchema.protocols?.href ?? []), "node"],
+    href: [...(defaultSchema.protocols?.href ?? []), "node", "integration"],
   },
 };
 
@@ -100,7 +106,7 @@ export function MarkdownContent({
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
-        urlTransform={(url) => (isNodeLink(url) ? url : defaultUrlTransform(url))}
+        urlTransform={(url) => (isSpecialMarkdownLink(url) ? url : defaultUrlTransform(url))}
         components={{
           h1: ({ children, ...props }) => (
             <h1 className={markdownHeadingClassName("h1")} {...props}>
@@ -199,9 +205,15 @@ function MarkdownLink({
   organizationId,
   ...props
 }: ComponentProps<"a"> & { canvasId?: string; organizationId?: string }) {
+  const label = typeof children === "string" ? children : undefined;
+
+  const integrationMatch = href?.match(/^integration:(.+)$/);
+  if (integrationMatch) {
+    return <IntegrationButton integrationRef={integrationMatch[1]} label={label} />;
+  }
+
   const nodeMatch = href?.match(/^node:(.+)$/);
   if (nodeMatch && canvasId && organizationId) {
-    const label = typeof children === "string" ? children : undefined;
     return (
       <NodeChipFromLink nodeId={nodeMatch[1]} rawLabel={label} canvasId={canvasId} organizationId={organizationId} />
     );
@@ -214,8 +226,8 @@ function MarkdownLink({
   );
 }
 
-function isNodeLink(url: string): boolean {
-  return url.startsWith("node:");
+function isSpecialMarkdownLink(url: string): boolean {
+  return url.startsWith("node:") || url.startsWith("integration:");
 }
 
 function hasLanguageCodeChild(children: ReactNode): boolean {
