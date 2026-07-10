@@ -31,6 +31,7 @@ export function RunInspectorStepTimeline({
   section,
   componentIconMap,
   organizationId,
+  canShowExpressionTemplates,
   onEditNode,
   errorScrollRequestId,
   onErrorScrolled,
@@ -38,6 +39,7 @@ export function RunInspectorStepTimeline({
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
   organizationId?: string;
+  canShowExpressionTemplates?: boolean;
   onEditNode?: (nodeId: string) => void;
   errorScrollRequestId?: number | null;
   onErrorScrolled?: () => void;
@@ -120,6 +122,7 @@ export function RunInspectorStepTimeline({
                 section={section}
                 jsonViewStyle={jsonViewStyle}
                 organizationId={organizationId}
+                canShowExpressionTemplates={canShowExpressionTemplates}
                 onEditNode={onEditNode}
               />
             ) : (
