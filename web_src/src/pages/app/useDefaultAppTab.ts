@@ -20,31 +20,48 @@ function urlViewFlagsToTab(flags: UrlViewFlags): AppTabId | null {
   return "canvas";
 }
 
-// Query params that pin the URL to a destination. `view` and `run` select a
-// tab directly; `version` (version preview), `edit` (edit-session entry),
-// `sidebar`/`node` (node selection), and `file` (file selection) deep-link
-// into a specific spot. A default-tab redirect would pull the user away from
-// any of them — and would even delete the selection params outright.
-const TAB_SELECTION_PARAMS = ["view", "run"] as const;
+// Query params that pin the URL to a destination. A tab-selecting `view`
+// and `run` select a destination directly; `version` (version preview),
+// `edit` (edit-session entry), `sidebar`/`node` (node selection), and `file`
+// (file selection) deep-link into a specific spot. A default-tab redirect
+// would pull the user away from any of them — and would even delete the
+// selection params outright.
 const DEEP_LINK_PARAMS = ["version", "edit", "sidebar", "node", "file"] as const;
+
+// `view` values that actually select a tab (`dashboard` is the legacy alias
+// for Console and is rewritten to it on mount). Legacy values that select no
+// tab — `runs`, `versions` — are deleted on mount by
+// useWorkflowViewSearchParams, landing on the bare canvas URL, so they must
+// not pin navigation; otherwise the stored-tab redirect and the Console
+// fallback would be skipped for that visit.
+const TAB_SELECTING_VIEW_VALUES = ["console", "dashboard", "memory", "files"] as const;
 
 function hasAnyParam(searchParams: URLSearchParams, params: readonly string[]): boolean {
   return params.some((param) => (searchParams.get(param) ?? "") !== "");
 }
 
+function viewParamSelectsTab(searchParams: URLSearchParams): boolean {
+  const view = searchParams.get("view") ?? "";
+  return (TAB_SELECTING_VIEW_VALUES as readonly string[]).includes(view);
+}
+
 /** A tab-selecting or deep-link param means there is no default tab to resolve. */
 function urlPinsNavigation(searchParams: URLSearchParams): boolean {
-  return hasAnyParam(searchParams, TAB_SELECTION_PARAMS) || hasAnyParam(searchParams, DEEP_LINK_PARAMS);
+  return (
+    viewParamSelectsTab(searchParams) ||
+    hasAnyParam(searchParams, ["run"]) ||
+    hasAnyParam(searchParams, DEEP_LINK_PARAMS)
+  );
 }
 
 /**
- * A deep link without an explicit `view` lands on a tab the user did not
+ * A deep link without a tab-selecting `view` lands on a tab the user did not
  * actively pick, so that landing must not be persisted as a tab change.
  * (`run` needs no handling here: it maps to no tab at all, and closing run
  * inspection already skips recording via its own guard.)
  */
 function urlDeepLinksWithoutTabPick(searchParams: URLSearchParams): boolean {
-  return hasAnyParam(searchParams, DEEP_LINK_PARAMS) && !hasAnyParam(searchParams, ["view"]);
+  return hasAnyParam(searchParams, DEEP_LINK_PARAMS) && !viewParamSelectsTab(searchParams);
 }
 
 type ConsoleQueryLike = Pick<UseQueryResult<CanvasConsoleData | undefined>, "data" | "isSuccess" | "isError">;

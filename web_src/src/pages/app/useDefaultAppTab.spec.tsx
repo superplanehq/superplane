@@ -321,6 +321,66 @@ describe("useDefaultAppTab — deep links and explicit view params", () => {
   });
 });
 
+describe("useDefaultAppTab — legacy view params", () => {
+  // Legacy `view=runs` / `view=versions` bookmarks are deleted on mount by
+  // useWorkflowViewSearchParams and land on the bare canvas URL. They select
+  // no tab, so they must not pin navigation: the stored-tab redirect and the
+  // Console fallback still apply for that visit.
+  it("applies the stored-tab redirect when the URL carries the legacy runs view", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+
+    const { setSearchParams } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("view=runs"),
+    });
+
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies the stored-tab redirect when the URL carries the legacy versions view", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+
+    const { setSearchParams } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("view=versions"),
+    });
+
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies the Console fallback when the URL carries the legacy runs view", () => {
+    mockLiveConsoleQuery = consoleLoaded([{ id: "p1", type: "markdown", content: {} }]);
+
+    const { setSearchParams } = renderDefaultAppTab({
+      searchParams: new URLSearchParams("view=runs"),
+    });
+
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
+  });
+
+  it("still pins navigation when the legacy runs view carries a run id (run inspection)", () => {
+    recordLastVisitedAppTab("canvas-1", "console");
+
+    const { setSearchParams } = renderDefaultAppTab({
+      urlViewFlags: RUN_FLAGS,
+      searchParams: new URLSearchParams("view=runs&run=run-1"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+  });
+
+  it("still pins navigation on the legacy dashboard alias for Console", () => {
+    recordLastVisitedAppTab("canvas-1", "memory");
+
+    const { setSearchParams } = renderDefaultAppTab({
+      urlViewFlags: CONSOLE_FLAGS,
+      searchParams: new URLSearchParams("view=dashboard"),
+    });
+
+    expect(setSearchParams).not.toHaveBeenCalled();
+    // `view=dashboard` is an explicit Console pick; it is recorded as usual.
+    expect(readLastVisitedAppTab("canvas-1")).toBe("console");
+  });
+});
+
 describe("useDefaultAppTab — console query resolution", () => {
   it("applies the Console fallback once an in-flight console query succeeds", () => {
     mockLiveConsoleQuery = consoleLoading();
