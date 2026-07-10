@@ -230,7 +230,9 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
 
     expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
+});
 
+describe("useDefaultAppTab — deep links and explicit view params", () => {
   it("skips the redirect entirely when the URL already selects a view", () => {
     recordLastVisitedAppTab("canvas-1", "console");
 
@@ -317,7 +319,9 @@ describe("useDefaultAppTab — stored-tab redirect vs. tab recording", () => {
 
     expect(readLastVisitedAppTab("canvas-1")).toBe("memory");
   });
+});
 
+describe("useDefaultAppTab — console query resolution", () => {
   it("applies the Console fallback once an in-flight console query succeeds", () => {
     mockLiveConsoleQuery = consoleLoading();
     const { rerender, setSearchParams } = renderDefaultAppTab();
