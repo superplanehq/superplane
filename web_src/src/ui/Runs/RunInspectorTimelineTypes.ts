@@ -31,7 +31,9 @@ export function buildTimelineItems(section: RunInspectorNodeSection, hasRuntimeC
     items.push({ value: "runtime" });
   }
 
-  items.push({ value: "output" });
+  if (section.outputSections.length > 0 || section.errorMessage) {
+    items.push({ value: "output" });
+  }
 
   return items;
 }

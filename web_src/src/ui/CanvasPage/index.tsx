@@ -149,6 +149,41 @@ export interface NodeEditData {
   integrationRef?: ComponentsIntegrationRef;
 }
 
+type CreatedRerunSelectionOptions = {
+  eventId: string;
+  triggerNodeId?: string;
+  selectedNodeId?: string | null;
+  fetchRunId?: (event: SidebarEvent, options?: { maxPages?: number }) => Promise<string | null>;
+  selectRun?: (runId: string, options?: { nodeId?: string }) => void;
+};
+
+async function selectCreatedRerun({
+  eventId,
+  triggerNodeId,
+  selectedNodeId,
+  fetchRunId,
+  selectRun,
+}: CreatedRerunSelectionOptions) {
+  if (!eventId || !triggerNodeId || !fetchRunId || !selectRun) return;
+
+  const runId = await fetchRunId(buildRerunLookupEvent(eventId, triggerNodeId), { maxPages: 1 });
+  if (!runId) return;
+
+  selectRun(runId, { nodeId: selectedNodeId ?? triggerNodeId });
+}
+
+function buildRerunLookupEvent(eventId: string, triggerNodeId: string): SidebarEvent {
+  return {
+    id: eventId,
+    title: "Re-emitted event",
+    state: "running",
+    isOpen: false,
+    nodeId: triggerNodeId,
+    triggerEventId: eventId,
+    kind: "trigger",
+  };
+}
+
 export interface NewNodeData {
   icon?: string;
   buildingBlock: BuildingBlock;
@@ -211,7 +246,7 @@ export interface CanvasPageProps {
   onDiscardStaleStaging?: () => void;
   discardStaleStagingPending?: boolean;
   headerMode?: "default" | "version-live" | "console" | "memory" | "files";
-  onEnterEditMode?: () => void;
+  onEnterEditMode?: () => void | Promise<void>;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   onExitEditMode?: () => void;
@@ -307,7 +342,7 @@ export interface CanvasPageProps {
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
   resolveRunIdForSidebarEvent?: (event: SidebarEvent) => string | null;
-  fetchRunIdForSidebarEvent?: (event: SidebarEvent) => Promise<string | null>;
+  fetchRunIdForSidebarEvent?: (event: SidebarEvent, options?: { maxPages?: number }) => Promise<string | null>;
   onSelectRunFromSidebarEvent?: (runId: string, options?: { nodeId?: string }) => void;
 
   // Building blocks for adding new nodes
@@ -798,6 +833,7 @@ function CanvasPage(props: CanvasPageProps) {
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
+  const [pendingRuntimeEditNodeId, setPendingRuntimeEditNodeId] = useState<string | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const localHasFitToViewRef = useRef(false);
   const localHasUserToggledSidebarRef = useRef(false);
@@ -1265,6 +1301,14 @@ function CanvasPage(props: CanvasPageProps) {
     }
   }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
+  useEffect(() => {
+    if (!pendingRuntimeEditNodeId || props.isRunInspectionMode || !props.isEditing) return;
+
+    state.componentSidebar.open(pendingRuntimeEditNodeId);
+    setCurrentTab("settings");
+    setPendingRuntimeEditNodeId(null);
+  }, [pendingRuntimeEditNodeId, props.isEditing, props.isRunInspectionMode, state.componentSidebar]);
+
   const canvasStateMode = props.canvasStateMode || "default";
   const showRunInspectionFloatingBar =
     props.isRunInspectionMode && !props.isEditSessionActive && !props.isEditing && !!props.onBackToLiveCanvas;
@@ -1578,6 +1622,23 @@ function CanvasPage(props: CanvasPageProps) {
             selectedNodeId={props.runNodeDetailNodeId}
             onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
             onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
+            onEditNode={
+              props.onEnterEditMode
+                ? (nodeId) => {
+                    setPendingRuntimeEditNodeId(nodeId);
+                    void props.onEnterEditMode?.();
+                  }
+                : undefined
+            }
+            onRerunCreated={(eventId) =>
+              selectCreatedRerun({
+                eventId,
+                triggerNodeId: props.runNodeDetailRun?.rootEvent?.nodeId,
+                selectedNodeId: props.runNodeDetailNodeId,
+                fetchRunId: props.fetchRunIdForSidebarEvent,
+                selectRun: props.onSelectRunFromSidebarEvent,
+              })
+            }
             onClose={() => props.onRunNodeDetailClose?.()}
           />
         ) : runInspectorOpen ? (

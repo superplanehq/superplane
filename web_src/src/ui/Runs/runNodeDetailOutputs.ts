@@ -63,7 +63,8 @@ export function buildNodeActions(
   return {
     canStop: Boolean(execution?.id && isActive),
     canPushThrough: Boolean(execution?.id && isActive && (componentName === "wait" || componentName === "timegate")),
-    approvalRecords: componentName.includes("approval") ? extractApprovalRecords(execution?.metadata) : [],
+    approvalRecords:
+      execution?.id && isActive && componentName.includes("approval") ? extractApprovalRecords(execution.metadata) : [],
   };
 }
 

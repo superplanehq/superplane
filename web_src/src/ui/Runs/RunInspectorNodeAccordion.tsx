@@ -8,10 +8,10 @@ import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { AccordionContent, AccordionItem } from "@/ui/accordion";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
 import { RunInspectorStepTimeline } from "./RunInspectorStepTimeline";
-import type {
-  RunInspectorApprovalRecord,
-  RunInspectorCurrentUser,
-  RunInspectorNodeSection,
+import {
+  type RunInspectorApprovalRecord,
+  type RunInspectorCurrentUser,
+  type RunInspectorNodeSection,
 } from "./runNodeDetailModel";
 import type { useRunInspectorActions } from "./useRunInspectorActions";
 
@@ -22,8 +22,11 @@ export function RunInspectorNodeAccordion({
   isOpen,
   onRerun,
   rerunPending,
+  onEditNode,
   actions,
   currentUser,
+  errorScrollRequestId,
+  onErrorScrolled,
 }: {
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
@@ -31,8 +34,11 @@ export function RunInspectorNodeAccordion({
   isOpen: boolean;
   onRerun: () => void;
   rerunPending: boolean;
+  onEditNode?: (nodeId: string) => void;
   actions: ReturnType<typeof useRunInspectorActions>;
   currentUser?: RunInspectorCurrentUser;
+  errorScrollRequestId?: number | null;
+  onErrorScrolled?: () => void;
 }) {
   const iconSrc = getHeaderIconSrc(section.workflowNode?.component);
   const iconSlug = section.workflowNode?.component ? componentIconMap[section.workflowNode.component] : undefined;
@@ -50,11 +56,17 @@ export function RunInspectorNodeAccordion({
     }
 
     wasOpenRef.current = true;
-    const frame = window.requestAnimationFrame(() => {
-      itemRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        itemRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+      });
     });
 
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
   }, [isOpen]);
 
   return (
@@ -96,6 +108,9 @@ export function RunInspectorNodeAccordion({
           section={section}
           componentIconMap={componentIconMap}
           organizationId={organizationId}
+          onEditNode={onEditNode}
+          errorScrollRequestId={errorScrollRequestId}
+          onErrorScrolled={onErrorScrolled}
         />
       </AccordionContent>
     </AccordionItem>
