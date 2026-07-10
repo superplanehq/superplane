@@ -1,12 +1,13 @@
 import JsonView from "@uiw/react-json-view";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { Check, ChevronDown, Copy, Maximize2 } from "lucide-react";
-import { useMemo, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { jsonViewClassName } from "@/lib/jsonViewTheme";
 import { AccordionContent, AccordionItem } from "@/ui/accordion";
+import { FullscreenContentDialog } from "@/ui/FullscreenContentDialog";
+import { HeaderIconButton } from "@/ui/HeaderIconButton";
+import { escapeJsonStringValue } from "./runInspectorJson";
 import type { InternalAccordionKey, StatusPill } from "./RunInspectorTimelineTypes";
 
 export function TimelineAccordionCard({
@@ -18,6 +19,7 @@ export function TimelineAccordionCard({
   trailing,
   actionPayload,
   jsonViewStyle,
+  errorOutputNodeId,
   children,
 }: {
   value: InternalAccordionKey;
@@ -28,6 +30,7 @@ export function TimelineAccordionCard({
   trailing?: ReactNode;
   actionPayload?: unknown;
   jsonViewStyle: CSSProperties;
+  errorOutputNodeId?: string;
   children: ReactNode;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -85,85 +88,67 @@ export function TimelineAccordionCard({
             <ChevronDown className="h-4 w-4 transition-transform duration-200" />
           </AccordionPrimitive.Trigger>
         </AccordionPrimitive.Header>
-        <AccordionContent className="px-3 py-2.5">{children}</AccordionContent>
+        <AccordionContent className="px-3 py-2.5">
+          <div data-run-error-output-node-id={errorOutputNodeId}>{children}</div>
+        </AccordionContent>
       </AccordionItem>
 
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent
-          size="large"
-          className="flex h-[80vh] w-[60vw] max-w-[60vw] flex-col gap-0 overflow-hidden p-0"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 pr-10 dark:border-gray-800 dark:bg-gray-900">
-            <DialogTitle className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
-              {title}
-            </DialogTitle>
-            <span className="flex items-center gap-0.5">
-              <HeaderIconButton
-                label={modalCopied ? "Copied" : "Copy"}
-                icon={
-                  modalCopied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />
-                }
-                onClick={() => copyPayload(setModalCopied)}
-              />
-            </span>
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto p-3">
-            <JsonPayload value={actionPayload} jsonViewStyle={jsonViewStyle} />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FullscreenContentDialog
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        title={title}
+        headerActions={
+          <HeaderIconButton
+            label={modalCopied ? "Copied" : "Copy"}
+            icon={modalCopied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+            onClick={() => copyPayload(setModalCopied)}
+          />
+        }
+      >
+        <JsonPayload value={actionPayload} jsonViewStyle={jsonViewStyle} collapsed={false} />
+      </FullscreenContentDialog>
     </>
   );
 }
 
-export function HeaderIconButton({
-  label,
-  icon,
-  onClick,
-  active,
+export function JsonPayload({
+  value,
+  jsonViewStyle,
+  collapsed = 2,
 }: {
-  label: string;
-  icon: ReactNode;
-  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
-  active?: boolean;
+  value: unknown;
+  jsonViewStyle: CSSProperties;
+  collapsed?: boolean | number;
 }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={label}
-          aria-pressed={active}
-          onClick={(event) => {
-            event.stopPropagation();
-            onClick?.(event);
-          }}
-          className={cn(
-            "flex h-6 w-6 items-center justify-center rounded transition-colors",
-            active
-              ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-              : "text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-gray-800 dark:hover:text-gray-100",
-          )}
-        >
-          {icon}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top">{label}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-export function JsonPayload({ value, jsonViewStyle }: { value: unknown; jsonViewStyle: CSSProperties }) {
   return (
     <JsonView
       value={(value ?? {}) as object}
-      collapsed={2}
+      collapsed={collapsed}
       style={jsonViewStyle}
       className={jsonViewClassName}
       displayObjectSize={false}
       enableClipboard={false}
-    />
+    >
+      <JsonView.String
+        render={({ children, ...props }, { type, value: stringValue }) => {
+          if (type !== "value") return undefined;
+
+          const displayValue = typeof children === "string" ? children : String(stringValue ?? "");
+
+          return (
+            <>
+              <span aria-hidden className={props.className}>
+                &quot;
+              </span>
+              <span {...props}>{escapeJsonStringValue(displayValue)}</span>
+              <span aria-hidden className={props.className}>
+                &quot;
+              </span>
+            </>
+          );
+        }}
+      />
+    </JsonView>
   );
 }
 

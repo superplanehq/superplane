@@ -15,7 +15,11 @@ let mockedExecutionsLoading = false;
 let mockedMe: SuperplaneMeUser | null = null;
 
 vi.mock("@uiw/react-json-view", () => ({
-  default: ({ value }: { value: unknown }) => <pre data-testid="json-view">{JSON.stringify(value)}</pre>,
+  default: ({ value, collapsed }: { value: unknown; collapsed?: boolean | number }) => (
+    <pre data-testid="json-view" data-collapsed={String(collapsed)}>
+      {JSON.stringify(value)}
+    </pre>
+  ),
 }));
 
 const reemitTriggerEventMock = vi.fn();
@@ -107,6 +111,14 @@ describe("RunInspectorPanel", () => {
     expect(screen.getAllByText("Add Grade Label").length).toBeGreaterThan(0);
   });
 
+  it("shows input as the fixed triggered event for the selected node", () => {
+    renderInspector({ selectedNodeId: "action-2" });
+
+    const inputHeader = screen.getByRole("button", { name: /Triggered\s+Input\s+Add Grade Label/i });
+    expect(within(inputHeader).getByText("Triggered")).toBeInTheDocument();
+    expect(within(inputHeader).queryByText("error")).not.toBeInTheDocument();
+  });
+
   it("does not show trigger input and shows the root event payload as trigger output", () => {
     renderInspector({ selectedNodeId: "trigger-1" });
 
@@ -144,6 +156,34 @@ describe("RunInspectorPanel", () => {
 
     await waitFor(() => {
       expect(scrollIntoView).toHaveBeenCalledWith({ block: "center", behavior: "smooth" });
+    });
+  });
+
+  it("opens nested output before scrolling to failed emitted output", async () => {
+    const scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    localStorage.setItem(
+      "superplane.runInspector.internalAccordions",
+      JSON.stringify({ input: false, runtime: false, output: false }),
+    );
+    mockedExecutions = executions.map((execution) =>
+      execution.nodeId === "action-1"
+        ? {
+            ...execution,
+            outputs: { default: [{ data: { error: "details" } }] },
+          }
+        : execution,
+    );
+
+    renderInspector({ selectedNodeId: "action-1" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Jump to error" }));
+
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "center", behavior: "smooth" });
+    });
+    expect(JSON.parse(localStorage.getItem("superplane.runInspector.internalAccordions") || "{}")).toMatchObject({
+      output: true,
     });
   });
 
@@ -192,15 +232,47 @@ describe("RunInspectorPanel", () => {
     expect(screen.getByTestId("json-view")).toHaveTextContent(/"type":"anyone"/);
   });
 
-  it("honors stored internal accordion preferences", () => {
-    localStorage.setItem(
-      "superplane.runInspector.internalAccordions",
-      JSON.stringify({ input: false, runtime: false, output: true }),
-    );
+  describe("runtime and output regressions", () => {
+    it("preserves newlines in fallback runtime config strings", () => {
+      mockedExecutions = executions.map((execution) =>
+        execution.nodeId === "action-1"
+          ? { ...execution, configuration: { message: "first line\nsecond line" } }
+          : execution,
+      );
 
-    renderInspector({ selectedNodeId: "action-2" });
+      renderInspector({ selectedNodeId: "action-1" });
+      fireEvent.click(screen.getByRole("button", { name: /Runtime config/i }));
 
-    expect(screen.getByText(/"data":\{"ok":true\}/)).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("first line\nsecond line");
+    });
+
+    it("shows an edit action in the runtime config header", () => {
+      const onEditNode = vi.fn();
+      renderInspector({ selectedNodeId: "action-2", onEditNode });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit runtime config" }));
+      expect(onEditNode).toHaveBeenCalledWith("action-2");
+    });
+
+    it("honors stored internal accordion preferences", () => {
+      localStorage.setItem(
+        "superplane.runInspector.internalAccordions",
+        JSON.stringify({ input: false, runtime: false, output: true }),
+      );
+
+      renderInspector({ selectedNodeId: "action-2" });
+
+      expect(screen.getByText(/"data":\{"ok":true\}/)).toBeInTheDocument();
+    });
+
+    it("does not show an output section for steps that have no output", () => {
+      mockedExecutions = runningExecutions;
+
+      renderInspector({ run: runningRun, selectedNodeId: "action-2" });
+
+      expect(screen.queryByRole("button", { name: /Output/i })).not.toBeInTheDocument();
+      expect(screen.queryByText("No output for this step.")).not.toBeInTheDocument();
+    });
   });
 
   it("opens the upstream input chain in a modal from the more chip", () => {
@@ -213,6 +285,20 @@ describe("RunInspectorPanel", () => {
     expect(within(dialog).getByRole("button", { name: /On Pull Request/i })).toBeInTheDocument();
     expect(within(dialog).getAllByText("Add Grade Label").length).toBeGreaterThanOrEqual(2);
     expect(within(dialog).getByTestId("json-view")).toHaveTextContent("{}");
+    expect(within(dialog).getByTestId("json-view")).toHaveAttribute("data-collapsed", "false");
+  });
+
+  it("expands timeline JSON by default in fullscreen modals only", () => {
+    renderInspector({ selectedNodeId: "action-2" });
+
+    fireEvent.click(screen.getByRole("button", { name: /Output · default/i }));
+
+    expect(screen.getByTestId("json-view")).toHaveAttribute("data-collapsed", "2");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Open fullscreen" })[0]);
+
+    const dialog = screen.getByRole("dialog", { name: "Input" });
+    expect(within(dialog).getByTestId("json-view")).toHaveAttribute("data-collapsed", "false");
   });
 
   it("renders a single close button that closes the inspector", () => {
@@ -244,6 +330,19 @@ describe("RunInspectorPanel", () => {
           },
         }),
       );
+    });
+  });
+
+  it("notifies callers with the new root event id after rerun", async () => {
+    const onRerunCreated = vi.fn();
+    reemitTriggerEventMock.mockResolvedValueOnce({ data: { eventId: "event-rerun" } });
+
+    renderInspector({ onRerunCreated });
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Rerun/i })[0]);
+
+    await waitFor(() => {
+      expect(onRerunCreated).toHaveBeenCalledWith("event-rerun");
     });
   });
 
@@ -404,6 +503,34 @@ describe("RunInspectorPanel", () => {
         }),
       );
     });
+  });
+
+  it("hides approval actions for cancelled approval executions", () => {
+    mockedExecutions = [
+      {
+        id: "execution-approval",
+        nodeId: "approval-1",
+        state: "STATE_FINISHED",
+        result: "RESULT_CANCELLED",
+        resultReason: "RESULT_REASON_OK",
+        resultMessage: "",
+        createdAt: "2026-05-01T12:00:03Z",
+        updatedAt: "2026-05-01T12:00:04Z",
+        outputs: {},
+        metadata: {
+          records: [{ index: 0, state: "pending", type: "user", user: { id: "account-1", email: "me@example.com" } }],
+        },
+        configuration: {},
+      },
+    ];
+
+    renderInspector({
+      selectedNodeId: "approval-1",
+      account: { id: "account-1", name: "Me", email: "me@example.com", avatar_url: "", installation_admin: false },
+    });
+
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
   it("shows approval nodes from run execution refs when the current user cannot approve", () => {

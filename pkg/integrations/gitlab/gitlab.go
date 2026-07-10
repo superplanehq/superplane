@@ -104,6 +104,8 @@ To connect with **App OAuth**:
 To connect with a **Personal Access Token**:
 1. [Create a personal access token](https://gitlab.com/-/user_settings/personal_access_tokens?name=SuperPlane&scopes=%s) — the link prefills the name and scopes (%s), so you only need to click **Create personal access token**. On a self-managed instance, use the same path on your GitLab URL.
 2. Paste the token into the **Access Token** field and click **Save**.
+
+**Note:** Triggers (On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor.
 `, strings.Join(scopeList, ","), strings.Join(scopeList, ", "))
 }
 
@@ -175,12 +177,15 @@ func (g *GitLab) Actions() []core.Action {
 		&GetPipeline{},
 		&GetLatestPipeline{},
 		&GetTestReportSummary{},
+		&CreateMergeComment{},
+		&AddReaction{},
 	}
 }
 
 func (g *GitLab) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIssue{},
+		&OnMergeComment{},
 		&OnMergeRequest{},
 		&OnMilestone{},
 		&OnPipeline{},

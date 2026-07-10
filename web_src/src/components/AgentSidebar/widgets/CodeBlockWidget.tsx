@@ -1,8 +1,10 @@
 import { Check, Copy, Maximize2 } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import { useTheme } from "@/contexts/useTheme";
+import { FullscreenContentDialog } from "@/ui/FullscreenContentDialog";
+import { HeaderIconButton } from "@/ui/HeaderIconButton";
 
 interface CodeBlockWidgetProps {
   code: string;
@@ -57,16 +59,21 @@ function calcHeight(code: string, maxPx = 250): number {
 
 export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
   const [copied, setCopied] = useState(false);
+  const [modalCopied, setModalCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const { resolvedTheme } = useTheme();
   const monacoLang = mapLanguage(language);
   const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+  const title = (language || "code").toUpperCase();
 
-  const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [code]);
+  const copyCode = useCallback(
+    async (markCopied: (value: boolean) => void) => {
+      await navigator.clipboard.writeText(code);
+      markCopied(true);
+      setTimeout(() => markCopied(false), 2000);
+    },
+    [code],
+  );
 
   const height = calcHeight(code);
 
@@ -80,7 +87,7 @@ export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }:
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={handleCopy}
+              onClick={() => void copyCode(setCopied)}
               className="cursor-pointer rounded p-1 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               aria-label="Copy code"
             >
@@ -108,33 +115,30 @@ export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }:
         </div>
       </div>
 
-      <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogContent size="large" className="w-[90vw] max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span className="text-sm font-medium">{language || "Code"}</span>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="cursor-pointer rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                aria-label="Copy code"
-              >
-                {copied ? <Check className="size-4 text-green-600" /> : <Copy className="size-4" />}
-              </button>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-200 dark:border-gray-700">
-            <Editor
-              height={`${Math.min(Math.max(code.split("\n").length * 19 + 20, 200), window.innerHeight * 0.7)}px`}
-              width="100%"
-              defaultLanguage={monacoLang}
-              value={code}
-              theme={monacoTheme}
-              options={{ ...MONACO_OPTIONS, lineNumbers: "on", fontSize: 13 }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FullscreenContentDialog
+        open={expanded}
+        onOpenChange={setExpanded}
+        title={title}
+        bodyClassName="overflow-hidden"
+        headerActions={
+          <HeaderIconButton
+            label={modalCopied ? "Copied" : "Copy"}
+            icon={modalCopied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+            onClick={() => void copyCode(setModalCopied)}
+          />
+        }
+      >
+        <div className="h-full min-h-0 overflow-hidden rounded border border-slate-200 dark:border-gray-700">
+          <Editor
+            height="100%"
+            width="100%"
+            defaultLanguage={monacoLang}
+            value={code}
+            theme={monacoTheme}
+            options={{ ...MONACO_OPTIONS, lineNumbers: "on", fontSize: 13 }}
+          />
+        </div>
+      </FullscreenContentDialog>
     </>
   );
 });

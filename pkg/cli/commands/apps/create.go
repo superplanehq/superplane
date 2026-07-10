@@ -3,124 +3,49 @@ package apps
 import (
 	"fmt"
 	"io"
-	"net/http"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/cli/layout"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 type createCommand struct {
-	canvasFile            *string
-	canvasAutoLayout      *string
-	canvasAutoLayoutScope *string
-	canvasAutoLayoutNodes *[]string
+	name        *string
+	description *string
+	files       *[]string
+	message     *string
 }
 
 func (c *createCommand) Execute(ctx core.CommandContext) error {
-	filePath := ""
-	if c.canvasFile != nil {
-		filePath = *c.canvasFile
+	name := ""
+	if c.name != nil {
+		name = strings.TrimSpace(*c.name)
 	}
-	autoLayoutValue := ""
-	if c.canvasAutoLayout != nil {
-		autoLayoutValue = strings.TrimSpace(*c.canvasAutoLayout)
-	}
-	autoLayoutScopeValue := ""
-	if c.canvasAutoLayoutScope != nil {
-		autoLayoutScopeValue = strings.TrimSpace(*c.canvasAutoLayoutScope)
-	}
-	autoLayoutNodeIDs := []string{}
-	if c.canvasAutoLayoutNodes != nil {
-		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.canvasAutoLayoutNodes...)
+	if name == "" {
+		return fmt.Errorf("--name is required")
 	}
 
-	if filePath != "" {
-		if len(ctx.Args) > 0 {
-			return fmt.Errorf("cannot use <app-name> together with --canvas-file")
-		}
-		return c.createFromFile(ctx, filePath, autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+	description := ""
+	if c.description != nil {
+		description = strings.TrimSpace(*c.description)
 	}
 
-	if len(ctx.Args) != 1 {
-		return fmt.Errorf("either --canvas-file or <app-name> is required")
+	localFiles := []string{}
+	if c.files != nil {
+		localFiles = append(localFiles, *c.files...)
 	}
 
-	name := ctx.Args[0]
-	resource := models.Canvas{
-		APIVersion: core.APIVersion,
-		Kind:       models.CanvasKind,
-		Metadata:   &openapi_client.CanvasesCanvasMetadata{Name: &name},
-		Spec:       models.EmptyCanvasSpec(),
+	request := openapi_client.NewCanvasesCreateCanvasRequest()
+	request.SetName(name)
+	if description != "" {
+		request.SetDescription(description)
 	}
 
-	request := models.CreateCanvasRequestFromCanvas(resource)
-	if layout.HasCanvasFlags(ctx) {
-		autoLayout, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
-		if parseErr != nil {
-			return parseErr
-		}
-		if autoLayout != nil {
-			request.SetAutoLayout(*autoLayout)
-		}
-	} else {
-		request.SetAutoLayout(layout.DefaultAutoLayout())
-	}
-
-	resp, httpResp, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
-	return validateAndPrintCreateResponse(ctx, resp, httpResp, err)
-}
-
-func (c *createCommand) createFromFile(
-	ctx core.CommandContext,
-	path string,
-	autoLayoutValue string,
-	autoLayoutScopeValue string,
-	autoLayoutNodeIDs []string,
-) error {
-	resource, err := models.ParseCanvasResourceFromFile(path, "create")
-	if err != nil {
-		return err
-	}
-
-	canvas := models.CanvasFromCanvas(*resource)
-	fileAutoLayout := resource.AutoLayout
-	request := openapi_client.CanvasesCreateCanvasRequest{}
-	request.SetCanvas(canvas)
-
-	if layout.HasCanvasFlags(ctx) {
-		autoLayout, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
-		if parseErr != nil {
-			return parseErr
-		}
-		if autoLayout != nil {
-			if fileAutoLayout != nil {
-				return fmt.Errorf("cannot use auto-layout flags with --canvas-file when file already defines autoLayout")
-			}
-			request.SetAutoLayout(*autoLayout)
-		}
-	} else {
-		if fileAutoLayout != nil {
-			request.SetAutoLayout(*fileAutoLayout)
-		} else {
-			request.SetAutoLayout(layout.DefaultAutoLayout())
-		}
-	}
-
-	resp, httpResp, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
-	return validateAndPrintCreateResponse(ctx, resp, httpResp, err)
-}
-
-func validateAndPrintCreateResponse(
-	ctx core.CommandContext,
-	resp *openapi_client.CanvasesCreateCanvasResponse,
-	httpResp *http.Response,
-	err error,
-) error {
+	resp, httpResp, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(*request).Execute()
 	if err != nil {
 		return err
 	}
@@ -133,10 +58,103 @@ func validateAndPrintCreateResponse(
 		return fmt.Errorf("failed to create canvas: the server returned an empty response")
 	}
 
-	canvas := *resp.Canvas
-	resource := models.CanvasResourceFromCanvas(canvas)
+	canvasID := resp.Canvas.Metadata.GetId()
+	if len(localFiles) == 0 {
+		return printCreateResponse(ctx, *resp.Canvas, nil)
+	}
+
+	commitMessage, err := resolveCreateCommitMessage(c.message, name)
+	if err != nil {
+		return err
+	}
+
+	stagedFiles, err := prepareCreateRepositoryFiles(localFiles)
+	if err != nil {
+		return err
+	}
+
+	if err := common.StageRepositoryFiles(ctx, canvasID, stagedFiles); err != nil {
+		return fmt.Errorf("app was created but staging failed: %w", err)
+	}
+
+	commitResponse, err := common.CommitCanvasStaging(ctx, canvasID, commitMessage)
+	if err != nil {
+		return fmt.Errorf("app was created but commit failed: %w", err)
+	}
+
+	return printCreateResponse(ctx, *resp.Canvas, commitResponse)
+}
+
+func resolveCreateCommitMessage(message *string, name string) (string, error) {
+	if message != nil {
+		trimmed := strings.TrimSpace(*message)
+		if trimmed != "" {
+			return trimmed, nil
+		}
+	}
+	return fmt.Sprintf("Create %q", name), nil
+}
+
+func prepareCreateRepositoryFiles(localFiles []string) ([]common.RepositoryFileStaging, error) {
+	if len(localFiles) == 0 {
+		return nil, fmt.Errorf("at least one --file is required")
+	}
+
+	stagedFiles := make([]common.RepositoryFileStaging, 0, len(localFiles))
+	seenPaths := make(map[string]struct{}, len(localFiles))
+
+	for _, localPath := range localFiles {
+		trimmedPath := strings.TrimSpace(localPath)
+		if trimmedPath == "" {
+			return nil, fmt.Errorf("file path is required")
+		}
+
+		content, err := os.ReadFile(trimmedPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", trimmedPath, err)
+		}
+
+		repositoryPath := common.RepositoryPathFromLocalFile(trimmedPath)
+		if _, exists := seenPaths[repositoryPath]; exists {
+			return nil, fmt.Errorf("duplicate repository file %q", repositoryPath)
+		}
+		seenPaths[repositoryPath] = struct{}{}
+
+		switch repositoryPath {
+		case common.CanvasYAMLRepositoryPath:
+			_, err := yaml.CanvasFromYAML(content)
+			if err != nil {
+				return nil, fmt.Errorf("invalid canvas yaml: %w", err)
+			}
+		case common.ConsoleYAMLRepositoryPath:
+			_, err := yaml.ConsoleFromYML(content)
+			if err != nil {
+				return nil, fmt.Errorf("invalid console yaml: %w", err)
+			}
+		}
+
+		stagedFiles = append(stagedFiles, common.RepositoryFileStaging{
+			Path:    repositoryPath,
+			Content: content,
+		})
+	}
+
+	return stagedFiles, nil
+}
+
+func printCreateResponse(
+	ctx core.CommandContext,
+	canvas openapi_client.CanvasesCanvas,
+	commitResponse *openapi_client.CanvasesCommitCanvasStagingResponse,
+) error {
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(resource)
+		output := map[string]any{
+			"canvas": canvas,
+		}
+		if commitResponse != nil && commitResponse.Version != nil {
+			output["version"] = commitResponse.Version
+		}
+		return ctx.Renderer.Render(output)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
@@ -148,35 +166,48 @@ func validateAndPrintCreateResponse(
 				return err
 			}
 		}
+		if commitResponse != nil && commitResponse.Version != nil && commitResponse.Version.Metadata != nil {
+			if _, err := fmt.Fprintf(stdout, "Committed version: %s\n", commitResponse.Version.Metadata.GetId()); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }
 
 // NewCreateCommand registers app creation under `apps create`.
 func NewCreateCommand(options core.BindOptions) *cobra.Command {
-	var canvasFile string
-	var canvasAutoLayout string
-	var canvasAutoLayoutScope string
-	var canvasAutoLayoutNodes []string
+	var name string
+	var description string
+	var files []string
+	var message string
 	createCmd := &cobra.Command{
-		Use:   "create [app-name]",
+		Use:   "create",
 		Short: "Create an app",
-		Long: `Create an app by name or from a canvas YAML file.
+		Long: `Create an app by name and optionally commit repository files.
+
+Examples:
+  superplane apps create --name "My App"
+  superplane apps create --name "My App" --file canvas.yaml --file console.yaml --file README.md
+
+When --file is provided, the command creates an empty app, stages the files, and
+commits them in one step. canvas.yaml and console.yaml do not need metadata.id
+or metadata.canvasId beforehand; those fields are filled in automatically.
 
 AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 - ` + core.SkillsInstallCommand("superplane-app-builder") + `
 - ` + core.SkillsInstallCommand("superplane-cli"),
-		Args: cobra.MaximumNArgs(1),
 	}
-	createCmd.Flags().StringVarP(&canvasFile, "canvas-file", "f", "", "filename, directory, or URL to files to use to create the resource")
-	createCmd.Flags().StringVar(&canvasAutoLayout, "canvas-auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
-	createCmd.Flags().StringVar(&canvasAutoLayoutScope, "canvas-auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
-	createCmd.Flags().StringArrayVar(&canvasAutoLayoutNodes, "canvas-auto-layout-node", nil, "node id seed for auto layout (repeatable)")
+	createCmd.Flags().StringVar(&name, "name", "", "app name (required)")
+	createCmd.Flags().StringVar(&description, "description", "", "app description")
+	createCmd.Flags().StringArrayVar(&files, "file", nil, "local file to stage and commit (repeatable)")
+	createCmd.Flags().StringVar(&message, "message", "", "commit message when --file is used (default: Create \"<name>\")")
+	_ = createCmd.MarkFlagRequired("name")
 	core.Bind(createCmd, &createCommand{
-		canvasFile:            &canvasFile,
-		canvasAutoLayout:      &canvasAutoLayout,
-		canvasAutoLayoutScope: &canvasAutoLayoutScope,
-		canvasAutoLayoutNodes: &canvasAutoLayoutNodes,
+		name:        &name,
+		description: &description,
+		files:       &files,
+		message:     &message,
 	}, options)
 
 	return createCmd

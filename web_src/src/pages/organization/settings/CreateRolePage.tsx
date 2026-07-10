@@ -198,14 +198,6 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
         action: "update",
       },
       {
-        id: "canvas.publish",
-        name: "Publish Drafts",
-        description: "Publish canvas drafts",
-        category: "Canvases",
-        resource: "canvases",
-        action: "publish",
-      },
-      {
         id: "canvas.delete",
         name: "Delete Canvases",
         description: "Delete canvases from the organization",

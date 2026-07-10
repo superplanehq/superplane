@@ -10,8 +10,9 @@ import type { ConsolePanel, ConsoleLayoutItem } from "@/hooks/useCanvasData";
 import type { DraftConsoleDiffItem, DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
 import { ConsoleGrid } from "./ConsoleGrid";
+import { CONSOLE_PANEL_SHELL_SURFACE } from "./consolePanelStyles";
 import { useConsolePanelState } from "./useConsolePanelState";
-import { PANEL_TYPE_META, PANEL_TYPES, type PanelType } from "./panelTypes";
+import { CREATABLE_PANEL_TYPES, PANEL_TYPE_META, type PanelType } from "./panelTypes";
 
 export interface ConsoleViewProps {
   panels: ConsolePanel[];
@@ -193,7 +194,12 @@ function countDiffItems(items: DraftConsoleDiffItem[], changeType: DraftConsoleD
 function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
   return (
     <div className="flex flex-1 items-center justify-center p-6 sm:p-8" data-testid="console-empty-state">
-      <div className="flex w-full max-w-3xl flex-col items-center overflow-hidden rounded-2xl border border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
+      <div
+        className={cn(
+          "flex w-full max-w-3xl flex-col items-center overflow-hidden rounded-2xl border border-slate-950/15 bg-white dark:border-gray-700/70",
+          CONSOLE_PANEL_SHELL_SURFACE,
+        )}
+      >
         <div className="flex flex-col items-center px-4 pb-6 pt-8 text-center sm:px-6">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-50 dark:bg-gray-800">
             <LayoutGrid className="h-6 w-6 text-sky-600 dark:text-gray-300" />
@@ -330,7 +336,7 @@ function AddPanelDialog({
           <div className="space-y-1.5">
             <Label className="mb-3">Type</Label>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3" role="radiogroup" aria-label="Panel type">
-              {PANEL_TYPES.map((t) => {
+              {CREATABLE_PANEL_TYPES.map((t) => {
                 const meta = PANEL_TYPE_META[t];
                 const Icon = PANEL_TYPE_ICONS[t];
                 const selected = type === t;

@@ -14,16 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	canvasyaml "github.com/superplanehq/superplane/pkg/canvas/yaml"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	canvasRepository "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
+	canvaslayout "github.com/superplanehq/superplane/pkg/layout"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
@@ -31,24 +32,24 @@ import (
 )
 
 func TestResolveToolAutoLayoutInput_DefaultsNodeIDsToConnectedComponent(t *testing.T) {
-	layout := resolveToolAutoLayoutInput(&AutoLayoutInput{NodeIDs: []string{"node-1"}})
+	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{NodeIDs: []string{"node-1"}})
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
-	assert.Equal(t, []string{"node-1"}, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
+	assert.Equal(t, []string{"node-1"}, autoLayout.NodeIDs)
 }
 
 func TestResolveToolAutoLayoutInput_PreservesExplicitSettings(t *testing.T) {
-	layout := resolveToolAutoLayoutInput(&AutoLayoutInput{
+	autoLayout := resolveToolAutoLayoutInput(&AutoLayoutInput{
 		Scope:   "connected_component",
 		NodeIDs: []string{"node-1"},
 	})
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
-	assert.Equal(t, []string{"node-1"}, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
+	assert.Equal(t, []string{"node-1"}, autoLayout.NodeIDs)
 }
 
 func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *testing.T) {
@@ -67,31 +68,31 @@ func TestResolvePatchDraftAutoLayout_DefaultsToAffectedConnectedComponents(t *te
 		},
 	})
 
-	layout := resolvePatchStagingAutoLayout(
+	autoLayout := resolvePatchStagingAutoLayout(
 		nil,
 		changeset,
 		[]models.Edge{{SourceID: "kept-node", TargetID: "deleted-node", Channel: "default"}},
 		[]models.Node{{ID: "new-node"}, {ID: "kept-node"}},
 	)
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
-	assert.Equal(t, []string{"kept-node", "new-node"}, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
+	assert.Equal(t, []string{"kept-node", "new-node"}, autoLayout.NodeIDs)
 }
 
 func TestResolvePatchDraftAutoLayout_PreservesExplicitSettings(t *testing.T) {
-	layout := resolvePatchStagingAutoLayout(
+	autoLayout := resolvePatchStagingAutoLayout(
 		&AutoLayoutInput{Scope: "full_canvas"},
 		nil,
 		nil,
 		nil,
 	)
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_FULL_CANVAS, layout.Scope)
-	assert.Empty(t, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeFullCanvas, autoLayout.Scope)
+	assert.Empty(t, autoLayout.NodeIDs)
 }
 
 func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
@@ -106,25 +107,25 @@ func TestResolvePatchDraftAutoLayout_TreatsEmptyInputLikeOmitted(t *testing.T) {
 		},
 	})
 
-	layout := resolvePatchStagingAutoLayout(
+	autoLayout := resolvePatchStagingAutoLayout(
 		&AutoLayoutInput{},
 		changeset,
 		nil,
 		[]models.Node{{ID: "new-node"}},
 	)
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_CONNECTED_COMPONENT, layout.Scope)
-	assert.Equal(t, []string{"new-node"}, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.ScopeConnectedComponent, autoLayout.Scope)
+	assert.Equal(t, []string{"new-node"}, autoLayout.NodeIDs)
 }
 
 func TestResolvePatchDraftAutoLayout_DefaultsLayoutOnlyUpdatesToFullCanvas(t *testing.T) {
-	layout := resolvePatchStagingAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}})
+	autoLayout := resolvePatchStagingAutoLayout(&AutoLayoutInput{}, nil, nil, []models.Node{{ID: "node-1"}})
 
-	require.NotNil(t, layout)
-	assert.Equal(t, pb.CanvasAutoLayout_ALGORITHM_HORIZONTAL, layout.Algorithm)
-	assert.Equal(t, pb.CanvasAutoLayout_SCOPE_FULL_CANVAS, layout.Scope)
-	assert.Empty(t, layout.NodeIds)
+	require.NotNil(t, autoLayout)
+	assert.Equal(t, canvaslayout.AlgorithmHorizontal, autoLayout.Algorithm)
+	assert.Equal(t, canvaslayout.ScopeFullCanvas, autoLayout.Scope)
+	assert.Empty(t, autoLayout.NodeIDs)
 }
 
 func TestResolveLiveCanvasVersion_ResolvesLiveVersion(t *testing.T) {
@@ -264,13 +265,13 @@ func TestAppAgentTool_PatchStagingStagesSmallGraphEdits(t *testing.T) {
 	staged, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, &liveVersion, canvasRepository.CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
+	patched, err := yaml.CanvasFromYAML([]byte(staged))
 	require.NoError(t, err)
-	require.Len(t, patched.GetSpec().GetNodes(), 2)
-	require.Len(t, patched.GetSpec().GetEdges(), 1)
-	assert.Equal(t, "first-node", patched.GetSpec().GetNodes()[0].GetId())
-	assert.Equal(t, "second-node", patched.GetSpec().GetNodes()[1].GetId())
-	assert.Equal(t, "default", patched.GetSpec().GetEdges()[0].GetChannel())
+	require.Len(t, patched.Nodes(), 2)
+	require.Len(t, patched.Edges(), 1)
+	assert.Equal(t, "first-node", patched.Nodes()[0].ID)
+	assert.Equal(t, "second-node", patched.Nodes()[1].ID)
+	assert.Equal(t, "default", patched.Edges()[0].Channel)
 }
 
 func TestAppAgentTool_PatchStagingAddsIntegrationBackedNode(t *testing.T) {
@@ -324,13 +325,13 @@ func TestAppAgentTool_PatchStagingAddsIntegrationBackedNode(t *testing.T) {
 	staged, err := canvasRepository.ReadRepositorySpecFileStaged(ctx, canvas, &liveVersion, canvasRepository.CanvasYAMLRepositoryPath)
 	require.NoError(t, err)
 
-	patched, err := canvasyaml.ParseCanvasResource([]byte(staged))
+	patched, err := yaml.CanvasFromYAML([]byte(staged))
 	require.NoError(t, err)
-	require.Len(t, patched.GetSpec().GetNodes(), 1)
-	node := patched.GetSpec().GetNodes()[0]
-	assert.Equal(t, "github.createIssue", node.GetComponent())
-	require.NotNil(t, node.GetIntegration())
-	assert.Equal(t, integration.ID.String(), *node.GetIntegration().Id)
+	require.Len(t, patched.Spec.Nodes, 1)
+	node := patched.Spec.Nodes[0]
+	assert.Equal(t, "github.createIssue", node.Component)
+	require.NotNil(t, node.Integration)
+	assert.Equal(t, integration.ID.String(), node.Integration.ID)
 }
 
 func TestAppAgentTool_PatchStagingStagesConsoleYAML(t *testing.T) {
