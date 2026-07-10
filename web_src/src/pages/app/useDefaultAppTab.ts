@@ -144,8 +144,14 @@ export function useDefaultAppTab({ canvasId, urlViewFlags, searchParams, setSear
     // (e.g. the user opens a node, a version preview, or an edit session on
     // Canvas — none of which change the tab). Redirecting after that would
     // pull the user away and strip the selection params, so settle without a
-    // redirect instead.
+    // redirect instead. If that param is a deep link without a tab pick, the
+    // tab it lands on was not chosen by the user any more than a mount-time
+    // deep link would be, so flag it for the record effect to skip — else
+    // settling would persist the landing and overwrite the stored tab.
     if (urlPinsNavigation(searchParams)) {
+      if (urlDeepLinksWithoutTabPick(searchParams)) {
+        deepLinkLandingRef.current = true;
+      }
       setRedirectResolved(true);
       return;
     }
