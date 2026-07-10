@@ -14,9 +14,16 @@ const IDPathParam = "id"
  * This is used when scoped-tokens are used for authentication / authorization.
  */
 type AuthorizationRule struct {
-	Resource                     string
-	Action                       string
-	DomainType                   string
-	ResourcePathParams           []string
+	Resource           string
+	Action             string
+	DomainType         string
+	ResourcePathParams []string
+	// LegacyActions keeps persisted grants working during permission migrations.
+	// Prefer Action for new checks, and scope legacy actions to the smallest route set possible.
+	LegacyActions                []string
 	RequiredExperimentalFeatures []string
+}
+
+func (r AuthorizationRule) AllowedActions() []string {
+	return append([]string{r.Action}, r.LegacyActions...)
 }
