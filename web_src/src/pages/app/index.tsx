@@ -3547,7 +3547,8 @@ export function AppPage() {
     handleUseVersion(liveCanvasVersionId);
   }, [hasEditableVersion, liveCanvasVersionId, handleUseVersion]);
 
-  const liveSidebarRunLookupEnabled = isViewingLiveVersion && !isRunInspectionMode && !isEditing;
+  const runLookupEnabled = isViewingLiveVersion && !isEditing;
+  const liveSidebarRunLookupEnabled = runLookupEnabled && !isRunInspectionMode;
 
   const handleSelectRun = useCallback(
     (runId: string) => {
@@ -3564,7 +3565,7 @@ export function AppPage() {
   );
 
   const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
-    enabled: liveSidebarRunLookupEnabled,
+    enabled: runLookupEnabled,
     canvasId,
     organizationId,
     queryClient,
@@ -4330,8 +4331,8 @@ export function AppPage() {
           onReEmit={canUpdateCanvas && showLiveActivity ? handleReEmit : undefined}
           onRunItemOpen={showLiveActivity ? handleRunItemOpen : undefined}
           resolveRunIdForSidebarEvent={liveSidebarRunLookupEnabled ? resolveRunIdForSidebarEvent : undefined}
-          fetchRunIdForSidebarEvent={liveSidebarRunLookupEnabled ? fetchRunIdForSidebarEvent : undefined}
-          onSelectRunFromSidebarEvent={liveSidebarRunLookupEnabled ? handleSelectRunFromSidebarEvent : undefined}
+          fetchRunIdForSidebarEvent={runLookupEnabled ? fetchRunIdForSidebarEvent : undefined}
+          onSelectRunFromSidebarEvent={runLookupEnabled ? handleSelectRunFromSidebarEvent : undefined}
           getExecutionState={getExecutionState}
           workflowNodes={canvasNodes}
           components={allComponents}

@@ -1,20 +1,23 @@
+import { Pencil } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { cn } from "@/lib/utils";
-import { EmptySectionText, JsonPayload, TimelineAccordionCard } from "./RunInspectorTimelineCard";
+import { EmptySectionText, HeaderIconButton, JsonPayload, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import { hasObjectValue, type RunInspectorNodeSection } from "./runNodeDetailModel";
 
 export function RuntimeTimelineCard({
   section,
   jsonViewStyle,
   organizationId,
+  onEditNode,
 }: {
   section: RunInspectorNodeSection;
   jsonViewStyle: CSSProperties;
   organizationId?: string;
+  onEditNode?: (nodeId: string) => void;
 }) {
   const [mode, setMode] = useState<"form" | "json">("form");
   const configuration = section.tabData?.configuration;
@@ -24,7 +27,9 @@ export function RuntimeTimelineCard({
       value="runtime"
       status={{ dotClassName: "bg-blue-500", label: "Running" }}
       title="Runtime Config"
-      trailing={<RuntimeViewToggle mode={mode} onChange={setMode} />}
+      trailing={
+        <RuntimeHeaderActions mode={mode} nodeId={section.nodeId} onModeChange={setMode} onEditNode={onEditNode} />
+      }
       jsonViewStyle={jsonViewStyle}
     >
       {mode === "form" ? (
@@ -38,6 +43,31 @@ export function RuntimeTimelineCard({
         <JsonPayload value={configuration} jsonViewStyle={jsonViewStyle} />
       )}
     </TimelineAccordionCard>
+  );
+}
+
+function RuntimeHeaderActions({
+  mode,
+  nodeId,
+  onModeChange,
+  onEditNode,
+}: {
+  mode: "form" | "json";
+  nodeId: string;
+  onModeChange: (mode: "form" | "json") => void;
+  onEditNode?: (nodeId: string) => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <RuntimeViewToggle mode={mode} onChange={onModeChange} />
+      {onEditNode ? (
+        <HeaderIconButton
+          label="Edit runtime config"
+          icon={<Pencil className="h-3.5 w-3.5" />}
+          onClick={() => onEditNode(nodeId)}
+        />
+      ) : null}
+    </span>
   );
 }
 
