@@ -12,7 +12,7 @@ import type { DraftConsoleDiffItem, DraftConsoleDiffSummary } from "../draftCons
 import { ConsoleGrid } from "./ConsoleGrid";
 import { CONSOLE_PANEL_SHELL_SURFACE } from "./consolePanelStyles";
 import { useConsolePanelState } from "./useConsolePanelState";
-import { PANEL_TYPE_META, PANEL_TYPES, type PanelType } from "./panelTypes";
+import { CREATABLE_PANEL_TYPES, PANEL_TYPE_META, type PanelType } from "./panelTypes";
 
 export interface ConsoleViewProps {
   panels: ConsolePanel[];
@@ -336,7 +336,7 @@ function AddPanelDialog({
           <div className="space-y-1.5">
             <Label className="mb-3">Type</Label>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3" role="radiogroup" aria-label="Panel type">
-              {PANEL_TYPES.map((t) => {
+              {CREATABLE_PANEL_TYPES.map((t) => {
                 const meta = PANEL_TYPE_META[t];
                 const Icon = PANEL_TYPE_ICONS[t];
                 const selected = type === t;

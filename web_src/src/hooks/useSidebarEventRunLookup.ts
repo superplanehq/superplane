@@ -30,6 +30,14 @@ type UseSidebarEventRunLookupOptions = {
   infiniteRunsPages?: Array<CanvasesListRunsResponse | undefined>;
 };
 
+type FetchRunLookupOptions = {
+  maxPages?: number;
+};
+
+type InfiniteRunsCacheData = {
+  pages?: Array<CanvasesListRunsResponse | undefined>;
+};
+
 export function useSidebarEventRunLookup({
   enabled = true,
   canvasId,
@@ -83,7 +91,7 @@ export function useSidebarEventRunLookup({
   );
 
   const fetchRunIdForSidebarEvent = useCallback(
-    async (event: SidebarEvent) => {
+    async (event: SidebarEvent, options: FetchRunLookupOptions = {}) => {
       if (!enabled || !canvasId) {
         return null;
       }
@@ -93,11 +101,19 @@ export function useSidebarEventRunLookup({
         return null;
       }
 
-      const scopedLookupKey = `${canvasId}:${lookupKey}`;
+      const scopedLookupKey = `${canvasId}:${lookupKey}:${options.maxPages ?? "all"}`;
 
       const resolvedRunId = findRunIdInLookupIndex(lookupIndex, event);
       if (resolvedRunId) {
         return resolvedRunId;
+      }
+
+      const freshCachedRunId = findRunIdInCurrentInfiniteRunsCache(queryClient, canvasId, event, {
+        primaryRuns: runs,
+        pages: infiniteRunsPages ?? [],
+      });
+      if (freshCachedRunId) {
+        return freshCachedRunId;
       }
 
       const inFlight = inFlightRef.current.get(scopedLookupKey);
@@ -108,8 +124,9 @@ export function useSidebarEventRunLookup({
       const fetchPromise = (async () => {
         let before: string | undefined;
         let loadedCount = 0;
+        const maxPages = Math.min(options.maxPages ?? RUN_LOOKUP_MAX_PAGES, RUN_LOOKUP_MAX_PAGES);
 
-        for (let page = 0; page < RUN_LOOKUP_MAX_PAGES; page += 1) {
+        for (let page = 0; page < maxPages; page += 1) {
           const response = await canvasesListRuns(
             withOrganizationHeader({
               organizationId: organizationId ?? undefined,
@@ -151,11 +168,32 @@ export function useSidebarEventRunLookup({
         inFlightRef.current.delete(scopedLookupKey);
       }
     },
-    [canvasId, enabled, lookupIndex, organizationId, queryClient],
+    [canvasId, enabled, infiniteRunsPages, lookupIndex, organizationId, queryClient, runs],
   );
 
   return {
     resolveRunIdForSidebarEvent,
     fetchRunIdForSidebarEvent,
   };
+}
+
+function findRunIdInCurrentInfiniteRunsCache(
+  queryClient: QueryClient,
+  canvasId: string,
+  event: SidebarEvent,
+  sources: {
+    primaryRuns: CanvasesCanvasRun[];
+    pages: Array<CanvasesListRunsResponse | undefined>;
+  },
+): string | null {
+  const currentPages = queryClient
+    .getQueriesData<InfiniteRunsCacheData>({ queryKey: canvasKeys.infiniteRuns(canvasId) })
+    .flatMap(([, data]) => data?.pages ?? []);
+
+  const cachedRuns = collectCachedCanvasRuns({
+    primaryRuns: sources.primaryRuns,
+    pages: [...sources.pages, ...currentPages],
+  });
+
+  return findRunIdInLookupIndex(buildRunLookupIndex(cachedRuns), event);
 }

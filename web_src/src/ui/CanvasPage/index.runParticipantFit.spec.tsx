@@ -120,15 +120,20 @@ describe("CanvasPage run participant fit", () => {
     };
   });
 
-  it("fits run inspection to the active participant nodes when requested", async () => {
+  it("fits run inspection to all requested participant nodes", async () => {
     vi.useFakeTimers();
     try {
       const hasFitToViewRef = { current: true };
       const viewportRef = { current: { x: 0, y: 0, zoom: 1 } };
       const activeNode = { id: "run-node-1", position: { x: 0, y: 0 } };
-      const inactiveNode = { id: "run-node-2", position: { x: 1000, y: 1000 } };
+      const secondParticipantNode = { id: "run-node-2", position: { x: 1000, y: 1000 } };
+      const renderedActiveNode = { ...activeNode, data: { label: "Run 1", state: "success", type: "component" } };
+      const renderedSecondNode = {
+        ...secondParticipantNode,
+        data: { label: "Run 2", state: "pending", type: "component" },
+      };
       const fittedViewport = { x: -120, y: -80, zoom: 1.1 };
-      getNodesMock.mockReturnValue([activeNode, inactiveNode]);
+      getNodesMock.mockReturnValue([activeNode]);
       getViewportMock.mockReturnValue(fittedViewport);
 
       render(
@@ -137,10 +142,7 @@ describe("CanvasPage run participant fit", () => {
             title="Canvas"
             headerMode="version-live"
             isRunInspectionMode
-            nodes={[
-              { ...activeNode, data: { label: "Run 1", state: "success", type: "component" } },
-              { ...inactiveNode, data: { label: "Run 2", state: "pending", type: "component" } },
-            ]}
+            nodes={[renderedActiveNode, renderedSecondNode]}
             edges={[]}
             buildingBlocks={[]}
             isEditing={false}
@@ -148,7 +150,7 @@ describe("CanvasPage run participant fit", () => {
             hasFitToViewRef={hasFitToViewRef}
             viewportRef={viewportRef}
             fitAllRequest={1}
-            fitAllFocusNodeIds={["run-node-1"]}
+            fitAllFocusNodeIds={["run-node-1", "run-node-2"]}
           />
         </MemoryRouter>,
       );
@@ -158,10 +160,9 @@ describe("CanvasPage run participant fit", () => {
       });
 
       expect(fitViewMock).toHaveBeenCalledWith({
-        nodes: [activeNode],
+        nodes: [activeNode, renderedSecondNode],
         includeHiddenNodes: true,
         maxZoom: 1.2,
-        minZoom: 0.85,
         padding: 0.1,
         duration: 500,
       });

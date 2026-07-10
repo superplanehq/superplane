@@ -1,30 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import { ExternalLink, Loader2, Play, Plus, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
 
-import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
-import { Avatar } from "@/components/Avatar/avatar";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
-import { ConsoleBadge } from "../ConsoleBadge";
 import { CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES } from "../consoleTableStyles";
-import { resolveConsoleAvatar } from "../consoleAvatar";
-import { CONSOLE_CODE_BADGE_CLASSES } from "../consoleCodeStyles";
-import { CONSOLE_LINK_CLASSES } from "../consoleLinkStyles";
+import { isManualRunNode } from "../manualRunTriggers";
 import { applyTableWhere } from "./evalTableWhere";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
 import { evaluateRowShow } from "./rowVisibility";
-import { resolveCellValue } from "./resolveCellValue";
-import { resolveHref } from "./resolveHref";
 import { makeRowStyleResolver } from "./rowStyles";
 import { applyFilters, applySort } from "./widgetData";
 import { WidgetEmptyState } from "../WidgetEmptyState";
-import { formatValue } from "./widgetFormat";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import { useWidgetTableActionLock } from "./WidgetTableActionLockContext";
+import { WidgetTableCell } from "./WidgetTableCell";
 import type { WidgetRowAction, WidgetTableRender } from "./types";
 
 interface WidgetTableProps {
@@ -68,13 +60,15 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
 
   const resolveRowStyle = useMemo(() => makeRowStyleResolver(render.rowStyles), [render.rowStyles]);
 
-  // Collect the unique trigger node ids referenced by this table's row actions
-  // so the action lock can subscribe to the runs query only when needed.
+  // Row actions whose configured node isn't manually runnable are hidden
+  // downstream in `WidgetTableGrid`; unresolved actions still render with a
+  // "Node not found" tooltip. We only need the trigger id set here to scope
+  // the lock's runs subscription to the actual manual-runnable targets.
   const triggerNodeIds = useMemo(() => {
     const ids = new Set<string>();
     for (const action of render.rowActions ?? []) {
       const resolved = resolveConsoleNode(ctx, action.node);
-      if (resolved?.node.id && resolved.node.type === "TYPE_TRIGGER") ids.add(resolved.node.id);
+      if (resolved?.node.id && isManualRunNode(resolved.node)) ids.add(resolved.node.id);
     }
     return Array.from(ids);
   }, [render.rowActions, ctx]);
@@ -169,7 +163,12 @@ function WidgetTableGrid({
   onLoadMore,
   onScroll,
 }: WidgetTableGridProps) {
-  const hasActions = Boolean(render.rowActions && render.rowActions.length > 0);
+  const ctx = useConsoleContext();
+  const rowActions = (render.rowActions ?? []).filter((action) => {
+    const resolved = resolveConsoleNode(ctx, action.node);
+    return !resolved || isManualRunNode(resolved.node);
+  });
+  const hasActions = rowActions.length > 0;
   return (
     <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
       <table className="w-full border-collapse text-[13px]">
@@ -209,13 +208,13 @@ function WidgetTableGrid({
                 )}
               >
                 {render.columns.map((col, ci) => (
-                  <Cell key={`${col.field}-${ci}`} col={col} row={row} />
+                  <WidgetTableCell key={`${col.field}-${ci}`} col={col} row={row} />
                 ))}
                 {hasActions ? (
                   <td className="px-3 py-1.5 text-right">
                     <div className="inline-flex items-center gap-1">
-                      {render.rowActions
-                        ?.filter((action) => evaluateRowShow(action.show, row))
+                      {rowActions
+                        .filter((action) => evaluateRowShow(action.show, row))
                         .map((action, ai) => (
                           <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
                         ))}
@@ -256,101 +255,22 @@ function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolea
   );
 }
 
-function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Record<string, unknown> }) {
-  const visible = evaluateRowShow(col.show, row);
-  if (!visible) {
-    return <td className="px-3 py-1.5 text-slate-300 dark:text-gray-600">—</td>;
-  }
-  const value = resolveCellValue(col.field, row);
-  const formatted = formatValue(value, col.format);
-  if (col.format === "badge" || col.format === "status") {
-    return (
-      <td className="px-3 py-1.5">
-        <ConsoleBadge label={formatted} />
-      </td>
-    );
-  }
-  if (col.format === "relative") {
-    const title = formatAbsoluteTitle(value);
-    return (
-      <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300" title={title}>
-        {formatted}
-      </td>
-    );
-  }
-  if (col.format === "avatar") {
-    const committer = col.avatarCommitterField ? resolveCellValue(col.avatarCommitterField, row) : undefined;
-    const { src, initials, name } = resolveConsoleAvatar(value, committer);
-    if (!name && !src && !initials) {
-      return <td className="px-3 py-1.5 text-slate-300 dark:text-gray-600">—</td>;
-    }
-    return (
-      <td className="px-3 py-1.5 align-middle">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex cursor-default">
-              <Avatar
-                src={src ?? null}
-                initials={initials}
-                className="size-6 bg-slate-200 text-slate-600 dark:bg-gray-700 dark:text-gray-200"
-              />
-            </span>
-          </TooltipTrigger>
-          {name ? <TooltipContent side="top">{name}</TooltipContent> : null}
-        </Tooltip>
-      </td>
-    );
-  }
-  if (col.format === "link" || col.href) {
-    const href = col.href ? resolveHref(col.href, row) : String(value ?? "");
-    return (
-      <td className="px-3 py-1.5">
-        <a href={href} target="_blank" rel="noopener noreferrer" className={CONSOLE_LINK_CLASSES}>
-          {formatted || href}
-        </a>
-      </td>
-    );
-  }
-  if (col.format === "code") {
-    return (
-      <td className="px-3 py-1.5">
-        <code className={CONSOLE_CODE_BADGE_CLASSES}>{formatted}</code>
-      </td>
-    );
-  }
-  return <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300">{formatted}</td>;
-}
+type ActionDisabledReason = "no-perm" | "no-node" | "not-manual-run" | "run-in-flight" | "submitting" | null;
 
-function formatAbsoluteTitle(value: unknown): string | undefined {
-  if (value == null) return undefined;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) return formatTimestampInUserTimezone(new Date(parsed).toISOString());
-  }
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return undefined;
-  const ms = n > 1e12 ? n : n * 1000;
-  return formatTimestampInUserTimezone(new Date(ms).toISOString());
-}
-
-type ActionDisabledReason = "no-perm" | "no-node" | "not-trigger" | "run-in-flight" | "submitting" | null;
-
-function disabledReason({
-  canRun,
-  hasResolvedNode,
-  isTrigger,
-  runInFlight,
-  submitting,
-}: {
-  canRun: boolean;
-  hasResolvedNode: boolean;
-  isTrigger: boolean;
-  runInFlight: boolean;
-  submitting: boolean;
-}): ActionDisabledReason {
+// `not-manual-run` is defense in depth: `WidgetTableGrid` already hides
+// non-manual-run actions upstream. This branch covers the transient case
+// before the trigger catalog resolves — the action then renders disabled
+// rather than as a button that would fail server-side.
+function disabledReason(
+  canRun: boolean,
+  hasResolvedNode: boolean,
+  isManualRun: boolean,
+  runInFlight: boolean,
+  submitting: boolean,
+): ActionDisabledReason {
   if (!canRun) return "no-perm";
   if (!hasResolvedNode) return "no-node";
-  if (!isTrigger) return "not-trigger";
+  if (!isManualRun) return "not-manual-run";
   if (runInFlight) return "run-in-flight";
   if (submitting) return "submitting";
   return null;
@@ -380,8 +300,8 @@ function disabledTooltip(reason: ActionDisabledReason, node: string): string | u
       return "You do not have permission to run actions in this canvas";
     case "no-node":
       return `Node "${node}" not found on this canvas`;
-    case "not-trigger":
-      return "Only trigger nodes can be run from the console. Pick the trigger that starts your flow.";
+    case "not-manual-run":
+      return "Only trigger nodes with a manual run can be fired from the console.";
     case "run-in-flight":
       return "A run for this trigger is already in progress.";
     case "submitting":
@@ -448,7 +368,9 @@ function useRowActionGate(action: WidgetRowAction, rowKey: string) {
   const lock = useWidgetTableActionLock();
   const canRun = ctx?.canRunNodes ?? false;
   const resolved = resolveConsoleNode(ctx, action.node);
-  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
+  // WidgetTable hides non-manual actions upstream; at this level `true` is
+  // the normal case, unresolved nodes render disabled with a tooltip.
+  const isManualRun = isManualRunNode(resolved?.node);
   const triggerNodeId = resolved?.node.id;
   // Per-row locking: a row's button is disabled by `runInFlight` only when
   // its own submission produced the in-flight run (i.e. the mapping points
@@ -458,16 +380,10 @@ function useRowActionGate(action: WidgetRowAction, rowKey: string) {
     triggerNodeId && lock.runInFlightIds.has(triggerNodeId) && lock.inFlightRowByTrigger.get(triggerNodeId) === rowKey,
   );
   const submitting = lock.pendingRowKeys.has(rowKey);
-  const reason = disabledReason({
-    canRun,
-    hasResolvedNode: Boolean(resolved),
-    isTrigger,
-    runInFlight,
-    submitting,
-  });
+  const reason = disabledReason(canRun, Boolean(resolved), isManualRun, runInFlight, submitting);
   return {
     resolved,
-    isTrigger,
+    isManualRun,
     disabled: reason !== null,
     reason,
     tooltip: disabledTooltip(reason, action.node),
@@ -485,7 +401,7 @@ function RowActionButton({
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { resolved, isTrigger, disabled, reason, tooltip } = useRowActionGate(action, rowKey);
+  const { resolved, isManualRun, disabled, reason, tooltip } = useRowActionGate(action, rowKey);
   const label = action.label ?? "Run";
   const hookName = action.hook ?? "run";
   const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
@@ -541,7 +457,7 @@ function RowActionButton({
           action={action}
           row={row}
           resolved={resolved}
-          isTrigger={isTrigger}
+          isManualRun={isManualRun}
           hookName={hookName}
           label={label}
           open={confirmOpen}

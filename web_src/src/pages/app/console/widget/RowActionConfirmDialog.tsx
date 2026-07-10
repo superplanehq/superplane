@@ -26,7 +26,13 @@ interface RowActionConfirmDialogProps {
   action: WidgetRowAction;
   row: Record<string, unknown>;
   resolved: ResolvedNode | undefined;
-  isTrigger: boolean;
+  /**
+   * True when the resolved node is a trigger with a user-invokable `run`
+   * hook (see `isManualRunNode`). The dialog uses this to warn when a row
+   * is configured to target a node that the backend will not accept — a
+   * defensive fallback since `WidgetTable` normally hides such rows.
+   */
+  isManualRun: boolean;
   hookName: string;
   label: string;
   open: boolean;
@@ -46,7 +52,7 @@ export function RowActionConfirmDialog({
   action,
   row,
   resolved,
-  isTrigger,
+  isManualRun,
   hookName,
   label,
   open,
@@ -79,7 +85,7 @@ export function RowActionConfirmDialog({
           <DialogDescription className="min-w-0">{confirmBody}</DialogDescription>
         </DialogHeader>
         <div className="min-w-0 space-y-3 text-xs" data-testid={`${testId}-preview`}>
-          <ConfirmTriggerFact resolved={resolved} fallback={action.node} isTrigger={isTrigger} />
+          <ConfirmTriggerFact resolved={resolved} fallback={action.node} isManualRun={isManualRun} />
           <ConfirmHookFact hookName={hookName} templateName={extractTemplateName(preview?.parameters)} />
           <ConfirmParametersFact preview={preview} testId={testId} />
         </div>
@@ -105,11 +111,11 @@ export function RowActionConfirmDialog({
 function ConfirmTriggerFact({
   resolved,
   fallback,
-  isTrigger,
+  isManualRun,
 }: {
   resolved: ResolvedNode | undefined;
   fallback: string;
-  isTrigger: boolean;
+  isManualRun: boolean;
 }) {
   return (
     <ConfirmFact label="Trigger">
@@ -119,8 +125,8 @@ function ConfirmTriggerFact({
       ) : null}
       {!resolved ? (
         <span className="ml-1 text-red-600 dark:text-red-400">— node not found on this canvas</span>
-      ) : !isTrigger ? (
-        <span className="ml-1 text-amber-600 dark:text-amber-400">— not a trigger node</span>
+      ) : !isManualRun ? (
+        <span className="ml-1 text-amber-600 dark:text-amber-400">— not a manual-run trigger</span>
       ) : null}
     </ConfirmFact>
   );

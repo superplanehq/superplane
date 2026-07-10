@@ -41,6 +41,15 @@ export { asObject };
 export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number"] as const;
 export type PanelType = (typeof PANEL_TYPES)[number];
 
+/**
+ * Panel types offered in the Add Panel picker. `node` is intentionally
+ * excluded — the merged {@link NodesPanelCard} renders both legacy `node`
+ * and modern `nodes` panels, so authors always start from the plural
+ * shape. The legacy `node` panel type remains in {@link PANEL_TYPES} for
+ * validation and YAML import compatibility.
+ */
+export const CREATABLE_PANEL_TYPES = PANEL_TYPES.filter((t) => t !== "node") as readonly Exclude<PanelType, "node">[];
+
 export interface PanelTypeMeta {
   type: PanelType;
   label: string;
@@ -70,8 +79,8 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
   },
   nodes: {
     type: "nodes",
-    label: "Key Nodes",
-    description: "Multiple canvas nodes in one card with live status and optional descriptions.",
+    label: "Nodes",
+    description: "One or more canvas nodes with live status and optional manual-run buttons.",
   },
   table: {
     type: "table",

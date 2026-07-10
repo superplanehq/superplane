@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CREATABLE_PANEL_TYPES,
   isPanelType,
   normalizeTablePanelContent,
+  PANEL_TYPE_META,
   PANEL_TYPES,
   templateForPanelType,
   validatePanelContent,
@@ -20,6 +22,24 @@ describe("PANEL_TYPES", () => {
     expect(isPanelType("nodes")).toBe(true);
     expect(isPanelType("timeline")).toBe(false);
     expect(isPanelType(42)).toBe(false);
+  });
+});
+
+describe("CREATABLE_PANEL_TYPES", () => {
+  it("hides the legacy `node` type from the Add Panel picker", () => {
+    expect(CREATABLE_PANEL_TYPES).not.toContain("node");
+  });
+
+  it("still offers every other panel type", () => {
+    for (const type of PANEL_TYPES) {
+      if (type === "node") continue;
+      expect(CREATABLE_PANEL_TYPES).toContain(type);
+    }
+  });
+
+  it("uses the merged label/description for the nodes type", () => {
+    expect(PANEL_TYPE_META.nodes.label).toBe("Nodes");
+    expect(PANEL_TYPE_META.nodes.description.toLowerCase()).toContain("one or more");
   });
 });
 

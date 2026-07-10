@@ -14,7 +14,6 @@ export const LIVE_CANVAS_FIT_VIEW_OPTIONS = {
 export const RUN_CANVAS_FIT_VIEW_OPTIONS = {
   ...CANVAS_FIT_VIEW_INCLUDE_HIDDEN,
   maxZoom: 1.2,
-  minZoom: 0.85,
   padding: 0.1,
 } as const;
 
