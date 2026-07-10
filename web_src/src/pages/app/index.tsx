@@ -172,10 +172,10 @@ const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
 const RUNNING_RUNS_FILTERS = { states: ["STATE_STARTED" as CanvasesCanvasRunState] };
 
 function getCanvasVersionEditPermissionState({
-  canUpdateCanvas,
+  canEditCanvasDraft,
   canvasDeletedRemotely,
 }: {
-  canUpdateCanvas: boolean;
+  canEditCanvasDraft: boolean;
   canvasDeletedRemotely: boolean;
 }) {
   if (canvasDeletedRemotely) {
@@ -185,7 +185,7 @@ function getCanvasVersionEditPermissionState({
     };
   }
 
-  if (!canUpdateCanvas) {
+  if (!canEditCanvasDraft) {
     return {
       canStageCanvasVersion: false,
       tooltip: "You don't have permission to edit this canvas.",
@@ -517,13 +517,14 @@ export function AppPage() {
   const createCanvasMemoryNamespace = useCreateCanvasMemoryNamespace(canvasId!);
   const updateCanvasMemoryNamespace = useUpdateCanvasMemoryNamespace(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
+  const canEditCanvasDraft = canUpdateCanvas || canAct("canvases", "update_version");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const canvasAccess = { canUpdateCanvas, canvasDeletedRemotely };
   const canActOnCanvas = canUpdateCanvas && !canvasDeletedRemotely;
   const canvasVersionEditPermission = getCanvasVersionEditPermissionState({
-    canUpdateCanvas,
+    canEditCanvasDraft,
     canvasDeletedRemotely,
   });
   const canStageCanvasVersion = canvasVersionEditPermission.canStageCanvasVersion;
@@ -1854,7 +1855,7 @@ export function AppPage() {
     async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean; savingVersionId?: string }) => {
       const targetWorkflow = workflowToSave || canvasRef.current;
       if (!targetWorkflow || !organizationId || !canvasId) return;
-      if (!canUpdateCanvas) {
+      if (!canStageCanvasVersion) {
         if (options?.showToast !== false) {
           showErrorToast("You don't have permission to edit this canvas version");
         }
@@ -1916,7 +1917,14 @@ export function AppPage() {
         }
       }
     },
-    [organizationId, canvasId, activeCanvasVersionId, canUpdateCanvas, enqueueCanvasSave, setLastSavedWorkflowSnapshot],
+    [
+      organizationId,
+      canvasId,
+      activeCanvasVersionId,
+      canStageCanvasVersion,
+      enqueueCanvasSave,
+      setLastSavedWorkflowSnapshot,
+    ],
   );
 
   const getNodeEditData = useCallback(
@@ -4244,8 +4252,8 @@ export function AppPage() {
           onCommitStaging={whenAllowed(canUpdateCanvas, handleOpenCommitDialog)}
           commitStagingPending={commitStagingPending}
           resetStagingPending={resetStagingPending}
-          onResetStaging={whenAllowed(canUpdateCanvas, handleResetStaging)}
-          onDiscardStaleStaging={whenAllowed(canUpdateCanvas, handleDiscardStaleStaging)}
+          onResetStaging={whenAllowed(canStageCanvasVersion, handleResetStaging)}
+          onDiscardStaleStaging={whenAllowed(canStageCanvasVersion, handleDiscardStaleStaging)}
           discardStaleStagingPending={resetStagingPending}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
