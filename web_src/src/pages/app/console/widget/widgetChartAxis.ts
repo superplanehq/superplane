@@ -1,4 +1,4 @@
-import { formatValue } from "./widgetFormat";
+import { coerceWidgetTimestamp, formatValue } from "./widgetFormat";
 import type { WidgetChartSeries, WidgetColumnFormat } from "./types";
 
 type SeriesWithFormat = Pick<WidgetChartSeries, "format">;
@@ -38,25 +38,57 @@ export function formatXAxisTick(value: unknown, format: WidgetColumnFormat | und
 /** Tooltip category label — includes time for timestamp buckets. */
 export function formatXTooltipLabel(value: unknown, format: WidgetColumnFormat | undefined): string {
   if (value == null || value === "") return "";
-  if (format === "date" && isTimestampAxisBucket(value, format)) {
-    const dateOnly = formatDateTimeAxisTick(value, "date");
-    if (dateOnly) return dateOnly;
+  if (!isTimestampAxisBucket(value, format)) {
+    return formatXAxisTick(value, format);
   }
-  if (parseTimestampMs(value) != null) {
-    return formatDateTimeAxisTick(value, "datetime") ?? String(value);
+  // Explicit `date` stays day-only in the tooltip; datetime / auto-detect include time.
+  if (format === "date") {
+    return formatDateTimeAxisTick(value, "date") ?? String(value);
   }
-  return formatXAxisTick(value, format);
+  return formatDateTimeAxisTick(value, "datetime") ?? String(value);
 }
 
 function isTimestampAxisBucket(value: unknown, format: WidgetColumnFormat | undefined): boolean {
-  if (parseTimestampMs(value) == null) return false;
-  return !format || format === "datetime" || format === "date";
+  if (format && format !== "datetime" && format !== "date") return false;
+  if (format === "date" || format === "datetime") {
+    return coerceWidgetTimestamp(value) != null;
+  }
+  // Unset xFormat: only auto-detect unambiguous timestamps so categorical
+  // numbers like "12" / "404" stay category labels, not Jan 1-style dates.
+  return looksLikeChartTimestamp(value);
 }
 
+/**
+ * True when a value is unambiguous enough to treat as a chart timestamp without
+ * an explicit `xFormat`. Rejects small numeric categories that `Date.parse` or
+ * epoch coercion would otherwise happily turn into dates.
+ */
+function looksLikeChartTimestamp(value: unknown): boolean {
+  if (value instanceof Date) return Number.isFinite(value.getTime());
+  if (typeof value === "number") return isPlausibleEpochNumber(value);
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (trimmed === "") return false;
+  // Pure digits (and decimals): only accept plausible epoch seconds/ms.
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    return isPlausibleEpochNumber(Number(trimmed));
+  }
+  return coerceWidgetTimestamp(trimmed) != null;
+}
+
+/** Epoch seconds (~1e9–1e10) or milliseconds (~1e12–1e13); not status codes / hours. */
+function isPlausibleEpochNumber(n: number): boolean {
+  if (!Number.isFinite(n)) return false;
+  const abs = Math.abs(n);
+  return (abs >= 1e9 && abs < 1e11) || (abs >= 1e12 && abs < 1e14);
+}
+
+// Compact axis-only formats (kept locale-fixed so tick strings match
+// `Jul 6` / `May 26 4:10 PM` regardless of the viewer's locale — the hover
+// details block still reflects the user's local timezone).
 function formatDateTimeAxisTick(value: unknown, format: "datetime" | "date"): string | null {
-  const ms = parseTimestampMs(value);
-  if (ms == null) return null;
-  const date = new Date(ms);
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return null;
   if (format === "date") {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
@@ -67,17 +99,6 @@ function formatDateTimeAxisTick(value: unknown, format: "datetime" | "date"): st
     minute: "2-digit",
     hour12: true,
   });
-}
-
-function parseTimestampMs(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value > 1e12 ? value : value * 1000;
-  }
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return null;
 }
 
 /**
