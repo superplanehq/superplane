@@ -5,6 +5,10 @@ import React from "react";
 import { ThemeProvider } from "../src/contexts/ThemeProvider";
 import "../src/App.css";
 import "../src/index.css";
+// Same global React Flow stylesheet the app loads in `main.tsx`. Without it,
+// Live Canvas stories mount an unstyled graph (nodes have no absolute
+// positioning) until some other story happens to import the CSS.
+import "@xyflow/react/dist/style.css";
 
 // Load Material Symbols font for icons
 const link = document.createElement("link");
