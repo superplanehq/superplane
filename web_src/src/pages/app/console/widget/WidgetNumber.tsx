@@ -133,11 +133,23 @@ function ValueBlock({
   suffixClassName: string;
 }) {
   if (!prefix && !suffix) return <>{valueNode}</>;
+
+  // Suffix needs a small gap from the value. Prefix stays flush (currency-style
+  // "R$" / "$") — only introduce flex gap when a suffix is present.
+  if (suffix) {
+    return (
+      <div className="flex items-baseline gap-0.5">
+        {prefix ? <span className={VALUE_CLASS}>{prefix}</span> : null}
+        {valueNode}
+        <span className={suffixClassName}>{suffix}</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-baseline gap-0.5">
-      {prefix ? <span className={VALUE_CLASS}>{prefix}</span> : null}
+    <div className="flex items-baseline">
+      <span className={VALUE_CLASS}>{prefix}</span>
       {valueNode}
-      {suffix ? <span className={suffixClassName}>{suffix}</span> : null}
     </div>
   );
 }
