@@ -29,7 +29,8 @@ import {
 } from "./markdownTableStyles";
 
 /** Shared chrome for markdown thematic breaks (`___`, `---`, `***`). */
-export const MARKDOWN_DIVIDER_CLASSES = "my-4 border-0 border-t border-slate-200 dark:border-gray-700";
+export const MARKDOWN_DIVIDER_CLASSES =
+  "my-5 h-0 border-0 border-t-2 border-solid border-slate-300 dark:border-gray-600";
 
 /**
  * Tailwind class string shared by every full-document markdown renderer in the

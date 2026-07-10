@@ -132,6 +132,8 @@ describe("MarkdownContent", () => {
     const divider = screen.getByTestId("markdown-divider");
     expect(divider.tagName).toBe("HR");
     expect(divider).toHaveAttribute("role", "separator");
+    expect(divider.className).toContain("border-t-2");
+    expect(divider.className).toContain("border-slate-300");
   });
 
   it.each([

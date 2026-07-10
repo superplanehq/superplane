@@ -24,6 +24,16 @@ Storybook fixture for the **Files** tab and Console markdown panel.
 > [!CAUTION]
 > Destructive actions in table row triggers cannot be undone.
 
+## Dividers
+
+A line of underscores becomes a horizontal rule between blocks:
+
+Above the divider.
+
+___
+
+Below the divider.
+
 ## Sections
 
 Presets pick icon + accent: `overview`, `setup`, `runbook`, `run`, `troubleshoot`,
