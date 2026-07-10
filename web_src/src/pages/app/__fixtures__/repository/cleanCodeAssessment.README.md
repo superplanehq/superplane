@@ -4,8 +4,8 @@ This README is a Storybook fixture for the **Files** tab. It exercises every
 feature currently supported by `MarkdownContent` (Console markdown panels and
 Files `.md` preview share the same renderer).
 
-> Agent-only widgets (`:::chart`, `:::buttons`, `run:` / `integration:` chips,
-> etc.) are **not** rendered here yet — those are the next feature.
+> Agent-only widgets (`:::chart`, `:::buttons`, `run:` chips, etc.) are **not**
+> rendered here yet — those are the next feature.
 
 ---
 
@@ -27,6 +27,7 @@ becomes a `<br>` in the rendered output.
 - External: [SuperPlane docs](https://docs.superplane.com)
 - Relative: [local docs](../docs "Local docs title")
 - Node chip (canvas context required): [Analyze PR](node:analyze-pr) · [On Pull Request](node:on-pull-request) · [Post Assessment](node:post-assessment)
+- Integration chip: [GitHub](integration:github) · [Cursor](integration:cursor)
 
 ## Lists
 
@@ -46,6 +47,8 @@ Ordered:
 Task list (GFM):
 
 - [x] Supported today
+- [x] Integration chips
+- [x] GitHub alerts
 - [ ] Agent widgets (charts, run chips, …)
 - [ ] Interactive confirm / survey blocks
 
@@ -54,6 +57,23 @@ Task list (GFM):
 > Use markdown panels for runbooks, status notes, and lightweight docs.
 > Nested quotes and **formatting** work inside blockquotes.
 
+## GitHub alerts
+
+> [!NOTE]
+> Useful information when skimming a runbook.
+
+> [!TIP]
+> Prefer `node:` chips when linking to canvas steps.
+
+> [!IMPORTANT]
+> Console interpolates `{{ variables }}` before markdown renders.
+
+> [!WARNING]
+> Urgent info that needs attention before the next deploy.
+
+> [!CAUTION]
+> Destructive actions in table row triggers cannot be undone.
+
 ## Table
 
 | Feature        | Console | Files | Agent chat |
@@ -61,6 +81,8 @@ Task list (GFM):
 | GFM markdown   | yes     | yes   | yes        |
 | Mermaid        | yes     | yes   | yes        |
 | `node:` chips  | yes     | yes   | yes        |
+| `integration:` | yes     | yes   | yes        |
+| GitHub alerts  | yes     | yes   | no         |
 | `:::chart`     | no      | no    | yes        |
 | `run:` chips   | no      | no    | yes        |
 
