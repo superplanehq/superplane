@@ -70,6 +70,9 @@ func (o *OpenAI) Actions() []core.Action {
 	return []core.Action{
 		&CreateResponse{},
 		&GetUsage{},
+		&GetFile{},
+		&DownloadFile{},
+		&DownloadContainerFile{},
 	}
 }
 
@@ -93,6 +96,16 @@ Create an [Admin API key](https://platform.openai.com/settings/organization/admi
 
 - Only **Organization Owners** can create admin keys.
 - Admin keys can read organization usage and costs but cannot call model endpoints.
+
+## Restricted API keys
+
+Unrestricted project keys work by default. If you use a restricted key, grant it:
+
+- **Model capabilities** → **Request** — required for Text Prompt.
+- **Responses API** → **Write** — required for Text Prompt.
+- **Files** → **Read** — required for the file picker, Get File, and Download File (use **Write** if you attach files to Text Prompt).
+
+> **Note:** Container files (Code Interpreter artifacts) expire about 20 minutes after their last activity — download them promptly.
 
 > **Note:** Both keys are shown only once — store them somewhere safe before continuing.`
 }
@@ -137,10 +150,17 @@ func (o *OpenAI) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "model" {
+	switch resourceType {
+	case "model":
+		return o.listModelResources(resourceType, ctx)
+	case "file":
+		return o.listFileResources(resourceType, ctx)
+	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
 
+func (o *OpenAI) listModelResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -161,6 +181,33 @@ func (o *OpenAI) ListResources(resourceType string, ctx core.ListResourcesContex
 			Type: resourceType,
 			Name: model.ID,
 			ID:   model.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func (o *OpenAI) listFileResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := client.ListFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(files))
+	for _, file := range files {
+		if file.ID == "" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: file.Filename,
+			ID:   file.ID,
 		})
 	}
 

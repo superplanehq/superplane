@@ -13,6 +13,10 @@ const (
 	maxPollErrors           = 5
 	finalMessageReads       = 15
 	finalMessageDelay       = 2 * time.Second
+	// Session outputs can take a few seconds to be indexed by the Files API
+	// after the session goes idle, so an empty listing is retried once.
+	sessionFileListReads = 2
+	sessionFileListDelay = 2 * time.Second
 )
 
 // Spec is the workflow node configuration for claude.runAgent.
@@ -53,10 +57,56 @@ type SessionMetadata struct {
 
 // OutputPayload is emitted on the default channel when the run completes.
 type OutputPayload struct {
-	Status      string   `json:"status"`
-	SessionID   string   `json:"sessionId"`
-	LastMessage string   `json:"lastMessage"`
-	Messages    []string `json:"messages"`
+	Status      string            `json:"status"`
+	SessionID   string            `json:"sessionId"`
+	LastMessage string            `json:"lastMessage"`
+	Messages    []string          `json:"messages"`
+	Artifacts   []SessionArtifact `json:"artifacts,omitempty"`
+}
+
+// SessionArtifact is a file the agent generated during the session (written to
+// /mnt/session/outputs/), stored in the Files API and downloadable with the
+// API key.
+type SessionArtifact struct {
+	FileID      string `json:"fileId"`
+	Filename    string `json:"filename"`
+	MimeType    string `json:"mimeType"`
+	SizeBytes   int64  `json:"sizeBytes"`
+	DownloadURL string `json:"downloadUrl"`
+}
+
+// CollectSessionArtifacts lists the files the agent generated during the
+// session and resolves them into artifacts with download links. Collection is
+// best-effort: a listing failure is logged and yields no artifacts rather than
+// failing a run whose real output is already available.
+func CollectSessionArtifacts(client *Client, sessionID string, logWarn func(string, ...any)) []SessionArtifact {
+	files, err := client.ListSessionFilesWithRetry(sessionID, sessionFileListReads, sessionFileListDelay)
+	if err != nil {
+		if logWarn != nil {
+			logWarn("Failed to list session files for %s: %v", sessionID, err)
+		}
+		return nil
+	}
+
+	artifacts := make([]SessionArtifact, 0, len(files))
+	for _, f := range files {
+		// Input files mounted into the session are listed too, but only
+		// agent-generated outputs are downloadable.
+		if !f.Downloadable || f.ID == "" {
+			continue
+		}
+		artifacts = append(artifacts, SessionArtifact{
+			FileID:      f.ID,
+			Filename:    f.Filename,
+			MimeType:    f.MimeType,
+			SizeBytes:   f.SizeBytes,
+			DownloadURL: client.FileContentURL(f.ID),
+		})
+	}
+	if len(artifacts) == 0 {
+		return nil
+	}
+	return artifacts
 }
 
 func isSessionTerminal(status string) bool {

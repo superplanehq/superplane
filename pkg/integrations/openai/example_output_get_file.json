@@ -1,0 +1,13 @@
+{
+  "data": {
+    "id": "file-abc123",
+    "filename": "salesOverview.pdf",
+    "purpose": "assistants",
+    "bytes": 175,
+    "createdAt": "2026-02-13T12:00:00Z",
+    "expiresAt": "2026-03-13T12:00:00Z",
+    "url": "https://platform.openai.com/storage/files/file-abc123"
+  },
+  "timestamp": "2026-07-10T12:00:00Z",
+  "type": "openai.file.fetched"
+}

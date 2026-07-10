@@ -28,7 +28,16 @@
     "usage": {
       "input_tokens": 45,
       "output_tokens": 120
-    }
+    },
+    "artifacts": [
+      {
+        "fileId": "file_011CNha8iCJcU1wXNR6q4V8w",
+        "filename": "deployment-summary.csv",
+        "mimeType": "text/csv",
+        "sizeBytes": 2048,
+        "downloadUrl": "https://api.anthropic.com/v1/files/file_011CNha8iCJcU1wXNR6q4V8w/content"
+      }
+    ]
   },
   "timestamp": "2026-02-06T12:00:00Z",
   "type": "claude.message"

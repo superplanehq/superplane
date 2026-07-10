@@ -1,0 +1,13 @@
+{
+  "data": {
+    "id": "file-abc123",
+    "filename": "results.csv",
+    "purpose": "batch_output",
+    "bytes": 880,
+    "encoding": "text",
+    "content": "custom_id,status\nrequest-1,completed\n",
+    "url": "https://platform.openai.com/storage/files/file-abc123"
+  },
+  "timestamp": "2026-07-10T12:00:00Z",
+  "type": "openai.file.downloaded"
+}

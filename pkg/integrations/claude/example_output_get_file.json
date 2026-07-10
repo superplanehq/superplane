@@ -1,0 +1,13 @@
+{
+  "data": {
+    "id": "file_011CNha8iCJcU1wXNR6q4V8w",
+    "filename": "quarterly-report.pdf",
+    "mimeType": "application/pdf",
+    "sizeBytes": 102400,
+    "createdAt": "2026-04-15T18:37:24.100435Z",
+    "downloadable": true,
+    "downloadUrl": "https://api.anthropic.com/v1/files/file_011CNha8iCJcU1wXNR6q4V8w/content"
+  },
+  "timestamp": "2026-07-10T12:00:00Z",
+  "type": "claude.file.fetched"
+}

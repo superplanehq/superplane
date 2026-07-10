@@ -44,7 +44,9 @@ func (a *RunCodeAgent) Documentation() string {
 
 ## Output
 
-Emits the final **status**, the **pull request URL**, the working **branch**, and a **summary** so downstream steps can branch or post the result.`
+Emits the final **status**, the **pull request URL**, the working **branch**, and a **summary** so downstream steps can branch or post the result.
+
+Files the agent saves under ` + "`/mnt/session/outputs/`" + ` are additionally emitted as **artifacts** (file id, filename, MIME type, size, and a download link usable with the API key); consume them downstream with the **Get File** or **Download File** component.`
 }
 
 func (a *RunCodeAgent) Icon() string { return "bot" }
@@ -336,6 +338,7 @@ func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagen
 	}
 
 	out := buildOutput(session.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
+	out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, ctx.Logger.Warnf)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
 		ctx.Logger.Warnf("Failed to emit result for session %s: %v; scheduling poll.", meta.Session.ID, err)
 		return false, nil

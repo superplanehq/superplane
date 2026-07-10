@@ -329,6 +329,7 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		resp(`{"id":"sess_1","status":"idle"}`),
 		resp(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Done. PR_URL=https://github.com/o/r/pull/7"}]}]}`),
+		resp(`{"data":[{"id":"file_out1","filename":"migration-notes.md","mime_type":"text/markdown","size_bytes":2048,"downloadable":true}]}`), // session artifacts
 		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), // teardown
 	}}
 	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -349,6 +350,9 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 	assert.Equal(t, "idle", out.Status)
 	assert.Equal(t, "https://github.com/o/r/pull/7", out.PrURL)
 	assert.Equal(t, "claude/agent-abc", out.Branch)
+	require.Len(t, out.Artifacts, 1)
+	assert.Equal(t, "file_out1", out.Artifacts[0].FileID)
+	assert.Equal(t, "migration-notes.md", out.Artifacts[0].Filename)
 }
 
 func Test__RunCodeAgent__poll__timeoutReclaims(t *testing.T) {

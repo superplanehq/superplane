@@ -65,6 +65,8 @@ func (i *Claude) Actions() []core.Action {
 		&runagent.RunAgent{},
 		&runcodeagent.RunCodeAgent{},
 		&GetDailyUsage{},
+		&GetFile{},
+		&DownloadFile{},
 	}
 }
 
@@ -73,7 +75,11 @@ func (i *Claude) Triggers() []core.Trigger {
 }
 
 func (i *Claude) Instructions() string {
-	return "To get new Claude API key, go to [platform.claude.com](https://platform.claude.com)."
+	return `To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
+
+## Files & artifacts
+
+The Files API is in beta: SuperPlane enables it per request via the ` + "`anthropic-beta`" + ` header, so no console toggle is needed and a standard API key suffices. Files and sessions are scoped to the API key's workspace. For **Run Claude Agent** artifacts, the agent must save its deliverables under ` + "`/mnt/session/outputs/`" + `.`
 }
 
 func (i *Claude) Cleanup(ctx core.IntegrationCleanupContext) error {
@@ -107,10 +113,17 @@ func (i *Claude) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "model" {
+	switch resourceType {
+	case "model":
+		return i.listModelResources(resourceType, ctx)
+	case "file":
+		return i.listFileResources(resourceType, ctx)
+	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
 
+func (i *Claude) listModelResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -131,6 +144,33 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 			Type: resourceType,
 			Name: model.ID,
 			ID:   model.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func (i *Claude) listFileResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := client.ListFiles("")
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(files))
+	for _, file := range files {
+		if file.ID == "" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: file.Filename,
+			ID:   file.ID,
 		})
 	}
 
