@@ -271,6 +271,8 @@ You can also re-check from the **Recent checks** table using the row action.
 
 </details>
 
+___
+
 <details>
 <summary>How review works</summary>
 
