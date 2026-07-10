@@ -18,7 +18,17 @@ import type { PermissionCheck } from "./types";
 export const COMMAND_SHORTCUT = "/";
 export const DOCS_URL = "https://docs.superplane.com";
 
-export const PUBLIC_TOP_LEVEL_SEGMENTS = new Set(["", "admin", "create", "invite", "install", "login", "setup"]);
+export const PUBLIC_TOP_LEVEL_SEGMENTS = new Set([
+  "",
+  "admin",
+  "create",
+  "invite",
+  "install",
+  "login",
+  "setup",
+  "signup",
+  "welcome",
+]);
 
 export const ORGANIZATION_SETTINGS_LINKS: Array<{
   id: string;

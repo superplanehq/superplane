@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { cn } from "@/lib/utils";
+
 import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
+import { CONSOLE_PANEL_BODY_SURFACE, CONSOLE_PANEL_SHELL_SURFACE } from "./consolePanelStyles";
 import { PanelFrame } from "./__stories__/storyDecorators";
 import { prRiskReviewMarkdownBody, prRiskReviewMarkdownPanelSize } from "./__stories__/storyFixtures";
 
@@ -37,13 +40,20 @@ function MarkdownCardFrame({
 }) {
   return (
     <PanelFrame width={width ?? 320} height={height ?? 320}>
-      <div className="group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
+      <div
+        className={cn(
+          "group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70",
+          CONSOLE_PANEL_SHELL_SURFACE,
+        )}
+      >
         <div className="flex items-center justify-between rounded-t-lg py-1.5 pl-3 pr-1.5">
-          <span className="truncate text-[13px] font-medium text-slate-700" title={title}>
+          <span className="truncate text-[13px] font-medium text-slate-700 dark:text-gray-300" title={title}>
             {title}
           </span>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3">{children}</div>
+        <div className={cn("min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3", CONSOLE_PANEL_BODY_SURFACE)}>
+          {children}
+        </div>
       </div>
     </PanelFrame>
   );

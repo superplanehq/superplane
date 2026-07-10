@@ -231,7 +231,7 @@ Each column needs a non-empty `field`. Optional fields:
 | Field | Meaning |
 | --- | --- |
 | `label` | Header text. Falls back to `field`. |
-| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, or `link`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). |
+| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, `link`, or `avatar`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). `avatar` renders the resolved value as a circular avatar: direct image URLs are used as the image source, GitHub usernames (or author maps with a `username`) resolve to the GitHub avatar with the person's name in a tooltip, and values without a username fall back to an initials disc; blank values render as an em-dash. Use `avatarCommitterField` to supply a secondary person map for initials. |
 | `show` | Row expression controlling whether the cell is visible. |
 | `href` | Link template for `link` columns. Accepts `{{ cel }}` expressions and templates (e.g. `{{ prUrl }}` or `https://github.com/{{ org }}/pull/{{ prNumber }}`), legacy single-brace `{field}` placeholders, and bare static URLs. The column editor shows a dedicated href input with a field picker (values inserted as `{{ field }}`) when the format is `link`. |
 
@@ -253,6 +253,8 @@ Filters are validated in both `panelTypes.ts` and `canvas_dashboard_yml.go`.
 ### Row Actions
 
 Row actions invoke a trigger node on the canvas through `InvokeNodeTriggerHook`. They do not call HTTP Request nodes directly. Downstream steps run because the trigger fires, just like a normal manual run.
+
+Only triggers that expose a user-invokable `run` hook (`core.HookTypeUser`) can be fired manually. In practice this is the built-in **`start`** and **`schedule`** triggers, so the console UI filters on `node.component` against a hardcoded allowlist (`web_src/src/pages/app/console/manualRunTriggers.ts`). `WidgetTable` **hides** row actions whose target node is an event-driven trigger (for example `github.onPullRequest`) — the backend would reject the invoke anyway, so a disabled button would just clutter the row. `TablePanelForm`'s trigger node dropdown filters to the same set so authors cannot configure a row action against an event trigger in the first place. Backend authorization in `InvokeNodeTriggerHook` remains the source of truth; adding a new manual-run trigger requires updating the frontend allowlist alongside the trigger implementation.
 
 Supported action fields:
 
@@ -679,17 +681,21 @@ The example uses Tailwind classes for layout and color, a scoped `<style>` block
 
 ## Node Panels
 
-Node panels resolve the configured `node` by id or name. They display the node's name and can optionally show a manual Run button. The optional `label` field overrides the displayed name (falling back to the resolved canvas node name), mirroring the per-entry `label` on the Key Nodes panel.
+Node panels display one or more pinned canvas nodes in a single card. The single and multi-node widgets share one implementation — `NodesPanelCard` — that renders the compact centered layout when the panel holds exactly one entry and a row list otherwise. Each entry resolves its `node` reference by id or name and can optionally show a manual Run button, with an optional `label` overriding the resolved canvas node name.
 
-`showRun` only exposes the button, and only for **trigger nodes** (`type: TYPE_TRIGGER`). Non-trigger nodes can still be pinned for status, but the Run button is suppressed at render time and the editor hides the Show-Run / trigger-template controls when a non-trigger node is selected. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
+`showRun` only exposes the button, and only for **manual-run triggers** — the built-in `start` and `schedule` triggers whose component declares a user-invokable `run` hook. The UI filters on `node.component` against the hardcoded allowlist in `web_src/src/pages/app/console/manualRunTriggers.ts`; event triggers (for example `github.onPullRequest`) can still be pinned for status, but the Run button and the editor's Show-Run / trigger-template controls are hidden when a non-manual node is selected. The actual click still requires `canRunNodes`, and the backend authorization in `InvokeNodeTriggerHook` remains the source of truth.
 
 `promptConfirmation` (default `false`) controls whether a Run click pops the confirmation dialog. Templates that declare input fields (`parameters`) always open the dialog so the operator can fill them in. Templates with no input fields fire immediately on click unless `promptConfirmation` is `true`, in which case a bare "Run X?" confirmation is shown first.
 
-> **Behavior change:** dashboards created before `promptConfirmation` existed used to prompt on every Run click. After upgrading, parameter-less triggers fire immediately on the first click; set `promptConfirmation: true` on the panel (or the individual Key Nodes entry) to restore the confirm-first behavior.
+Every Run button — whether in the node panel or in a table row action — is disabled while its target trigger has an active canvas run in `STATE_STARTED`, so operators cannot enqueue duplicate runs while a pipeline is still executing. The shared `useConsoleTriggerLock` combines websocket-driven in-flight signals with a short submission-grace window; the tooltip switches to "A run for this trigger is already in progress." while the lock is engaged. Each Nodes panel holds a single lock instance shared by all of its entries, with submissions keyed by trigger node id — so two entries pointing at the same trigger lock together the moment either one fires, closing the window between the invoke call and the websocket-driven `STATE_STARTED` refresh.
 
-## Multi-Node Panels
+> **Behavior change:** dashboards created before `promptConfirmation` existed used to prompt on every Run click. After upgrading, parameter-less triggers fire immediately on the first click; set `promptConfirmation: true` on the panel (or the individual Nodes entry) to restore the confirm-first behavior.
 
-The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow) instead of stamping out one `node` panel per row.
+### Panel Types And Backward Compatibility
+
+The Add Panel picker offers a single "Nodes" option (`type: nodes`) that covers both single- and multi-entry cases. The legacy `type: node` shape stays valid on the backend (`canvas_dashboard_yml.go`) and in YAML import so existing dashboards keep working; `NodesPanelCard` folds a `node` panel into a one-entry list at render time. When an author saves a legacy panel through the editor, the shape migrates to `type: nodes` on the fly (see `useConsolePanelState.migratedPanelType`), so once touched the panel adopts the modern list layout.
+
+The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow):
 
 ```yaml
 type: nodes
@@ -715,7 +721,7 @@ Per-entry fields:
 | `node` | Required. Canvas node id or name. |
 | `label` | Optional override for the displayed row name. Falls back to the resolved canvas node name. |
 | `description` | Optional short purpose line shown under the row name. |
-| `showRun` | When true and the resolved node is a trigger (`TYPE_TRIGGER`), surface a manual "Run" button. Still gated by `canRunNodes`. |
+| `showRun` | When true and the resolved node is a manual-run trigger (see [Node Panels](#node-panels)), surface a manual "Run" button. Still gated by `canRunNodes` and the shared in-flight lock. |
 | `triggerName` | Optional start template name when the trigger exposes multiple templates. |
 | `promptConfirmation` | When true, always confirm before running (default `false`). Templates with input fields always prompt regardless. |
 

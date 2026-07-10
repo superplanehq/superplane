@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { getJsonViewStyle } from "@/lib/jsonViewTheme";
 import { Accordion } from "@/ui/accordion";
 import { useTheme } from "@/contexts/useTheme";
@@ -22,14 +22,25 @@ import {
 } from "./RunInspectorTimelineTypes";
 import { hasObjectValue, type RunInspectorNodeSection, type RunInspectorUpstreamSection } from "./runNodeDetailModel";
 
+const INPUT_TRIGGERED_STATUS: StatusPill = {
+  dotClassName: "bg-violet-400",
+  label: "Triggered",
+};
+
 export function RunInspectorStepTimeline({
   section,
   componentIconMap,
   organizationId,
+  onEditNode,
+  errorScrollRequestId,
+  onErrorScrolled,
 }: {
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
   organizationId?: string;
+  onEditNode?: (nodeId: string) => void;
+  errorScrollRequestId?: number | null;
+  onErrorScrolled?: () => void;
 }) {
   const { resolvedTheme } = useTheme();
   const jsonViewStyle = getJsonViewStyle(resolvedTheme);
@@ -41,6 +52,37 @@ export function RunInspectorStepTimeline({
   const hasDetails = !!section.tabData?.details && Object.keys(section.tabData.details).length > 0;
   const hasRuntimeConfig = hasObjectValue(section.tabData?.configuration);
   const timelineItems = buildTimelineItems(section, hasRuntimeConfig);
+  const hasOutputTimelineItem = timelineItems.some((item) => item.value === "output");
+
+  useEffect(() => {
+    if (!errorScrollRequestId || !hasOutputTimelineItem) return;
+
+    setPreferences((current) => {
+      if (current.output) return current;
+
+      const next = { ...current, output: true };
+      localStorage.setItem(ACCORDION_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [errorScrollRequestId, hasOutputTimelineItem]);
+
+  useEffect(() => {
+    if (!errorScrollRequestId || !preferences.output) return;
+
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const errorOutput = document.querySelector(`[data-run-error-output-node-id="${section.nodeId}"]`);
+        errorOutput?.scrollIntoView({ block: "center", behavior: "smooth" });
+        onErrorScrolled?.();
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [errorScrollRequestId, onErrorScrolled, preferences.output, section.nodeId]);
 
   const handlePreferenceChange = (values: string[]) => {
     const next: InternalAccordionPreferences = {
@@ -74,7 +116,12 @@ export function RunInspectorStepTimeline({
             {item.value === "input" ? (
               <InputTimelineCard section={section} jsonViewStyle={jsonViewStyle} componentIconMap={componentIconMap} />
             ) : item.value === "runtime" ? (
-              <RuntimeTimelineCard section={section} jsonViewStyle={jsonViewStyle} organizationId={organizationId} />
+              <RuntimeTimelineCard
+                section={section}
+                jsonViewStyle={jsonViewStyle}
+                organizationId={organizationId}
+                onEditNode={onEditNode}
+              />
             ) : (
               <OutputTimelineCard section={section} jsonViewStyle={jsonViewStyle} />
             )}
@@ -102,7 +149,7 @@ function InputTimelineCard({
   return (
     <TimelineAccordionCard
       value="input"
-      status={inputStatus(leadInput)}
+      status={INPUT_TRIGGERED_STATUS}
       title="Input"
       sourceName={leadInput?.nodeName}
       actionPayload={leadInput ? (leadInput.output ?? {}) : undefined}
@@ -148,6 +195,7 @@ function OutputTimelineCard({
       title={outputTitle(section)}
       actionPayload={outputActionPayload(section)}
       jsonViewStyle={jsonViewStyle}
+      errorOutputNodeId={section.errorMessage ? section.nodeId : undefined}
     >
       {hasOutputs ? (
         <OutputSection section={section} jsonViewStyle={jsonViewStyle} />
@@ -196,13 +244,6 @@ function outputActionPayload(section: RunInspectorNodeSection): unknown {
   }
 
   return section.errorMessage ? { error: section.errorMessage } : undefined;
-}
-
-function inputStatus(section?: RunInspectorUpstreamSection): StatusPill {
-  return {
-    dotClassName: section?.badge?.badgeColor ?? "bg-violet-400",
-    label: section?.badge?.label ?? "Triggered",
-  };
 }
 
 function outputStatus(section: RunInspectorNodeSection): StatusPill {

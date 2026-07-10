@@ -5,7 +5,7 @@ import (
 	"regexp"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
-	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -26,7 +26,7 @@ func (e *ExpressionError) Error() string {
 // ValidateCanvasExpressions runs static expression validation across every
 // node's configuration. Errors are returned per node ID; an empty result means
 // nothing failed.
-func ValidateCanvasExpressions(reg *registry.Registry, nodes []*componentpb.Node) map[string][]ExpressionError {
+func ValidateCanvasExpressions(reg *registry.Registry, nodes []models.Node) map[string][]ExpressionError {
 	results := map[string][]ExpressionError{}
 	if len(nodes) == 0 {
 		return results
@@ -34,32 +34,34 @@ func ValidateCanvasExpressions(reg *registry.Registry, nodes []*componentpb.Node
 
 	knownNodeNames := make(map[string]struct{}, len(nodes))
 	for _, n := range nodes {
-		if n == nil || n.Name == "" {
+		if n.Name == "" {
 			continue
 		}
 		knownNodeNames[n.Name] = struct{}{}
 	}
 
 	for _, node := range nodes {
-		if node == nil || node.Configuration == nil {
+		if node.Configuration == nil {
 			continue
 		}
 
 		fields := schemaForNode(reg, node)
-		errs := validateNodeExpressions(node.Id, node.Name, node.Configuration.AsMap(), fields, knownNodeNames)
+		errs := validateNodeExpressions(node.ID, node.Name, node.Configuration, fields, knownNodeNames)
 		if len(errs) > 0 {
-			results[node.Id] = errs
+			results[node.ID] = errs
 		}
 	}
 
 	return results
 }
 
-func schemaForNode(reg *registry.Registry, node *componentpb.Node) []configuration.Field {
-	if reg == nil || node.Component == "" {
+func schemaForNode(reg *registry.Registry, node models.Node) []configuration.Field {
+	componentName := node.ComponentName()
+	if componentName == "" {
 		return nil
 	}
-	configurable, err := reg.FindConfigurableComponent(node.Component)
+
+	configurable, err := reg.FindConfigurableComponent(componentName)
 	if err != nil {
 		return nil
 	}

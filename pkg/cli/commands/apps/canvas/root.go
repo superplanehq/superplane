@@ -35,13 +35,14 @@ configured with "superplane apps active" is used.`,
 	var updateAutoLayoutScope string
 	var updateAutoLayoutNodes []string
 	updateCmd := &cobra.Command{
-		Use:   "update",
+		Use:   "update [name-or-id]",
 		Short: "Update a canvas from a YAML file",
 		Long: `Update the live canvas from --file and commit immediately with --message.
 
-The file must include metadata.id to identify the target canvas. To stage changes
-without committing, use "superplane apps staging update" and "staging commit".`,
-		Args: cobra.NoArgs,
+The app argument is optional. When omitted, the active app configured with
+"superplane apps active" is used. To stage changes without committing, use
+"superplane apps staging update" and "staging commit".`,
+		Args: cobra.MaximumNArgs(1),
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	_ = updateCmd.MarkFlagRequired("file")

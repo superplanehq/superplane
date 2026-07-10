@@ -406,29 +406,12 @@ message UpdateCanvasPreferenceResponse {
 }
 
 message CreateCanvasRequest {
-  Canvas canvas = 1;
-  CanvasAutoLayout auto_layout = 2;
+  string name = 1;
+  string description = 2;
 }
 
 message CreateCanvasResponse {
   Canvas canvas = 1;
-}
-
-message CanvasAutoLayout {
-  enum Algorithm {
-    ALGORITHM_UNSPECIFIED = 0;
-    ALGORITHM_HORIZONTAL = 1;
-  }
-
-  enum Scope {
-    SCOPE_UNSPECIFIED = 0;
-    SCOPE_FULL_CANVAS = 1;
-    SCOPE_CONNECTED_COMPONENT = 2;
-  }
-
-  Algorithm algorithm = 1;
-  repeated string node_ids = 2;
-  Scope scope = 3;
 }
 
 message CanvasRepository {
@@ -745,6 +728,7 @@ message CanvasNodeExecution {
   google.protobuf.Struct configuration = 13;
   CanvasEvent root_event = 14;
   UserRef cancelled_by = 15;
+  string run_id = 16;
 }
 
 message CanvasNodeQueueItem {
@@ -862,6 +846,7 @@ message CanvasEvent {
   google.protobuf.Struct data = 6;
   google.protobuf.Timestamp created_at = 7;
   bool root = 8;
+  string run_id = 9;
 }
 
 message CanvasRun {

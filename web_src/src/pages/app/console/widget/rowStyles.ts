@@ -22,17 +22,17 @@ import {
 } from "./types";
 
 export const ROW_STYLE_CLASS: Record<WidgetRowStyleTone, string> = {
-  dimmed: "bg-slate-100 dark:bg-gray-800",
-  yellow: "bg-yellow-100 dark:bg-gray-700",
-  "yellow-soft": "bg-yellow-50 dark:bg-gray-800/80",
-  orange: "bg-orange-100 dark:bg-gray-700",
-  "orange-soft": "bg-orange-50 dark:bg-gray-800/80",
-  red: "bg-red-100 dark:bg-gray-700",
-  "red-soft": "bg-red-50 dark:bg-gray-800/80",
-  blue: "bg-sky-100 dark:bg-gray-700",
-  "blue-soft": "bg-sky-50 dark:bg-gray-800/80",
-  green: "bg-green-100 dark:bg-gray-700",
-  "green-soft": "bg-green-50 dark:bg-gray-800/80",
+  dimmed: "bg-slate-100 dark:bg-gray-800/60",
+  yellow: "bg-yellow-100 dark:bg-yellow-950/50",
+  "yellow-soft": "bg-yellow-50 dark:bg-yellow-950/30",
+  orange: "bg-orange-100 dark:bg-orange-950/50",
+  "orange-soft": "bg-orange-50 dark:bg-orange-950/30",
+  red: "bg-red-100 dark:bg-red-950/50",
+  "red-soft": "bg-red-50 dark:bg-red-950/30",
+  blue: "bg-sky-100 dark:bg-sky-950/50",
+  "blue-soft": "bg-sky-50 dark:bg-sky-950/30",
+  green: "bg-green-100 dark:bg-emerald-950/50",
+  "green-soft": "bg-green-50 dark:bg-emerald-950/30",
 };
 
 export const ROW_STYLE_LABEL: Record<WidgetRowStyleTone, string> = {
