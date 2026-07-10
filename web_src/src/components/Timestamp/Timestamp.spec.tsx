@@ -54,11 +54,39 @@ describe("Timestamp", () => {
     expect(screen.getByText("5m ago")).toBeInTheDocument();
   });
 
+  it("renders abbreviated future times as 'in …' instead of clamping to zero", () => {
+    render(
+      <Timestamp
+        date={new Date(Date.now() + 3 * 60 * 60 * 1000)}
+        display="relative"
+        relativeStyle="abbreviated"
+        includeAgo={false}
+      />,
+    );
+    expect(screen.getByText("in 3h")).toBeInTheDocument();
+  });
+
   it("renders the fallback for missing or invalid dates", () => {
     const { rerender } = render(<Timestamp date={null} fallback={<span>—</span>} />);
     expect(screen.getByText("—")).toBeInTheDocument();
 
     rerender(<Timestamp date="not-a-date" fallback={<span>n/a</span>} />);
     expect(screen.getByText("n/a")).toBeInTheDocument();
+  });
+
+  it("renders a date-only label without time-of-day when display is date", () => {
+    render(<Timestamp date={iso} display="date" />);
+    const time = getTimeByDateTime(iso);
+    const text = time.textContent ?? "";
+    expect(text).toMatch(/Jun/);
+    expect(text).toMatch(/2026/);
+    // Date-only mode intentionally drops the HH:MM segment.
+    expect(text).not.toMatch(/\d{2}:\d{2}/);
+  });
+
+  it("accepts datetime as an alias for absolute", () => {
+    render(<Timestamp date={iso} display="datetime" />);
+    const time = getTimeByDateTime(iso);
+    expect(time.textContent ?? "").toMatch(/\d{2}:\d{2}/);
   });
 });

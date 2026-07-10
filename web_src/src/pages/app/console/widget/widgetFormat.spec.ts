@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { formatValue } from "./widgetFormat";
+import { coerceWidgetTimestamp, formatValue } from "./widgetFormat";
 
 /**
  * `format: "duration"` always interprets its input as milliseconds. The old
@@ -20,6 +20,97 @@ describe("formatValue relative", () => {
   it("uses compact relative labels without an ago suffix", () => {
     expect(formatValue("2026-03-29T11:55:00.000Z", "relative")).toBe("5m");
     expect(formatValue("2026-03-29T10:00:00.000Z", "relative")).toBe("2h");
+  });
+
+  it("formats future timestamps with an in prefix", () => {
+    expect(formatValue("2026-03-29T12:30:00.000Z", "relative")).toBe("in 30m");
+    expect(formatValue("2026-03-29T14:00:00.000Z", "relative")).toBe("in 2h");
+  });
+
+  it("accepts epoch seconds and milliseconds", () => {
+    const now = new Date("2026-03-29T12:00:00.000Z").getTime();
+    // Epoch seconds (< 1e12) are treated as seconds; ms values (>= 1e12) pass through.
+    expect(formatValue((now - 5 * 60 * 1000) / 1000, "relative")).toBe("5m");
+    expect(formatValue(now - 2 * 60 * 60 * 1000, "relative")).toBe("2h");
+  });
+
+  it("accepts numeric epoch strings", () => {
+    const now = new Date("2026-03-29T12:00:00.000Z").getTime();
+    expect(formatValue(String((now - 5 * 60 * 1000) / 1000), "relative")).toBe("5m");
+    expect(formatValue(String(now - 2 * 60 * 60 * 1000), "relative")).toBe("2h");
+  });
+});
+
+describe("formatValue date / datetime", () => {
+  const iso = "2026-06-02T10:01:10.561Z";
+
+  it("date renders a calendar day and drops the time-of-day segment", () => {
+    const formatted = formatValue(iso, "date");
+    expect(formatted).toMatch(/Jun/);
+    expect(formatted).toMatch(/2026/);
+    expect(formatted).not.toMatch(/\d{2}:\d{2}/);
+  });
+
+  it("datetime renders a locale timestamp with time-of-day", () => {
+    const formatted = formatValue(iso, "datetime");
+    expect(formatted).toMatch(/Jun/);
+    expect(formatted).toMatch(/2026/);
+    expect(formatted).toMatch(/\d{2}:\d{2}/);
+  });
+
+  it("falls back to the raw string for unparseable input", () => {
+    expect(formatValue("not-a-date", "date")).toBe("not-a-date");
+    expect(formatValue("not-a-date", "datetime")).toBe("not-a-date");
+  });
+});
+
+describe("coerceWidgetTimestamp", () => {
+  it("returns null for null/undefined/empty/invalid inputs", () => {
+    expect(coerceWidgetTimestamp(null)).toBeNull();
+    expect(coerceWidgetTimestamp(undefined)).toBeNull();
+    expect(coerceWidgetTimestamp("")).toBeNull();
+    expect(coerceWidgetTimestamp("   nope   ")).toBeNull();
+  });
+
+  it("parses ISO strings and Date instances", () => {
+    const iso = "2026-06-02T10:01:10.561Z";
+    expect(coerceWidgetTimestamp(iso)?.toISOString()).toBe(iso);
+    const date = new Date(iso);
+    expect(coerceWidgetTimestamp(date)).toBe(date);
+  });
+
+  it("treats big numbers as ms and small numbers as seconds since epoch", () => {
+    const ms = new Date("2026-06-02T10:01:10.561Z").getTime();
+    expect(coerceWidgetTimestamp(ms)?.getTime()).toBe(ms);
+    // Seconds must be scaled up.
+    const seconds = Math.floor(ms / 1000);
+    expect(coerceWidgetTimestamp(seconds)?.getTime()).toBe(seconds * 1000);
+  });
+
+  it("parses numeric epoch strings as seconds or milliseconds", () => {
+    const ms = new Date("2026-06-02T10:01:10.561Z").getTime();
+    const seconds = Math.floor(ms / 1000);
+    // JSON / CEL often emit epochs as strings; Date.parse alone rejects them.
+    expect(coerceWidgetTimestamp(String(ms))?.getTime()).toBe(ms);
+    expect(coerceWidgetTimestamp(String(seconds))?.getTime()).toBe(seconds * 1000);
+    expect(coerceWidgetTimestamp(`  ${seconds}  `)?.getTime()).toBe(seconds * 1000);
+  });
+
+  it("rejects short digit strings and small numbers that are not plausible epochs", () => {
+    for (const value of ["12", "200", "404", "9999", 12, 200, 404, 9999]) {
+      expect(coerceWidgetTimestamp(value)).toBeNull();
+    }
+    expect(formatValue("404", "date")).toBe("404");
+    expect(formatValue(404, "datetime")).toBe("404");
+    expect(formatValue("12", "relative")).toBe("12");
+  });
+
+  it("scales negative epoch milliseconds by magnitude, not sign", () => {
+    const ms = -1_500_000_000_000; // ~1922-07-05 in UTC
+    expect(coerceWidgetTimestamp(ms)?.getTime()).toBe(ms);
+    expect(coerceWidgetTimestamp(String(ms))?.getTime()).toBe(ms);
+    const seconds = -1_500_000_000;
+    expect(coerceWidgetTimestamp(seconds)?.getTime()).toBe(seconds * 1000);
   });
 });
 
