@@ -1,6 +1,10 @@
-import { useEffect, useId, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Minus, Plus, RotateCcw } from "lucide-react";
 import mermaid from "mermaid";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+import { FullscreenContentDialog } from "@/ui/FullscreenContentDialog";
+import { HeaderIconButton } from "@/ui/HeaderIconButton";
+import { useMermaidFitToViewport, useMermaidPan } from "./useMermaidViewport";
 
 mermaid.initialize({
   startOnLoad: false,
@@ -8,23 +12,46 @@ mermaid.initialize({
   securityLevel: "strict",
   fontFamily: "ui-sans-serif, system-ui, sans-serif",
   themeVariables: {
-    primaryColor: "#ede9fe",
+    // Keep the purple primary; give secondary/tertiary real mid-tone fills
+    // instead of near-white pastels that read as washed out.
+    primaryColor: "#ddd6fe",
     primaryTextColor: "#4c1d95",
-    primaryBorderColor: "#8b5cf6",
-    secondaryColor: "#ecfeff",
+    primaryBorderColor: "#7c3aed",
+    secondaryColor: "#67e8f9",
     secondaryTextColor: "#164e63",
-    secondaryBorderColor: "#06b6d4",
-    tertiaryColor: "#fffbeb",
+    secondaryBorderColor: "#0891b2",
+    tertiaryColor: "#fcd34d",
     tertiaryTextColor: "#78350f",
-    tertiaryBorderColor: "#f59e0b",
-    lineColor: "#94a3b8",
-    textColor: "#334155",
-    nodeBorder: "#8b5cf6",
+    tertiaryBorderColor: "#d97706",
+    lineColor: "#64748b",
+    textColor: "#1e293b",
+    nodeBorder: "#7c3aed",
     nodeTextColor: "#1e293b",
     clusterBkg: "#f8fafc",
-    clusterBorder: "#e2e8f0",
-    defaultLinkColor: "#8b5cf6",
+    clusterBorder: "#cbd5e1",
+    defaultLinkColor: "#7c3aed",
     fontSize: "13px",
+    // Pie slices: purple first, then saturated companions (opacity 1 so they
+    // don't look faded on white).
+    pie1: "#8b5cf6",
+    pie2: "#06b6d4",
+    pie3: "#f59e0b",
+    pie4: "#10b981",
+    pie5: "#f43f5e",
+    pie6: "#3b82f6",
+    pie7: "#eab308",
+    pie8: "#14b8a6",
+    pie9: "#ec4899",
+    pie10: "#6366f1",
+    pie11: "#84cc16",
+    pie12: "#f97316",
+    pieOpacity: "1",
+    pieStrokeColor: "#ffffff",
+    pieStrokeWidth: "1px",
+    pieOuterStrokeColor: "#e2e8f0",
+    pieTitleTextColor: "#1e293b",
+    pieSectionTextColor: "#0f172a",
+    pieLegendTextColor: "#334155",
   },
 });
 
@@ -34,10 +61,12 @@ interface MermaidWidgetProps {
 
 export function MermaidWidget({ content }: MermaidWidgetProps) {
   const id = useId().replace(/:/g, "m");
-  const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [fitScale, setFitScale] = useState(1);
+  const fitToViewportRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,113 +112,118 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
   return (
     <>
-      <div
-        ref={containerRef}
+      <button
+        type="button"
         onClick={() => setExpanded(true)}
-        className="my-4 w-full min-w-0 cursor-pointer overflow-x-auto rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
+        aria-label="Expand diagram"
+        className="my-4 w-full min-w-0 cursor-pointer overflow-x-auto rounded-lg border border-slate-200 bg-white p-3 text-left transition-colors hover:border-slate-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
       >
         <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: svg }} />
-      </div>
+      </button>
 
-      <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogContent size="large" className="w-[90vw] max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-medium">Diagram</DialogTitle>
-          </DialogHeader>
-          <MermaidPanZoom svg={svg} />
-        </DialogContent>
-      </Dialog>
+      <FullscreenContentDialog
+        open={expanded}
+        onOpenChange={setExpanded}
+        title="Diagram"
+        size="wide"
+        bodyClassName="overflow-hidden p-0"
+        headerActions={
+          <>
+            <HeaderIconButton
+              label="Zoom in"
+              icon={<Plus className="h-3.5 w-3.5" />}
+              onClick={() => setScale((current) => Math.min(current * 1.2, 5))}
+            />
+            <HeaderIconButton
+              label="Zoom out"
+              icon={<Minus className="h-3.5 w-3.5" />}
+              onClick={() => setScale((current) => Math.max(current * 0.8, 0.2))}
+            />
+            <HeaderIconButton
+              label="Fit to view"
+              icon={<RotateCcw className="h-3.5 w-3.5" />}
+              onClick={() => fitToViewportRef.current?.()}
+            />
+            <span className="px-1 text-[11px] tabular-nums text-slate-500 dark:text-gray-400">
+              {Math.round(scale * 100)}%{Math.abs(scale - fitScale) < 0.01 ? " · fitted" : ""}
+            </span>
+          </>
+        }
+      >
+        <MermaidPanZoom
+          svg={svg}
+          scale={scale}
+          onScaleChange={setScale}
+          onFitScaleChange={setFitScale}
+          fitToViewportRef={fitToViewportRef}
+        />
+      </FullscreenContentDialog>
     </>
   );
 }
 
-function MermaidPanZoom({ svg }: { svg: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(2.5);
-  const [translate, setTranslate] = useState({ x: 0, y: 0 });
-  const dragRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
+function MermaidPanZoom({
+  svg,
+  scale,
+  onScaleChange,
+  onFitScaleChange,
+  fitToViewportRef,
+}: {
+  svg: string;
+  scale: number;
+  onScaleChange: (scale: number) => void;
+  onFitScaleChange: (scale: number) => void;
+  fitToViewportRef: React.MutableRefObject<(() => void) | null>;
+}) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const scaleRef = useRef(scale);
+  const fitScaleRef = useRef(1);
+  scaleRef.current = scale;
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setScale((prev) => Math.min(Math.max(prev * delta, 0.2), 5));
-  }, []);
+  const { translate, resetPan, handleMouseDown, handleMouseMove, handleMouseUp } = useMermaidPan();
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      dragRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        startTx: translate.x,
-        startTy: translate.y,
-      };
+  useMermaidFitToViewport({
+    viewportRef,
+    contentRef,
+    svg,
+    onScaleChange: (next) => {
+      resetPan();
+      onScaleChange(next);
     },
-    [translate],
+    onFitScaleChange,
+    fitToViewportRef,
+    scaleRef,
+    fitScaleRef,
+  });
+
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      onScaleChange(Math.min(Math.max(scaleRef.current * delta, 0.2), 5));
+    },
+    [onScaleChange],
   );
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragRef.current) return;
-    setTranslate({
-      x: dragRef.current.startTx + (e.clientX - dragRef.current.startX),
-      y: dragRef.current.startTy + (e.clientY - dragRef.current.startY),
-    });
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    dragRef.current = null;
-  }, []);
-
-  const resetView = useCallback(() => {
-    setScale(2.5);
-    setTranslate({ x: 0, y: 0 });
-  }, []);
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-2 flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400">
-        <button
-          type="button"
-          onClick={() => setScale((s) => Math.min(s * 1.2, 5))}
-          className="cursor-pointer rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 dark:border-gray-700 dark:hover:bg-gray-800"
-        >
-          Zoom +
-        </button>
-        <button
-          type="button"
-          onClick={() => setScale((s) => Math.max(s * 0.8, 0.2))}
-          className="cursor-pointer rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 dark:border-gray-700 dark:hover:bg-gray-800"
-        >
-          Zoom −
-        </button>
-        <button
-          type="button"
-          onClick={resetView}
-          className="cursor-pointer rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 dark:border-gray-700 dark:hover:bg-gray-800"
-        >
-          Reset
-        </button>
-        <span>{Math.round(scale * 100)}%</span>
-      </div>
+    <div
+      ref={viewportRef}
+      className="h-full min-h-0 cursor-grab overflow-hidden bg-slate-50/50 active:cursor-grabbing dark:bg-gray-900"
+      onWheel={handleWheel}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       <div
-        ref={containerRef}
-        className="min-h-0 flex-1 cursor-grab overflow-hidden rounded-lg border border-slate-200 bg-slate-50/50 active:cursor-grabbing dark:border-gray-700 dark:bg-gray-900"
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        className="flex h-full w-full items-center justify-center"
+        style={{
+          transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+          transformOrigin: "center center",
+        }}
       >
-        <div
-          className="flex h-full w-full items-center justify-center"
-          style={{
-            transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-            transformOrigin: "center center",
-            minHeight: "40vh",
-          }}
-        >
-          <div className="[&_svg]:max-w-none [&_svg]:h-auto" dangerouslySetInnerHTML={{ __html: svg }} />
-        </div>
+        <div ref={contentRef} className="[&_svg]:h-auto [&_svg]:max-w-none" dangerouslySetInnerHTML={{ __html: svg }} />
       </div>
     </div>
   );
