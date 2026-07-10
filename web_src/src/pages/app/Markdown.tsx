@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES } from "./console/consoleCodeStyles";
 import { CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES } from "./console/consoleLinkStyles";
 import { MarkdownAlert, parseGithubAlertChildren } from "./markdownAlerts";
+import { MarkdownSection, parseGithubSectionChildren } from "./markdownSection";
 import { markdownHeadingClassName } from "./markdownHeadingStyles";
 import {
   MARKDOWN_TABLE_CLASSES,
@@ -201,6 +202,15 @@ function MarkdownCodeWithDiagrams({
 }
 
 function MarkdownBlockquote({ children, node: _node, ...props }: ComponentProps<"blockquote"> & ExtraProps) {
+  const section = parseGithubSectionChildren(children);
+  if (section) {
+    return (
+      <MarkdownSection title={section.title} trailing={section.trailing} presetId={section.presetId}>
+        {section.body}
+      </MarkdownSection>
+    );
+  }
+
   const alert = parseGithubAlertChildren(children);
   if (alert) {
     return <MarkdownAlert type={alert.type}>{alert.body}</MarkdownAlert>;

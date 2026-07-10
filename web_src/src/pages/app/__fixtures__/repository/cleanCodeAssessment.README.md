@@ -1,61 +1,11 @@
 # Markdown renderer showcase
 
-This README is a Storybook fixture for the **Files** tab. It exercises every
-feature currently supported by `MarkdownContent` (Console markdown panels and
-Files `.md` preview share the same renderer).
+Storybook fixture for the **Files** tab and Console markdown panel.
 
-> Agent-only widgets (`:::chart`, `:::buttons`, `run:` chips, etc.) are **not**
-> rendered here yet — those are the next feature.
+## Chips
 
----
-
-## Headings
-
-### Heading level 3
-
-#### Heading level 4
-
-## Inline formatting
-
-**Bold**, *italic*, ***bold italic***, ~~strikethrough~~, and `inline code`.
-
-Soft line breaks are enabled (remark-breaks), so a single newline
-becomes a `<br>` in the rendered output.
-
-## Links
-
-- External: [SuperPlane docs](https://docs.superplane.com)
-- Relative: [local docs](../docs "Local docs title")
-- Node chip (canvas context required): [Analyze PR](node:analyze-pr) · [On Pull Request](node:on-pull-request) · [Post Assessment](node:post-assessment)
-- Integration chip: [GitHub](integration:github) · [Cursor](integration:cursor)
-
-## Lists
-
-Unordered:
-
-- First item
-- Second item
-  - Nested item
-- Third item
-
-Ordered:
-
-1. One
-2. Two
-3. Three
-
-Task list (GFM):
-
-- [x] Supported today
-- [x] Integration chips
-- [x] GitHub alerts
-- [ ] Agent widgets (charts, run chips, …)
-- [ ] Interactive confirm / survey blocks
-
-## Blockquote
-
-> Use markdown panels for runbooks, status notes, and lightweight docs.
-> Nested quotes and **formatting** work inside blockquotes.
+- Node: [Analyze PR](node:analyze-pr) · [On Pull Request](node:on-pull-request) · [Post Assessment](node:post-assessment)
+- Integration: [GitHub](integration:github) · [Cursor](integration:cursor) · [Slack](integration:slack)
 
 ## GitHub alerts
 
@@ -63,7 +13,7 @@ Task list (GFM):
 > Useful information when skimming a runbook.
 
 > [!TIP]
-> Prefer `node:` chips when linking to canvas steps.
+> Prefer `node:` chips when linking to canvas steps: [Analyze PR](node:analyze-pr).
 
 > [!IMPORTANT]
 > Console interpolates `{{ variables }}` before markdown renders.
@@ -74,39 +24,34 @@ Task list (GFM):
 > [!CAUTION]
 > Destructive actions in table row triggers cannot be undone.
 
-## Table
+## Sections
 
-| Feature        | Console | Files | Agent chat |
-| -------------- | ------- | ----- | ---------- |
-| GFM markdown   | yes     | yes   | yes        |
-| Mermaid        | yes     | yes   | yes        |
-| `node:` chips  | yes     | yes   | yes        |
-| `integration:` | yes     | yes   | yes        |
-| GitHub alerts  | yes     | yes   | no         |
-| `:::chart`     | no      | no    | yes        |
-| `run:` chips   | no      | no    | yes        |
+Presets pick icon + accent: `tools`, `rules`, `skills`, `mcp`, `folder`.
+Trailing meta after ` · ` is optional. Nested sections show a count on the parent.
 
-## Code blocks
+> [!SECTION:tools] Tool definitions · ~9,202
+> Descriptions of tools the agent can call.
 
-Labeled fence (Monaco widget):
+> [!SECTION:rules] Rules · ~5,366
+> Standing instructions the agent follows each turn. Keep them focused and lightweight.
+>
+> Nested markdown still works: [docs](https://docs.superplane.com) and `inline code`.
+>
+> > [!SECTION:folder] Project Rules · ~2,752
+> > Project-local guidance from `AGENTS.md` and related files.
+>
+> > [!SECTION:rules] Cursor & User Rules · ~2,522
+> > Personal and Cursor-level standing instructions.
 
-```yaml
-apiVersion: v1
-kind: Canvas
-metadata:
-  name: Clean Code Assessment
-```
+> [!SECTION:skills] Scoring
+> The agent checks out the PR, runs metric tooling, and posts a self-updating comment.
 
-Unlabeled fence (plain `<pre><code>`):
+> [!SECTION:mcp] MCP servers · 3
+> Connected tools the agent can call through Model Context Protocol.
 
-```
-raw output line 1
-raw output line 2
-```
+## Mermaid
 
-Inline: call `upsertMemory` with namespace `prScores`.
-
-## Mermaid diagram
+Flowchart (custom node colors):
 
 ```mermaid
 flowchart LR
@@ -114,45 +59,35 @@ flowchart LR
   analyze --> report[Get Report]
   report --> post[Post Assessment]
   post --> memory[Update Saved Assessment]
+
+  style trigger fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  style analyze fill:#ecfdf5,stroke:#059669,color:#064e3b
+  style report fill:#fef3c7,stroke:#d97706,color:#78350f
+  style post fill:#fce7f3,stroke:#db2777,color:#831843
+  style memory fill:#f1f5f9,stroke:#64748b,color:#1e293b
 ```
 
-## Collapsible details
+Sequence:
 
-<details>
-<summary>How scoring works</summary>
+```mermaid
+sequenceDiagram
+  participant Dev as Developer
+  participant SP as SuperPlane
+  participant GH as GitHub
+  Dev->>SP: Open PR
+  SP->>GH: Analyze PR
+  GH-->>SP: Metrics
+  SP->>GH: Post assessment comment
+```
 
-The agent checks out the PR, runs metric tooling, and posts a single
-self-updating comment with a 0–100 Clean Code score.
+State diagram:
 
-You can nest markdown inside details:
-
-- Coverage
-- Complexity
-- Module size
-
-</details>
-
-<details open>
-<summary>Open by default</summary>
-
-This section uses `<details open>` so it starts expanded.
-
-</details>
-
-## Horizontal rule
-
-Above the rule.
-
----
-
-Below the rule.
-
-## Escaped / edge cases
-
-HTML that should be stripped for safety (script tags must not run):
-
-<script>window.__shouldNotRun = true</script>
-
-Anchors keep their `href` but lose event handlers:
-
-<a href="#safe" onclick="alert('nope')">Safe link text</a>
+```mermaid
+stateDiagram-v2
+  [*] --> Queued
+  Queued --> Running
+  Running --> Passed
+  Running --> Failed
+  Passed --> [*]
+  Failed --> Queued: Retry
+```

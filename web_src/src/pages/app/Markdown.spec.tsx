@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MarkdownContent } from "./Markdown";
 
@@ -157,5 +158,72 @@ describe("MarkdownContent", () => {
     expect(alert).toHaveTextContent("Tip");
     expect(screen.getByRole("link", { name: "docs" })).toHaveAttribute("href", "https://example.com");
     expect(screen.getByTestId("markdown-code")).toHaveTextContent("sha");
+  });
+
+  it("renders [!SECTION] blockquotes as collapsed accordions", async () => {
+    const user = userEvent.setup();
+    render(
+      <MarkdownContent
+        content={"> [!SECTION] Rules\n> Standing instructions for the agent.\n>\n> Keep them focused."}
+      />,
+    );
+
+    const section = screen.getByTestId("markdown-section");
+    expect(section).toHaveTextContent("Rules");
+    expect(section).not.toHaveTextContent("[!SECTION]");
+    expect(screen.queryByText(/Standing instructions/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Rules/i }));
+    expect(screen.getByText(/Standing instructions for the agent/)).toBeInTheDocument();
+    expect(screen.getByText(/Keep them focused/)).toBeInTheDocument();
+  });
+
+  it("renders optional section trailing meta after a middle dot", () => {
+    render(<MarkdownContent content={"> [!SECTION] Rules · ~5,366\n> Body copy."} />);
+
+    const section = screen.getByTestId("markdown-section");
+    expect(section).toHaveTextContent("Rules");
+    expect(section).toHaveTextContent("~5,366");
+    expect(section).not.toHaveTextContent("[!SECTION]");
+  });
+
+  it("applies named section presets for icon and accent color", () => {
+    render(<MarkdownContent content={"> [!SECTION:tools] Tool definitions · ~9,202\n> Body copy."} />);
+
+    const section = screen.getByTestId("markdown-section");
+    expect(section).toHaveAttribute("data-section-preset", "tools");
+    expect(section).toHaveTextContent("Tool definitions");
+    expect(section).toHaveTextContent("~9,202");
+  });
+
+  it("shows a count of direct nested sections beside the title", () => {
+    render(
+      <MarkdownContent
+        content={
+          "> [!SECTION:rules] Rules · ~5,366\n> Intro.\n>\n> > [!SECTION:folder] Project Rules\n> > One.\n>\n> > [!SECTION:folder] Cursor & User Rules\n> > Two."
+        }
+      />,
+    );
+
+    const section = screen.getByTestId("markdown-section");
+    expect(section).toHaveAttribute("data-section-count", "2");
+    expect(section).toHaveTextContent("Rules");
+    expect(section).toHaveTextContent("2");
+  });
+
+  it("preserves nested markdown inside section bodies", async () => {
+    const user = userEvent.setup();
+    render(<MarkdownContent content={"> [!SECTION] Tips\n> See [docs](https://example.com) and `sha`."} />);
+
+    await user.click(screen.getByRole("button", { name: /Tips/i }));
+    expect(screen.getByRole("link", { name: "docs" })).toHaveAttribute("href", "https://example.com");
+    expect(screen.getByTestId("markdown-code")).toHaveTextContent("sha");
+  });
+
+  it("does not treat [!SECTION] without a title as a section", () => {
+    render(<MarkdownContent content={"> [!SECTION]\n> Missing title stays a quote."} />);
+
+    expect(screen.queryByTestId("markdown-section")).not.toBeInTheDocument();
+    expect(document.querySelector("blockquote")).toBeTruthy();
   });
 });
