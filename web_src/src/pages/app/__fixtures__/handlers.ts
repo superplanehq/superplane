@@ -1,4 +1,5 @@
 import defaultRaw from "./canvasAppResponses.json";
+import cleanCodeAssessmentReadme from "./repository/cleanCodeAssessment.README.md?raw";
 
 // Shape of a captured fixture. Endpoint bodies are stored verbatim as the
 // live API returned them (after trimming GitHub webhook payloads and
@@ -34,9 +35,28 @@ export interface CanvasAppFixture {
   memory?: { items?: unknown[] };
   /** GET /api/v1/canvases/{canvasId}/repository/file?path=console.yaml */
   consoleYaml?: string;
+  /**
+   * Extra repository file bodies keyed by path (e.g. `README.md`).
+   * `console.yaml` still prefers `consoleYaml` when both are set.
+   */
+  repositoryFileContents?: Record<string, string>;
+  /**
+   * Paths returned by GET .../repository/files. Defaults to the standard
+   * app-repo trio (`README.md`, `canvas.yaml`, `console.yaml`) plus any
+   * keys from `repositoryFileContents`.
+   */
+  repositoryFilePaths?: string[];
 }
 
-const defaultFixture = defaultRaw as CanvasAppFixture;
+const DEFAULT_REPOSITORY_FILE_PATHS = ["README.md", "canvas.yaml", "console.yaml"] as const;
+
+const defaultFixture = {
+  ...(defaultRaw as CanvasAppFixture),
+  repositoryFileContents: {
+    "README.md": cleanCodeAssessmentReadme,
+    ...(defaultRaw as CanvasAppFixture).repositoryFileContents,
+  },
+} satisfies CanvasAppFixture;
 
 export const canvasAppIds = {
   organizationId: defaultFixture.organizationId,
@@ -143,19 +163,31 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     // Real API shape is `{items: []}`; some legacy fixtures used `{memory: []}`
     // which no widget ever read successfully — normalize on `items` here.
     { pattern: re(`${CANVAS}/memory`), resolve: () => ({ json: fixture.memory ?? { items: [] } }) },
-    // Repository files are text payloads. Only `console.yaml` gets special
-    // treatment because that's what feeds the console tab; everything else
-    // (e.g. canvas.yaml, config manifests) returns an empty body so the UI
-    // renders its default empty state.
+    // Files tab needs a ready repository before it will render the tree.
+    // Without this, `useCanvasRepository` returns `undefined` and TanStack
+    // Query surfaces `["canvases","repository",…] data is undefined`.
+    {
+      pattern: re(`${CANVAS}/repository/files`),
+      resolve: () => ({
+        json: {
+          files: resolveRepositoryFilePaths(fixture).map((path) => ({ path })),
+        },
+      }),
+    },
     {
       pattern: re(`${CANVAS}/repository/file`),
-      resolve: (_m, url) => {
-        const path = url.searchParams.get("path");
-        if (path === "console.yaml" && typeof fixture.consoleYaml === "string") {
-          return { text: fixture.consoleYaml };
-        }
-        return { text: "" };
-      },
+      resolve: (_m, url) => ({ text: resolveRepositoryFileContent(fixture, url.searchParams.get("path")) }),
+    },
+    {
+      pattern: re(`${CANVAS}/repository`),
+      resolve: () => ({
+        json: {
+          repository: {
+            metadata: { canvasId: fixture.canvasId },
+            status: { state: "STATE_READY", headSha: "storybook-fixture-head" },
+          },
+        },
+      }),
     },
     { pattern: re(CANVAS), resolve: () => ({ json: fixture.canvas ?? { canvas: {} } }) },
     { pattern: re("/api/v1/canvases"), resolve: () => ({ json: { canvases: [], totalCount: 0, hasNextPage: false } }) },
@@ -231,4 +263,28 @@ function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.href;
   return input.url;
+}
+
+function resolveRepositoryFilePaths(fixture: CanvasAppFixture): string[] {
+  if (fixture.repositoryFilePaths?.length) {
+    return [...fixture.repositoryFilePaths];
+  }
+
+  const paths = new Set<string>(DEFAULT_REPOSITORY_FILE_PATHS);
+  for (const path of Object.keys(fixture.repositoryFileContents ?? {})) {
+    paths.add(path);
+  }
+  return Array.from(paths).sort();
+}
+
+function resolveRepositoryFileContent(fixture: CanvasAppFixture, path: string | null): string {
+  if (!path) {
+    return "";
+  }
+
+  if (path === "console.yaml" && typeof fixture.consoleYaml === "string") {
+    return fixture.consoleYaml;
+  }
+
+  return fixture.repositoryFileContents?.[path] ?? "";
 }
