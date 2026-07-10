@@ -48,7 +48,7 @@ function dateFromEpochNumber(n: number): Date | null {
 }
 
 /** Epoch seconds (~1e9–1e10) or milliseconds (~1e12–1e13); not status codes / hours. */
-export function isPlausibleEpochNumber(n: number): boolean {
+function isPlausibleEpochNumber(n: number): boolean {
   if (!Number.isFinite(n)) return false;
   const abs = Math.abs(n);
   return (abs >= 1e9 && abs < 1e11) || (abs >= 1e12 && abs < 1e14);
