@@ -579,9 +579,9 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 }
 
 // loadCommandFile reads, size-limits, and validates the command file referenced
-// by rawPath, returning its content verbatim. It rejects empty or
-// whitespace-only files so both Setup (publish time) and Execute (run time)
-// agree on what counts as a runnable script.
+// by rawPath, returning its content with shell-safe line endings. It rejects
+// empty or whitespace-only files so both Setup (publish time) and Execute (run
+// time) agree on what counts as a runnable script.
 func loadCommandFile(files core.RepositoryFilesContext, rawPath string) (string, error) {
 	path := strings.TrimSpace(rawPath)
 	if path == "" {
@@ -610,7 +610,7 @@ func loadCommandFile(files core.RepositoryFilesContext, rawPath string) (string,
 	if strings.TrimSpace(string(data)) == "" {
 		return "", fmt.Errorf("command file %q is empty", path)
 	}
-	return string(data), nil
+	return normalizeScriptLineEndings(string(data)), nil
 }
 
 func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
@@ -864,10 +864,10 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 // File mode pipes the (already-loaded) script body to `bash -s` over stdin.
 // This avoids embedding the whole script in the command line — argv has size
 // limits and nested quoting is fragile — while preserving multi-line
-// constructs, comments, and bash-only features (pipefail, declare -A,
-// here-docs, process substitution) exactly as written. The stream is always
-// interpreted by bash, so any leading `#!` line is just a comment: non-bash
-// shebangs are not honored.
+// constructs, comments, and bash-only features (pipefail, declare -A, here-docs,
+// process substitution) except for normalizing CRLF/CR line endings to LF. The
+// stream is always interpreted by bash, so any leading `#!` line is just a
+// comment: non-bash shebangs are not honored.
 func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBody string) (string, io.Reader, error) {
 	if metadata.CommandSource == CommandSourceFile {
 		if scriptBody == "" {
@@ -889,9 +889,9 @@ func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBod
 // prepended on its own line (followed by `|| exit 1`) so a leading shebang or
 // comment in the script cannot swallow the `cd` via `#`-to-end-of-line.
 func (c *SSHCommand) buildScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
-	payload := script
+	payload := normalizeScriptLineEndings(script)
 	if workingDirectory != "" {
-		payload = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), script)
+		payload = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), payload)
 	}
 
 	command := "bash -s"
@@ -958,7 +958,7 @@ func validateCommandSource(ctx core.SetupContext, spec Spec) error {
 }
 
 func buildCombinedCommands(commands string) string {
-	lines := strings.Split(commands, "\n")
+	lines := strings.Split(normalizeScriptLineEndings(commands), "\n")
 	parts := make([]string, 0, len(lines))
 	for _, line := range lines {
 		l := strings.TrimSpace(line)
@@ -971,6 +971,11 @@ func buildCombinedCommands(commands string) string {
 		return ""
 	}
 	return strings.Join(parts, " && ")
+}
+
+func normalizeScriptLineEndings(script string) string {
+	script = strings.ReplaceAll(script, "\r\n", "\n")
+	return strings.ReplaceAll(script, "\r", "\n")
 }
 
 func shellQuote(value string) string {
