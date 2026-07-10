@@ -728,6 +728,7 @@ message CanvasNodeExecution {
   google.protobuf.Struct configuration = 13;
   CanvasEvent root_event = 14;
   UserRef cancelled_by = 15;
+  string run_id = 16;
 }
 
 message CanvasNodeQueueItem {
@@ -845,6 +846,7 @@ message CanvasEvent {
   google.protobuf.Struct data = 6;
   google.protobuf.Timestamp created_at = 7;
   bool root = 8;
+  string run_id = 9;
 }
 
 message CanvasRun {

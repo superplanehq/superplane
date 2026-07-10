@@ -131,6 +131,7 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
     kind: "trigger",
     nodeId: node.id,
     originalEvent: event,
+    runId: event.runId,
   };
 }
 
@@ -179,6 +180,7 @@ export function mapExecutionsToSidebarEvents(
       nodeId: execution?.nodeId,
       originalExecution: execution,
       triggerEventId: execution.rootEvent?.id,
+      runId: execution.runId || execution.rootEvent?.runId,
     };
   });
 }
@@ -239,6 +241,10 @@ export function getSidebarEventExecutionId(event: SidebarEvent): string | undefi
 }
 
 export function findRunIdForSidebarEvent(runs: CanvasesCanvasRun[], event: SidebarEvent): string | null {
+  if (event.runId) {
+    return event.runId;
+  }
+
   const executionId = getSidebarEventExecutionId(event);
   if (executionId) {
     const run = runs.find((candidate) => candidate.executions?.some((execution) => execution.id === executionId));
