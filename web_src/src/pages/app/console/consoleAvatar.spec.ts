@@ -10,6 +10,13 @@ describe("resolveConsoleAvatar", () => {
     });
   });
 
+  it("passes direct image URLs through as the avatar source", () => {
+    expect(resolveConsoleAvatar("https://github.com/forestileao.png?size=64")).toEqual({
+      src: "https://github.com/forestileao.png?size=64",
+      name: "",
+    });
+  });
+
   it("uses the GitHub avatar when author.username is present", () => {
     expect(resolveConsoleAvatar({ name: "Pedro Leão", username: "forestileao" }, { name: "Pedro Leão" })).toEqual({
       src: "https://github.com/forestileao.png",

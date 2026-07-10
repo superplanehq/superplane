@@ -16,6 +16,8 @@ export interface MemoryFieldSummary {
 
 const META_KEYS = new Set(["id", "namespace"]);
 
+const AVATAR_FIELD_NAMES = new Set(["avatar", "avatar_url", "imageurl", "image_url", "photourl", "photo_url"]);
+
 function collectFieldKeys(entries: CanvasMemoryEntry[], namespace: string): MemoryFieldSummary[] {
   const keys = new Set<string>();
   const samples = new Map<string, unknown>();
@@ -67,10 +69,18 @@ export function useMemoryCatalog(canvasId: string | undefined, namespace?: strin
   };
 }
 
-export function suggestColumnFormat(field: string): "status" | "relative" | "datetime" | "link" | "duration" | "text" {
+export function suggestColumnFormat(
+  field: string,
+): "status" | "relative" | "datetime" | "link" | "duration" | "avatar" | "text" {
   const lower = field.toLowerCase();
   if (lower === "status" || lower === "state" || lower === "health") return "status";
   if (lower.endsWith("_at") || lower.includes("created") || lower.includes("updated")) return "relative";
+  // Avatar-like fields must be checked before the generic URL/link heuristic
+  // so `avatar_url` / `avatarUrl` / `image_url` land on the avatar renderer
+  // instead of the plain link one.
+  if (AVATAR_FIELD_NAMES.has(lower) || lower.endsWith("avatarurl") || lower.endsWith("_avatar_url")) {
+    return "avatar";
+  }
   if (lower === "url" || lower === "link" || lower === "href") return "link";
   // `durationMs` (and any `*Ms` numeric field) renders best with the duration
   // formatter, which turns ms counts into "5m 30s" style strings.
