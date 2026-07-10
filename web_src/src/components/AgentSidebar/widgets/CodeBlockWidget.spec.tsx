@@ -51,4 +51,13 @@ describe("CodeBlockWidget", () => {
 
     expect(editorMountSpy.mock.calls.length).toBe(initialMounts);
   });
+
+  it("opens the shared fullscreen dialog when expand is clicked", () => {
+    const { getByRole, getByText } = render(<CodeBlockWidget code="echo hello" language="bash" />);
+
+    fireEvent.click(getByRole("button", { name: "Expand code" }));
+
+    expect(getByText("BASH")).toBeInTheDocument();
+    expect(getByRole("button", { name: "Copy" })).toBeInTheDocument();
+  });
 });
