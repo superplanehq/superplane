@@ -50,7 +50,7 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 		return nil, status.Error(codes.NotFound, "Not found")
 	}
 
-	allowed, err := checkOrganizationPermission(ctx, a.auth, userID, organizationID, rule.Resource, rule.Action)
+	allowed, err := checkOrganizationRulePermission(ctx, a.auth, userID, organizationID, rule)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +94,28 @@ func withAuthorizedContext(ctx context.Context, pathParams map[string]string, or
 	ctx = context.WithValue(ctx, DomainTypeContextKey, models.DomainTypeOrganization)
 	ctx = context.WithValue(ctx, DomainIdContextKey, organizationID)
 	return ctx
+}
+
+func checkOrganizationRulePermission(
+	ctx context.Context,
+	auth organizationPermissionChecker,
+	userID string,
+	organizationID string,
+	rule AuthorizationRule,
+) (bool, error) {
+	allowed, err := checkOrganizationPermission(ctx, auth, userID, organizationID, rule.Resource, rule.Action)
+	if err != nil || allowed {
+		return allowed, err
+	}
+
+	for _, action := range rule.LegacyActions {
+		allowed, err = checkOrganizationPermission(ctx, auth, userID, organizationID, rule.Resource, action)
+		if err != nil || allowed {
+			return allowed, err
+		}
+	}
+
+	return false, nil
 }
 
 func firstHTTPHeader(r *http.Request, key string) string {

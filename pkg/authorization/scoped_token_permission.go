@@ -21,8 +21,9 @@ func hasRequiredScopedTokenPermissionForScopes(
 		return false
 	}
 
+	actions := allowedActions(rule)
 	for _, permission := range permissions {
-		if permission.ResourceType != rule.Resource || permission.Action != rule.Action {
+		if permission.ResourceType != rule.Resource || !slices.Contains(actions, permission.Action) {
 			continue
 		}
 
@@ -43,6 +44,10 @@ func hasRequiredScopedTokenPermissionForScopes(
 	}
 
 	return false
+}
+
+func allowedActions(rule AuthorizationRule) []string {
+	return append([]string{rule.Action}, rule.LegacyActions...)
 }
 
 func permissionsFromScopedTokenScopes(tokenScopesJSON string) ([]jwt.Permission, error) {
