@@ -1,16 +1,27 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Hash, Loader2 } from "lucide-react";
 
+import { Timestamp, type TimestampDisplay } from "@/components/Timestamp";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
 import { WidgetEmptyState } from "../WidgetEmptyState";
 import { CONSOLE_WIDGET_LABEL_CLASSES } from "../consoleTableStyles";
 
 import { aggregateNumber, aggregateNumberPerSource, applyFilters, combinePartials } from "./widgetData";
-import { formatValue } from "./widgetFormat";
+import { coerceWidgetTimestamp, formatValue } from "./widgetFormat";
 import { getValueAtPath } from "./fieldPath";
-import type { WidgetNumberRender } from "./types";
+import type { WidgetColumnFormat, WidgetNumberRender } from "./types";
 import type { MemoryNumberSource, WidgetNumberCombine } from "../panelTypes";
+
+const TIMESTAMP_NUMBER_FORMATS: Record<"date" | "datetime" | "relative", TimestampDisplay> = {
+  date: "date",
+  datetime: "datetime",
+  relative: "relative",
+};
+
+function isTimestampNumberFormat(format: WidgetColumnFormat | undefined): format is "date" | "datetime" | "relative" {
+  return format === "date" || format === "datetime" || format === "relative";
+}
 
 /**
  * Layout variant for the rendered number block.
@@ -90,33 +101,69 @@ interface NumberDisplayProps {
   variant: WidgetNumberVariant;
 }
 
+const VALUE_CLASS = "text-4xl font-medium text-slate-900 dark:text-gray-100";
+
+function renderValueNode(value: number, format: WidgetColumnFormat | undefined, formatted: string) {
+  if (isTimestampNumberFormat(format)) {
+    const date = coerceWidgetTimestamp(value);
+    if (date) {
+      return (
+        <Timestamp
+          date={date}
+          display={TIMESTAMP_NUMBER_FORMATS[format]}
+          relativeStyle="abbreviated"
+          includeAgo={false}
+          className={VALUE_CLASS}
+        />
+      );
+    }
+  }
+  return <span className={VALUE_CLASS}>{formatted}</span>;
+}
+
+function ValueBlock({
+  valueNode,
+  prefix,
+  suffix,
+  suffixClassName,
+}: {
+  valueNode: ReactNode;
+  prefix: string | undefined;
+  suffix: string | undefined;
+  suffixClassName: string;
+}) {
+  if (!prefix && !suffix) return <>{valueNode}</>;
+  return (
+    <div className="flex items-baseline gap-0.5">
+      {prefix ? <span className={VALUE_CLASS}>{prefix}</span> : null}
+      {valueNode}
+      {suffix ? <span className={suffixClassName}>{suffix}</span> : null}
+    </div>
+  );
+}
+
 function NumberDisplay({ render, value, sparkline, variant }: NumberDisplayProps) {
-  const formatted = value == null ? null : formatValue(value, render.format ?? "number");
+  const format = render.format;
+  const formatted = value == null ? null : formatValue(value, format ?? "number");
   const className =
     variant === "inline"
       ? "flex flex-col items-start justify-center gap-1 text-left"
       : "flex h-full flex-col items-start justify-center gap-1 p-4";
-  const valueClassName = "text-4xl font-medium text-slate-900 dark:text-gray-100";
   const suffixClassName =
     variant === "inline"
       ? "text-base font-semibold text-slate-900 dark:text-gray-100"
       : "text-xl font-semibold text-slate-900 dark:text-gray-100";
-  const hasSuffix = formatted != null && Boolean(render.suffix);
   const hasSparkline = sparkline != null && sparkline.length > 1;
   const valueBlock =
-    formatted == null ? (
-      <span className={valueClassName}>—</span>
-    ) : hasSuffix ? (
-      <div className="flex items-baseline gap-0.5">
-        {render.prefix ? <span className={valueClassName}>{render.prefix}</span> : null}
-        <span className={valueClassName}>{formatted}</span>
-        <span className={suffixClassName}>{render.suffix}</span>
-      </div>
+    formatted == null || value == null ? (
+      <span className={VALUE_CLASS}>—</span>
     ) : (
-      <span className={valueClassName}>
-        {render.prefix ?? ""}
-        {formatted}
-      </span>
+      <ValueBlock
+        valueNode={renderValueNode(value, format, formatted)}
+        prefix={render.prefix}
+        suffix={render.suffix}
+        suffixClassName={suffixClassName}
+      />
     );
   return (
     <div className={className} data-testid="widget-number">
