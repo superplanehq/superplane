@@ -359,7 +359,6 @@ export function AppPage() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
-  const liveCanvasVersionIdFromDescribe = liveCanvas?.metadata?.versionId;
   const {
     canvasLiveVersionsQuery,
     liveCanvasVersion,
@@ -370,7 +369,7 @@ export function AppPage() {
     liveCanvasVersionId,
     isLiveVersionLoading,
     effectiveLiveCanvasVersionId,
-  } = useLiveCanvasVersionCatalog(organizationId!, canvasId!, liveCanvasVersionIdFromDescribe, canvasLoading);
+  } = useLiveCanvasVersionCatalog(organizationId!, canvasId!, liveCanvas, canvasLoading);
   const refreshLatestLiveCanvasData = useRefreshLatestLiveCanvasData(
     organizationId,
     canvasId,

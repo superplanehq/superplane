@@ -1802,21 +1802,21 @@ export const useDiscardRepositoryFilePaths = (canvasId: string) => {
 export function useLiveCanvasVersionCatalog(
   organizationId: string,
   canvasId: string,
-  liveCanvasVersionIdFromDescribe: string | undefined,
+  liveCanvas: CanvasesCanvas | undefined,
   canvasLoading: boolean,
 ) {
-  const { data: committedLiveCanvasVersion, isLoading: committedLiveCanvasVersionLoading } = useCanvasVersion(
+  const liveCanvasVersionId = liveCanvas?.metadata?.versionId;
+  const { data: liveCanvasVersion, isLoading: liveCanvasVersionLoading } = useCanvasVersion(
     organizationId,
     canvasId,
-    liveCanvasVersionIdFromDescribe!,
-    !!liveCanvasVersionIdFromDescribe,
+    liveCanvasVersionId!,
+    !!liveCanvasVersionId,
   );
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId, canvasId, true);
   const paginatedVersions = useMemo(
     () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
     [canvasLiveVersionsQuery.data?.pages],
   );
-  const liveCanvasVersion = committedLiveCanvasVersion ?? paginatedVersions[0];
   const { visibleCanvasVersions, selectableVersionsById } = useMemo(() => {
     const versionMap = new Map<string, CanvasesCanvasVersion>();
     const candidates = liveCanvasVersion ? [liveCanvasVersion, ...paginatedVersions] : paginatedVersions;
@@ -1840,10 +1840,9 @@ export function useLiveCanvasVersionCatalog(
     liveVersions: useMemo(() => sortVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]),
     hasMoreLiveVersions: canvasLiveVersionsQuery.hasNextPage || false,
     isLoadingMoreLiveVersions: canvasLiveVersionsQuery.isFetchingNextPage,
-    liveCanvasVersionId: liveCanvasVersionIdFromDescribe ?? liveCanvasVersion?.metadata?.id,
-    isLiveVersionLoading: canvasLoading || committedLiveCanvasVersionLoading || canvasLiveVersionsQuery.isLoading,
-    effectiveLiveCanvasVersionId:
-      liveCanvasVersionIdFromDescribe ?? liveCanvasVersion?.metadata?.id ?? paginatedVersions[0]?.metadata?.id,
+    liveCanvasVersionId: liveCanvasVersion?.metadata?.id ?? liveCanvasVersionId,
+    isLiveVersionLoading: canvasLoading || (!!liveCanvasVersionId && liveCanvasVersionLoading),
+    effectiveLiveCanvasVersionId: liveCanvasVersion?.metadata?.id ?? liveCanvasVersionId,
   };
 }
 
