@@ -1,1 +1,2 @@
-export { Timestamp } from "./Timestamp";
+export { Timestamp, type TimestampDisplay } from "./Timestamp";
+export { TimestampDetails } from "./TimestampDetails";
