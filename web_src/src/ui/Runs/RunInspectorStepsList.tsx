@@ -15,6 +15,7 @@ export function RunInspectorStepsList({
   selectedValue,
   componentIconMap,
   organizationId,
+  canShowExpressionTemplates,
   onValueChange,
   onJumpToError,
   onRerun,
@@ -32,6 +33,7 @@ export function RunInspectorStepsList({
   selectedValue: string;
   componentIconMap: Record<string, string>;
   organizationId?: string;
+  canShowExpressionTemplates?: boolean;
   onValueChange: (value: string) => void;
   onJumpToError: (nodeId: string) => void;
   onRerun: () => void;
@@ -74,6 +76,7 @@ export function RunInspectorStepsList({
               section={section}
               componentIconMap={componentIconMap}
               organizationId={organizationId}
+              canShowExpressionTemplates={canShowExpressionTemplates}
               isOpen={selectedValue === section.nodeId}
               onRerun={onRerun}
               onEditNode={onEditNode}

@@ -8,7 +8,7 @@ import {
   type TriggersTrigger,
 } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
-import { useEventExecutions } from "@/hooks/useCanvasData";
+import { useCanvasVersion, useEventExecutions } from "@/hooks/useCanvasData";
 import { useMe } from "@/hooks/useMe";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
@@ -78,24 +78,32 @@ export function RunInspectorPanel({
   const resolvedCurrentUser = useMemo(() => resolveCurrentUser(currentUser, me, account), [account, currentUser, me]);
   const rootEventId = run.rootEvent?.id || null;
   const executionsQuery = useEventExecutions(canvasId, rootEventId);
+  const runVersionQuery = useCanvasVersion(organizationId ?? "", canvasId, run.versionId ?? "", Boolean(run.versionId));
   const executions = useMemo(() => executionsQuery.data?.executions || [], [executionsQuery.data?.executions]);
-  const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
+  const shouldUseRunVersion = Boolean(run.versionId);
+  const hasRunVersionSpec = shouldUseRunVersion && Boolean(runVersionQuery.data?.spec?.nodes);
+  const inspectorWorkflowNodes = useMemo(() => {
+    return shouldUseRunVersion ? (runVersionQuery.data?.spec?.nodes ?? []) : workflowNodes;
+  }, [runVersionQuery.data?.spec?.nodes, shouldUseRunVersion, workflowNodes]);
+  const inspectorWorkflowEdges = useMemo(() => {
+    return shouldUseRunVersion ? runVersionQuery.data?.spec?.edges : workflowEdges;
+  }, [runVersionQuery.data?.spec?.edges, shouldUseRunVersion, workflowEdges]);
+  const nodeMap = useMemo(() => buildNodeMap(inspectorWorkflowNodes), [inspectorWorkflowNodes]);
   const presentation = useMemo(() => buildRunPresentation(run, nodeMap), [nodeMap, run]);
   const sections = useMemo(
     () =>
       buildRunInspectorNodeSections({
         run,
         executions,
-        workflowNodes,
-        workflowEdges,
+        workflowNodes: inspectorWorkflowNodes,
+        workflowEdges: inspectorWorkflowEdges,
         componentDefinitions,
         triggerDefinitions,
       }),
-    [componentDefinitions, executions, run, triggerDefinitions, workflowEdges, workflowNodes],
+    [componentDefinitions, executions, run, triggerDefinitions, inspectorWorkflowEdges, inspectorWorkflowNodes],
   );
   const errorSummaries = useMemo(() => findRunInspectorErrorSummaries(sections), [sections]);
   const inspectorWidth = useResizableInspectorWidth();
-  const selectedValue = selectedNodeId ?? "";
   const [errorScrollRequest, setErrorScrollRequest] = useState<{ nodeId: string; requestId: number } | null>(null);
   const actions = useRunInspectorActions({
     canvasId,
@@ -153,9 +161,10 @@ export function RunInspectorPanel({
         status={presentation.status}
         sections={sections}
         isLoading={executionsQuery.isLoading}
-        selectedValue={selectedValue}
+        selectedValue={selectedNodeId ?? ""}
         componentIconMap={componentIconMap}
         organizationId={organizationId}
+        canShowExpressionTemplates={hasRunVersionSpec}
         onValueChange={handleValueChange}
         onJumpToError={jumpToErrorOutput}
         onRerun={actions.rerun}
