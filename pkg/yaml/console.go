@@ -649,6 +649,9 @@ func validateTablePanelContent(panel ConsolePanel) error {
 		if !ok || field == "" {
 			return fmt.Errorf("panel %q render.columns[%d].field must be a non-empty string", panel.ID, i)
 		}
+		if err := validateTableColumnTrend(panel.ID, i, column); err != nil {
+			return err
+		}
 	}
 	if err := validateTableWhere(panel.ID, render["where"]); err != nil {
 		return err
@@ -660,6 +663,30 @@ func validateTablePanelContent(panel ConsolePanel) error {
 		return err
 	}
 	return validateTableRowActions(panel.ID, render["rowActions"])
+}
+
+// allowedTrendBetter / allowedTrendDisplay must stay in lockstep with the
+// frontend `WIDGET_TREND_BETTER` / `WIDGET_TREND_DISPLAYS` enums in
+// `web_src/.../widget/types.ts`.
+var (
+	allowedTrendBetter  = []string{"up", "down"}
+	allowedTrendDisplay = []string{"percent", "value", "none"}
+)
+
+func validateTableColumnTrend(panelID string, index int, column map[string]any) error {
+	if raw, ok := column["trendBetter"]; ok && raw != nil {
+		s, isString := raw.(string)
+		if !isString || !slices.Contains(allowedTrendBetter, s) {
+			return fmt.Errorf("panel %q render.columns[%d].trendBetter must be one of %s", panelID, index, strings.Join(allowedTrendBetter, "/"))
+		}
+	}
+	if raw, ok := column["trendDisplay"]; ok && raw != nil {
+		s, isString := raw.(string)
+		if !isString || !slices.Contains(allowedTrendDisplay, s) {
+			return fmt.Errorf("panel %q render.columns[%d].trendDisplay must be one of %s", panelID, index, strings.Join(allowedTrendDisplay, "/"))
+		}
+	}
+	return nil
 }
 
 // allowedRowStyleTones must stay in lockstep with the frontend tone enum

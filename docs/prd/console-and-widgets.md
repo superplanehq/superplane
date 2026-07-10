@@ -231,11 +231,55 @@ Each column needs a non-empty `field`. Optional fields:
 | Field | Meaning |
 | --- | --- |
 | `label` | Header text. Falls back to `field`. |
-| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, `link`, or `avatar`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). `avatar` renders the resolved value as a circular avatar: direct image URLs are used as the image source, GitHub usernames (or author maps with a `username`) resolve to the GitHub avatar with the person's name in a tooltip, and values without a username fall back to an initials disc; blank values render as an em-dash. Use `avatarCommitterField` to supply a secondary person map for initials. |
+| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, `link`, `avatar`, or `trend`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). `avatar` renders the resolved value as a circular avatar: direct image URLs are used as the image source, GitHub usernames (or author maps with a `username`) resolve to the GitHub avatar with the person's name in a tooltip, and values without a username fall back to an initials disc; blank values render as an em-dash. Use `avatarCommitterField` to supply a secondary person map for initials. `trend` compares the row's numeric value against **the row directly below it** (after filter + sort) and renders a diagonal arrow colored by whether the change is "better" or "worse"; see the trend section below. |
 | `show` | Row expression controlling whether the cell is visible. |
 | `href` | Link template for `link` columns. Accepts `{{ cel }}` expressions and templates (e.g. `{{ prUrl }}` or `https://github.com/{{ org }}/pull/{{ prNumber }}`), legacy single-brace `{field}` placeholders, and bare static URLs. The column editor shows a dedicated href input with a field picker (values inserted as `{{ field }}`) when the format is `link`. |
+| `trendBetter` | For `format: trend`. `up` (default) treats an increase as better (green), `down` treats a decrease as better. |
+| `trendDisplay` | For `format: trend`. `percent` (default) prints a signed percent change, `value` prints a signed absolute delta, `none` renders arrow only. |
 
 Column fields can be direct paths such as `status` or expression templates where supported by the widget helpers.
+
+#### Trend columns
+
+`format: trend` turns a numeric column into a row-to-row comparison. The cell resolves the column's `field` (path or `{{ CEL }}`) on both the current row and the row directly below it, then renders one of the following:
+
+| Case | Cell |
+| --- | --- |
+| Both values finite and different | Diagonal arrow (`↗` up / `↘` down) in green when the change is "better" and red when "worse", plus the signed magnitude according to `trendDisplay`. |
+| Delta is exactly `0` | Gray `- 0` (no change). |
+| Current or previous value isn't a finite number | Gray `-` (incomparable). |
+| Percent mode with a previous value of `0` | Gray `-` (percent undefined). |
+| Last visible row while more data is still loading | Gray `...` (pending — the previous entry hasn't been fetched yet). |
+| Last row with no more data expected | Gray `- 0` (no baseline). |
+
+The tooltip always shows both the percent change and the absolute delta when both are meaningful (e.g. `+12.5% · +4`).
+
+Notes:
+
+- **"Previous" is always the row directly below** in the current filter + sort order, so authors control what "previous" means by choosing the sort. For chronological trends, sort by `createdAt`.
+- Percent math is `(current - previous) / |previous| * 100`, rounded to one decimal, capped at ±999% (values beyond the cap render as `>+999%` / `<-999%`).
+- `trend` cells never carry a link/href — combine with a separate `link` column when both are needed.
+
+Example — duration trend where a shorter run is a win:
+
+```yaml
+render:
+  kind: table
+  sort:
+    field: createdAt
+    order: desc
+  columns:
+    - field: name
+      label: Node
+    - field: durationMs
+      label: Duration
+      format: duration
+    - field: durationMs
+      label: Trend
+      format: trend
+      trendBetter: down
+      trendDisplay: percent
+```
 
 ### Structured Filters
 
