@@ -19,6 +19,7 @@ export function RunInspectorNodeAccordion({
   section,
   componentIconMap,
   organizationId,
+  canShowExpressionTemplates,
   isOpen,
   onRerun,
   rerunPending,
@@ -31,6 +32,7 @@ export function RunInspectorNodeAccordion({
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
   organizationId?: string;
+  canShowExpressionTemplates?: boolean;
   isOpen: boolean;
   onRerun: () => void;
   rerunPending: boolean;
@@ -108,6 +110,7 @@ export function RunInspectorNodeAccordion({
           section={section}
           componentIconMap={componentIconMap}
           organizationId={organizationId}
+          canShowExpressionTemplates={canShowExpressionTemplates}
           onEditNode={onEditNode}
           errorScrollRequestId={errorScrollRequestId}
           onErrorScrolled={onErrorScrolled}

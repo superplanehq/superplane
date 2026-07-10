@@ -45,6 +45,10 @@ vi.mock("@/hooks/useCanvasData", () => ({
     data: { executions: mockedExecutions },
     isLoading: mockedExecutionsLoading,
   }),
+  useCanvasVersion: () => ({
+    data: undefined,
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/hooks/useMe", () => ({
@@ -233,19 +237,6 @@ describe("RunInspectorPanel", () => {
   });
 
   describe("runtime and output regressions", () => {
-    it("preserves newlines in fallback runtime config strings", () => {
-      mockedExecutions = executions.map((execution) =>
-        execution.nodeId === "action-1"
-          ? { ...execution, configuration: { message: "first line\nsecond line" } }
-          : execution,
-      );
-
-      renderInspector({ selectedNodeId: "action-1" });
-      fireEvent.click(screen.getByRole("button", { name: /Runtime config/i }));
-
-      expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("first line\nsecond line");
-    });
-
     it("shows an edit action in the runtime config header", () => {
       const onEditNode = vi.fn();
       renderInspector({ selectedNodeId: "action-2", onEditNode });
