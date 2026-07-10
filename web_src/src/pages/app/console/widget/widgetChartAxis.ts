@@ -1,4 +1,4 @@
-import { formatValue } from "./widgetFormat";
+import { coerceWidgetTimestamp, formatValue } from "./widgetFormat";
 import type { WidgetChartSeries, WidgetColumnFormat } from "./types";
 
 type SeriesWithFormat = Pick<WidgetChartSeries, "format">;
@@ -42,21 +42,23 @@ export function formatXTooltipLabel(value: unknown, format: WidgetColumnFormat |
     const dateOnly = formatDateTimeAxisTick(value, "date");
     if (dateOnly) return dateOnly;
   }
-  if (parseTimestampMs(value) != null) {
+  if (coerceWidgetTimestamp(value) != null) {
     return formatDateTimeAxisTick(value, "datetime") ?? String(value);
   }
   return formatXAxisTick(value, format);
 }
 
 function isTimestampAxisBucket(value: unknown, format: WidgetColumnFormat | undefined): boolean {
-  if (parseTimestampMs(value) == null) return false;
+  if (coerceWidgetTimestamp(value) == null) return false;
   return !format || format === "datetime" || format === "date";
 }
 
+// Compact axis-only formats (kept locale-fixed so tick strings match
+// `Jul 6` / `May 26 4:10 PM` regardless of the viewer's locale — the hover
+// details block still reflects the user's local timezone).
 function formatDateTimeAxisTick(value: unknown, format: "datetime" | "date"): string | null {
-  const ms = parseTimestampMs(value);
-  if (ms == null) return null;
-  const date = new Date(ms);
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return null;
   if (format === "date") {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
@@ -67,17 +69,6 @@ function formatDateTimeAxisTick(value: unknown, format: "datetime" | "date"): st
     minute: "2-digit",
     hour12: true,
   });
-}
-
-function parseTimestampMs(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value > 1e12 ? value : value * 1000;
-  }
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return null;
 }
 
 /**
