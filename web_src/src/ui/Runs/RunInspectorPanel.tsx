@@ -8,7 +8,7 @@ import {
   type TriggersTrigger,
 } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
-import { useEventExecutions } from "@/hooks/useCanvasData";
+import { useCanvasVersion, useEventExecutions } from "@/hooks/useCanvasData";
 import { useMe } from "@/hooks/useMe";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
@@ -78,24 +78,33 @@ export function RunInspectorPanel({
   const resolvedCurrentUser = useMemo(() => resolveCurrentUser(currentUser, me, account), [account, currentUser, me]);
   const rootEventId = run.rootEvent?.id || null;
   const executionsQuery = useEventExecutions(canvasId, rootEventId);
+  const runVersionQuery = useCanvasVersion(organizationId ?? "", canvasId, run.versionId ?? "", Boolean(run.versionId));
   const executions = useMemo(() => executionsQuery.data?.executions || [], [executionsQuery.data?.executions]);
-  const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
+  const shouldUseRunVersion = Boolean(run.versionId);
+  const versionWorkflowNodes = runVersionQuery.data?.spec?.nodes;
+  const versionWorkflowEdges = runVersionQuery.data?.spec?.edges;
+  const hasRunVersionSpec = shouldUseRunVersion && hasWorkflowNodes(versionWorkflowNodes);
+  const inspectorWorkflowNodes = useMemo(
+    () => selectInspectorWorkflowNodes(shouldUseRunVersion, hasRunVersionSpec, versionWorkflowNodes, workflowNodes),
+    [hasRunVersionSpec, shouldUseRunVersion, versionWorkflowNodes, workflowNodes],
+  );
+  const inspectorWorkflowEdges = hasRunVersionSpec ? versionWorkflowEdges : workflowEdges;
+  const nodeMap = useMemo(() => buildNodeMap(inspectorWorkflowNodes), [inspectorWorkflowNodes]);
   const presentation = useMemo(() => buildRunPresentation(run, nodeMap), [nodeMap, run]);
   const sections = useMemo(
     () =>
       buildRunInspectorNodeSections({
         run,
         executions,
-        workflowNodes,
-        workflowEdges,
+        workflowNodes: inspectorWorkflowNodes,
+        workflowEdges: inspectorWorkflowEdges,
         componentDefinitions,
         triggerDefinitions,
       }),
-    [componentDefinitions, executions, run, triggerDefinitions, workflowEdges, workflowNodes],
+    [componentDefinitions, executions, run, triggerDefinitions, inspectorWorkflowEdges, inspectorWorkflowNodes],
   );
   const errorSummaries = useMemo(() => findRunInspectorErrorSummaries(sections), [sections]);
   const inspectorWidth = useResizableInspectorWidth();
-  const selectedValue = selectedNodeId ?? "";
   const [errorScrollRequest, setErrorScrollRequest] = useState<{ nodeId: string; requestId: number } | null>(null);
   const actions = useRunInspectorActions({
     canvasId,
@@ -106,11 +115,7 @@ export function RunInspectorPanel({
   });
 
   const handleValueChange = (value: string) => {
-    if (value) {
-      onSelectNode(value);
-      return;
-    }
-
+    if (value) return onSelectNode(value);
     onClearSelectedNode?.();
   };
 
@@ -153,9 +158,10 @@ export function RunInspectorPanel({
         status={presentation.status}
         sections={sections}
         isLoading={executionsQuery.isLoading}
-        selectedValue={selectedValue}
+        selectedValue={selectedNodeId ?? ""}
         componentIconMap={componentIconMap}
         organizationId={organizationId}
+        canShowExpressionTemplates={hasRunVersionSpec}
         onValueChange={handleValueChange}
         onJumpToError={jumpToErrorOutput}
         onRerun={actions.rerun}
@@ -168,6 +174,21 @@ export function RunInspectorPanel({
       />
     </aside>
   );
+}
+
+function selectInspectorWorkflowNodes(
+  shouldUseRunVersion: boolean,
+  hasRunVersionSpec: boolean,
+  versionWorkflowNodes: ComponentsNode[] | undefined,
+  workflowNodes: ComponentsNode[],
+): ComponentsNode[] {
+  if (!shouldUseRunVersion) return workflowNodes;
+  if (hasRunVersionSpec) return versionWorkflowNodes ?? [];
+  return workflowNodes.map((node) => ({ ...node, configuration: undefined }));
+}
+
+function hasWorkflowNodes(nodes: ComponentsNode[] | undefined): boolean {
+  return Boolean(nodes?.length);
 }
 
 function resolveCurrentUser(
