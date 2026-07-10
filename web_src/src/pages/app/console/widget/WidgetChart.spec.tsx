@@ -436,6 +436,31 @@ describe("WidgetChart axis formatting", () => {
     expect(labelFormatter?.("ec2", [])).toBe("ec2");
   });
 
+  it("keeps numeric category X values as labels when xFormat is unset", () => {
+    const { container } = renderChart(
+      { kind: "chart", type: "bar", xField: "code", series: [{ field: "count", label: "Count" }] },
+      {
+        rows: [
+          { code: "12", count: 1 },
+          { code: "200", count: 2 },
+          { code: "404", count: 3 },
+        ],
+      },
+    );
+    const ticks = tickTexts(container, "xAxis");
+    expect(ticks).toEqual(expect.arrayContaining(["12", "200", "404"]));
+    expect(ticks.every((text) => !/Jan|May|Jul/.test(text))).toBe(true);
+
+    tooltipContentProps.value = null as Record<string, unknown> | null;
+    renderChart(
+      { kind: "chart", type: "bar", xField: "code", series: [{ field: "count", label: "Count" }] },
+      { rows: [{ code: "404", count: 3 }] },
+    );
+    const props: Record<string, unknown> | null = tooltipContentProps.value;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
+    expect(labelFormatter?.("404", [])).toBe("404");
+  });
+
   it("formats Y-axis ticks with yFormat", () => {
     const { container } = renderChart(
       {

@@ -1,13 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentProps,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { useEffect, useMemo, type ComponentProps, type CSSProperties, type ReactNode } from "react";
 import { LineChart as LineChartIcon, Loader2 } from "lucide-react";
 import {
   Area,
@@ -49,13 +40,12 @@ import {
   formatYTick,
   resolveCartesianYFormat,
 } from "./widgetChartAxis";
+import { useInteractiveChartTooltip } from "./useInteractiveChartTooltip";
 import { coerceWidgetTimestamp } from "./widgetFormat";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries, WidgetColumnFormat } from "./types";
 
 const TIMESTAMP_X_FORMATS = new Set<WidgetColumnFormat>(["date", "datetime", "relative"]);
-
-/** Grace period to move from a chart point onto an interactive tooltip. */
-const TOOLTIP_INTERACT_GRACE_MS = 200;
+const TOOLTIP_WRAPPER_STYLE: CSSProperties = { transition: "none" };
 
 interface WidgetChartProps {
   render: WidgetChartRender;
@@ -185,78 +175,7 @@ const CHART_MARGIN = { top: 8, right: 8, left: 4, bottom: 0 } as const;
 // in from the chart origin (top-left) the first time it appears, which feels
 // confusing. We disable the wrapper transition and add a quick fade-in on the
 // content so the tooltip appears in place.
-const TOOLTIP_WRAPPER_STYLE: CSSProperties = { transition: "none" };
-// Timestamp tooltips host a CopyButton. Recharts defaults the wrapper to
-// `pointer-events: none`, which makes that control unreachable — override it
-// and keep the tooltip mounted briefly so the pointer can move onto it.
-const INTERACTIVE_TOOLTIP_WRAPPER_STYLE: CSSProperties = {
-  transition: "none",
-  pointerEvents: "auto",
-};
 const TOOLTIP_CONTENT_CLASS = "animate-in fade-in duration-150";
-
-/**
- * Keeps a Recharts tooltip interactive: enables pointer events and holds the
- * tooltip open long enough to move from the chart point onto CopyButton / etc.
- */
-function useInteractiveChartTooltip(enabled: boolean) {
-  const [forceActive, setForceActive] = useState(false);
-  const tooltipHoveredRef = useRef(false);
-  const wasActiveRef = useRef(false);
-  const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearGraceTimer = useCallback(() => {
-    if (graceTimerRef.current == null) return;
-    clearTimeout(graceTimerRef.current);
-    graceTimerRef.current = null;
-  }, []);
-
-  useEffect(() => () => clearGraceTimer(), [clearGraceTimer]);
-
-  const syncRechartsActive = useCallback(
-    (active: boolean) => {
-      if (!enabled) return;
-      if (active) {
-        clearGraceTimer();
-        wasActiveRef.current = true;
-        return;
-      }
-      if (!wasActiveRef.current) return;
-      wasActiveRef.current = false;
-      clearGraceTimer();
-      setForceActive(true);
-      graceTimerRef.current = setTimeout(() => {
-        graceTimerRef.current = null;
-        if (!tooltipHoveredRef.current) setForceActive(false);
-      }, TOOLTIP_INTERACT_GRACE_MS);
-    },
-    [enabled, clearGraceTimer],
-  );
-
-  const onTooltipEnter = useCallback(() => {
-    if (!enabled) return;
-    tooltipHoveredRef.current = true;
-    clearGraceTimer();
-    setForceActive(true);
-  }, [enabled, clearGraceTimer]);
-
-  const onTooltipLeave = useCallback(() => {
-    if (!enabled) return;
-    tooltipHoveredRef.current = false;
-    clearGraceTimer();
-    setForceActive(false);
-  }, [enabled, clearGraceTimer]);
-
-  return {
-    // `true` forces the tooltip to stay visible; `undefined` defers to Recharts.
-    activeProp: enabled && forceActive ? true : undefined,
-    forceContentActive: enabled && forceActive,
-    syncRechartsActive,
-    onTooltipEnter,
-    onTooltipLeave,
-    wrapperStyle: enabled ? INTERACTIVE_TOOLTIP_WRAPPER_STYLE : TOOLTIP_WRAPPER_STYLE,
-  };
-}
 
 /** Bridges Recharts' `active` flag into the interactive-tooltip hook without doing work in render. */
 function RechartsActiveBridge({
