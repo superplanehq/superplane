@@ -27,8 +27,6 @@ func TestTextPrompt_Configuration(t *testing.T) {
 		"model":         {true, string(configuration.FieldTypeIntegrationResource)},
 		"prompt":        {true, string(configuration.FieldTypeText)},
 		"systemMessage": {false, string(configuration.FieldTypeText)},
-		"maxTokens":     {false, string(configuration.FieldTypeNumber)},
-		"temperature":   {false, string(configuration.FieldTypeNumber)},
 		"files":         {false, string(configuration.FieldTypeList)},
 		"outputSchema":  {false, string(configuration.FieldTypeText)},
 	}
@@ -171,9 +169,7 @@ func TestTextPrompt_Execute(t *testing.T) {
 			config: map[string]interface{}{
 				"model":         "claude-3-test",
 				"prompt":        "Say hello",
-				"maxTokens":     500,
 				"systemMessage": "You are a bot",
-				"temperature":   0.7,
 			},
 			responseStatus: 200,
 			responseBody:   validResponseJSON,
@@ -274,7 +270,7 @@ func TestTextPrompt_Execute(t *testing.T) {
 					var sent CreateMessageRequest
 					if err := json.Unmarshal(bodyBytes, &sent); err != nil {
 						t.Errorf("failed to unmarshal sent body: %v", err)
-					} else if sent.Model != "claude-3-test" || sent.MaxTokens != 500 || sent.System != "You are a bot" {
+					} else if sent.Model != "claude-3-test" || sent.MaxTokens != defaultMaxTokens || sent.System != "You are a bot" {
 						t.Errorf("request body mismatch: model=%s max_tokens=%d system=%s", sent.Model, sent.MaxTokens, sent.System)
 					}
 				}
@@ -536,7 +532,6 @@ func TestTextPrompt_NodeMetadata(t *testing.T) {
 		Configuration: map[string]any{
 			"model":        "claude-3-test",
 			"prompt":       "hi",
-			"maxTokens":    500,
 			"outputSchema": `{"type":"object","properties":{"x":{"type":"string"}},"required":["x"]}`,
 		},
 		Metadata: md,
@@ -552,9 +547,6 @@ func TestTextPrompt_NodeMetadata(t *testing.T) {
 	}
 	if meta.Model != "claude-3-test" {
 		t.Errorf("expected model claude-3-test, got %q", meta.Model)
-	}
-	if meta.MaxTokens != 500 {
-		t.Errorf("expected maxTokens 500, got %d", meta.MaxTokens)
 	}
 	if !meta.StructuredOutput {
 		t.Error("expected structuredOutput true")

@@ -2,8 +2,12 @@ package discord
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,7 +48,64 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 			Configuration: map[string]any{"channel": "123456789"},
 		})
 
-		require.ErrorContains(t, err, "either content or embed")
+		require.ErrorContains(t, err, "either content, embed (title/description), or files is required")
+	})
+
+	t.Run("only empty file entries -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"botToken": "test-token"},
+			},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"channel": "123456789", "files": []any{"", ""}},
+		})
+
+		require.ErrorContains(t, err, "either content, embed (title/description), or files is required")
+	})
+
+	t.Run("too many files -> error", func(t *testing.T) {
+		files := make([]any, 11)
+		for i := range files {
+			files[i] = fmt.Sprintf("https://example.com/file-%d.png", i)
+		}
+
+		err := component.Setup(core.SetupContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"botToken": "test-token"},
+			},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"channel": "123456789", "files": files},
+		})
+
+		require.ErrorContains(t, err, "at most 10 files")
+	})
+
+	t.Run("invalid file URL -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"botToken": "test-token"},
+			},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"channel": "123456789", "files": []any{"ftp://example.com/file.png"}},
+		})
+
+		require.ErrorContains(t, err, "must be an http(s) URL")
+	})
+
+	t.Run("unresolved expression file URL is allowed", func(t *testing.T) {
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, `{"id":"123456789","name":"general","type":0}`), nil
+		})
+
+		err := component.Setup(core.SetupContext{
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"botToken": "test-token"},
+			},
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"channel": "123456789", "files": []any{"{{ nodes.download.outputs.url }}"}},
+		})
+
+		require.NoError(t, err)
 	})
 
 	t.Run("invalid embed color -> error", func(t *testing.T) {
@@ -173,6 +234,117 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		data := payload["data"].(map[string]any)
 		assert.Equal(t, "1234567890", data["id"])
 		assert.Equal(t, "Hello, Discord!", data["content"])
+	})
+
+	t.Run("message with file URL -> fetches and uploads as attachment", func(t *testing.T) {
+		// The artifact link is fetched through the workflow HTTP context (SSRF
+		// policy applies); only the Discord upload uses the bot transport.
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("png-bytes")),
+				},
+			},
+		}
+
+		withDefaultTransport(t, func(req *http.Request) (*http.Response, error) {
+			// Multipart message upload to Discord.
+			assert.Contains(t, req.URL.String(), "/channels/123456789/messages")
+			assert.Equal(t, "Bot test-bot-token", req.Header.Get("Authorization"))
+			mediaType, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+			require.NoError(t, err)
+			assert.Equal(t, "multipart/form-data", mediaType)
+
+			reader := multipart.NewReader(req.Body, params["boundary"])
+			form, err := reader.ReadForm(1 << 20)
+			require.NoError(t, err)
+
+			require.Len(t, form.Value["payload_json"], 1)
+			var payload CreateMessageRequest
+			require.NoError(t, json.Unmarshal([]byte(form.Value["payload_json"][0]), &payload))
+			assert.Equal(t, "Here is the artifact", payload.Content)
+
+			require.Len(t, form.File["files[0]"], 1)
+			assert.Equal(t, "screenshot.png", form.File["files[0]"][0].Filename)
+
+			return jsonResponse(http.StatusOK, `{
+				"id": "1234567890",
+				"type": 0,
+				"content": "Here is the artifact",
+				"channel_id": "123456789",
+				"author": {"id": "999888777", "username": "TestBot", "bot": true},
+				"timestamp": "2025-01-16T12:00:00.000Z"
+			}`), nil
+		})
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"botToken": "test-bot-token"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+			HTTP:           httpContext,
+			Configuration: map[string]any{
+				"channel": "123456789",
+				"content": "Here is the artifact",
+				"files":   []any{"https://artifacts.example.com/agents/abc/artifacts/screenshot.png?sig=xyz"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "discord.message.sent", execState.Type)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "artifacts.example.com", httpContext.Requests[0].URL.Host)
+	})
+
+	t.Run("file fetch failure -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader("{}")),
+				},
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"botToken": "test-bot-token"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+			HTTP:           httpContext,
+			Configuration: map[string]any{
+				"channel": "123456789",
+				"files":   []any{"https://artifacts.example.com/missing.png"},
+			},
+		})
+
+		require.ErrorContains(t, err, "failed to fetch file")
+	})
+
+	t.Run("all file entries empty at execution with no content -> error", func(t *testing.T) {
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"botToken": "test-bot-token"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+			HTTP:           &contexts.HTTPContext{},
+			Configuration: map[string]any{
+				"channel": "123456789",
+				"files":   []any{""},
+			},
+		})
+
+		require.ErrorContains(t, err, "nothing to send")
 	})
 
 	t.Run("message with embed -> sends correctly", func(t *testing.T) {
