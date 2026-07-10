@@ -67,10 +67,28 @@ export function useMemoryCatalog(canvasId: string | undefined, namespace?: strin
   };
 }
 
-export function suggestColumnFormat(field: string): "status" | "relative" | "datetime" | "link" | "duration" | "text" {
+export function suggestColumnFormat(
+  field: string,
+): "status" | "relative" | "datetime" | "link" | "duration" | "avatar" | "text" {
   const lower = field.toLowerCase();
   if (lower === "status" || lower === "state" || lower === "health") return "status";
   if (lower.endsWith("_at") || lower.includes("created") || lower.includes("updated")) return "relative";
+  // Avatar-like fields must be checked before the generic URL/link heuristic
+  // so `avatar_url` / `avatarUrl` / `image_url` land on the avatar renderer
+  // instead of the plain link one.
+  if (
+    lower === "avatar" ||
+    lower === "avatarurl" ||
+    lower === "avatar_url" ||
+    lower === "imageurl" ||
+    lower === "image_url" ||
+    lower === "photourl" ||
+    lower === "photo_url" ||
+    lower.endsWith("avatarurl") ||
+    lower.endsWith("_avatar_url")
+  ) {
+    return "avatar";
+  }
   if (lower === "url" || lower === "link" || lower === "href") return "link";
   // `durationMs` (and any `*Ms` numeric field) renders best with the duration
   // formatter, which turns ms counts into "5m 30s" style strings.

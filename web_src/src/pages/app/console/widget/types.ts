@@ -34,7 +34,8 @@ export type WidgetColumnFormat =
   | "status"
   | "badge"
   | "code"
-  | "link";
+  | "link"
+  | "avatar";
 
 export interface WidgetTableColumn {
   field: string;
