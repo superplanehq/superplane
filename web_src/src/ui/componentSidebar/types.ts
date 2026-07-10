@@ -14,6 +14,8 @@ export interface SidebarEvent {
   originalExecution?: CanvasesCanvasNodeExecution;
 
   // Optional specific identifiers to avoid overloading `id`
+  // Present when the API can identify the run directly without ListRuns lookup.
+  runId?: string;
   // Present for execution items
   executionId?: string;
   nodeId?: string;
