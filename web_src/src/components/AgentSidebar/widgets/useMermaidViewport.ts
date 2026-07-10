@@ -30,6 +30,13 @@ export function useMermaidFitToViewport({
   scaleRef: MutableRefObject<number>;
   fitScaleRef: MutableRefObject<number>;
 }) {
+  // Keep callbacks in refs so fitToViewport stays stable across parent re-renders
+  // (e.g. zoom/pan). Otherwise useLayoutEffect would re-fit and wipe user scale.
+  const onScaleChangeRef = useRef(onScaleChange);
+  const onFitScaleChangeRef = useRef(onFitScaleChange);
+  onScaleChangeRef.current = onScaleChange;
+  onFitScaleChangeRef.current = onFitScaleChange;
+
   const fitToViewport = useCallback(() => {
     const viewport = viewportRef.current;
     const svgEl = contentRef.current?.querySelector("svg");
@@ -47,9 +54,9 @@ export function useMermaidFitToViewport({
     const bounds = readSvgSize(svgEl);
     const nextFit = computeFitScale(viewportWidth, viewportHeight, bounds.width, bounds.height);
     fitScaleRef.current = nextFit;
-    onFitScaleChange(nextFit);
-    onScaleChange(nextFit);
-  }, [contentRef, fitScaleRef, onFitScaleChange, onScaleChange, viewportRef]);
+    onFitScaleChangeRef.current(nextFit);
+    onScaleChangeRef.current(nextFit);
+  }, [contentRef, fitScaleRef, viewportRef]);
 
   useEffect(() => {
     fitToViewportRef.current = fitToViewport;

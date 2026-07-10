@@ -183,14 +183,19 @@ function MermaidPanZoom({
 
   const { translate, resetPan, handleMouseDown, handleMouseMove, handleMouseUp } = useMermaidPan();
 
+  const applyFitScale = useCallback(
+    (next: number) => {
+      resetPan();
+      onScaleChange(next);
+    },
+    [onScaleChange, resetPan],
+  );
+
   useMermaidFitToViewport({
     viewportRef,
     contentRef,
     svg,
-    onScaleChange: (next) => {
-      resetPan();
-      onScaleChange(next);
-    },
+    onScaleChange: applyFitScale,
     onFitScaleChange,
     fitToViewportRef,
     scaleRef,
