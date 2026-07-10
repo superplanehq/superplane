@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Batch Message" href="#create-batch-message" description="Sends many prompts to Claude in a single Message Batches request, at lower cost than individual calls" />
   <LinkCard title="Get Daily Usage" href="#get-daily-usage" description="Fetches daily Messages and Claude Code usage metrics from Anthropic's Admin API." />
   <LinkCard title="Run Claude Agent" href="#run-claude-agent" description="Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated." />
   <LinkCard title="Run Code Agent" href="#run-code-agent" description="Runs an autonomous Claude coding agent against a repository in Anthropic's managed sandbox and opens (or updates) a pull request." />
@@ -18,6 +19,98 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
+
+<a id="create-batch-message"></a>
+
+## Create Batch Message
+
+**Component key:** `claude.createBatchMessage`
+
+The Create Batch Message component uses [Anthropic's Message Batches API](https://platform.claude.com/docs/en/build-with-claude/batch-processing) to run one or more prompts over an array of inputs in a single batch, at a lower cost than issuing them individually.
+
+Every batch is built from a matrix: an array of **Items** (the N data points, e.g. a list of pull requests) crossed with one or more prompts. **Mode** controls whether that's a single prompt (1 x N) or several (M x N).
+
+### Use Cases
+
+- **Update the same kind of resource, one at a time or many at once**: pass a one-element array to update a single pull request, or the full list to update every open one, with the same node.
+- **Multiple derived outputs per item**: generate a title suggestion, a description suggestion, and a risk assessment for every pull request in one batch (Multiple Prompts mode).
+- **Bulk classification or extraction**: run the same prompt over many inputs at once, at a lower cost than individual requests.
+
+### How It Works
+
+1. Evaluates **Items** to an array, then builds one request per item (Single Prompt) or one request per (prompt, item) pair (Multiple Prompts).
+2. Submits them as a single batch and polls it until it ends.
+3. Emits **Results**: one entry per element of Items, in the same order.
+
+Batches typically complete within an hour, but can take up to 24 hours. This component polls with increasing backoff and keeps the execution open (without emitting) until the batch ends.
+
+### Configuration
+
+- **Items**: An expression evaluating to the array to run over, e.g. `$['List Open Pull Requests'].body`. Use a one-element array to run over a single item.
+- **Model**: The Claude model used for every request.
+- **System Message**: (Optional) Context applied to every request.
+- **Mode**: Whether one prompt or several are applied to each item.
+  - **Single Prompt**: one prompt, applied to every element of Items.
+  - **Multiple Prompts**: several prompts, each applied to every element of Items.
+- **Prompt** (Single Prompt mode): The prompt sent for every item. Plain text is sent verbatim; use `{{ item }}` and `{{ index }}` to reference the current item and its position, e.g. `Suggest a title for PR #{{ item.number }}: {{ item.body }}`.
+- **Prompts** (Multiple Prompts mode): A short list of prompts (each with an **ID** and its own text, using `{{ item }}`/`{{ index }}` the same way). Each one is sent for every element of Items.
+- **Structured Output**: (Optional) A JSON Schema every response must conform to.
+
+### Output
+
+Emits a single payload once the batch ends, containing:
+- **status**: `ended`, `timeout`, or `error`.
+- **batchId**: The Anthropic batch ID.
+- **requestCounts**: How many requests succeeded, errored, were canceled, or expired.
+- **results**: One entry per element of Items, in order (`results[i]` corresponds to the i-th item). In Single Prompt mode each entry has its own `text`/`parsed`/etc. directly; in Multiple Prompts mode each entry has a `prompts` object keyed by prompt ID, e.g. `results[i].prompts.title.text`.
+
+### Notes
+
+- Requires a valid Claude API key configured in the integration.
+- A batch can contain up to 1000 requests (prompts x items, in Multiple Prompts mode).
+- Cancelling the workflow execution requests cancellation of the batch on Anthropic's side; requests already completed are unaffected.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "batchId": "msgbatch_01HkcTjaV5uDC8jWR4ZsqFqz",
+    "requestCounts": {
+      "canceled": 0,
+      "errored": 0,
+      "expired": 0,
+      "processing": 0,
+      "succeeded": 2
+    },
+    "results": [
+      {
+        "index": 0,
+        "stopReason": "end_turn",
+        "text": "Paris is the capital of France.",
+        "type": "succeeded",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 9
+        }
+      },
+      {
+        "index": 1,
+        "stopReason": "end_turn",
+        "text": "Berlin is the capital of Germany.",
+        "type": "succeeded",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 9
+        }
+      }
+    ],
+    "status": "ended"
+  },
+  "timestamp": "2026-07-07T12:00:00Z",
+  "type": "claude.createBatchMessage.result"
+}
+```
 
 <a id="get-daily-usage"></a>
 
@@ -230,13 +323,11 @@ The Text Prompt component uses Anthropic's Claude models to generate text respon
 
 ### Configuration
 
-- **Model**: The Claude model to use (e.g., claude-3-5-sonnet-latest).
-- **Prompt**: The main user message/instruction.
+- **Model**: The Claude model to use.
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
-- **Max Tokens**: (Optional) Limit the length of the generated response.
-- **Temperature**: (Optional) Control randomness (0.0 to 1.0).
-- **Files**: (Optional) Attach files from the Files tab (images, PDFs, or text). They are uploaded to the Files API and sent alongside the prompt.
-- **Structured Output**: (Optional) Provide a JSON Schema for the response. Claude is constrained to return JSON matching it, available on the parsed output. The schema is validated before the request; every object is sent with additionalProperties:false.
+- **Prompt**: The main user message or instruction.
+- **Files**: (Optional) Files from the Files tab (images, PDFs, or text) to attach alongside the prompt.
+- **Structured Output**: (Optional) A JSON Schema the response must match, available on the parsed output.
 
 ### Output
 
