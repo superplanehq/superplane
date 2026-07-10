@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { jsonViewClassName } from "@/lib/jsonViewTheme";
 import { AccordionContent, AccordionItem } from "@/ui/accordion";
+import { escapeJsonStringValue } from "./runInspectorJson";
 import type { InternalAccordionKey, StatusPill } from "./RunInspectorTimelineTypes";
 
 export function TimelineAccordionCard({
@@ -18,6 +19,7 @@ export function TimelineAccordionCard({
   trailing,
   actionPayload,
   jsonViewStyle,
+  errorOutputNodeId,
   children,
 }: {
   value: InternalAccordionKey;
@@ -28,6 +30,7 @@ export function TimelineAccordionCard({
   trailing?: ReactNode;
   actionPayload?: unknown;
   jsonViewStyle: CSSProperties;
+  errorOutputNodeId?: string;
   children: ReactNode;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -85,7 +88,9 @@ export function TimelineAccordionCard({
             <ChevronDown className="h-4 w-4 transition-transform duration-200" />
           </AccordionPrimitive.Trigger>
         </AccordionPrimitive.Header>
-        <AccordionContent className="px-3 py-2.5">{children}</AccordionContent>
+        <AccordionContent className="px-3 py-2.5">
+          <div data-run-error-output-node-id={errorOutputNodeId}>{children}</div>
+        </AccordionContent>
       </AccordionItem>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
@@ -171,7 +176,23 @@ export function JsonPayload({
       className={jsonViewClassName}
       displayObjectSize={false}
       enableClipboard={false}
-    />
+    >
+      <JsonView.String
+        render={({ children, ...props }, { type, value: stringValue }) => {
+          if (type !== "value") return undefined;
+
+          const displayValue = typeof children === "string" ? children : String(stringValue ?? "");
+
+          return (
+            <>
+              <JsonView.ValueQuote />
+              <span {...props}>{escapeJsonStringValue(displayValue)}</span>
+              <JsonView.ValueQuote />
+            </>
+          );
+        }}
+      />
+    </JsonView>
   );
 }
 
