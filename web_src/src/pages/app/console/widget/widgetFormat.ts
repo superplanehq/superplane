@@ -3,12 +3,18 @@ import { formatAbsolute, formatDate as formatDateOnly } from "@/lib/datetime";
 
 import type { WidgetColumnFormat } from "./types";
 
+/** Pure digit / decimal strings (epoch candidates); excludes ISO and other date text. */
+const PURE_NUMERIC_RE = /^\d+(\.\d+)?$/;
+
 /**
  * Coerce a widget cell value into a `Date`. Accepts ISO strings, `Date`
- * instances, and epoch seconds/milliseconds — including numeric strings
- * like `"1717390000"` that JSON/CEL often emit (using the shared `>= 1e12`
- * heuristic to disambiguate). Returns `null` for anything that can't be
+ * instances, and plausible epoch seconds/milliseconds — including numeric
+ * strings like `"1717390000"` that JSON/CEL often emit (using `>= 1e12` to
+ * disambiguate ms vs seconds). Returns `null` for anything that can't be
  * parsed, so callers can fall back to the raw string.
+ *
+ * Short digit strings / small numbers (`"404"`, `12`) are rejected so status
+ * codes and categories never become early-1970 or year-404 dates.
  *
  * Shared by widget formatters and CEL builtins (`formatDate`, `epochMs`) so
  * timestamp parsing stays consistent across the console package.
@@ -21,20 +27,30 @@ export function coerceWidgetTimestamp(value: unknown): Date | null {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed === "") return null;
+    // Skip Date.parse for pure digits — it treats values like "404" as years.
+    if (PURE_NUMERIC_RE.test(trimmed)) {
+      return dateFromEpochNumber(Number(trimmed));
+    }
     const parsed = Date.parse(trimmed);
     if (Number.isFinite(parsed)) return new Date(parsed);
-    // Date.parse rejects pure epoch digit strings; fall through to Number.
-    return dateFromEpochNumber(Number(trimmed));
+    return null;
   }
   return dateFromEpochNumber(typeof value === "number" ? value : Number(value));
 }
 
 function dateFromEpochNumber(n: number): Date | null {
-  if (!Number.isFinite(n)) return null;
-  // Match CEL / historical widget heuristic: values >= 1e12 are milliseconds.
+  if (!isPlausibleEpochNumber(n)) return null;
+  // Values >= 1e12 are milliseconds; otherwise treat as seconds.
   const ms = n >= 1e12 ? n : n * 1000;
   const date = new Date(ms);
   return Number.isFinite(date.getTime()) ? date : null;
+}
+
+/** Epoch seconds (~1e9–1e10) or milliseconds (~1e12–1e13); not status codes / hours. */
+export function isPlausibleEpochNumber(n: number): boolean {
+  if (!Number.isFinite(n)) return false;
+  const abs = Math.abs(n);
+  return (abs >= 1e9 && abs < 1e11) || (abs >= 1e12 && abs < 1e14);
 }
 
 /**

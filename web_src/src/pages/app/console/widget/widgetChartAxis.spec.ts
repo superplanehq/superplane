@@ -26,4 +26,10 @@ describe("widgetChartAxis timestamp auto-detect", () => {
     expect(formatXTooltipLabel(seconds, "datetime")).toMatch(/May/);
     expect(formatXTooltipLabel(seconds, "datetime")).toMatch(/\d/);
   });
+
+  it("keeps categorical digit strings as labels even with explicit date xFormat", () => {
+    expect(formatXAxisTick("404", "date")).toBe("404");
+    expect(formatXTooltipLabel("404", "datetime")).toBe("404");
+    expect(formatXAxisTick(12, "date")).toBe("12");
+  });
 });

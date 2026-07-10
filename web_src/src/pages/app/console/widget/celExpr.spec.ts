@@ -114,6 +114,8 @@ describe("celExpr", () => {
       expect(evalExpr(compileExpr('formatDate(bad, "MM/dd")'), { bad: "not a date" }, env)).toBe("");
       expect(evalExpr(compileExpr('formatDate(value, "")'), { value: "2026-03-15T00:00:00Z" }, env)).toBe("");
       expect(evalExpr(compileExpr('formatDate(value, "MM/dd")'), { value: null }, env)).toBe("");
+      expect(evalExpr(compileExpr('formatDate(code, "MM/dd")'), { code: "404" }, env)).toBe("");
+      expect(evalExpr(compileExpr('formatDate(code, "MM/dd")'), { code: 404 }, env)).toBe("");
     });
 
     it("preserves non-token characters in the pattern", () => {

@@ -95,6 +95,15 @@ describe("coerceWidgetTimestamp", () => {
     expect(coerceWidgetTimestamp(String(seconds))?.getTime()).toBe(seconds * 1000);
     expect(coerceWidgetTimestamp(`  ${seconds}  `)?.getTime()).toBe(seconds * 1000);
   });
+
+  it("rejects short digit strings and small numbers that are not plausible epochs", () => {
+    for (const value of ["12", "200", "404", "9999", 12, 200, 404, 9999]) {
+      expect(coerceWidgetTimestamp(value)).toBeNull();
+    }
+    expect(formatValue("404", "date")).toBe("404");
+    expect(formatValue(404, "datetime")).toBe("404");
+    expect(formatValue("12", "relative")).toBe("12");
+  });
 });
 
 describe("formatValue duration", () => {
