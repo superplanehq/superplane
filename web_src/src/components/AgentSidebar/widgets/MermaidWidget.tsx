@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import mermaid from "mermaid";
 
 import { FullscreenContentDialog } from "@/ui/FullscreenContentDialog";
 import { HeaderIconButton } from "@/ui/HeaderIconButton";
+import { useMermaidFitToViewport, useMermaidPan } from "./useMermaidViewport";
 
 mermaid.initialize({
   startOnLoad: false,
@@ -176,78 +177,25 @@ function MermaidPanZoom({
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [translate, setTranslate] = useState({ x: 0, y: 0 });
-  const dragRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
   const scaleRef = useRef(scale);
   const fitScaleRef = useRef(1);
   scaleRef.current = scale;
 
-  const fitToViewport = useCallback(() => {
-    const viewport = viewportRef.current;
-    const content = contentRef.current;
-    const svgEl = content?.querySelector("svg");
-    if (!viewport || !svgEl) {
-      return;
-    }
+  const { translate, resetPan, handleMouseDown, handleMouseMove, handleMouseUp } = useMermaidPan();
 
-    // Mermaid emits `max-width: 100%` which shrinks the SVG to its parent
-    // before we apply transform scale — clear that so fit math uses the
-    // diagram's intrinsic size and can fill the dialog.
-    normalizeSvgForViewport(svgEl);
-
-    const padding = 48;
-    const viewportWidth = Math.max(viewport.clientWidth - padding, 1);
-    const viewportHeight = Math.max(viewport.clientHeight - padding, 1);
-    const bounds = readSvgSize(svgEl);
-    if (bounds.width <= 0 || bounds.height <= 0) {
-      return;
-    }
-
-    // Fill the viewport (scale up or down). Cap only to stay within the
-    // interactive zoom range — do not keep diagrams artificially small.
-    const nextFit = Math.min(viewportWidth / bounds.width, viewportHeight / bounds.height, 5);
-    fitScaleRef.current = nextFit;
-    onFitScaleChange(nextFit);
-    onScaleChange(nextFit);
-    setTranslate({ x: 0, y: 0 });
-  }, [onFitScaleChange, onScaleChange]);
-
-  useEffect(() => {
-    fitToViewportRef.current = fitToViewport;
-    return () => {
-      fitToViewportRef.current = null;
-    };
-  }, [fitToViewport, fitToViewportRef]);
-
-  useLayoutEffect(() => {
-    fitToViewport();
-  }, [fitToViewport, svg]);
-
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport || typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    // Re-fit when the dialog viewport size changes, but only while the user is
-    // still at the fitted scale so intentional zoom/pan is preserved.
-    let lastWidth = viewport.clientWidth;
-    let lastHeight = viewport.clientHeight;
-    const observer = new ResizeObserver(() => {
-      const width = viewport.clientWidth;
-      const height = viewport.clientHeight;
-      if (width === lastWidth && height === lastHeight) {
-        return;
-      }
-      lastWidth = width;
-      lastHeight = height;
-      if (Math.abs(scaleRef.current - fitScaleRef.current) < 0.01) {
-        fitToViewport();
-      }
-    });
-    observer.observe(viewport);
-    return () => observer.disconnect();
-  }, [fitToViewport]);
+  useMermaidFitToViewport({
+    viewportRef,
+    contentRef,
+    svg,
+    onScaleChange: (next) => {
+      resetPan();
+      onScaleChange(next);
+    },
+    onFitScaleChange,
+    fitToViewportRef,
+    scaleRef,
+    fitScaleRef,
+  });
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -257,31 +205,6 @@ function MermaidPanZoom({
     },
     [onScaleChange],
   );
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      dragRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        startTx: translate.x,
-        startTy: translate.y,
-      };
-    },
-    [translate],
-  );
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragRef.current) return;
-    setTranslate({
-      x: dragRef.current.startTx + (e.clientX - dragRef.current.startX),
-      y: dragRef.current.startTy + (e.clientY - dragRef.current.startY),
-    });
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    dragRef.current = null;
-  }, []);
 
   return (
     <div
@@ -304,42 +227,4 @@ function MermaidPanZoom({
       </div>
     </div>
   );
-}
-
-function normalizeSvgForViewport(svgEl: SVGSVGElement) {
-  svgEl.style.maxWidth = "none";
-  svgEl.style.height = "auto";
-
-  const bounds = readSvgSize(svgEl);
-  if (bounds.width > 0) {
-    svgEl.setAttribute("width", String(bounds.width));
-  }
-  if (bounds.height > 0) {
-    svgEl.setAttribute("height", String(bounds.height));
-  }
-}
-
-function readSvgSize(svgEl: SVGSVGElement): { width: number; height: number } {
-  const viewBox = svgEl.viewBox?.baseVal;
-  if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
-    return { width: viewBox.width, height: viewBox.height };
-  }
-
-  try {
-    const bbox = svgEl.getBBox();
-    if (bbox.width > 0 && bbox.height > 0) {
-      return { width: bbox.width, height: bbox.height };
-    }
-  } catch {
-    // getBBox can throw if the SVG is not rendered yet.
-  }
-
-  const widthAttr = svgEl.getAttribute("width");
-  const heightAttr = svgEl.getAttribute("height");
-  const width = widthAttr && !widthAttr.endsWith("%") ? Number.parseFloat(widthAttr) : NaN;
-  const height = heightAttr && !heightAttr.endsWith("%") ? Number.parseFloat(heightAttr) : NaN;
-  return {
-    width: Number.isFinite(width) && width > 0 ? width : svgEl.clientWidth,
-    height: Number.isFinite(height) && height > 0 ? height : svgEl.clientHeight,
-  };
 }
