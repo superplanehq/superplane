@@ -50,7 +50,7 @@ func (c *CreateDeploymentStatus) Documentation() string {
 ## Configuration
 
 - **Project** (required): The GitLab project containing the deployment
-- **Deployment ID** (required): The ID of the deployment to update. Supports expressions, e.g. ` + "`{{ $['Create Deployment'].id }}`" + `
+- **Deployment ID** (required): The ID of the deployment to update. Supports expressions, e.g. ` + "`{{ $['Create Deployment'].data.id }}`" + `
 - **Status** (required): The new deployment status (running, success, failed, canceled)
 
 ## Output
@@ -103,7 +103,7 @@ func (c *CreateDeploymentStatus) Configuration() []configuration.Field {
 			Label:       "Deployment ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The ID of the deployment to update. Supports expressions, e.g. {{ $['Create Deployment'].id }}",
+			Description: "The ID of the deployment to update. Supports expressions, e.g. {{ $['Create Deployment'].data.id }}",
 		},
 		{
 			Name:     "status",

@@ -898,7 +898,7 @@ The Create Deployment Status component updates the status of an existing GitLab 
 ### Configuration
 
 - **Project** (required): The GitLab project containing the deployment
-- **Deployment ID** (required): The ID of the deployment to update. Supports expressions, e.g. `{{ $['Create Deployment'].id }}`
+- **Deployment ID** (required): The ID of the deployment to update. Supports expressions, e.g. `{{ $['Create Deployment'].data.id }}`
 - **Status** (required): The new deployment status (running, success, failed, canceled)
 
 ### Output
