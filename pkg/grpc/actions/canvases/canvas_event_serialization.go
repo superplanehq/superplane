@@ -3,6 +3,7 @@ package canvases
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -42,6 +43,7 @@ func SerializeCanvasEvent(event models.CanvasEvent) (*pb.CanvasEvent, error) {
 		Data:       s,
 		CreatedAt:  timestamppb.New(*event.CreatedAt),
 		Root:       event.ExecutionID == nil,
+		RunId:      uuidStringOrEmpty(event.RunID),
 	}, nil
 }
 
@@ -64,6 +66,14 @@ func valueOrEmpty(value *string) string {
 	}
 
 	return *value
+}
+
+func uuidStringOrEmpty(value uuid.UUID) string {
+	if value == uuid.Nil {
+		return ""
+	}
+
+	return value.String()
 }
 
 func getLastEventTimestamp(events []models.CanvasEvent) *timestamppb.Timestamp {
