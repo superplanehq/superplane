@@ -1,18 +1,21 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
 import type * as ApiClient from "@/api-client";
-import type { CanvasesCanvasNodeExecution, SuperplaneMeUser } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasVersion, SuperplaneMeUser } from "@/api-client";
 import {
   executions,
   firePointerEvent,
+  run as baseRun,
   renderInspector,
   renderInteractiveInspector,
   runningExecutions,
   runningRun,
+  workflowNodes,
 } from "./RunInspectorPanel.spec.fixtures";
 let mockedExecutions = executions;
 let mockedExecutionsLoading = false;
 let mockedMe: SuperplaneMeUser | null = null;
+let mockedRunVersion: CanvasesCanvasVersion | undefined = undefined;
 
 vi.mock("@uiw/react-json-view", () => ({
   default: ({ value, collapsed }: { value: unknown; collapsed?: boolean | number }) => (
@@ -44,6 +47,10 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useEventExecutions: () => ({
     data: { executions: mockedExecutions },
     isLoading: mockedExecutionsLoading,
+  }),
+  useCanvasVersion: () => ({
+    data: mockedRunVersion,
+    isLoading: false,
   }),
 }));
 
@@ -80,6 +87,7 @@ beforeEach(() => {
   mockedExecutions = executions;
   mockedExecutionsLoading = false;
   mockedMe = null;
+  mockedRunVersion = undefined;
   reemitTriggerEventMock.mockResolvedValue({});
   cancelExecutionMock.mockResolvedValue({});
   invokeExecutionHookMock.mockResolvedValue({});
@@ -230,6 +238,217 @@ describe("RunInspectorPanel", () => {
     expect(screen.getByRole("button", { name: "JSON" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("json-view")).toHaveTextContent(/"mode":"create"/);
     expect(screen.getByTestId("json-view")).toHaveTextContent(/"type":"anyone"/);
+  });
+
+  it("highlights resolved runtime config values using workflow configuration expressions", () => {
+    const resolvedMessage = "Hello, World!\n\n\nasdasfkgdokgf;dkgodkfgopdfkgpfodkgodfk ofdkgodfkgo dkfgop dkfgo";
+    mockedRunVersion = {
+      metadata: { id: "version-used-by-run" },
+      spec: {
+        nodes: workflowNodes.map((node) =>
+          node.id === "action-1"
+            ? {
+                ...node,
+                configuration: { url: "http://{{ root().data.message }}" },
+              }
+            : node,
+        ),
+      },
+    };
+
+    mockedExecutions = executions.map((execution) =>
+      execution.nodeId === "action-1"
+        ? {
+            ...execution,
+            result: "RESULT_PASSED",
+            resultReason: "RESULT_REASON_OK",
+            resultMessage: "",
+            configuration: { url: `http://${resolvedMessage}` },
+          }
+        : execution,
+    );
+
+    renderInspector({
+      selectedNodeId: "action-1",
+      run: {
+        ...baseRun,
+        versionId: "version-used-by-run",
+        rootEvent: baseRun.rootEvent
+          ? {
+              ...baseRun.rootEvent,
+              data: { data: { message: "client-side value should not render" } },
+            }
+          : baseRun.rootEvent,
+      },
+      workflowNodes: workflowNodes.map((node) =>
+        node.id === "action-1"
+          ? {
+              ...node,
+              configuration: { url: "https://{{ root().data.currentConfigShouldNotBeUsed }}" },
+            }
+          : node,
+      ),
+      componentDefinitions: [
+        {
+          name: "github.addLabel",
+          configuration: [
+            {
+              name: "url",
+              label: "URL",
+              type: "string",
+            },
+          ],
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Runtime config/i }));
+
+    expect(screen.getByText("URL")).toBeInTheDocument();
+    expect(screen.queryByText(/client-side value should not render/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/root\(\)\.data\.message/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/currentConfigShouldNotBeUsed/)).not.toBeInTheDocument();
+    const resolvedSegment = screen
+      .getAllByText((_, element) => {
+        const className = typeof element?.className === "string" ? element.className : "";
+        return className.includes("text-emerald-700") && element?.textContent?.includes(resolvedMessage) === true;
+      })
+      .find((element) => element.className.includes("text-emerald-700"));
+    expect(resolvedSegment).toBeDefined();
+    expect(resolvedSegment!).toHaveClass("text-emerald-700");
+    expect(resolvedSegment!.parentElement?.textContent).toBe(`http://{{ ${resolvedMessage} }}`);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show expression" }));
+
+    expect(screen.getByText("root().data.message")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show applied" })).toBeInTheDocument();
+  });
+
+  it("does not use live workflow expressions while a run version is unavailable", () => {
+    mockedRunVersion = undefined;
+    mockedExecutions = executions.map((execution) =>
+      execution.nodeId === "action-1"
+        ? {
+            ...execution,
+            result: "RESULT_PASSED",
+            resultReason: "RESULT_REASON_OK",
+            resultMessage: "",
+            configuration: { url: "http://server-applied-value" },
+          }
+        : execution,
+    );
+
+    renderInspector({
+      selectedNodeId: "action-1",
+      run: {
+        ...baseRun,
+        versionId: "version-still-loading",
+      },
+      workflowNodes: workflowNodes.map((node) =>
+        node.id === "action-1"
+          ? {
+              ...node,
+              configuration: { url: "https://{{ root().data.currentConfigShouldNotBeUsed }}" },
+            }
+          : node,
+      ),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Runtime config/i }));
+
+    expect(screen.getByRole("textbox", { name: "Url" })).toHaveValue("http://server-applied-value");
+    expect(screen.queryByText(/currentConfigShouldNotBeUsed/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show expression" })).not.toBeInTheDocument();
+  });
+
+  it("shows field-specific runtime config expression errors below the field", () => {
+    const expressionError =
+      'error resolving field url: expression evaluation failed: cannot fetch ss from <nil> (1:45) | $["start 2"].data.dasdkasdkaospdkoaskdopad.ss | ............................................^';
+
+    mockedExecutions = executions.map((execution) =>
+      execution.nodeId === "action-1"
+        ? {
+            ...execution,
+            resultMessage: expressionError,
+            configuration: { url: '{{ $["start 2"].data.dasdkasdkaospdkoaskdopad.ss }}' },
+          }
+        : execution,
+    );
+
+    renderInspector({
+      selectedNodeId: "action-1",
+      componentDefinitions: [
+        {
+          name: "github.addLabel",
+          configuration: [
+            {
+              name: "url",
+              label: "URL",
+              type: "string",
+            },
+          ],
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Runtime config/i }));
+
+    const highlightedExpression = screen
+      .getAllByText(/start 2.*dasdkasdkaospdkoaskdopad\.ss/)
+      .find((element) => element.className.includes("underline"));
+    expect(highlightedExpression).toBeDefined();
+    expect(highlightedExpression!).toHaveClass("text-red-600");
+    const fieldError = screen.getByTestId("runtime-config-expression-error-url");
+    expect(fieldError).toHaveTextContent("expression evaluation failed: cannot fetch ss from <nil>");
+    expect(fieldError).not.toHaveTextContent("$[");
+    expect(fieldError).not.toHaveTextContent(/error resolving field url/i);
+    expect(screen.queryByRole("button", { name: "Preview" })).not.toBeInTheDocument();
+  });
+
+  it("matches runtime config expression errors by expression text when the backend field path differs", () => {
+    const expressionError =
+      'error resolving field request.url: expression evaluation failed: cannot fetch ss from <nil> (1:45) | $["start 2"].data.dasdkasdkaospdkoaskdopad.ss | ............................................^';
+
+    mockedExecutions = executions.map((execution) =>
+      execution.nodeId === "action-1"
+        ? {
+            ...execution,
+            resultMessage: expressionError,
+            configuration: { endpoint: "" },
+          }
+        : execution,
+    );
+
+    renderInspector({
+      selectedNodeId: "action-1",
+      workflowNodes: workflowNodes.map((node) =>
+        node.id === "action-1"
+          ? {
+              ...node,
+              configuration: { endpoint: '{{ $["start 2"].data.dasdkasdkaospdkoaskdopad.ss }}' },
+            }
+          : node,
+      ),
+      componentDefinitions: [
+        {
+          name: "github.addLabel",
+          configuration: [
+            {
+              name: "endpoint",
+              label: "Endpoint",
+              type: "string",
+            },
+          ],
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Runtime config/i }));
+
+    expect(screen.getByTestId("runtime-config-expression-error-endpoint")).toHaveTextContent(
+      "expression evaluation failed: cannot fetch ss from <nil>",
+    );
+    expect(screen.queryByRole("button", { name: "Preview" })).not.toBeInTheDocument();
   });
 
   describe("runtime and output regressions", () => {

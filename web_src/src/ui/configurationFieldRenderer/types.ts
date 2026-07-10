@@ -23,4 +23,7 @@ export interface FieldRendererProps {
   readOnly?: boolean;
   excludedSuggestions?: string[];
   valuePreviewLabel?: string;
+  expressionPreviewContext?: Record<string, unknown> | null;
+  expressionErrorMessage?: string;
+  expressionTemplateValue?: unknown;
 }
