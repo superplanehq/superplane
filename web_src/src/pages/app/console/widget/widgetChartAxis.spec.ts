@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatXAxisTick, formatXTooltipLabel } from "./widgetChartAxis";
+import { buildXAxisTickShowIndices, formatXAxisTick, formatXTooltipLabel } from "./widgetChartAxis";
 
 describe("widgetChartAxis timestamp auto-detect", () => {
   it("keeps categorical numeric strings as labels when xFormat is unset", () => {
@@ -38,5 +38,14 @@ describe("widgetChartAxis timestamp auto-detect", () => {
     expect(formatXAxisTick(iso, "relative")).toMatch(/May/);
     expect(formatXAxisTick(iso, "relative")).not.toMatch(/ago|in \d/);
     expect(formatXTooltipLabel(iso, "relative")).toMatch(/May/);
+  });
+
+  it("dedupes day ticks for xFormat relative like date/datetime", () => {
+    const data = [{ x: "2026-07-05T10:00:00Z" }, { x: "2026-07-05T14:00:00Z" }, { x: "2026-07-06T10:00:00Z" }];
+    const show = buildXAxisTickShowIndices(data, "relative");
+    expect(show).not.toBeNull();
+    expect([...show!].sort((a, b) => a - b)).toEqual([0, 2]);
+    expect(formatXAxisTick(data[0].x, "relative")).toBe("Jul 5");
+    expect(formatXAxisTick(data[2].x, "relative")).toBe("Jul 6");
   });
 });

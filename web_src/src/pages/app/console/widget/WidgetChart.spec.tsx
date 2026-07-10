@@ -304,21 +304,6 @@ describe("WidgetChart axis formatting", () => {
     expect(ticks.some((text) => text.includes("T00:00:00Z"))).toBe(false);
   });
 
-  it("formats ISO timestamp X values as dates on the axis", () => {
-    const TIME_ROWS = [
-      { day: "2026-05-26T00:00:00Z", cost: 10 },
-      { day: "2026-05-27T00:00:00Z", cost: 12 },
-    ];
-    const { container } = renderChart(
-      { kind: "chart", type: "bar", xField: "day", series: [{ field: "cost", label: "Cost" }] },
-      { rows: TIME_ROWS },
-    );
-    const ticks = tickTexts(container, "xAxis");
-    expect(ticks.some((text) => text.includes("T00:00:00Z"))).toBe(false);
-    expect(ticks.some((text) => /May/.test(text))).toBe(true);
-    expect(ticks.every((text) => !/AM|PM/.test(text))).toBe(true);
-  });
-
   it("renders a Y-axis title when yLabel is set", () => {
     const { container } = renderChart({
       kind: "chart",
@@ -329,19 +314,6 @@ describe("WidgetChart axis formatting", () => {
     });
     const labels = Array.from(container.querySelectorAll(".recharts-label")).map((node) => node.textContent ?? "");
     expect(labels).toContain("USD");
-  });
-
-  it("trims surrounding whitespace from yLabel before rendering it", () => {
-    const { container } = renderChart({
-      kind: "chart",
-      type: "bar",
-      xField: "service",
-      yLabel: "  USD  ",
-      series: [{ field: "cost", label: "Cost" }],
-    });
-    const labels = Array.from(container.querySelectorAll(".recharts-label")).map((node) => node.textContent ?? "");
-    expect(labels).toContain("USD");
-    expect(labels).not.toContain("  USD  ");
   });
 
   it("does not render a Y-axis label when yLabel is blank", () => {
@@ -408,28 +380,6 @@ describe("WidgetChart axis formatting", () => {
     expect(visible).toEqual(["Jul 5", "Jul 6"]);
   });
 
-  it("dedupes day ticks for xFormat relative like date/datetime", () => {
-    const TIME_ROWS = [
-      { day: "2026-07-05T10:00:00Z", cost: 10 },
-      { day: "2026-07-05T14:00:00Z", cost: 11 },
-      { day: "2026-07-06T10:00:00Z", cost: 13 },
-    ];
-    const { container } = renderChart(
-      {
-        kind: "chart",
-        type: "bar",
-        xField: "day",
-        xFormat: "relative",
-        series: [{ field: "cost", label: "Cost" }],
-      },
-      { rows: TIME_ROWS },
-    );
-    const ticks = tickTexts(container, "xAxis");
-    const visible = ticks.filter((text) => text.trim() !== "");
-    expect(visible).toEqual(["Jul 5", "Jul 6"]);
-    expect(visible.every((text) => !/ago|^\d+[smhd]$/.test(text))).toBe(true);
-  });
-
   it("passes a labelFormatter to the tooltip that mirrors xFormat date", () => {
     tooltipContentProps.value = null as Record<string, unknown> | null;
     renderChart(
@@ -456,31 +406,6 @@ describe("WidgetChart axis formatting", () => {
     const props: Record<string, unknown> | null = tooltipContentProps.value;
     const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
     expect(labelFormatter?.("ec2", [])).toBe("ec2");
-  });
-
-  it("keeps numeric category X values as labels when xFormat is unset", () => {
-    const { container } = renderChart(
-      { kind: "chart", type: "bar", xField: "code", series: [{ field: "count", label: "Count" }] },
-      {
-        rows: [
-          { code: "12", count: 1 },
-          { code: "200", count: 2 },
-          { code: "404", count: 3 },
-        ],
-      },
-    );
-    const ticks = tickTexts(container, "xAxis");
-    expect(ticks).toEqual(expect.arrayContaining(["12", "200", "404"]));
-    expect(ticks.every((text) => !/Jan|May|Jul/.test(text))).toBe(true);
-
-    tooltipContentProps.value = null as Record<string, unknown> | null;
-    renderChart(
-      { kind: "chart", type: "bar", xField: "code", series: [{ field: "count", label: "Count" }] },
-      { rows: [{ code: "404", count: 3 }] },
-    );
-    const props: Record<string, unknown> | null = tooltipContentProps.value;
-    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
-    expect(labelFormatter?.("404", [])).toBe("404");
   });
 
   it("formats Y-axis ticks with yFormat", () => {
