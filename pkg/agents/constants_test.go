@@ -13,7 +13,7 @@ func TestAgentTokenScopes(t *testing.T) {
 		"org:read",
 		"integrations:read",
 		"canvases:read:" + canvasID,
-		"canvases:update_version:" + canvasID,
+		"canvases:update:" + canvasID,
 	}, AgentTokenScopes(canvasID))
 }
 

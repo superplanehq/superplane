@@ -36,7 +36,7 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Should have all canvas permissions (inherited from admin)
-		actions := []string{"read", "create", "update", "update_version", "publish", "delete"}
+		actions := []string{"read", "create", "update", "delete"}
 		for _, action := range actions {
 			allowed, err := r.AuthService.CheckOrganizationPermission(context.Background(), userID, orgID, canvasPath, action)
 			require.NoError(t, err)
@@ -72,7 +72,7 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Should have canvas management permissions
-		actions := []string{"read", "create", "update", "update_version", "publish", "delete"}
+		actions := []string{"read", "create", "update", "delete"}
 		for _, action := range actions {
 			allowed, err := r.AuthService.CheckOrganizationPermission(context.Background(), adminID, orgID, canvasPath, action)
 			require.NoError(t, err)
@@ -112,8 +112,8 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
-		// Should not have canvas create/update/publish/delete permissions
-		actions := []string{"create", "update", "update_version", "publish", "delete"}
+		// Should not have canvas create/update/delete permissions
+		actions := []string{"create", "update", "delete"}
 		for _, action := range actions {
 			allowed, err := r.AuthService.CheckOrganizationPermission(context.Background(), viewerID, orgID, canvasPath, action)
 			require.NoError(t, err)

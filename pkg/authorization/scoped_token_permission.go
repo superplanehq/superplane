@@ -21,8 +21,9 @@ func hasRequiredScopedTokenPermissionForScopes(
 		return false
 	}
 
+	actions := rule.AllowedActions()
 	for _, permission := range permissions {
-		if permission.ResourceType != rule.Resource || permission.Action != rule.Action {
+		if permission.ResourceType != rule.Resource || !slices.Contains(actions, permission.Action) {
 			continue
 		}
 
