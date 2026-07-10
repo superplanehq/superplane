@@ -177,17 +177,22 @@ const CHART_MARGIN = { top: 8, right: 8, left: 4, bottom: 0 } as const;
 // content so the tooltip appears in place.
 const TOOLTIP_CONTENT_CLASS = "animate-in fade-in duration-150";
 
-/** Bridges Recharts' `active` flag into the interactive-tooltip hook without doing work in render. */
+/** Bridges Recharts' active point into the interactive-tooltip hook without doing work in render. */
 function RechartsActiveBridge({
   active,
+  activeKey,
+  forceContentActive,
   onActiveChange,
 }: {
   active?: boolean;
-  onActiveChange: (active: boolean) => void;
+  activeKey?: string;
+  /** Re-sync when force releases so a still-hovered point re-arms `wasActive`. */
+  forceContentActive: boolean;
+  onActiveChange: (active: boolean, activeKey?: string) => void;
 }) {
   useEffect(() => {
-    onActiveChange(Boolean(active));
-  }, [active, onActiveChange]);
+    onActiveChange(Boolean(active), activeKey);
+  }, [active, activeKey, forceContentActive, onActiveChange]);
   return null;
 }
 
@@ -205,13 +210,19 @@ function InteractiveChartTooltipContent({
   ...tooltipProps
 }: ChartTooltipContentProps & {
   forceContentActive: boolean;
-  syncRechartsActive: (active: boolean) => void;
+  syncRechartsActive: (active: boolean, activeKey?: string) => void;
   onTooltipEnter: () => void;
   onTooltipLeave: () => void;
 }) {
+  const activeKey = tooltipProps.label == null ? undefined : String(tooltipProps.label);
   return (
     <div onMouseEnter={onTooltipEnter} onMouseLeave={onTooltipLeave}>
-      <RechartsActiveBridge active={tooltipProps.active} onActiveChange={syncRechartsActive} />
+      <RechartsActiveBridge
+        active={tooltipProps.active}
+        activeKey={activeKey}
+        forceContentActive={forceContentActive}
+        onActiveChange={syncRechartsActive}
+      />
       <ChartTooltipContent {...tooltipProps} active={Boolean(tooltipProps.active || forceContentActive)} />
     </div>
   );

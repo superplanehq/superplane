@@ -17,15 +17,18 @@ const INTERACTIVE_TOOLTIP_WRAPPER_STYLE: CSSProperties = {
  * Keeps a Recharts tooltip interactive: enables pointer events and holds the
  * tooltip open long enough to move from the chart point onto CopyButton / etc.
  *
- * Important: when we force `active={true}` on Recharts' Tooltip, that value
- * echoes back through the content's `active` prop. Ignoring that echo while
- * `forceActive` is set keeps the grace timer alive so the tooltip can dismiss.
+ * Forced `active={true}` echoes back through Recharts. We ignore that echo
+ * (same point key while forced) so the grace timer can dismiss — but a different
+ * point key during grace means the pointer moved onto another bar, so we
+ * re-engage natural hover tracking.
  */
 export function useInteractiveChartTooltip(enabled: boolean) {
   const [forceActive, setForceActive] = useState(false);
   const forceActiveRef = useRef(false);
   const tooltipHoveredRef = useRef(false);
   const wasActiveRef = useRef(false);
+  const activeKeyRef = useRef<string | null>(null);
+  const frozenKeyRef = useRef<string | null>(null);
   const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearGraceTimer = useCallback(() => {
@@ -42,18 +45,31 @@ export function useInteractiveChartTooltip(enabled: boolean) {
   useEffect(() => () => clearGraceTimer(), [clearGraceTimer]);
 
   const syncRechartsActive = useCallback(
-    (active: boolean) => {
+    (active: boolean, activeKey?: string) => {
       if (!enabled) return;
+      const key = activeKey ?? null;
+
       if (active) {
-        // Forced `active={true}` echoes back through RechartsActiveBridge.
-        // Ignoring that echo keeps the grace timer alive so the tooltip can dismiss.
-        if (forceActiveRef.current) return;
+        if (forceActiveRef.current) {
+          // Echo of our forced active on the same point — keep grace running.
+          if (key == null || key === frozenKeyRef.current) return;
+          // Pointer moved onto a different point during grace: resume normal tracking.
+          clearGraceTimer();
+          setForced(false);
+          wasActiveRef.current = true;
+          activeKeyRef.current = key;
+          frozenKeyRef.current = null;
+          return;
+        }
         clearGraceTimer();
         wasActiveRef.current = true;
+        if (key != null) activeKeyRef.current = key;
         return;
       }
+
       if (!wasActiveRef.current) return;
       wasActiveRef.current = false;
+      frozenKeyRef.current = activeKeyRef.current;
       clearGraceTimer();
       setForced(true);
       graceTimerRef.current = setTimeout(() => {
@@ -76,6 +92,7 @@ export function useInteractiveChartTooltip(enabled: boolean) {
     tooltipHoveredRef.current = false;
     clearGraceTimer();
     setForced(false);
+    wasActiveRef.current = false;
   }, [enabled, clearGraceTimer, setForced]);
 
   return {
