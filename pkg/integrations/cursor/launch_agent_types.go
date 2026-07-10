@@ -157,6 +157,20 @@ type LaunchAgentOutputPayload struct {
 	// either the array (e.g. messages[-1] via an expression) or lastMessage.
 	Messages    []ConversationMessage `json:"messages,omitempty"`
 	LastMessage *ConversationMessage  `json:"lastMessage,omitempty"`
+	// Artifacts lists the files the agent produced, attached on successful
+	// completion like the conversation, each with a presigned download link so
+	// downstream steps (e.g. Discord file attachments) can consume them directly.
+	Artifacts []LaunchAgentArtifact `json:"artifacts,omitempty"`
+}
+
+// LaunchAgentArtifact is an artifact produced by the agent run, carrying the
+// same download link the Download Artifact component returns.
+type LaunchAgentArtifact struct {
+	Path      string `json:"path"`
+	SizeBytes int64  `json:"sizeBytes,omitempty"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
+	URL       string `json:"url,omitempty"`
+	ExpiresAt string `json:"expiresAt,omitempty"`
 }
 
 // --- HELPER FUNCTIONS ---
