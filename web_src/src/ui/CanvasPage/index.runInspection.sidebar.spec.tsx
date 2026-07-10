@@ -73,6 +73,17 @@ vi.mock("../componentSidebar", () => ({
   ComponentSidebar: () => <div data-testid="live-node-detail-pane-content" />,
 }));
 
+vi.mock("../Runs/RunInspectorPanel", () => ({
+  RunInspectorPanel: ({ onClose, onEditNode }: { onClose?: () => void; onEditNode?: (nodeId: string) => void }) => (
+    <div data-testid="run-inspector-panel">
+      <button type="button" aria-label="Close" onClick={onClose} />
+      <button type="button" onClick={() => onEditNode?.("run-node-1")}>
+        Edit runtime config
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock("@/components/CanvasToolSidebar", () => ({
   CanvasToolSidebar: () => null,
 }));
@@ -217,6 +228,50 @@ describe("CanvasPage run inspection sidebar", () => {
 
     expect(onRunNodeDetailClose).toHaveBeenCalledOnce();
     expect(onBackToLiveCanvas).not.toHaveBeenCalled();
+  });
+
+  it("enters edit mode when editing runtime config from run inspection", async () => {
+    const onEnterEditMode = vi.fn();
+    const canvasProps = {
+      title: "Canvas",
+      headerMode: "version-live" as const,
+      runNodeDetailNodeId: "run-node-1",
+      runNodeDetailCanvasId: "canvas-1",
+      runNodeDetailRun: {
+        id: "run-1",
+        rootEvent: { id: "root-event-1", nodeId: "trigger-node" },
+      },
+      nodes: [
+        {
+          id: "run-node-1",
+          position: { x: 0, y: 0 },
+          data: {
+            label: "Run node",
+            state: "success",
+            type: "component",
+          },
+        },
+      ],
+      edges: [],
+      buildingBlocks: [],
+      activeCanvasVersionId: "live-version",
+      onEnterEditMode,
+    };
+
+    render(
+      <MemoryRouter>
+        <CanvasPage {...canvasProps} isRunInspectionMode isEditing={false} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("run-inspector-panel")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit runtime config" }));
+
+    expect(onEnterEditMode).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId("live-node-detail-pane-content")).not.toBeInTheDocument();
   });
 
   it("shows right run inspector loading chrome while run detail is loading", () => {

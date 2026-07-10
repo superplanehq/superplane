@@ -31,12 +31,14 @@ export function RunInspectorStepTimeline({
   section,
   componentIconMap,
   organizationId,
+  onEditNode,
   errorScrollRequestId,
   onErrorScrolled,
 }: {
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
   organizationId?: string;
+  onEditNode?: (nodeId: string) => void;
   errorScrollRequestId?: number | null;
   onErrorScrolled?: () => void;
 }) {
@@ -114,7 +116,12 @@ export function RunInspectorStepTimeline({
             {item.value === "input" ? (
               <InputTimelineCard section={section} jsonViewStyle={jsonViewStyle} componentIconMap={componentIconMap} />
             ) : item.value === "runtime" ? (
-              <RuntimeTimelineCard section={section} jsonViewStyle={jsonViewStyle} organizationId={organizationId} />
+              <RuntimeTimelineCard
+                section={section}
+                jsonViewStyle={jsonViewStyle}
+                organizationId={organizationId}
+                onEditNode={onEditNode}
+              />
             ) : (
               <OutputTimelineCard section={section} jsonViewStyle={jsonViewStyle} />
             )}
