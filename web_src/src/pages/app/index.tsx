@@ -123,7 +123,9 @@ import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
-import { useRunsDetailState } from "./useRunsDetailState";
+import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
+import { useComponentIconMap } from "./useComponentIconMap";
+import { useRunSidebarNavigationState } from "./useRunSidebarNavigationState";
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
@@ -485,6 +487,7 @@ export function AppPage() {
     [liveCanvas, selectedCanvasVersion, isEditing, isViewingCurrentLiveVersion, draftSpecForView, canvasId],
   );
   const canvasForPrep = canvas ?? ((isEditing || isEnteringEditSession) && liveCanvas ? liveCanvas : null);
+  const canvasNodes = canvas?.spec?.nodes ?? EMPTY_CANVAS_SPEC_ITEMS;
 
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(
@@ -555,16 +558,15 @@ export function AppPage() {
     canvas,
     liveCanvas,
   });
-  const componentIconMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const c of components) {
-      if (c.name && c.icon) map[c.name] = c.icon;
-    }
-    for (const t of triggers) {
-      if (t.name && t.icon) map[t.name] = t.icon;
-    }
-    return map;
-  }, [components, triggers]);
+  const componentIconMap = useComponentIconMap(components, triggers);
+  const { runFilterState, runNavigation } = useRunSidebarNavigationState({
+    runs: runsData.runs,
+    selectedRunId,
+    hasNextPage: infiniteRunsQuery.hasNextPage,
+    workflowNodes: canvasNodes,
+    componentIconMap,
+    onStatusFiltersChange: setRunStatusFilters,
+  });
   const {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
@@ -1359,7 +1361,6 @@ export function AppPage() {
     () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
     [triggers, components, availableIntegrations],
   );
-  const canvasNodes = canvas?.spec?.nodes ?? EMPTY_CANVAS_SPEC_ITEMS;
   const canvasEdges = canvas?.spec?.edges ?? EMPTY_CANVAS_SPEC_ITEMS;
   const canvasNodesById = useMemo(() => {
     const nodesById = new Map<string, ComponentsNode>();
@@ -4093,6 +4094,7 @@ export function AppPage() {
   // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).
   // Within the edit session it can be shown/hidden with the header toggle.
   const showVersionsSidebar = editSessionActive && !runInspectionChromeActive && !urlViewFlags.isMemoryMode;
+  const selectedRunDetailDismissed = isRunDetailDismissed(detailDismissedForRunId, selectedRunId);
 
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
     isOpen: showRunsSidebar,
@@ -4102,7 +4104,6 @@ export function AppPage() {
     selectedRun,
     isSelectedRunLoading,
     onSelectRun: handleSelectRun,
-    onNavigateRun: handleNavigateRun,
     onSelectLiveCanvas: handleSelectLiveCanvas,
     onBackToRunList: handleBackToRunList,
     initialOpenDetail: openRunDetailOnMount,
@@ -4115,9 +4116,8 @@ export function AppPage() {
     isLoading: infiniteRunsQuery.isLoading,
     isError: infiniteRunsQuery.isError,
     onRetry: () => infiniteRunsQuery.refetch(),
-    workflowNodes: canvasNodes,
     componentIconMap,
-    onStatusFiltersChange: setRunStatusFilters,
+    filterState: runFilterState,
   });
   const toolSidebarVersionsContent = renderCanvasVersionsSidebarPanel({
     isOpen: showVersionsSidebar,
@@ -4266,20 +4266,19 @@ export function AppPage() {
           initialFocusNodeId={initialFocusNodeIdRef.current}
           {...runParticipantFit.canvasFitProps}
           runCanvasLoading={
-            runInspectionChromeActive &&
-            selectedRunId !== null &&
-            detailDismissedForRunId !== selectedRunId &&
-            runCanvasLoading
+            runInspectionChromeActive && selectedRunId !== null && !selectedRunDetailDismissed && runCanvasLoading
           }
           runNodeDetailRun={
-            runInspectionChromeActive && selectedRunId && detailDismissedForRunId !== selectedRunId ? selectedRun : null
+            runInspectionChromeActive && selectedRunId && !selectedRunDetailDismissed ? selectedRun : null
           }
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
           runNodeDetailEdges={selectedRunCanvas?.spec?.edges}
+          runNavigation={runNavigation}
           onRunNodeDetailClose={handleBackToRunList}
           onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
+          onRunNavigate={handleNavigateRun}
           onBackToLiveCanvas={handleSelectLiveCanvas}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
