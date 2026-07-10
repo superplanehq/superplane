@@ -45,6 +45,17 @@ describe("createFixtureFetch repository routes", () => {
     expect(await consoleYaml.text()).toBe("kind: Console\n");
   });
 
+  it("seeds a non-empty default console.yaml for Live Canvas stories", async () => {
+    const { createFixtureFetch: createDefaultFixtureFetch } = await import("./handlers");
+    const fallback = vi.fn() as unknown as typeof fetch;
+    const fixtureFetch = createDefaultFixtureFetch(fallback);
+    const response = await fixtureFetch("http://localhost/api/v1/canvases/any/repository/file?path=console.yaml");
+    const text = await response.text();
+    expect(text).toContain("kind: Console");
+    expect(text).toContain("markdown-showcase");
+    expect(text).toContain("Markdown renderer showcase");
+  });
+
   it("honors an explicit repositoryFilePaths override", async () => {
     const response = await fetchFixture("/api/v1/canvases/canvas-1/repository/files", {
       ...baseFixture,
