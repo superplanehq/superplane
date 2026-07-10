@@ -1,6 +1,41 @@
-import { formatRelativeTime } from "@/lib/timezone";
+import { formatTimeAgo } from "@/lib/date";
+import { formatAbsolute, formatDate as formatDateOnly } from "@/lib/datetime";
 
 import type { WidgetColumnFormat } from "./types";
+
+/**
+ * Coerce a widget cell value into a `Date`. Accepts ISO strings, `Date`
+ * instances, and epoch seconds/milliseconds — including numeric strings
+ * like `"1717390000"` that JSON/CEL often emit (using the shared `>= 1e12`
+ * heuristic to disambiguate). Returns `null` for anything that can't be
+ * parsed, so callers can fall back to the raw string.
+ *
+ * Shared by widget formatters and CEL builtins (`formatDate`, `epochMs`) so
+ * timestamp parsing stays consistent across the console package.
+ */
+export function coerceWidgetTimestamp(value: unknown): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const parsed = Date.parse(trimmed);
+    if (Number.isFinite(parsed)) return new Date(parsed);
+    // Date.parse rejects pure epoch digit strings; fall through to Number.
+    return dateFromEpochNumber(Number(trimmed));
+  }
+  return dateFromEpochNumber(typeof value === "number" ? value : Number(value));
+}
+
+function dateFromEpochNumber(n: number): Date | null {
+  if (!Number.isFinite(n)) return null;
+  // Match CEL / historical widget heuristic: values >= 1e12 are milliseconds.
+  const ms = n >= 1e12 ? n : n * 1000;
+  const date = new Date(ms);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
 
 /**
  * Format a raw value for display, consistent with the format hints declared in
@@ -15,9 +50,9 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case "percent":
       return formatPercent(value);
     case "date":
-      return formatDate(value, false);
+      return formatDate(value);
     case "datetime":
-      return formatDate(value, true);
+      return formatDatetime(value);
     case "relative":
       return formatRelative(value);
     case "duration":
@@ -51,26 +86,24 @@ function formatPercent(value: unknown): string {
 }
 
 function formatRelative(value: unknown): string {
-  const format = (iso: string) => formatRelativeTime(iso, true).replace(" ago", "");
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) {
-      return format(new Date(parsed).toISOString());
-    }
-  }
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return String(value ?? "");
-  const ms = n > 1e12 ? n : n * 1000;
-  return format(new Date(ms).toISOString());
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return String(value ?? "");
+  // Compact relative text without an "ago" suffix (e.g. "5m", "in 2h") so
+  // dense table cells stay short; the hover details always expose the verbose
+  // "5 minutes ago" / "in 3 hours" phrasing.
+  return formatTimeAgo(date, false);
 }
 
-function formatDate(value: unknown, includeTime: boolean): string {
-  if (typeof value !== "string" && typeof value !== "number") return String(value);
-  const ms = typeof value === "number" ? value : Date.parse(value);
-  if (!Number.isFinite(ms)) return String(value);
-  const date = new Date(ms);
-  if (includeTime) return date.toLocaleString();
-  return date.toLocaleDateString();
+function formatDate(value: unknown): string {
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return String(value);
+  return formatDateOnly(date);
+}
+
+function formatDatetime(value: unknown): string {
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return String(value);
+  return formatAbsolute(date);
 }
 
 /**
