@@ -9,6 +9,7 @@ import {
   WIDGET_FILTER_OPS,
   WIDGET_ROW_STYLE_TONES,
   type WidgetColumnFormat,
+  type WidgetProgressLabel,
   type WidgetRowStyle,
   type WidgetRowStyleTone,
   type WidgetTableColumn,
@@ -29,6 +30,13 @@ const COLUMN_FORMATS: WidgetColumnFormat[] = [
   "code",
   "link",
   "avatar",
+  "progress",
+];
+
+const PROGRESS_LABEL_OPTIONS: { value: WidgetProgressLabel; label: string }[] = [
+  { value: "percent", label: "Percent (50%)" },
+  { value: "number", label: "Number (5/10)" },
+  { value: "none", label: "None" },
 ];
 
 export function ColumnRow({
@@ -71,7 +79,13 @@ export function ColumnRow({
           value={col.format ?? "__none__"}
           onValueChange={(v) => {
             const format = v === "__none__" ? undefined : (v as WidgetColumnFormat);
-            onChange({ format, ...(format === "link" ? {} : { href: undefined }) });
+            onChange({
+              format,
+              ...(format === "link" ? {} : { href: undefined }),
+              ...(format === "progress"
+                ? { progressLabel: col.progressLabel ?? "percent" }
+                : { progressTarget: undefined, progressLabel: undefined }),
+            });
           }}
         >
           <SelectTrigger className="col-span-4 h-8">
@@ -95,6 +109,33 @@ export function ColumnRow({
             list={fieldOptions.length > 0 ? "table-href-field-options" : undefined}
             data-testid="table-column-href"
           />
+        ) : null}
+        {col.format === "progress" ? (
+          <>
+            <Input
+              className="col-span-8 h-8"
+              value={col.progressTarget ?? ""}
+              onChange={(e) => onChange({ progressTarget: e.target.value || undefined })}
+              placeholder="target, e.g. 10, payload.goal or {{ items.size() }}"
+              list={fieldOptions.length > 0 ? "table-field-options" : undefined}
+              data-testid="table-column-progress-target"
+            />
+            <Select
+              value={col.progressLabel ?? "percent"}
+              onValueChange={(v) => onChange({ progressLabel: v as WidgetProgressLabel })}
+            >
+              <SelectTrigger className="col-span-4 h-8" data-testid="table-column-progress-label">
+                <SelectValue placeholder="Label" />
+              </SelectTrigger>
+              <SelectContent>
+                {PROGRESS_LABEL_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
         ) : null}
       </div>
       <div className="flex shrink-0 items-start justify-end">
