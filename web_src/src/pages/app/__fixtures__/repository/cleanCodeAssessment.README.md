@@ -49,6 +49,19 @@ Trailing meta after ` · ` is optional. Nested sections show a count on the pare
 > [!SECTION:mcp] MCP servers · 3
 > Connected tools the agent can call through Model Context Protocol.
 
+## Code
+
+```yaml
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Clean Code Assessment
+spec:
+  nodes:
+    - id: analyze-pr
+      type: cursor.analyze_pr
+```
+
 ## Mermaid
 
 Flowchart (custom node colors):
@@ -90,4 +103,15 @@ stateDiagram-v2
   Running --> Failed
   Passed --> [*]
   Failed --> Queued: Retry
+```
+
+Pie chart:
+
+```mermaid
+pie showData
+  title Assessment outcomes (last 30 days)
+  "Passed" : 48
+  "Failed" : 12
+  "Skipped" : 7
+  "Retried" : 5
 ```
