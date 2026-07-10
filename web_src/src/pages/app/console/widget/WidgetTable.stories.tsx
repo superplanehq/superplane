@@ -126,6 +126,57 @@ export const RowActions: Story = {
   },
 };
 
+const avatarRows: Record<string, unknown>[] = [
+  {
+    id: "u-1",
+    name: "Ada Lovelace",
+    role: "Owner",
+    avatarUrl: "https://i.pravatar.cc/64?img=47",
+  },
+  {
+    id: "u-2",
+    name: "Grace Hopper",
+    role: "Maintainer",
+    avatarUrl: "https://i.pravatar.cc/64?img=32",
+  },
+  {
+    id: "u-3",
+    name: "Alan Turing",
+    role: "Contributor",
+    avatarUrl: "https://i.pravatar.cc/64?img=12",
+  },
+  {
+    id: "u-4",
+    name: "Katherine Johnson",
+    role: "Contributor",
+    avatarUrl: "",
+  },
+  {
+    // A bare GitHub username resolves to the github.com avatar with the
+    // username in the tooltip (see resolveConsoleAvatar).
+    id: "u-5",
+    name: "GitHub username",
+    role: "Guest",
+    avatarUrl: "torvalds",
+  },
+];
+
+export const Avatars: Story = {
+  render: (args) => <TablePanel title="Team roster" {...args} />,
+  args: {
+    render: {
+      kind: "table",
+      columns: [
+        { field: "avatarUrl", label: "", format: "avatar" },
+        { field: "name", label: "Name" },
+        { field: "role", label: "Role", format: "badge" },
+      ],
+    },
+    rows: avatarRows,
+    isLoading: false,
+  },
+};
+
 export const ManyColumnsAndFormats: Story = {
   render: (args) => <TablePanel title="All column formats" {...args} />,
   args: {
@@ -139,6 +190,7 @@ export const ManyColumnsAndFormats: Story = {
         { field: "cost", label: "Cost", format: "number" },
         { field: "createdAt", label: "Started", format: "datetime" },
         { field: "url", label: "Link", format: "link" },
+        { field: '{{ "https://i.pravatar.cc/64?u=" + id }}', label: "Avatar", format: "avatar" },
       ],
     },
     rows: executionRows,
