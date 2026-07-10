@@ -476,6 +476,30 @@ func TestSSHCommand_Execute_FileMode(t *testing.T) {
 	})
 }
 
+func TestLoadCommandFile_NormalizesLineEndings(t *testing.T) {
+	t.Run("normalizes Windows CRLF line endings", func(t *testing.T) {
+		files := &fakeFilesContext{
+			files: map[string]string{"scripts/deploy.sh": "set -eo pipefail\r\nprintf ok\r\n"},
+		}
+
+		body, err := loadCommandFile(files, "scripts/deploy.sh")
+		require.NoError(t, err)
+		assert.Equal(t, "set -eo pipefail\nprintf ok\n", body)
+		assert.NotContains(t, body, "\r")
+	})
+
+	t.Run("normalizes lone carriage returns", func(t *testing.T) {
+		files := &fakeFilesContext{
+			files: map[string]string{"scripts/deploy.sh": "set -eo pipefail\rprintf ok\r"},
+		}
+
+		body, err := loadCommandFile(files, "scripts/deploy.sh")
+		require.NoError(t, err)
+		assert.Equal(t, "set -eo pipefail\nprintf ok\n", body)
+		assert.NotContains(t, body, "\r")
+	})
+}
+
 func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
 	c := &SSHCommand{}
 	metadata := &testMetadataContext{}
@@ -594,6 +618,18 @@ func TestBuildCombinedCommands(t *testing.T) {
 		assert.Equal(t, "echo 1 && echo 2", combined)
 	})
 
+	t.Run("normalizes CRLF input before joining lines", func(t *testing.T) {
+		combined := buildCombinedCommands("set -eo pipefail\r\necho ok\r\n")
+		assert.Equal(t, "set -eo pipefail && echo ok", combined)
+		assert.NotContains(t, combined, "\r")
+	})
+
+	t.Run("normalizes lone carriage returns before joining lines", func(t *testing.T) {
+		combined := buildCombinedCommands("set -eo pipefail\recho ok\r")
+		assert.Equal(t, "set -eo pipefail && echo ok", combined)
+		assert.NotContains(t, combined, "\r")
+	})
+
 	t.Run("empty input yields empty string", func(t *testing.T) {
 		combined := buildCombinedCommands("\n \n")
 		assert.Equal(t, "", combined)
@@ -636,6 +672,13 @@ func TestSSHCommand_BuildScriptCommand(t *testing.T) {
 		command, payload := c.buildScriptCommand("", nil, script)
 		assert.Equal(t, "bash -s", command)
 		assert.Equal(t, script, payload)
+	})
+
+	t.Run("normalizes CRLF scripts before streaming", func(t *testing.T) {
+		command, payload := c.buildScriptCommand("", nil, "set -eo pipefail\r\necho ok\r\n")
+		assert.Equal(t, "bash -s", command)
+		assert.Equal(t, "set -eo pipefail\necho ok\n", payload)
+		assert.NotContains(t, payload, "\r")
 	})
 
 	// Regression: a bash script with embedded `{{ ... }}` template syntax
@@ -697,6 +740,24 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 		body, readErr := io.ReadAll(stdin)
 		require.NoError(t, readErr)
 		assert.Equal(t, script, string(body))
+	})
+
+	t.Run("file mode normalizes CRLF before streaming stdin", func(t *testing.T) {
+		script := "set -eo pipefail\r\necho hi\r\n"
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceFile,
+			CommandFile:   "scripts/deploy.sh",
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, script)
+		require.NoError(t, err)
+		assert.Equal(t, "bash -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, "set -eo pipefail\necho hi\n", string(body))
+		assert.NotContains(t, string(body), "\r")
 	})
 
 	t.Run("file mode prepends working directory to the streamed script", func(t *testing.T) {
