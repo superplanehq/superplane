@@ -1,5 +1,5 @@
 import { Pencil } from "lucide-react";
-import { useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,16 +8,19 @@ import { cn } from "@/lib/utils";
 import { EmptySectionText, JsonPayload, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import { HeaderIconButton } from "@/ui/HeaderIconButton";
 import { hasObjectValue, type RunInspectorNodeSection } from "./runNodeDetailModel";
+import { buildRuntimeExpressionContext } from "./runInspectorExpressionContext";
 
 export function RuntimeTimelineCard({
   section,
   jsonViewStyle,
   organizationId,
+  canShowExpressionTemplates = false,
   onEditNode,
 }: {
   section: RunInspectorNodeSection;
   jsonViewStyle: CSSProperties;
   organizationId?: string;
+  canShowExpressionTemplates?: boolean;
   onEditNode?: (nodeId: string) => void;
 }) {
   const [mode, setMode] = useState<"form" | "json">("form");
@@ -39,6 +42,7 @@ export function RuntimeTimelineCard({
           value={configuration}
           jsonViewStyle={jsonViewStyle}
           organizationId={organizationId}
+          canShowExpressionTemplates={canShowExpressionTemplates}
         />
       ) : (
         <JsonPayload value={configuration} jsonViewStyle={jsonViewStyle} />
@@ -105,19 +109,30 @@ function RuntimeConfigForm({
   value,
   jsonViewStyle,
   organizationId,
+  canShowExpressionTemplates,
 }: {
   section: RunInspectorNodeSection;
   value: unknown;
   jsonViewStyle: CSSProperties;
   organizationId?: string;
+  canShowExpressionTemplates: boolean;
 }) {
+  const expressionPreviewContext = useMemo(() => buildRuntimeExpressionContext(section), [section]);
+
   if (!hasObjectValue(value)) {
     return <EmptySectionText>No runtime configuration for this step.</EmptySectionText>;
   }
 
   if (section.configurationFields.length > 0) {
     return (
-      <RuntimeSchemaConfigForm fields={section.configurationFields} value={value} organizationId={organizationId} />
+      <RuntimeSchemaConfigForm
+        fields={section.configurationFields}
+        value={value}
+        templateValues={canShowExpressionTemplates ? section.workflowNode?.configuration : undefined}
+        organizationId={organizationId}
+        expressionPreviewContext={expressionPreviewContext}
+        expressionErrorMessage={section.errorMessage}
+      />
     );
   }
 
@@ -133,11 +148,17 @@ function RuntimeConfigForm({
 function RuntimeSchemaConfigForm({
   fields,
   value,
+  templateValues,
   organizationId,
+  expressionPreviewContext,
+  expressionErrorMessage,
 }: {
   fields: RunInspectorNodeSection["configurationFields"];
   value: Record<string, unknown>;
+  templateValues?: Record<string, unknown>;
   organizationId?: string;
+  expressionPreviewContext?: Record<string, unknown> | null;
+  expressionErrorMessage?: string;
 }) {
   return (
     <div className="space-y-4">
@@ -154,6 +175,9 @@ function RuntimeSchemaConfigForm({
             domainId={organizationId}
             organizationId={organizationId}
             readOnly
+            expressionPreviewContext={expressionPreviewContext}
+            expressionErrorMessage={expressionErrorMessage}
+            expressionTemplateValue={templateValues?.[field.name]}
           />
         );
       })}
