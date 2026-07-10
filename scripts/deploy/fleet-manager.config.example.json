@@ -9,6 +9,12 @@
   "reconcile_interval_sec": 60,
 
   "subnet_id": "subnet-CHANGEME",
+  "subnet_ids": [
+    "subnet-CHANGEME-a",
+    "subnet-CHANGEME-c",
+    "subnet-CHANGEME-d",
+    "subnet-CHANGEME-f"
+  ],
   "security_group_ids": ["sg-CHANGEME"],
   "iam_instance_profile": "YOUR_INSTANCE_PROFILE_WITH_S3_READ",
   "key_name": "",

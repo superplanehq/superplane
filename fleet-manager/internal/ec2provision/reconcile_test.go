@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/smithy-go"
 	"github.com/superplane/runner/shared/api"
 )
 
@@ -264,5 +265,54 @@ func TestDrainTerminationCandidates_FailsClosedWhenBrokerDrainFails(t *testing.T
 
 	if _, err := l.drainTerminationCandidates(context.Background(), []string{"i-idle"}); err == nil {
 		t.Fatal("expected drain error")
+	}
+}
+
+func TestLaunchAdditional_FallsBackToSingleInstanceBatches(t *testing.T) {
+	var batchSizes []int
+	launch := func(_ context.Context, count int) ([]string, error) {
+		batchSizes = append(batchSizes, count)
+		if count > 1 {
+			return nil, &smithy.GenericAPIError{Code: "InsufficientInstanceCapacity"}
+		}
+		return []string{"i-ok"}, nil
+	}
+
+	if err := launchAdditional(context.Background(), 3, defaultLaunchBatch, launch); err != nil {
+		t.Fatalf("launchAdditional: %v", err)
+	}
+	want := []int{3, 1, 1, 1}
+	if len(batchSizes) != len(want) {
+		t.Fatalf("batch sizes = %v, want %v", batchSizes, want)
+	}
+	for i := range want {
+		if batchSizes[i] != want[i] {
+			t.Fatalf("batch sizes = %v, want %v", batchSizes, want)
+		}
+	}
+}
+
+func TestLaunchAdditional_UsesConfiguredBatchSize(t *testing.T) {
+	var batchSizes []int
+	launch := func(_ context.Context, count int) ([]string, error) {
+		batchSizes = append(batchSizes, count)
+		ids := make([]string, count)
+		for i := range ids {
+			ids[i] = "i-ok"
+		}
+		return ids, nil
+	}
+
+	if err := launchAdditional(context.Background(), 7, defaultLaunchBatch, launch); err != nil {
+		t.Fatalf("launchAdditional: %v", err)
+	}
+	want := []int{5, 2}
+	if len(batchSizes) != len(want) {
+		t.Fatalf("batch sizes = %v, want %v", batchSizes, want)
+	}
+	for i := range want {
+		if batchSizes[i] != want[i] {
+			t.Fatalf("batch sizes = %v, want %v", batchSizes, want)
+		}
 	}
 }
