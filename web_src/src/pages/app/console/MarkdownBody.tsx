@@ -1,12 +1,9 @@
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
 import { MarkdownContent } from "../Markdown";
 
-import { CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES } from "./consoleCodeStyles";
-import { CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES } from "./consoleLinkStyles";
+import { useConsoleContext } from "./ConsoleContext";
 import { interpolateMarkdownTemplate } from "./markdownInterpolation";
 
 /**
@@ -14,8 +11,26 @@ import { interpolateMarkdownTemplate } from "./markdownInterpolation";
  * `{{ name.field }}` variable interpolation applied first. Returns `null`
  * when the resulting markdown is empty so the caller can decide whether to
  * show its own empty state.
+ *
+ * Canvas ids come from `ConsoleContext` so `[label](node:…)` links render as
+ * node chips the same way they do in the Files markdown preview. Link and
+ * inline-code styling live on `MarkdownContent` so Files and Console match.
  */
-export function MarkdownBody({ body, vars }: { body: string; vars: Record<string, unknown> }) {
+export function MarkdownBody({
+  body,
+  vars,
+  canvasId,
+  organizationId,
+}: {
+  body: string;
+  vars: Record<string, unknown>;
+  canvasId?: string;
+  organizationId?: string;
+}) {
+  const ctx = useConsoleContext();
+  const resolvedCanvasId = canvasId ?? ctx?.canvasId;
+  const resolvedOrganizationId = organizationId ?? ctx?.organizationId;
+
   // Interpolate `{{ name.field }}` (and `$["Node"]` run-node references) before
   // delegating to the shared markdown renderer so live values flow through the
   // same sanitize + GFM pipeline as static markdown. Trim here (not in
@@ -26,7 +41,8 @@ export function MarkdownBody({ body, vars }: { body: string; vars: Record<string
   return (
     <MarkdownContent
       content={interpolated}
-      className={cn(CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES, CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES)}
+      canvasId={resolvedCanvasId}
+      organizationId={resolvedOrganizationId}
       data-testid="console-markdown"
     />
   );
