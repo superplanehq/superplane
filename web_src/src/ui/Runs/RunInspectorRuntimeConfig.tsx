@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { cn } from "@/lib/utils";
-import { EmptySectionText, HeaderIconButton, JsonPayload, TimelineAccordionCard } from "./RunInspectorTimelineCard";
+import { EmptySectionText, JsonPayload, TimelineAccordionCard } from "./RunInspectorTimelineCard";
+import { HeaderIconButton } from "@/ui/HeaderIconButton";
 import { hasObjectValue, type RunInspectorNodeSection } from "./runNodeDetailModel";
 
 export function RuntimeTimelineCard({
