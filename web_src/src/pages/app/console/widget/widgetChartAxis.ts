@@ -49,7 +49,9 @@ export function formatXTooltipLabel(value: unknown, format: WidgetColumnFormat |
 }
 
 function isTimestampAxisBucket(value: unknown, format: WidgetColumnFormat | undefined): boolean {
-  if (format && format !== "datetime" && format !== "date") return false;
+  // `relative` matches date/datetime on the axis: compact day ticks + day dedupe.
+  // Live relative text belongs in table/number cells, not dense chart axes.
+  if (format && format !== "datetime" && format !== "date" && format !== "relative") return false;
   // Shared coercer rejects categorical digit strings / small numbers.
   return coerceWidgetTimestamp(value) != null;
 }

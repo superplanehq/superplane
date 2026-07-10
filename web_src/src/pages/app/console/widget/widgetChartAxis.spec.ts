@@ -32,4 +32,11 @@ describe("widgetChartAxis timestamp auto-detect", () => {
     expect(formatXTooltipLabel("404", "datetime")).toBe("404");
     expect(formatXAxisTick(12, "date")).toBe("12");
   });
+
+  it("uses compact date axis ticks for xFormat relative, not live relative text", () => {
+    const iso = "2026-05-26T16:10:00Z";
+    expect(formatXAxisTick(iso, "relative")).toMatch(/May/);
+    expect(formatXAxisTick(iso, "relative")).not.toMatch(/ago|in \d/);
+    expect(formatXTooltipLabel(iso, "relative")).toMatch(/May/);
+  });
 });

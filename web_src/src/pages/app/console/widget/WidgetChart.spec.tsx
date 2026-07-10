@@ -408,6 +408,28 @@ describe("WidgetChart axis formatting", () => {
     expect(visible).toEqual(["Jul 5", "Jul 6"]);
   });
 
+  it("dedupes day ticks for xFormat relative like date/datetime", () => {
+    const TIME_ROWS = [
+      { day: "2026-07-05T10:00:00Z", cost: 10 },
+      { day: "2026-07-05T14:00:00Z", cost: 11 },
+      { day: "2026-07-06T10:00:00Z", cost: 13 },
+    ];
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "bar",
+        xField: "day",
+        xFormat: "relative",
+        series: [{ field: "cost", label: "Cost" }],
+      },
+      { rows: TIME_ROWS },
+    );
+    const ticks = tickTexts(container, "xAxis");
+    const visible = ticks.filter((text) => text.trim() !== "");
+    expect(visible).toEqual(["Jul 5", "Jul 6"]);
+    expect(visible.every((text) => !/ago|^\d+[smhd]$/.test(text))).toBe(true);
+  });
+
   it("passes a labelFormatter to the tooltip that mirrors xFormat date", () => {
     tooltipContentProps.value = null as Record<string, unknown> | null;
     renderChart(
