@@ -125,6 +125,7 @@ import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
+import { useAgentNodeFocusRequest, type CanvasFocusRequest } from "./useAgentNodeFocusRequest";
 import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
 import { useComponentIconMap } from "./useComponentIconMap";
 import { useRunSidebarNavigationState } from "./useRunSidebarNavigationState";
@@ -1589,12 +1590,7 @@ export function AppPage() {
   });
 
   const [currentHistoryNode, setCurrentHistoryNode] = useState<{ nodeId: string; nodeType: string } | null>(null);
-  const [focusRequest, setFocusRequest] = useState<{
-    nodeId: string;
-    requestId: number;
-    targetMode: "live" | "runs";
-    tab?: "latest" | "settings";
-  } | null>(null);
+  const [focusRequest, setFocusRequest] = useState<CanvasFocusRequest | null>(null);
   const handleSidebarChange = useCallback(
     (open: boolean, nodeId: string | null) => {
       // Use the functional updater so this composes with other concurrent
@@ -3340,6 +3336,7 @@ export function AppPage() {
   );
 
   const runInspectionChromeActive = isRunInspectionMode && !editSessionActive && !isEnteringEditSession;
+  useAgentNodeFocusRequest(setFocusRequest, runInspectionChromeActive);
   const runParticipantFit = useRunParticipantFitRequest({
     isRunInspectionMode: runInspectionChromeActive,
     selectedRunId,
