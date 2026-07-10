@@ -185,9 +185,13 @@ export function JsonPayload({
 
           return (
             <>
-              <JsonView.ValueQuote />
+              <span aria-hidden className={props.className}>
+                &quot;
+              </span>
               <span {...props}>{escapeJsonStringValue(displayValue)}</span>
-              <JsonView.ValueQuote />
+              <span aria-hidden className={props.className}>
+                &quot;
+              </span>
             </>
           );
         }}
