@@ -50,6 +50,7 @@ function runLookupEventFromExecution(nodeId: string, execution: CanvasesCanvasNo
     executionId,
     originalExecution: execution,
     kind: "execution",
+    runId: execution.runId || execution.rootEvent?.runId,
   };
 }
 
@@ -67,6 +68,7 @@ function runLookupEventFromTriggerEvent(nodeId: string, event: CanvasesCanvasEve
     triggerEventId: event.id,
     originalEvent: event,
     kind: "trigger",
+    runId: event.runId,
   };
 }
 
@@ -96,5 +98,5 @@ export function resolveCachedNodeRunId(
   const nodeType = workflowNode.type || "TYPE_ACTION";
   const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
   const lookupEvent = resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
-  return lookupEvent ? resolveRunId(lookupEvent) : null;
+  return lookupEvent?.runId || (lookupEvent ? resolveRunId(lookupEvent) : null);
 }

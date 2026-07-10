@@ -26,28 +26,39 @@ Storybook fixture for the **Files** tab and Console markdown panel.
 
 ## Sections
 
-Presets pick icon + accent: `tools`, `rules`, `skills`, `mcp`, `folder`.
-Trailing meta after ` · ` is optional. Nested sections show a count on the parent.
+Presets pick icon + accent: `overview`, `setup`, `runbook`, `run`, `troubleshoot`,
+`agent`, `integrations`, `group`. Trailing meta after ` · ` is optional. Nested
+sections show a count on the parent.
 
-> [!SECTION:tools] Tool definitions · ~9,202
-> Descriptions of tools the agent can call.
+> [!SECTION:overview] Clean Code Assessment
+> Scores pull requests for maintainability and posts a self-updating comment.
 
-> [!SECTION:rules] Rules · ~5,366
-> Standing instructions the agent follows each turn. Keep them focused and lightweight.
+> [!SECTION:setup] Prerequisites
+> Connect `[GitHub](integration:github)` and `[Cursor](integration:cursor)` before the first run.
+
+> [!SECTION:runbook] Score a pull request · on-call
+> Trigger from a PR event, wait for analysis, then review the posted comment.
 >
 > Nested markdown still works: [docs](https://docs.superplane.com) and `inline code`.
 >
-> > [!SECTION:folder] Project Rules · ~2,752
-> > Project-local guidance from `AGENTS.md` and related files.
+> > [!SECTION:group] Analysis
+> > `[Analyze PR](node:analyze-pr)` runs the scoring pass.
 >
-> > [!SECTION:rules] Cursor & User Rules · ~2,522
-> > Personal and Cursor-level standing instructions.
+> > [!SECTION:group] Reporting
+> > `[Post Assessment](node:post-assessment)` updates the PR comment.
 
-> [!SECTION:skills] Scoring
-> The agent checks out the PR, runs metric tooling, and posts a self-updating comment.
+> [!SECTION:run] Promote after green canary · prod
+> 1. Confirm health checks passed.
+> 2. Promote with the deploy node on the canvas.
 
-> [!SECTION:mcp] MCP servers · 3
-> Connected tools the agent can call through Model Context Protocol.
+> [!SECTION:troubleshoot] Analysis stuck
+> Re-run `[Analyze PR](node:analyze-pr)` if the Cursor job times out.
+
+> [!SECTION:agent] Agent notes
+> Prefer `node:` chips when linking canvas steps. Keep standing instructions short.
+
+> [!SECTION:integrations] Connected integrations · GitHub, Slack
+> Wire org integrations into nodes with `[GitHub](integration:github)` chips.
 
 ## Code
 
