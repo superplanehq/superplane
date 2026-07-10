@@ -16,8 +16,9 @@ type FocusRequestSetter = (request: {
 
 /**
  * Persists node-chip focus across canvas remounts (e.g. leaving Files mode, which
- * unmounts ReactFlow). The CanvasContent `agent:focus-node` listener alone is not
- * enough when that tree is not mounted at click time.
+ * unmounts ReactFlow). Node chips dispatch `agent:focus-node`; AppPage owns that
+ * event and converts it to `focusRequest`. CanvasContent applies `focusRequest`
+ * only — it does not listen for the event directly.
  */
 export function useAgentNodeFocusRequest(setFocusRequest: FocusRequestSetter): void {
   useEffect(() => {

@@ -91,8 +91,11 @@ export function getNodeHoverMetadataItems(node: SuperplaneComponentsNode, compon
         return props.metadata;
       }
     }
-  } catch {
-    // Mapper failures should not break chip hover; fall through to summarizers.
+  } catch (error) {
+    // Hover cards must not crash on mapper failures; fall through to summarizers.
+    if (import.meta.env.DEV) {
+      console.warn(`Failed to resolve hover metadata for ${componentName}`, error);
+    }
   }
 
   return fallbackMetadataItems(componentName, node.configuration);

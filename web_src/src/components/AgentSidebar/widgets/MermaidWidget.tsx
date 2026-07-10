@@ -111,12 +111,14 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
   return (
     <>
-      <div
+      <button
+        type="button"
         onClick={() => setExpanded(true)}
-        className="my-4 w-full min-w-0 cursor-pointer overflow-x-auto rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
+        aria-label="Expand diagram"
+        className="my-4 w-full min-w-0 cursor-pointer overflow-x-auto rounded-lg border border-slate-200 bg-white p-3 text-left transition-colors hover:border-slate-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
       >
         <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: svg }} />
-      </div>
+      </button>
 
       <FullscreenContentDialog
         open={expanded}

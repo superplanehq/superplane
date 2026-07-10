@@ -10,8 +10,6 @@ import { HeaderIconButton } from "@/ui/HeaderIconButton";
 import { escapeJsonStringValue } from "./runInspectorJson";
 import type { InternalAccordionKey, StatusPill } from "./RunInspectorTimelineTypes";
 
-export { HeaderIconButton } from "@/ui/HeaderIconButton";
-
 export function TimelineAccordionCard({
   value,
   status,
