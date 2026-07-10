@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 const RUN_INSPECTOR_AUTO_OPEN_STORAGE_KEY = "superplane.runInspector.autoOpen";
+const ALL_RUN_DETAILS_DISMISSED = "__all__";
 
 export function runInspectorAutoOpenStorageKey(canvasId?: string): string {
   return canvasId ? `${RUN_INSPECTOR_AUTO_OPEN_STORAGE_KEY}:${canvasId}` : RUN_INSPECTOR_AUTO_OPEN_STORAGE_KEY;
+}
+
+export function isRunDetailDismissed(detailDismissedForRunId: string | null, runId: string | null): boolean {
+  if (!runId) return false;
+  return detailDismissedForRunId === ALL_RUN_DETAILS_DISMISSED || detailDismissedForRunId === runId;
 }
 
 function readRunInspectorAutoOpen(canvasId?: string): boolean {
@@ -58,8 +64,11 @@ export function useRunsDetailState(
   options: UseRunsDetailStateOptions = {},
 ) {
   const { canvasId, onBackToRunList } = options;
-  const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(() => Boolean(searchParams.get("run")));
-  const [autoOpenRunDetail, setAutoOpenRunDetail] = useState(() => readRunInspectorAutoOpen(canvasId));
+  const initialAutoOpenRunDetail = readRunInspectorAutoOpen(canvasId);
+  const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(
+    () => initialAutoOpenRunDetail && Boolean(searchParams.get("run")),
+  );
+  const [autoOpenRunDetail, setAutoOpenRunDetail] = useState(() => initialAutoOpenRunDetail);
   const urlRunDetailNodeId = useMemo(
     () => getRunDetailNodeIdFromSearchParams(searchParams, isRunInspectionMode, selectedRunId),
     [isRunInspectionMode, searchParams, selectedRunId],
@@ -67,7 +76,9 @@ export function useRunsDetailState(
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(() =>
     getRunDetailNodeIdFromSearchParams(searchParams, isRunInspectionMode, selectedRunId),
   );
-  const [detailDismissedForRunId, setDetailDismissedForRunId] = useState<string | null>(null);
+  const [detailDismissedForRunId, setDetailDismissedForRunId] = useState<string | null>(() =>
+    initialAutoOpenRunDetail || !searchParams.get("run") ? null : ALL_RUN_DETAILS_DISMISSED,
+  );
   const wasRunInspectionModeRef = useRef(isRunInspectionMode);
   const previousSelectedRunIdForDetailRef = useRef<string | null>(selectedRunId);
   const previousUrlRunDetailNodeIdRef = useRef<string | null>(urlRunDetailNodeId);
@@ -77,8 +88,11 @@ export function useRunsDetailState(
     if (previousCanvasIdRef.current === canvasId) return;
 
     previousCanvasIdRef.current = canvasId;
-    setAutoOpenRunDetail(readRunInspectorAutoOpen(canvasId));
-  }, [canvasId]);
+    const nextAutoOpenRunDetail = readRunInspectorAutoOpen(canvasId);
+    setAutoOpenRunDetail(nextAutoOpenRunDetail);
+    setOpenRunDetailOnMount(nextAutoOpenRunDetail && Boolean(searchParams.get("run")));
+    setDetailDismissedForRunId(nextAutoOpenRunDetail || !searchParams.get("run") ? null : ALL_RUN_DETAILS_DISMISSED);
+  }, [canvasId, searchParams]);
 
   useEffect(() => {
     if (!searchParams.get("run")) {
@@ -145,7 +159,7 @@ export function useRunsDetailState(
 
   const maybeOpenRunDetailForRun = useCallback(
     (runId: string | null) => {
-      setDetailDismissedForRunId(autoOpenRunDetail ? null : runId);
+      setDetailDismissedForRunId(autoOpenRunDetail ? null : runId ? ALL_RUN_DETAILS_DISMISSED : null);
     },
     [autoOpenRunDetail],
   );

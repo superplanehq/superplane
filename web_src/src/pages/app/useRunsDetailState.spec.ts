@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { runInspectorAutoOpenStorageKey, useRunsDetailState } from "./useRunsDetailState";
+import { isRunDetailDismissed, runInspectorAutoOpenStorageKey, useRunsDetailState } from "./useRunsDetailState";
 
 function makeSearchParams(params: Record<string, string> = {}) {
   return new URLSearchParams(params);
@@ -15,6 +15,17 @@ describe("useRunsDetailState", () => {
     const { result } = renderHook(() => useRunsDetailState(makeSearchParams({ run: "run-1" }), true, "run-1"));
 
     expect(result.current.openRunDetailOnMount).toBe(true);
+  });
+
+  it("respects persisted closed detail on mount when run is in the URL", () => {
+    window.localStorage.setItem(runInspectorAutoOpenStorageKey("canvas-1"), "false");
+
+    const { result } = renderHook(() =>
+      useRunsDetailState(makeSearchParams({ run: "run-1" }), true, "run-1", undefined, { canvasId: "canvas-1" }),
+    );
+
+    expect(result.current.openRunDetailOnMount).toBe(false);
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-1")).toBe(true);
   });
 
   it("restores the selected run node on mount when the URL points at the detail pane", () => {
@@ -320,7 +331,8 @@ describe("useRunsDetailState", () => {
       result.current.maybeOpenRunDetailForRun("run-2");
     });
 
-    expect(result.current.detailDismissedForRunId).toBe("run-2");
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-1")).toBe(true);
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-2")).toBe(true);
   });
 
   it("persists auto-open again when a node opens run detail", () => {

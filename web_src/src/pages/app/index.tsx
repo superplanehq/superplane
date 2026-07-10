@@ -22,6 +22,7 @@ import type {
   OrganizationsIntegration,
 } from "@/api-client";
 import { canvasesReemitTriggerEvent } from "@/api-client";
+import type { RunSidebarNavigationState } from "@/components/CanvasToolSidebar/runsSidebarNavigation";
 import { Button } from "@/components/ui/button";
 import {
   renderCanvasRunsSidebarPanel,
@@ -123,7 +124,7 @@ import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
-import { useRunsDetailState } from "./useRunsDetailState";
+import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
 import { useSidebarEventRunLookup } from "@/hooks/useSidebarEventRunLookup";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
@@ -487,6 +488,7 @@ export function AppPage() {
   const canvasForPrep = canvas ?? ((isEditing || isEnteringEditSession) && liveCanvas ? liveCanvas : null);
 
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
+  const [runNavigation, setRunNavigation] = useState<RunSidebarNavigationState | null>(null);
   const runApiFilters = useMemo(
     () => (isRunInspectionMode && selectedRunId ? {} : statusFiltersToApiFilters(runStatusFilters)),
     [isRunInspectionMode, selectedRunId, runStatusFilters],
@@ -4093,6 +4095,7 @@ export function AppPage() {
   // Canvas, Console, or Files surfaces (hidden in Memory and run inspection).
   // Within the edit session it can be shown/hidden with the header toggle.
   const showVersionsSidebar = editSessionActive && !runInspectionChromeActive && !urlViewFlags.isMemoryMode;
+  const selectedRunDetailDismissed = isRunDetailDismissed(detailDismissedForRunId, selectedRunId);
 
   const toolSidebarRunsContent = renderCanvasRunsSidebarPanel({
     isOpen: showRunsSidebar,
@@ -4102,7 +4105,6 @@ export function AppPage() {
     selectedRun,
     isSelectedRunLoading,
     onSelectRun: handleSelectRun,
-    onNavigateRun: handleNavigateRun,
     onSelectLiveCanvas: handleSelectLiveCanvas,
     onBackToRunList: handleBackToRunList,
     initialOpenDetail: openRunDetailOnMount,
@@ -4118,6 +4120,7 @@ export function AppPage() {
     workflowNodes: canvasNodes,
     componentIconMap,
     onStatusFiltersChange: setRunStatusFilters,
+    onRunNavigationChange: setRunNavigation,
   });
   const toolSidebarVersionsContent = renderCanvasVersionsSidebarPanel({
     isOpen: showVersionsSidebar,
@@ -4266,20 +4269,19 @@ export function AppPage() {
           initialFocusNodeId={initialFocusNodeIdRef.current}
           {...runParticipantFit.canvasFitProps}
           runCanvasLoading={
-            runInspectionChromeActive &&
-            selectedRunId !== null &&
-            detailDismissedForRunId !== selectedRunId &&
-            runCanvasLoading
+            runInspectionChromeActive && selectedRunId !== null && !selectedRunDetailDismissed && runCanvasLoading
           }
           runNodeDetailRun={
-            runInspectionChromeActive && selectedRunId && detailDismissedForRunId !== selectedRunId ? selectedRun : null
+            runInspectionChromeActive && selectedRunId && !selectedRunDetailDismissed ? selectedRun : null
           }
           runNodeDetailNodeId={runDetailNodeId}
           runNodeDetailCanvasId={canvasId}
           runNodeDetailEdges={selectedRunCanvas?.spec?.edges}
+          runNavigation={runNavigation}
           onRunNodeDetailClose={handleBackToRunList}
           onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
+          onRunNavigate={handleNavigateRun}
           onBackToLiveCanvas={handleSelectLiveCanvas}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}

@@ -4,6 +4,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
+import type { RunSidebarNavigationState } from "@/components/CanvasToolSidebar/runsSidebarNavigation";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
 import type { ReactNode } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
@@ -16,7 +17,6 @@ export interface CanvasRunsSidebarPanelConfig {
   selectedRun?: CanvasesCanvasRun | null;
   isSelectedRunLoading?: boolean;
   onSelectRun: (runId: string) => void;
-  onNavigateRun?: (runId: string) => void;
   onSelectLiveCanvas: () => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
@@ -32,6 +32,7 @@ export interface CanvasRunsSidebarPanelConfig {
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
+  onRunNavigationChange?: (navigation: RunSidebarNavigationState) => void;
 }
 
 export interface CanvasVersionsSidebarPanelConfig {
