@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Folder, List, Plug, Sparkles, Wrench } from "lucide-react";
 
-export const MARKDOWN_SECTION_PRESET_IDS = ["tools", "rules", "skills", "mcp", "folder"] as const;
+export const MARKDOWN_SECTION_PRESET_IDS = ["tools", "rules", "skills", "integrations", "folder"] as const;
 
 export type MarkdownSectionPresetId = (typeof MARKDOWN_SECTION_PRESET_IDS)[number];
 
@@ -37,8 +37,8 @@ export const MARKDOWN_SECTION_PRESETS: Record<MarkdownSectionPresetId, MarkdownS
     iconClassName: "text-cyan-600 dark:text-cyan-400",
     barClassName: "bg-cyan-100/70 dark:bg-cyan-950/40",
   },
-  mcp: {
-    id: "mcp",
+  integrations: {
+    id: "integrations",
     Icon: Plug,
     iconClassName: "text-sky-600 dark:text-sky-400",
     barClassName: "bg-sky-100/70 dark:bg-sky-950/40",

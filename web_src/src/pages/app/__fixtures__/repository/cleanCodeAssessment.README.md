@@ -26,7 +26,7 @@ Storybook fixture for the **Files** tab and Console markdown panel.
 
 ## Sections
 
-Presets pick icon + accent: `tools`, `rules`, `skills`, `mcp`, `folder`.
+Presets pick icon + accent: `tools`, `rules`, `skills`, `integrations`, `folder`.
 Trailing meta after ` · ` is optional. Nested sections show a count on the parent.
 
 > [!SECTION:tools] Tool definitions · ~9,202
@@ -46,8 +46,8 @@ Trailing meta after ` · ` is optional. Nested sections show a count on the pare
 > [!SECTION:skills] Scoring
 > The agent checks out the PR, runs metric tooling, and posts a self-updating comment.
 
-> [!SECTION:mcp] MCP servers · 3
-> Connected tools the agent can call through Model Context Protocol.
+> [!SECTION:integrations] Connected integrations · GitHub, Slack
+> Wire org integrations into nodes with `[GitHub](integration:github)` chips.
 
 ## Code
 

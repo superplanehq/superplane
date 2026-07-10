@@ -196,6 +196,12 @@ describe("MarkdownContent", () => {
     expect(section).toHaveTextContent("~9,202");
   });
 
+  it("applies the integrations section preset", () => {
+    render(<MarkdownContent content={"> [!SECTION:integrations] Connected integrations\n> Body copy."} />);
+
+    expect(screen.getByTestId("markdown-section")).toHaveAttribute("data-section-preset", "integrations");
+  });
+
   it("shows a count of direct nested sections beside the title", () => {
     render(
       <MarkdownContent
