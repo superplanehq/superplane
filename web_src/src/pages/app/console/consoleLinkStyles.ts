@@ -8,8 +8,9 @@ export const CONSOLE_LINK_CLASSES =
 
 /**
  * Tailwind selector utilities applied to all `<a>` tags inside console panel
- * bodies. For HTML panels, mount on a wrapper outside `dark-mode-disabled` so
- * `dark:` link colors still apply when the app is in dark mode.
+ * bodies and shared markdown (`MarkdownContent`). For HTML panels, mount on a
+ * wrapper outside `dark-mode-disabled` so `dark:` link colors still apply when
+ * the app is in dark mode.
  */
 export const CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES =
   "[&_a]:text-sky-600 [&_a]:no-underline [&_a]:underline-offset-2 [&_a]:hover:!underline [&_a]:hover:text-sky-700 dark:[&_a]:text-indigo-300 dark:[&_a]:hover:!underline dark:[&_a]:hover:text-indigo-200";
