@@ -1,3 +1,5 @@
+import { materializeConsoleSpec } from "../lib/workflow-spec-files";
+
 import defaultRaw from "./canvasAppResponses.json";
 import cleanCodeAssessmentReadme from "./repository/cleanCodeAssessment.README.md?raw";
 
@@ -50,11 +52,37 @@ export interface CanvasAppFixture {
 
 const DEFAULT_REPOSITORY_FILE_PATHS = ["README.md", "canvas.yaml", "console.yaml"] as const;
 
+const capturedFixture = defaultRaw as CanvasAppFixture;
+
+// Live Canvas stories need a real console.yaml: `useCanvasConsole` treats an
+// empty/missing file as `undefined`, which TanStack Query rejects. Seed one
+// markdown panel that reuses the README showcase so Console and Files stay in
+// sync while we prototype markdown rendering.
+const defaultConsoleYaml =
+  capturedFixture.consoleYaml ??
+  materializeConsoleSpec({
+    canvasId: capturedFixture.canvasId,
+    canvasName: capturedFixture.canvas?.canvas?.metadata?.name ?? "Clean Code Assessment",
+    panels: [
+      {
+        id: "markdown-showcase",
+        type: "markdown",
+        content: {
+          title: "Markdown showcase",
+          body: cleanCodeAssessmentReadme,
+          variables: [],
+        },
+      },
+    ],
+    layout: [{ i: "markdown-showcase", x: 0, y: 0, w: 12, h: 20, minW: 4, minH: 4 }],
+  });
+
 const defaultFixture = {
-  ...(defaultRaw as CanvasAppFixture),
+  ...capturedFixture,
+  consoleYaml: defaultConsoleYaml,
   repositoryFileContents: {
     "README.md": cleanCodeAssessmentReadme,
-    ...(defaultRaw as CanvasAppFixture).repositoryFileContents,
+    ...capturedFixture.repositoryFileContents,
   },
 } satisfies CanvasAppFixture;
 
