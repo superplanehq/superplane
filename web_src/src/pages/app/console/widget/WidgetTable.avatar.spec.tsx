@@ -7,17 +7,25 @@ import { ConsoleContextProvider } from "../ConsoleContextProvider";
 import { WidgetTable } from "./WidgetTable";
 import type { WidgetTableRender } from "./types";
 
-function renderAvatar(tableRender: WidgetTableRender, rows: unknown[]) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+function buildTree(queryClient: QueryClient, tableRender: WidgetTableRender, rows: unknown[]) {
+  return (
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
         <ConsoleContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
           <WidgetTable render={tableRender} rows={rows} isLoading={false} />
         </ConsoleContextProvider>
       </QueryClientProvider>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderAvatar(tableRender: WidgetTableRender, rows: unknown[]) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const view = render(buildTree(queryClient, tableRender, rows));
+  return {
+    ...view,
+    rerenderRows: (nextRows: unknown[]) => view.rerender(buildTree(queryClient, tableRender, nextRows)),
+  };
 }
 
 const AVATAR_RENDER: WidgetTableRender = {
@@ -77,6 +85,23 @@ describe("WidgetTable avatar column", () => {
     const fallback = screen.getByTestId("widget-avatar-fallback");
     expect(fallback.className).toContain("rounded-full");
     expect(fallback.getAttribute("aria-label")).toBe("Avatar");
+    view.unmount();
+  });
+
+  it("retries with a fresh <img> when the URL changes after a load error", async () => {
+    const view = renderAvatar(AVATAR_RENDER, [
+      { id: "row-1", name: "Ada", avatarUrl: "https://example.com/broken.png" },
+    ]);
+    const img = view.container.querySelector("table tbody tr td:nth-child(2) img")!;
+    await act(async () => {
+      fireEvent.error(img);
+    });
+    expect(view.container.querySelector("table tbody tr td:nth-child(2) img")).toBeNull();
+
+    view.rerenderRows([{ id: "row-1", name: "Ada", avatarUrl: "https://example.com/fixed.png" }]);
+    const retried = view.container.querySelector("table tbody tr td:nth-child(2) img");
+    expect(retried).not.toBeNull();
+    expect(retried!.getAttribute("src")).toBe("https://example.com/fixed.png");
     view.unmount();
   });
 });

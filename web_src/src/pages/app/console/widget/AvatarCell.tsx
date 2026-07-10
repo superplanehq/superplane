@@ -14,12 +14,15 @@ const AVATAR_CLASS =
  * leaks into the table.
  */
 export function AvatarCell({ url, label }: { url: string; label: string }) {
-  const [failed, setFailed] = useState(false);
+  // Track the URL that failed (not just a boolean) so a prop change to a new
+  // URL automatically retries with a fresh <img> instead of staying stuck on
+  // the fallback disc.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const trimmed = url.trim();
   if (!trimmed) {
     return <span className="text-slate-300 dark:text-gray-600">—</span>;
   }
-  if (failed) {
+  if (failedUrl === trimmed) {
     return <span className={AVATAR_CLASS} aria-label={label} data-testid="widget-avatar-fallback" />;
   }
   return (
@@ -28,7 +31,7 @@ export function AvatarCell({ url, label }: { url: string; label: string }) {
       alt={label}
       loading="lazy"
       referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
+      onError={() => setFailedUrl(trimmed)}
       className={AVATAR_CLASS}
       data-testid="widget-avatar"
     />
