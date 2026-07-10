@@ -21,7 +21,7 @@ func TestStatusCommandPrintsStagedPaths(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == stagingPath(testAppID) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["canvas.yaml","console.yaml"],"baseVersionId":"version-1","stale":false}}`))
+			_, _ = w.Write([]byte(`{"staging":{"hasStaging":true,"stagedPaths":["canvas.yaml","console.yaml"],"baseVersionId":"version-1","stale":false}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -40,7 +40,7 @@ func TestStatusCommandPrintsNothingWhenEmpty(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == stagingPath(testAppID) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":false}}`))
+			_, _ = w.Write([]byte(`{"staging":{"hasStaging":false}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -59,7 +59,7 @@ func TestUpdateCommandStagesFiles(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut && r.URL.Path == stagingPath(testAppID) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"stagingSummary":{"hasStaging":true,"stagedPaths":["canvas.yaml","README.md"]}}`))
+			_, _ = w.Write([]byte(`{"staging":{"hasStaging":true,"stagedPaths":["canvas.yaml","README.md"]}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)

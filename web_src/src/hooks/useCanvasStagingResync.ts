@@ -1,10 +1,8 @@
 import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { fetchStagedCanvasVersionWithSpec } from "@/pages/app/lib/repository-spec-files";
-
-import { canvasKeys } from "@/hooks/useCanvasData";
+import type { CanvasesCanvas, CanvasesCanvasVersion, CanvasesStaging } from "@/api-client";
+import { canvasKeys, fetchFreshCanvasStaging } from "@/hooks/useCanvasData";
 
 type CanvasSpec = CanvasesCanvas["spec"] | null;
 
@@ -20,12 +18,154 @@ interface UseCanvasStagingResyncOptions {
   setStagingResetNonce: Dispatch<SetStateAction<number>>;
 }
 
-type ResyncStagedOptions = {
+export type ResyncStagedOptions = {
   /** Bumps stagingResetNonce so file/console baselines reset. Avoid when entering edit from agent staging — it remounts CanvasPage and can loop auto-open. */
   bumpResetNonce?: boolean;
-  /** When true, reuse a warm stagedCanvasSpec cache instead of forcing a refetch. */
-  preferCachedStagedSpec?: boolean;
+  /** When true, reuse a warm staging cache instead of forcing a refetch. */
+  preferCachedStaging?: boolean;
 };
+
+export const FRESH_STAGING_RESYNC_OPTIONS: ResyncStagedOptions = {
+  bumpResetNonce: false,
+  preferCachedStaging: false,
+};
+
+type ResyncStagedEditorState = (versionId: string, options?: ResyncStagedOptions) => Promise<void>;
+
+type AgentCanvasStagingHandlersOptions = {
+  handleRemoteStagingUpdatedRef: MutableRefObject<() => Promise<void>>;
+  canvasId?: string;
+  effectiveLiveCanvasVersionId?: string;
+  editSessionActive: boolean;
+  editSessionActiveRef: MutableRefObject<boolean>;
+  activeCanvasVersionIdRef: MutableRefObject<string>;
+  isViewingCurrentLiveVersion: boolean;
+  resyncStagedEditorState: ResyncStagedEditorState;
+  enterLiveEditSessionRef: MutableRefObject<() => Promise<boolean>>;
+  queryClient: QueryClient;
+};
+
+export function useAgentCanvasStagingHandlers({
+  handleRemoteStagingUpdatedRef,
+  canvasId,
+  effectiveLiveCanvasVersionId,
+  editSessionActive,
+  editSessionActiveRef,
+  activeCanvasVersionIdRef,
+  isViewingCurrentLiveVersion,
+  resyncStagedEditorState,
+  enterLiveEditSessionRef,
+  queryClient,
+}: AgentCanvasStagingHandlersOptions) {
+  handleRemoteStagingUpdatedRef.current = () =>
+    handleRemoteCanvasStagingUpdated({
+      canvasId,
+      targetVersionId: effectiveLiveCanvasVersionId,
+      queryClient,
+      isEditingTargetVersion:
+        editSessionActiveRef.current && activeCanvasVersionIdRef.current === effectiveLiveCanvasVersionId,
+      resyncStagedEditorState,
+      enterLiveEditSession: () => enterLiveEditSessionRef.current(),
+    });
+
+  return useCallback(
+    () =>
+      handleAgentCanvasStagingReady({
+        targetVersionId: effectiveLiveCanvasVersionId,
+        editSessionActive,
+        isViewingCurrentLiveVersion,
+        resyncStagedEditorState,
+        enterLiveEditSession: () => enterLiveEditSessionRef.current(),
+      }),
+    [
+      editSessionActive,
+      effectiveLiveCanvasVersionId,
+      enterLiveEditSessionRef,
+      isViewingCurrentLiveVersion,
+      resyncStagedEditorState,
+    ],
+  );
+}
+
+export async function handleRemoteCanvasStagingUpdated(options: {
+  canvasId?: string;
+  targetVersionId?: string;
+  queryClient: QueryClient;
+  isEditingTargetVersion: boolean;
+  resyncStagedEditorState: ResyncStagedEditorState;
+  enterLiveEditSession: () => Promise<boolean>;
+}): Promise<void> {
+  const {
+    canvasId,
+    targetVersionId,
+    queryClient,
+    isEditingTargetVersion,
+    resyncStagedEditorState,
+    enterLiveEditSession,
+  } = options;
+  if (!targetVersionId || !canvasId) {
+    return;
+  }
+
+  if (isEditingTargetVersion) {
+    await resyncStagedEditorState(targetVersionId, FRESH_STAGING_RESYNC_OPTIONS);
+    return;
+  }
+
+  const staging = await fetchFreshCanvasStaging(queryClient, canvasId);
+  if (!staging?.hasStaging) {
+    return;
+  }
+
+  await enterLiveEditSession();
+}
+
+export async function handleAgentCanvasStagingReady(options: {
+  targetVersionId?: string;
+  editSessionActive: boolean;
+  isViewingCurrentLiveVersion: boolean;
+  resyncStagedEditorState: ResyncStagedEditorState;
+  enterLiveEditSession: () => Promise<boolean>;
+}): Promise<boolean> {
+  const {
+    targetVersionId,
+    editSessionActive,
+    isViewingCurrentLiveVersion,
+    resyncStagedEditorState,
+    enterLiveEditSession,
+  } = options;
+  if (!targetVersionId) {
+    return false;
+  }
+
+  if (editSessionActive && isViewingCurrentLiveVersion) {
+    await resyncStagedEditorState(targetVersionId, FRESH_STAGING_RESYNC_OPTIONS);
+    return true;
+  }
+
+  return enterLiveEditSession();
+}
+
+async function resolveStaging(
+  queryClient: ReturnType<typeof useQueryClient>,
+  canvasId: string,
+  preferCachedStaging: boolean,
+): Promise<CanvasesStaging> {
+  const stagingKey = canvasKeys.canvasStaging(canvasId);
+  const cachedStaging = queryClient.getQueryData<CanvasesStaging>(stagingKey);
+  const cachedStagingQueryState = queryClient.getQueryState(stagingKey);
+
+  if (
+    preferCachedStaging &&
+    cachedStaging?.spec &&
+    cachedStagingQueryState?.isInvalidated !== true &&
+    cachedStagingQueryState?.fetchStatus !== "fetching"
+  ) {
+    return cachedStaging;
+  }
+
+  return fetchFreshCanvasStaging(queryClient, canvasId);
+}
 
 // Re-applies the staged (uncommitted) spec into React editor state after a remote
 // staging_updated event. The graph reads local state, not React Query, so query
@@ -93,7 +233,7 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
       }
 
       const bumpResetNonce = options?.bumpResetNonce ?? true;
-      const preferCachedStagedSpec = options?.preferCachedStagedSpec ?? false;
+      const preferCachedStaging = options?.preferCachedStaging ?? false;
 
       const resyncPromise = (async () => {
         if (activeCanvasVersionIdRef.current !== versionId) {
@@ -101,44 +241,12 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
           return;
         }
 
-        const versionShell = queryClient.getQueryData<CanvasesCanvasVersion>(
-          canvasKeys.versionDetail(canvasId, versionId),
-        ) ??
-          queryClient
-            .getQueryData<CanvasesCanvasVersion[]>(canvasKeys.versionList(canvasId))
-            ?.find((item) => item.metadata?.id === versionId) ?? { metadata: { id: versionId } };
-
-        const stagedCanvasSpecKey = canvasKeys.stagedCanvasSpec(canvasId);
-        const cachedStaged = preferCachedStagedSpec
-          ? queryClient.getQueryData<CanvasesCanvasVersion>(stagedCanvasSpecKey)
-          : undefined;
-        const cachedStagedQueryState = preferCachedStagedSpec
-          ? queryClient.getQueryState(stagedCanvasSpecKey)
-          : undefined;
-
-        if (
-          cachedStaged?.spec &&
-          cachedStaged.metadata?.id === versionId &&
-          cachedStagedQueryState?.isInvalidated !== true
-        ) {
-          applyStagedSpec(versionId, cachedStaged.spec);
-          return;
-        }
-
         consoleMutationGenerationRef.current += 1;
-        await queryClient.cancelQueries({ queryKey: stagedCanvasSpecKey });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+        const staging = await resolveStaging(queryClient, canvasId, preferCachedStaging);
+        const stagedSpec = staging?.spec ?? null;
 
-        const stagedVersion = await fetchStagedCanvasVersionWithSpec(canvasId, versionShell);
-        const stagedSpec = stagedVersion?.spec ?? null;
-
-        // Apply editor state before updating the staged query cache so draft sync
-        // effects cannot briefly overwrite resynced content with a stale snapshot.
         applyStagedSpec(versionId, stagedSpec);
-        await queryClient.cancelQueries({ queryKey: stagedCanvasSpecKey });
-        queryClient.setQueryData(stagedCanvasSpecKey, stagedVersion ?? null);
+        queryClient.setQueryData(canvasKeys.canvasStaging(canvasId), staging);
 
         if (bumpResetNonce) {
           setStagingResetNonce((nonce) => nonce + 1);

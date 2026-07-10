@@ -18,7 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func PutCanvasStaging(ctx context.Context, organizationID string, canvasID string, operations []*pb.CanvasRepositoryFileOperation) (*pb.StagingSummary, error) {
+func PutCanvasStaging(ctx context.Context, organizationID string, canvasID string, operations []*pb.CanvasRepositoryFileOperation) (*pb.Staging, error) {
 	db := database.DB(ctx)
 
 	user, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -98,7 +98,7 @@ func PutCanvasStaging(ctx context.Context, organizationID string, canvasID strin
 		log.Errorf("failed to publish canvas staging updated RabbitMQ message: %v", err)
 	}
 
-	return buildStagingSummary(canvas, rows), nil
+	return buildStaging(ctx, canvas, rows)
 }
 
 func findBaseVersionIDForStagingUpdate(db *gorm.DB, canvas *models.Canvas, userID uuid.UUID) (*uuid.UUID, error) {

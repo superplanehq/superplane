@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import type { CanvasesStaging } from "@/api-client";
+
 import {
-  isAwaitingStagedCanvasSpec,
+  isAwaitingCanvasStaging,
   isViewingCurrentLiveCanvasVersion,
   resolveSelectedCanvasVersion,
   shouldReadStagedCanvasVersion,
@@ -42,64 +44,47 @@ describe("shouldReadStagedCanvasVersion", () => {
   });
 });
 
-describe("isAwaitingStagedCanvasSpec", () => {
-  it("is true while entering edit before staged content is cached", () => {
+describe("isAwaitingCanvasStaging", () => {
+  it("is true while entering edit before staging is cached", () => {
     expect(
-      isAwaitingStagedCanvasSpec({
-        activeCanvasVersionId: "live-version",
+      isAwaitingCanvasStaging({
         shouldReadStagedCanvasVersion: true,
-        loadedStagedCanvasVersion: undefined,
-        loadedStagedCanvasVersionLoading: false,
-        loadedStagedCanvasVersionFetching: false,
+        stagingLoading: false,
+        stagingFetching: false,
         isEnteringEditSession: true,
+        staging: undefined,
       }),
     ).toBe(true);
   });
 
-  it("ignores staged cache from a previous live version after commit", () => {
+  it("waits while staging is refetching", () => {
     expect(
-      isAwaitingStagedCanvasSpec({
-        activeCanvasVersionId: "new-live-version",
+      isAwaitingCanvasStaging({
         shouldReadStagedCanvasVersion: true,
-        loadedStagedCanvasVersion: {
-          metadata: { id: "old-live-version" },
+        stagingLoading: false,
+        stagingFetching: true,
+        isEnteringEditSession: false,
+        staging: {
+          hasStaging: true,
+          stagedPaths: ["canvas.yaml"],
           spec: { nodes: [{ id: "stale-node" }], edges: [] },
         },
-        loadedStagedCanvasVersionLoading: false,
-        loadedStagedCanvasVersionFetching: true,
-        isEnteringEditSession: false,
       }),
     ).toBe(true);
   });
 
-  it("waits while a matched staged cache is refetching", () => {
+  it("uses settled staging for the active live version", () => {
     expect(
-      isAwaitingStagedCanvasSpec({
-        activeCanvasVersionId: "live-version",
+      isAwaitingCanvasStaging({
         shouldReadStagedCanvasVersion: true,
-        loadedStagedCanvasVersion: {
-          metadata: { id: "live-version" },
-          spec: { nodes: [{ id: "stale-node" }], edges: [] },
-        },
-        loadedStagedCanvasVersionLoading: false,
-        loadedStagedCanvasVersionFetching: true,
+        stagingLoading: false,
+        stagingFetching: false,
         isEnteringEditSession: false,
-      }),
-    ).toBe(true);
-  });
-
-  it("uses a settled staged cache for the active live version", () => {
-    expect(
-      isAwaitingStagedCanvasSpec({
-        activeCanvasVersionId: "live-version",
-        shouldReadStagedCanvasVersion: true,
-        loadedStagedCanvasVersion: {
-          metadata: { id: "live-version" },
+        staging: {
+          hasStaging: true,
+          stagedPaths: ["canvas.yaml"],
           spec: { nodes: [{ id: "staged-node" }], edges: [] },
         },
-        loadedStagedCanvasVersionLoading: false,
-        loadedStagedCanvasVersionFetching: false,
-        isEnteringEditSession: false,
       }),
     ).toBe(false);
   });
@@ -140,8 +125,9 @@ describe("resolveSelectedCanvasVersion", () => {
     metadata: { id: "live-version" },
     spec: { nodes: [{ id: "list-node" }], edges: [] },
   };
-  const stagedVersion = {
-    metadata: { id: "live-version" },
+  const staging: CanvasesStaging = {
+    hasStaging: true,
+    stagedPaths: ["canvas.yaml"],
     spec: { nodes: [{ id: "staged-node" }], edges: [] },
   };
 
@@ -150,23 +136,26 @@ describe("resolveSelectedCanvasVersion", () => {
       resolveSelectedCanvasVersion({
         activeCanvasVersionId: "live-version",
         shouldReadStagedCanvasVersion: true,
-        loadedStagedCanvasVersion: stagedVersion,
+        staging,
         loadedCommittedCanvasVersion: undefined,
         activeCanvasVersion: shellVersion,
-        isAwaitingStagedSpec: false,
+        awaitingCanvasStaging: false,
       }),
-    ).toBe(stagedVersion);
+    ).toEqual({
+      metadata: { id: "live-version" },
+      spec: staging.spec,
+    });
   });
 
-  it("strips shell spec while staged content is still loading", () => {
+  it("strips shell spec while staging is still loading", () => {
     expect(
       resolveSelectedCanvasVersion({
         activeCanvasVersionId: "live-version",
         shouldReadStagedCanvasVersion: true,
-        loadedStagedCanvasVersion: undefined,
+        staging: undefined,
         loadedCommittedCanvasVersion: undefined,
         activeCanvasVersion: shellVersion,
-        isAwaitingStagedSpec: true,
+        awaitingCanvasStaging: true,
       }),
     ).toEqual({
       metadata: { id: "live-version" },
@@ -174,21 +163,18 @@ describe("resolveSelectedCanvasVersion", () => {
     });
   });
 
-  it("ignores staged cache from a previous live version after commit", () => {
+  it("falls back to the active shell while staging settles without blocking", () => {
     expect(
       resolveSelectedCanvasVersion({
         activeCanvasVersionId: "new-live-version",
         shouldReadStagedCanvasVersion: true,
-        loadedStagedCanvasVersion: {
-          metadata: { id: "old-live-version" },
-          spec: { nodes: [{ id: "stale-node" }], edges: [] },
-        },
+        staging: undefined,
         loadedCommittedCanvasVersion: undefined,
         activeCanvasVersion: {
           metadata: { id: "new-live-version" },
           spec: { nodes: [{ id: "live-node" }], edges: [] },
         },
-        isAwaitingStagedSpec: false,
+        awaitingCanvasStaging: false,
       }),
     ).toEqual({
       metadata: { id: "new-live-version" },

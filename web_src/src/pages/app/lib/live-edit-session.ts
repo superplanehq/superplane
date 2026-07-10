@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { MutableRefObject } from "react";
 
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvas, CanvasesCanvasVersion, CanvasesStaging } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 
 import { clearComponentSidebarSearchParams } from "../viewState";
@@ -57,27 +57,18 @@ export function isViewingCurrentLiveCanvasVersion({
   );
 }
 
-function isStagedCanvasVersionForActiveVersion(
-  loadedStagedCanvasVersion: CanvasesCanvasVersion | null | undefined,
-  activeCanvasVersionId: string,
-): loadedStagedCanvasVersion is CanvasesCanvasVersion {
-  return !!loadedStagedCanvasVersion?.metadata?.id && loadedStagedCanvasVersion.metadata.id === activeCanvasVersionId;
-}
-
-export function isAwaitingStagedCanvasSpec({
-  activeCanvasVersionId,
+export function isAwaitingCanvasStaging({
   shouldReadStagedCanvasVersion,
-  loadedStagedCanvasVersion,
-  loadedStagedCanvasVersionLoading,
-  loadedStagedCanvasVersionFetching,
+  stagingLoading,
+  stagingFetching,
   isEnteringEditSession,
+  staging,
 }: {
-  activeCanvasVersionId: string;
   shouldReadStagedCanvasVersion: boolean;
-  loadedStagedCanvasVersion: CanvasesCanvasVersion | null | undefined;
-  loadedStagedCanvasVersionLoading: boolean;
-  loadedStagedCanvasVersionFetching: boolean;
+  stagingLoading: boolean;
+  stagingFetching: boolean;
   isEnteringEditSession: boolean;
+  staging: CanvasesStaging | undefined;
 }): boolean {
   if (!shouldReadStagedCanvasVersion) {
     return false;
@@ -87,40 +78,40 @@ export function isAwaitingStagedCanvasSpec({
     return true;
   }
 
-  if (loadedStagedCanvasVersionLoading || loadedStagedCanvasVersionFetching) {
+  if (stagingLoading || stagingFetching) {
     return true;
   }
 
-  return !isStagedCanvasVersionForActiveVersion(loadedStagedCanvasVersion, activeCanvasVersionId);
+  return !staging;
 }
 
-// While staged canvas.yaml is still loading, avoid falling back to the version-list
+// While staged canvas spec is still loading, avoid falling back to the version-list
 // shell spec (committed snapshot) which would overwrite resynced draft state.
 export function resolveSelectedCanvasVersion({
   activeCanvasVersionId,
   shouldReadStagedCanvasVersion,
-  loadedStagedCanvasVersion,
+  staging,
   loadedCommittedCanvasVersion,
   activeCanvasVersion,
-  isAwaitingStagedSpec,
+  awaitingCanvasStaging,
 }: {
   activeCanvasVersionId: string;
   shouldReadStagedCanvasVersion: boolean;
-  loadedStagedCanvasVersion: CanvasesCanvasVersion | null | undefined;
+  staging: CanvasesStaging | undefined;
   loadedCommittedCanvasVersion: CanvasesCanvasVersion | null | undefined;
   activeCanvasVersion: CanvasesCanvasVersion | null;
-  isAwaitingStagedSpec: boolean;
+  awaitingCanvasStaging: boolean;
 }): CanvasesCanvasVersion | null {
   if (!activeCanvasVersionId) {
     return null;
   }
 
   if (shouldReadStagedCanvasVersion) {
-    if (isStagedCanvasVersionForActiveVersion(loadedStagedCanvasVersion, activeCanvasVersionId)) {
-      return loadedStagedCanvasVersion;
+    if (staging?.spec && activeCanvasVersion) {
+      return { ...activeCanvasVersion, spec: staging.spec };
     }
 
-    if (isAwaitingStagedSpec && activeCanvasVersion) {
+    if (awaitingCanvasStaging && activeCanvasVersion) {
       return { ...activeCanvasVersion, spec: undefined };
     }
 
