@@ -40,7 +40,12 @@ export const mockConsoleContextValue: ConsoleContextValue = {
   onOpenNode: storyNoop,
 };
 
-/** Execution-like rows for table widgets (status, duration, owner, links). */
+/** Execution-like rows for table widgets (status, duration, owner, links).
+ *
+ * `cost_budget` is a per-row target used by the progress-column story
+ * (`ManyColumnsAndFormats`) so authors can see the bar respond to different
+ * budgets. `run-tests` intentionally overshoots the 60 s SLA to exercise the
+ * bar-clamping / overshoot-label behaviour. */
 export const executionRows: Record<string, unknown>[] = [
   {
     id: "exec-1",
@@ -49,6 +54,7 @@ export const executionRows: Record<string, unknown>[] = [
     service: "api",
     durationMs: 42_000,
     cost: 12.5,
+    cost_budget: 15,
     createdAt: "2026-06-26T09:12:00Z",
     url: "https://example.com/runs/exec-1",
   },
@@ -59,6 +65,7 @@ export const executionRows: Record<string, unknown>[] = [
     service: "api",
     durationMs: 8_000,
     cost: 3.2,
+    cost_budget: 15,
     createdAt: "2026-06-26T09:30:00Z",
     url: "https://example.com/runs/exec-2",
   },
@@ -69,6 +76,7 @@ export const executionRows: Record<string, unknown>[] = [
     service: "web",
     durationMs: 65_000,
     cost: 9.9,
+    cost_budget: 10,
     createdAt: "2026-06-26T08:55:00Z",
     url: "https://example.com/runs/exec-3",
   },
@@ -79,6 +87,7 @@ export const executionRows: Record<string, unknown>[] = [
     service: "web",
     durationMs: 1_200,
     cost: 0.4,
+    cost_budget: 5,
     createdAt: "2026-06-26T09:40:00Z",
     url: "https://example.com/runs/exec-4",
   },
@@ -89,9 +98,29 @@ export const executionRows: Record<string, unknown>[] = [
     service: "infra",
     durationMs: 3_500,
     cost: 1.1,
+    cost_budget: 5,
     createdAt: "2026-06-26T07:20:00Z",
     url: "https://example.com/runs/exec-5",
   },
+];
+
+/**
+ * Rows for the dedicated `ProgressColumn` story. Each row exercises a
+ * different branch of the progress cell so the story doubles as a visual
+ * regression reference:
+ *
+ * - `mid` — 5/10 with the default `percent` label.
+ * - `almost-full` — 8/10 with the `number` label.
+ * - `overshoot` — 12/10, clamps at 100% but keeps `120%` / `12/10` in text.
+ * - `zero` — 0/10, empty fill.
+ * - `empty` — null current + target, renders the em-dash placeholder.
+ */
+export const progressRows: Record<string, unknown>[] = [
+  { id: "prog-1", label: "Almost there", done: 5, total: 10 },
+  { id: "prog-2", label: "Nearly done", done: 8, total: 10 },
+  { id: "prog-3", label: "Over budget", done: 12, total: 10 },
+  { id: "prog-4", label: "Just started", done: 0, total: 10 },
+  { id: "prog-5", label: "Not started", done: null, total: null },
 ];
 
 /** Aggregated per-service rows for bar / donut charts. */
@@ -219,7 +248,13 @@ export const prRiskChecksTableRender: WidgetTableRender = {
       href: "https://github.com/{repository}/pull/{pr_number}",
     },
     { field: "author", label: "Author", format: "avatar" },
-    { field: '{{ string(int(risk_score)) + "/100" }}', label: "Risk" },
+    {
+      field: "risk_score",
+      label: "Risk",
+      format: "progress",
+      progressTarget: "100",
+      progressLabel: "number",
+    },
     { field: "risk_level", label: "Level", format: "status" },
     { field: "last_checked_at", label: "When", format: "relative" },
   ],
