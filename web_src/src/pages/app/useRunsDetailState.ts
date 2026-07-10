@@ -1,5 +1,42 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
+const RUN_INSPECTOR_AUTO_OPEN_STORAGE_KEY = "superplane.runInspector.autoOpen";
+
+export function runInspectorAutoOpenStorageKey(canvasId?: string): string {
+  return canvasId ? `${RUN_INSPECTOR_AUTO_OPEN_STORAGE_KEY}:${canvasId}` : RUN_INSPECTOR_AUTO_OPEN_STORAGE_KEY;
+}
+
+function readRunInspectorAutoOpen(canvasId?: string): boolean {
+  if (typeof window === "undefined") return true;
+
+  try {
+    const stored = window.localStorage.getItem(runInspectorAutoOpenStorageKey(canvasId));
+    if (stored === null) return true;
+    return stored === "true";
+  } catch {
+    return true;
+  }
+}
+
+function writeRunInspectorAutoOpen(canvasId: string | undefined, open: boolean) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(runInspectorAutoOpenStorageKey(canvasId), String(open));
+  } catch {
+    // Ignore storage failures; the in-memory state still reflects the click.
+  }
+}
+
+type ClearDismissedRunDetailOptions = {
+  persistAutoOpen?: boolean;
+};
+
+type UseRunsDetailStateOptions = {
+  canvasId?: string;
+  onBackToRunList?: () => void;
+};
+
 function getRunDetailNodeIdFromSearchParams(
   searchParams: URLSearchParams,
   isRunInspectionMode: boolean,
@@ -18,9 +55,11 @@ export function useRunsDetailState(
   isRunInspectionMode: boolean,
   selectedRunId: string | null,
   preserveRunDetailNodeOnNextRunChangeRef?: RefObject<boolean>,
-  onBackToRunList?: () => void,
+  options: UseRunsDetailStateOptions = {},
 ) {
+  const { canvasId, onBackToRunList } = options;
   const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(() => Boolean(searchParams.get("run")));
+  const [autoOpenRunDetail, setAutoOpenRunDetail] = useState(() => readRunInspectorAutoOpen(canvasId));
   const urlRunDetailNodeId = useMemo(
     () => getRunDetailNodeIdFromSearchParams(searchParams, isRunInspectionMode, selectedRunId),
     [isRunInspectionMode, searchParams, selectedRunId],
@@ -32,6 +71,14 @@ export function useRunsDetailState(
   const wasRunInspectionModeRef = useRef(isRunInspectionMode);
   const previousSelectedRunIdForDetailRef = useRef<string | null>(selectedRunId);
   const previousUrlRunDetailNodeIdRef = useRef<string | null>(urlRunDetailNodeId);
+  const previousCanvasIdRef = useRef<string | undefined>(canvasId);
+
+  useEffect(() => {
+    if (previousCanvasIdRef.current === canvasId) return;
+
+    previousCanvasIdRef.current = canvasId;
+    setAutoOpenRunDetail(readRunInspectorAutoOpen(canvasId));
+  }, [canvasId]);
 
   useEffect(() => {
     if (!searchParams.get("run")) {
@@ -78,22 +125,45 @@ export function useRunsDetailState(
     setRunDetailNodeId(urlRunDetailNodeId);
   }, [urlRunDetailNodeId]);
 
-  const clearDismissedRunDetail = useCallback(() => {
-    setDetailDismissedForRunId(null);
-  }, []);
+  const setRunDetailAutoOpen = useCallback(
+    (open: boolean) => {
+      setAutoOpenRunDetail(open);
+      writeRunInspectorAutoOpen(canvasId, open);
+    },
+    [canvasId],
+  );
+
+  const clearDismissedRunDetail = useCallback(
+    (options?: ClearDismissedRunDetailOptions) => {
+      setDetailDismissedForRunId(null);
+      if (options?.persistAutoOpen) {
+        setRunDetailAutoOpen(true);
+      }
+    },
+    [setRunDetailAutoOpen],
+  );
+
+  const maybeOpenRunDetailForRun = useCallback(
+    (runId: string | null) => {
+      setDetailDismissedForRunId(autoOpenRunDetail ? null : runId);
+    },
+    [autoOpenRunDetail],
+  );
 
   const handleBackToRunList = useCallback(() => {
     setDetailDismissedForRunId(selectedRunId);
+    setRunDetailAutoOpen(false);
     setRunDetailNodeId(null);
     setOpenRunDetailOnMount(false);
     onBackToRunList?.();
-  }, [onBackToRunList, selectedRunId]);
+  }, [onBackToRunList, selectedRunId, setRunDetailAutoOpen]);
 
   return {
     openRunDetailOnMount,
     runDetailNodeId,
     setRunDetailNodeId,
     clearDismissedRunDetail,
+    maybeOpenRunDetailForRun,
     detailDismissedForRunId,
     handleBackToRunList,
   };

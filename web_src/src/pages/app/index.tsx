@@ -295,15 +295,13 @@ export function AppPage() {
     runDetailNodeId,
     setRunDetailNodeId,
     clearDismissedRunDetail,
+    maybeOpenRunDetailForRun,
     detailDismissedForRunId,
     handleBackToRunList,
-  } = useRunsDetailState(
-    searchParams,
-    isRunInspectionMode,
-    selectedRunId,
-    preserveRunDetailNodeOnNextRunChangeRef,
-    clearRunDetailNodeSearch,
-  );
+  } = useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId, preserveRunDetailNodeOnNextRunChangeRef, {
+    canvasId,
+    onBackToRunList: clearRunDetailNodeSearch,
+  });
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActionsSlotId } = useFilesHeaderState(canvasId);
   const currentUserId = me?.id;
@@ -3553,7 +3551,7 @@ export function AppPage() {
   const handleSelectRun = useCallback(
     (runId: string) => {
       exitEditableVersionForRunInspection();
-      clearDismissedRunDetail();
+      maybeOpenRunDetailForRun(runId);
       setRunDetailNodeId(null);
       setFocusRequest(null);
       requestRunFitRef.current(runId);
@@ -3561,7 +3559,7 @@ export function AppPage() {
         setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
       });
     },
-    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
+    [exitEditableVersionForRunInspection, maybeOpenRunDetailForRun, setRunDetailNodeId, setSearchParams],
   );
 
   const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
@@ -3576,7 +3574,7 @@ export function AppPage() {
   const handleSelectRunFromSidebarEvent = useCallback(
     (runId: string, options?: { nodeId?: string }) => {
       exitEditableVersionForRunInspection();
-      clearDismissedRunDetail();
+      clearDismissedRunDetail({ persistAutoOpen: true });
       const inspectorNodeId =
         options?.nodeId ?? (searchParams.get("sidebar") === "1" ? searchParams.get("node") : null);
       if (!inspectorNodeId) requestRunFitRef.current(runId);
@@ -3604,7 +3602,7 @@ export function AppPage() {
   const handleLogRunExecutionSelect = useCallback(
     (options: { runId: string; nodeId: string }) => {
       exitEditableVersionForRunInspection();
-      clearDismissedRunDetail();
+      clearDismissedRunDetail({ persistAutoOpen: true });
       preserveRunDetailNodeOnNextRunChangeRef.current = true;
       setRunDetailNodeId(options.nodeId);
       setFocusRequest({ nodeId: options.nodeId, requestId: Date.now(), targetMode: "runs", tab: "latest" });
@@ -3625,7 +3623,7 @@ export function AppPage() {
       exitEditableVersionForRunInspection();
       const preservedNodeId = runDetailNodeId;
       preserveRunDetailNodeOnNextRunChangeRef.current = Boolean(preservedNodeId);
-      clearDismissedRunDetail();
+      clearDismissedRunDetail({ persistAutoOpen: true });
       setFocusRequest(null);
       requestRunFitRef.current(runId);
       setSearchParams(
@@ -3651,7 +3649,7 @@ export function AppPage() {
     (nodeId: string | null) => {
       setRunDetailNodeId(nodeId);
       if (nodeId) {
-        clearDismissedRunDetail();
+        clearDismissedRunDetail({ persistAutoOpen: true });
       } else {
         setFocusRequest(null);
       }
