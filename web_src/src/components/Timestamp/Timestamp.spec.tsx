@@ -61,4 +61,20 @@ describe("Timestamp", () => {
     rerender(<Timestamp date="not-a-date" fallback={<span>n/a</span>} />);
     expect(screen.getByText("n/a")).toBeInTheDocument();
   });
+
+  it("renders a date-only label without time-of-day when display is date", () => {
+    render(<Timestamp date={iso} display="date" />);
+    const time = getTimeByDateTime(iso);
+    const text = time.textContent ?? "";
+    expect(text).toMatch(/Jun/);
+    expect(text).toMatch(/2026/);
+    // Date-only mode intentionally drops the HH:MM segment.
+    expect(text).not.toMatch(/\d{2}:\d{2}/);
+  });
+
+  it("accepts datetime as an alias for absolute", () => {
+    render(<Timestamp date={iso} display="datetime" />);
+    const time = getTimeByDateTime(iso);
+    expect(time.textContent ?? "").toMatch(/\d{2}:\d{2}/);
+  });
 });
