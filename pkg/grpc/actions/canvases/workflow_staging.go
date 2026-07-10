@@ -16,7 +16,6 @@ import (
 func effectiveSpecYAML(
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
-	organizationID string,
 	rows []models.WorkflowStagedFile,
 	path string,
 ) (string, error) {
@@ -66,5 +65,5 @@ func ReadStagedRepositorySpecFile(
 		return "", err
 	}
 
-	return effectiveSpecYAML(canvas, version, organizationID, stagedFiles, path)
+	return effectiveSpecYAML(canvas, version, stagedFiles, path)
 }
