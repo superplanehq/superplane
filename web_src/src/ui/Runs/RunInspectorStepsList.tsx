@@ -18,9 +18,12 @@ export function RunInspectorStepsList({
   onValueChange,
   onJumpToError,
   onRerun,
+  onEditNode,
   rerunPending,
   actions,
   currentUser,
+  errorScrollRequest,
+  onErrorScrolled,
 }: {
   errorSummaries: RunInspectorErrorSummary[];
   status: keyof typeof RUN_STATUS_META;
@@ -32,9 +35,12 @@ export function RunInspectorStepsList({
   onValueChange: (value: string) => void;
   onJumpToError: (nodeId: string) => void;
   onRerun: () => void;
+  onEditNode?: (nodeId: string) => void;
   rerunPending: boolean;
   actions: ReturnType<typeof useRunInspectorActions>;
   currentUser?: RunInspectorCurrentUser;
+  errorScrollRequest?: { nodeId: string; requestId: number } | null;
+  onErrorScrolled?: () => void;
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="run-panel-step-list">
@@ -70,9 +76,12 @@ export function RunInspectorStepsList({
               organizationId={organizationId}
               isOpen={selectedValue === section.nodeId}
               onRerun={onRerun}
+              onEditNode={onEditNode}
               rerunPending={rerunPending}
               actions={actions}
               currentUser={currentUser}
+              errorScrollRequestId={errorScrollRequest?.nodeId === section.nodeId ? errorScrollRequest.requestId : null}
+              onErrorScrolled={onErrorScrolled}
             />
           ))}
         </Accordion>

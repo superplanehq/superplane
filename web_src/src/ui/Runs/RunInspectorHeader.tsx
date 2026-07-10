@@ -1,4 +1,4 @@
-import { Loader2, Square } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -76,18 +76,14 @@ export function RunInspectorHeader({
                   disabled={actionDisabled || actionPending}
                   onClick={onAction}
                   className={cn(
-                    "inline-flex shrink-0 items-center rounded border px-2 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                    "inline-flex h-6 shrink-0 items-center justify-center rounded border px-2 py-0 text-xs font-medium leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                     status === "running"
                       ? "border-red-200 bg-white text-red-600 hover:bg-red-50 dark:border-red-900/70 dark:bg-gray-950 dark:text-red-300"
                       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200",
                   )}
                 >
-                  <span className="inline-flex items-center gap-2">
-                    {actionPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : status === "running" ? (
-                      <Square className="h-3.5 w-3.5" />
-                    ) : null}
+                  <span className="inline-flex items-center gap-1.5 leading-none">
+                    {actionPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
                     <span>{actionPending ? `${actionLabel}...` : actionLabel}</span>
                   </span>
                 </button>

@@ -84,7 +84,7 @@ function ReadonlyValue({ field, value }: { field: ConfigurationField; value: unk
 
 function ReadonlyPrimitiveValue({ value }: { value: string }) {
   return (
-    <div className="min-h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+    <div className="min-h-9 w-full whitespace-pre-wrap break-words rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
       {value}
     </div>
   );

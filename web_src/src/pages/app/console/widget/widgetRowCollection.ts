@@ -207,7 +207,7 @@ export function buildNodeNameMap(nodes: SuperplaneComponentsNode[] | undefined):
  * Collapse the API `state` / `result` enum pair into the lowercase status
  * vocabulary the rest of the dashboard speaks: `passed`, `failed`,
  * `cancelled`, `running`, `pending`, `unknown`. Matches the lookup tables in
- * `WidgetTable` (`STATUS_PILL_CLASS`) and `NodePanelCard` (`STATUS_CLASS`).
+ * `WidgetTable` (`consoleBadgeStyles`) and `NodePanelCard` (`STATUS_CLASS`).
  */
 function deriveExecutionStatus(
   state: string | undefined,

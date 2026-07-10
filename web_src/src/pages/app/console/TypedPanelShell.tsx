@@ -13,6 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import { CONSOLE_PANEL_BODY_SURFACE, CONSOLE_PANEL_SHELL_SURFACE } from "./consolePanelStyles";
+
 /**
  * Reusable card shell for all typed panel kinds (node / table / chart /
  * number). Provides the header (title + edit/delete actions), the drag handle
@@ -48,7 +50,7 @@ export function TypedPanelShell({
         className={cn(
           "group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg bg-white",
           appDarkModeClasses.modalEdge,
-          appDarkModeClasses.surface,
+          CONSOLE_PANEL_SHELL_SURFACE,
         )}
       >
         <div
@@ -103,7 +105,11 @@ export function TypedPanelShell({
           ) : null}
         </div>
         <div
-          className={cn("min-h-0 flex-1 overflow-auto rounded-b-lg bg-white dark:bg-gray-900", bodyClassName)}
+          className={cn(
+            "min-h-0 flex-1 overflow-auto rounded-b-lg bg-white",
+            CONSOLE_PANEL_BODY_SURFACE,
+            bodyClassName,
+          )}
           onDoubleClick={readOnly ? undefined : onEdit}
           data-testid="typed-panel-body"
         >
