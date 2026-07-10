@@ -211,6 +211,20 @@ describe("MarkdownContent", () => {
     expect(section).toHaveTextContent("2");
   });
 
+  it("does not count sections nested inside alerts as direct children", () => {
+    render(
+      <MarkdownContent
+        content={
+          "> [!SECTION] Parent\n> Intro.\n>\n> > [!NOTE]\n> > Note body.\n> >\n> > > [!SECTION] Nested in note\n> > > Deep.\n>\n> > [!SECTION] Direct child\n> > Child body."
+        }
+      />,
+    );
+
+    const section = screen.getByTestId("markdown-section");
+    expect(section).toHaveAttribute("data-section-count", "1");
+    expect(screen.getByTestId("markdown-section-count")).toHaveTextContent("1");
+  });
+
   it("preserves nested markdown inside section bodies", async () => {
     const user = userEvent.setup();
     render(<MarkdownContent content={"> [!SECTION] Tips\n> See [docs](https://example.com) and `sha`."} />);

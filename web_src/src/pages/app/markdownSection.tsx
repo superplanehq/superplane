@@ -4,47 +4,11 @@ import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-import { splitBlockquoteMarkerLine } from "./markdownBlockquoteMarker";
+import { parseGithubAlertChildren } from "./markdownAlertParse";
+import { parseGithubSectionChildren } from "./markdownSectionParse";
 import { resolveMarkdownSectionPreset } from "./markdownSectionPresets";
 
-const SECTION_MARKER_RE = /^\[!SECTION(?::([a-z0-9_-]+))?\]\s+(.+)$/i;
-
-type ParsedSection = {
-  title: string;
-  trailing?: string;
-  presetId?: string;
-  body: ReactNode;
-};
-
 const SectionDepthContext = createContext(0);
-
-/**
- * If `children` are a `[!SECTION] Title` or `[!SECTION:preset] Title` blockquote,
- * return the title/preset/body with the marker line removed.
- *
- * Optional trailing meta after a middle-dot separator:
- * `> [!SECTION:rules] Rules · ~5,366`
- */
-export function parseGithubSectionChildren(children: ReactNode): ParsedSection | null {
-  const split = splitBlockquoteMarkerLine(children);
-  if (!split) {
-    return null;
-  }
-
-  const match = split.markerText.match(SECTION_MARKER_RE);
-  if (!match) {
-    return null;
-  }
-
-  const presetId = match[1]?.toLowerCase();
-  const rawTitle = match[2].trim();
-  if (!rawTitle) {
-    return null;
-  }
-
-  const { title, trailing } = splitSectionTitle(rawTitle);
-  return { title, trailing, presetId, body: split.body };
-}
 
 export function MarkdownSection({
   title,
@@ -134,13 +98,14 @@ export function MarkdownSection({
 
 /**
  * Count nested `[!SECTION]` blocks that are direct children of this section’s
- * body (walking through wrapper elements, but not into other sections).
+ * body (walking through wrapper elements, but not into other sections, alerts,
+ * or plain blockquotes).
  *
  * Nested quotes arrive from react-markdown as unevaluated `blockquote`
  * components (not yet `MarkdownSection`), so we detect them by parsing their
  * children for a `[!SECTION]` marker.
  */
-export function countDirectChildSections(children: ReactNode): number {
+function countDirectChildSections(children: ReactNode): number {
   let count = 0;
 
   Children.forEach(children, (child) => {
@@ -159,26 +124,19 @@ export function countDirectChildSections(children: ReactNode): number {
       return;
     }
 
+    // Alerts and plain blockquotes are siblings, not wrappers — do not count
+    // sections nested inside them as direct children of this section.
+    if (child.type === "blockquote") {
+      return;
+    }
+    if (child.props.children != null && parseGithubAlertChildren(child.props.children)) {
+      return;
+    }
+
     if (child.props.children != null) {
       count += countDirectChildSections(child.props.children);
     }
   });
 
   return count;
-}
-
-function splitSectionTitle(rawTitle: string): { title: string; trailing?: string } {
-  const separator = " · ";
-  const separatorIndex = rawTitle.indexOf(separator);
-  if (separatorIndex < 0) {
-    return { title: rawTitle };
-  }
-
-  const title = rawTitle.slice(0, separatorIndex).trim();
-  const trailing = rawTitle.slice(separatorIndex + separator.length).trim();
-  if (!title) {
-    return { title: rawTitle };
-  }
-
-  return trailing ? { title, trailing } : { title };
 }

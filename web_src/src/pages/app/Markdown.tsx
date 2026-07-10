@@ -16,8 +16,10 @@ import { cn } from "@/lib/utils";
 
 import { CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES } from "./console/consoleCodeStyles";
 import { CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES } from "./console/consoleLinkStyles";
-import { MarkdownAlert, parseGithubAlertChildren } from "./markdownAlerts";
-import { MarkdownSection, parseGithubSectionChildren } from "./markdownSection";
+import { MarkdownAlert } from "./markdownAlerts";
+import { parseGithubAlertChildren } from "./markdownAlertParse";
+import { MarkdownSection } from "./markdownSection";
+import { parseGithubSectionChildren } from "./markdownSectionParse";
 import { markdownHeadingClassName } from "./markdownHeadingStyles";
 import {
   MARKDOWN_TABLE_CLASSES,

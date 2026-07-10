@@ -26,7 +26,7 @@ export function splitBlockquoteMarkerLine(children: ReactNode): BlockquoteMarker
   }
 
   const markerText = String(inner[markerIndex]).trim();
-  let restInner = inner.slice(markerIndex + 1);
+  let restInner: ReactNode[] = inner.slice(markerIndex + 1);
   restInner = skipLeadingWhitespaceNodes(restInner);
   if (restInner.length > 0 && isBreakElement(restInner[0])) {
     restInner = restInner.slice(1);
