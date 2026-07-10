@@ -1,6 +1,6 @@
 import { Avatar } from "@/components/Avatar/avatar";
+import { Timestamp, type TimestampDisplay } from "@/components/Timestamp";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatTimestampInUserTimezone } from "@/lib/timezone";
 
 import { ConsoleBadge } from "../ConsoleBadge";
 import { resolveConsoleAvatar } from "../consoleAvatar";
@@ -10,7 +10,7 @@ import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
 import { resolveHref } from "./resolveHref";
 import type { WidgetTableRender } from "./types";
-import { formatValue } from "./widgetFormat";
+import { coerceWidgetTimestamp, formatValue } from "./widgetFormat";
 
 type WidgetTableColumn = WidgetTableRender["columns"][number];
 
@@ -25,8 +25,10 @@ export function WidgetTableCell({ col, row }: { col: WidgetTableColumn; row: Rec
     case "badge":
     case "status":
       return <BadgeCell label={formatted} />;
+    case "date":
+    case "datetime":
     case "relative":
-      return <RelativeCell value={value} label={formatted} />;
+      return <TimestampCell format={col.format} value={value} label={formatted} />;
     case "avatar":
       return <AvatarCell col={col} row={row} value={value} />;
     case "link":
@@ -51,10 +53,30 @@ function BadgeCell({ label }: { label: string }) {
   );
 }
 
-function RelativeCell({ value, label }: { value: unknown; label: string }) {
+const TIMESTAMP_DISPLAY_BY_FORMAT: Record<"date" | "datetime" | "relative", TimestampDisplay> = {
+  date: "date",
+  datetime: "datetime",
+  relative: "relative",
+};
+
+function TimestampCell({
+  format,
+  value,
+  label,
+}: {
+  format: "date" | "datetime" | "relative";
+  value: unknown;
+  label: string;
+}) {
+  const date = coerceWidgetTimestamp(value);
+  if (!date) {
+    // Preserve the raw fallback text (e.g. an unparseable string) rather than
+    // rendering an empty cell — matches the pre-Timestamp behavior.
+    return <TextCell label={label} />;
+  }
   return (
-    <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300" title={formatAbsoluteTitle(value)}>
-      {label}
+    <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300">
+      <Timestamp date={date} display={TIMESTAMP_DISPLAY_BY_FORMAT[format]} relativeStyle="abbreviated" />
     </td>
   );
 }
@@ -113,16 +135,4 @@ function CodeCell({ label }: { label: string }) {
 
 function TextCell({ label }: { label: string }) {
   return <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300">{label}</td>;
-}
-
-function formatAbsoluteTitle(value: unknown): string | undefined {
-  if (value == null) return undefined;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) return formatTimestampInUserTimezone(new Date(parsed).toISOString());
-  }
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return undefined;
-  const ms = n > 1e12 ? n : n * 1000;
-  return formatTimestampInUserTimezone(new Date(ms).toISOString());
 }

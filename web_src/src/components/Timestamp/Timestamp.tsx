@@ -1,9 +1,9 @@
 import React, { useEffect, useReducer } from "react";
 import { twMerge } from "tailwind-merge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { CopyButton } from "@/ui/CopyButton";
 import { formatTimeAgo } from "@/lib/date";
-import { formatAbsolute, formatISO, formatRelative, formatUTC, toDate, type TimestampInput } from "@/lib/datetime";
+import { formatAbsolute, formatDate, formatISO, formatRelative, toDate, type TimestampInput } from "@/lib/datetime";
+import { TimestampDetails } from "./TimestampDetails";
 
 // A single shared 1s ticker drives every relative label so a page with many
 // timestamps doesn't spin up an interval per instance (mirrors `TimeAgo`).
@@ -51,15 +51,21 @@ function RelativeLabel({
   return <time dateTime={iso}>{label}</time>;
 }
 
+/**
+ * Controls the visible label:
+ * - `"absolute"` / `"datetime"`: locale date-time in the user's timezone.
+ * - `"date"`: locale date-only in the user's timezone (no time-of-day).
+ * - `"relative"`: live-updating "5m ago" style text.
+ *
+ * The hover card content is identical across all display modes.
+ */
+export type TimestampDisplay = "absolute" | "datetime" | "date" | "relative";
+
 interface TimestampProps {
   /** Accepts a `Date`, ISO string, or epoch milliseconds. */
   date: TimestampInput | null | undefined;
-  /**
-   * Controls the visible label:
-   * - `"absolute"` (default): locale date-time in the user's timezone.
-   * - `"relative"`: live-updating "5m ago" style text.
-   */
-  display?: "absolute" | "relative";
+  /** Visible label style. Defaults to `"absolute"`. `"datetime"` is an alias. */
+  display?: TimestampDisplay;
   /**
    * Style of the relative label (only applies when `display="relative"`):
    * - `"full"` (default): verbose Intl text, e.g. "5 minutes ago" / "in 3 hours".
@@ -79,15 +85,6 @@ interface TimestampProps {
   align?: "start" | "center" | "end";
   /** Rendered when the date is missing/invalid. */
   fallback?: React.ReactNode;
-}
-
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <>
-      <dt className="text-right font-medium text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="min-w-0 text-gray-800 dark:text-gray-100">{children}</dd>
-    </>
-  );
 }
 
 /**
@@ -119,23 +116,15 @@ export const Timestamp = React.memo(function Timestamp({
         <span className={twMerge(hintClasses, className)}>
           {display === "relative" ? (
             <RelativeLabel date={resolved} iso={iso} relativeStyle={relativeStyle} includeAgo={includeAgo} />
+          ) : display === "date" ? (
+            <time dateTime={iso}>{formatDate(resolved)}</time>
           ) : (
             <time dateTime={iso}>{formatAbsolute(resolved)}</time>
           )}
         </span>
       </HoverCardTrigger>
       <HoverCardContent align={align} className="w-auto max-w-sm p-3">
-        <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1.5 text-sm">
-          <DetailRow label="Local">{formatAbsolute(resolved)}</DetailRow>
-          <DetailRow label="UTC">{formatUTC(resolved)}</DetailRow>
-          <DetailRow label="Relative">{formatRelative(resolved)}</DetailRow>
-          <DetailRow label="Timestamp">
-            <div className="flex items-center gap-1.5">
-              <span className="min-w-0 truncate font-mono text-xs">{iso}</span>
-              <CopyButton text={iso} data-testid="timestamp-copy" />
-            </div>
-          </DetailRow>
-        </dl>
+        <TimestampDetails date={resolved} />
       </HoverCardContent>
     </HoverCard>
   );

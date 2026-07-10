@@ -26,6 +26,12 @@ const ABSOLUTE_OPTIONS: Intl.DateTimeFormatOptions = {
   hour12: false,
 };
 
+const DATE_ONLY_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+};
+
 /**
  * Locale-aware absolute timestamp in the user's local timezone, including a
  * short timezone name, e.g. `"02 Jun 2026, 12:01:10 CEST"`.
@@ -44,6 +50,16 @@ export function formatUTC(value: TimestampInput, locale?: string): string {
   const date = toDate(value);
   if (!date) return "";
   return new Intl.DateTimeFormat(locale, { ...ABSOLUTE_OPTIONS, timeZone: "UTC" }).format(date);
+}
+
+/**
+ * Locale-aware date-only timestamp in the user's local timezone, e.g.
+ * `"02 Jun 2026"`. Use for surfaces that only want a calendar day.
+ */
+export function formatDate(value: TimestampInput, locale?: string): string {
+  const date = toDate(value);
+  if (!date) return "";
+  return new Intl.DateTimeFormat(locale, DATE_ONLY_OPTIONS).format(date);
 }
 
 const SECOND = 1000;

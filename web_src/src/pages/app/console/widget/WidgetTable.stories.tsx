@@ -198,6 +198,29 @@ export const ManyColumnsAndFormats: Story = {
   },
 };
 
+/**
+ * Every timestamp-formatted column renders through the shared `Timestamp`
+ * component — each label carries a dashed underline hint, and hovering any
+ * cell reveals Local / UTC / Relative / ISO with a copy affordance for the
+ * ISO value.
+ */
+export const TimestampFormats: Story = {
+  render: (args) => <TablePanel title="Timestamp column formats" {...args} />,
+  args: {
+    render: {
+      kind: "table",
+      columns: [
+        { field: "name", label: "Node" },
+        { field: "createdAt", label: "Day", format: "date" },
+        { field: "createdAt", label: "When", format: "datetime" },
+        { field: "createdAt", label: "Started", format: "relative" },
+      ],
+    },
+    rows: executionRows,
+    isLoading: false,
+  },
+};
+
 export const Pagination: Story = {
   render: (args) => <TablePanel title="Progressive loading" {...args} />,
   args: {

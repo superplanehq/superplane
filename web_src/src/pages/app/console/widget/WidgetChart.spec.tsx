@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { isValidElement } from "react";
 import type * as Recharts from "recharts";
 import { render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -348,7 +349,7 @@ describe("WidgetChart axis formatting", () => {
     expect(container.querySelector(".recharts-label")).toBeNull();
   });
 
-  it("shows date-only axis ticks but datetime tooltip labels for xFormat datetime", () => {
+  it("shows date-only axis ticks but a TimestampDetails tooltip label for xFormat datetime", () => {
     tooltipContentProps.value = null as Record<string, unknown> | null;
     const TIME_ROWS = [{ day: "2026-05-26T16:10:00Z", cost: 10 }];
     const { container } = renderChart(
@@ -364,9 +365,13 @@ describe("WidgetChart axis formatting", () => {
     const ticks = tickTexts(container, "xAxis");
     expect(ticks.every((text) => !/AM|PM/.test(text))).toBe(true);
     const props: Record<string, unknown> | null = tooltipContentProps.value;
-    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
     const formatted = labelFormatter?.("2026-05-26T16:10:00Z", []);
-    expect(formatted).toMatch(/AM|PM/);
+    expect(isValidElement(formatted)).toBe(true);
+    const { container: labelContainer } = render(<>{formatted}</>);
+    expect(labelContainer.textContent).toMatch(/Local/);
+    expect(labelContainer.textContent).toMatch(/UTC/);
+    expect(labelContainer.textContent).toMatch(/2026-05-26T16:10:00\.000Z/);
   });
 
   it("shows a date axis label only on the first bar of each calendar day", () => {
@@ -401,21 +406,23 @@ describe("WidgetChart axis formatting", () => {
     );
     const props: Record<string, unknown> | null = tooltipContentProps.value;
     expect(props).not.toBeNull();
-    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
     expect(labelFormatter).toBeTypeOf("function");
     const formatted = labelFormatter?.("2026-05-26T00:00:00Z", []);
-    expect(formatted).not.toContain("T00:00:00Z");
-    expect(formatted).toMatch(/May/);
+    expect(isValidElement(formatted)).toBe(true);
+    const { container: labelContainer } = render(<>{formatted}</>);
+    expect(labelContainer.textContent).toMatch(/2026-05-26T00:00:00\.000Z/);
+    expect(labelContainer.textContent).toMatch(/Local/);
   });
 
-  it("omits the tooltip labelFormatter when xFormat is unset (raw category text)", () => {
+  it("returns the raw category label from the tooltip formatter when xFormat is unset", () => {
     tooltipContentProps.value = null as Record<string, unknown> | null;
     renderChart(
       { kind: "chart", type: "bar", xField: "service", series: [{ field: "cost", label: "Cost" }] },
       { rows: [{ service: "ec2", cost: 1 }] },
     );
     const props: Record<string, unknown> | null = tooltipContentProps.value;
-    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
     expect(labelFormatter?.("ec2", [])).toBe("ec2");
   });
 
