@@ -1,4 +1,4 @@
-import { Loader2, Square } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { CanvasesCanvasRun } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -83,11 +83,7 @@ export function RunInspectorHeader({
                   )}
                 >
                   <span className="inline-flex items-center gap-2">
-                    {actionPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : status === "running" ? (
-                      <Square className="h-3.5 w-3.5" />
-                    ) : null}
+                    {actionPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                     <span>{actionPending ? `${actionLabel}...` : actionLabel}</span>
                   </span>
                 </button>

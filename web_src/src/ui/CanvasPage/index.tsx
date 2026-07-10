@@ -246,7 +246,7 @@ export interface CanvasPageProps {
   onDiscardStaleStaging?: () => void;
   discardStaleStagingPending?: boolean;
   headerMode?: "default" | "version-live" | "console" | "memory" | "files";
-  onEnterEditMode?: () => void;
+  onEnterEditMode?: () => void | Promise<void>;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   onExitEditMode?: () => void;
@@ -833,6 +833,7 @@ function CanvasPage(props: CanvasPageProps) {
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
+  const [pendingRuntimeEditNodeId, setPendingRuntimeEditNodeId] = useState<string | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const localHasFitToViewRef = useRef(false);
   const localHasUserToggledSidebarRef = useRef(false);
@@ -1300,6 +1301,14 @@ function CanvasPage(props: CanvasPageProps) {
     }
   }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
+  useEffect(() => {
+    if (!pendingRuntimeEditNodeId || props.isRunInspectionMode || !props.isEditing) return;
+
+    state.componentSidebar.open(pendingRuntimeEditNodeId);
+    setCurrentTab("settings");
+    setPendingRuntimeEditNodeId(null);
+  }, [pendingRuntimeEditNodeId, props.isEditing, props.isRunInspectionMode, state.componentSidebar]);
+
   const canvasStateMode = props.canvasStateMode || "default";
   const showRunInspectionFloatingBar =
     props.isRunInspectionMode && !props.isEditSessionActive && !props.isEditing && !!props.onBackToLiveCanvas;
@@ -1614,13 +1623,20 @@ function CanvasPage(props: CanvasPageProps) {
             onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
             onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
             onEditNode={
-              readOnly
-                ? undefined
-                : (nodeId) => {
-                    props.onBackToLiveCanvas?.();
-                    state.componentSidebar.open(nodeId);
-                    setCurrentTab("settings");
+              props.onEnterEditMode
+                ? (nodeId) => {
+                    setPendingRuntimeEditNodeId(nodeId);
+                    void (async () => {
+                      try {
+                        await props.onEnterEditMode?.();
+                      } catch {
+                        setPendingRuntimeEditNodeId((currentNodeId) =>
+                          currentNodeId === nodeId ? null : currentNodeId,
+                        );
+                      }
+                    })();
                   }
+                : undefined
             }
             onRerunCreated={(eventId) =>
               selectCreatedRerun({

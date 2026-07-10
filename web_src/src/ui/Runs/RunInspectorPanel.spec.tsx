@@ -246,12 +246,11 @@ describe("RunInspectorPanel", () => {
       expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("first line\nsecond line");
     });
 
-    it("shows an edit action on node headers with runtime config", () => {
+    it("shows an edit action in the runtime config header", () => {
       const onEditNode = vi.fn();
       renderInspector({ selectedNodeId: "action-2", onEditNode });
 
-      fireEvent.click(screen.getAllByRole("button", { name: "Edit" }).at(-1)!);
-
+      fireEvent.click(screen.getByRole("button", { name: "Edit runtime config" }));
       expect(onEditNode).toHaveBeenCalledWith("action-2");
     });
 
