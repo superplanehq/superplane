@@ -1,24 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import { ExternalLink, Loader2, Play, Plus, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
 
-import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
+import { CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES } from "../consoleTableStyles";
 import { isManualRunNode } from "../manualRunTriggers";
 import { applyTableWhere } from "./evalTableWhere";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
 import { evaluateRowShow } from "./rowVisibility";
-import { resolveCellValue } from "./resolveCellValue";
-import { resolveHref } from "./resolveHref";
 import { makeRowStyleResolver } from "./rowStyles";
 import { applyFilters, applySort } from "./widgetData";
 import { WidgetEmptyState } from "../WidgetEmptyState";
-import { formatValue } from "./widgetFormat";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import { useWidgetTableActionLock } from "./WidgetTableActionLockContext";
+import { WidgetTableCell } from "./WidgetTableCell";
 import type { WidgetRowAction, WidgetTableRender } from "./types";
 
 interface WidgetTableProps {
@@ -35,27 +33,6 @@ interface WidgetTableProps {
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
 }
-
-const STATUS_PILL_CLASS: Record<string, string> = {
-  passed: "bg-emerald-500 text-white",
-  ready: "bg-emerald-500 text-white",
-  active: "bg-emerald-500 text-white",
-  "very low": "bg-emerald-500 text-white",
-  low: "bg-emerald-500 text-white",
-  failed: "bg-red-500 text-white",
-  critical: "bg-red-500 text-white",
-  high: "bg-orange-500 text-white",
-  running: "bg-blue-500 text-white",
-  medium: "bg-yellow-500 text-white",
-  cancelled: "bg-gray-500 text-white",
-  pending: "bg-gray-500 text-white",
-  idle: "bg-gray-500 text-white",
-};
-
-const STATUS_PILL_BASE_CLASS = "inline-flex rounded-full border-none px-2 py-0.5 text-[11px] font-medium";
-
-const BADGE_PILL_CLASS =
-  "inline-flex rounded-full bg-transparent px-2 py-0.5 text-[11px] font-medium text-slate-700 outline outline-1 -outline-offset-1 outline-slate-950/15 dark:text-gray-300 dark:outline-gray-600";
 
 const ACTION_ICONS = {
   play: Play,
@@ -200,13 +177,15 @@ function WidgetTableGrid({
             {render.columns.map((col, i) => (
               <th
                 key={`${col.field}-${i}`}
-                className="border-b border-slate-200 px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-gray-600 dark:text-gray-400"
+                className={cn(CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES, "text-left")}
               >
                 {col.label ?? col.field}
               </th>
             ))}
             {hasActions ? (
-              <th className="border-b border-slate-200 px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-gray-600 dark:text-gray-400">
+              <th
+                className={cn(CONSOLE_WIDGET_TABLE_HEAD_CLASSES, CONSOLE_TABLE_HEAD_BORDER_DARK_CLASSES, "text-right")}
+              >
                 Actions
               </th>
             ) : null}
@@ -229,7 +208,7 @@ function WidgetTableGrid({
                 )}
               >
                 {render.columns.map((col, ci) => (
-                  <Cell key={`${col.field}-${ci}`} col={col} row={row} />
+                  <WidgetTableCell key={`${col.field}-${ci}`} col={col} row={row} />
                 ))}
                 {hasActions ? (
                   <td className="px-3 py-1.5 text-right">
@@ -274,78 +253,6 @@ function LoadMoreFooter({ isFetchingMore, onLoadMore }: { isFetchingMore: boolea
       </Button>
     </div>
   );
-}
-
-function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Record<string, unknown> }) {
-  const visible = evaluateRowShow(col.show, row);
-  if (!visible) {
-    return <td className="px-3 py-1.5 text-slate-300 dark:text-gray-600">—</td>;
-  }
-  const value = resolveCellValue(col.field, row);
-  const formatted = formatValue(value, col.format);
-  // `status` renders semantic values (passed, failed, risk levels) as colored
-  // pills. `badge` is for neutral tags (service names, categories) with a
-  // lighter outlined treatment.
-  if (col.format === "badge") {
-    return (
-      <td className="px-3 py-1.5">
-        <span className={BADGE_PILL_CLASS}>{formatted}</span>
-      </td>
-    );
-  }
-  if (col.format === "status") {
-    const toneClass = STATUS_PILL_CLASS[formatted.toLowerCase()] ?? "bg-gray-500 text-white";
-    return (
-      <td className="px-3 py-1.5">
-        <span className={cn(STATUS_PILL_BASE_CLASS, toneClass)}>{formatted}</span>
-      </td>
-    );
-  }
-  if (col.format === "relative") {
-    const title = formatAbsoluteTitle(value);
-    return (
-      <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300" title={title}>
-        {formatted}
-      </td>
-    );
-  }
-  if (col.format === "link" || col.href) {
-    const href = col.href ? resolveHref(col.href, row) : String(value ?? "");
-    return (
-      <td className="px-3 py-1.5">
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sky-600 no-underline hover:!underline underline-offset-2 decoration-current dark:text-gray-300 dark:hover:text-gray-100"
-        >
-          {formatted || href}
-        </a>
-      </td>
-    );
-  }
-  if (col.format === "code") {
-    return (
-      <td className="px-3 py-1.5">
-        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[13px] text-slate-800 dark:bg-gray-800 dark:text-gray-100">
-          {formatted}
-        </code>
-      </td>
-    );
-  }
-  return <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300">{formatted}</td>;
-}
-
-function formatAbsoluteTitle(value: unknown): string | undefined {
-  if (value == null) return undefined;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) return formatTimestampInUserTimezone(new Date(parsed).toISOString());
-  }
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return undefined;
-  const ms = n > 1e12 ? n : n * 1000;
-  return formatTimestampInUserTimezone(new Date(ms).toISOString());
 }
 
 type ActionDisabledReason = "no-perm" | "no-node" | "not-manual-run" | "run-in-flight" | "submitting" | null;

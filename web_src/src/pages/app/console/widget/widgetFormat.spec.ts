@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { formatValue } from "./widgetFormat";
 
@@ -7,6 +7,22 @@ import { formatValue } from "./widgetFormat";
  * magnitude-based heuristic mis-classified small ms values (4527 ms used to
  * print as `1h 15m` because anything <= 10_000 was assumed to be seconds).
  */
+describe("formatValue relative", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-29T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("uses compact relative labels without an ago suffix", () => {
+    expect(formatValue("2026-03-29T11:55:00.000Z", "relative")).toBe("5m");
+    expect(formatValue("2026-03-29T10:00:00.000Z", "relative")).toBe("2h");
+  });
+});
+
 describe("formatValue duration", () => {
   it("formats sub-second values in milliseconds", () => {
     expect(formatValue(547, "duration")).toBe("547ms");
