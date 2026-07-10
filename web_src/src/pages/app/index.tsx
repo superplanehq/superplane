@@ -123,6 +123,7 @@ import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
+import { useAgentNodeFocusRequest } from "./useAgentNodeFocusRequest";
 import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
 import { useComponentIconMap } from "./useComponentIconMap";
 import { useRunSidebarNavigationState } from "./useRunSidebarNavigationState";
@@ -1653,6 +1654,7 @@ export function AppPage() {
     targetMode: "live" | "runs";
     tab?: "latest" | "settings";
   } | null>(null);
+  useAgentNodeFocusRequest(setFocusRequest);
   const handleSidebarChange = useCallback(
     (open: boolean, nodeId: string | null) => {
       // Use the functional updater so this composes with other concurrent
