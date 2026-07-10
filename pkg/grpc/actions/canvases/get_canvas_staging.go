@@ -3,13 +3,16 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
 
@@ -72,7 +75,7 @@ func buildStaging(ctx context.Context, canvas *models.Canvas, rows []models.Work
 	//
 	// Otherwise, combine the live version with the staged changes
 	//
-	spec, err := effectiveCanvasSpec(canvas, liveVersion, canvas.OrganizationID.String(), rows)
+	spec, err := effectiveCanvasSpec(canvas, liveVersion, rows)
 	if err != nil {
 		return nil, err
 	}
@@ -98,4 +101,73 @@ func findStagingBaseVersionID(rows []models.WorkflowStagedFile) uuid.UUID {
 		return uuid.Nil
 	}
 	return rows[0].BaseVersionID
+}
+
+func effectiveCanvasSpec(canvas *models.Canvas, version *models.CanvasVersion, rows []models.WorkflowStagedFile) (*pb.Canvas_Spec, error) {
+	spec, err := SerializeCanvasSpecFromVersion(version)
+	if err != nil {
+		return nil, err
+	}
+
+	canvasYAML, err := effectiveSpecYAML(canvas, version, rows, CanvasYAMLRepositoryPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := applyCanvasYAMLToSpec(spec, canvasYAML); err != nil {
+		return nil, err
+	}
+
+	consoleYAML, err := effectiveSpecYAML(canvas, version, rows, ConsoleYAMLRepositoryPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyConsoleYAMLToSpec(spec, consoleYAML); err != nil {
+		return nil, err
+	}
+
+	return spec, nil
+}
+
+func applyCanvasYAMLToSpec(spec *pb.Canvas_Spec, yamlText string) error {
+	if strings.TrimSpace(yamlText) == "" {
+		spec.Nodes = nil
+		spec.Edges = nil
+		return nil
+	}
+
+	canvas, err := yaml.CanvasFromYAML([]byte(yamlText))
+	if err != nil {
+		return err
+	}
+
+	if canvas == nil || canvas.Spec == nil {
+		return nil
+	}
+
+	spec.Nodes = actions.NodesToProto(canvas.Nodes())
+	spec.Edges = actions.EdgesToProto(canvas.Edges())
+	return nil
+}
+
+func applyConsoleYAMLToSpec(spec *pb.Canvas_Spec, yamlText string) error {
+	if strings.TrimSpace(yamlText) == "" {
+		spec.Panels = nil
+		spec.Layout = nil
+		return nil
+	}
+
+	console, err := yaml.ConsoleFromYML([]byte(yamlText))
+	if err != nil {
+		return err
+	}
+
+	protoPanels, err := ConsolePanelsToProto(console.Panels())
+	if err != nil {
+		return err
+	}
+
+	spec.Panels = protoPanels
+	spec.Layout = ConsoleLayoutToProto(console.Layout())
+	return nil
 }
