@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { canvasesGetCanvasStaging } from "@/api-client";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { parseAgentContent, type DraftActionsSegment } from "./widgets/parser";
 import type { AgentMessage } from "@/components/CanvasToolSidebar/types";
 import { buildAgentStagingAutoOpenKey, releaseAgentStagingAutoOpen } from "@/pages/app/lib/agent-staging-auto-open";
-
-type StagingSummaryResponse = {
-  stagingSummary?: {
-    hasStaging?: boolean;
-  };
-};
 
 type UseDraftActionsArgs = {
   messages: AgentMessage[];
@@ -68,8 +64,8 @@ export function useDraftActions({
 
     async function detectStaging() {
       try {
-        const hasStaging = await fetchCanvasHasStaging(canvasId, organizationId);
-        if (cancelled || !hasStaging || dismissedCanvasIds.has(canvasId)) {
+        const response = await canvasesGetCanvasStaging(withOrganizationHeader({ path: { canvasId } }));
+        if (cancelled || !response.data?.staging?.hasStaging || dismissedCanvasIds.has(canvasId)) {
           return;
         }
 
@@ -101,9 +97,10 @@ export function useDraftActions({
 
     async function verifyStaging() {
       try {
-        const hasStaging = await fetchCanvasHasStaging(targetCanvasId, organizationId);
+        const response = await canvasesGetCanvasStaging(withOrganizationHeader({ path: { canvasId: targetCanvasId } }));
         if (cancelled) return;
 
+        const hasStaging = !!response.data?.staging?.hasStaging;
         if (!hasStaging) {
           dismissCanvas(targetCanvasId);
         }
@@ -168,22 +165,4 @@ function addDismissedCanvasId(current: Set<string>, canvasId: string): Set<strin
   const next = new Set(current);
   next.add(canvasId);
   return next;
-}
-
-async function fetchCanvasHasStaging(canvasId: string, organizationId: string): Promise<boolean> {
-  const data = await fetchJson<StagingSummaryResponse>(`/api/v1/canvases/${canvasId}/staging`, organizationId);
-  return !!data?.stagingSummary?.hasStaging;
-}
-
-async function fetchJson<T>(url: string, organizationId: string): Promise<T | null> {
-  const response = await fetch(url, {
-    headers: { "x-organization-id": organizationId },
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  return (await response.json()) as T;
 }

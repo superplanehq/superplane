@@ -52,7 +52,10 @@ func ListCanvasVersionsPaginated(
 		return nil, grpcerrors.Internal(err, "failed to list canvas versions")
 	}
 
-	protoVersions := serializeCanvasVersions(ctx, versions, organizationID)
+	protoVersions, err := serializeCanvasVersions(ctx, versions, organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to serialize versions")
+	}
 
 	return &pb.ListCanvasVersionsResponse{
 		Versions:      protoVersions,
