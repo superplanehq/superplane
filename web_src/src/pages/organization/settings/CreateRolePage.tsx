@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Checkbox } from "@/ui/checkbox";
 import { showErrorToast } from "@/lib/toast";
+import type { AuthorizationPermission } from "@/api-client";
 
 interface Permission {
   id: string;
@@ -28,6 +29,12 @@ interface PermissionCategory {
   icon: string;
   permissions: Permission[];
 }
+
+type RolePermissionPayload = {
+  resource: string;
+  action: string;
+  domainType: AuthorizationPermission["domainType"];
+};
 
 // Organization permissions based on RBAC policy
 const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
@@ -285,12 +292,41 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
   },
 ];
 
+const VISIBLE_ROLE_PERMISSIONS = ORGANIZATION_PERMISSIONS.flatMap((category) => category.permissions);
+const VISIBLE_ROLE_PERMISSION_KEYS = new Set(
+  VISIBLE_ROLE_PERMISSIONS.map((permission) => permissionKey(permission.resource, permission.action)),
+);
+
 const DEFAULT_ROLE_NAMES = ["org_viewer", "org_admin", "org_owner"];
 
 const isDefaultRole = (roleName?: string | null) => {
   if (!roleName) return false;
   return DEFAULT_ROLE_NAMES.includes(roleName);
 };
+
+function permissionKey(resource?: string, action?: string) {
+  return `${resource || ""}:${action || ""}`;
+}
+
+function hiddenRolePermissions(permissions?: AuthorizationPermission[]): RolePermissionPayload[] {
+  return (permissions || []).flatMap((permission) => {
+    if (!permission.resource || !permission.action) {
+      return [];
+    }
+
+    if (VISIBLE_ROLE_PERMISSION_KEYS.has(permissionKey(permission.resource, permission.action))) {
+      return [];
+    }
+
+    return [
+      {
+        resource: permission.resource,
+        action: permission.action,
+        domainType: permission.domainType,
+      },
+    ];
+  });
+}
 
 export function CreateRolePage() {
   const { roleName: roleNameParam } = useParams<{ roleName?: string }>();
@@ -313,6 +349,8 @@ export function CreateRolePage() {
   const canReadRoles = canAct("roles", "read");
   const canCreateRoles = canAct("roles", "create");
   const canUpdateRoles = canAct("roles", "update");
+  const preservedHiddenPermissions = isEditMode ? hiddenRolePermissions(existingRole?.spec?.permissions) : [];
+  const hasSelectedPermissions = selectedPermissions.size > 0 || preservedHiddenPermissions.length > 0;
 
   usePageTitle([isReadOnly ? "View Role" : isEditMode ? "Edit Role" : "Create Role"]);
 
@@ -351,8 +389,8 @@ export function CreateRolePage() {
       // Convert permissions back to selected format
       const permissionIds = new Set<string>();
       existingRole.spec?.permissions?.forEach((perm) => {
-        const matchingPerm = ORGANIZATION_PERMISSIONS.flatMap((cat) => cat.permissions).find(
-          (p) => p.resource === perm.resource && p.action === perm.action,
+        const matchingPerm = VISIBLE_ROLE_PERMISSIONS.find(
+          (permission) => permission.resource === perm.resource && permission.action === perm.action,
         );
 
         if (matchingPerm) {
@@ -365,14 +403,14 @@ export function CreateRolePage() {
 
   const handleSubmitRole = async () => {
     if (isReadOnly) return;
-    if (!roleName.trim() || selectedPermissions.size === 0 || !orgId) return;
+    if (!roleName.trim() || !hasSelectedPermissions || !orgId) return;
     if (isEditMode && !canUpdateRoles) return;
     if (!isEditMode && !canCreateRoles) return;
 
     try {
       // Convert selected permissions to the protobuf format
-      const permissions = Array.from(selectedPermissions).map((permId) => {
-        const permission = ORGANIZATION_PERMISSIONS.flatMap((cat) => cat.permissions).find((p) => p.id === permId);
+      const visiblePermissions = Array.from(selectedPermissions).map((permId) => {
+        const permission = VISIBLE_ROLE_PERMISSIONS.find((p) => p.id === permId);
 
         if (!permission) {
           throw new Error(`Permission ${permId} not found`);
@@ -384,6 +422,7 @@ export function CreateRolePage() {
           domainType: "DOMAIN_TYPE_ORGANIZATION" as const,
         };
       });
+      const permissions = isEditMode ? [...visiblePermissions, ...preservedHiddenPermissions] : visiblePermissions;
 
       if (isEditMode && roleNameParam) {
         // Update existing role
@@ -564,7 +603,7 @@ export function CreateRolePage() {
                   ))}
                 </div>
 
-                {selectedPermissions.size === 0 && !isReadOnly && (
+                {!hasSelectedPermissions && !isReadOnly && (
                   <Text className="text-sm text-red-600 dark:text-red-400 mt-2">
                     Please select at least one permission for this role
                   </Text>
@@ -578,7 +617,7 @@ export function CreateRolePage() {
             {!isReadOnly && (
               <LoadingButton
                 onClick={handleSubmitRole}
-                disabled={!roleName.trim() || selectedPermissions.size === 0 || isLoading}
+                disabled={!roleName.trim() || !hasSelectedPermissions || isLoading}
                 loading={isSubmitting}
                 loadingText={isEditMode ? "Updating..." : "Creating..."}
               >

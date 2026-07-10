@@ -72,7 +72,10 @@ A quick reference for the **production** deploy flow.
 - Owner: _Platform team_
 - Rollback: revert + redeploy
 
-> Tip: keep an eye on the error rate panel after each deploy.
+___
+
+> [!TIP]
+> Keep an eye on the error rate panel after each deploy.
 
 \`\`\`bash
 make deploy ENV=prod

@@ -921,6 +921,46 @@ func TestAccessAction_ReportsInterceptorBackedAgentTokenAccess(t *testing.T) {
 	assert.True(t, toolActions["delete_file"].Allowed)
 }
 
+func TestAccessAction_ReportsLegacyDraftUpdateAccess(t *testing.T) {
+	organizationID := uuid.NewString()
+	userID := uuid.NewString()
+	canvasID := uuid.NewString()
+	action := accessAction{auth: actionPermissionChecker{
+		"org:read":                true,
+		"integrations:read":       true,
+		"canvases:read":           true,
+		"canvases:update_version": true,
+	}}
+
+	payload, err := action.Execute(context.Background(), agents.AgentSessionContext{
+		SessionID:      "session-1",
+		OrganizationID: organizationID,
+		UserID:         userID,
+		CanvasID:       canvasID,
+	}, Input{})
+
+	require.NoError(t, err)
+	result, ok := payload.(accessResult)
+	require.True(t, ok)
+
+	accessible := apiAccessByMethod(result.Accessible)
+	unavailable := apiAccessByMethod(result.Unavailable)
+	assert.Contains(t, accessible, "PUT /api/v1/canvases/{canvas_id}/staging")
+	assert.Contains(t, accessible, "DELETE /api/v1/canvases/{canvas_id}/staging")
+	assert.Contains(t, unavailable, "POST /api/v1/canvases/{canvas_id}/staging/commit")
+	assert.Contains(t, unavailable, "PATCH /api/v1/canvases/{canvas_id}/executions/{execution_id}/cancel")
+
+	toolActions := toolAccessByAction(result.ToolActions)
+	require.Contains(t, toolActions, "patch_staging")
+	assert.True(t, toolActions["patch_staging"].Allowed)
+	require.Contains(t, toolActions, "write_file")
+	assert.True(t, toolActions["write_file"].Allowed)
+	require.Contains(t, toolActions, "delete_file")
+	assert.True(t, toolActions["delete_file"].Allowed)
+	require.Contains(t, toolActions, "read_runtime")
+	assert.True(t, toolActions["read_runtime"].Allowed)
+}
+
 func TestReadRuntimeAction_ParseFilters(t *testing.T) {
 	runStates, err := parseRunStates([]string{"started", "STATE_FINISHED"})
 	require.NoError(t, err)
@@ -1166,6 +1206,12 @@ type allowingPermissionChecker struct{}
 
 func (allowingPermissionChecker) CheckOrganizationPermission(_ context.Context, _, _, _, _ string) (bool, error) {
 	return true, nil
+}
+
+type actionPermissionChecker map[string]bool
+
+func (c actionPermissionChecker) CheckOrganizationPermission(_ context.Context, _, _, resource, action string) (bool, error) {
+	return c[resource+":"+action], nil
 }
 
 func apiAccessByMethod(entries []apiAccessResult) map[string]apiAccessResult {
