@@ -79,10 +79,10 @@ func (c *CreateDeployment) Documentation() string {
 ## Configuration
 
 - **Project** (required): The GitLab project to deploy in
-- **Environment** (required): The target environment (e.g., production, staging). GitLab creates the environment if it does not exist yet.
-- **Ref** (required): The branch or tag being deployed (defaults to main)
+- **Environment** (required): The target environment (e.g., production, staging). Pick an existing one from the dropdown, or switch to Expression and type a new name - GitLab creates it automatically on first deploy.
+- **Ref** (required): The branch or tag being deployed (defaults to main). When you pick **Tag** in this field, the deployment is automatically recorded as a tag deployment.
 - **Commit SHA** (required): The commit SHA being deployed. Supports expressions.
-- **Ref is a tag**: Enable when the ref is a tag rather than a branch
+- **Ref is a tag**: Only needed when **Ref** comes from an expression that doesn't carry the tag prefix (e.g. a raw tag name). Not needed when using the Ref field's own Tag option.
 - **Status**: The initial deployment status (defaults to running)
 
 ## Output
@@ -136,7 +136,8 @@ func (c *CreateDeployment) Configuration() []configuration.Field {
 			Label:       "Environment",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The target environment. GitLab creates it if it does not exist yet.",
+			Description: "The target environment. Pick an existing one, or if it doesn't exist yet, switch to Expression and type its name - GitLab creates it automatically on first deploy.",
+			Placeholder: "e.g. production",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:           ResourceTypeEnvironment,
@@ -170,7 +171,7 @@ func (c *CreateDeployment) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
 			Default:     false,
-			Description: "Enable when the ref is a tag rather than a branch.",
+			Description: "Only needed when Ref comes from an expression without the tag prefix. Automatically detected when you pick Tag in the Ref field.",
 		},
 		{
 			Name:     "status",
@@ -240,7 +241,7 @@ func (c *CreateDeployment) Execute(ctx core.ExecutionContext) error {
 		Environment: config.Environment,
 		Ref:         normalizePipelineRef(config.Ref),
 		SHA:         config.SHA,
-		Tag:         config.Tag,
+		Tag:         config.Tag || isTagRef(config.Ref),
 		Status:      status,
 	})
 	if err != nil {
@@ -276,4 +277,11 @@ func (c *CreateDeployment) Hooks() []core.Hook {
 
 func (c *CreateDeployment) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+// isTagRef reports whether ref carries the refs/tags/ prefix produced by the
+// git-ref field's "Tag" option, so Tag is inferred automatically instead of
+// relying solely on the user also toggling "Ref is a tag" by hand.
+func isTagRef(ref string) bool {
+	return strings.HasPrefix(ref, "refs/tags/")
 }

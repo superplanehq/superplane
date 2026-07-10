@@ -148,6 +148,29 @@ func Test__CreateDeploymentStatus__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid deployment ID")
 	})
 
+	t.Run("rejects fractional deployment ID instead of truncating", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":      "123",
+				"deploymentId": "42.9",
+				"status":       "success",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+				},
+			},
+		}
+
+		err := c.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid deployment ID")
+		assert.Contains(t, err.Error(), "whole number")
+	})
+
 	t.Run("failure", func(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
@@ -173,5 +196,39 @@ func Test__CreateDeploymentStatus__Execute(t *testing.T) {
 		err := c.Execute(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update deployment status")
+	})
+}
+
+func Test__ParseDeploymentID(t *testing.T) {
+	t.Run("accepts plain integers", func(t *testing.T) {
+		id, err := parseDeploymentID("42")
+		require.NoError(t, err)
+		assert.Equal(t, 42, id)
+	})
+
+	t.Run("accepts whole-number floats from expression coercion", func(t *testing.T) {
+		id, err := parseDeploymentID("42.0")
+		require.NoError(t, err)
+		assert.Equal(t, 42, id)
+
+		id, err = parseDeploymentID("4.2e+01")
+		require.NoError(t, err)
+		assert.Equal(t, 42, id)
+	})
+
+	t.Run("rejects fractional values instead of truncating", func(t *testing.T) {
+		_, err := parseDeploymentID("42.9")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "whole number")
+	})
+
+	t.Run("rejects empty value", func(t *testing.T) {
+		_, err := parseDeploymentID("")
+		require.Error(t, err)
+	})
+
+	t.Run("rejects non-numeric value", func(t *testing.T) {
+		_, err := parseDeploymentID("not-a-number")
+		require.Error(t, err)
 	})
 }

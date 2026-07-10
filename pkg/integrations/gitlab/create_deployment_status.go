@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -204,7 +205,10 @@ func (c *CreateDeploymentStatus) HandleHook(ctx core.ActionHookContext) error {
 }
 
 // parseDeploymentID converts the configured deployment ID (which may come from an
-// expression that resolves to a number) into an int.
+// expression that resolves to a number) into an int. Expressions can coerce
+// deployment IDs through JSON numbers, which stringify as floats or scientific
+// notation (e.g. "42" -> "4.2e+01"), so a whole-number float is also accepted -
+// but fractional values like "42.9" are rejected rather than silently truncated.
 func parseDeploymentID(value string) (int, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
@@ -215,9 +219,10 @@ func parseDeploymentID(value string) (int, error) {
 		return id, nil
 	}
 
-	if f, err := strconv.ParseFloat(trimmed, 64); err == nil {
-		return int(f), nil
+	f, err := strconv.ParseFloat(trimmed, 64)
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) || math.Trunc(f) != f {
+		return 0, fmt.Errorf("invalid deployment ID %q: must be a whole number", value)
 	}
 
-	return 0, fmt.Errorf("invalid deployment ID %q: must be a number", value)
+	return int(f), nil
 }

@@ -831,10 +831,10 @@ The Create Deployment component records a deployment for a GitLab project enviro
 ### Configuration
 
 - **Project** (required): The GitLab project to deploy in
-- **Environment** (required): The target environment (e.g., production, staging). GitLab creates the environment if it does not exist yet.
-- **Ref** (required): The branch or tag being deployed (defaults to main)
+- **Environment** (required): The target environment (e.g., production, staging). Pick an existing one from the dropdown, or switch to Expression and type a new name - GitLab creates it automatically on first deploy.
+- **Ref** (required): The branch or tag being deployed (defaults to main). When you pick **Tag** in this field, the deployment is automatically recorded as a tag deployment.
 - **Commit SHA** (required): The commit SHA being deployed. Supports expressions.
-- **Ref is a tag**: Enable when the ref is a tag rather than a branch
+- **Ref is a tag**: Only needed when **Ref** comes from an expression that doesn't carry the tag prefix (e.g. a raw tag name). Not needed when using the Ref field's own Tag option.
 - **Status**: The initial deployment status (defaults to running)
 
 ### Output

@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 
@@ -162,6 +163,50 @@ func Test__CreateDeployment__Execute(t *testing.T) {
 		assert.Equal(t, "running", deployment.Status)
 		require.NotNil(t, deployment.Environment)
 		assert.Equal(t, "production", deployment.Environment.Name)
+	})
+
+	t.Run("infers tag from git-ref tag prefix even when tag checkbox is off", func(t *testing.T) {
+		mockHTTP := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{
+					"id": 42,
+					"ref": "v1.0.0",
+					"status": "running",
+					"environment": {"id": 9, "name": "production"}
+				}`),
+			},
+		}
+
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":     "123",
+				"environment": "production",
+				"ref":         "refs/tags/v1.0.0",
+				"sha":         "a91957a858320c0e17f3a0eca7cfacbff50ea29a",
+				"status":      "running",
+				"tag":         false,
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+				},
+			},
+			HTTP:           mockHTTP,
+			ExecutionState: &contexts.ExecutionStateContext{},
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+
+		require.Len(t, mockHTTP.Requests, 1)
+		body, readErr := io.ReadAll(mockHTTP.Requests[0].Body)
+		require.NoError(t, readErr)
+		bodyString := string(body)
+		assert.Contains(t, bodyString, `"ref":"v1.0.0"`)
+		assert.Contains(t, bodyString, `"tag":true`)
 	})
 
 	t.Run("failure", func(t *testing.T) {
