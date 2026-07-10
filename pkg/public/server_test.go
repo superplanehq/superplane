@@ -297,7 +297,11 @@ func Test__GRPCGatewayRejectsUnknownFields(t *testing.T) {
 	require.NoError(t, err)
 
 	requestBody := `{
-  "name": "unknown-field-test",
+  "canvas": {
+    "metadata": {
+      "name": "unknown-field-test"
+    }
+  },
   "hello": "what"
 }`
 
