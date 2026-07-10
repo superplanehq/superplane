@@ -28,6 +28,10 @@ import {
   MARKDOWN_TABLE_HEAD_CLASSES,
 } from "./markdownTableStyles";
 
+/** Shared chrome for markdown thematic breaks (`___`, `---`, `***`). */
+export const MARKDOWN_DIVIDER_CLASSES =
+  "my-5 h-0 border-0 border-t-2 border-solid border-slate-300 dark:border-gray-600";
+
 /**
  * Tailwind class string shared by every full-document markdown renderer in the
  * app (Console panels and Files `.md` preview). We deliberately do not use the
@@ -165,6 +169,7 @@ export function MarkdownContent({
           blockquote: MarkdownBlockquote,
           code: MarkdownCodeWithDiagrams,
           pre: MarkdownPre,
+          hr: MarkdownDivider,
         }}
       >
         {normalized}
@@ -182,6 +187,10 @@ function MarkdownPre({ children, node, ...props }: ComponentProps<"pre"> & Extra
   }
 
   return <pre {...props}>{children}</pre>;
+}
+
+function MarkdownDivider(props: ComponentProps<"hr">) {
+  return <hr {...props} role="separator" data-testid="markdown-divider" className={MARKDOWN_DIVIDER_CLASSES} />;
 }
 
 function MarkdownCodeWithDiagrams({

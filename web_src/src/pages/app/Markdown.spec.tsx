@@ -126,6 +126,16 @@ describe("MarkdownContent", () => {
     expect(screen.getByText("Failed").className).toContain("font-semibold");
   });
 
+  it("renders ___ as a horizontal divider", () => {
+    render(<MarkdownContent content={"Above\n\n___\n\nBelow"} />);
+
+    const divider = screen.getByTestId("markdown-divider");
+    expect(divider.tagName).toBe("HR");
+    expect(divider).toHaveAttribute("role", "separator");
+    expect(divider.className).toContain("border-t-2");
+    expect(divider.className).toContain("border-slate-300");
+  });
+
   it.each([
     ["NOTE", "Note"],
     ["TIP", "Tip"],

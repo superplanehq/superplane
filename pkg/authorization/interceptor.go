@@ -23,3 +23,7 @@ type AuthorizationRule struct {
 	LegacyActions                []string
 	RequiredExperimentalFeatures []string
 }
+
+func (r AuthorizationRule) AllowedActions() []string {
+	return append([]string{r.Action}, r.LegacyActions...)
+}
