@@ -1,7 +1,8 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { useCallback, useEffect, useRef, type UIEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, type UIEvent } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { LiveCanvasSidebarRow } from "./LiveCanvasSidebarRow";
+import { getRunSidebarNavigation, type RunSidebarNavigationState } from "./runsSidebarNavigation";
 import { RunsTabListView } from "./RunsTabListView";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
 import { useRunFilters } from "./useRunFilters";
@@ -15,7 +16,6 @@ export interface RunsTabPanelProps {
   selectedRun?: CanvasesCanvasRun | null;
   isSelectedRunLoading?: boolean;
   onSelectRun: (runId: string) => void;
-  onNavigateRun?: (runId: string) => void;
   onSelectLiveCanvas: () => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
@@ -31,6 +31,7 @@ export interface RunsTabPanelProps {
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
+  onRunNavigationChange?: (navigation: RunSidebarNavigationState) => void;
 }
 
 export function RunsTabPanel({
@@ -47,8 +48,17 @@ export function RunsTabPanel({
   workflowNodes = [],
   componentIconMap = {},
   onStatusFiltersChange,
+  onRunNavigationChange,
 }: RunsTabPanelProps) {
   const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const navigationState = useMemo(
+    () =>
+      getRunSidebarNavigation(filterState.orderedRuns, selectedRunId, {
+        hasNextPage,
+        hasActiveFilters: filterState.hasAnyFilter,
+      }),
+    [filterState.hasAnyFilter, filterState.orderedRuns, hasNextPage, selectedRunId],
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: hasNextPage,
@@ -65,6 +75,10 @@ export function RunsTabPanel({
   useEffect(() => {
     loadMoreIfNeeded(scrollRef.current);
   }, [filterState.filteredRuns.length, loadMoreIfNeeded]);
+
+  useEffect(() => {
+    onRunNavigationChange?.(navigationState);
+  }, [navigationState, onRunNavigationChange]);
 
   const handleRunSelect = useCallback(
     (runId: string) => {

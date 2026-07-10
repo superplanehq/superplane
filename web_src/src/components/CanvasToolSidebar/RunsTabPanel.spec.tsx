@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -181,6 +181,42 @@ describe("RunsTabPanel", () => {
 
     expect(screen.getByText("Broken deploy")).toBeInTheDocument();
     expect(screen.queryByText("Healthy deploy")).not.toBeInTheDocument();
+  });
+
+  it("reports navigation for the currently filtered loaded runs", async () => {
+    const onRunNavigationChange = vi.fn();
+
+    render(
+      <RunsTabPanel
+        runs={[
+          makeRun({
+            id: "run-failed",
+            result: "RESULT_FAILED",
+            rootEvent: { ...makeRun().rootEvent, customName: "Broken deploy" },
+          }),
+          makeRun({
+            id: "run-passed",
+            result: "RESULT_PASSED",
+            rootEvent: { ...makeRun().rootEvent, customName: "Healthy deploy" },
+          }),
+        ]}
+        selectedRunId="run-failed"
+        {...baseProps}
+        onRunNavigationChange={onRunNavigationChange}
+      />,
+      { wrapper: routerWrapper },
+    );
+
+    await waitFor(() => {
+      expect(onRunNavigationChange).toHaveBeenLastCalledWith(expect.objectContaining({ olderRunId: "run-passed" }));
+    });
+
+    fireEvent.click(screen.getByLabelText("Filter runs"));
+    fireEvent.click(within(screen.getByRole("dialog")).getByText("Failed"));
+
+    await waitFor(() => {
+      expect(onRunNavigationChange).toHaveBeenLastCalledWith(expect.objectContaining({ olderRunId: null }));
+    });
   });
 
   it("loads more runs when the sidebar scroll reaches the end", () => {
