@@ -68,6 +68,8 @@ export function renderInspector({
   onNavigateRun,
   onNavigateOlder,
   run: inspectedRun = run,
+  workflowNodes: inspectedWorkflowNodes = workflowNodes,
+  componentDefinitions: inspectedComponentDefinitions = componentDefinitions,
   account = null,
   passCurrentUser = true,
 }: {
@@ -80,6 +82,8 @@ export function renderInspector({
   onNavigateRun?: (runId: string) => void;
   onNavigateOlder?: () => void;
   run?: CanvasesCanvasRun;
+  workflowNodes?: SuperplaneComponentsNode[];
+  componentDefinitions?: ActionsAction[];
   account?: {
     id: string;
     name: string;
@@ -113,8 +117,8 @@ export function renderInspector({
             canvasId="canvas-1"
             organizationId="org-1"
             run={inspectedRun}
-            workflowNodes={workflowNodes}
-            componentDefinitions={componentDefinitions}
+            workflowNodes={inspectedWorkflowNodes}
+            componentDefinitions={inspectedComponentDefinitions}
             currentUser={
               passCurrentUser && account
                 ? { id: account.id, email: account.email, roles: account.roles, groups: account.groups }
@@ -179,7 +183,7 @@ export function firePointerEvent(
   fireEvent(target, event);
 }
 
-const run: CanvasesCanvasRun = {
+export const run: CanvasesCanvasRun = {
   id: "run-1",
   canvasId: "canvas-1",
   state: "STATE_FINISHED",
@@ -211,7 +215,7 @@ export const runningRun: CanvasesCanvasRun = {
   },
 };
 
-const workflowNodes: SuperplaneComponentsNode[] = [
+export const workflowNodes: SuperplaneComponentsNode[] = [
   {
     id: "trigger-1",
     name: "On Pull Request",
