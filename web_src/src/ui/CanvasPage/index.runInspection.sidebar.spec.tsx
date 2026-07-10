@@ -73,6 +73,28 @@ vi.mock("../componentSidebar", () => ({
   ComponentSidebar: () => <div data-testid="live-node-detail-pane-content" />,
 }));
 
+vi.mock("../Runs/RunInspectorPanel", () => ({
+  RunInspectorPanel: ({
+    onClose,
+    onEditNode,
+    onRerunCreated,
+  }: {
+    onClose?: () => void;
+    onEditNode?: (nodeId: string) => void;
+    onRerunCreated?: (eventId: string) => void;
+  }) => (
+    <div data-testid="run-inspector-panel">
+      <button type="button" aria-label="Close" onClick={onClose} />
+      <button type="button" onClick={() => onEditNode?.("run-node-1")}>
+        Edit runtime config
+      </button>
+      <button type="button" onClick={() => onRerunCreated?.("rerun-event-1")}>
+        Rerun
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock("@/components/CanvasToolSidebar", () => ({
   CanvasToolSidebar: () => null,
 }));
@@ -217,6 +239,166 @@ describe("CanvasPage run inspection sidebar", () => {
 
     expect(onRunNodeDetailClose).toHaveBeenCalledOnce();
     expect(onBackToLiveCanvas).not.toHaveBeenCalled();
+  });
+
+  it("enters edit mode when editing runtime config from run inspection", async () => {
+    const onEnterEditMode = vi.fn();
+    const canvasProps = {
+      title: "Canvas",
+      headerMode: "version-live" as const,
+      runNodeDetailNodeId: "run-node-1",
+      runNodeDetailCanvasId: "canvas-1",
+      runNodeDetailRun: {
+        id: "run-1",
+        rootEvent: { id: "root-event-1", nodeId: "trigger-node" },
+      },
+      nodes: [
+        {
+          id: "run-node-1",
+          position: { x: 0, y: 0 },
+          data: {
+            label: "Run node",
+            state: "success",
+            type: "component",
+          },
+        },
+      ],
+      edges: [],
+      buildingBlocks: [],
+      activeCanvasVersionId: "live-version",
+      onEnterEditMode,
+    };
+
+    render(
+      <MemoryRouter>
+        <CanvasPage {...canvasProps} isRunInspectionMode isEditing={false} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("run-inspector-panel")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit runtime config" }));
+
+    expect(onEnterEditMode).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId("live-node-detail-pane-content")).not.toBeInTheDocument();
+  });
+
+  it("does not open stale runtime edit settings after edit mode entry fails", async () => {
+    const onEnterEditMode = vi.fn().mockRejectedValue(new Error("edit failed"));
+    const sidebarData = {
+      title: "Run node",
+      iconSrc: "",
+      iconSlug: "box",
+      latestEvents: [],
+      nextInQueueEvents: [],
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+      isLoading: false,
+    };
+    const canvasProps = {
+      title: "Canvas",
+      headerMode: "version-live" as const,
+      runNodeDetailNodeId: "run-node-1",
+      runNodeDetailCanvasId: "canvas-1",
+      runNodeDetailRun: {
+        id: "run-1",
+        rootEvent: { id: "root-event-1", nodeId: "trigger-node" },
+      },
+      nodes: [
+        {
+          id: "run-node-1",
+          position: { x: 0, y: 0 },
+          data: {
+            label: "Run node",
+            state: "success",
+            type: "component",
+          },
+        },
+      ],
+      edges: [],
+      buildingBlocks: [],
+      activeCanvasVersionId: "live-version",
+      onEnterEditMode,
+      getSidebarData: vi.fn(() => sidebarData),
+    };
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <CanvasPage {...canvasProps} isRunInspectionMode isEditing={false} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("run-inspector-panel")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit runtime config" }));
+
+    await waitFor(() => {
+      expect(onEnterEditMode).toHaveBeenCalledOnce();
+    });
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage {...canvasProps} isRunInspectionMode={false} isEditing />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId("live-node-detail-pane-content")).not.toBeInTheDocument();
+  });
+
+  it("selects the created run after rerun from run inspection", async () => {
+    const fetchRunIdForSidebarEvent = vi.fn().mockResolvedValue("new-run-1");
+    const onSelectRunFromSidebarEvent = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          isRunInspectionMode
+          runNodeDetailNodeId="run-node-1"
+          runNodeDetailCanvasId="canvas-1"
+          runNodeDetailRun={{
+            id: "run-1",
+            rootEvent: { id: "root-event-1", nodeId: "trigger-node" },
+          }}
+          fetchRunIdForSidebarEvent={fetchRunIdForSidebarEvent}
+          onSelectRunFromSidebarEvent={onSelectRunFromSidebarEvent}
+          nodes={[
+            {
+              id: "run-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Run node",
+                state: "success",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Rerun" }));
+
+    await waitFor(() => {
+      expect(onSelectRunFromSidebarEvent).toHaveBeenCalledWith("new-run-1", { nodeId: "run-node-1" });
+    });
+    expect(fetchRunIdForSidebarEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "rerun-event-1",
+        nodeId: "trigger-node",
+        triggerEventId: "rerun-event-1",
+      }),
+      { maxPages: 1 },
+    );
   });
 
   it("shows right run inspector loading chrome while run detail is loading", () => {
