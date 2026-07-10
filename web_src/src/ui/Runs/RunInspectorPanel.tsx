@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   type ActionsAction,
   type CanvasesCanvasRun,
@@ -38,6 +38,11 @@ export interface RunInspectorPanelProps {
   selectedNodeId?: string | null;
   onSelectNode: (nodeId: string) => void;
   onClearSelectedNode?: () => void;
+  onEditNode?: (nodeId: string) => void;
+  onRerunCreated?: (eventId: string) => void | Promise<void>;
+  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
+  onNavigateRun?: (runId: string) => void;
+  onNavigateOlder?: () => void;
   onClose: () => void;
 }
 
@@ -61,6 +66,11 @@ export function RunInspectorPanel({
   selectedNodeId = null,
   onSelectNode,
   onClearSelectedNode,
+  onEditNode,
+  onRerunCreated,
+  runNavigation,
+  onNavigateRun,
+  onNavigateOlder,
   onClose,
 }: RunInspectorPanelProps) {
   const { account } = useAccount();
@@ -86,12 +96,13 @@ export function RunInspectorPanel({
   const errorSummaries = useMemo(() => findRunInspectorErrorSummaries(sections), [sections]);
   const inspectorWidth = useResizableInspectorWidth();
   const selectedValue = selectedNodeId ?? "";
-  const [pendingErrorScrollNodeId, setPendingErrorScrollNodeId] = useState<string | null>(null);
+  const [errorScrollRequest, setErrorScrollRequest] = useState<{ nodeId: string; requestId: number } | null>(null);
   const actions = useRunInspectorActions({
     canvasId,
     run,
     sections,
     executionsLoading: executionsQuery.isLoading,
+    onRerunCreated,
   });
 
   const handleValueChange = (value: string) => {
@@ -104,21 +115,9 @@ export function RunInspectorPanel({
   };
 
   const jumpToErrorOutput = (nodeId: string) => {
-    setPendingErrorScrollNodeId(nodeId);
+    setErrorScrollRequest({ nodeId, requestId: Date.now() });
     onSelectNode(nodeId);
   };
-
-  useEffect(() => {
-    if (!pendingErrorScrollNodeId || selectedNodeId !== pendingErrorScrollNodeId) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      const errorOutput = document.querySelector(`[data-run-error-output-node-id="${pendingErrorScrollNodeId}"]`);
-      errorOutput?.scrollIntoView({ block: "center", behavior: "smooth" });
-      setPendingErrorScrollNodeId(null);
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [pendingErrorScrollNodeId, selectedNodeId]);
 
   return (
     <aside
@@ -131,7 +130,15 @@ export function RunInspectorPanel({
       aria-label="Run inspector"
     >
       <ResizeHandle onPointerDown={inspectorWidth.startResize} isResizing={inspectorWidth.isResizing} />
-      <RunInspectorChrome onClose={onClose} />
+      <RunInspectorChrome
+        runId={run.id}
+        newerRunId={runNavigation?.newerRunId}
+        olderRunId={runNavigation?.olderRunId}
+        canNavigateOlder={runNavigation?.canNavigateOlder}
+        onNavigateRun={onNavigateRun}
+        onNavigateOlder={onNavigateOlder}
+        onClose={onClose}
+      />
       <RunInspectorHeader
         run={run}
         title={presentation.title}
@@ -152,9 +159,12 @@ export function RunInspectorPanel({
         onValueChange={handleValueChange}
         onJumpToError={jumpToErrorOutput}
         onRerun={actions.rerun}
+        onEditNode={onEditNode}
         rerunPending={actions.rerunPending}
         actions={actions}
         currentUser={resolvedCurrentUser}
+        errorScrollRequest={errorScrollRequest}
+        onErrorScrolled={() => setErrorScrollRequest(null)}
       />
     </aside>
   );

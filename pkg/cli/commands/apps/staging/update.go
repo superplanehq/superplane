@@ -6,10 +6,9 @@ import (
 	"os"
 	"strings"
 
-	canvasmodels "github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/console"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 type updateCommand struct {
@@ -51,19 +50,11 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		repositoryPath := common.RepositoryPathFromLocalFile(trimmedPath)
 		switch repositoryPath {
 		case common.CanvasYAMLRepositoryPath:
-			fileCanvasID, err := canvasIDFromCanvasYAML(content)
-			if err != nil {
-				return err
-			}
-			if fileCanvasID != appID {
-				return fmt.Errorf(
-					"canvas.yaml metadata.id %q does not match app %q",
-					fileCanvasID,
-					appID,
-				)
+			if _, err := yaml.CanvasFromYAML(content); err != nil {
+				return fmt.Errorf("invalid canvas yaml in %s: %w", trimmedPath, err)
 			}
 		case common.ConsoleYAMLRepositoryPath:
-			if _, err := console.ParseConsoleYAML(content); err != nil {
+			if _, err := yaml.ConsoleFromYML(content); err != nil {
 				return fmt.Errorf("invalid console yaml in %s: %w", trimmedPath, err)
 			}
 		}
@@ -94,15 +85,4 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 		return nil
 	})
-}
-
-func canvasIDFromCanvasYAML(content []byte) (string, error) {
-	resource, err := canvasmodels.ParseCanvas(content)
-	if err != nil {
-		return "", fmt.Errorf("invalid canvas yaml: %w", err)
-	}
-	if resource.Metadata == nil || strings.TrimSpace(resource.Metadata.GetId()) == "" {
-		return "", fmt.Errorf("canvas metadata.id is required in canvas.yaml")
-	}
-	return strings.TrimSpace(resource.Metadata.GetId()), nil
 }

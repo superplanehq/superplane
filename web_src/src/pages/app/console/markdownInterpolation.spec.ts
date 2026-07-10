@@ -56,9 +56,23 @@ describe("interpolateMarkdownTemplate", () => {
     expect(out).toBe("Deployed to https://example.com");
   });
 
-  it("renders empty string for unresolved variables instead of throwing", () => {
-    const out = interpolateMarkdownTemplate("Missing: {{ nope.field }}", {});
-    expect(out).toBe("Missing: ");
+  it("renders deployer avatar fallback html for bot commits without a github username", () => {
+    const out = interpolateMarkdownTemplate(
+      "{{ githubAvatarOrInitial(prod.payload.data.head_commit.author, prod.payload.data.head_commit.committer) }}",
+      {
+        prod: {
+          payload: {
+            data: {
+              head_commit: {
+                author: { name: "cloud-robot" },
+                committer: { name: "cloud-robot" },
+              },
+            },
+          },
+        },
+      },
+    );
+    expect(out).toBe('<div class="avatar avatar-fallback">C</div>');
   });
 
   it("serializes object values as JSON for inline insertion", () => {

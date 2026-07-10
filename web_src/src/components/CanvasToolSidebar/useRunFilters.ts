@@ -118,3 +118,5 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
     clearTriggers: () => setSelectedTriggerIds(new Set()),
   };
 }
+
+export type RunFiltersState = ReturnType<typeof useRunFilters>;

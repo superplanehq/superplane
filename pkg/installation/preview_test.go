@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 func TestBuildPreviewUsesCanvasMetadata(t *testing.T) {
@@ -39,7 +39,7 @@ spec:
 func TestPreviewFromCanvasFallsBackToRepoNameWhenCanvasNameMissing(t *testing.T) {
 	preview := previewFromCanvas(
 		&Repository{Owner: "acme", Name: "preview-env-github-digitalocean"},
-		&pb.Canvas{Metadata: &pb.Canvas_Metadata{Description: "A preview app"}},
+		&yaml.Canvas{Metadata: &yaml.CanvasMetadata{Description: "A preview app"}},
 		"main",
 	)
 
@@ -52,8 +52,8 @@ func TestPreviewFromCanvasFallsBackToRepoNameWhenCanvasNameMissing(t *testing.T)
 func TestPreviewFromCanvasUsesCanvasMetadata(t *testing.T) {
 	preview := previewFromCanvas(
 		&Repository{Owner: "acme", Name: "ignored-repo"},
-		&pb.Canvas{
-			Metadata: &pb.Canvas_Metadata{
+		&yaml.Canvas{
+			Metadata: &yaml.CanvasMetadata{
 				Name:        "My Workflow",
 				Description: "Does useful things",
 			},

@@ -99,6 +99,7 @@ import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
+import { selectCreatedRerun } from "./runInspectionRerunSelection";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
@@ -211,7 +212,7 @@ export interface CanvasPageProps {
   onDiscardStaleStaging?: () => void;
   discardStaleStagingPending?: boolean;
   headerMode?: "default" | "version-live" | "console" | "memory" | "files";
-  onEnterEditMode?: () => void;
+  onEnterEditMode?: () => void | Promise<void>;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   onExitEditMode?: () => void;
@@ -307,7 +308,7 @@ export interface CanvasPageProps {
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
   resolveRunIdForSidebarEvent?: (event: SidebarEvent) => string | null;
-  fetchRunIdForSidebarEvent?: (event: SidebarEvent) => Promise<string | null>;
+  fetchRunIdForSidebarEvent?: (event: SidebarEvent, options?: { maxPages?: number }) => Promise<string | null>;
   onSelectRunFromSidebarEvent?: (runId: string, options?: { nodeId?: string }) => void;
 
   // Building blocks for adding new nodes
@@ -370,9 +371,12 @@ export interface CanvasPageProps {
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
   runNodeDetailEdges?: ComponentsEdge[];
+  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onRunNodeDetailClose?: () => void;
   onRunNodeDetailClear?: () => void;
   onRunNodeDetailNavigate?: (nodeId: string) => void;
+  onRunNavigate?: (runId: string) => void;
+  onRunNavigateOlder?: () => void;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -798,6 +802,7 @@ function CanvasPage(props: CanvasPageProps) {
     props.canvasStateMode === "editing" ? "settings" : "latest",
   );
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
+  const [pendingRuntimeEditNodeId, setPendingRuntimeEditNodeId] = useState<string | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const localHasFitToViewRef = useRef(false);
   const localHasUserToggledSidebarRef = useRef(false);
@@ -1265,6 +1270,14 @@ function CanvasPage(props: CanvasPageProps) {
     }
   }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
+  useEffect(() => {
+    if (!pendingRuntimeEditNodeId || props.isRunInspectionMode || !props.isEditing) return;
+
+    state.componentSidebar.open(pendingRuntimeEditNodeId);
+    setCurrentTab("settings");
+    setPendingRuntimeEditNodeId(null);
+  }, [pendingRuntimeEditNodeId, props.isEditing, props.isRunInspectionMode, state.componentSidebar]);
+
   const canvasStateMode = props.canvasStateMode || "default";
   const showRunInspectionFloatingBar =
     props.isRunInspectionMode && !props.isEditSessionActive && !props.isEditing && !!props.onBackToLiveCanvas;
@@ -1578,6 +1591,34 @@ function CanvasPage(props: CanvasPageProps) {
             selectedNodeId={props.runNodeDetailNodeId}
             onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
             onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
+            runNavigation={props.runNavigation}
+            onNavigateRun={props.onRunNavigate}
+            onNavigateOlder={props.onRunNavigateOlder}
+            onEditNode={
+              props.onEnterEditMode
+                ? (nodeId) => {
+                    setPendingRuntimeEditNodeId(nodeId);
+                    void (async () => {
+                      try {
+                        await props.onEnterEditMode?.();
+                      } catch {
+                        setPendingRuntimeEditNodeId((currentNodeId) =>
+                          currentNodeId === nodeId ? null : currentNodeId,
+                        );
+                      }
+                    })();
+                  }
+                : undefined
+            }
+            onRerunCreated={(eventId) =>
+              selectCreatedRerun({
+                eventId,
+                triggerNodeId: props.runNodeDetailRun?.rootEvent?.nodeId,
+                selectedNodeId: props.runNodeDetailNodeId,
+                fetchRunId: props.fetchRunIdForSidebarEvent,
+                selectRun: props.onSelectRunFromSidebarEvent,
+              })
+            }
             onClose={() => props.onRunNodeDetailClose?.()}
           />
         ) : runInspectorOpen ? (
@@ -2743,11 +2784,21 @@ function CanvasContent({
     if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
     if (!hasFitToViewRef.current) return;
     lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
-    const id = window.setTimeout(() => {
+    let timeoutId: number | null = null;
+    const runFit = (attempt: number) => {
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
-      const renderedNodes = getNodes();
-      const nodeSubset =
-        focusIds && focusIds.size > 0 ? renderedNodes.filter((n) => n.id && focusIds.has(n.id)) : undefined;
+      const nodesById = new Map(stateRef.current.nodes.map((node) => [node.id, node]));
+      getNodes().forEach((node) => nodesById.set(node.id, node));
+      const nodeSubset = focusIds
+        ? Array.from(focusIds)
+            .map((nodeId) => nodesById.get(nodeId))
+            .filter((node) => node !== undefined)
+        : undefined;
+      if (focusIds && nodeSubset && nodeSubset.length < focusIds.size && attempt < 10) {
+        timeoutId = window.setTimeout(() => runFit(attempt + 1), 50);
+        return;
+      }
+
       const fitOptions = isRunInspectionMode ? RUN_CANVAS_FIT_VIEW_OPTIONS : LIVE_CANVAS_FIT_VIEW_OPTIONS;
       void fitView({
         ...(nodeSubset && nodeSubset.length > 0 ? { nodes: nodeSubset } : {}),
@@ -2761,8 +2812,12 @@ function CanvasContent({
         },
         () => undefined,
       );
-    }, 0);
-    return () => window.clearTimeout(id);
+    };
+
+    timeoutId = window.setTimeout(() => runFit(0), 0);
+    return () => {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+    };
   }, [
     fitAllRequest,
     fitAllFocusNodeIds,

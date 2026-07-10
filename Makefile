@@ -192,6 +192,9 @@ check.db.migrations:
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
 
+check.build.storybook:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run build-storybook"
+
 check.test.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
 

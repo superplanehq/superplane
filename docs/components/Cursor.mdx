@@ -109,13 +109,14 @@ The Launch Cloud Agent component triggers a Cursor AI coding agent and waits for
 ### How It Works
 1. Launches a Cursor Cloud Agent with the specified prompt and configuration
 2. Waits for the agent to complete (monitored via webhook and polling)
-3. On success, fetches the agent's conversation and emits the result together with the messages
+3. On success, fetches the agent's conversation and artifacts, and emits the result together with the messages and artifact links
 
 ### Output
 On completion the component emits:
 - **status**, **agentId**, **prUrl**, **summary**, **branchName**
 - **messages**: the agent's full conversation history (chronological); each message has an `id`, `type` (`user_message` or `assistant_message`) and `text`
 - **lastMessage**: convenience pointer to the final assistant reply — or, if the agent produced no assistant reply, the last message overall (use this, or select from `messages` via an expression)
+- **artifacts**: files the agent produced, each with `path`, `sizeBytes`, `updatedAt` and a presigned `url` (with `expiresAt`) that downstream components can consume directly (e.g. Discord file attachments)
 
 ### Example Output
 
@@ -123,6 +124,15 @@ On completion the component emits:
 {
   "data": {
     "agentId": "agent_12345",
+    "artifacts": [
+      {
+        "expiresAt": "2026-03-26T20:29:35Z",
+        "path": "artifacts/report.md",
+        "sizeBytes": 1024,
+        "updatedAt": "2026-03-26T19:20:00Z",
+        "url": "https://storage.cursor.com/agents/agent_12345/artifacts/report.md?sig=abc123"
+      }
+    ],
     "branchName": "cursor/agent-550e8400",
     "lastMessage": {
       "id": "msg_002",
