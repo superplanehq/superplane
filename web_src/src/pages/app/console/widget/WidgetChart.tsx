@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { LineChart as LineChartIcon, Loader2 } from "lucide-react";
 import {
   Area,
@@ -17,6 +17,7 @@ import {
   type BarShapeProps,
 } from "recharts";
 
+import { TimestampDetails } from "@/components/Timestamp";
 import {
   ChartContainer,
   ChartLegend,
@@ -39,7 +40,10 @@ import {
   formatYTick,
   resolveCartesianYFormat,
 } from "./widgetChartAxis";
+import { coerceWidgetTimestamp } from "./widgetFormat";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries, WidgetColumnFormat } from "./types";
+
+const TIMESTAMP_X_FORMATS = new Set<WidgetColumnFormat>(["date", "datetime", "relative"]);
 
 interface WidgetChartProps {
   render: WidgetChartRender;
@@ -319,7 +323,13 @@ function CartesianFrame({
     if (xTickShowIndices && !xTickShowIndices.has(index)) return "";
     return formatXAxisTick(v, xFormat);
   };
-  const xTooltipLabelFormatter = (v: unknown) => formatXTooltipLabel(v, xFormat);
+  const xTooltipLabelFormatter = (v: unknown): ReactNode => {
+    if (xFormat && TIMESTAMP_X_FORMATS.has(xFormat)) {
+      const date = coerceWidgetTimestamp(v);
+      if (date) return <TimestampDetails date={date} copyTestId="chart-tooltip-timestamp-copy" />;
+    }
+    return formatXTooltipLabel(v, xFormat);
+  };
   const yTick = (v: number) => formatYTick(v, yFormat);
   const trimmedYLabel = yLabel?.trim() ? yLabel.trim() : undefined;
   return (
