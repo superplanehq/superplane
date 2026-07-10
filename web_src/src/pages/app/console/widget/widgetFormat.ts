@@ -28,6 +28,7 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case "code":
     case "text":
     case "link":
+    case "avatar":
     case undefined:
       return String(value);
     default:

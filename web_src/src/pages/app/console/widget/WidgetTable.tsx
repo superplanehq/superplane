@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 
 import { useConsoleContext, resolveConsoleNode } from "../ConsoleContext";
 import { isManualRunNode } from "../manualRunTriggers";
+import { AvatarCell } from "./AvatarCell";
 import { applyTableWhere } from "./evalTableWhere";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
@@ -283,6 +284,13 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
   }
   const value = resolveCellValue(col.field, row);
   const formatted = formatValue(value, col.format);
+  if (col.format === "avatar") {
+    return (
+      <td className="px-3 py-1.5">
+        <AvatarCell url={typeof value === "string" ? value : ""} label={col.label ?? col.field} />
+      </td>
+    );
+  }
   // `status` renders semantic values (passed, failed, risk levels) as colored
   // pills. `badge` is for neutral tags (service names, categories) with a
   // lighter outlined treatment.
