@@ -4,7 +4,7 @@ import { formatAbsolute, formatDate as formatDateOnly } from "@/lib/datetime";
 import type { WidgetColumnFormat } from "./types";
 
 /** Pure digit / decimal strings (epoch candidates); excludes ISO and other date text. */
-const PURE_NUMERIC_RE = /^\d+(\.\d+)?$/;
+const PURE_NUMERIC_RE = /^-?\d+(\.\d+)?$/;
 
 /**
  * Coerce a widget cell value into a `Date`. Accepts ISO strings, `Date`
@@ -40,8 +40,9 @@ export function coerceWidgetTimestamp(value: unknown): Date | null {
 
 function dateFromEpochNumber(n: number): Date | null {
   if (!isPlausibleEpochNumber(n)) return null;
-  // Values >= 1e12 are milliseconds; otherwise treat as seconds.
-  const ms = n >= 1e12 ? n : n * 1000;
+  // Use magnitude so negative pre-1970 ms values (e.g. -1.5e12) are not
+  // mistaken for seconds and multiplied by 1000.
+  const ms = Math.abs(n) >= 1e12 ? n : n * 1000;
   const date = new Date(ms);
   return Number.isFinite(date.getTime()) ? date : null;
 }

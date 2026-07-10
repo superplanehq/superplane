@@ -104,6 +104,14 @@ describe("coerceWidgetTimestamp", () => {
     expect(formatValue(404, "datetime")).toBe("404");
     expect(formatValue("12", "relative")).toBe("12");
   });
+
+  it("scales negative epoch milliseconds by magnitude, not sign", () => {
+    const ms = -1_500_000_000_000; // ~1922-07-05 in UTC
+    expect(coerceWidgetTimestamp(ms)?.getTime()).toBe(ms);
+    expect(coerceWidgetTimestamp(String(ms))?.getTime()).toBe(ms);
+    const seconds = -1_500_000_000;
+    expect(coerceWidgetTimestamp(seconds)?.getTime()).toBe(seconds * 1000);
+  });
 });
 
 describe("formatValue duration", () => {
