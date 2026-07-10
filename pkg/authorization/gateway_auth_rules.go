@@ -26,9 +26,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "DELETE", Pattern: "/api/v1/canvases/{canvas_id}/staging"}: {
 			Resource:           "canvases",
-			Action:             "update_version",
+			Action:             "update",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
+			LegacyActions:      []string{"update_version"},
 		},
 		{Method: "DELETE", Pattern: "/api/v1/canvases/{id}"}: {
 			Resource:           "canvases",
@@ -306,9 +307,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "PUT", Pattern: "/api/v1/canvases/{canvas_id}/staging"}: {
 			Resource:           "canvases",
-			Action:             "update_version",
+			Action:             "update",
 			DomainType:         models.DomainTypeOrganization,
 			ResourcePathParams: []string{CanvasIDPathParam},
+			LegacyActions:      []string{"update_version"},
 		},
 		{Method: "PATCH", Pattern: "/api/v1/groups/{group_name}/users/remove"}: {
 			Resource:   "groups",
