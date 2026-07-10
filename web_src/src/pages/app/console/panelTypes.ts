@@ -20,8 +20,14 @@ import type {
   WidgetTableFilter,
   WidgetTableRender,
 } from "./widget/types";
-import { normalizeRowAction, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
-import type { WidgetSort, WidgetSortOrder } from "./widget/types";
+import {
+  normalizeRowAction,
+  WIDGET_FILTER_OPS,
+  WIDGET_SORT_ORDERS,
+  WIDGET_TREND_BETTER,
+  WIDGET_TREND_DISPLAYS,
+} from "./widget/types";
+import type { WidgetSort, WidgetSortOrder, WidgetTrendBetter, WidgetTrendDisplay } from "./widget/types";
 import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
@@ -467,6 +473,14 @@ function normalizeTableColumns(raw: unknown): WidgetTableColumn[] {
       show: typeof c.show === "string" ? c.show : undefined,
       href: typeof c.href === "string" ? c.href : undefined,
       avatarCommitterField: typeof c.avatarCommitterField === "string" ? c.avatarCommitterField : undefined,
+      trendBetter:
+        typeof c.trendBetter === "string" && WIDGET_TREND_BETTER.includes(c.trendBetter as WidgetTrendBetter)
+          ? (c.trendBetter as WidgetTrendBetter)
+          : undefined,
+      trendDisplay:
+        typeof c.trendDisplay === "string" && WIDGET_TREND_DISPLAYS.includes(c.trendDisplay as WidgetTrendDisplay)
+          ? (c.trendDisplay as WidgetTrendDisplay)
+          : undefined,
     };
   });
 }

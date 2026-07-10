@@ -208,7 +208,13 @@ function WidgetTableGrid({
                 )}
               >
                 {render.columns.map((col, ci) => (
-                  <WidgetTableCell key={`${col.field}-${ci}`} col={col} row={row} />
+                  <WidgetTableCell
+                    key={`${col.field}-${ci}`}
+                    col={col}
+                    row={row}
+                    nextRow={filtered[idx + 1] as Record<string, unknown> | undefined}
+                    hasMoreBelow={idx === filtered.length - 1 && Boolean(hasMore)}
+                  />
                 ))}
                 {hasActions ? (
                   <td className="px-3 py-1.5 text-right">
