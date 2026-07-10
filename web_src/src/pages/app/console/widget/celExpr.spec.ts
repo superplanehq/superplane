@@ -101,11 +101,21 @@ describe("celExpr", () => {
       expect(evalExpr(compiled, { sec: seconds }, buildEnv())).toBe("07/04");
     });
 
+    it("parses numeric epoch strings the same way as numbers", () => {
+      const local = new Date(2026, 6, 4, 12, 0); // Jul 4, 2026 12:00
+      const seconds = Math.trunc(local.getTime() / 1000);
+      const compiled = compileExpr('formatDate(sec, "MM/dd")');
+      expect(evalExpr(compiled, { sec: String(seconds) }, buildEnv())).toBe("07/04");
+      expect(evalExpr(compiled, { sec: String(local.getTime()) }, buildEnv())).toBe("07/04");
+    });
+
     it("returns empty string for unparseable values and empty patterns", () => {
       const env = buildEnv();
       expect(evalExpr(compileExpr('formatDate(bad, "MM/dd")'), { bad: "not a date" }, env)).toBe("");
       expect(evalExpr(compileExpr('formatDate(value, "")'), { value: "2026-03-15T00:00:00Z" }, env)).toBe("");
       expect(evalExpr(compileExpr('formatDate(value, "MM/dd")'), { value: null }, env)).toBe("");
+      expect(evalExpr(compileExpr('formatDate(code, "MM/dd")'), { code: "404" }, env)).toBe("");
+      expect(evalExpr(compileExpr('formatDate(code, "MM/dd")'), { code: 404 }, env)).toBe("");
     });
 
     it("preserves non-token characters in the pattern", () => {
