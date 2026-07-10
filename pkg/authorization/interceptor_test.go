@@ -35,17 +35,26 @@ func TestResourceIDsFromPathParams(t *testing.T) {
 	})
 }
 
-func TestCanvasAuthorizationRulesSeparateStagingAndLiveActions(t *testing.T) {
+func TestCanvasAuthorizationRulesUseCanvasUpdateForStaging(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 
 	tests := []struct {
-		route  HTTPRoute
-		action string
+		route         HTTPRoute
+		action        string
+		legacyActions []string
 	}{
 		{route: HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/canvases/{canvas_id}/versions"}, action: "read"},
 		{route: HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/canvases/{canvas_id}/staging"}, action: "read"},
-		{route: HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{canvas_id}/staging"}, action: "update_version"},
-		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{canvas_id}/staging"}, action: "update_version"},
+		{
+			route:         HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{canvas_id}/staging"},
+			action:        "update",
+			legacyActions: []string{"update_version"},
+		},
+		{
+			route:         HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{canvas_id}/staging"},
+			action:        "update",
+			legacyActions: []string{"update_version"},
+		},
 		{route: HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/staging/commit"}, action: "update"},
 		{route: HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{id}"}, action: "update"},
 		{route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{id}"}, action: "delete"},
@@ -57,6 +66,7 @@ func TestCanvasAuthorizationRulesSeparateStagingAndLiveActions(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, "canvases", rule.Resource)
 			assert.Equal(t, tt.action, rule.Action)
+			assert.Equal(t, tt.legacyActions, rule.LegacyActions)
 		})
 	}
 }
@@ -71,6 +81,19 @@ func TestHasRequiredScopedTokenPermissionForScopes(t *testing.T) {
 	ruleWithCanvasPathParam := AuthorizationRule{
 		Resource:           "canvases",
 		Action:             "read",
+		DomainType:         models.DomainTypeOrganization,
+		ResourcePathParams: []string{CanvasIDPathParam},
+	}
+	stagingDraftWriteRule := AuthorizationRule{
+		Resource:           "canvases",
+		Action:             "update",
+		DomainType:         models.DomainTypeOrganization,
+		ResourcePathParams: []string{CanvasIDPathParam},
+		LegacyActions:      []string{"update_version"},
+	}
+	liveWriteRule := AuthorizationRule{
+		Resource:           "canvases",
+		Action:             "update",
 		DomainType:         models.DomainTypeOrganization,
 		ResourcePathParams: []string{CanvasIDPathParam},
 	}
@@ -138,12 +161,75 @@ func TestHasRequiredScopedTokenPermissionForScopes(t *testing.T) {
 			rule:        ruleWithCanvasPathParam,
 			expectAllow: false,
 		},
+		{
+			name:        "allows legacy draft write action for staging route",
+			scopes:      marshalScopes(t, []string{"canvases:update_version:canvas-123"}),
+			pathParams:  map[string]string{"canvas_id": "canvas-123"},
+			rule:        stagingDraftWriteRule,
+			expectAllow: true,
+		},
+		{
+			name:        "rejects legacy draft write action for live update route",
+			scopes:      marshalScopes(t, []string{"canvases:update_version:canvas-123"}),
+			pathParams:  map[string]string{"canvas_id": "canvas-123"},
+			rule:        liveWriteRule,
+			expectAllow: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			allowed := hasRequiredScopedTokenPermissionForScopes(tt.scopes, tt.pathParams, tt.rule)
 			assert.Equal(t, tt.expectAllow, allowed)
+		})
+	}
+}
+
+func TestGatewayAuthorizerAllowsLegacyCanvasUpdateVersionOnlyForStagingDraftWrites(t *testing.T) {
+	clearOrganizationPermissionCacheForTest()
+	authorizer := NewGatewayAuthorizer(actionPermissionChecker{
+		"canvases:update_version": true,
+	})
+	r := httptestRequest(t, map[string]string{
+		"x-user-id":         "22222222-2222-4222-8222-222222222222",
+		"x-organization-id": "11111111-1111-4111-8111-111111111111",
+	})
+	pathParams := map[string]string{"canvas_id": "canvas-123"}
+
+	tests := []struct {
+		name      string
+		route     HTTPRoute
+		expectErr bool
+	}{
+		{
+			name:  "allows staging edit",
+			route: HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{canvas_id}/staging"},
+		},
+		{
+			name:  "allows staging discard",
+			route: HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/canvases/{canvas_id}/staging"},
+		},
+		{
+			name:      "rejects staging commit",
+			route:     HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/canvases/{canvas_id}/staging/commit"},
+			expectErr: true,
+		},
+		{
+			name:      "rejects live canvas update",
+			route:     HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/canvases/{id}"},
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := authorizer.AuthorizeHTTP(context.Background(), r, tt.route, pathParams)
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }
@@ -228,4 +314,10 @@ func marshalScopes(t *testing.T, scopes []string) string {
 	payload, err := json.Marshal(scopes)
 	require.NoError(t, err)
 	return string(payload)
+}
+
+type actionPermissionChecker map[string]bool
+
+func (c actionPermissionChecker) CheckOrganizationPermission(_ context.Context, _, _, resource, action string) (bool, error) {
+	return c[resource+":"+action], nil
 }
