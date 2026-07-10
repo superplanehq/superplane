@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { jsonViewClassName } from "@/lib/jsonViewTheme";
 import { AccordionContent, AccordionItem } from "@/ui/accordion";
+import { escapeJsonStringValue } from "./runInspectorJson";
 import type { InternalAccordionKey, StatusPill } from "./RunInspectorTimelineTypes";
 
 export function TimelineAccordionCard({
@@ -175,7 +176,23 @@ export function JsonPayload({
       className={jsonViewClassName}
       displayObjectSize={false}
       enableClipboard={false}
-    />
+    >
+      <JsonView.String
+        render={({ children, ...props }, { type, value: stringValue }) => {
+          if (type !== "value") return undefined;
+
+          const displayValue = typeof children === "string" ? children : String(stringValue ?? "");
+
+          return (
+            <>
+              <JsonView.ValueQuote />
+              <span {...props}>{escapeJsonStringValue(displayValue)}</span>
+              <JsonView.ValueQuote />
+            </>
+          );
+        }}
+      />
+    </JsonView>
   );
 }
 

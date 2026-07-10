@@ -9,7 +9,6 @@ import { AccordionContent, AccordionItem } from "@/ui/accordion";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
 import { RunInspectorStepTimeline } from "./RunInspectorStepTimeline";
 import {
-  hasObjectValue,
   type RunInspectorApprovalRecord,
   type RunInspectorCurrentUser,
   type RunInspectorNodeSection,
@@ -101,7 +100,6 @@ export function RunInspectorNodeAccordion({
             {section.nodeName}
           </span>
         </AccordionPrimitive.Trigger>
-        <NodeEditAction section={section} onEditNode={onEditNode} />
         <NodeActions section={section} actions={actions} currentUser={currentUser} />
         <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
       </AccordionPrimitive.Header>
@@ -110,27 +108,12 @@ export function RunInspectorNodeAccordion({
           section={section}
           componentIconMap={componentIconMap}
           organizationId={organizationId}
+          onEditNode={onEditNode}
           errorScrollRequestId={errorScrollRequestId}
           onErrorScrolled={onErrorScrolled}
         />
       </AccordionContent>
     </AccordionItem>
-  );
-}
-
-function NodeEditAction({
-  section,
-  onEditNode,
-}: {
-  section: RunInspectorNodeSection;
-  onEditNode?: (nodeId: string) => void;
-}) {
-  if (!onEditNode || !hasObjectValue(section.tabData?.configuration)) return null;
-
-  return (
-    <div className="flex shrink-0 items-center pl-3">
-      <NodeActionButton label="Edit" tone="neutral" disabled={false} onClick={() => onEditNode(section.nodeId)} />
-    </div>
   );
 }
 
