@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef } from "react";
 
 /** Focus payload AppPage stores and CanvasContent applies. */
 export type CanvasFocusRequest = {
@@ -16,13 +16,16 @@ type FocusRequestSetter = (request: CanvasFocusRequest) => void;
  * event and converts it to `focusRequest`. CanvasContent applies `focusRequest`
  * only — it does not listen for the event directly.
  *
- * `targetModeRef` must track the canvas currently mounted (live vs run inspection),
- * matching CanvasContent's `isRunInspectionMode` gate.
+ * Pass the same run-inspection flag CanvasContent uses so chips focus the
+ * currently mounted canvas (live vs runs).
  */
 export function useAgentNodeFocusRequest(
   setFocusRequest: FocusRequestSetter,
-  targetModeRef: RefObject<"live" | "runs">,
+  isRunInspectionMode: boolean,
 ): void {
+  const targetModeRef = useRef<"live" | "runs">("live");
+  targetModeRef.current = isRunInspectionMode ? "runs" : "live";
+
   useEffect(() => {
     const handler = (event: Event) => {
       const nodeId = (event as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
@@ -30,7 +33,7 @@ export function useAgentNodeFocusRequest(
         return;
       }
 
-      const targetMode = targetModeRef.current ?? "live";
+      const targetMode = targetModeRef.current;
       setFocusRequest({
         nodeId,
         requestId: Date.now(),
@@ -41,5 +44,5 @@ export function useAgentNodeFocusRequest(
 
     window.addEventListener("agent:focus-node", handler);
     return () => window.removeEventListener("agent:focus-node", handler);
-  }, [setFocusRequest, targetModeRef]);
+  }, [setFocusRequest]);
 }

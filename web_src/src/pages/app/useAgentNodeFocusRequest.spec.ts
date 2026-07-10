@@ -5,8 +5,7 @@ import { useAgentNodeFocusRequest, type CanvasFocusRequest } from "./useAgentNod
 describe("useAgentNodeFocusRequest", () => {
   it("turns agent:focus-node into a live canvas focus request", () => {
     const setFocusRequest = vi.fn<(request: CanvasFocusRequest) => void>();
-    const targetModeRef = { current: "live" as const };
-    renderHook(() => useAgentNodeFocusRequest(setFocusRequest, targetModeRef));
+    renderHook(() => useAgentNodeFocusRequest(setFocusRequest, false));
 
     act(() => {
       window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId: "http-fetch-abc123" } }));
@@ -25,8 +24,7 @@ describe("useAgentNodeFocusRequest", () => {
 
   it("targets the run canvas while run inspection is active", () => {
     const setFocusRequest = vi.fn<(request: CanvasFocusRequest) => void>();
-    const targetModeRef = { current: "runs" as const };
-    renderHook(() => useAgentNodeFocusRequest(setFocusRequest, targetModeRef));
+    renderHook(() => useAgentNodeFocusRequest(setFocusRequest, true));
 
     act(() => {
       window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId: "http-fetch-abc123" } }));
@@ -43,8 +41,7 @@ describe("useAgentNodeFocusRequest", () => {
 
   it("ignores events without a node id", () => {
     const setFocusRequest = vi.fn<(request: CanvasFocusRequest) => void>();
-    const targetModeRef = { current: "live" as const };
-    renderHook(() => useAgentNodeFocusRequest(setFocusRequest, targetModeRef));
+    renderHook(() => useAgentNodeFocusRequest(setFocusRequest, false));
 
     act(() => {
       window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: {} }));
