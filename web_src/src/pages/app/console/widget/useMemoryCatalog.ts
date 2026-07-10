@@ -16,6 +16,8 @@ export interface MemoryFieldSummary {
 
 const META_KEYS = new Set(["id", "namespace"]);
 
+const AVATAR_FIELD_NAMES = new Set(["avatar", "avatar_url", "imageurl", "image_url", "photourl", "photo_url"]);
+
 function collectFieldKeys(entries: CanvasMemoryEntry[], namespace: string): MemoryFieldSummary[] {
   const keys = new Set<string>();
   const samples = new Map<string, unknown>();
@@ -76,17 +78,7 @@ export function suggestColumnFormat(
   // Avatar-like fields must be checked before the generic URL/link heuristic
   // so `avatar_url` / `avatarUrl` / `image_url` land on the avatar renderer
   // instead of the plain link one.
-  if (
-    lower === "avatar" ||
-    lower === "avatarurl" ||
-    lower === "avatar_url" ||
-    lower === "imageurl" ||
-    lower === "image_url" ||
-    lower === "photourl" ||
-    lower === "photo_url" ||
-    lower.endsWith("avatarurl") ||
-    lower.endsWith("_avatar_url")
-  ) {
+  if (AVATAR_FIELD_NAMES.has(lower) || lower.endsWith("avatarurl") || lower.endsWith("_avatar_url")) {
     return "avatar";
   }
   if (lower === "url" || lower === "link" || lower === "href") return "link";
