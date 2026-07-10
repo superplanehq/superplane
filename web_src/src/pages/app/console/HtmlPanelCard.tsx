@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import type { ConsolePanel } from "@/hooks/useCanvasData";
 
 import { useConsoleContext } from "./ConsoleContext";
+import { CONSOLE_PANEL_BODY_SURFACE, CONSOLE_PANEL_SHELL_SURFACE } from "./consolePanelStyles";
 import { useMarkdownVariables } from "./useMarkdownVariables";
 import {
   interpolateMarkdownTemplate,
@@ -236,7 +237,12 @@ function HtmlPanelView({
 }) {
   return (
     <>
-      <div className="group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
+      <div
+        className={cn(
+          "group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70",
+          CONSOLE_PANEL_SHELL_SURFACE,
+        )}
+      >
         <HtmlPanelHeader
           displayTitle={displayTitle}
           readOnly={readOnly}
@@ -245,7 +251,7 @@ function HtmlPanelView({
         />
         {body.trim() ? (
           <div
-            className="min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3 dark:bg-gray-900"
+            className={cn("min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3", CONSOLE_PANEL_BODY_SURFACE)}
             onDoubleClick={readOnly ? undefined : onEditBody}
             data-testid="console-html-view"
           >
@@ -256,7 +262,10 @@ function HtmlPanelView({
             type="button"
             onClick={readOnly ? undefined : onEditBody}
             disabled={readOnly}
-            className="console-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 rounded-b-lg bg-white text-[13px] text-gray-500 transition-colors hover:text-gray-800 disabled:cursor-default disabled:hover:text-gray-500 dark:bg-gray-900 dark:text-gray-400 dark:hover:text-gray-200 dark:disabled:hover:text-gray-400"
+            className={cn(
+              "console-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 rounded-b-lg bg-white text-[13px] text-gray-500 transition-colors hover:text-gray-800 disabled:cursor-default disabled:hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-200 dark:disabled:hover:text-gray-400",
+              CONSOLE_PANEL_BODY_SURFACE,
+            )}
             data-testid="console-html-empty"
           >
             <Pencil className="size-4" />

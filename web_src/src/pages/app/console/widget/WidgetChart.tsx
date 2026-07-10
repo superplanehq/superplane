@@ -30,8 +30,15 @@ import { useTheme } from "@/contexts/useTheme";
 import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
 import { resolveChartColor } from "./chartColors";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
-import { formatValue } from "./widgetFormat";
 import { WidgetEmptyState } from "../WidgetEmptyState";
+import {
+  buildXAxisTickShowIndices,
+  estimateYAxisWidth,
+  formatXAxisTick,
+  formatXTooltipLabel,
+  formatYTick,
+  resolveCartesianYFormat,
+} from "./widgetChartAxis";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries, WidgetColumnFormat } from "./types";
 
 interface WidgetChartProps {
@@ -156,7 +163,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   );
 }
 
-const CHART_MARGIN = { top: 8, right: 8, left: 0, bottom: 0 } as const;
+const CHART_MARGIN = { top: 8, right: 8, left: 4, bottom: 0 } as const;
 // Recharts wraps the tooltip in an absolutely positioned div with a default
 // `transform 400ms ease` transition. That transition makes the tooltip slide
 // in from the chart origin (top-left) the first time it appears, which feels
@@ -192,14 +199,27 @@ function CartesianChartView({
   const seriesByKey = useMemo(() => new Map(series.map((s) => [s.key, s])), [series]);
   const showLegend = legendMode === "show" || (legendMode === "auto" && series.length > 1);
   const stacked = type === "stacked-bar";
+  const effectiveYFormat = resolveCartesianYFormat(yFormat, series);
+  const yAxisWidth = useMemo(
+    () =>
+      estimateYAxisWidth(
+        data,
+        series.map((s) => s.key),
+        effectiveYFormat,
+        Boolean(yLabel?.trim()),
+      ),
+    [data, series, effectiveYFormat, yLabel],
+  );
 
   const sharedAxes = (
     <CartesianFrame
+      data={data}
       stacked={stacked || type === "bar"}
       seriesByKey={seriesByKey}
       xFormat={xFormat}
       yLabel={yLabel}
-      yFormat={yFormat}
+      yFormat={effectiveYFormat}
+      yAxisWidth={yAxisWidth}
     />
   );
   const legend = showLegend ? <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" /> : null;
@@ -266,18 +286,23 @@ function CartesianChartView({
 }
 
 function CartesianFrame({
+  data,
   stacked,
   seriesByKey,
   xFormat,
   yLabel,
   yFormat,
+  yAxisWidth,
 }: {
+  data: Array<Record<string, unknown>>;
   stacked: boolean;
   seriesByKey: Map<string, ChartSeries>;
   xFormat?: WidgetColumnFormat;
   yLabel?: string;
   yFormat?: WidgetColumnFormat;
+  yAxisWidth: number;
 }) {
+  const xTickShowIndices = useMemo(() => buildXAxisTickShowIndices(data, xFormat), [data, xFormat]);
   const tooltipFormatter = (value: unknown, name: unknown) => {
     const key = String(name ?? "");
     const s = seriesByKey.get(key);
@@ -290,13 +315,13 @@ function CartesianFrame({
       </div>
     );
   };
-  const xTickFormatter = (v: unknown) => formatXTick(v, xFormat);
+  const xTickFormatter = (v: unknown, index: number) => {
+    if (xTickShowIndices && !xTickShowIndices.has(index)) return "";
+    return formatXAxisTick(v, xFormat);
+  };
+  const xTooltipLabelFormatter = (v: unknown) => formatXTooltipLabel(v, xFormat);
   const yTick = (v: number) => formatYTick(v, yFormat);
   const trimmedYLabel = yLabel?.trim() ? yLabel.trim() : undefined;
-  // Widen the Y-axis gutter when a rotated label is present so the title
-  // doesn't overlap the tick numbers. The default 36px is enough for ticks
-  // alone but clips a vertical label.
-  const yWidth = trimmedYLabel ? 56 : 36;
   return (
     <>
       <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -313,7 +338,7 @@ function CartesianFrame({
         tickLine={false}
         axisLine={false}
         fontSize={11}
-        width={yWidth}
+        width={yAxisWidth}
         tickFormatter={yTick}
         label={
           trimmedYLabel
@@ -332,7 +357,7 @@ function CartesianFrame({
         content={
           <ChartTooltipContent
             formatter={tooltipFormatter}
-            labelFormatter={xTickFormatter}
+            labelFormatter={xTooltipLabelFormatter}
             indicator="dot"
             className={TOOLTIP_CONTENT_CLASS}
           />
@@ -340,30 +365,6 @@ function CartesianFrame({
       />
     </>
   );
-}
-
-/**
- * Format an X-axis tick. The bucket key is always a raw string (built in
- * `buildChartData`), so we let `formatValue` decide whether the requested
- * format (date, duration, number, ...) actually applies — it falls through
- * to the raw string when it can't.
- */
-function formatXTick(value: unknown, format: WidgetColumnFormat | undefined): string {
-  if (value == null || value === "") return "";
-  if (!format) return String(value);
-  return formatValue(value, format);
-}
-
-/**
- * Format a Y-axis tick. Honors the configured `yFormat` (currency, duration,
- * percent, ...); otherwise falls back to a locale-aware numeric default with
- * thousands separators above 1k.
- */
-function formatYTick(value: number, format: WidgetColumnFormat | undefined): string {
-  if (!Number.isFinite(value)) return String(value);
-  if (format) return formatValue(value, format);
-  if (Math.abs(value) >= 1000) return value.toLocaleString();
-  return String(value);
 }
 
 function DonutChartView({

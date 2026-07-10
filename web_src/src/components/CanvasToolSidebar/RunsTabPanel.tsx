@@ -4,7 +4,7 @@ import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { LiveCanvasSidebarRow } from "./LiveCanvasSidebarRow";
 import { RunsTabListView } from "./RunsTabListView";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
-import { useRunFilters } from "./useRunFilters";
+import { useRunFilters, type RunFiltersState } from "./useRunFilters";
 
 export type RunsSidebarView = "list" | "detail";
 
@@ -15,7 +15,6 @@ export interface RunsTabPanelProps {
   selectedRun?: CanvasesCanvasRun | null;
   isSelectedRunLoading?: boolean;
   onSelectRun: (runId: string) => void;
-  onNavigateRun?: (runId: string) => void;
   onSelectLiveCanvas: () => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
@@ -49,6 +48,54 @@ export function RunsTabPanel({
   onStatusFiltersChange,
 }: RunsTabPanelProps) {
   const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+
+  return (
+    <RunsTabPanelContent
+      runs={runs}
+      selectedRunId={selectedRunId}
+      onSelectRun={onSelectRun}
+      onSelectLiveCanvas={onSelectLiveCanvas}
+      hasNextPage={hasNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      onLoadMore={onLoadMore}
+      isLoading={isLoading}
+      isError={isError}
+      onRetry={onRetry}
+      componentIconMap={componentIconMap}
+      filterState={filterState}
+    />
+  );
+}
+
+export interface RunsTabPanelContentProps {
+  runs: CanvasesCanvasRun[];
+  selectedRunId: string | null;
+  onSelectRun: (runId: string) => void;
+  onSelectLiveCanvas: () => void;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
+  componentIconMap?: Record<string, string>;
+  filterState: RunFiltersState;
+}
+
+export function RunsTabPanelContent({
+  runs,
+  selectedRunId,
+  onSelectRun,
+  onSelectLiveCanvas,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+  isLoading,
+  isError,
+  onRetry,
+  componentIconMap = {},
+  filterState,
+}: RunsTabPanelContentProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: hasNextPage,

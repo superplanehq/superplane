@@ -62,6 +62,11 @@ export function renderInspector({
   selectedNodeId = null,
   onSelectNode = vi.fn(),
   onClose = vi.fn(),
+  onEditNode,
+  onRerunCreated,
+  runNavigation,
+  onNavigateRun,
+  onNavigateOlder,
   run: inspectedRun = run,
   account = null,
   passCurrentUser = true,
@@ -69,6 +74,11 @@ export function renderInspector({
   selectedNodeId?: string | null;
   onSelectNode?: (nodeId: string) => void;
   onClose?: () => void;
+  onEditNode?: (nodeId: string) => void;
+  onRerunCreated?: (eventId: string) => void | Promise<void>;
+  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
+  onNavigateRun?: (runId: string) => void;
+  onNavigateOlder?: () => void;
   run?: CanvasesCanvasRun;
   account?: {
     id: string;
@@ -112,6 +122,11 @@ export function renderInspector({
             }
             selectedNodeId={selectedNodeId}
             onSelectNode={onSelectNode}
+            onEditNode={onEditNode}
+            onRerunCreated={onRerunCreated}
+            runNavigation={runNavigation}
+            onNavigateRun={onNavigateRun}
+            onNavigateOlder={onNavigateOlder}
             onClose={onClose}
           />
         </ThemeProvider>

@@ -153,20 +153,13 @@ export const baseNumberRender: WidgetNumberRender = {
   label: "Total runs",
 };
 
-/**
- * Memory rows for the `prRiskChecks` namespace (`checks-table` panel). Each
- * row carries `author_avatar_url` so the checks table story can demo the
- * `avatar` column format alongside the author name — this mirrors the real
- * shape of the memory rows persisted by the pr-risk-review workflow (which
- * captures the PR author's GitHub avatar URL from the pull-request event).
- */
+/** Memory rows for the `prRiskChecks` namespace (`checks-table` panel). */
 export const prRiskCheckRows: Record<string, unknown>[] = [
   {
     id: "check-1",
     pr_number: 42,
     title: "Fix auth middleware",
     author: "alice",
-    author_avatar_url: "https://github.com/alice.png?size=64",
     risk_score: 15,
     risk_level: "low",
     repository: "acme/api",
@@ -177,7 +170,6 @@ export const prRiskCheckRows: Record<string, unknown>[] = [
     pr_number: 87,
     title: "Refactor billing webhooks",
     author: "bob",
-    author_avatar_url: "https://github.com/bob.png?size=64",
     risk_score: 52,
     risk_level: "medium",
     repository: "acme/billing",
@@ -188,7 +180,6 @@ export const prRiskCheckRows: Record<string, unknown>[] = [
     pr_number: 103,
     title: "Remove legacy session store",
     author: "carol",
-    author_avatar_url: "https://github.com/carol.png?size=64",
     risk_score: 88,
     risk_level: "critical",
     repository: "acme/api",
@@ -199,7 +190,6 @@ export const prRiskCheckRows: Record<string, unknown>[] = [
     pr_number: 19,
     title: "Docs: update onboarding guide",
     author: "dave",
-    author_avatar_url: "https://github.com/dave.png?size=64",
     risk_score: 4,
     risk_level: "very low",
     repository: "acme/docs",
@@ -210,7 +200,6 @@ export const prRiskCheckRows: Record<string, unknown>[] = [
     pr_number: 64,
     title: "Add rate limiting to public API",
     author: "erin",
-    author_avatar_url: "https://github.com/erin.png?size=64",
     risk_score: 71,
     risk_level: "high",
     repository: "acme/api",
@@ -229,11 +218,10 @@ export const prRiskChecksTableRender: WidgetTableRender = {
       format: "link",
       href: "https://github.com/{repository}/pull/{pr_number}",
     },
-    { field: "author_avatar_url", label: "", format: "avatar" },
-    { field: "author", label: "Author" },
+    { field: "author", label: "Author", format: "avatar" },
     { field: '{{ string(int(risk_score)) + "/100" }}', label: "Risk" },
     { field: "risk_level", label: "Level", format: "status" },
-    { field: "last_checked_at", label: "Last check", format: "relative" },
+    { field: "last_checked_at", label: "When", format: "relative" },
   ],
   rowActions: [
     {

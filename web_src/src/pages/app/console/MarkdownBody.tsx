@@ -1,8 +1,12 @@
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+
 import { MarkdownContent } from "../Markdown";
 
+import { CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES } from "./consoleCodeStyles";
+import { CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES } from "./consoleLinkStyles";
 import { interpolateMarkdownTemplate } from "./markdownInterpolation";
 
 /**
@@ -19,7 +23,13 @@ export function MarkdownBody({ body, vars }: { body: string; vars: Record<string
   // leading/trailing whitespace" behavior while the file viewer still sees
   // its content byte-for-byte.
   const interpolated = useMemo(() => interpolateMarkdownTemplate(body, vars).trim(), [body, vars]);
-  return <MarkdownContent content={interpolated} data-testid="console-markdown" />;
+  return (
+    <MarkdownContent
+      content={interpolated}
+      className={cn(CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES, CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES)}
+      data-testid="console-markdown"
+    />
+  );
 }
 
 /**

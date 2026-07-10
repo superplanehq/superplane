@@ -152,10 +152,12 @@ const avatarRows: Record<string, unknown>[] = [
     avatarUrl: "",
   },
   {
+    // A bare GitHub username resolves to the github.com avatar with the
+    // username in the tooltip (see resolveConsoleAvatar).
     id: "u-5",
-    name: "Broken link",
+    name: "GitHub username",
     role: "Guest",
-    avatarUrl: "https://example.invalid/does-not-exist.png",
+    avatarUrl: "torvalds",
   },
 ];
 

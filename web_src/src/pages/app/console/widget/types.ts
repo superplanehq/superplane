@@ -43,6 +43,8 @@ export interface WidgetTableColumn {
   format?: WidgetColumnFormat;
   show?: string;
   href?: string;
+  /** Secondary person map used for avatar initials when `format: avatar`. */
+  avatarCommitterField?: string;
 }
 
 export type WidgetFilterOp = "eq" | "neq" | "contains" | "not_contains" | "gt" | "lt" | "exists" | "not_exists";
