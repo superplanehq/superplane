@@ -9,6 +9,7 @@ import { buildTemplateParametersAutocompleteObject } from "./templateParametersA
 import { getRunTitlePresentation, RUN_TITLE_EXCLUDED_SUGGESTIONS } from "./runTitlePresentation";
 import { ReadonlyConfigurationField } from "./ReadonlyFieldRenderer";
 import { ConfigurationFieldInput } from "./ConfigurationFieldInput";
+import { buildReadonlyExpressionPreview } from "./expressionPreview";
 
 const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50 dark:border-orange-400/50 dark:bg-orange-950/30 dark:text-orange-300";
@@ -117,6 +118,9 @@ export const ConfigurationFieldRenderer = ({
   autocompleteExampleObj,
   allowExpressions = false,
   readOnly = false,
+  expressionPreviewContext,
+  expressionErrorMessage,
+  expressionTemplateValue,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -282,9 +286,20 @@ export const ConfigurationFieldRenderer = ({
     readOnly,
     excludedSuggestions: runTitlePresentation ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
     valuePreviewLabel: runTitlePresentation?.previewLabel,
+    expressionPreviewContext,
+    expressionErrorMessage,
+    expressionTemplateValue,
   };
 
   if (readOnly && !shouldRenderFieldForReadOnly(field)) {
+    const expressionPreview = buildReadonlyExpressionPreview({
+      field,
+      value,
+      templateValue: expressionTemplateValue,
+      context: expressionPreviewContext,
+      errorMessage: expressionErrorMessage,
+    });
+
     return (
       <ReadonlyConfigurationField
         field={field}
@@ -293,6 +308,7 @@ export const ConfigurationFieldRenderer = ({
         value={value}
         isTogglable={isTogglable}
         isEnabled={isEnabled}
+        expressionPreview={expressionPreview}
       />
     );
   }

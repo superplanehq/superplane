@@ -8,7 +8,7 @@ import {
   type TriggersTrigger,
 } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
-import { useEventExecutions } from "@/hooks/useCanvasData";
+import { useCanvasVersion, useEventExecutions } from "@/hooks/useCanvasData";
 import { useMe } from "@/hooks/useMe";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
@@ -78,20 +78,23 @@ export function RunInspectorPanel({
   const resolvedCurrentUser = useMemo(() => resolveCurrentUser(currentUser, me, account), [account, currentUser, me]);
   const rootEventId = run.rootEvent?.id || null;
   const executionsQuery = useEventExecutions(canvasId, rootEventId);
+  const runVersionQuery = useCanvasVersion(organizationId ?? "", canvasId, run.versionId ?? "", Boolean(run.versionId));
   const executions = useMemo(() => executionsQuery.data?.executions || [], [executionsQuery.data?.executions]);
-  const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
+  const versionedWorkflowNodes = runVersionQuery.data?.spec?.nodes ?? workflowNodes;
+  const versionedWorkflowEdges = runVersionQuery.data?.spec?.edges ?? workflowEdges;
+  const nodeMap = useMemo(() => buildNodeMap(versionedWorkflowNodes), [versionedWorkflowNodes]);
   const presentation = useMemo(() => buildRunPresentation(run, nodeMap), [nodeMap, run]);
   const sections = useMemo(
     () =>
       buildRunInspectorNodeSections({
         run,
         executions,
-        workflowNodes,
-        workflowEdges,
+        workflowNodes: versionedWorkflowNodes,
+        workflowEdges: versionedWorkflowEdges,
         componentDefinitions,
         triggerDefinitions,
       }),
-    [componentDefinitions, executions, run, triggerDefinitions, workflowEdges, workflowNodes],
+    [componentDefinitions, executions, run, triggerDefinitions, versionedWorkflowEdges, versionedWorkflowNodes],
   );
   const errorSummaries = useMemo(() => findRunInspectorErrorSummaries(sections), [sections]);
   const inspectorWidth = useResizableInspectorWidth();
