@@ -1,12 +1,30 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { canvasKeys, type CanvasMemoryEntry, type ConsolePanel } from "@/hooks/useCanvasData";
 
 import { ConsoleContextProvider } from "./ConsoleContextProvider";
 import { MarkdownPanelCard } from "./MarkdownPanelCard";
+
+vi.mock("@/components/AgentSidebar/widgets/NodeChip", () => ({
+  NodeChipFromLink: ({
+    nodeId,
+    rawLabel,
+    canvasId,
+    organizationId,
+  }: {
+    nodeId: string;
+    rawLabel?: string;
+    canvasId: string;
+    organizationId: string;
+  }) => (
+    <button type="button" data-testid="node-chip">
+      {rawLabel}:{nodeId}:{canvasId}:{organizationId}
+    </button>
+  ),
+}));
 
 function renderMarkdown(body: string) {
   // The MarkdownPanelCard always issues queries through `useMarkdownVariables`,
@@ -57,6 +75,13 @@ describe("MarkdownPanelCard rendering", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].textContent).toMatch(/api/);
     expect(rows[1].textContent).toMatch(/failed/);
+  });
+
+  it("renders node links as chips using console canvas context", () => {
+    renderMarkdown("Open [Deploy](node:deploy-node) before continuing.");
+
+    expect(screen.getByTestId("node-chip")).toHaveTextContent("Deploy:deploy-node:canvas-1:org-1");
+    expect(screen.queryByRole("link", { name: "Deploy" })).not.toBeInTheDocument();
   });
 
   it("preserves <details>/<summary> accordions and the open attribute", () => {
