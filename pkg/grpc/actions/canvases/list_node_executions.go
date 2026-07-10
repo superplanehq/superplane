@@ -191,6 +191,7 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, resources 
 			Outputs:             outputs,
 			RootEvent:           rootEvent,
 			CancelledBy:         cancelledByRef(execution.CancelledBy, resources.cancelledByUsersByID),
+			RunId:               uuidStringOrEmpty(execution.RunID),
 		})
 	}
 
@@ -398,6 +399,7 @@ func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents m
 		Data:       s,
 		CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
 		Root:       rootEvent.ExecutionID == nil,
+		RunId:      uuidStringOrEmpty(rootEvent.RunID),
 	}, nil
 }
 
