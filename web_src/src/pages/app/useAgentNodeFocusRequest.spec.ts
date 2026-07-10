@@ -1,10 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { useAgentNodeFocusRequest, type AgentNodeFocusRequest } from "./useAgentNodeFocusRequest";
+import { useAgentNodeFocusRequest, type CanvasFocusRequest } from "./useAgentNodeFocusRequest";
 
 describe("useAgentNodeFocusRequest", () => {
   it("turns agent:focus-node into a live canvas focus request", () => {
-    const setFocusRequest = vi.fn<(request: AgentNodeFocusRequest) => void>();
+    const setFocusRequest = vi.fn<(request: CanvasFocusRequest) => void>();
     renderHook(() => useAgentNodeFocusRequest(setFocusRequest));
 
     act(() => {
@@ -23,7 +23,7 @@ describe("useAgentNodeFocusRequest", () => {
   });
 
   it("ignores events without a node id", () => {
-    const setFocusRequest = vi.fn<(request: AgentNodeFocusRequest) => void>();
+    const setFocusRequest = vi.fn<(request: CanvasFocusRequest) => void>();
     renderHook(() => useAgentNodeFocusRequest(setFocusRequest));
 
     act(() => {

@@ -1,5 +1,14 @@
 import { useEffect } from "react";
 
+/** Focus payload AppPage stores and CanvasContent applies. */
+export type CanvasFocusRequest = {
+  nodeId: string;
+  requestId: number;
+  targetMode: "live" | "runs";
+  tab?: "latest" | "settings";
+};
+
+/** Payload produced by `agent:focus-node` (always live settings). */
 export type AgentNodeFocusRequest = {
   nodeId: string;
   requestId: number;
@@ -7,12 +16,7 @@ export type AgentNodeFocusRequest = {
   tab: "settings";
 };
 
-type FocusRequestSetter = (request: {
-  nodeId: string;
-  requestId: number;
-  targetMode: "live" | "runs";
-  tab?: "latest" | "settings";
-}) => void;
+type FocusRequestSetter = (request: CanvasFocusRequest) => void;
 
 /**
  * Persists node-chip focus across canvas remounts (e.g. leaving Files mode, which
