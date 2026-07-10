@@ -23,6 +23,7 @@ CLAUDE.local.md
 !.agents/skills/**
 .worktrees/
 .superpowers/
+docs/superpowers/
 coverage-go.out
 
 # Generated protobuf and OpenAPI artifacts
