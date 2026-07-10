@@ -1,5 +1,8 @@
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+
 import { Avatar } from "@/components/Avatar/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 
 import { ConsoleBadge } from "../ConsoleBadge";
@@ -11,12 +14,34 @@ import { resolveCellValue } from "./resolveCellValue";
 import { resolveHref } from "./resolveHref";
 import type { WidgetTableRender } from "./types";
 import { formatValue } from "./widgetFormat";
+import { computeTrend, formatTrendLabel, formatTrendTooltip, type TrendResult } from "./widgetTrend";
 
 type WidgetTableColumn = WidgetTableRender["columns"][number];
 
-export function WidgetTableCell({ col, row }: { col: WidgetTableColumn; row: Record<string, unknown> }) {
+export interface WidgetTableCellProps {
+  col: WidgetTableColumn;
+  row: Record<string, unknown>;
+  /**
+   * The row rendered immediately below the current one, after filter+sort.
+   * Only consumed by `format: "trend"` columns. `undefined` for the last
+   * visible row.
+   */
+  nextRow?: Record<string, unknown>;
+  /**
+   * Whether more rows can still be loaded below the current one. Only
+   * meaningful for the last visible row of a paginated table; enables the
+   * `...` pending state on `format: "trend"` cells.
+   */
+  hasMoreBelow?: boolean;
+}
+
+export function WidgetTableCell({ col, row, nextRow, hasMoreBelow }: WidgetTableCellProps) {
   const visible = evaluateRowShow(col.show, row);
   if (!visible) return <EmptyCell />;
+
+  if (col.format === "trend") {
+    return <TrendCell col={col} row={row} nextRow={nextRow} hasMoreBelow={hasMoreBelow} />;
+  }
 
   const value = resolveCellValue(col.field, row);
   const formatted = formatValue(value, col.format);
@@ -113,6 +138,74 @@ function CodeCell({ label }: { label: string }) {
 
 function TextCell({ label }: { label: string }) {
   return <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300">{label}</td>;
+}
+
+const TREND_MUTED_CLASSES = "text-slate-400 dark:text-gray-500";
+const TREND_BETTER_CLASSES = "text-emerald-600 dark:text-emerald-400";
+const TREND_WORSE_CLASSES = "text-red-600 dark:text-red-400";
+
+function TrendCell({
+  col,
+  row,
+  nextRow,
+  hasMoreBelow,
+}: {
+  col: WidgetTableColumn;
+  row: Record<string, unknown>;
+  nextRow: Record<string, unknown> | undefined;
+  hasMoreBelow: boolean | undefined;
+}) {
+  const current = resolveCellValue(col.field, row);
+  const previous = nextRow ? resolveCellValue(col.field, nextRow) : undefined;
+  const result = computeTrend(current, previous, {
+    better: col.trendBetter,
+    hasMoreBelow: nextRow ? false : Boolean(hasMoreBelow),
+  });
+  const label = formatTrendLabel(result, col.trendDisplay);
+  const tooltip = formatTrendTooltip(result);
+
+  const content = (
+    <span
+      className={cn("inline-flex items-center gap-1 whitespace-nowrap tabular-nums", trendColorClasses(result))}
+      data-testid="widget-trend-cell"
+      data-trend-kind={result.kind}
+      data-trend-direction={result.kind === "changed" ? result.direction : undefined}
+      data-trend-polarity={result.kind === "changed" ? result.polarity : undefined}
+    >
+      {renderTrendIcon(result)}
+      {label ? <span>{label}</span> : null}
+    </span>
+  );
+
+  return (
+    <td className="px-3 py-1.5 align-middle">
+      {tooltip ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex cursor-default">{content}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top">{tooltip}</TooltipContent>
+        </Tooltip>
+      ) : (
+        content
+      )}
+    </td>
+  );
+}
+
+function renderTrendIcon(result: TrendResult) {
+  if (result.kind !== "changed") {
+    return <span aria-hidden="true">-</span>;
+  }
+  if (result.direction === "up") {
+    return <ArrowUpRight className="size-3.5" aria-hidden="true" />;
+  }
+  return <ArrowDownRight className="size-3.5" aria-hidden="true" />;
+}
+
+function trendColorClasses(result: TrendResult): string {
+  if (result.kind !== "changed") return TREND_MUTED_CLASSES;
+  return result.polarity === "better" ? TREND_BETTER_CLASSES : TREND_WORSE_CLASSES;
 }
 
 function formatAbsoluteTitle(value: unknown): string | undefined {
