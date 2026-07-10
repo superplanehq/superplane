@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { isValidElement } from "react";
 import type * as Recharts from "recharts";
 import { render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -20,6 +21,7 @@ vi.mock("recharts", async () => {
 });
 
 const tooltipContentProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+const tooltipWrapperProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
 
 vi.mock("@/components/ui/chart", async () => {
   const actual = (await vi.importActual("@/components/ui/chart")) as Record<string, unknown>;
@@ -28,7 +30,12 @@ vi.mock("@/components/ui/chart", async () => {
     const Original = actual.ChartTooltipContent as (p: unknown) => ReactNode;
     return <Original {...props} />;
   };
-  return { ...actual, ChartTooltipContent };
+  const ChartTooltip = (props: Record<string, unknown>) => {
+    tooltipWrapperProps.value = props;
+    const Original = actual.ChartTooltip as (p: unknown) => ReactNode;
+    return <Original {...props} />;
+  };
+  return { ...actual, ChartTooltip, ChartTooltipContent };
 });
 
 import { WidgetChart } from "./WidgetChart";
@@ -348,8 +355,9 @@ describe("WidgetChart axis formatting", () => {
     expect(container.querySelector(".recharts-label")).toBeNull();
   });
 
-  it("shows date-only axis ticks but datetime tooltip labels for xFormat datetime", () => {
+  it("shows date-only axis ticks but a TimestampDetails tooltip label for xFormat datetime", () => {
     tooltipContentProps.value = null as Record<string, unknown> | null;
+    tooltipWrapperProps.value = null as Record<string, unknown> | null;
     const TIME_ROWS = [{ day: "2026-05-26T16:10:00Z", cost: 10 }];
     const { container } = renderChart(
       {
@@ -363,10 +371,17 @@ describe("WidgetChart axis formatting", () => {
     );
     const ticks = tickTexts(container, "xAxis");
     expect(ticks.every((text) => !/AM|PM/.test(text))).toBe(true);
+    const wrapperStyle = tooltipWrapperProps.value?.wrapperStyle as { pointerEvents?: string } | undefined;
+    expect(wrapperStyle?.pointerEvents).toBe("auto");
     const props: Record<string, unknown> | null = tooltipContentProps.value;
-    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
     const formatted = labelFormatter?.("2026-05-26T16:10:00Z", []);
-    expect(formatted).toMatch(/AM|PM/);
+    expect(isValidElement(formatted)).toBe(true);
+    const { container: labelContainer } = render(<>{formatted}</>);
+    expect(labelContainer.textContent).toMatch(/Local/);
+    expect(labelContainer.textContent).toMatch(/UTC/);
+    expect(labelContainer.textContent).toMatch(/2026-05-26T16:10:00\.000Z/);
+    expect(labelContainer.querySelector('[data-testid="chart-tooltip-timestamp-copy"]')).not.toBeNull();
   });
 
   it("shows a date axis label only on the first bar of each calendar day", () => {
@@ -401,22 +416,49 @@ describe("WidgetChart axis formatting", () => {
     );
     const props: Record<string, unknown> | null = tooltipContentProps.value;
     expect(props).not.toBeNull();
-    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
     expect(labelFormatter).toBeTypeOf("function");
     const formatted = labelFormatter?.("2026-05-26T00:00:00Z", []);
-    expect(formatted).not.toContain("T00:00:00Z");
-    expect(formatted).toMatch(/May/);
+    expect(isValidElement(formatted)).toBe(true);
+    const { container: labelContainer } = render(<>{formatted}</>);
+    expect(labelContainer.textContent).toMatch(/2026-05-26T00:00:00\.000Z/);
+    expect(labelContainer.textContent).toMatch(/Local/);
   });
 
-  it("omits the tooltip labelFormatter when xFormat is unset (raw category text)", () => {
+  it("returns the raw category label from the tooltip formatter when xFormat is unset", () => {
     tooltipContentProps.value = null as Record<string, unknown> | null;
     renderChart(
       { kind: "chart", type: "bar", xField: "service", series: [{ field: "cost", label: "Cost" }] },
       { rows: [{ service: "ec2", cost: 1 }] },
     );
     const props: Record<string, unknown> | null = tooltipContentProps.value;
-    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => string) | undefined;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
     expect(labelFormatter?.("ec2", [])).toBe("ec2");
+  });
+
+  it("keeps numeric category X values as labels when xFormat is unset", () => {
+    const { container } = renderChart(
+      { kind: "chart", type: "bar", xField: "code", series: [{ field: "count", label: "Count" }] },
+      {
+        rows: [
+          { code: "12", count: 1 },
+          { code: "200", count: 2 },
+          { code: "404", count: 3 },
+        ],
+      },
+    );
+    const ticks = tickTexts(container, "xAxis");
+    expect(ticks).toEqual(expect.arrayContaining(["12", "200", "404"]));
+    expect(ticks.every((text) => !/Jan|May|Jul/.test(text))).toBe(true);
+
+    tooltipContentProps.value = null as Record<string, unknown> | null;
+    renderChart(
+      { kind: "chart", type: "bar", xField: "code", series: [{ field: "count", label: "Count" }] },
+      { rows: [{ code: "404", count: 3 }] },
+    );
+    const props: Record<string, unknown> | null = tooltipContentProps.value;
+    const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
+    expect(labelFormatter?.("404", [])).toBe("404");
   });
 
   it("formats Y-axis ticks with yFormat", () => {
