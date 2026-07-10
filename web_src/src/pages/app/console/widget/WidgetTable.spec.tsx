@@ -452,6 +452,18 @@ describe("WidgetTable trend columns", () => {
     view.unmount();
   });
 
+  it("renders incomparable '-' when the row below exists but the field is missing", () => {
+    const view = renderTrend({
+      render: TREND_RENDER,
+      rows: [{ id: "d-2", durationMs: 900 }, { id: "d-1" }],
+    });
+    const cells = view.container.querySelectorAll('[data-testid="widget-trend-cell"]');
+    expect(cells[0].getAttribute("data-trend-kind")).toBe("incomparable");
+    expect(cells[0].textContent).not.toContain("0");
+    expect(cells[1].getAttribute("data-trend-kind")).toBe("no-baseline");
+    view.unmount();
+  });
+
   it("re-evaluates a CEL field on the row below (same aggregation on both rows)", () => {
     const view = renderTrend({
       render: {

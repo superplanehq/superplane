@@ -156,7 +156,9 @@ function TrendCell({
   hasMoreBelow: boolean | undefined;
 }) {
   const current = resolveCellValue(col.field, row);
-  const previous = nextRow ? resolveCellValue(col.field, nextRow) : undefined;
+  // `undefined` means "no row below" to computeTrend. A present next row with a
+  // missing field must become `null` so it renders as incomparable, not no-baseline.
+  const previous = nextRow ? (resolveCellValue(col.field, nextRow) ?? null) : undefined;
   const result = computeTrend(current, previous, {
     better: col.trendBetter,
     hasMoreBelow: nextRow ? false : Boolean(hasMoreBelow),

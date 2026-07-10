@@ -19,6 +19,7 @@ describe("computeTrend", () => {
       expect(computeTrend("hello", 5)).toEqual({ kind: "incomparable" });
       expect(computeTrend(5, "world")).toEqual({ kind: "incomparable" });
       expect(computeTrend(null, 5)).toEqual({ kind: "incomparable" });
+      // null (not undefined) means the row below exists but the value is missing
       expect(computeTrend(5, null)).toEqual({ kind: "incomparable" });
       expect(computeTrend(Number.NaN, 5)).toEqual({ kind: "incomparable" });
     });
