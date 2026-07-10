@@ -66,6 +66,7 @@ export function renderInspector({
   onRerunCreated,
   runNavigation,
   onNavigateRun,
+  onNavigateOlder,
   run: inspectedRun = run,
   account = null,
   passCurrentUser = true,
@@ -75,8 +76,9 @@ export function renderInspector({
   onClose?: () => void;
   onEditNode?: (nodeId: string) => void;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
-  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null } | null;
+  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onNavigateRun?: (runId: string) => void;
+  onNavigateOlder?: () => void;
   run?: CanvasesCanvasRun;
   account?: {
     id: string;
@@ -124,6 +126,7 @@ export function renderInspector({
             onRerunCreated={onRerunCreated}
             runNavigation={runNavigation}
             onNavigateRun={onNavigateRun}
+            onNavigateOlder={onNavigateOlder}
             onClose={onClose}
           />
         </ThemeProvider>

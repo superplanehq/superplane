@@ -4279,6 +4279,9 @@ export function AppPage() {
           onRunNodeDetailClear={() => handleRunNodeDetailSelection(null)}
           onRunNodeDetailNavigate={handleRunNodeDetailNavigate}
           onRunNavigate={handleNavigateRun}
+          onRunNavigateOlder={() => {
+            void infiniteRunsQuery.fetchNextPage();
+          }}
           onBackToLiveCanvas={handleSelectLiveCanvas}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}

@@ -40,8 +40,9 @@ export interface RunInspectorPanelProps {
   onClearSelectedNode?: () => void;
   onEditNode?: (nodeId: string) => void;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
-  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null } | null;
+  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onNavigateRun?: (runId: string) => void;
+  onNavigateOlder?: () => void;
   onClose: () => void;
 }
 
@@ -69,6 +70,7 @@ export function RunInspectorPanel({
   onRerunCreated,
   runNavigation,
   onNavigateRun,
+  onNavigateOlder,
   onClose,
 }: RunInspectorPanelProps) {
   const { account } = useAccount();
@@ -132,7 +134,9 @@ export function RunInspectorPanel({
         runId={run.id}
         newerRunId={runNavigation?.newerRunId}
         olderRunId={runNavigation?.olderRunId}
+        canNavigateOlder={runNavigation?.canNavigateOlder}
         onNavigateRun={onNavigateRun}
+        onNavigateOlder={onNavigateOlder}
         onClose={onClose}
       />
       <RunInspectorHeader

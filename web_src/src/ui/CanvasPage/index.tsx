@@ -371,11 +371,12 @@ export interface CanvasPageProps {
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
   runNodeDetailEdges?: ComponentsEdge[];
-  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null } | null;
+  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onRunNodeDetailClose?: () => void;
   onRunNodeDetailClear?: () => void;
   onRunNodeDetailNavigate?: (nodeId: string) => void;
   onRunNavigate?: (runId: string) => void;
+  onRunNavigateOlder?: () => void;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -1592,6 +1593,7 @@ function CanvasPage(props: CanvasPageProps) {
             onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
             runNavigation={props.runNavigation}
             onNavigateRun={props.onRunNavigate}
+            onNavigateOlder={props.onRunNavigateOlder}
             onEditNode={
               props.onEnterEditMode
                 ? (nodeId) => {

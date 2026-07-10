@@ -27,6 +27,16 @@ describe("RunInspectorChrome", () => {
     expect(onNavigateRun).toHaveBeenNthCalledWith(2, "run-older");
   });
 
+  it("loads more runs when navigating older at the paginated boundary", () => {
+    const onNavigateOlder = vi.fn();
+
+    render(<RunInspectorChrome runId="run-1" canNavigateOlder onNavigateOlder={onNavigateOlder} onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Older run" }));
+
+    expect(onNavigateOlder).toHaveBeenCalledTimes(1);
+  });
+
   it("copies a run-only link", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {

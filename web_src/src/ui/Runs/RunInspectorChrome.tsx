@@ -8,15 +8,31 @@ export function RunInspectorChrome({
   runId,
   newerRunId,
   olderRunId,
+  canNavigateOlder,
   onNavigateRun,
+  onNavigateOlder,
   onClose,
 }: {
   runId?: string | null;
   newerRunId?: string | null;
   olderRunId?: string | null;
+  canNavigateOlder?: boolean;
   onNavigateRun?: (runId: string) => void;
+  onNavigateOlder?: () => void;
   onClose: () => void;
 }) {
+  const canUseOlderNavigation = canNavigateOlder ?? Boolean(olderRunId);
+  const olderNavigationDisabled = !canUseOlderNavigation || (olderRunId ? !onNavigateRun : !onNavigateOlder);
+
+  const handleOlderNavigation = () => {
+    if (olderRunId) {
+      onNavigateRun?.(olderRunId);
+      return;
+    }
+
+    onNavigateOlder?.();
+  };
+
   return (
     <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-950/10 px-2 py-1.5 dark:border-gray-800">
       <div className="flex items-center gap-1">
@@ -41,11 +57,7 @@ export function RunInspectorChrome({
         >
           <ChevronUp className="h-4 w-4" />
         </RunNavigationButton>
-        <RunNavigationButton
-          label="Older run"
-          disabled={!olderRunId || !onNavigateRun}
-          onClick={() => olderRunId && onNavigateRun?.(olderRunId)}
-        >
+        <RunNavigationButton label="Older run" disabled={olderNavigationDisabled} onClick={handleOlderNavigation}>
           <ChevronDown className="h-4 w-4" />
         </RunNavigationButton>
       </div>
