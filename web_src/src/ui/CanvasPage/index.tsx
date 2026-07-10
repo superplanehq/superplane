@@ -99,6 +99,7 @@ import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
+import { selectCreatedRerun } from "./runInspectionRerunSelection";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
@@ -147,41 +148,6 @@ export interface NodeEditData {
   integrationLabel?: string;
   blockName?: string;
   integrationRef?: ComponentsIntegrationRef;
-}
-
-type CreatedRerunSelectionOptions = {
-  eventId: string;
-  triggerNodeId?: string;
-  selectedNodeId?: string | null;
-  fetchRunId?: (event: SidebarEvent, options?: { maxPages?: number }) => Promise<string | null>;
-  selectRun?: (runId: string, options?: { nodeId?: string }) => void;
-};
-
-async function selectCreatedRerun({
-  eventId,
-  triggerNodeId,
-  selectedNodeId,
-  fetchRunId,
-  selectRun,
-}: CreatedRerunSelectionOptions) {
-  if (!eventId || !triggerNodeId || !fetchRunId || !selectRun) return;
-
-  const runId = await fetchRunId(buildRerunLookupEvent(eventId, triggerNodeId), { maxPages: 1 });
-  if (!runId) return;
-
-  selectRun(runId, { nodeId: selectedNodeId ?? triggerNodeId });
-}
-
-function buildRerunLookupEvent(eventId: string, triggerNodeId: string): SidebarEvent {
-  return {
-    id: eventId,
-    title: "Re-emitted event",
-    state: "running",
-    isOpen: false,
-    nodeId: triggerNodeId,
-    triggerEventId: eventId,
-    kind: "trigger",
-  };
 }
 
 export interface NewNodeData {
@@ -405,9 +371,12 @@ export interface CanvasPageProps {
   runNodeDetailNodeId?: string | null;
   runNodeDetailCanvasId?: string;
   runNodeDetailEdges?: ComponentsEdge[];
+  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onRunNodeDetailClose?: () => void;
   onRunNodeDetailClear?: () => void;
   onRunNodeDetailNavigate?: (nodeId: string) => void;
+  onRunNavigate?: (runId: string) => void;
+  onRunNavigateOlder?: () => void;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -1622,6 +1591,9 @@ function CanvasPage(props: CanvasPageProps) {
             selectedNodeId={props.runNodeDetailNodeId}
             onSelectNode={(nodeId) => props.onRunNodeDetailNavigate?.(nodeId)}
             onClearSelectedNode={() => props.onRunNodeDetailClear?.()}
+            runNavigation={props.runNavigation}
+            onNavigateRun={props.onRunNavigate}
+            onNavigateOlder={props.onRunNavigateOlder}
             onEditNode={
               props.onEnterEditMode
                 ? (nodeId) => {
