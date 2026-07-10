@@ -114,13 +114,13 @@ export const Timestamp = React.memo(function Timestamp({
     <HoverCard openDelay={150} closeDelay={100}>
       <HoverCardTrigger asChild>
         <span className={twMerge(hintClasses, className)}>
-          {display === "relative" ? (
-            <RelativeLabel date={resolved} iso={iso} relativeStyle={relativeStyle} includeAgo={includeAgo} />
-          ) : display === "date" ? (
-            <time dateTime={iso}>{formatDate(resolved)}</time>
-          ) : (
-            <time dateTime={iso}>{formatAbsolute(resolved)}</time>
-          )}
+          <TimestampLabel
+            date={resolved}
+            iso={iso}
+            display={display}
+            relativeStyle={relativeStyle}
+            includeAgo={includeAgo}
+          />
         </span>
       </HoverCardTrigger>
       <HoverCardContent align={align} className="w-auto max-w-sm p-3">
@@ -129,3 +129,25 @@ export const Timestamp = React.memo(function Timestamp({
     </HoverCard>
   );
 });
+
+function TimestampLabel({
+  date,
+  iso,
+  display,
+  relativeStyle,
+  includeAgo,
+}: {
+  date: Date;
+  iso: string;
+  display: TimestampDisplay;
+  relativeStyle: "full" | "abbreviated";
+  includeAgo: boolean;
+}) {
+  if (display === "relative") {
+    return <RelativeLabel date={date} iso={iso} relativeStyle={relativeStyle} includeAgo={includeAgo} />;
+  }
+  if (display === "date") {
+    return <time dateTime={iso}>{formatDate(date)}</time>;
+  }
+  return <time dateTime={iso}>{formatAbsolute(date)}</time>;
+}

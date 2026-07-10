@@ -21,6 +21,7 @@ vi.mock("recharts", async () => {
 });
 
 const tooltipContentProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
+const tooltipWrapperProps = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }));
 
 vi.mock("@/components/ui/chart", async () => {
   const actual = (await vi.importActual("@/components/ui/chart")) as Record<string, unknown>;
@@ -29,7 +30,12 @@ vi.mock("@/components/ui/chart", async () => {
     const Original = actual.ChartTooltipContent as (p: unknown) => ReactNode;
     return <Original {...props} />;
   };
-  return { ...actual, ChartTooltipContent };
+  const ChartTooltip = (props: Record<string, unknown>) => {
+    tooltipWrapperProps.value = props;
+    const Original = actual.ChartTooltip as (p: unknown) => ReactNode;
+    return <Original {...props} />;
+  };
+  return { ...actual, ChartTooltip, ChartTooltipContent };
 });
 
 import { WidgetChart } from "./WidgetChart";
@@ -351,6 +357,7 @@ describe("WidgetChart axis formatting", () => {
 
   it("shows date-only axis ticks but a TimestampDetails tooltip label for xFormat datetime", () => {
     tooltipContentProps.value = null as Record<string, unknown> | null;
+    tooltipWrapperProps.value = null as Record<string, unknown> | null;
     const TIME_ROWS = [{ day: "2026-05-26T16:10:00Z", cost: 10 }];
     const { container } = renderChart(
       {
@@ -364,6 +371,8 @@ describe("WidgetChart axis formatting", () => {
     );
     const ticks = tickTexts(container, "xAxis");
     expect(ticks.every((text) => !/AM|PM/.test(text))).toBe(true);
+    const wrapperStyle = tooltipWrapperProps.value?.wrapperStyle as { pointerEvents?: string } | undefined;
+    expect(wrapperStyle?.pointerEvents).toBe("auto");
     const props: Record<string, unknown> | null = tooltipContentProps.value;
     const labelFormatter = props?.labelFormatter as ((label: unknown, payload?: unknown[]) => ReactNode) | undefined;
     const formatted = labelFormatter?.("2026-05-26T16:10:00Z", []);
@@ -372,6 +381,7 @@ describe("WidgetChart axis formatting", () => {
     expect(labelContainer.textContent).toMatch(/Local/);
     expect(labelContainer.textContent).toMatch(/UTC/);
     expect(labelContainer.textContent).toMatch(/2026-05-26T16:10:00\.000Z/);
+    expect(labelContainer.querySelector('[data-testid="chart-tooltip-timestamp-copy"]')).not.toBeNull();
   });
 
   it("shows a date axis label only on the first bar of each calendar day", () => {

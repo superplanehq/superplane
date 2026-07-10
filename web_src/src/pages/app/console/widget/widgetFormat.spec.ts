@@ -29,7 +29,7 @@ describe("formatValue relative", () => {
 
   it("accepts epoch seconds and milliseconds", () => {
     const now = new Date("2026-03-29T12:00:00.000Z").getTime();
-    // Epoch seconds (< 1e12) are treated as seconds; ms values pass through.
+    // Epoch seconds (< 1e12) are treated as seconds; ms values (>= 1e12) pass through.
     expect(formatValue((now - 5 * 60 * 1000) / 1000, "relative")).toBe("5m");
     expect(formatValue(now - 2 * 60 * 60 * 1000, "relative")).toBe("2h");
   });
