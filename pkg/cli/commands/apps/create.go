@@ -40,10 +40,14 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	request := openapi_client.NewCanvasesCreateCanvasRequest()
-	request.SetName(name)
+	canvas := openapi_client.NewCanvasesCanvas()
+	metadata := openapi_client.NewCanvasesCanvasMetadata()
+	metadata.SetName(name)
 	if description != "" {
-		request.SetDescription(description)
+		metadata.SetDescription(description)
 	}
+	canvas.SetMetadata(*metadata)
+	request.SetCanvas(*canvas)
 
 	resp, httpResp, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(*request).Execute()
 	if err != nil {
