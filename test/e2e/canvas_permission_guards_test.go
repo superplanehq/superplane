@@ -35,16 +35,15 @@ func TestCanvasPermissionGuards(t *testing.T) {
 		steps.assertAgentHidden()
 	})
 
-	t.Run("update version without update can stage and reset but cannot commit", func(t *testing.T) {
+	t.Run("update can stage, reset, commit, and edit version history", func(t *testing.T) {
 		steps := &canvasPermissionGuardSteps{t: t}
 		steps.start()
-		steps.givenACanvasExists("Version Editor Canvas")
-		steps.loginWithCanvasPermissions("canvas-version-editor", canvasPermission("update_version"))
+		steps.givenACanvasExists("Canvas Editor Canvas")
+		steps.loginWithCanvasPermissions("canvas-editor", canvasPermission("update"))
 		steps.visitCanvas()
 		steps.enterEditMode()
-		steps.stageNoopNode("Draft Only Node")
-		steps.assertResetVisible()
-		steps.assertCommitHidden()
+		steps.stageNoopNode("Canvas Update Node")
+		steps.assertStagingActionsEnabled()
 		steps.assertVersionHistoryAllowsEditing()
 	})
 }
@@ -106,12 +105,8 @@ func (s *canvasPermissionGuardSteps) assertAgentHidden() {
 	s.session.AssertHidden(q.TestID("canvas-tool-sidebar"))
 }
 
-func (s *canvasPermissionGuardSteps) assertResetVisible() {
-	s.session.AssertVisible(q.TestID("canvas-reset-staging-button"))
-}
-
-func (s *canvasPermissionGuardSteps) assertCommitHidden() {
-	s.session.AssertHidden(q.TestID("canvas-commit-staging-button"))
+func (s *canvasPermissionGuardSteps) assertStagingActionsEnabled() {
+	s.canvas.AssertStagingActionsVisibleAndEnabled()
 }
 
 func (s *canvasPermissionGuardSteps) assertVersionHistoryAllowsEditing() {

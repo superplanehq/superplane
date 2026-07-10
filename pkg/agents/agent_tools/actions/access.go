@@ -54,7 +54,7 @@ func (a accessAction) Execute(ctx context.Context, session agents.AgentSessionCo
 		Notes: []string{
 			"Accessible API routes are the intersection of organization RBAC and the scoped agent token permissions enforced by gateway authorization.",
 			"Canvas-scoped token permissions only allow API routes whose authorization rule can resolve this session canvas_id.",
-			"Staging graph, Console, and repository file edits are allowed through canvases:update_version on this canvas; committing staging and live app operations are not included in the agent token.",
+			"Staging graph, Console, and repository file edits are allowed through canvases:update on this canvas; this access report also lists any other canvas-scoped update routes allowed by the same permission.",
 		},
 	}, nil
 }
@@ -103,9 +103,9 @@ func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessi
 		{name: readFileActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: listIntegrationsActionName, resource: "integrations", operation: "read"},
 		{name: listResourcesActionName, resource: "integrations", operation: "read"},
-		{name: writeFileActionName, resource: "canvases", operation: "update_version", scoped: true},
-		{name: deleteFileActionName, resource: "canvases", operation: "update_version", scoped: true},
-		{name: patchStagingActionName, resource: "canvases", operation: "update_version", scoped: true},
+		{name: writeFileActionName, resource: "canvases", operation: "update", scoped: true},
+		{name: deleteFileActionName, resource: "canvases", operation: "update", scoped: true},
+		{name: patchStagingActionName, resource: "canvases", operation: "update", scoped: true},
 	}
 
 	results := make([]toolAccessResult, 0, len(actions))
