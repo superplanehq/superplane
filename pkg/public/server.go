@@ -1308,6 +1308,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				BaseURL:        s.BaseURL,
 				Configuration:  execution.Configuration.Data(),
 				HTTP:           s.registry.HTTPContext(),
+				Integration:    integrationCtx,
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
