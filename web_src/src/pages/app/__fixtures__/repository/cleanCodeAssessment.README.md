@@ -60,6 +60,8 @@ sections show a count on the parent.
 > [!SECTION:integrations] Connected integrations · GitHub, Slack
 > Wire org integrations into nodes with `[GitHub](integration:github)` chips.
 
+___
+
 ## Code
 
 ```yaml
