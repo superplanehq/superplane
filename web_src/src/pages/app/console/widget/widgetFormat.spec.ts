@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { formatValue } from "./widgetFormat";
+import { computeProgress, formatPercentageDisplay, formatValue } from "./widgetFormat";
 
 /**
  * `format: "duration"` always interprets its input as milliseconds. The old
@@ -74,5 +74,74 @@ describe("formatValue duration", () => {
   it("returns an empty string for null/undefined", () => {
     expect(formatValue(null, "duration")).toBe("");
     expect(formatValue(undefined, "duration")).toBe("");
+  });
+});
+
+describe("computeProgress", () => {
+  it("computes a straightforward fraction below the target", () => {
+    const result = computeProgress(5, 10);
+    expect(result).not.toBeNull();
+    expect(result!.percent).toBe(50);
+    expect(result!.barPercent).toBe(50);
+    expect(result!.current).toBe(5);
+    expect(result!.target).toBe(10);
+  });
+
+  it("clamps the bar at 100% when the current value overshoots the target", () => {
+    const result = computeProgress(12, 10);
+    expect(result).not.toBeNull();
+    expect(result!.percent).toBe(120);
+    expect(result!.barPercent).toBe(100);
+  });
+
+  it("clamps the bar at 0% when the current value is negative", () => {
+    const result = computeProgress(-3, 10);
+    expect(result).not.toBeNull();
+    expect(result!.percent).toBe(-30);
+    expect(result!.barPercent).toBe(0);
+  });
+
+  it("accepts numeric strings for both current and target", () => {
+    const result = computeProgress("7", "20");
+    expect(result).not.toBeNull();
+    expect(result!.percent).toBe(35);
+  });
+
+  it("returns null when either value is not a finite number", () => {
+    expect(computeProgress("nope", 10)).toBeNull();
+    expect(computeProgress(5, "")).toBeNull();
+    expect(computeProgress(null, 10)).toBeNull();
+    expect(computeProgress(5, undefined)).toBeNull();
+    expect(computeProgress(Number.NaN, 10)).toBeNull();
+  });
+
+  it("returns null when the target is zero or negative (division would be undefined)", () => {
+    expect(computeProgress(5, 0)).toBeNull();
+    expect(computeProgress(5, -1)).toBeNull();
+  });
+
+  it("does not silently promote fractional current values like `percent` formatting", () => {
+    // A `current` of 0.5 against a `target` of 10 is 5%, not 50%.
+    const result = computeProgress(0.5, 10);
+    expect(result!.percent).toBe(5);
+    expect(result!.barPercent).toBe(5);
+  });
+});
+
+describe("formatPercentageDisplay", () => {
+  it("rounds whole numbers without a decimal", () => {
+    expect(formatPercentageDisplay(50)).toBe("50%");
+    expect(formatPercentageDisplay(100)).toBe("100%");
+    expect(formatPercentageDisplay(0)).toBe("0%");
+  });
+
+  it("shows one decimal place for fractional percentages", () => {
+    expect(formatPercentageDisplay(33.3333)).toBe("33.3%");
+    expect(formatPercentageDisplay(66.6)).toBe("66.6%");
+  });
+
+  it("preserves overshoot values as-is", () => {
+    expect(formatPercentageDisplay(120)).toBe("120%");
+    expect(formatPercentageDisplay(-15)).toBe("-15%");
   });
 });

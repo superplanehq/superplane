@@ -35,7 +35,13 @@ export type WidgetColumnFormat =
   | "badge"
   | "code"
   | "link"
-  | "avatar";
+  | "avatar"
+  | "progress";
+
+/** Text label rendered next to the bar for `format: progress`. */
+export type WidgetProgressLabel = "none" | "number" | "percent";
+
+export const WIDGET_PROGRESS_LABELS: WidgetProgressLabel[] = ["none", "number", "percent"];
 
 export interface WidgetTableColumn {
   field: string;
@@ -45,6 +51,14 @@ export interface WidgetTableColumn {
   href?: string;
   /** Secondary person map used for avatar initials when `format: avatar`. */
   avatarCommitterField?: string;
+  /**
+   * Target (100%) reference for `format: progress`. Accepts a numeric literal,
+   * a dot path against the row, or a full `{{ CEL }}` expression — resolved
+   * with the same helper as `field` at render time.
+   */
+  progressTarget?: string;
+  /** Label style rendered next to the progress bar. Defaults to `"percent"`. */
+  progressLabel?: WidgetProgressLabel;
 }
 
 export type WidgetFilterOp = "eq" | "neq" | "contains" | "not_contains" | "gt" | "lt" | "exists" | "not_exists";
