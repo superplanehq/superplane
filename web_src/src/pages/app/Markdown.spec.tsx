@@ -188,26 +188,34 @@ describe("MarkdownContent", () => {
   });
 
   it("applies named section presets for icon and accent color", () => {
-    render(<MarkdownContent content={"> [!SECTION:tools] Tool definitions · ~9,202\n> Body copy."} />);
+    render(<MarkdownContent content={"> [!SECTION:runbook] Deploy checklist · prod\n> Body copy."} />);
 
     const section = screen.getByTestId("markdown-section");
-    expect(section).toHaveAttribute("data-section-preset", "tools");
-    expect(section).toHaveTextContent("Tool definitions");
-    expect(section).toHaveTextContent("~9,202");
+    expect(section).toHaveAttribute("data-section-preset", "runbook");
+    expect(section).toHaveTextContent("Deploy checklist");
+    expect(section).toHaveTextContent("prod");
+  });
+
+  it("applies the agent and run section presets", () => {
+    const { rerender } = render(<MarkdownContent content={"> [!SECTION:agent] Agent notes\n> Body copy."} />);
+    expect(screen.getByTestId("markdown-section")).toHaveAttribute("data-section-preset", "agent");
+
+    rerender(<MarkdownContent content={"> [!SECTION:run] Promote · prod\n> Body copy."} />);
+    expect(screen.getByTestId("markdown-section")).toHaveAttribute("data-section-preset", "run");
   });
 
   it("shows a count of direct nested sections beside the title", () => {
     render(
       <MarkdownContent
         content={
-          "> [!SECTION:rules] Rules · ~5,366\n> Intro.\n>\n> > [!SECTION:folder] Project Rules\n> > One.\n>\n> > [!SECTION:folder] Cursor & User Rules\n> > Two."
+          "> [!SECTION:runbook] Score a PR · on-call\n> Intro.\n>\n> > [!SECTION:group] Analysis\n> > One.\n>\n> > [!SECTION:group] Reporting\n> > Two."
         }
       />,
     );
 
     const section = screen.getByTestId("markdown-section");
     expect(section).toHaveAttribute("data-section-count", "2");
-    expect(section).toHaveTextContent("Rules");
+    expect(section).toHaveTextContent("Score a PR");
     expect(section).toHaveTextContent("2");
   });
 

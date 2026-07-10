@@ -16,7 +16,7 @@ export type ParsedMarkdownSection = {
  * return the title/preset/body with the marker line removed.
  *
  * Optional trailing meta after a middle-dot separator:
- * `> [!SECTION:rules] Rules · ~5,366`
+ * `> [!SECTION:runbook] Deploy checklist · prod`
  */
 export function parseGithubSectionChildren(children: ReactNode): ParsedMarkdownSection | null {
   const split = splitBlockquoteMarkerLine(children);
