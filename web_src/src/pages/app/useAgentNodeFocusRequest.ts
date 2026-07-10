@@ -19,10 +19,7 @@ type FocusRequestSetter = (request: CanvasFocusRequest) => void;
  * Pass the same run-inspection flag CanvasContent uses so chips focus the
  * currently mounted canvas (live vs runs).
  */
-export function useAgentNodeFocusRequest(
-  setFocusRequest: FocusRequestSetter,
-  isRunInspectionMode: boolean,
-): void {
+export function useAgentNodeFocusRequest(setFocusRequest: FocusRequestSetter, isRunInspectionMode: boolean): void {
   const targetModeRef = useRef<"live" | "runs">("live");
   targetModeRef.current = isRunInspectionMode ? "runs" : "live";
 
