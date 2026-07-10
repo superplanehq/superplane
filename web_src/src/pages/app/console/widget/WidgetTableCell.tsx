@@ -154,9 +154,10 @@ function ProgressCell({ col, row, value }: { col: WidgetTableColumn; row: Record
             <div
               className="h-2 min-w-[32px] flex-1 cursor-default overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
               role="progressbar"
-              aria-valuenow={Math.round(progress.percent)}
+              aria-valuenow={Math.round(progress.barPercent)}
               aria-valuemin={0}
               aria-valuemax={100}
+              aria-valuetext={tooltipLabel}
               data-testid="widget-progress-track"
             >
               <div

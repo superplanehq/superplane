@@ -79,6 +79,10 @@ describe("WidgetTable progress column", () => {
     const labels = view.container.querySelectorAll('[data-testid="widget-progress-label"]');
     expect(labels[0].textContent).toBe("120%");
     expect(labels[1].textContent).toBe("12/10");
+
+    const tracks = view.container.querySelectorAll('[role="progressbar"]');
+    expect(tracks[0].getAttribute("aria-valuenow")).toBe("100");
+    expect(tracks[0].getAttribute("aria-valuetext")).toBe("120%");
     view.unmount();
   });
 
@@ -135,6 +139,7 @@ describe("WidgetTable progress column", () => {
     expect(track!.getAttribute("aria-valuenow")).toBe("38");
     expect(track!.getAttribute("aria-valuemin")).toBe("0");
     expect(track!.getAttribute("aria-valuemax")).toBe("100");
+    expect(track!.getAttribute("aria-valuetext")).toBe("37.5%");
     view.unmount();
   });
 });
