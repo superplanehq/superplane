@@ -77,3 +77,5 @@ export function getRunSidebarNavigation(
     atOlderPaginationBoundary,
   };
 }
+
+export type RunSidebarNavigationState = ReturnType<typeof getRunSidebarNavigation>;

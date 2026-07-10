@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { runInspectorAutoOpenStorageKey, useRunsDetailState } from "./useRunsDetailState";
+import { isRunDetailDismissed, runInspectorAutoOpenStorageKey, useRunsDetailState } from "./useRunsDetailState";
 
 function makeSearchParams(params: Record<string, string> = {}) {
   return new URLSearchParams(params);
@@ -320,7 +320,8 @@ describe("useRunsDetailState", () => {
       result.current.maybeOpenRunDetailForRun("run-2");
     });
 
-    expect(result.current.detailDismissedForRunId).toBe("run-2");
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-1")).toBe(true);
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-2")).toBe(true);
   });
 
   it("persists auto-open again when a node opens run detail", () => {
