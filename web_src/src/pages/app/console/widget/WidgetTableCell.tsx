@@ -76,7 +76,12 @@ function TimestampCell({
   }
   return (
     <td className="px-3 py-1.5 text-slate-700 dark:text-gray-300">
-      <Timestamp date={date} display={TIMESTAMP_DISPLAY_BY_FORMAT[format]} relativeStyle="abbreviated" />
+      <Timestamp
+        date={date}
+        display={TIMESTAMP_DISPLAY_BY_FORMAT[format]}
+        relativeStyle="abbreviated"
+        includeAgo={false}
+      />
     </td>
   );
 }

@@ -17,16 +17,21 @@ describe("formatValue relative", () => {
     vi.useRealTimers();
   });
 
-  it("uses compact relative labels with an ago suffix", () => {
-    expect(formatValue("2026-03-29T11:55:00.000Z", "relative")).toBe("5m ago");
-    expect(formatValue("2026-03-29T10:00:00.000Z", "relative")).toBe("2h ago");
+  it("uses compact relative labels without an ago suffix", () => {
+    expect(formatValue("2026-03-29T11:55:00.000Z", "relative")).toBe("5m");
+    expect(formatValue("2026-03-29T10:00:00.000Z", "relative")).toBe("2h");
+  });
+
+  it("formats future timestamps with an in prefix", () => {
+    expect(formatValue("2026-03-29T12:30:00.000Z", "relative")).toBe("in 30m");
+    expect(formatValue("2026-03-29T14:00:00.000Z", "relative")).toBe("in 2h");
   });
 
   it("accepts epoch seconds and milliseconds", () => {
     const now = new Date("2026-03-29T12:00:00.000Z").getTime();
     // Epoch seconds (< 1e12) are treated as seconds; ms values pass through.
-    expect(formatValue((now - 5 * 60 * 1000) / 1000, "relative")).toBe("5m ago");
-    expect(formatValue(now - 2 * 60 * 60 * 1000, "relative")).toBe("2h ago");
+    expect(formatValue((now - 5 * 60 * 1000) / 1000, "relative")).toBe("5m");
+    expect(formatValue(now - 2 * 60 * 60 * 1000, "relative")).toBe("2h");
   });
 });
 

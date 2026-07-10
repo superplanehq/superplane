@@ -54,6 +54,18 @@ describe("Timestamp", () => {
     expect(screen.getByText("5m ago")).toBeInTheDocument();
   });
 
+  it("renders abbreviated future times as 'in …' instead of clamping to zero", () => {
+    render(
+      <Timestamp
+        date={new Date(Date.now() + 3 * 60 * 60 * 1000)}
+        display="relative"
+        relativeStyle="abbreviated"
+        includeAgo={false}
+      />,
+    );
+    expect(screen.getByText("in 3h")).toBeInTheDocument();
+  });
+
   it("renders the fallback for missing or invalid dates", () => {
     const { rerender } = render(<Timestamp date={null} fallback={<span>—</span>} />);
     expect(screen.getByText("—")).toBeInTheDocument();

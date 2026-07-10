@@ -30,9 +30,9 @@ function subscribeRelativeTick(listener: () => void): () => void {
  * Live-updating relative label driven by the shared 1s ticker.
  *
  * - `"full"` uses `formatRelative` so future timestamps render as "in …"
- *   instead of being clamped ("in 3 hours", "5 minutes ago").
+ *   ("in 3 hours", "5 minutes ago").
  * - `"abbreviated"` reuses `formatTimeAgo` (the helper `TimeAgo` uses) so dense
- *   rows keep their compact "5m" / "5m ago" text byte-for-byte.
+ *   rows keep their compact "5m" / "5m ago" / "in 3h" text.
  */
 function RelativeLabel({
   date,

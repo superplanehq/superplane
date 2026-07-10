@@ -112,6 +112,7 @@ function renderValueNode(value: number, format: WidgetColumnFormat | undefined, 
           date={date}
           display={TIMESTAMP_NUMBER_FORMATS[format]}
           relativeStyle="abbreviated"
+          includeAgo={false}
           className={VALUE_CLASS}
         />
       );

@@ -77,10 +77,10 @@ function formatPercent(value: unknown): string {
 function formatRelative(value: unknown): string {
   const date = coerceWidgetTimestamp(value);
   if (!date) return String(value ?? "");
-  // Compact, live-updating relative text with an "ago" suffix so the label
-  // matches the runs sidebar; the hover details always expose the verbose
-  // "5 minutes ago" phrasing.
-  return formatTimeAgo(date, true);
+  // Compact relative text without an "ago" suffix (e.g. "5m", "in 2h") so
+  // dense table cells stay short; the hover details always expose the verbose
+  // "5 minutes ago" / "in 3 hours" phrasing.
+  return formatTimeAgo(date, false);
 }
 
 function formatDate(value: unknown): string {
