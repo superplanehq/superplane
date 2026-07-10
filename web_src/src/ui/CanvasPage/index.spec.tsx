@@ -823,4 +823,61 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
     expect(fitViewMock).toHaveBeenCalledTimes(1);
     expect(setViewport).toHaveBeenCalled();
   });
+
+  it("applies a live focus request after leaving files mode remounts ReactFlow", async () => {
+    // Files mode replaces ReactFlow with a backdrop, so agent:focus-node cannot
+    // reach CanvasContent. focusRequest on AppPage must survive the remount.
+    const focusNode = {
+      id: "node-1",
+      position: { x: 0, y: 0 },
+      data: { label: "Node 1", type: "component" },
+    };
+    getNodesMock.mockReturnValue([focusNode]);
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="files"
+          nodes={[focusNode]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="v1"
+          focusRequest={{ nodeId: "node-1", requestId: 42, targetMode: "live", tab: "settings" }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("canvas-files-backdrop")).toBeInTheDocument();
+    expect(reactFlowPropsRef.current).toBeNull();
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[focusNode]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="v1"
+          focusRequest={{ nodeId: "node-1", requestId: 42, targetMode: "live", tab: "settings" }}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+
+    await waitFor(() => {
+      expect(fitViewMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodes: [focusNode],
+          duration: 500,
+        }),
+      );
+    });
+  });
 });
