@@ -51,6 +51,36 @@ export function templateForNodesPanel(defaultTitle?: string): NodesPanelContent 
   return { title: defaultTitle ?? "", nodes: [] };
 }
 
+/**
+ * Fold a legacy single-node panel body into a one-entry `nodes` panel. Used
+ * by the panel router so both the `node` and `nodes` panel types share the
+ * merged renderer, and by the panel state on first edit so the persisted
+ * panel migrates to `type: nodes` (see `useConsolePanelState`).
+ *
+ * The reverse (unfolding a one-entry `nodes` panel back into a `node`) is
+ * intentionally not provided: the compact single-node layout falls out of
+ * the `nodes.length === 1` render branch, so both shapes look identical
+ * once merged.
+ */
+export function nodesPanelContentFromLegacyNode(raw: Record<string, unknown> | undefined): NodesPanelContent {
+  const obj = asObject(raw) ?? {};
+  const node = typeof obj.node === "string" ? obj.node : "";
+  const entry: NodesPanelNode = {
+    node,
+    label: typeof obj.label === "string" ? obj.label : undefined,
+    showRun: typeof obj.showRun === "boolean" ? obj.showRun : false,
+    triggerName: typeof obj.triggerName === "string" ? obj.triggerName : undefined,
+    promptConfirmation: typeof obj.promptConfirmation === "boolean" ? obj.promptConfirmation : false,
+  };
+  // Always fold into exactly one entry — even when the legacy node is
+  // unset — so the merged renderer keeps the compact single-node layout
+  // and its "pick a node" empty state, matching the pre-merge card.
+  return {
+    title: typeof obj.title === "string" ? obj.title : "",
+    nodes: [entry],
+  };
+}
+
 /** Validate the persisted `nodes` content. Returns null when valid. */
 export function validateNodesContent(content: unknown): string | null {
   const obj = asObject(content);

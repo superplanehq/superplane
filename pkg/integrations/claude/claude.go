@@ -18,7 +18,8 @@ func init() {
 type Claude struct{}
 
 type Configuration struct {
-	APIKey string `json:"apiKey"`
+	APIKey   string `json:"apiKey"`
+	AdminKey string `json:"adminKey"`
 }
 
 func (i *Claude) Name() string {
@@ -47,6 +48,14 @@ func (i *Claude) Configuration() []configuration.Field {
 			Description: "Claude API key",
 			Required:    true,
 		},
+		{
+			Name:        "adminKey",
+			Label:       "Admin API Key",
+			Type:        configuration.FieldTypeString,
+			Sensitive:   true,
+			Description: "Admin API key, required for fetching usage and cost reports.",
+			Required:    false,
+		},
 	}
 }
 
@@ -55,6 +64,7 @@ func (i *Claude) Actions() []core.Action {
 		&TextPrompt{},
 		&runagent.RunAgent{},
 		&runcodeagent.RunCodeAgent{},
+		&GetDailyUsage{},
 	}
 }
 

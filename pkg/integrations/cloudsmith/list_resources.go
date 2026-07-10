@@ -13,6 +13,10 @@ func (c *Cloudsmith) ListResources(resourceType string, ctx core.ListResourcesCo
 		return listRepositories(ctx)
 	case "package":
 		return listPackages(ctx)
+	case "organization":
+		return listOrganizations(ctx)
+	case "vulnerabilityPolicy":
+		return listVulnerabilityPolicies(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -80,6 +84,65 @@ func listPackages(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 			Type: "package",
 			Name: name,
 			ID:   pkg.SlugPerm,
+		})
+	}
+
+	return resources, nil
+}
+
+func listOrganizations(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	organizations, err := client.ListOrganizations()
+	if err != nil {
+		return nil, fmt.Errorf("error listing organizations: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(organizations))
+	for _, organization := range organizations {
+		name := organization.Name
+		if name == "" {
+			name = organization.Slug
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "organization",
+			Name: name,
+			ID:   organization.Slug,
+		})
+	}
+
+	return resources, nil
+}
+
+func listVulnerabilityPolicies(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	org := ctx.Parameters["organization"]
+	if org == "" || strings.Contains(org, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	policies, err := client.ListVulnerabilityPolicies(org)
+	if err != nil {
+		return nil, fmt.Errorf("error listing vulnerability policies: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(policies))
+	for _, policy := range policies {
+		name := policy.Name
+		if name == "" {
+			name = policy.SlugPerm
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "vulnerabilityPolicy",
+			Name: name,
+			ID:   policy.SlugPerm,
 		})
 	}
 

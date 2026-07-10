@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 // Preview describes an installable GitHub app before the user confirms installation.
@@ -25,7 +25,7 @@ type Preview struct {
 
 // BuildPreview loads app metadata from GitHub and prepares install defaults.
 // If reg is non-nil, it also detects which integrations the canvas needs.
-func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
+func BuildPreview(repoParam string, registry *registry.Registry) (*Preview, error) {
 	repo, err := ParseRepository(repoParam)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
 		canvasBody = SubstituteInstallParams(canvasBody, DefaultParamValues(params.InstallParams))
 	}
 
-	canvas, err := parseCanvasYAML(canvasBody)
+	canvas, err := yaml.CanvasFromYAML(canvasBody)
 	if err != nil {
 		return nil, err
 	}
@@ -54,21 +54,18 @@ func BuildPreview(repoParam string, reg *registry.Registry) (*Preview, error) {
 		preview.InstallParams = params.InstallParams
 	}
 
-	if reg != nil {
-		preview.Integrations = detectIntegrations(canvas, reg)
-	}
-
+	preview.Integrations = detectIntegrations(canvas, registry)
 	return preview, nil
 }
 
 // detectIntegrations returns a deduplicated list of integration type names
 // required by the canvas nodes.
-func detectIntegrations(canvas *pb.Canvas, reg *registry.Registry) []string {
+func detectIntegrations(canvas *yaml.Canvas, registry *registry.Registry) []string {
 	if canvas.Spec == nil {
 		return nil
 	}
 
-	componentToIntegration := buildComponentIntegrationMap(reg)
+	componentToIntegration := buildComponentIntegrationMap(registry)
 	seen := make(map[string]bool)
 	var result []string
 
@@ -84,9 +81,9 @@ func detectIntegrations(canvas *pb.Canvas, reg *registry.Registry) []string {
 	return result
 }
 
-func previewFromCanvas(repo *Repository, canvas *pb.Canvas, ref string) *Preview {
-	canvasName := strings.TrimSpace(canvas.GetMetadata().GetName())
-	description := strings.TrimSpace(canvas.GetMetadata().GetDescription())
+func previewFromCanvas(repo *Repository, canvas *yaml.Canvas, ref string) *Preview {
+	canvasName := strings.TrimSpace(canvas.Metadata.Name)
+	description := strings.TrimSpace(canvas.Metadata.Description)
 
 	defaultName := truncateInstallationName(canvasName)
 	if defaultName == "" {

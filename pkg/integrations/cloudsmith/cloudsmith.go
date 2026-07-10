@@ -53,6 +53,8 @@ SuperPlane authenticates to Cloudsmith using a service account API key, which is
 5. To give the service access to any repository, click on your Repository and then **Settings** → **Access control → Privileges for specific services**, and add the service with the **Admin** privilege.
 
 > **Note:** The **Promote Package** action (copy or move a package between repositories) requires **Admin** privilege on **both** the source and destination repositories. Make sure the service account has been granted Admin access to every repository it needs to promote packages to or from.
+
+> **Note:** The vulnerability policy actions (create, get, delete) are organization-scoped. The service account must have permission to manage policies in the target organization.
 `
 }
 
@@ -81,6 +83,9 @@ func (c *Cloudsmith) Actions() []core.Action {
 		&ScanPackage{},
 		&QuarantinePackage{},
 		&GetPackageVulnerabilities{},
+		&CreateVulnerabilityPolicy{},
+		&GetVulnerabilityPolicy{},
+		&DeleteVulnerabilityPolicy{},
 	}
 }
 

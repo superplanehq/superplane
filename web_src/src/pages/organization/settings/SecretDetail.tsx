@@ -1,10 +1,12 @@
 import { Breadcrumbs } from "@/components/Breadcrumbs/breadcrumbs";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Textarea } from "@/components/Textarea/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Edit2, Key, Loader2, Plus, Trash2 } from "lucide-react";
@@ -25,6 +27,7 @@ interface SecretDetailProps {
 export function SecretDetail({ organizationId }: SecretDetailProps) {
   const navigate = useNavigate();
   const { secretId } = useParams<{ secretId: string }>();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
 
   const { data: secret, isLoading, error } = useSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   usePageTitle(["Secrets", secret?.metadata?.name]);
@@ -46,8 +49,11 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   const deleteSecretKeyMutation = useDeleteSecretKey(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const updateSecretNameMutation = useUpdateSecretName(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
   const deleteSecretMutation = useDeleteSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+  const canUpdateSecrets = canAct("secrets", "update");
+  const canDeleteSecrets = canAct("secrets", "delete");
 
   const handleSaveEdit = async () => {
+    if (!canUpdateSecrets) return;
     if (!secret || !editingKey || !editingValue.trim()) return;
     const newName = editingKeyName.trim();
     if (!newName) {
@@ -83,11 +89,13 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   };
 
   const handleStartEditSecretName = () => {
+    if (!canUpdateSecrets) return;
     setEditingSecretNameValue(secret?.metadata?.name || "");
     setEditingSecretName(true);
   };
 
   const handleSaveSecretName = async () => {
+    if (!canUpdateSecrets) return;
     const name = editingSecretNameValue.trim();
     if (!name) {
       showErrorToast("Secret name is required");
@@ -114,6 +122,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   };
 
   const handleAddKey = async () => {
+    if (!canUpdateSecrets) return;
     if (!secret || !newKey.trim() || !newValue.trim()) {
       showErrorToast("Key and value are required");
       return;
@@ -144,6 +153,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   };
 
   const handleRemoveKey = async (keyToRemove: string) => {
+    if (!canUpdateSecrets) return;
     if (!secret) return;
     const secretData = secret.spec?.local?.data || {};
     const remainingCount = Object.keys(secretData).filter((k) => k !== keyToRemove).length;
@@ -164,6 +174,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
   };
 
   const handleDelete = async () => {
+    if (!canDeleteSecrets) return;
     if (!secret) return;
     if (
       !confirm(`Are you sure you want to delete the secret "${secret.metadata?.name}"? This action cannot be undone.`)
@@ -268,35 +279,46 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                 <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 truncate">
                   {secret.metadata?.name || "Unnamed Secret"}
                 </h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleStartEditSecretName}
-                  className="shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  title="Edit secret name"
-                  data-testid="secret-detail-edit-name"
+                <PermissionTooltip
+                  allowed={canUpdateSecrets || permissionsLoading}
+                  message="You don't have permission to update secrets."
                 >
-                  <Edit2 className="w-4 h-4" />
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleStartEditSecretName}
+                    disabled={!canUpdateSecrets}
+                    className="shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    title="Edit secret name"
+                    data-testid="secret-detail-edit-name"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                </PermissionTooltip>
               </>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDelete}
-            disabled={deleteSecretMutation.isPending}
-            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 shrink-0"
-            title="Delete secret"
-            data-testid="secret-detail-delete"
+          <PermissionTooltip
+            allowed={canDeleteSecrets || permissionsLoading}
+            message="You don't have permission to delete secrets."
           >
-            {deleteSecretMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Trash2 className="w-4 h-4" />
-            )}
-            <span className="ml-1">Delete secret</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDelete}
+              disabled={deleteSecretMutation.isPending || !canDeleteSecrets}
+              className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 shrink-0"
+              title="Delete secret"
+              data-testid="secret-detail-delete"
+            >
+              {deleteSecretMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+              <span className="ml-1">Delete secret</span>
+            </Button>
+          </PermissionTooltip>
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
@@ -359,32 +381,44 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
                           {keyName}
                         </span>
                         <span className="text-gray-500 dark:text-gray-400">•••</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingKey(keyName);
-                            setEditingKeyName(keyName);
-                            setEditingValue("");
-                          }}
-                          className="shrink-0 text-gray-600 dark:text-gray-300"
-                          title="Edit value"
-                          data-testid="secret-detail-edit-key"
+                        <PermissionTooltip
+                          allowed={canUpdateSecrets || permissionsLoading}
+                          message="You don't have permission to update secrets."
                         >
-                          <Edit2 className="w-3 h-3" />
-                        </Button>
-                        {keys.length > 1 && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleRemoveKey(keyName)}
-                            disabled={isUpdating}
-                            className="shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
-                            title="Remove key"
-                            data-testid="secret-detail-remove-key"
+                            onClick={() => {
+                              if (!canUpdateSecrets) return;
+                              setEditingKey(keyName);
+                              setEditingKeyName(keyName);
+                              setEditingValue("");
+                            }}
+                            disabled={!canUpdateSecrets}
+                            className="shrink-0 text-gray-600 dark:text-gray-300"
+                            title="Edit value"
+                            data-testid="secret-detail-edit-key"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Edit2 className="w-3 h-3" />
                           </Button>
+                        </PermissionTooltip>
+                        {keys.length > 1 && (
+                          <PermissionTooltip
+                            allowed={canUpdateSecrets || permissionsLoading}
+                            message="You don't have permission to update secrets."
+                          >
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveKey(keyName)}
+                              disabled={isUpdating || !canUpdateSecrets}
+                              className="shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
+                              title="Remove key"
+                              data-testid="secret-detail-remove-key"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </PermissionTooltip>
                         )}
                       </>
                     )}
@@ -430,20 +464,27 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
               )}
             </div>
             {!isAddingKey && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsAddingKey(true);
-                  setNewKey("");
-                  setNewValue("");
-                }}
-                className="mt-3 text-xs"
-                data-testid="secret-detail-add-key"
+              <PermissionTooltip
+                allowed={canUpdateSecrets || permissionsLoading}
+                message="You don't have permission to update secrets."
               >
-                <Plus className="w-3 h-3 mr-1" />
-                Add key
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (!canUpdateSecrets) return;
+                    setIsAddingKey(true);
+                    setNewKey("");
+                    setNewValue("");
+                  }}
+                  disabled={!canUpdateSecrets}
+                  className="mt-3 text-xs"
+                  data-testid="secret-detail-add-key"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add key
+                </Button>
+              </PermissionTooltip>
             )}
           </div>
         </div>

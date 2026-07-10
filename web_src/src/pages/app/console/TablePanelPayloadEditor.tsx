@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 
 import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
+import { CONSOLE_CODE_BADGE_CLASSES } from "./consoleCodeStyles";
 import { buildEnv, compileTemplate, evalTemplateDetailed } from "./widget/celExpr";
 
 export type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
@@ -165,7 +166,7 @@ function PayloadPreview({ entry, sampleRow }: { entry: PayloadDraftEntry; sample
   return (
     <p className="text-[10px] text-slate-500" data-testid="payload-preview">
       <span className="font-medium text-slate-600">Preview:</span>{" "}
-      <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-slate-700">{text || "(empty)"}</code>
+      <code className={CONSOLE_CODE_BADGE_CLASSES}>{text || "(empty)"}</code>
     </p>
   );
 }

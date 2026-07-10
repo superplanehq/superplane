@@ -87,4 +87,5 @@ export function useCanvasRunsSidebarState(canvasId?: string) {
 
 export type CanvasRunsSidebarState = ReturnType<typeof useCanvasRunsSidebarState> & {
   showRunsSidebarToggle: boolean;
+  runningRunsCount?: number;
 };

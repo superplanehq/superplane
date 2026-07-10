@@ -49,42 +49,42 @@ export function OrgCanvasesTable({ orgId }: { orgId: string }) {
     <div className="mb-8">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Palette size={16} className="text-gray-600" />
-          <Heading level={2} className="text-gray-800 text-base">
+          <Palette size={16} className="text-gray-600 dark:text-gray-400" />
+          <Heading level={2} className="text-gray-800 text-base dark:text-gray-100">
             Canvases ({total})
           </Heading>
         </div>
         <div className="relative w-56">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             placeholder="Search canvases..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-sm border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full pl-9 pr-3 py-1.5 text-sm border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500"
           />
         </div>
       </div>
 
       {canvases.length === 0 ? (
-        <Text className="text-gray-500 text-sm">
+        <Text className="text-gray-500 text-sm dark:text-gray-400">
           {search ? "No canvases match your search." : "No canvases in this organization."}
         </Text>
       ) : (
         <>
-          <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden">
+          <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Name</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Description</th>
+                <tr className="border-b border-slate-100 dark:border-gray-700/70">
+                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Name</th>
+                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Description</th>
                 </tr>
               </thead>
               <tbody>
                 {canvases.map((canvas) => (
-                  <tr key={canvas.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-2.5 text-gray-800 font-medium">{canvas.name}</td>
-                    <td className="px-4 py-2.5 text-gray-500">{canvas.description || "—"}</td>
+                  <tr key={canvas.id} className="border-b border-slate-50 last:border-0 dark:border-gray-800/70">
+                    <td className="px-4 py-2.5 text-gray-800 font-medium dark:text-gray-100">{canvas.name}</td>
+                    <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">{canvas.description || "—"}</td>
                   </tr>
                 ))}
               </tbody>

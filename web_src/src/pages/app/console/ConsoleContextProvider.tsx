@@ -17,7 +17,15 @@ export function ConsoleContextProvider({
   onOpenNode,
 }: ConsoleContextProviderProps) {
   const value = useMemo<ConsoleContextValue>(
-    () => ({ canvasId, organizationId, nodes, nodeStatuses, canRunNodes, onTriggerNode, onOpenNode }),
+    () => ({
+      canvasId,
+      organizationId,
+      nodes,
+      nodeStatuses,
+      canRunNodes,
+      onTriggerNode,
+      onOpenNode,
+    }),
     [canvasId, organizationId, nodes, nodeStatuses, canRunNodes, onTriggerNode, onOpenNode],
   );
 

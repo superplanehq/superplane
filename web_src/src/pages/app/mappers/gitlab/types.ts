@@ -41,3 +41,24 @@ export interface GitLabNodeMetadata {
     id?: number;
   };
 }
+
+export interface Note {
+  id: number;
+  body: string;
+  author: User;
+  created_at: string;
+  updated_at: string;
+  system: boolean;
+  noteable_id?: number;
+  noteable_iid?: number;
+  noteable_type?: string;
+}
+
+export interface AwardEmoji {
+  id: number;
+  name: string;
+  user: User;
+  created_at: string;
+  updated_at: string;
+  awardable_id?: number;
+}
