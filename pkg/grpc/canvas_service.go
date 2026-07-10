@@ -79,7 +79,6 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 	}
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	metadata := req.GetCanvas().GetMetadata()
 
 	return canvases.CreateCanvas(
 		ctx,
@@ -89,8 +88,8 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		s.gitProvider,
 		s.webhookBaseURL,
 		uuid.MustParse(organizationID),
-		metadata.GetName(),
-		metadata.GetDescription(),
+		req.GetName(),
+		req.GetDescription(),
 		s.usageService,
 	)
 }

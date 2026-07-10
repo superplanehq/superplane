@@ -193,11 +193,8 @@ func newCreateOnlyServer(t *testing.T, id, name, orgID string) *httptest.Server 
 
 		var payload map[string]any
 		require.NoError(t, json.Unmarshal(body, &payload))
-		canvas, ok := payload["canvas"].(map[string]any)
-		require.True(t, ok)
-		metadata, ok := canvas["metadata"].(map[string]any)
-		require.True(t, ok)
-		require.Equal(t, name, metadata["name"])
+		require.Equal(t, name, payload["name"])
+		require.NotContains(t, strings.ToLower(string(body)), `"canvas"`)
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + id + `","name":"` + name + `","organizationId":"` + orgID + `"}}}`))

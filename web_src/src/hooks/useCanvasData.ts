@@ -459,12 +459,8 @@ export const useCreateCanvas = (organizationId: string) => {
       return await canvasesCreateCanvas(
         withOrganizationHeader({
           body: {
-            canvas: {
-              metadata: {
-                name: data.name,
-                description: data.description || "",
-              },
-            },
+            name: data.name,
+            description: data.description || "",
           },
         }),
       );
