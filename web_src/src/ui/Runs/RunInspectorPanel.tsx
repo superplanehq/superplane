@@ -40,6 +40,9 @@ export interface RunInspectorPanelProps {
   onClearSelectedNode?: () => void;
   onEditNode?: (nodeId: string) => void;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
+  runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
+  onNavigateRun?: (runId: string) => void;
+  onNavigateOlder?: () => void;
   onClose: () => void;
 }
 
@@ -65,6 +68,9 @@ export function RunInspectorPanel({
   onClearSelectedNode,
   onEditNode,
   onRerunCreated,
+  runNavigation,
+  onNavigateRun,
+  onNavigateOlder,
   onClose,
 }: RunInspectorPanelProps) {
   const { account } = useAccount();
@@ -124,7 +130,15 @@ export function RunInspectorPanel({
       aria-label="Run inspector"
     >
       <ResizeHandle onPointerDown={inspectorWidth.startResize} isResizing={inspectorWidth.isResizing} />
-      <RunInspectorChrome onClose={onClose} />
+      <RunInspectorChrome
+        runId={run.id}
+        newerRunId={runNavigation?.newerRunId}
+        olderRunId={runNavigation?.olderRunId}
+        canNavigateOlder={runNavigation?.canNavigateOlder}
+        onNavigateRun={onNavigateRun}
+        onNavigateOlder={onNavigateOlder}
+        onClose={onClose}
+      />
       <RunInspectorHeader
         run={run}
         title={presentation.title}
