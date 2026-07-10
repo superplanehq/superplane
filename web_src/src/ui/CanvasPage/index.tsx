@@ -2607,20 +2607,6 @@ function CanvasContent({
     });
   }, [isRunInspectionMode, runSelectedNodeId, runCanvasNodeIdsKey]);
 
-  // Listen for agent sidebar node chip clicks to zoom to nodes
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const nodeId = (e as CustomEvent).detail?.nodeId;
-      if (!nodeId) return;
-      const targetNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
-      if (!targetNode) return;
-      stateRef.current.setNodes((nodes) => nodes.map((n) => ({ ...n, selected: n.id === nodeId })));
-      fitView({ nodes: [targetNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
-    };
-    window.addEventListener("agent:focus-node", handler);
-    return () => window.removeEventListener("agent:focus-node", handler);
-  }, [fitView]);
-
   useEffect(() => {
     return () => {
       if (suppressNextPaneClickTimeoutRef.current !== null && typeof window !== "undefined") {
