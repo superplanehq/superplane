@@ -33,6 +33,12 @@ describe("formatValue relative", () => {
     expect(formatValue((now - 5 * 60 * 1000) / 1000, "relative")).toBe("5m");
     expect(formatValue(now - 2 * 60 * 60 * 1000, "relative")).toBe("2h");
   });
+
+  it("accepts numeric epoch strings", () => {
+    const now = new Date("2026-03-29T12:00:00.000Z").getTime();
+    expect(formatValue(String((now - 5 * 60 * 1000) / 1000), "relative")).toBe("5m");
+    expect(formatValue(String(now - 2 * 60 * 60 * 1000), "relative")).toBe("2h");
+  });
 });
 
 describe("formatValue date / datetime", () => {
@@ -79,6 +85,15 @@ describe("coerceWidgetTimestamp", () => {
     // Seconds must be scaled up.
     const seconds = Math.floor(ms / 1000);
     expect(coerceWidgetTimestamp(seconds)?.getTime()).toBe(seconds * 1000);
+  });
+
+  it("parses numeric epoch strings as seconds or milliseconds", () => {
+    const ms = new Date("2026-06-02T10:01:10.561Z").getTime();
+    const seconds = Math.floor(ms / 1000);
+    // JSON / CEL often emit epochs as strings; Date.parse alone rejects them.
+    expect(coerceWidgetTimestamp(String(ms))?.getTime()).toBe(ms);
+    expect(coerceWidgetTimestamp(String(seconds))?.getTime()).toBe(seconds * 1000);
+    expect(coerceWidgetTimestamp(`  ${seconds}  `)?.getTime()).toBe(seconds * 1000);
   });
 });
 

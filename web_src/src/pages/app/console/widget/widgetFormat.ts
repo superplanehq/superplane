@@ -5,7 +5,8 @@ import type { WidgetColumnFormat } from "./types";
 
 /**
  * Coerce a widget cell value into a `Date`. Accepts ISO strings, `Date`
- * instances, and epoch seconds/milliseconds (using the existing `> 1e12`
+ * instances, and epoch seconds/milliseconds — including numeric strings
+ * like `"1717390000"` that JSON/CEL often emit (using the existing `> 1e12`
  * heuristic to disambiguate). Returns `null` for anything that can't be
  * parsed, so callers can fall back to the raw string.
  */
@@ -15,12 +16,17 @@ export function coerceWidgetTimestamp(value: unknown): Date | null {
     return Number.isNaN(value.getTime()) ? null : value;
   }
   if (typeof value === "string") {
-    if (value.trim() === "") return null;
-    const parsed = Date.parse(value);
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const parsed = Date.parse(trimmed);
     if (Number.isFinite(parsed)) return new Date(parsed);
-    return null;
+    // Date.parse rejects pure epoch digit strings; fall through to Number.
+    return dateFromEpochNumber(Number(trimmed));
   }
-  const n = typeof value === "number" ? value : Number(value);
+  return dateFromEpochNumber(typeof value === "number" ? value : Number(value));
+}
+
+function dateFromEpochNumber(n: number): Date | null {
   if (!Number.isFinite(n)) return null;
   const ms = n > 1e12 ? n : n * 1000;
   return new Date(ms);
