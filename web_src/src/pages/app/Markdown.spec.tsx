@@ -124,4 +124,38 @@ describe("MarkdownContent", () => {
     expect(screen.getByText("Failed").tagName).toBe("STRONG");
     expect(screen.getByText("Failed").className).toContain("font-semibold");
   });
+
+  it.each([
+    ["NOTE", "Note"],
+    ["TIP", "Tip"],
+    ["IMPORTANT", "Important"],
+    ["WARNING", "Warning"],
+    ["CAUTION", "Caution"],
+  ] as const)("renders GitHub %s alerts with SuperPlane chrome", (type, label) => {
+    render(<MarkdownContent content={`> [!${type}]\n> Useful ${label.toLowerCase()} details.`} />);
+
+    const alert = screen.getByTestId(`markdown-alert-${type.toLowerCase()}`);
+    expect(alert.tagName).toBe("ASIDE");
+    expect(alert).toHaveTextContent(label);
+    expect(alert).toHaveTextContent(`Useful ${label.toLowerCase()} details.`);
+    expect(alert).not.toHaveTextContent(`[!${type}]`);
+    expect(document.querySelector("blockquote")).toBeNull();
+  });
+
+  it("keeps unknown alert markers as plain blockquotes", () => {
+    render(<MarkdownContent content={"> [!TODO]\n> Ship it later."} />);
+
+    expect(screen.queryByTestId(/markdown-alert-/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Ship it later/)).toBeInTheDocument();
+    expect(document.querySelector("blockquote")).toBeTruthy();
+  });
+
+  it("preserves nested markdown inside alert bodies", () => {
+    render(<MarkdownContent content={"> [!TIP]\n> See [docs](https://example.com) and `sha`."} />);
+
+    const alert = screen.getByTestId("markdown-alert-tip");
+    expect(alert).toHaveTextContent("Tip");
+    expect(screen.getByRole("link", { name: "docs" })).toHaveAttribute("href", "https://example.com");
+    expect(screen.getByTestId("markdown-code")).toHaveTextContent("sha");
+  });
 });

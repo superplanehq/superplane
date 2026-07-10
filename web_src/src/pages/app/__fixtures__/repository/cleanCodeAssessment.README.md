@@ -48,6 +48,7 @@ Task list (GFM):
 
 - [x] Supported today
 - [x] Integration chips
+- [x] GitHub alerts
 - [ ] Agent widgets (charts, run chips, …)
 - [ ] Interactive confirm / survey blocks
 
@@ -55,6 +56,23 @@ Task list (GFM):
 
 > Use markdown panels for runbooks, status notes, and lightweight docs.
 > Nested quotes and **formatting** work inside blockquotes.
+
+## GitHub alerts
+
+> [!NOTE]
+> Useful information when skimming a runbook.
+
+> [!TIP]
+> Prefer `node:` chips when linking to canvas steps.
+
+> [!IMPORTANT]
+> Console interpolates `{{ variables }}` before markdown renders.
+
+> [!WARNING]
+> Urgent info that needs attention before the next deploy.
+
+> [!CAUTION]
+> Destructive actions in table row triggers cannot be undone.
 
 ## Table
 
@@ -64,6 +82,7 @@ Task list (GFM):
 | Mermaid        | yes     | yes   | yes        |
 | `node:` chips  | yes     | yes   | yes        |
 | `integration:` | yes     | yes   | yes        |
+| GitHub alerts  | yes     | yes   | no         |
 | `:::chart`     | no      | no    | yes        |
 | `run:` chips   | no      | no    | yes        |
 
