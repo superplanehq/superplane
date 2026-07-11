@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, type ComponentProps, type CSSProperties, type ReactNode } from "react";
 import { LineChart as LineChartIcon, Loader2 } from "lucide-react";
 import {
   Area,
@@ -17,6 +17,7 @@ import {
   type BarShapeProps,
 } from "recharts";
 
+import { TimestampDetails } from "@/components/Timestamp";
 import {
   ChartContainer,
   ChartLegend,
@@ -39,7 +40,12 @@ import {
   formatYTick,
   resolveCartesianYFormat,
 } from "./widgetChartAxis";
+import { useInteractiveChartTooltip } from "./useInteractiveChartTooltip";
+import { coerceWidgetTimestamp } from "./widgetFormat";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries, WidgetColumnFormat } from "./types";
+
+const TIMESTAMP_X_FORMATS = new Set<WidgetColumnFormat>(["date", "datetime", "relative"]);
+const TOOLTIP_WRAPPER_STYLE: CSSProperties = { transition: "none" };
 
 interface WidgetChartProps {
   render: WidgetChartRender;
@@ -169,8 +175,58 @@ const CHART_MARGIN = { top: 8, right: 8, left: 4, bottom: 0 } as const;
 // in from the chart origin (top-left) the first time it appears, which feels
 // confusing. We disable the wrapper transition and add a quick fade-in on the
 // content so the tooltip appears in place.
-const TOOLTIP_WRAPPER_STYLE: CSSProperties = { transition: "none" };
 const TOOLTIP_CONTENT_CLASS = "animate-in fade-in duration-150";
+
+/** Bridges Recharts' active point into the interactive-tooltip hook without doing work in render. */
+function RechartsActiveBridge({
+  active,
+  activeKey,
+  forceContentActive,
+  onActiveChange,
+}: {
+  active?: boolean;
+  activeKey?: string;
+  /** Re-sync when force releases so a still-hovered point re-arms `wasActive`. */
+  forceContentActive: boolean;
+  onActiveChange: (active: boolean, activeKey?: string) => void;
+}) {
+  useEffect(() => {
+    onActiveChange(Boolean(active), activeKey);
+  }, [active, activeKey, forceContentActive, onActiveChange]);
+  return null;
+}
+
+type ChartTooltipContentProps = ComponentProps<typeof ChartTooltipContent>;
+
+/**
+ * Chart tooltip content that can receive pointer events (CopyButton) and stays
+ * mounted briefly after the pointer leaves the chart point.
+ */
+function InteractiveChartTooltipContent({
+  forceContentActive,
+  syncRechartsActive,
+  onTooltipEnter,
+  onTooltipLeave,
+  ...tooltipProps
+}: ChartTooltipContentProps & {
+  forceContentActive: boolean;
+  syncRechartsActive: (active: boolean, activeKey?: string) => void;
+  onTooltipEnter: () => void;
+  onTooltipLeave: () => void;
+}) {
+  const activeKey = tooltipProps.label == null ? undefined : String(tooltipProps.label);
+  return (
+    <div onMouseEnter={onTooltipEnter} onMouseLeave={onTooltipLeave}>
+      <RechartsActiveBridge
+        active={tooltipProps.active}
+        activeKey={activeKey}
+        forceContentActive={forceContentActive}
+        onActiveChange={syncRechartsActive}
+      />
+      <ChartTooltipContent {...tooltipProps} active={Boolean(tooltipProps.active || forceContentActive)} />
+    </div>
+  );
+}
 
 function CartesianChartView({
   type,
@@ -319,9 +375,19 @@ function CartesianFrame({
     if (xTickShowIndices && !xTickShowIndices.has(index)) return "";
     return formatXAxisTick(v, xFormat);
   };
-  const xTooltipLabelFormatter = (v: unknown) => formatXTooltipLabel(v, xFormat);
+  const xTooltipLabelFormatter = (v: unknown): ReactNode => {
+    if (xFormat && TIMESTAMP_X_FORMATS.has(xFormat)) {
+      const date = coerceWidgetTimestamp(v);
+      if (date) return <TimestampDetails date={date} copyTestId="chart-tooltip-timestamp-copy" />;
+    }
+    return formatXTooltipLabel(v, xFormat);
+  };
   const yTick = (v: number) => formatYTick(v, yFormat);
   const trimmedYLabel = yLabel?.trim() ? yLabel.trim() : undefined;
+  const interactiveTooltip = Boolean(xFormat && TIMESTAMP_X_FORMATS.has(xFormat));
+  const { activeProp, forceContentActive, syncRechartsActive, onTooltipEnter, onTooltipLeave, wrapperStyle } =
+    useInteractiveChartTooltip(interactiveTooltip);
+
   return (
     <>
       <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -353,14 +419,28 @@ function CartesianFrame({
       />
       <ChartTooltip
         cursor={stacked ? { fill: "rgba(148, 163, 184, 0.12)" } : true}
-        wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+        active={activeProp}
+        wrapperStyle={wrapperStyle}
         content={
-          <ChartTooltipContent
-            formatter={tooltipFormatter}
-            labelFormatter={xTooltipLabelFormatter}
-            indicator="dot"
-            className={TOOLTIP_CONTENT_CLASS}
-          />
+          interactiveTooltip ? (
+            <InteractiveChartTooltipContent
+              forceContentActive={forceContentActive}
+              syncRechartsActive={syncRechartsActive}
+              onTooltipEnter={onTooltipEnter}
+              onTooltipLeave={onTooltipLeave}
+              formatter={tooltipFormatter}
+              labelFormatter={xTooltipLabelFormatter}
+              indicator="dot"
+              className={TOOLTIP_CONTENT_CLASS}
+            />
+          ) : (
+            <ChartTooltipContent
+              formatter={tooltipFormatter}
+              labelFormatter={xTooltipLabelFormatter}
+              indicator="dot"
+              className={TOOLTIP_CONTENT_CLASS}
+            />
+          )
         }
       />
     </>

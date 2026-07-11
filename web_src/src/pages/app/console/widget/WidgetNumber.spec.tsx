@@ -23,4 +23,43 @@ describe("WidgetNumber", () => {
     expect(label.className).not.toContain("text-xs");
     expect(label.className).not.toContain("font-medium");
   });
+
+  it("keeps a prefix-only currency symbol flush against the value (no flex gap)", () => {
+    render(
+      <WidgetNumber
+        rows={[{ cost: 1234 }]}
+        isLoading={false}
+        render={{ kind: "number", aggregation: "sum", field: "cost", format: "number", prefix: "R$" }}
+      />,
+    );
+
+    const root = screen.getByTestId("widget-number");
+    const valueRow = root.querySelector(".flex.items-baseline");
+    expect(valueRow).not.toBeNull();
+    expect(valueRow!.className).not.toContain("gap-");
+    expect(root).toHaveTextContent("R$1,234");
+  });
+
+  it("uses a baseline gap when a suffix is present", () => {
+    render(
+      <WidgetNumber
+        rows={[{ cost: 42 }]}
+        isLoading={false}
+        render={{
+          kind: "number",
+          aggregation: "sum",
+          field: "cost",
+          format: "number",
+          prefix: "$",
+          suffix: " /mo",
+        }}
+      />,
+    );
+
+    const root = screen.getByTestId("widget-number");
+    const valueRow = root.querySelector(".flex.items-baseline");
+    expect(valueRow).not.toBeNull();
+    expect(valueRow!.className).toContain("gap-0.5");
+    expect(root).toHaveTextContent("$42 /mo");
+  });
 });

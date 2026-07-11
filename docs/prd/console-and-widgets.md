@@ -231,13 +231,34 @@ Each column needs a non-empty `field`. Optional fields:
 | Field | Meaning |
 | --- | --- |
 | `label` | Header text. Falls back to `field`. |
-| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, `link`, `avatar`, or `progress`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). `avatar` renders the resolved value as a circular avatar: direct image URLs are used as the image source, GitHub usernames (or author maps with a `username`) resolve to the GitHub avatar with the person's name in a tooltip, and values without a username fall back to an initials disc; blank values render as an em-dash. Use `avatarCommitterField` to supply a secondary person map for initials. `progress` renders a horizontal bar that fills to `field / progressTarget`; see the row below. |
+| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, `link`, `avatar`, or `progress`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `date`, `datetime`, and `relative` render through the shared `Timestamp` component, so every timestamp cell has an identical hover card exposing Local, UTC, Relative, and raw ISO with a copy button (see [Timestamp hover](#timestamp-hover) below). `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). `avatar` renders the resolved value as a circular avatar: direct image URLs are used as the image source, GitHub usernames (or author maps with a `username`) resolve to the GitHub avatar with the person's name in a tooltip, and values without a username fall back to an initials disc; blank values render as an em-dash. Use `avatarCommitterField` to supply a secondary person map for initials. `progress` renders a horizontal bar that fills to `field / progressTarget`; see the row below. |
 | `show` | Row expression controlling whether the cell is visible. |
 | `href` | Link template for `link` columns. Accepts `{{ cel }}` expressions and templates (e.g. `{{ prUrl }}` or `https://github.com/{{ org }}/pull/{{ prNumber }}`), legacy single-brace `{field}` placeholders, and bare static URLs. The column editor shows a dedicated href input with a field picker (values inserted as `{{ field }}`) when the format is `link`. |
 | `progressTarget` | Target (100%) for `format: progress`. Required for progress columns. Accepts a numeric literal (`"10"`, `"100.5"`), a row field path (`total`, `payload.goal`), or a full `{{ CEL }}` expression (`{{ base * 2 }}`). Resolved with the same helper as `field`. |
 | `progressLabel` | Text rendered next to the progress bar: `none`, `number` (`5/10`), or `percent` (`50%`). Defaults to `percent`. The bar itself clamps at `[0, 100]%`, but the label and hover tooltip always show the real percentage, so overshoots (`120%`, `12/10`) stay visible. |
 
 Column fields can be direct paths such as `status` or expression templates where supported by the widget helpers.
+
+### Timestamp hover
+
+Every timestamp-formatted surface across the console renders through the shared `Timestamp` component (`web_src/src/components/Timestamp/`), the same component used by the runs sidebar. Hovering a timestamp reveals a card with four representations of the same instant:
+
+- **Local** — locale-aware absolute time in the viewer's timezone, e.g. `10 Jul 2026, 15:46:53 CEST`
+- **UTC** — the same instant rendered in UTC without a timezone suffix
+- **Relative** — verbose live text, e.g. `5 minutes ago` / `in 3 hours`
+- **Timestamp** — the raw full-precision ISO string with a copy button
+
+The visible cell/panel label matches the column `format`:
+
+- `format: date` — locale calendar day (no time-of-day)
+- `format: datetime` — locale absolute timestamp with timezone
+- `format: relative` — compact live-updating text without an "ago" suffix (e.g. `5m`, `2h`)
+
+The presentational details block is exported as `TimestampDetails` (`@/components/Timestamp`) so tooltips that can't host a Radix hover card render an identical grid. Chart tooltips use it: whenever `xFormat` is `date`, `datetime`, or `relative`, hovering a chart point surfaces the same Local / UTC / Relative / ISO details block. Chart X-axis ticks stay short (`Jul 6` / `May 26 4:10 PM`) so densely-binned buckets keep readable.
+
+Number panels follow the same rule: setting `render.format` to `date`, `datetime`, or `relative` wraps the aggregated value in `Timestamp`, so `max(updatedAt)`-style "last event" KPIs get the same hover details as tables.
+
+Formatters and coercion live in `web_src/src/pages/app/console/widget/widgetFormat.ts` (`formatValue`, `coerceWidgetTimestamp`) and delegate to `@/lib/datetime` (`formatAbsolute`, `formatDate`, `formatRelative`, `formatISO`, `formatUTC`) plus `@/lib/date` (`formatTimeAgo`). Do not add ad-hoc `toLocale*` timestamp formatting in widget code — extend the shared helpers instead.
 
 ### Structured Filters
 
@@ -392,7 +413,7 @@ Tooltips show the category in the header and one row per series with `label — 
 
 Cartesian charts (`bar`, `stacked-bar`, `line`, `area`) expose three optional axis fields:
 
-- `xFormat` — display format applied to X-axis tick labels **and the hover tooltip header** (so the category in the tooltip matches the axis). Reuses the shared column-format vocabulary (`text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`). Useful when `xField` is a raw timestamp or numeric field — set `xFormat: date` instead of wrapping `xField` in a CEL expression like `{{ formatDate(createdAt, "MM/dd") }}`.
+- `xFormat` — display format applied to X-axis tick labels **and the hover tooltip header** (so the category in the tooltip matches the axis). Reuses the shared column-format vocabulary (`text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`). Useful when `xField` is a raw timestamp or numeric field — set `xFormat: date` instead of wrapping `xField` in a CEL expression like `{{ formatDate(createdAt, "MM/dd") }}`. Timestamp formats (`date`, `datetime`, `relative`) replace the tooltip header with the shared `TimestampDetails` block (Local / UTC / Relative / ISO with copy) so hovering a point exposes the exact instant — see [Timestamp hover](#timestamp-hover).
 - `yLabel` — Y-axis title rendered alongside the ticks (for example `USD`, `Errors / day`). Omitted by default.
 - `yFormat` — display format applied to Y-axis tick labels (`number`, `percent`, `duration`). Falls back to a locale-aware numeric default with thousands separators above 1k. The `format` declared on a series only affects tooltip values; configure `yFormat` to match it on the axis itself.
 
@@ -428,6 +449,8 @@ Number panels aggregate rows into a single KPI. Supported aggregations are:
 - `last`
 
 Aggregations other than `count` require a non-empty `field`.
+
+`render.format` accepts the same vocabulary as table columns. Numeric formats (`number`, `percent`, `duration`) render the raw aggregate; setting the format to `date`, `datetime`, or `relative` treats the aggregate as an epoch (ms or seconds) and wraps the visible label in the shared `Timestamp` component — this is the recommended way to build "last update" / "next run" KPIs. See [Timestamp hover](#timestamp-hover) for the shared hover behavior.
 
 ### Display Symbols
 
