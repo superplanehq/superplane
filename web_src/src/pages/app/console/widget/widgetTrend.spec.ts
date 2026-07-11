@@ -50,9 +50,24 @@ describe("computeTrend", () => {
       expect(oneDecimal).toMatchObject({ kind: "changed", percent: 3.8 });
     });
 
-    it("returns percent === null when previous is 0", () => {
-      const result = computeTrend(5, 0);
-      expect(result).toMatchObject({ kind: "changed", percent: null, percentCapped: false });
+    it("returns incomparable in percent mode when previous is 0 (percent undefined)", () => {
+      expect(computeTrend(5, 0)).toEqual({ kind: "incomparable" });
+      expect(computeTrend(5, 0, { display: "percent" })).toEqual({ kind: "incomparable" });
+    });
+
+    it("still returns changed in value/none mode when previous is 0", () => {
+      expect(computeTrend(5, 0, { display: "value" })).toMatchObject({
+        kind: "changed",
+        direction: "up",
+        delta: 5,
+        percent: null,
+        percentCapped: false,
+      });
+      expect(computeTrend(5, 0, { display: "none" })).toMatchObject({
+        kind: "changed",
+        direction: "up",
+        percent: null,
+      });
     });
 
     it("uses absolute value of previous so a negative baseline preserves direction sign", () => {
@@ -97,13 +112,16 @@ describe("formatTrendLabel", () => {
     expect(formatTrendLabel({ kind: "no-baseline" }, "percent")).toBe("0");
   });
 
-  it("prints - for incomparable", () => {
-    expect(formatTrendLabel({ kind: "incomparable" }, "percent")).toBe("-");
+  it("prints empty label for incomparable (icon supplies the muted dash)", () => {
+    expect(formatTrendLabel({ kind: "incomparable" }, "percent")).toBe("");
   });
 
-  it("prints - for percent mode when percent is null (previous === 0)", () => {
-    const result = computeTrend(5, 0);
-    expect(formatTrendLabel(result, "percent")).toBe("-");
+  it("prints empty label for percent mode when previous is 0 (incomparable)", () => {
+    expect(formatTrendLabel(computeTrend(5, 0, { display: "percent" }), "percent")).toBe("");
+  });
+
+  it("prints signed absolute delta in value mode even when previous is 0", () => {
+    expect(formatTrendLabel(computeTrend(5, 0, { display: "value" }), "value")).toBe("+5");
   });
 
   it("prints signed percent for percent mode", () => {
@@ -148,7 +166,11 @@ describe("formatTrendTooltip", () => {
     expect(formatTrendTooltip(computeTrend(5, 10))).toBe("-50% · -5");
   });
 
-  it("omits percent when previous is 0", () => {
-    expect(formatTrendTooltip(computeTrend(5, 0))).toBe("+5");
+  it("explains incomparable when percent mode has previous 0", () => {
+    expect(formatTrendTooltip(computeTrend(5, 0, { display: "percent" }))).toBe("Values cannot be compared");
+  });
+
+  it("omits percent in the tooltip when value mode has previous 0", () => {
+    expect(formatTrendTooltip(computeTrend(5, 0, { display: "value" }))).toBe("+5");
   });
 });

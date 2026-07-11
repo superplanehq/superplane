@@ -97,6 +97,25 @@ describe("WidgetTable trend columns", () => {
     view.unmount();
   });
 
+  it("renders muted '-' with no arrow when percent mode has previous value 0", () => {
+    const view = renderTrend({
+      render: TREND_RENDER,
+      rows: [
+        { id: "d-2", durationMs: 900 },
+        { id: "d-1", durationMs: 0 },
+      ],
+    });
+    const cell = view.container.querySelectorAll('[data-testid="widget-trend-cell"]')[0];
+    expect(cell.getAttribute("data-trend-kind")).toBe("incomparable");
+    expect(cell.getAttribute("data-trend-direction")).toBeNull();
+    expect(cell.getAttribute("data-trend-polarity")).toBeNull();
+    expect(cell.className).toContain("text-slate-400");
+    expect(cell.className).not.toContain("text-emerald");
+    expect(cell.className).not.toContain("text-red");
+    expect(cell.textContent).toBe("-");
+    view.unmount();
+  });
+
   it("re-evaluates a CEL field on the row below (same aggregation on both rows)", () => {
     const view = renderTrend({
       render: {

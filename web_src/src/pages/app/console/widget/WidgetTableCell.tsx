@@ -161,6 +161,7 @@ function TrendCell({
   const previous = nextRow ? (resolveCellValue(col.field, nextRow) ?? null) : undefined;
   const result = computeTrend(current, previous, {
     better: col.trendBetter,
+    display: col.trendDisplay,
     hasMoreBelow: nextRow ? false : Boolean(hasMoreBelow),
   });
   const label = formatTrendLabel(result, col.trendDisplay);

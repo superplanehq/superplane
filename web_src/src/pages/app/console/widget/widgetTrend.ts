@@ -43,8 +43,9 @@ export type TrendResult =
       /**
        * Signed percent change `(current - previous) / |previous| * 100`,
        * rounded to one decimal, capped at ±TREND_PERCENT_CAP. `null` when
-       * the previous value is 0 (percent is undefined). Always populated
-       * for the tooltip when non-null, regardless of `display` mode.
+       * the previous value is 0 (only reachable in `value`/`none` display
+       * modes — percent mode returns `incomparable` instead). Always
+       * populated for the tooltip when non-null, regardless of `display` mode.
        */
       percent: number | null;
       /** Whether `percent` hit the ±TREND_PERCENT_CAP clamp. */
@@ -61,6 +62,13 @@ export interface ComputeTrendOptions {
    * a paginated table with more pages available). Renderer shows `...`.
    */
   hasMoreBelow?: boolean;
+  /**
+   * How the cell will display magnitude. Defaults to `percent`. When the
+   * mode is `percent` and the previous value is `0`, percent is undefined
+   * so this returns `incomparable` (muted `-`, no arrow) per the PRD.
+   * `value` / `none` still render a directional change against a zero baseline.
+   */
+  display?: WidgetTrendDisplay;
 }
 
 /**
@@ -81,6 +89,13 @@ export function computeTrend(current: unknown, previous: unknown, opts: ComputeT
 
   const delta = currentNum - previousNum;
   if (delta === 0) return { kind: "flat", current: currentNum, previous: previousNum };
+
+  const display = opts.display ?? "percent";
+  // Percent change is undefined when previous is 0 — treat as incomparable so
+  // the cell renders muted `-` with no directional arrow (PRD).
+  if (display === "percent" && previousNum === 0) {
+    return { kind: "incomparable" };
+  }
 
   const direction: Exclude<TrendDirection, "flat"> = delta > 0 ? "up" : "down";
   const better: WidgetTrendBetter = opts.better ?? "up";
@@ -112,7 +127,8 @@ export function formatTrendLabel(result: TrendResult, display: WidgetTrendDispla
     case "flat":
       return "0";
     case "incomparable":
-      return "-";
+      // Icon alone supplies the muted `-`; avoid a second dash in the label.
+      return "";
     case "changed": {
       const mode = display ?? "percent";
       if (mode === "none") return "";
