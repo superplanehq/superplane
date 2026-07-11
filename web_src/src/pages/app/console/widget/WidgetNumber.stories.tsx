@@ -159,3 +159,60 @@ export const Empty: Story = {
     isLoading: false,
   },
 };
+
+const timestampNumberRows = [
+  { updatedAt: Date.now() - 45 * 60 * 1000 },
+  { updatedAt: Date.now() - 15 * 60 * 1000 },
+  { updatedAt: Date.now() - 5 * 60 * 1000 },
+];
+
+/**
+ * When a number panel's `format` is `date`, `datetime`, or `relative`, the
+ * aggregated value renders through the shared `Timestamp` component. The
+ * value carries a dashed underline hint, and hover exposes Local / UTC /
+ * Relative / ISO with a copy affordance.
+ */
+export const TimestampRelative: Story = {
+  render: (args) => <NumberPanel title="Last update" {...args} />,
+  args: {
+    render: {
+      kind: "number",
+      aggregation: "max",
+      field: "updatedAt",
+      label: "Last update",
+      format: "relative",
+    },
+    rows: timestampNumberRows,
+    isLoading: false,
+  },
+};
+
+export const TimestampDatetime: Story = {
+  render: (args) => <NumberPanel title="Last deploy" {...args} />,
+  args: {
+    render: {
+      kind: "number",
+      aggregation: "max",
+      field: "updatedAt",
+      label: "Last deploy",
+      format: "datetime",
+    },
+    rows: timestampNumberRows,
+    isLoading: false,
+  },
+};
+
+export const TimestampDateOnly: Story = {
+  render: (args) => <NumberPanel title="Last release day" {...args} />,
+  args: {
+    render: {
+      kind: "number",
+      aggregation: "max",
+      field: "updatedAt",
+      label: "Last release day",
+      format: "date",
+    },
+    rows: timestampNumberRows,
+    isLoading: false,
+  },
+};
