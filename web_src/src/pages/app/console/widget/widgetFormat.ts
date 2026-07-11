@@ -9,7 +9,7 @@ const PURE_NUMERIC_RE = /^-?\d+(\.\d+)?$/;
 /**
  * Coerce a widget cell value into a `Date`. Accepts ISO strings, `Date`
  * instances, and plausible epoch seconds/milliseconds — including numeric
- * strings like `"1717390000"` that JSON/CEL often emit (using `>= 1e12` to
+ * strings like `"1717390000"` that JSON/CEL often emit (using `>= 1e11` to
  * disambiguate ms vs seconds). Returns `null` for anything that can't be
  * parsed, so callers can fall back to the raw string.
  *
@@ -38,20 +38,26 @@ export function coerceWidgetTimestamp(value: unknown): Date | null {
   return dateFromEpochNumber(typeof value === "number" ? value : Number(value));
 }
 
+/** Milliseconds from ~1973 onward; below this, values are treated as seconds. */
+const EPOCH_MS_MAGNITUDE = 1e11;
+
 function dateFromEpochNumber(n: number): Date | null {
   if (!isPlausibleEpochNumber(n)) return null;
   // Use magnitude so negative pre-1970 ms values (e.g. -1.5e12) are not
   // mistaken for seconds and multiplied by 1000.
-  const ms = Math.abs(n) >= 1e12 ? n : n * 1000;
+  const ms = Math.abs(n) >= EPOCH_MS_MAGNITUDE ? n : n * 1000;
   const date = new Date(ms);
   return Number.isFinite(date.getTime()) ? date : null;
 }
 
-/** Epoch seconds (~1e9–1e10) or milliseconds (~1e12–1e13); not status codes / hours. */
+/**
+ * Epoch seconds (~1e9–1e10) or milliseconds (~1e11–1e13). The bands meet at
+ * `1e11` so 1973–2001 ms epochs are accepted; status codes / hours stay out.
+ */
 function isPlausibleEpochNumber(n: number): boolean {
   if (!Number.isFinite(n)) return false;
   const abs = Math.abs(n);
-  return (abs >= 1e9 && abs < 1e11) || (abs >= 1e12 && abs < 1e14);
+  return abs >= 1e9 && abs < 1e14;
 }
 
 /**

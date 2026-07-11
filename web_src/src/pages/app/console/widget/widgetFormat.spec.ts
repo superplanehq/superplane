@@ -29,7 +29,7 @@ describe("formatValue relative", () => {
 
   it("accepts epoch seconds and milliseconds", () => {
     const now = new Date("2026-03-29T12:00:00.000Z").getTime();
-    // Epoch seconds (< 1e12) are treated as seconds; ms values (>= 1e12) pass through.
+    // Epoch seconds (< 1e11) are treated as seconds; ms values (>= 1e11) pass through.
     expect(formatValue((now - 5 * 60 * 1000) / 1000, "relative")).toBe("5m");
     expect(formatValue(now - 2 * 60 * 60 * 1000, "relative")).toBe("2h");
   });
@@ -111,6 +111,13 @@ describe("coerceWidgetTimestamp", () => {
     expect(coerceWidgetTimestamp(String(ms))?.getTime()).toBe(ms);
     const seconds = -1_500_000_000;
     expect(coerceWidgetTimestamp(seconds)?.getTime()).toBe(seconds * 1000);
+  });
+
+  it("accepts millisecond epochs in the former 1e11–1e12 gap (1973–2001)", () => {
+    // 2000-01-01T00:00:00.000Z as ms sits between the old seconds and ms bands.
+    const y2kMs = 946_684_800_000;
+    expect(coerceWidgetTimestamp(y2kMs)?.toISOString()).toBe("2000-01-01T00:00:00.000Z");
+    expect(coerceWidgetTimestamp(String(y2kMs))?.toISOString()).toBe("2000-01-01T00:00:00.000Z");
   });
 });
 

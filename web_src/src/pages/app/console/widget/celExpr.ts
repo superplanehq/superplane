@@ -453,7 +453,7 @@ function formatTimestampSeconds(value: number): string {
  * Format a date value using a small token pattern (e.g. `MM/dd`, `yyyy-MM-dd HH:mm`).
  *
  * The value may be an ISO-8601 string, a `Date` instance, an epoch number in
- * seconds (`< 1e12`), or an epoch number in milliseconds (`>= 1e12`). All
+ * seconds (`< 1e11`), or an epoch number in milliseconds (`>= 1e11`). All
  * tokens render in the viewer's local time, matching the rest of the
  * dashboard's display conventions (`widgetFormat.ts` also uses `toLocale*`).
  *
