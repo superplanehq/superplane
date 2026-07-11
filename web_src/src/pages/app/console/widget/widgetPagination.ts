@@ -74,18 +74,28 @@ export function computeDisplaySlice(displayCount: number, effectiveLimit: number
 }
 
 /**
- * How many rows to collect when the progressive display window may be hiding
- * already-loaded rows. Returns `displaySlice + 1` so callers can peek the
- * first hidden row as a trend baseline without rendering it.
+ * How many source rows to materialize in progressive mode. Collect every
+ * already-loaded row (capped by the configured limit) so the table can
+ * filter+sort the full loaded set, then slice the display window — trend
+ * baselines must see neighbors that sort into place after the visible rows.
  */
-export function computeTrendCollectLimit(displaySlice: number, loadedRowCount: number): number {
-  if (loadedRowCount > displaySlice) return displaySlice + 1;
-  return displaySlice;
+export function computeTrendCollectLimit(
+  displaySlice: number,
+  loadedRowCount: number,
+  effectiveLimit: number = Number.POSITIVE_INFINITY,
+): number {
+  const loaded = Math.max(displaySlice, loadedRowCount);
+  if (!Number.isFinite(effectiveLimit)) return loaded;
+  return Math.min(loaded, effectiveLimit);
 }
 
 /**
  * Split a collected row list into the visible display window and the optional
- * first already-loaded row beyond it (used as a trend baseline peek).
+ * first already-loaded row beyond it.
+ *
+ * @deprecated Progressive tables now pass the full loaded set plus
+ * `displayCount` so filter/sort run before the display slice. Kept for specs
+ * that still exercise the helper.
  */
 export function splitDisplayRowsWithTrendPeek<T>(
   collected: T[],

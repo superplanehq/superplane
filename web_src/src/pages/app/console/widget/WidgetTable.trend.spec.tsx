@@ -12,12 +12,12 @@ describe("WidgetTable trend columns", () => {
     render: tableRender,
     rows,
     hasMore,
-    nextLoadedRow,
+    displayCount,
   }: {
     render: WidgetTableRender;
     rows: unknown[];
     hasMore?: boolean;
-    nextLoadedRow?: Record<string, unknown>;
+    displayCount?: number;
   }) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     return render(
@@ -29,7 +29,7 @@ describe("WidgetTable trend columns", () => {
               rows={rows}
               isLoading={false}
               hasMore={hasMore}
-              nextLoadedRow={nextLoadedRow}
+              displayCount={displayCount}
             />
           </ConsoleContextProvider>
         </QueryClientProvider>
@@ -95,16 +95,17 @@ describe("WidgetTable trend columns", () => {
 
   it("compares against the next already-loaded row when hasMore is only the display window", () => {
     // Progressive tables set hasMore when more rows are loaded but still
-    // hidden behind the display window. The last visible trend cell must
-    // use that peek row as its baseline instead of showing pending `...`.
+    // hidden behind the display window. Pass the full loaded set + displayCount
+    // so the last visible trend cell compares against the hidden neighbor.
     const view = renderTrend({
       render: TREND_RENDER,
       rows: [
         { id: "d-3", durationMs: 900 },
         { id: "d-2", durationMs: 1000 },
+        { id: "d-1", durationMs: 1000 },
       ],
       hasMore: true,
-      nextLoadedRow: { id: "d-1", durationMs: 1000 },
+      displayCount: 2,
     });
     const cells = view.container.querySelectorAll('[data-testid="widget-trend-cell"]');
     expect(cells).toHaveLength(2);
@@ -114,9 +115,9 @@ describe("WidgetTable trend columns", () => {
     view.unmount();
   });
 
-  it("ignores a peek baseline that fails where/filters", () => {
-    // Peek rows come from the unfiltered progressive cache. If where/filters
-    // would hide that row, trend must not use it as the "row below".
+  it("ignores a loaded baseline that fails where/filters", () => {
+    // Loaded-but-hidden rows still go through where/filters. If they would
+    // be hidden, trend must not use them as the "row below".
     const view = renderTrend({
       render: {
         ...TREND_RENDER,
@@ -125,14 +126,41 @@ describe("WidgetTable trend columns", () => {
       rows: [
         { id: "d-3", durationMs: 900, status: "ok" },
         { id: "d-2", durationMs: 1000, status: "ok" },
+        { id: "d-1", durationMs: 500, status: "fail" },
       ],
       hasMore: true,
-      nextLoadedRow: { id: "d-1", durationMs: 500, status: "fail" },
+      displayCount: 2,
     });
     const cells = view.container.querySelectorAll('[data-testid="widget-trend-cell"]');
     expect(cells).toHaveLength(2);
     expect(cells[1].getAttribute("data-trend-kind")).toBe("pending");
     expect(cells[1].textContent).toContain("...");
+    view.unmount();
+  });
+
+  it("uses the next row after widget sort, not fetch order", () => {
+    // Loaded order is ascending by name, but sort desc so the visible window's
+    // last row's baseline is the next name in sorted order (c), not the next
+    // in fetch order.
+    const view = renderTrend({
+      render: {
+        ...TREND_RENDER,
+        sort: { field: "id", order: "desc" },
+      },
+      rows: [
+        { id: "a", durationMs: 1000 },
+        { id: "b", durationMs: 800 },
+        { id: "c", durationMs: 900 },
+      ],
+      displayCount: 2,
+    });
+    const cells = view.container.querySelectorAll('[data-testid="widget-trend-cell"]');
+    expect(cells).toHaveLength(2);
+    // Visible sorted: c (900), b (800); baseline for b is a (1000).
+    // b vs a: 800 vs 1000 → down / better with trendBetter: down → -20%
+    expect(cells[1].getAttribute("data-trend-kind")).toBe("changed");
+    expect(cells[1].getAttribute("data-trend-direction")).toBe("down");
+    expect(cells[1].textContent).toContain("-20%");
     view.unmount();
   });
 

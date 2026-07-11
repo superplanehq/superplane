@@ -5,6 +5,8 @@
 import { type CstNode } from "chevrotain";
 import { CelTypeError, evaluate as celEvaluate, parse as celParse } from "cel-js";
 
+import { coerceWidgetTimestamp } from "./widgetFormat";
+
 export type CompiledExpr = { ok: true; raw: string; cst: CstNode } | { ok: false; raw: string; error: string };
 
 export type MaybeExpr = { kind: "literal"; value: string } | { kind: "expr"; expr: CompiledExpr };
@@ -166,7 +168,7 @@ const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
   // values. Pairs with `duration()` for human-friendly output, e.g.
   // `{{ duration((epochMs(finishedAt) - epochMs(createdAt)) / 1000) }}`.
   epochMs: (value: unknown): number => {
-    const date = coerceToDate(value);
+    const date = coerceWidgetTimestamp(value);
     return date ? date.getTime() : 0;
   },
   // Parse a JSON-encoded string into a structured CEL value (list, map, or
@@ -451,7 +453,7 @@ function formatTimestampSeconds(value: number): string {
  * Format a date value using a small token pattern (e.g. `MM/dd`, `yyyy-MM-dd HH:mm`).
  *
  * The value may be an ISO-8601 string, a `Date` instance, an epoch number in
- * seconds (`< 1e12`), or an epoch number in milliseconds (`>= 1e12`). All
+ * seconds (`< 1e11`), or an epoch number in milliseconds (`>= 1e11`). All
  * tokens render in the viewer's local time, matching the rest of the
  * dashboard's display conventions (`widgetFormat.ts` also uses `toLocale*`).
  *
@@ -472,29 +474,9 @@ function formatTimestampSeconds(value: number): string {
  */
 function formatDate(value: unknown, pattern: unknown): string {
   if (typeof pattern !== "string" || pattern === "") return "";
-  const date = coerceToDate(value);
+  const date = coerceWidgetTimestamp(value);
   if (!date) return "";
   return formatDateTokens(date, pattern);
-}
-
-function coerceToDate(value: unknown): Date | null {
-  if (value == null) return null;
-  if (value instanceof Date) {
-    return Number.isFinite(value.getTime()) ? value : null;
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return null;
-    const parsed = Date.parse(trimmed);
-    return Number.isFinite(parsed) ? new Date(parsed) : null;
-  }
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) return null;
-    const ms = value >= 1e12 ? value : value * 1000;
-    const date = new Date(ms);
-    return Number.isFinite(date.getTime()) ? date : null;
-  }
-  return null;
 }
 
 const DATE_TOKEN_RE = /yyyy|yy|MM|M|dd|d|HH|H|mm|m|ss|s/g;

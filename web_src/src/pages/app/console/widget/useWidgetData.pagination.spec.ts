@@ -56,13 +56,17 @@ describe("computeDisplaySlice", () => {
 });
 
 describe("computeTrendCollectLimit", () => {
-  it("peeks one past the display window when more rows are already loaded", () => {
-    expect(computeTrendCollectLimit(100, 125)).toBe(101);
+  it("collects every already-loaded row so filter+sort can see hidden baselines", () => {
+    expect(computeTrendCollectLimit(100, 125)).toBe(125);
   });
 
   it("matches the display window when nothing is hidden", () => {
     expect(computeTrendCollectLimit(100, 100)).toBe(100);
     expect(computeTrendCollectLimit(100, 80)).toBe(100);
+  });
+
+  it("caps at the configured effective limit", () => {
+    expect(computeTrendCollectLimit(50, 200, 120)).toBe(120);
   });
 });
 

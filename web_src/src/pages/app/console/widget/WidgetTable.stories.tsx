@@ -8,6 +8,7 @@ import {
   prRiskCheckRows,
   prRiskChecksPanelSize,
   prRiskChecksTableRender,
+  progressRows,
 } from "../__stories__/storyFixtures";
 import { WidgetTable } from "./WidgetTable";
 import type { WidgetTableRender } from "./types";
@@ -178,7 +179,7 @@ export const Avatars: Story = {
 };
 
 export const ManyColumnsAndFormats: Story = {
-  render: (args) => <TablePanel title="All column formats" {...args} />,
+  render: (args) => <TablePanel title="All column formats" width={880} {...args} />,
   args: {
     render: {
       kind: "table",
@@ -188,12 +189,82 @@ export const ManyColumnsAndFormats: Story = {
         { field: "service", label: "Service", format: "badge" },
         { field: "durationMs", label: "Duration", format: "duration" },
         { field: "cost", label: "Cost", format: "number" },
+        {
+          field: "cost",
+          label: "Budget",
+          format: "progress",
+          progressTarget: "cost_budget",
+          progressLabel: "number",
+        },
         { field: "createdAt", label: "Started", format: "datetime" },
         { field: "url", label: "Link", format: "link" },
         { field: '{{ "https://i.pravatar.cc/64?u=" + id }}', label: "Avatar", format: "avatar" },
       ],
     },
     rows: executionRows,
+    isLoading: false,
+  },
+};
+
+/**
+ * Every timestamp-formatted column renders through the shared `Timestamp`
+ * component — each label carries a dashed underline hint, and hovering any
+ * cell reveals Local / UTC / Relative / ISO with a copy affordance for the
+ * ISO value.
+ */
+export const TimestampFormats: Story = {
+  render: (args) => <TablePanel title="Timestamp column formats" {...args} />,
+  args: {
+    render: {
+      kind: "table",
+      columns: [
+        { field: "name", label: "Node" },
+        { field: "createdAt", label: "Day", format: "date" },
+        { field: "createdAt", label: "When", format: "datetime" },
+        { field: "createdAt", label: "Started", format: "relative" },
+      ],
+    },
+    rows: executionRows,
+    isLoading: false,
+  },
+};
+
+/**
+ * Dedicated showcase for the `progress` column format. Rows cover the mid,
+ * near-full, overshoot, zero, and empty branches so the bar clamping, label
+ * modes, and em-dash placeholder are all visible in a single view.
+ */
+export const ProgressColumn: Story = {
+  render: (args) => <TablePanel title="Progress column showcase" width={720} {...args} />,
+  args: {
+    render: {
+      kind: "table",
+      columns: [
+        { field: "label", label: "Row" },
+        {
+          field: "done",
+          label: "Percent",
+          format: "progress",
+          progressTarget: "total",
+          progressLabel: "percent",
+        },
+        {
+          field: "done",
+          label: "Number",
+          format: "progress",
+          progressTarget: "total",
+          progressLabel: "number",
+        },
+        {
+          field: "done",
+          label: "Bar only",
+          format: "progress",
+          progressTarget: "total",
+          progressLabel: "none",
+        },
+      ],
+    },
+    rows: progressRows,
     isLoading: false,
   },
 };
@@ -295,8 +366,8 @@ export const TrendPending: Story = {
 
 /**
  * `hasMore` is true only because more rows are already loaded behind the
- * progressive display window. The last visible trend cell compares against
- * `nextLoadedRow` instead of showing pending `...`.
+ * progressive display window. Pass the full loaded set + `displayCount` so
+ * the last visible trend cell compares against the hidden neighbor.
  */
 export const TrendDisplayWindowPeek: Story = {
   render: (args) => <TablePanel title="Deploys (more loaded)" {...args} />,
@@ -315,8 +386,8 @@ export const TrendDisplayWindowPeek: Story = {
         },
       ],
     },
-    rows: trendRows.slice(0, 4),
-    nextLoadedRow: trendRows[4],
+    rows: trendRows,
+    displayCount: 4,
     isLoading: false,
     hasMore: true,
     isFetchingMore: false,

@@ -649,6 +649,9 @@ func validateTablePanelContent(panel ConsolePanel) error {
 		if !ok || field == "" {
 			return fmt.Errorf("panel %q render.columns[%d].field must be a non-empty string", panel.ID, i)
 		}
+		if err := validateTableProgressColumn(panel.ID, i, column); err != nil {
+			return err
+		}
 		if err := validateTableColumnTrend(panel.ID, i, column); err != nil {
 			return err
 		}
@@ -663,6 +666,32 @@ func validateTablePanelContent(panel ConsolePanel) error {
 		return err
 	}
 	return validateTableRowActions(panel.ID, render["rowActions"])
+}
+
+// allowedProgressLabels mirrors `WIDGET_PROGRESS_LABELS` on the FE. Keep the
+// two in lockstep so a valid YAML round-trips through either side.
+var allowedProgressLabels = []string{"none", "number", "percent"}
+
+// validateTableProgressColumn enforces the extra constraints on
+// `format: progress` columns: the target expression must be present and the
+// label enum, when set, must be one of the allowed values. Other formats
+// simply ignore these fields.
+func validateTableProgressColumn(panelID string, index int, column map[string]any) error {
+	if rawLabel, ok := column["progressLabel"]; ok && rawLabel != nil {
+		label, ok := rawLabel.(string)
+		if !ok || !slices.Contains(allowedProgressLabels, label) {
+			return fmt.Errorf("panel %q render.columns[%d].progressLabel must be one of %s", panelID, index, strings.Join(allowedProgressLabels, "/"))
+		}
+	}
+	format, _ := column["format"].(string)
+	if format != "progress" {
+		return nil
+	}
+	target, ok := column["progressTarget"].(string)
+	if !ok || strings.TrimSpace(target) == "" {
+		return fmt.Errorf("panel %q render.columns[%d].progressTarget must be a non-empty string for progress columns", panelID, index)
+	}
+	return nil
 }
 
 // allowedTrendBetter / allowedTrendDisplay must stay in lockstep with the

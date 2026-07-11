@@ -228,6 +228,40 @@ describe("validatePanelContent — table", () => {
     });
     expect(error).toMatch(/render\.rowStyles\[0\]\.field must be a non-empty string/);
   });
+
+  it("requires progressTarget when format is progress", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [{ field: "done", format: "progress" }],
+      },
+    });
+    expect(error).toMatch(/render\.columns\[0\]\.progressTarget/);
+  });
+
+  it("rejects an unknown progressLabel value", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [{ field: "done", format: "progress", progressTarget: "total", progressLabel: "fraction" }],
+      },
+    });
+    expect(error).toMatch(/render\.columns\[0\]\.progressLabel must be one of/);
+  });
+
+  it("accepts a well-formed progress column", () => {
+    expect(
+      validatePanelContent("table", {
+        dataSource: { kind: "memory", namespace: "env" },
+        render: {
+          kind: "table",
+          columns: [{ field: "done", format: "progress", progressTarget: "total", progressLabel: "number" }],
+        },
+      }),
+    ).toBeNull();
+  });
 });
 
 describe("normalizeTablePanelContent — data source limits", () => {
@@ -289,6 +323,31 @@ describe("normalizeTablePanelContent — rowStyles round-trip", () => {
       label: "Author",
       format: "avatar",
       avatarCommitterField: "committer",
+    });
+  });
+
+  it("preserves progress column options and drops unknown progressLabel values", () => {
+    const normalized = normalizeTablePanelContent({
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [
+          { field: "done", format: "progress", progressTarget: "total", progressLabel: "number" },
+          { field: "score", format: "progress", progressTarget: "100", progressLabel: "fraction" },
+        ],
+      },
+    });
+    expect(normalized.render.columns[0]).toEqual({
+      field: "done",
+      format: "progress",
+      progressTarget: "total",
+      progressLabel: "number",
+    });
+    expect(normalized.render.columns[1]).toEqual({
+      field: "score",
+      format: "progress",
+      progressTarget: "100",
+      progressLabel: undefined,
     });
   });
 

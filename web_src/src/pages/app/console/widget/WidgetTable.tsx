@@ -33,12 +33,11 @@ interface WidgetTableProps {
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
   /**
-   * First already-loaded row beyond the progressive display window. Trend
-   * columns on the last visible row compare against this peek when `rows`
-   * has no neighbor below — `hasMore` alone is not enough, because it is
-   * also true when more rows are loaded but still hidden.
+   * Progressive display window. When set, `rows` is the full loaded set and
+   * only the first `displayCount` rows after filter+sort are rendered — so
+   * trend columns can compare against loaded-but-hidden neighbors.
    */
-  nextLoadedRow?: Record<string, unknown>;
+  displayCount?: number;
 }
 
 const ACTION_ICONS = {
@@ -59,7 +58,7 @@ export function WidgetTable({
   hasMore,
   isFetchingMore,
   onLoadMore,
-  nextLoadedRow,
+  displayCount,
 }: WidgetTableProps) {
   const ctx = useConsoleContext();
   const recordRows = useMemo(
@@ -67,20 +66,18 @@ export function WidgetTable({
     [rows],
   );
 
-  const filtered = useMemo(() => {
+  const filteredAll = useMemo(() => {
     const afterWhere = applyTableWhere(recordRows, render.where);
     const afterFilters = applyFilters(afterWhere, render.filters);
     return applySort(afterFilters, render.sort);
   }, [recordRows, render.where, render.filters, render.sort]);
 
-  // Peek baseline must use the same where/filters as visible rows so trend
-  // never compares against a row the filtered table would hide.
-  const trendPeekRow = useMemo(() => {
-    if (!nextLoadedRow) return undefined;
-    const afterWhere = applyTableWhere([nextLoadedRow], render.where);
-    const afterFilters = applyFilters(afterWhere, render.filters);
-    return afterFilters[0];
-  }, [nextLoadedRow, render.where, render.filters]);
+  // Slice after filter+sort so progressive windows and trend baselines share
+  // the same ordered list. Without `displayCount`, render the full filtered set.
+  const filtered = useMemo(() => {
+    if (displayCount == null || displayCount >= filteredAll.length) return filteredAll;
+    return filteredAll.slice(0, displayCount);
+  }, [filteredAll, displayCount]);
 
   const resolveRowStyle = useMemo(() => makeRowStyleResolver(render.rowStyles), [render.rowStyles]);
 
@@ -158,12 +155,12 @@ export function WidgetTable({
       <WidgetTableGrid
         render={render}
         filtered={filtered}
+        filteredAll={filteredAll}
         resolveRowStyle={resolveRowStyle}
         hasMore={hasMore}
         isFetchingMore={isFetchingMore}
         onLoadMore={onLoadMore}
         onScroll={onScroll}
-        trendPeekRow={trendPeekRow}
       />
     </WidgetTableActionLockProvider>
   );
@@ -172,23 +169,24 @@ export function WidgetTable({
 interface WidgetTableGridProps {
   render: WidgetTableRender;
   filtered: Record<string, unknown>[];
+  /** Full filter+sort result; may be longer than `filtered` when displayCount slices. */
+  filteredAll: Record<string, unknown>[];
   resolveRowStyle: ReturnType<typeof makeRowStyleResolver>;
   hasMore?: boolean;
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
   onScroll: (event: UIEvent<HTMLDivElement>) => void;
-  trendPeekRow?: Record<string, unknown>;
 }
 
 function WidgetTableGrid({
   render,
   filtered,
+  filteredAll,
   resolveRowStyle,
   hasMore,
   isFetchingMore,
   onLoadMore,
   onScroll,
-  trendPeekRow,
 }: WidgetTableGridProps) {
   const ctx = useConsoleContext();
   const rowActions = (render.rowActions ?? []).filter((action) => {
@@ -223,12 +221,11 @@ function WidgetTableGrid({
           {filtered.map((row, idx) => {
             const rowKey = rowKeyForRow(row, idx);
             const toneClass = resolveRowStyle?.(row);
-            const neighborBelow = filtered[idx + 1] as Record<string, unknown> | undefined;
-            // Prefer the next visible filtered row; fall back to a filtered
-            // peek of the first already-loaded hidden row so trend cells
-            // don't show pending `...` for data we already have.
-            const nextRow = neighborBelow ?? (idx === lastIdx ? trendPeekRow : undefined);
-            const hasMoreBelow = idx === lastIdx && !neighborBelow && !trendPeekRow && Boolean(hasMore);
+            // Neighbor comes from the full ordered list so a progressive
+            // display window still compares against the next sorted row even
+            // when that row is loaded but not yet shown.
+            const nextRow = filteredAll[idx + 1] as Record<string, unknown> | undefined;
+            const hasMoreBelow = idx === lastIdx && !nextRow && Boolean(hasMore);
             return (
               <tr
                 key={rowKey}

@@ -23,11 +23,18 @@ import type {
 import {
   normalizeRowAction,
   WIDGET_FILTER_OPS,
+  WIDGET_PROGRESS_LABELS,
   WIDGET_SORT_ORDERS,
   WIDGET_TREND_BETTER,
   WIDGET_TREND_DISPLAYS,
 } from "./widget/types";
-import type { WidgetSort, WidgetSortOrder, WidgetTrendBetter, WidgetTrendDisplay } from "./widget/types";
+import type {
+  WidgetProgressLabel,
+  WidgetSort,
+  WidgetSortOrder,
+  WidgetTrendBetter,
+  WidgetTrendDisplay,
+} from "./widget/types";
 import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
@@ -473,6 +480,11 @@ function normalizeTableColumns(raw: unknown): WidgetTableColumn[] {
       show: typeof c.show === "string" ? c.show : undefined,
       href: typeof c.href === "string" ? c.href : undefined,
       avatarCommitterField: typeof c.avatarCommitterField === "string" ? c.avatarCommitterField : undefined,
+      progressTarget: typeof c.progressTarget === "string" ? c.progressTarget : undefined,
+      progressLabel:
+        typeof c.progressLabel === "string" && WIDGET_PROGRESS_LABELS.includes(c.progressLabel as WidgetProgressLabel)
+          ? (c.progressLabel as WidgetProgressLabel)
+          : undefined,
       trendBetter:
         typeof c.trendBetter === "string" && WIDGET_TREND_BETTER.includes(c.trendBetter as WidgetTrendBetter)
           ? (c.trendBetter as WidgetTrendBetter)
@@ -540,6 +552,25 @@ function validateTableColumns(columns: unknown): string | null {
     if (!col) return `render.columns[${i}] must be an object.`;
     if (typeof col.field !== "string" || col.field.trim() === "") {
       return `render.columns[${i}].field must be a non-empty string.`;
+    }
+    const progressError = validateProgressColumnFields(i, col);
+    if (progressError) return progressError;
+  }
+  return null;
+}
+
+function validateProgressColumnFields(index: number, col: Record<string, unknown>): string | null {
+  if (col.progressLabel !== undefined && col.progressLabel !== null) {
+    if (
+      typeof col.progressLabel !== "string" ||
+      !WIDGET_PROGRESS_LABELS.includes(col.progressLabel as WidgetProgressLabel)
+    ) {
+      return `render.columns[${index}].progressLabel must be one of ${WIDGET_PROGRESS_LABELS.join(", ")}.`;
+    }
+  }
+  if (col.format === "progress") {
+    if (typeof col.progressTarget !== "string" || col.progressTarget.trim() === "") {
+      return `render.columns[${index}].progressTarget must be a non-empty string for progress columns.`;
     }
   }
   return null;
