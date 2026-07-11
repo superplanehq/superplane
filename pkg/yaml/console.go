@@ -652,6 +652,9 @@ func validateTablePanelContent(panel ConsolePanel) error {
 		if err := validateTableProgressColumn(panel.ID, i, column); err != nil {
 			return err
 		}
+		if err := validateTableColumnTrend(panel.ID, i, column); err != nil {
+			return err
+		}
 	}
 	if err := validateTableWhere(panel.ID, render["where"]); err != nil {
 		return err
@@ -687,6 +690,30 @@ func validateTableProgressColumn(panelID string, index int, column map[string]an
 	target, ok := column["progressTarget"].(string)
 	if !ok || strings.TrimSpace(target) == "" {
 		return fmt.Errorf("panel %q render.columns[%d].progressTarget must be a non-empty string for progress columns", panelID, index)
+	}
+	return nil
+}
+
+// allowedTrendBetter / allowedTrendDisplay must stay in lockstep with the
+// frontend `WIDGET_TREND_BETTER` / `WIDGET_TREND_DISPLAYS` enums in
+// `web_src/.../widget/types.ts`.
+var (
+	allowedTrendBetter  = []string{"up", "down"}
+	allowedTrendDisplay = []string{"percent", "value", "none"}
+)
+
+func validateTableColumnTrend(panelID string, index int, column map[string]any) error {
+	if raw, ok := column["trendBetter"]; ok && raw != nil {
+		s, isString := raw.(string)
+		if !isString || !slices.Contains(allowedTrendBetter, s) {
+			return fmt.Errorf("panel %q render.columns[%d].trendBetter must be one of %s", panelID, index, strings.Join(allowedTrendBetter, "/"))
+		}
+	}
+	if raw, ok := column["trendDisplay"]; ok && raw != nil {
+		s, isString := raw.(string)
+		if !isString || !slices.Contains(allowedTrendDisplay, s) {
+			return fmt.Errorf("panel %q render.columns[%d].trendDisplay must be one of %s", panelID, index, strings.Join(allowedTrendDisplay, "/"))
+		}
 	}
 	return nil
 }

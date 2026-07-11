@@ -32,6 +32,12 @@ interface WidgetTableProps {
   hasMore?: boolean;
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
+  /**
+   * Progressive display window. When set, `rows` is the full loaded set and
+   * only the first `displayCount` rows after filter+sort are rendered — so
+   * trend columns can compare against loaded-but-hidden neighbors.
+   */
+  displayCount?: number;
 }
 
 const ACTION_ICONS = {
@@ -45,18 +51,33 @@ const ACTION_ICONS = {
 /** Distance from the bottom (px) at which scrolling auto-requests more rows. */
 const AUTO_LOAD_SCROLL_THRESHOLD_PX = 160;
 
-export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, onLoadMore }: WidgetTableProps) {
+export function WidgetTable({
+  render,
+  rows,
+  isLoading,
+  hasMore,
+  isFetchingMore,
+  onLoadMore,
+  displayCount,
+}: WidgetTableProps) {
   const ctx = useConsoleContext();
   const recordRows = useMemo(
     () => rows.filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object" && !Array.isArray(r)),
     [rows],
   );
 
-  const filtered = useMemo(() => {
+  const filteredAll = useMemo(() => {
     const afterWhere = applyTableWhere(recordRows, render.where);
     const afterFilters = applyFilters(afterWhere, render.filters);
     return applySort(afterFilters, render.sort);
   }, [recordRows, render.where, render.filters, render.sort]);
+
+  // Slice after filter+sort so progressive windows and trend baselines share
+  // the same ordered list. Without `displayCount`, render the full filtered set.
+  const filtered = useMemo(() => {
+    if (displayCount == null || displayCount >= filteredAll.length) return filteredAll;
+    return filteredAll.slice(0, displayCount);
+  }, [filteredAll, displayCount]);
 
   const resolveRowStyle = useMemo(() => makeRowStyleResolver(render.rowStyles), [render.rowStyles]);
 
@@ -134,6 +155,7 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
       <WidgetTableGrid
         render={render}
         filtered={filtered}
+        filteredAll={filteredAll}
         resolveRowStyle={resolveRowStyle}
         hasMore={hasMore}
         isFetchingMore={isFetchingMore}
@@ -147,6 +169,8 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
 interface WidgetTableGridProps {
   render: WidgetTableRender;
   filtered: Record<string, unknown>[];
+  /** Full filter+sort result; may be longer than `filtered` when displayCount slices. */
+  filteredAll: Record<string, unknown>[];
   resolveRowStyle: ReturnType<typeof makeRowStyleResolver>;
   hasMore?: boolean;
   isFetchingMore?: boolean;
@@ -157,6 +181,7 @@ interface WidgetTableGridProps {
 function WidgetTableGrid({
   render,
   filtered,
+  filteredAll,
   resolveRowStyle,
   hasMore,
   isFetchingMore,
@@ -169,6 +194,7 @@ function WidgetTableGrid({
     return !resolved || isManualRunNode(resolved.node);
   });
   const hasActions = rowActions.length > 0;
+  const lastIdx = filtered.length - 1;
   return (
     <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
       <table className="w-full border-collapse text-[13px]">
@@ -195,6 +221,11 @@ function WidgetTableGrid({
           {filtered.map((row, idx) => {
             const rowKey = rowKeyForRow(row, idx);
             const toneClass = resolveRowStyle?.(row);
+            // Neighbor comes from the full ordered list so a progressive
+            // display window still compares against the next sorted row even
+            // when that row is loaded but not yet shown.
+            const nextRow = filteredAll[idx + 1] as Record<string, unknown> | undefined;
+            const hasMoreBelow = idx === lastIdx && !nextRow && Boolean(hasMore);
             return (
               <tr
                 key={rowKey}
@@ -208,7 +239,13 @@ function WidgetTableGrid({
                 )}
               >
                 {render.columns.map((col, ci) => (
-                  <WidgetTableCell key={`${col.field}-${ci}`} col={col} row={row} />
+                  <WidgetTableCell
+                    key={`${col.field}-${ci}`}
+                    col={col}
+                    row={row}
+                    nextRow={nextRow}
+                    hasMoreBelow={hasMoreBelow}
+                  />
                 ))}
                 {hasActions ? (
                   <td className="px-3 py-1.5 text-right">
