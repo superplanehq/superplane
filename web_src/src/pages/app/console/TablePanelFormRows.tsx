@@ -1,8 +1,11 @@
+import { useId } from "react";
 import { Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/ui/checkbox";
 
 import { ROW_STYLE_CLASS, ROW_STYLE_LABEL } from "./widget/rowStyles";
 import {
@@ -10,6 +13,7 @@ import {
   WIDGET_ROW_STYLE_TONES,
   WIDGET_TREND_BETTER,
   WIDGET_TREND_DISPLAYS,
+  columnSupportsShowTrend,
   type WidgetColumnFormat,
   type WidgetProgressLabel,
   type WidgetRowStyle,
@@ -56,13 +60,18 @@ const TREND_DISPLAY_LABEL: Record<WidgetTrendDisplay, string> = {
 };
 
 function columnFormatPatch(format: WidgetColumnFormat | undefined, col: WidgetTableColumn): Partial<WidgetTableColumn> {
+  const keepTrendOpts = format === "trend" || columnSupportsShowTrend(format);
   return {
     format,
     ...(format === "link" ? {} : { href: undefined }),
     ...(format === "progress"
       ? { progressLabel: col.progressLabel ?? "percent" }
       : { progressTarget: undefined, progressLabel: undefined }),
-    ...(format === "trend" ? {} : { trendBetter: undefined, trendDisplay: undefined }),
+    ...(keepTrendOpts
+      ? format === "trend"
+        ? { showTrend: undefined }
+        : {}
+      : { showTrend: undefined, trendBetter: undefined, trendDisplay: undefined }),
   };
 }
 
@@ -144,6 +153,36 @@ function TrendFormatFields({
   );
 }
 
+function ShowTrendToggle({
+  col,
+  onChange,
+}: {
+  col: WidgetTableColumn;
+  onChange: (patch: Partial<WidgetTableColumn>) => void;
+}) {
+  const showTrendId = useId();
+  return (
+    <div className="col-span-12 flex items-center gap-2">
+      <Checkbox
+        id={showTrendId}
+        checked={Boolean(col.showTrend)}
+        onCheckedChange={(checked) =>
+          onChange(
+            checked === true
+              ? { showTrend: true }
+              : { showTrend: undefined, trendBetter: undefined, trendDisplay: undefined },
+          )
+        }
+        className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600 dark:border-gray-600"
+        data-testid="table-column-show-trend"
+      />
+      <Label htmlFor={showTrendId} className="text-xs text-slate-700 dark:text-gray-300">
+        Show trend
+      </Label>
+    </div>
+  );
+}
+
 export function ColumnRow({
   col,
   fieldOptions,
@@ -211,6 +250,12 @@ export function ColumnRow({
         ) : null}
         {col.format === "progress" ? (
           <ProgressFormatFields col={col} fieldOptions={fieldOptions} onChange={onChange} />
+        ) : null}
+        {columnSupportsShowTrend(col.format) ? (
+          <>
+            <ShowTrendToggle col={col} onChange={onChange} />
+            {col.showTrend ? <TrendFormatFields col={col} onChange={onChange} /> : null}
+          </>
         ) : null}
         {col.format === "trend" ? <TrendFormatFields col={col} onChange={onChange} /> : null}
       </div>

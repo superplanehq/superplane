@@ -1,7 +1,8 @@
 /**
- * Pure comparison math for `format: "trend"` table columns.
+ * Pure comparison math for `format: "trend"` columns and for numeric columns
+ * with `showTrend: true`.
  *
- * A trend cell compares the current row's numeric value against the "row
+ * A trend chip compares the current row's numeric value against the "row
  * below" in the filtered+sorted table (the previous entry in whatever
  * ordering the author configured). Rendering is intentionally split out —
  * this module returns a discriminated result the cell renderer can

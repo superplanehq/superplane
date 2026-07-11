@@ -13,6 +13,7 @@ import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
 import { resolveHref } from "./resolveHref";
 import type { WidgetTableRender } from "./types";
+import { columnSupportsShowTrend } from "./types";
 import { coerceWidgetTimestamp, computeProgress, formatPercentageDisplay, formatValue } from "./widgetFormat";
 import { computeTrend, formatTrendLabel, formatTrendTooltip, type TrendResult } from "./widgetTrend";
 
@@ -23,17 +24,17 @@ export interface WidgetTableCellProps {
   row: Record<string, unknown>;
   /**
    * The row rendered immediately below the current one, after filter+sort.
-   * Only consumed by `format: "trend"` columns. `undefined` for the last
-   * visible row.
+   * Consumed by `format: "trend"` and by numeric columns with `showTrend`.
+   * `undefined` for the last visible row.
    */
   nextRow?: Record<string, unknown>;
   /**
    * Whether more rows can still be loaded below the current one. Only
    * meaningful for the last visible row of a paginated table when the
    * previous entry has not been fetched yet; enables the `...` pending
-   * state on `format: "trend"` cells. Must not be set merely because more
-   * rows are loaded but still hidden behind the progressive display window
-   * — pass those via `nextRow` instead.
+   * state on trend chips. Must not be set merely because more rows are
+   * loaded but still hidden behind the progressive display window — pass
+   * those via `nextRow` instead.
    */
   hasMoreBelow?: boolean;
 }
@@ -43,11 +44,15 @@ export function WidgetTableCell({ col, row, nextRow, hasMoreBelow }: WidgetTable
   if (!visible) return <EmptyCell />;
 
   if (col.format === "trend") {
-    return <TrendCell col={col} row={row} nextRow={nextRow} hasMoreBelow={hasMoreBelow} />;
+    return <TrendOnlyCell col={col} row={row} nextRow={nextRow} hasMoreBelow={hasMoreBelow} />;
   }
 
   const value = resolveCellValue(col.field, row);
   const formatted = formatValue(value, col.format);
+
+  if (col.showTrend && columnSupportsShowTrend(col.format)) {
+    return <ValueWithTrendCell col={col} row={row} nextRow={nextRow} hasMoreBelow={hasMoreBelow} label={formatted} />;
+  }
 
   switch (col.format) {
     case "badge":
@@ -176,7 +181,7 @@ const TREND_MUTED_CLASSES = "text-slate-400 dark:text-gray-500";
 const TREND_BETTER_CLASSES = "text-emerald-600 dark:text-emerald-400";
 const TREND_WORSE_CLASSES = "text-red-600 dark:text-red-400";
 
-function TrendCell({
+function TrendOnlyCell({
   col,
   row,
   nextRow,
@@ -187,16 +192,59 @@ function TrendCell({
   nextRow: Record<string, unknown> | undefined;
   hasMoreBelow: boolean | undefined;
 }) {
+  const result = resolveColumnTrend(col, row, nextRow, hasMoreBelow);
+  return (
+    <td className="px-3 py-1.5 align-middle">
+      <TrendChip result={result} display={col.trendDisplay} />
+    </td>
+  );
+}
+
+function ValueWithTrendCell({
+  col,
+  row,
+  nextRow,
+  hasMoreBelow,
+  label,
+}: {
+  col: WidgetTableColumn;
+  row: Record<string, unknown>;
+  nextRow: Record<string, unknown> | undefined;
+  hasMoreBelow: boolean | undefined;
+  label: string;
+}) {
+  const result = resolveColumnTrend(col, row, nextRow, hasMoreBelow);
+  return (
+    <td className="px-3 py-1.5 align-middle">
+      <span className="inline-flex items-center whitespace-nowrap" data-testid="widget-value-with-trend">
+        <span className="tabular-nums text-slate-700 dark:text-gray-300">{label}</span>
+        <span className="ml-1">
+          <TrendChip result={result} display={col.trendDisplay} />
+        </span>
+      </span>
+    </td>
+  );
+}
+
+function resolveColumnTrend(
+  col: WidgetTableColumn,
+  row: Record<string, unknown>,
+  nextRow: Record<string, unknown> | undefined,
+  hasMoreBelow: boolean | undefined,
+): TrendResult {
   const current = resolveCellValue(col.field, row);
   // `undefined` means "no row below" to computeTrend. A present next row with a
   // missing field must become `null` so it renders as incomparable, not no-baseline.
   const previous = nextRow ? (resolveCellValue(col.field, nextRow) ?? null) : undefined;
-  const result = computeTrend(current, previous, {
+  return computeTrend(current, previous, {
     better: col.trendBetter,
     display: col.trendDisplay,
     hasMoreBelow: nextRow ? false : Boolean(hasMoreBelow),
   });
-  const label = formatTrendLabel(result, col.trendDisplay);
+}
+
+function TrendChip({ result, display }: { result: TrendResult; display: WidgetTableColumn["trendDisplay"] }) {
+  const label = formatTrendLabel(result, display);
   const tooltip = formatTrendTooltip(result);
 
   const content = (
@@ -212,19 +260,15 @@ function TrendCell({
     </span>
   );
 
+  if (!tooltip) return content;
+
   return (
-    <td className="px-3 py-1.5 align-middle">
-      {tooltip ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex cursor-default">{content}</span>
-          </TooltipTrigger>
-          <TooltipContent side="top">{tooltip}</TooltipContent>
-        </Tooltip>
-      ) : (
-        content
-      )}
-    </td>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex cursor-default">{content}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }
 

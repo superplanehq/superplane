@@ -476,6 +476,7 @@ function normalizeTableColumns(raw: unknown): WidgetTableColumn[] {
       avatarCommitterField: typeof c.avatarCommitterField === "string" ? c.avatarCommitterField : undefined,
       progressTarget: typeof c.progressTarget === "string" ? c.progressTarget : undefined,
       progressLabel: optionalEnum(c.progressLabel, WIDGET_PROGRESS_LABELS),
+      showTrend: c.showTrend === true ? true : undefined,
       trendBetter: optionalEnum(c.trendBetter, WIDGET_TREND_BETTER),
       trendDisplay: optionalEnum(c.trendDisplay, WIDGET_TREND_DISPLAYS),
     };

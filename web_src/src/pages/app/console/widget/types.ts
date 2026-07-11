@@ -45,7 +45,7 @@ export type WidgetProgressLabel = "none" | "number" | "percent";
 export const WIDGET_PROGRESS_LABELS: WidgetProgressLabel[] = ["none", "number", "percent"];
 
 /**
- * Direction that signals a "better" trend for `format: trend` columns.
+ * Direction that signals a "better" trend for trend columns / `showTrend`.
  * `up` (default) → an increase is good (green), a decrease is bad (red).
  * `down` → an increase is bad (red), a decrease is good (green).
  */
@@ -53,13 +53,20 @@ export type WidgetTrendBetter = "up" | "down";
 export const WIDGET_TREND_BETTER: WidgetTrendBetter[] = ["up", "down"];
 
 /**
- * How a trend cell prints its magnitude alongside the arrow.
+ * How a trend chip prints its magnitude alongside the arrow.
  * `percent` (default) → signed percent change vs. the row below.
  * `value` → signed absolute delta vs. the row below.
  * `none` → arrow only (still shows `- 0` / `...` / `-` for edge states).
  */
 export type WidgetTrendDisplay = "percent" | "value" | "none";
 export const WIDGET_TREND_DISPLAYS: WidgetTrendDisplay[] = ["percent", "value", "none"];
+
+/** Formats that can show a value + trend chip via `showTrend`. */
+export const WIDGET_SHOW_TREND_FORMATS: WidgetColumnFormat[] = ["number", "percent", "duration"];
+
+export function columnSupportsShowTrend(format: WidgetColumnFormat | undefined): boolean {
+  return format != null && WIDGET_SHOW_TREND_FORMATS.includes(format);
+}
 
 export interface WidgetTableColumn {
   field: string;
@@ -77,9 +84,14 @@ export interface WidgetTableColumn {
   progressTarget?: string;
   /** Label style rendered next to the progress bar. Defaults to `"percent"`. */
   progressLabel?: WidgetProgressLabel;
-  /** For `format: trend`: which direction is "better". Defaults to `up`. */
+  /**
+   * When true on `number` | `percent` | `duration`, render the formatted value
+   * plus a trend chip (same semantics as `format: trend`). Ignored otherwise.
+   */
+  showTrend?: boolean;
+  /** Which direction is "better" for trend / `showTrend`. Defaults to `up`. */
   trendBetter?: WidgetTrendBetter;
-  /** For `format: trend`: what to show next to the arrow. Defaults to `percent`. */
+  /** What to show next to the trend arrow. Defaults to `percent`. */
   trendDisplay?: WidgetTrendDisplay;
 }
 
