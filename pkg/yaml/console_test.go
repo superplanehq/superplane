@@ -832,6 +832,27 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			contains: "render.columns[0].trendDisplay must be one of",
 		},
 		{
+			name: "table column with invalid showTrend",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{
+								"field":     "durationMs",
+								"format":    "duration",
+								"showTrend": "yes",
+							},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].showTrend must be a boolean",
+		},
+		{
 			name: "row style with unknown tone",
 			panel: ConsolePanel{
 				ID:   "table",
@@ -1288,6 +1309,18 @@ func TestValidateConsoleContent_AcceptsTableTrendColumns(t *testing.T) {
 							"field":        "coverage",
 							"format":       "trend",
 							"trendDisplay": "none",
+						},
+						map[string]any{
+							"field":        "durationMs",
+							"format":       "duration",
+							"showTrend":    true,
+							"trendBetter":  "down",
+							"trendDisplay": "percent",
+						},
+						map[string]any{
+							"field":     "passRate",
+							"format":    "percent",
+							"showTrend": true,
 						},
 					},
 				},

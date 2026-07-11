@@ -703,6 +703,11 @@ var (
 )
 
 func validateTableColumnTrend(panelID string, index int, column map[string]any) error {
+	if raw, ok := column["showTrend"]; ok && raw != nil {
+		if _, isBool := raw.(bool); !isBool {
+			return fmt.Errorf("panel %q render.columns[%d].showTrend must be a boolean", panelID, index)
+		}
+	}
 	if raw, ok := column["trendBetter"]; ok && raw != nil {
 		s, isString := raw.(string)
 		if !isString || !slices.Contains(allowedTrendBetter, s) {

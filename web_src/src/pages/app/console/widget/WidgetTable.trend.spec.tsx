@@ -220,4 +220,59 @@ describe("WidgetTable trend columns", () => {
     expect(cells[0].textContent).toContain("-1");
     view.unmount();
   });
+
+  it("renders formatted value beside the trend chip when showTrend is set", () => {
+    const view = renderTrend({
+      render: {
+        kind: "table",
+        columns: [
+          { field: "id", label: "Deploy" },
+          {
+            field: "durationMs",
+            label: "Duration",
+            format: "duration",
+            showTrend: true,
+            trendBetter: "down",
+            trendDisplay: "percent",
+          },
+        ],
+      },
+      rows: TREND_ROWS,
+    });
+    const combined = view.container.querySelectorAll('[data-testid="widget-value-with-trend"]');
+    expect(combined).toHaveLength(3);
+    expect(combined[0].textContent).toContain("900ms");
+    expect(combined[0].textContent).toContain("-10%");
+    const chip = combined[0].querySelector('[data-testid="widget-trend-cell"]');
+    expect(chip?.getAttribute("data-trend-kind")).toBe("changed");
+    expect(chip?.getAttribute("data-trend-direction")).toBe("down");
+    expect(chip?.getAttribute("data-trend-polarity")).toBe("better");
+    view.unmount();
+  });
+
+  it("keeps the value visible when the trend chip is pending", () => {
+    const view = renderTrend({
+      render: {
+        kind: "table",
+        columns: [
+          {
+            field: "passRate",
+            label: "Pass rate",
+            format: "percent",
+            showTrend: true,
+            trendBetter: "up",
+          },
+        ],
+      },
+      rows: [{ passRate: 0.9 }, { passRate: 0.8 }],
+      hasMore: true,
+    });
+    const combined = view.container.querySelectorAll('[data-testid="widget-value-with-trend"]');
+    const last = combined[combined.length - 1];
+    expect(last.textContent).toContain("80%");
+    const chip = last.querySelector('[data-testid="widget-trend-cell"]');
+    expect(chip?.getAttribute("data-trend-kind")).toBe("pending");
+    expect(chip?.textContent).toContain("...");
+    view.unmount();
+  });
 });
