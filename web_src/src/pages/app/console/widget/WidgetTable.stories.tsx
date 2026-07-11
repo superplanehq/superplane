@@ -395,6 +395,62 @@ export const TrendDisplayWindowPeek: Story = {
   },
 };
 
+/**
+ * Value + trend in one column via `showTrend` on number / percent / duration.
+ * Same deploy rows as the Trend story — compare side-by-side with Trend.
+ */
+export const ValueWithTrend: Story = {
+  render: (args) => <TablePanel title="Deploys (value + trend)" {...args} />,
+  args: {
+    render: {
+      kind: "table",
+      columns: [
+        { field: "deploy", label: "Deploy" },
+        {
+          field: "durationMs",
+          label: "Duration",
+          format: "duration",
+          showTrend: true,
+          trendBetter: "down",
+          trendDisplay: "percent",
+        },
+        {
+          field: "errorRate",
+          label: "Errors %",
+          format: "number",
+          showTrend: true,
+          trendBetter: "down",
+          trendDisplay: "value",
+        },
+        {
+          field: "throughput",
+          label: "RPS",
+          format: "number",
+          showTrend: true,
+          trendBetter: "up",
+          trendDisplay: "percent",
+        },
+        {
+          field: "passRate",
+          label: "Pass rate",
+          format: "percent",
+          showTrend: true,
+          trendBetter: "up",
+          trendDisplay: "percent",
+        },
+      ],
+    },
+    rows: [
+      { deploy: "deploy #106", durationMs: 4200, errorRate: 0.4, throughput: 1250, passRate: 0.96 },
+      { deploy: "deploy #105", durationMs: 5100, errorRate: 0.8, throughput: 1180, passRate: 0.93 },
+      { deploy: "deploy #104", durationMs: 5100, errorRate: 0.8, throughput: 1180, passRate: 0.93 },
+      { deploy: "deploy #103", durationMs: 4700, errorRate: 1.2, throughput: 940, passRate: 0.88 },
+      { deploy: "deploy #102", durationMs: 6800, errorRate: 2.5, throughput: 720, passRate: 0.81 },
+    ],
+    isLoading: false,
+  },
+};
+
 /** Org fixture: `pr-risk-review` console → `checks-table` memory panel. */
 export const PrRiskRecentChecks: Story = {
   render: (args) => (
