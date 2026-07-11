@@ -279,7 +279,61 @@ export interface WidgetNumberRender {
   suffix?: string;
 }
 
-export type WidgetRender = WidgetTableRender | WidgetChartRender | WidgetNumberRender;
+/**
+ * How the scorecard change chip prints its magnitude. `both` mirrors the
+ * screenshot pattern `-29 (-22.8%)`; `none` hides text and keeps just the
+ * directional arrow.
+ */
+export type WidgetScorecardShowChange = "percent" | "number" | "both" | "none";
+export const WIDGET_SCORECARD_SHOW_CHANGES: WidgetScorecardShowChange[] = ["percent", "number", "both", "none"];
+
+/**
+ * Scorecard render: single KPI value plus optional change vs the first
+ * series point, direction-aware target/progress, and a status-colored
+ * sparkline. Composite memory and multi-KPI shapes are intentionally not
+ * supported — the dedicated `number` panel already covers those cases.
+ */
+export interface WidgetScorecardRender {
+  kind: "scorecard";
+  /** Same vocabulary as {@link WidgetNumberRender}. Required. */
+  aggregation: WidgetNumberAggregation;
+  /** Required when aggregation is not "count". */
+  field?: string;
+  /** Legacy show expressions applied to filter rows before aggregation / series extraction. */
+  filters?: string[];
+  format?: WidgetColumnFormat;
+  label?: string;
+  /** Optional display string rendered before the formatted value (e.g. "R$"). */
+  prefix?: string;
+  /** Optional display string rendered after the formatted value (e.g. " MWh"). */
+  suffix?: string;
+  /**
+   * Direction that signals "better". Colors the change chip, the sparkline,
+   * and the vs-target status. Defaults to `up`.
+   */
+  better?: WidgetTrendBetter;
+  /**
+   * Target value used for optional progress and (when the change is
+   * incomputable) status coloring. Accepts a numeric literal (`"50"`,
+   * `"100.5"`) or a full `{{ CEL }}` expression evaluated against the last
+   * filtered row plus `now`.
+   */
+  target?: string;
+  /** When true and the target resolves, render a direction-aware progress bar. */
+  showProgress?: boolean;
+  /**
+   * Field extracted from each filtered row (in order) to build the series
+   * driving both the sparkline and the "vs start of range" change baseline.
+   * When omitted the scorecard hides the change chip and sparkline.
+   */
+  sparklineField?: string;
+  /** What the change chip prints alongside its arrow. Defaults to `both`. */
+  showChange?: WidgetScorecardShowChange;
+  /** Optional short caption rendered next to the change chip (e.g. "vs start of range"). */
+  changeCaption?: string;
+}
+
+export type WidgetRender = WidgetTableRender | WidgetChartRender | WidgetNumberRender | WidgetScorecardRender;
 
 export interface WidgetConfig {
   title?: string;

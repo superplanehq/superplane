@@ -16,6 +16,7 @@ import type {
   WidgetNumberAggregation,
   WidgetNumberRender,
   WidgetRowAction,
+  WidgetScorecardRender,
   WidgetTableColumn,
   WidgetTableFilter,
   WidgetTableRender,
@@ -24,11 +25,12 @@ import {
   normalizeRowAction,
   WIDGET_FILTER_OPS,
   WIDGET_PROGRESS_LABELS,
+  WIDGET_SCORECARD_SHOW_CHANGES,
   WIDGET_SORT_ORDERS,
   WIDGET_TREND_BETTER,
   WIDGET_TREND_DISPLAYS,
 } from "./widget/types";
-import type { WidgetProgressLabel, WidgetSort, WidgetSortOrder } from "./widget/types";
+import type { WidgetProgressLabel, WidgetSort, WidgetSortOrder, WidgetTrendBetter } from "./widget/types";
 import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
@@ -45,7 +47,7 @@ export * from "./markdownVariables";
 export { asObject };
 
 /** All panel kinds the dashboard currently understands. */
-export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number"] as const;
+export const PANEL_TYPES = ["markdown", "html", "node", "nodes", "table", "chart", "number", "scorecard"] as const;
 export type PanelType = (typeof PANEL_TYPES)[number];
 
 /**
@@ -103,6 +105,11 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
     type: "number",
     label: "Number",
     description: "A single aggregated KPI value with optional sparkline.",
+  },
+  scorecard: {
+    type: "scorecard",
+    label: "Scorecard",
+    description: "A KPI with target, change vs the start of the range, and a status-colored sparkline.",
   },
 };
 
@@ -167,6 +174,17 @@ export interface NumberPanelContent {
   render?: WidgetNumberRender;
   /** Present (and an array) when the panel is in multi-number mode. */
   metrics?: NumberMetric[];
+}
+
+/**
+ * Content shape for the `scorecard` panel. Single-KPI variant of the
+ * number panel with target/change/progress. Composite memory and
+ * multi-KPI shapes are intentionally not supported (`number` covers those).
+ */
+export interface ScorecardPanelContent {
+  title?: string;
+  dataSource: TablePanelDataSource;
+  render: WidgetScorecardRender;
 }
 
 /**
@@ -276,6 +294,17 @@ const DEFAULT_NUMBER_RENDER: WidgetNumberRender = {
   label: "Runs",
 };
 
+// Seed a valid, drop-in template: `count` requires no `field`, so a freshly
+// added scorecard passes validation before the author picks a data source or
+// switches to an aggregation like `sum` / `last` (which do need a field).
+const DEFAULT_SCORECARD_RENDER: WidgetScorecardRender = {
+  kind: "scorecard",
+  aggregation: "count",
+  better: "up",
+  showChange: "both",
+  changeCaption: "vs start of range",
+};
+
 /**
  * Default content for a newly-added panel of the given kind. The default node
  * reference is left blank; the form editor pre-selects the first canvas node
@@ -308,6 +337,12 @@ export function templateForPanelType(type: PanelType, defaultTitle?: string): Re
         dataSource: { kind: "runs", limit: 100 },
         render: DEFAULT_NUMBER_RENDER,
       } satisfies NumberPanelContent;
+    case "scorecard":
+      return {
+        title: defaultTitle ?? "",
+        dataSource: { kind: "memory", namespace: "" },
+        render: DEFAULT_SCORECARD_RENDER,
+      } satisfies ScorecardPanelContent;
   }
 }
 
@@ -337,6 +372,8 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
       return validateChartContent(content);
     case "number":
       return validateNumberContent(content);
+    case "scorecard":
+      return validateScorecardContent(content);
   }
 }
 
@@ -649,6 +686,51 @@ export function validateNumberRenderSymbols(render: Record<string, unknown>): st
     const value = render[key];
     if (value !== undefined && value !== null && typeof value !== "string") {
       return `render.${key} must be a string.`;
+    }
+  }
+  return null;
+}
+
+function validateScorecardContent(content: unknown): string | null {
+  const obj = asObject(content);
+  if (!obj) return "content must be an object.";
+  const dsError = validateDataSource(obj.dataSource);
+  if (dsError) return dsError;
+  const render = asObject(obj.render);
+  if (!render) return "render must be an object.";
+  if (render.kind !== "scorecard") return 'render.kind must be "scorecard".';
+  return validateScorecardRender(render);
+}
+
+function validateScorecardRender(render: Record<string, unknown>): string | null {
+  if (typeof render.aggregation !== "string" || !isAllowedNumberAggregation(render.aggregation)) {
+    return `render.aggregation must be one of ${WIDGET_NUMBER_AGGREGATIONS.join(", ")}.`;
+  }
+  if (render.aggregation !== "count" && (typeof render.field !== "string" || render.field.trim() === "")) {
+    return `render.field is required when aggregation is "${render.aggregation}".`;
+  }
+  const symbolError = validateNumberRenderSymbols(render);
+  if (symbolError) return symbolError;
+  const stringError =
+    optionalStringError("render.label", render.label) ??
+    optionalStringError("render.format", render.format) ??
+    optionalStringError("render.sparklineField", render.sparklineField) ??
+    optionalStringError("render.target", render.target) ??
+    optionalStringError("render.changeCaption", render.changeCaption);
+  if (stringError) return stringError;
+  const boolError = optionalBooleanError("render.showProgress", render.showProgress);
+  if (boolError) return boolError;
+  if (render.better !== undefined && render.better !== null) {
+    if (typeof render.better !== "string" || !WIDGET_TREND_BETTER.includes(render.better as WidgetTrendBetter)) {
+      return `render.better must be one of ${WIDGET_TREND_BETTER.join(", ")}.`;
+    }
+  }
+  if (render.showChange !== undefined && render.showChange !== null) {
+    if (
+      typeof render.showChange !== "string" ||
+      !WIDGET_SCORECARD_SHOW_CHANGES.includes(render.showChange as (typeof WIDGET_SCORECARD_SHOW_CHANGES)[number])
+    ) {
+      return `render.showChange must be one of ${WIDGET_SCORECARD_SHOW_CHANGES.join(", ")}.`;
     }
   }
   return null;

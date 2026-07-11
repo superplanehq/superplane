@@ -1,5 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
-import { Loader2, LayoutGrid, CodeXml, FileText, Hash, LineChart, Network, Plus, Table2, Workflow } from "lucide-react";
+import {
+  CodeXml,
+  FileText,
+  Gauge,
+  Hash,
+  LayoutGrid,
+  LineChart,
+  Loader2,
+  Network,
+  Plus,
+  Table2,
+  Workflow,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -261,6 +273,7 @@ const PANEL_TYPE_ICONS: Record<PanelType, typeof FileText> = {
   table: Table2,
   chart: LineChart,
   number: Hash,
+  scorecard: Gauge,
 };
 
 /**

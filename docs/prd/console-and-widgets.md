@@ -570,6 +570,80 @@ Rules:
 
 The editor exposes a Single / Multiple toggle in the Number panel form. Switching to Multiple seeds one source from the current single-source configuration so existing panels do not lose context.
 
+## Scorecard Panels
+
+Scorecard panels are a single-KPI variant of the number panel with three extra affordances baked in:
+
+- **Change chip** comparing the current aggregated value to the first finite point of the loaded series (`sparklineField`).
+- **Target** (literal number or `{{ CEL }}`) that drives an optional progress bar and — when the change is incomputable — a fallback status color.
+- **Status direction** (`better: "up" | "down"`) that colors the value change, the sparkline, and the vs-target polarity.
+
+Multi-KPI and composite-memory shapes are intentionally not supported on scorecards. Use the standard `number` panel when you need those.
+
+```yaml
+type: scorecard
+content:
+  title: Open UX papercuts
+  dataSource:
+    kind: memory
+    namespace: ux_papercuts
+  render:
+    kind: scorecard
+    aggregation: last
+    field: openCount
+    format: number
+    label: Open UX papercuts
+    better: down
+    target: "80"
+    showProgress: true
+    sparklineField: openCount
+    showChange: both
+    changeCaption: vs start of range
+```
+
+### Value pipeline
+
+Value resolution is the single-source number pipeline: `dataSource` (`memory` | `executions` | `runs`) + `aggregation` + `field` (when needed) + `format` / `label` / `prefix` / `suffix`. Aggregations follow the standard number vocabulary (`count`, `sum`, `avg`, `min`, `max`, `first`, `last`). Aggregations other than `count` require a non-empty `field`.
+
+To keep the change chip meaningful, most scorecards use `aggregation: last` on the same field as `sparklineField` so the primary value matches the end of the series.
+
+### Change vs the start of the range
+
+When `sparklineField` is set, the scorecard extracts the first finite value from the filtered rows and compares the current value against it using the same math as the table trend chip (`computeTrend`). The direction of "better" is controlled by `better`:
+
+- `better: up` → an increase is good (green), a decrease is bad (red).
+- `better: down` → a decrease is good (green), an increase is bad (red).
+
+`render.showChange` controls the change chip's magnitude label:
+
+- `percent` — `-22.8%`.
+- `number` — `-29`.
+- `both` (default) — `-29 (-22.8%)`.
+- `none` — arrow only.
+
+`render.changeCaption` (optional) prints a short caption next to the chip (e.g. `vs start of range`). When the series has fewer than two finite points, the chip is hidden entirely.
+
+### Target and progress
+
+`render.target` accepts a numeric literal or a full `{{ CEL }}` expression. The expression is evaluated once against the last filtered row plus the shared `now` global, so authors can bind to memory / execution fields (`{{ goal }}`) or compute a target (`{{ base * 1.1 }}`).
+
+When `render.showProgress` is `true` and the target resolves to a finite positive number, the scorecard renders a thin direction-aware progress bar under the value:
+
+- `better: up` — bar = `clamp(current / target, 0, 100%)`; the goal is met when `current >= target`.
+- `better: down` — the goal is met when `current <= target` (bar fills to 100%); overshoot uses `target / current` so the bar shrinks as the value drifts further from the goal.
+
+The percentage label under the bar always uses the raw ratio (so authors still see overshoot values above 100%).
+
+### Status color priority
+
+The colored value change, sparkline, and progress bar all read from the same status polarity, resolved in priority order:
+
+1. If the change chip is computable, use its polarity (`better` → green, `worse` → red, `flat` → slate).
+2. Otherwise, if the target resolves, use target-based status (`met` → green, otherwise red).
+3. Otherwise, neutral slate.
+
+This keeps the widget legible when only one signal is available (e.g. a `count` scorecard with no `sparklineField` still colors correctly via its target).
+
 ### Multi-Number Mode
 
 A number panel can also render **multiple independently-configured numbers** in a single card. Each metric has its own data source, aggregation, field, label, format, prefix/suffix, and optional sparkline; the metrics lay out in a flex row that wraps to new lines when the panel is narrow.

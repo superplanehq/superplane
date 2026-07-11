@@ -64,6 +64,7 @@ Use this skill when working on **per-canvas dashboards**: the workflow v2 overla
 | `table` | `WidgetTable` | `dataSource`, `render.kind: "table"` |
 | `chart` | `WidgetChart` (SVG) | `dataSource`, `render.kind: "chart"` |
 | `number` | `WidgetNumber` | `dataSource`, `render.kind: "number"` |
+| `scorecard` | `WidgetScorecard` — single KPI only (no multi-KPI or composite memory); adds change vs the first series point, direction-aware target/progress, and a status-colored sparkline via the shared `Sparkline` | `dataSource`, `render.kind: "scorecard"` with `aggregation`, optional `field`, `better`, `target`, `showProgress`, `sparklineField`, `showChange`, `changeCaption` |
 
 New panels: `templateForPanelType` in `panelTypes.ts`. Draft states (e.g. empty memory namespace) should stay valid where possible.
 
@@ -138,6 +139,14 @@ Editor memory hints: `MemoryDiscoveryPanel.tsx`, `useMemoryCatalog.ts` (suggesti
 **Chart** `render.type`: `bar`, `stacked-bar`, `line`, `area`, `donut`. `xField` + `series[]`; omit `series[].field` to count rows per bucket.
 
 **Number** aggregations: `count`, `sum`, `avg`, `min`, `max`, `first`, `last` — non-`count` requires `field`.
+
+**Scorecard** shares the number aggregation vocabulary but is single-KPI only (no multi-KPI / composite memory). Comparison model:
+
+- **Change** = current value vs the first finite point in the loaded series (`sparklineField`). Reuses `computeTrend` (`widgetTrend.ts`) for percent/absolute math.
+- **Target** = literal number or `{{ CEL }}` (evaluated against the last filtered row + `now`), used for optional `showProgress` and fallback status color.
+- `better: "up" | "down"` controls the polarity for the value change, the sparkline, and the vs-target status.
+
+Helpers live in `widget/scorecardMath.ts` (`extractScorecardSeries`, `resolveScorecardTarget`, `computeScorecardProgress`, `computeScorecardChange`, `resolveScorecardStatus`, `formatScorecardChangeLabel`). Rendering is in `widget/WidgetScorecard.tsx`; the sparkline itself comes from the shared `widget/Sparkline.tsx` (shared with `WidgetNumber`) with a `className` prop for status coloring.
 
 ---
 
