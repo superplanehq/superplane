@@ -8,12 +8,16 @@ import { ROW_STYLE_CLASS, ROW_STYLE_LABEL } from "./widget/rowStyles";
 import {
   WIDGET_FILTER_OPS,
   WIDGET_ROW_STYLE_TONES,
+  WIDGET_TREND_BETTER,
+  WIDGET_TREND_DISPLAYS,
   type WidgetColumnFormat,
   type WidgetProgressLabel,
   type WidgetRowStyle,
   type WidgetRowStyleTone,
   type WidgetTableColumn,
   type WidgetTableFilter,
+  type WidgetTrendBetter,
+  type WidgetTrendDisplay,
 } from "./widget/types";
 import { suggestColumnFormat } from "./widget/useMemoryCatalog";
 
@@ -31,6 +35,7 @@ const COLUMN_FORMATS: WidgetColumnFormat[] = [
   "link",
   "avatar",
   "progress",
+  "trend",
 ];
 
 const PROGRESS_LABEL_OPTIONS: { value: WidgetProgressLabel; label: string }[] = [
@@ -38,6 +43,17 @@ const PROGRESS_LABEL_OPTIONS: { value: WidgetProgressLabel; label: string }[] = 
   { value: "number", label: "Number (5/10)" },
   { value: "none", label: "None" },
 ];
+
+const TREND_BETTER_LABEL: Record<WidgetTrendBetter, string> = {
+  up: "Up is better",
+  down: "Down is better",
+};
+
+const TREND_DISPLAY_LABEL: Record<WidgetTrendDisplay, string> = {
+  percent: "Percent",
+  value: "Value",
+  none: "None",
+};
 
 export function ColumnRow({
   col,
@@ -85,6 +101,7 @@ export function ColumnRow({
               ...(format === "progress"
                 ? { progressLabel: col.progressLabel ?? "percent" }
                 : { progressTarget: undefined, progressLabel: undefined }),
+              ...(format === "trend" ? {} : { trendBetter: undefined, trendDisplay: undefined }),
             });
           }}
         >
@@ -131,6 +148,40 @@ export function ColumnRow({
                 {PROGRESS_LABEL_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        ) : null}
+        {col.format === "trend" ? (
+          <>
+            <Select
+              value={col.trendBetter ?? "up"}
+              onValueChange={(v) => onChange({ trendBetter: v as WidgetTrendBetter })}
+            >
+              <SelectTrigger className="col-span-6 h-8" data-testid="table-column-trend-better">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WIDGET_TREND_BETTER.map((direction) => (
+                  <SelectItem key={direction} value={direction}>
+                    {TREND_BETTER_LABEL[direction]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={col.trendDisplay ?? "percent"}
+              onValueChange={(v) => onChange({ trendDisplay: v as WidgetTrendDisplay })}
+            >
+              <SelectTrigger className="col-span-6 h-8" data-testid="table-column-trend-display">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WIDGET_TREND_DISPLAYS.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {TREND_DISPLAY_LABEL[mode]}
                   </SelectItem>
                 ))}
               </SelectContent>
