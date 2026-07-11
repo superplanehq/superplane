@@ -788,6 +788,50 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			contains: "render.columns[0].progressLabel must be one of",
 		},
 		{
+			name: "table column with invalid trendBetter",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{
+								"field":        "durationMs",
+								"format":       "trend",
+								"trendBetter":  "sideways",
+								"trendDisplay": "percent",
+							},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].trendBetter must be one of",
+		},
+		{
+			name: "table column with invalid trendDisplay",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{
+								"field":        "durationMs",
+								"format":       "trend",
+								"trendBetter":  "down",
+								"trendDisplay": "chart",
+							},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].trendDisplay must be one of",
+		},
+		{
 			name: "row style with unknown tone",
 			panel: ConsolePanel{
 				ID:   "table",
@@ -1209,6 +1253,43 @@ func TestValidateConsoleContent_AcceptsChartAxisFormatting(t *testing.T) {
 					"yLabel":  "USD",
 					"yFormat": "number",
 					"series":  []any{map[string]any{"field": "cost", "label": "Cost", "prefix": "$"}},
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_AcceptsTableTrendColumns(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "table",
+			Type: ConsolePanelTypeTable,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+				"render": map[string]any{
+					"kind": "table",
+					"columns": []any{
+						map[string]any{
+							"field":        "durationMs",
+							"format":       "trend",
+							"trendBetter":  "down",
+							"trendDisplay": "percent",
+						},
+						map[string]any{
+							"field":        "score",
+							"format":       "trend",
+							"trendBetter":  "up",
+							"trendDisplay": "value",
+						},
+						map[string]any{
+							"field":        "coverage",
+							"format":       "trend",
+							"trendDisplay": "none",
+						},
+					},
 				},
 			},
 		},
