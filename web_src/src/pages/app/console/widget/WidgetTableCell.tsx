@@ -218,9 +218,7 @@ function ValueWithTrendCell({
     <td className="px-3 py-1.5 align-middle">
       <span className="inline-flex items-center whitespace-nowrap" data-testid="widget-value-with-trend">
         <span className="tabular-nums text-slate-700 dark:text-gray-300">{label}</span>
-        <span className="ml-1">
-          <TrendChip result={result} display={col.trendDisplay} />
-        </span>
+        <TrendChip result={result} display={col.trendDisplay} />
       </span>
     </td>
   );
