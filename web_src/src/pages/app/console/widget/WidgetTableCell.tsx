@@ -247,7 +247,7 @@ function TrendChip({ result, display }: { result: TrendResult; display: WidgetTa
 
   const content = (
     <span
-      className={cn("inline-flex items-center gap-1 whitespace-nowrap tabular-nums", trendColorClasses(result))}
+      className={cn("inline-flex items-center whitespace-nowrap tabular-nums", trendColorClasses(result))}
       data-testid="widget-trend-cell"
       data-trend-kind={result.kind}
       data-trend-direction={result.kind === "changed" ? result.direction : undefined}
