@@ -73,6 +73,15 @@ export function WidgetTable({
     return applySort(afterFilters, render.sort);
   }, [recordRows, render.where, render.filters, render.sort]);
 
+  // Peek baseline must use the same where/filters as visible rows so trend
+  // never compares against a row the filtered table would hide.
+  const trendPeekRow = useMemo(() => {
+    if (!nextLoadedRow) return undefined;
+    const afterWhere = applyTableWhere([nextLoadedRow], render.where);
+    const afterFilters = applyFilters(afterWhere, render.filters);
+    return afterFilters[0];
+  }, [nextLoadedRow, render.where, render.filters]);
+
   const resolveRowStyle = useMemo(() => makeRowStyleResolver(render.rowStyles), [render.rowStyles]);
 
   // Row actions whose configured node isn't manually runnable are hidden
@@ -154,7 +163,7 @@ export function WidgetTable({
         isFetchingMore={isFetchingMore}
         onLoadMore={onLoadMore}
         onScroll={onScroll}
-        nextLoadedRow={nextLoadedRow}
+        trendPeekRow={trendPeekRow}
       />
     </WidgetTableActionLockProvider>
   );
@@ -168,7 +177,7 @@ interface WidgetTableGridProps {
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
   onScroll: (event: UIEvent<HTMLDivElement>) => void;
-  nextLoadedRow?: Record<string, unknown>;
+  trendPeekRow?: Record<string, unknown>;
 }
 
 function WidgetTableGrid({
@@ -179,7 +188,7 @@ function WidgetTableGrid({
   isFetchingMore,
   onLoadMore,
   onScroll,
-  nextLoadedRow,
+  trendPeekRow,
 }: WidgetTableGridProps) {
   const ctx = useConsoleContext();
   const rowActions = (render.rowActions ?? []).filter((action) => {
@@ -215,11 +224,11 @@ function WidgetTableGrid({
             const rowKey = rowKeyForRow(row, idx);
             const toneClass = resolveRowStyle?.(row);
             const neighborBelow = filtered[idx + 1] as Record<string, unknown> | undefined;
-            // Prefer the next visible filtered row; fall back to the first
-            // already-loaded row still hidden by the progressive window so
-            // trend cells don't show pending `...` for data we already have.
-            const nextRow = neighborBelow ?? (idx === lastIdx ? nextLoadedRow : undefined);
-            const hasMoreBelow = idx === lastIdx && !neighborBelow && !nextLoadedRow && Boolean(hasMore);
+            // Prefer the next visible filtered row; fall back to a filtered
+            // peek of the first already-loaded hidden row so trend cells
+            // don't show pending `...` for data we already have.
+            const nextRow = neighborBelow ?? (idx === lastIdx ? trendPeekRow : undefined);
+            const hasMoreBelow = idx === lastIdx && !neighborBelow && !trendPeekRow && Boolean(hasMore);
             return (
               <tr
                 key={rowKey}

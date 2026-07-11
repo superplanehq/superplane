@@ -114,6 +114,28 @@ describe("WidgetTable trend columns", () => {
     view.unmount();
   });
 
+  it("ignores a peek baseline that fails where/filters", () => {
+    // Peek rows come from the unfiltered progressive cache. If where/filters
+    // would hide that row, trend must not use it as the "row below".
+    const view = renderTrend({
+      render: {
+        ...TREND_RENDER,
+        where: [{ field: "status", op: "eq", value: "ok" }],
+      },
+      rows: [
+        { id: "d-3", durationMs: 900, status: "ok" },
+        { id: "d-2", durationMs: 1000, status: "ok" },
+      ],
+      hasMore: true,
+      nextLoadedRow: { id: "d-1", durationMs: 500, status: "fail" },
+    });
+    const cells = view.container.querySelectorAll('[data-testid="widget-trend-cell"]');
+    expect(cells).toHaveLength(2);
+    expect(cells[1].getAttribute("data-trend-kind")).toBe("pending");
+    expect(cells[1].textContent).toContain("...");
+    view.unmount();
+  });
+
   it("renders incomparable '-' when the row below exists but the field is missing", () => {
     const view = renderTrend({
       render: TREND_RENDER,
