@@ -292,6 +292,39 @@ describe("normalizeTablePanelContent — rowStyles round-trip", () => {
     });
   });
 
+  it("preserves trend column options and drops invalid enum values", () => {
+    const normalized = normalizeTablePanelContent({
+      dataSource: { kind: "memory", namespace: "runs" },
+      render: {
+        kind: "table",
+        columns: [
+          {
+            field: "durationMs",
+            label: "Trend",
+            format: "trend",
+            trendBetter: "down",
+            trendDisplay: "value",
+          },
+          {
+            field: "score",
+            label: "Bad",
+            format: "trend",
+            trendBetter: "sideways",
+            trendDisplay: "chart",
+          },
+        ],
+      },
+    });
+    expect(normalized.render.columns[0]).toMatchObject({
+      field: "durationMs",
+      format: "trend",
+      trendBetter: "down",
+      trendDisplay: "value",
+    });
+    expect(normalized.render.columns[1].trendBetter).toBeUndefined();
+    expect(normalized.render.columns[1].trendDisplay).toBeUndefined();
+  });
+
   it("preserves valid rowStyles entries verbatim", () => {
     const normalized = normalizeTablePanelContent({
       title: "Envs",

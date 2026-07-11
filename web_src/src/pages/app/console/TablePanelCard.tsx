@@ -61,7 +61,7 @@ function TablePanelBody({ content }: { content: TablePanelContent }) {
 }
 
 function TablePanelDataBound({ content, canvasId }: { content: TablePanelContent; canvasId: string }) {
-  const { rows, isLoading, error, hasMore, isFetchingMore, loadMore } = useWidgetData(
+  const { rows, isLoading, error, hasMore, isFetchingMore, loadMore, nextLoadedRow } = useWidgetData(
     canvasId,
     content.dataSource,
     renderNeedsRunNodeOutputs(content.render),
@@ -76,6 +76,7 @@ function TablePanelDataBound({ content, canvasId }: { content: TablePanelContent
       hasMore={hasMore}
       isFetchingMore={isFetchingMore}
       onLoadMore={loadMore}
+      nextLoadedRow={nextLoadedRow}
     />
   );
 }

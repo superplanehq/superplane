@@ -210,6 +210,120 @@ export const Pagination: Story = {
   },
 };
 
+/**
+ * Rows are pre-ordered newest-first so each cell compares against the row
+ * below (its predecessor in time). Covers every trend edge state:
+ * - Increases and decreases in both polarity modes
+ * - A flat delta (`- 0`)
+ * - The last row with no baseline (`- 0`)
+ */
+const trendRows: Record<string, unknown>[] = [
+  { deploy: "deploy #106", durationMs: 4200, errorRate: 0.4, throughput: 1250 },
+  { deploy: "deploy #105", durationMs: 5100, errorRate: 0.8, throughput: 1180 },
+  { deploy: "deploy #104", durationMs: 5100, errorRate: 0.8, throughput: 1180 },
+  { deploy: "deploy #103", durationMs: 4700, errorRate: 1.2, throughput: 940 },
+  { deploy: "deploy #102", durationMs: 6800, errorRate: 2.5, throughput: 720 },
+];
+
+export const Trend: Story = {
+  render: (args) => <TablePanel title="Deploys" {...args} />,
+  args: {
+    render: {
+      kind: "table",
+      columns: [
+        { field: "deploy", label: "Deploy" },
+        { field: "durationMs", label: "Duration", format: "duration" },
+        {
+          field: "durationMs",
+          label: "Duration Δ",
+          format: "trend",
+          trendBetter: "down",
+          trendDisplay: "percent",
+        },
+        { field: "errorRate", label: "Errors %", format: "number" },
+        {
+          field: "errorRate",
+          label: "Errors Δ",
+          format: "trend",
+          trendBetter: "down",
+          trendDisplay: "value",
+        },
+        { field: "throughput", label: "RPS", format: "number" },
+        {
+          field: "throughput",
+          label: "RPS Δ",
+          format: "trend",
+          trendBetter: "up",
+          trendDisplay: "percent",
+        },
+      ],
+    },
+    rows: trendRows,
+    isLoading: false,
+  },
+};
+
+/**
+ * Same rows as the Trend story, but the table advertises `hasMore: true`
+ * with no peek row — the last cell renders `...` while it waits for a
+ * predecessor that has not been fetched yet.
+ */
+export const TrendPending: Story = {
+  render: (args) => <TablePanel title="Deploys (loading more)" {...args} />,
+  args: {
+    render: {
+      kind: "table",
+      columns: [
+        { field: "deploy", label: "Deploy" },
+        { field: "durationMs", label: "Duration", format: "duration" },
+        {
+          field: "durationMs",
+          label: "Duration Δ",
+          format: "trend",
+          trendBetter: "down",
+          trendDisplay: "percent",
+        },
+      ],
+    },
+    rows: trendRows,
+    isLoading: false,
+    hasMore: true,
+    isFetchingMore: false,
+    onLoadMore: () => console.log("load more"),
+  },
+};
+
+/**
+ * `hasMore` is true only because more rows are already loaded behind the
+ * progressive display window. The last visible trend cell compares against
+ * `nextLoadedRow` instead of showing pending `...`.
+ */
+export const TrendDisplayWindowPeek: Story = {
+  render: (args) => <TablePanel title="Deploys (more loaded)" {...args} />,
+  args: {
+    render: {
+      kind: "table",
+      columns: [
+        { field: "deploy", label: "Deploy" },
+        { field: "durationMs", label: "Duration", format: "duration" },
+        {
+          field: "durationMs",
+          label: "Duration Δ",
+          format: "trend",
+          trendBetter: "down",
+          trendDisplay: "percent",
+        },
+      ],
+    },
+    rows: trendRows.slice(0, 4),
+    nextLoadedRow: trendRows[4],
+    isLoading: false,
+    hasMore: true,
+    isFetchingMore: false,
+    onLoadMore: () => console.log("load more"),
+  },
+};
+
 /** Org fixture: `pr-risk-review` console → `checks-table` memory panel. */
 export const PrRiskRecentChecks: Story = {
   render: (args) => (

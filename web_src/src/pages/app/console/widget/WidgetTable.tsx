@@ -32,6 +32,13 @@ interface WidgetTableProps {
   hasMore?: boolean;
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
+  /**
+   * First already-loaded row beyond the progressive display window. Trend
+   * columns on the last visible row compare against this peek when `rows`
+   * has no neighbor below — `hasMore` alone is not enough, because it is
+   * also true when more rows are loaded but still hidden.
+   */
+  nextLoadedRow?: Record<string, unknown>;
 }
 
 const ACTION_ICONS = {
@@ -45,7 +52,15 @@ const ACTION_ICONS = {
 /** Distance from the bottom (px) at which scrolling auto-requests more rows. */
 const AUTO_LOAD_SCROLL_THRESHOLD_PX = 160;
 
-export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, onLoadMore }: WidgetTableProps) {
+export function WidgetTable({
+  render,
+  rows,
+  isLoading,
+  hasMore,
+  isFetchingMore,
+  onLoadMore,
+  nextLoadedRow,
+}: WidgetTableProps) {
   const ctx = useConsoleContext();
   const recordRows = useMemo(
     () => rows.filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object" && !Array.isArray(r)),
@@ -139,6 +154,7 @@ export function WidgetTable({ render, rows, isLoading, hasMore, isFetchingMore, 
         isFetchingMore={isFetchingMore}
         onLoadMore={onLoadMore}
         onScroll={onScroll}
+        nextLoadedRow={nextLoadedRow}
       />
     </WidgetTableActionLockProvider>
   );
@@ -152,6 +168,7 @@ interface WidgetTableGridProps {
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
   onScroll: (event: UIEvent<HTMLDivElement>) => void;
+  nextLoadedRow?: Record<string, unknown>;
 }
 
 function WidgetTableGrid({
@@ -162,6 +179,7 @@ function WidgetTableGrid({
   isFetchingMore,
   onLoadMore,
   onScroll,
+  nextLoadedRow,
 }: WidgetTableGridProps) {
   const ctx = useConsoleContext();
   const rowActions = (render.rowActions ?? []).filter((action) => {
@@ -169,6 +187,7 @@ function WidgetTableGrid({
     return !resolved || isManualRunNode(resolved.node);
   });
   const hasActions = rowActions.length > 0;
+  const lastIdx = filtered.length - 1;
   return (
     <div className="overflow-auto" data-testid="widget-table" onScroll={onScroll}>
       <table className="w-full border-collapse text-[13px]">
@@ -195,6 +214,12 @@ function WidgetTableGrid({
           {filtered.map((row, idx) => {
             const rowKey = rowKeyForRow(row, idx);
             const toneClass = resolveRowStyle?.(row);
+            const neighborBelow = filtered[idx + 1] as Record<string, unknown> | undefined;
+            // Prefer the next visible filtered row; fall back to the first
+            // already-loaded row still hidden by the progressive window so
+            // trend cells don't show pending `...` for data we already have.
+            const nextRow = neighborBelow ?? (idx === lastIdx ? nextLoadedRow : undefined);
+            const hasMoreBelow = idx === lastIdx && !neighborBelow && !nextLoadedRow && Boolean(hasMore);
             return (
               <tr
                 key={rowKey}
@@ -208,7 +233,13 @@ function WidgetTableGrid({
                 )}
               >
                 {render.columns.map((col, ci) => (
-                  <WidgetTableCell key={`${col.field}-${ci}`} col={col} row={row} />
+                  <WidgetTableCell
+                    key={`${col.field}-${ci}`}
+                    col={col}
+                    row={row}
+                    nextRow={nextRow}
+                    hasMoreBelow={hasMoreBelow}
+                  />
                 ))}
                 {hasActions ? (
                   <td className="px-3 py-1.5 text-right">
