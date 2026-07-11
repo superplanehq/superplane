@@ -28,13 +28,7 @@ import {
   WIDGET_TREND_BETTER,
   WIDGET_TREND_DISPLAYS,
 } from "./widget/types";
-import type {
-  WidgetProgressLabel,
-  WidgetSort,
-  WidgetSortOrder,
-  WidgetTrendBetter,
-  WidgetTrendDisplay,
-} from "./widget/types";
+import type { WidgetProgressLabel, WidgetSort, WidgetSortOrder } from "./widget/types";
 import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
@@ -481,20 +475,15 @@ function normalizeTableColumns(raw: unknown): WidgetTableColumn[] {
       href: typeof c.href === "string" ? c.href : undefined,
       avatarCommitterField: typeof c.avatarCommitterField === "string" ? c.avatarCommitterField : undefined,
       progressTarget: typeof c.progressTarget === "string" ? c.progressTarget : undefined,
-      progressLabel:
-        typeof c.progressLabel === "string" && WIDGET_PROGRESS_LABELS.includes(c.progressLabel as WidgetProgressLabel)
-          ? (c.progressLabel as WidgetProgressLabel)
-          : undefined,
-      trendBetter:
-        typeof c.trendBetter === "string" && WIDGET_TREND_BETTER.includes(c.trendBetter as WidgetTrendBetter)
-          ? (c.trendBetter as WidgetTrendBetter)
-          : undefined,
-      trendDisplay:
-        typeof c.trendDisplay === "string" && WIDGET_TREND_DISPLAYS.includes(c.trendDisplay as WidgetTrendDisplay)
-          ? (c.trendDisplay as WidgetTrendDisplay)
-          : undefined,
+      progressLabel: optionalEnum(c.progressLabel, WIDGET_PROGRESS_LABELS),
+      trendBetter: optionalEnum(c.trendBetter, WIDGET_TREND_BETTER),
+      trendDisplay: optionalEnum(c.trendDisplay, WIDGET_TREND_DISPLAYS),
     };
   });
+}
+
+function optionalEnum<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
+  return typeof value === "string" && allowed.includes(value as T) ? (value as T) : undefined;
 }
 
 function normalizeTableRowActions(raw: unknown): WidgetRowAction[] | undefined {
