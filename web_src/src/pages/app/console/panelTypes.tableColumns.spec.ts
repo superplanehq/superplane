@@ -60,4 +60,41 @@ describe("normalizeTablePanelContent — progress/trend columns", () => {
     expect(normalized.render.columns[1].trendBetter).toBeUndefined();
     expect(normalized.render.columns[1].trendDisplay).toBeUndefined();
   });
+
+  it("preserves showTrend on numeric columns and drops non-true values", () => {
+    const normalized = normalizeTablePanelContent({
+      dataSource: { kind: "memory", namespace: "runs" },
+      render: {
+        kind: "table",
+        columns: [
+          {
+            field: "durationMs",
+            format: "duration",
+            showTrend: true,
+            trendBetter: "down",
+            trendDisplay: "percent",
+          },
+          {
+            field: "passRate",
+            format: "percent",
+            showTrend: "yes",
+          },
+          {
+            field: "score",
+            format: "number",
+            showTrend: false,
+          },
+        ],
+      },
+    });
+    expect(normalized.render.columns[0]).toMatchObject({
+      field: "durationMs",
+      format: "duration",
+      showTrend: true,
+      trendBetter: "down",
+      trendDisplay: "percent",
+    });
+    expect(normalized.render.columns[1].showTrend).toBeUndefined();
+    expect(normalized.render.columns[2].showTrend).toBeUndefined();
+  });
 });
