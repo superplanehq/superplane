@@ -236,14 +236,15 @@ Each column needs a non-empty `field`. Optional fields:
 | `href` | Link template for `link` columns. Accepts `{{ cel }}` expressions and templates (e.g. `{{ prUrl }}` or `https://github.com/{{ org }}/pull/{{ prNumber }}`), legacy single-brace `{field}` placeholders, and bare static URLs. The column editor shows a dedicated href input with a field picker (values inserted as `{{ field }}`) when the format is `link`. |
 | `progressTarget` | Target (100%) for `format: progress`. Required for progress columns. Accepts a numeric literal (`"10"`, `"100.5"`), a row field path (`total`, `payload.goal`), or a full `{{ CEL }}` expression (`{{ base * 2 }}`). Resolved with the same helper as `field`. |
 | `progressLabel` | Text rendered next to the progress bar: `none`, `number` (`5/10`), or `percent` (`50%`). Defaults to `percent`. The bar itself clamps at `[0, 100]%`, but the label and hover tooltip always show the real percentage, so overshoots (`120%`, `12/10`) stay visible. |
-| `trendBetter` | For `format: trend`. `up` (default) treats an increase as better (green), `down` treats a decrease as better. |
-| `trendDisplay` | For `format: trend`. `percent` (default) prints a signed percent change, `value` prints a signed absolute delta, `none` renders arrow only. |
+| `trendBetter` | For `format: trend` or numeric columns with `showTrend: true`. `up` (default) treats an increase as better (green), `down` treats a decrease as better. |
+| `trendDisplay` | For `format: trend` or numeric columns with `showTrend: true`. `percent` (default) prints a signed percent change, `value` prints a signed absolute delta, `none` renders arrow only. |
+| `showTrend` | When `true` on `number`, `percent`, or `duration`, renders the formatted value plus a trend chip in the same cell (same row-below semantics as `format: trend`). Ignored on other formats. |
 
 Column fields can be direct paths such as `status` or expression templates where supported by the widget helpers.
 
 #### Trend columns
 
-`format: trend` turns a numeric column into a row-to-row comparison. The cell resolves the column's `field` (path or `{{ CEL }}`) on both the current row and the row directly below it, then renders one of the following:
+`format: trend` turns a numeric column into a **trend-only** row-to-row comparison. The cell resolves the column's `field` (path or `{{ CEL }}`) on both the current row and the row directly below it, then renders one of the following:
 
 | Case | Cell |
 | --- | --- |
@@ -262,8 +263,33 @@ Notes:
 - On progressive tables, when more rows are already loaded but still hidden behind the display window, the last visible trend cell compares against that first hidden row instead of showing pending `...`. Pending is reserved for baselines that have not been fetched yet.
 - Percent math is `(current - previous) / |previous| * 100`, rounded to one decimal, capped at ±999% (values beyond the cap render as `>+999%` / `<-999%`).
 - `trend` cells never carry a link/href — combine with a separate `link` column when both are needed.
+- Prefer **`showTrend: true`** on `number` / `percent` / `duration` when you want the formatted value and the trend in one column (e.g. `4.5s  ↘ -10%`). Keep `format: trend` when you want a dedicated delta column.
 
-Example — duration trend where a shorter run is a win:
+Example — duration and pass rate with value + trend in one column:
+
+```yaml
+render:
+  kind: table
+  sort:
+    field: createdAt
+    order: desc
+  columns:
+    - field: name
+      label: Node
+    - field: durationMs
+      label: Duration
+      format: duration
+      showTrend: true
+      trendBetter: down
+      trendDisplay: percent
+    - field: passRate
+      label: Pass rate
+      format: percent
+      showTrend: true
+      trendBetter: up
+```
+
+Example — standalone trend column where a shorter run is a win:
 
 ```yaml
 render:
