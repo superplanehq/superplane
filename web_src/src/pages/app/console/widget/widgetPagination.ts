@@ -74,6 +74,33 @@ export function computeDisplaySlice(displayCount: number, effectiveLimit: number
 }
 
 /**
+ * How many rows to collect when the progressive display window may be hiding
+ * already-loaded rows. Returns `displaySlice + 1` so callers can peek the
+ * first hidden row as a trend baseline without rendering it.
+ */
+export function computeTrendCollectLimit(displaySlice: number, loadedRowCount: number): number {
+  if (loadedRowCount > displaySlice) return displaySlice + 1;
+  return displaySlice;
+}
+
+/**
+ * Split a collected row list into the visible display window and the optional
+ * first already-loaded row beyond it (used as a trend baseline peek).
+ */
+export function splitDisplayRowsWithTrendPeek<T>(
+  collected: T[],
+  displaySlice: number,
+): { rows: T[]; nextLoadedRow: T | undefined } {
+  if (collected.length <= displaySlice) {
+    return { rows: collected, nextLoadedRow: undefined };
+  }
+  return {
+    rows: collected.slice(0, displaySlice),
+    nextLoadedRow: collected[displaySlice],
+  };
+}
+
+/**
  * Whether the progressive widget should expose a "Load more" affordance:
  * either there are already-loaded rows we haven't shown yet, or there are
  * more pages to fetch and we still have eager-page budget. Returns `false`
