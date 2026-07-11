@@ -44,6 +44,20 @@ export function useInteractiveChartTooltip(enabled: boolean) {
 
   useEffect(() => () => clearGraceTimer(), [clearGraceTimer]);
 
+  // Drop any in-flight hold when interactive mode turns off (e.g. xFormat leaves
+  // a timestamp format). Otherwise forceActiveRef stays true and the next enable
+  // treats the first hover as a same-point echo, breaking grace re-arming.
+  useEffect(() => {
+    if (enabled) return;
+    clearGraceTimer();
+    forceActiveRef.current = false;
+    tooltipHoveredRef.current = false;
+    wasActiveRef.current = false;
+    activeKeyRef.current = null;
+    frozenKeyRef.current = null;
+    setForceActive(false);
+  }, [enabled, clearGraceTimer]);
+
   const syncRechartsActive = useCallback(
     (active: boolean, activeKey?: string) => {
       if (!enabled) return;

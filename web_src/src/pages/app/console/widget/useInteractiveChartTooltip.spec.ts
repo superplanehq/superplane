@@ -136,4 +136,37 @@ describe("useInteractiveChartTooltip", () => {
     });
     expect(result.current.activeProp).toBeUndefined();
   });
+
+  it("clears forced hold state when interactive mode is disabled", () => {
+    const { result, rerender } = renderHook(({ enabled }) => useInteractiveChartTooltip(enabled), {
+      initialProps: { enabled: true },
+    });
+
+    act(() => {
+      result.current.syncRechartsActive(true, "a");
+      result.current.syncRechartsActive(false);
+    });
+    expect(result.current.activeProp).toBe(true);
+
+    act(() => {
+      rerender({ enabled: false });
+    });
+    expect(result.current.activeProp).toBeUndefined();
+    expect(result.current.forceContentActive).toBe(false);
+
+    act(() => {
+      rerender({ enabled: true });
+    });
+
+    // Stale forceActiveRef must not treat the next hover as a same-point echo.
+    act(() => {
+      result.current.syncRechartsActive(true, "a");
+    });
+    expect(result.current.activeProp).toBeUndefined();
+
+    act(() => {
+      result.current.syncRechartsActive(false);
+    });
+    expect(result.current.activeProp).toBe(true);
+  });
 });
