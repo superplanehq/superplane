@@ -1,6 +1,64 @@
-import { formatRelativeTime } from "@/lib/timezone";
+import { formatTimeAgo } from "@/lib/date";
+import { formatAbsolute, formatDate as formatDateOnly } from "@/lib/datetime";
 
 import type { WidgetColumnFormat } from "./types";
+
+/** Pure digit / decimal strings (epoch candidates); excludes ISO and other date text. */
+const PURE_NUMERIC_RE = /^-?\d+(\.\d+)?$/;
+
+/**
+ * Coerce a widget cell value into a `Date`. Accepts ISO strings, `Date`
+ * instances, and plausible epoch seconds/milliseconds — including numeric
+ * strings like `"1717390000"` that JSON/CEL often emit (using `>= 1e11` to
+ * disambiguate ms vs seconds). Returns `null` for anything that can't be
+ * parsed, so callers can fall back to the raw string.
+ *
+ * Short digit strings / small numbers (`"404"`, `12`) are rejected so status
+ * codes and categories never become early-1970 or year-404 dates.
+ *
+ * Shared by widget formatters and CEL builtins (`formatDate`, `epochMs`) so
+ * timestamp parsing stays consistent across the console package.
+ */
+export function coerceWidgetTimestamp(value: unknown): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    // Skip Date.parse for pure digits — it treats values like "404" as years.
+    if (PURE_NUMERIC_RE.test(trimmed)) {
+      return dateFromEpochNumber(Number(trimmed));
+    }
+    const parsed = Date.parse(trimmed);
+    if (Number.isFinite(parsed)) return new Date(parsed);
+    return null;
+  }
+  return dateFromEpochNumber(typeof value === "number" ? value : Number(value));
+}
+
+/** Milliseconds from ~1973 onward; below this, values are treated as seconds. */
+const EPOCH_MS_MAGNITUDE = 1e11;
+
+function dateFromEpochNumber(n: number): Date | null {
+  if (!isPlausibleEpochNumber(n)) return null;
+  // Use magnitude so negative pre-1970 ms values (e.g. -1.5e12) are not
+  // mistaken for seconds and multiplied by 1000.
+  const ms = Math.abs(n) >= EPOCH_MS_MAGNITUDE ? n : n * 1000;
+  const date = new Date(ms);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+/**
+ * Epoch seconds (~1e9–1e10) or milliseconds (~1e11–1e13). The bands meet at
+ * `1e11` so 1973–2001 ms epochs are accepted; status codes / hours stay out.
+ */
+function isPlausibleEpochNumber(n: number): boolean {
+  if (!Number.isFinite(n)) return false;
+  const abs = Math.abs(n);
+  return abs >= 1e9 && abs < 1e14;
+}
 
 /**
  * Resolved progress values for a table cell.
@@ -66,9 +124,9 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case "percent":
       return formatPercent(value);
     case "date":
-      return formatDate(value, false);
+      return formatDate(value);
     case "datetime":
-      return formatDate(value, true);
+      return formatDatetime(value);
     case "relative":
       return formatRelative(value);
     case "duration":
@@ -104,26 +162,24 @@ function formatPercent(value: unknown): string {
 }
 
 function formatRelative(value: unknown): string {
-  const format = (iso: string) => formatRelativeTime(iso, true).replace(" ago", "");
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) {
-      return format(new Date(parsed).toISOString());
-    }
-  }
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return String(value ?? "");
-  const ms = n > 1e12 ? n : n * 1000;
-  return format(new Date(ms).toISOString());
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return String(value ?? "");
+  // Compact relative text without an "ago" suffix (e.g. "5m", "in 2h") so
+  // dense table cells stay short; the hover details always expose the verbose
+  // "5 minutes ago" / "in 3 hours" phrasing.
+  return formatTimeAgo(date, false);
 }
 
-function formatDate(value: unknown, includeTime: boolean): string {
-  if (typeof value !== "string" && typeof value !== "number") return String(value);
-  const ms = typeof value === "number" ? value : Date.parse(value);
-  if (!Number.isFinite(ms)) return String(value);
-  const date = new Date(ms);
-  if (includeTime) return date.toLocaleString();
-  return date.toLocaleDateString();
+function formatDate(value: unknown): string {
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return String(value);
+  return formatDateOnly(date);
+}
+
+function formatDatetime(value: unknown): string {
+  const date = coerceWidgetTimestamp(value);
+  if (!date) return String(value);
+  return formatAbsolute(date);
 }
 
 /**
