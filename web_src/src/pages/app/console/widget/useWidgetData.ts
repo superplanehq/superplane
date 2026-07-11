@@ -11,8 +11,10 @@ import {
   computeDisplaySlice,
   computeEffectiveLimit,
   computeInitialDisplayCount,
+  computeTrendCollectLimit,
   computeWidgetHasMore,
   isWidgetQueryLoading,
+  splitDisplayRowsWithTrendPeek,
   useEagerInfinitePagination,
 } from "./widgetPagination";
 import { buildNodeNameMap, collectExecutionRows, collectRunRows } from "./widgetRowCollection";
@@ -29,9 +31,11 @@ export {
   computeDisplaySlice,
   computeEffectiveLimit,
   computeInitialDisplayCount,
+  computeTrendCollectLimit,
   computeWidgetHasMore,
   isWidgetQueryLoading,
   shouldFetchNextWidgetPage,
+  splitDisplayRowsWithTrendPeek,
 } from "./widgetPagination";
 export {
   buildDollarNodes,
@@ -63,6 +67,13 @@ export interface WidgetDataResult {
    * the configured limit, if any). No-op for non-progressive callers.
    */
   loadMore?: () => void;
+  /**
+   * First already-loaded row beyond the progressive display window. Used by
+   * trend columns so the last visible row can compare against data that is
+   * loaded but still hidden — `hasMore` alone cannot distinguish that from
+   * "baseline not fetched yet".
+   */
+  nextLoadedRow?: Record<string, unknown>;
 }
 
 /**
@@ -305,8 +316,14 @@ function useExecutionsDataSourceResult({
   const rows = useMemo(() => {
     if (dataSource.kind !== "executions") return [];
     const nodeNameById = buildNodeNameMap(ctx?.nodes);
-    return collectExecutionRows(pages, targetNodeId, nodeNameById, displaySlice);
-  }, [dataSource, pages, ctx, targetNodeId, displaySlice]);
+    const collectLimit = progressive ? computeTrendCollectLimit(displaySlice, loadedRowCount) : displaySlice;
+    return collectExecutionRows(pages, targetNodeId, nodeNameById, collectLimit);
+  }, [dataSource, pages, ctx, targetNodeId, displaySlice, loadedRowCount, progressive]);
+
+  const { rows: visibleRows, nextLoadedRow } = useMemo(
+    () => (progressive ? splitDisplayRowsWithTrendPeek(rows, displaySlice) : { rows, nextLoadedRow: undefined }),
+    [rows, displaySlice, progressive],
+  );
 
   const isLoading = isWidgetQueryLoading({
     queryIsLoading: query.isLoading,
@@ -329,8 +346,10 @@ function useExecutionsDataSourceResult({
   });
 
   const isFetchingMore = enabled && query.isFetchingNextPage && !isLoading && hasMore;
-  const paginationFields = progressive ? { hasMore, isFetchingMore, loadMore } : {};
-  return { rows, isLoading, error: errorMessage(query.error), ...paginationFields };
+  const paginationFields = progressive
+    ? { hasMore, isFetchingMore, loadMore, nextLoadedRow: nextLoadedRow as Record<string, unknown> | undefined }
+    : {};
+  return { rows: visibleRows, isLoading, error: errorMessage(query.error), ...paginationFields };
 }
 
 function useRunsDataSourceResult({
@@ -385,6 +404,9 @@ function useRunsDataSourceResult({
   // fetch their per-node executions (with `outputs`) via `ListEventExecutions`.
   // The runs API only returns lightweight execution refs without outputs, so
   // we have to side-load the full executions to support `$["node"].outputs`.
+  // In progressive mode, include one peek row beyond the display window when
+  // already loaded so trend columns can resolve `$` fields on the hidden baseline.
+  const collectLimit = progressive ? computeTrendCollectLimit(displaySlice, loadedRowCount) : displaySlice;
   const runRootEventIds = useMemo(() => {
     if (dataSource.kind !== "runs" || !needsNodeOutputs) return [] as string[];
     const seen = new Set<string>();
@@ -392,7 +414,7 @@ function useRunsDataSourceResult({
     let count = 0;
     for (const page of pages) {
       for (const run of page?.runs ?? []) {
-        if (count >= displaySlice) break;
+        if (count >= collectLimit) break;
         count++;
         const id = run.rootEvent?.id;
         if (id && !seen.has(id)) {
@@ -400,10 +422,10 @@ function useRunsDataSourceResult({
           ids.push(id);
         }
       }
-      if (count >= displaySlice) break;
+      if (count >= collectLimit) break;
     }
     return ids;
-  }, [dataSource, pages, displaySlice, needsNodeOutputs]);
+  }, [dataSource, pages, collectLimit, needsNodeOutputs]);
 
   const { queries: runExecutionQueries, isLoading: runExecutionsLoading } = useEventExecutionsBatch(
     canvasId,
@@ -420,11 +442,19 @@ function useRunsDataSourceResult({
     return map;
   }, [runRootEventIds, runExecutionQueries]);
 
-  const rows = useMemo(() => {
+  const collectedRows = useMemo(() => {
     if (dataSource.kind !== "runs") return [];
     const nodeNameById = buildNodeNameMap(ctx?.nodes);
-    return collectRunRows(pages, nodeNameById, displaySlice, executionsByRootEventId);
-  }, [dataSource, pages, ctx, displaySlice, executionsByRootEventId]);
+    return collectRunRows(pages, nodeNameById, collectLimit, executionsByRootEventId);
+  }, [dataSource, pages, ctx, collectLimit, executionsByRootEventId]);
+
+  const { rows, nextLoadedRow } = useMemo(
+    () =>
+      progressive
+        ? splitDisplayRowsWithTrendPeek(collectedRows, displaySlice)
+        : { rows: collectedRows, nextLoadedRow: undefined },
+    [collectedRows, displaySlice, progressive],
+  );
 
   const initialFillLoading = isWidgetQueryLoading({
     queryIsLoading: query.isLoading,
@@ -458,7 +488,9 @@ function useRunsDataSourceResult({
   });
 
   const isFetchingMore = enabled && query.isFetchingNextPage && !isLoading && hasMore;
-  const paginationFields = progressive ? { hasMore, isFetchingMore, loadMore } : {};
+  const paginationFields = progressive
+    ? { hasMore, isFetchingMore, loadMore, nextLoadedRow: nextLoadedRow as Record<string, unknown> | undefined }
+    : {};
   return {
     rows,
     isLoading,

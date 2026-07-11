@@ -91,7 +91,7 @@ Execution rows get `status`, `nodeName`, `durationMs`. Status vocabulary: `passe
 
 ### Columns
 
-Non-empty `field`; optional `label`, `format` (`text`, `number`, `status`, `relative`, `link`, `trend`, …), `show`, `href`. `format: trend` also accepts `trendBetter` (`up`/`down`, default `up`) and `trendDisplay` (`percent`/`value`/`none`, default `percent`); the cell compares against the row directly below in the filtered/sorted table.
+Non-empty `field`; optional `label`, `format` (`text`, `number`, `status`, `relative`, `link`, `trend`, …), `show`, `href`. `format: trend` also accepts `trendBetter` (`up`/`down`, default `up`) and `trendDisplay` (`percent`/`value`/`none`, default `percent`); the cell compares against the row directly below in the filtered/sorted table (or the first already-loaded row still hidden by the progressive display window).
 
 ### Filters
 

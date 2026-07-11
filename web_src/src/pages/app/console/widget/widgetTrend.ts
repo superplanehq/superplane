@@ -22,7 +22,9 @@ export type TrendPolarity = "better" | "worse" | "flat" | "none";
 /**
  * Result of a trend comparison. `kind` drives what the cell renders:
  *
- * - `pending` → last visible row while `hasMore` is true (`...`)
+ * - `pending` → last visible row while the previous entry has not been
+ *   fetched yet (`...`). Not used when the next row is already loaded but
+ *   still hidden behind the progressive display window.
  * - `no-baseline` → last row with no more data below (`- 0` in gray)
  * - `incomparable` → current or previous isn't a finite number, or
  *   percent-mode was requested against a zero previous (`-`)
@@ -58,8 +60,9 @@ export interface ComputeTrendOptions {
   /** Direction that signals "better". Defaults to `up`. */
   better?: WidgetTrendBetter;
   /**
-   * When `true`, the row below hasn't been loaded yet (last visible row of
-   * a paginated table with more pages available). Renderer shows `...`.
+   * When `true`, the row below hasn't been fetched yet (last visible row of
+   * a paginated table with more pages available and no already-loaded peek
+   * row). Renderer shows `...`.
    */
   hasMoreBelow?: boolean;
   /**

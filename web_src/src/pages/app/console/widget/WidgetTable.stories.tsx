@@ -265,7 +265,8 @@ export const Trend: Story = {
 
 /**
  * Same rows as the Trend story, but the table advertises `hasMore: true`
- * so the last row renders `...` while it waits for its predecessor to load.
+ * with no peek row — the last cell renders `...` while it waits for a
+ * predecessor that has not been fetched yet.
  */
 export const TrendPending: Story = {
   render: (args) => <TablePanel title="Deploys (loading more)" {...args} />,
@@ -285,6 +286,37 @@ export const TrendPending: Story = {
       ],
     },
     rows: trendRows,
+    isLoading: false,
+    hasMore: true,
+    isFetchingMore: false,
+    onLoadMore: () => console.log("load more"),
+  },
+};
+
+/**
+ * `hasMore` is true only because more rows are already loaded behind the
+ * progressive display window. The last visible trend cell compares against
+ * `nextLoadedRow` instead of showing pending `...`.
+ */
+export const TrendDisplayWindowPeek: Story = {
+  render: (args) => <TablePanel title="Deploys (more loaded)" {...args} />,
+  args: {
+    render: {
+      kind: "table",
+      columns: [
+        { field: "deploy", label: "Deploy" },
+        { field: "durationMs", label: "Duration", format: "duration" },
+        {
+          field: "durationMs",
+          label: "Duration Δ",
+          format: "trend",
+          trendBetter: "down",
+          trendDisplay: "percent",
+        },
+      ],
+    },
+    rows: trendRows.slice(0, 4),
+    nextLoadedRow: trendRows[4],
     isLoading: false,
     hasMore: true,
     isFetchingMore: false,

@@ -29,8 +29,11 @@ export interface WidgetTableCellProps {
   nextRow?: Record<string, unknown>;
   /**
    * Whether more rows can still be loaded below the current one. Only
-   * meaningful for the last visible row of a paginated table; enables the
-   * `...` pending state on `format: "trend"` cells.
+   * meaningful for the last visible row of a paginated table when the
+   * previous entry has not been fetched yet; enables the `...` pending
+   * state on `format: "trend"` cells. Must not be set merely because more
+   * rows are loaded but still hidden behind the progressive display window
+   * — pass those via `nextRow` instead.
    */
   hasMoreBelow?: boolean;
 }

@@ -249,7 +249,7 @@ Column fields can be direct paths such as `status` or expression templates where
 | Delta is exactly `0` | Gray `- 0` (no change). |
 | Current or previous value isn't a finite number | Gray `-` (incomparable). |
 | Percent mode with a previous value of `0` | Gray `-` (percent undefined). |
-| Last visible row while more data is still loading | Gray `...` (pending — the previous entry hasn't been fetched yet). |
+| Last visible row while the previous entry has not been fetched yet | Gray `...` (pending). Not used when the next row is already loaded but still hidden behind the progressive display window — that case compares against the hidden row. |
 | Last row with no more data expected | Gray `- 0` (no baseline). |
 
 The tooltip always shows both the percent change and the absolute delta when both are meaningful (e.g. `+12.5% · +4`).
@@ -257,6 +257,7 @@ The tooltip always shows both the percent change and the absolute delta when bot
 Notes:
 
 - **"Previous" is always the row directly below** in the current filter + sort order, so authors control what "previous" means by choosing the sort. For chronological trends, sort by `createdAt`.
+- On progressive tables, when more rows are already loaded but still hidden behind the display window, the last visible trend cell compares against that first hidden row instead of showing pending `...`. Pending is reserved for baselines that have not been fetched yet.
 - Percent math is `(current - previous) / |previous| * 100`, rounded to one decimal, capped at ±999% (values beyond the cap render as `>+999%` / `<-999%`).
 - `trend` cells never carry a link/href — combine with a separate `link` column when both are needed.
 

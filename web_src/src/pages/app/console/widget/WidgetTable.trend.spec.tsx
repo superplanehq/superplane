@@ -12,17 +12,25 @@ describe("WidgetTable trend columns", () => {
     render: tableRender,
     rows,
     hasMore,
+    nextLoadedRow,
   }: {
     render: WidgetTableRender;
     rows: unknown[];
     hasMore?: boolean;
+    nextLoadedRow?: Record<string, unknown>;
   }) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     return render(
       <MemoryRouter>
         <QueryClientProvider client={queryClient}>
           <ConsoleContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
-            <WidgetTable render={tableRender} rows={rows} isLoading={false} hasMore={hasMore} />
+            <WidgetTable
+              render={tableRender}
+              rows={rows}
+              isLoading={false}
+              hasMore={hasMore}
+              nextLoadedRow={nextLoadedRow}
+            />
           </ConsoleContextProvider>
         </QueryClientProvider>
       </MemoryRouter>,
@@ -82,6 +90,27 @@ describe("WidgetTable trend columns", () => {
     const cells = view.container.querySelectorAll('[data-testid="widget-trend-cell"]');
     expect(cells[cells.length - 1].getAttribute("data-trend-kind")).toBe("pending");
     expect(cells[cells.length - 1].textContent).toContain("...");
+    view.unmount();
+  });
+
+  it("compares against the next already-loaded row when hasMore is only the display window", () => {
+    // Progressive tables set hasMore when more rows are loaded but still
+    // hidden behind the display window. The last visible trend cell must
+    // use that peek row as its baseline instead of showing pending `...`.
+    const view = renderTrend({
+      render: TREND_RENDER,
+      rows: [
+        { id: "d-3", durationMs: 900 },
+        { id: "d-2", durationMs: 1000 },
+      ],
+      hasMore: true,
+      nextLoadedRow: { id: "d-1", durationMs: 1000 },
+    });
+    const cells = view.container.querySelectorAll('[data-testid="widget-trend-cell"]');
+    expect(cells).toHaveLength(2);
+    expect(cells[1].getAttribute("data-trend-kind")).toBe("flat");
+    expect(cells[1].textContent).toContain("0");
+    expect(cells[1].getAttribute("data-trend-kind")).not.toBe("pending");
     view.unmount();
   });
 
