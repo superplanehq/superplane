@@ -5,39 +5,65 @@ import {
   computeScorecardProgress,
   extractScorecardSeries,
   formatScorecardChangeLabel,
+  pickChangeAnchors,
   resolveScorecardStatus,
   resolveScorecardTarget,
 } from "./scorecardMath";
 import { computeTrend } from "./widgetTrend";
 
 describe("extractScorecardSeries", () => {
-  it("returns an empty series when no field is configured", () => {
-    expect(extractScorecardSeries([{ x: 1 }, { x: 2 }], undefined)).toEqual({ values: [], baseline: null });
+  it("returns an empty array when no field is configured", () => {
+    expect(extractScorecardSeries([{ x: 1 }, { x: 2 }], undefined)).toEqual([]);
   });
 
-  it("extracts finite numbers in row order and picks the first as baseline", () => {
+  it("extracts finite numbers in row order", () => {
     const rows = [{ x: 10 }, { x: 20 }, { x: 30 }];
-    expect(extractScorecardSeries(rows, "x")).toEqual({ values: [10, 20, 30], baseline: 10 });
+    expect(extractScorecardSeries(rows, "x")).toEqual([10, 20, 30]);
   });
 
-  it("skips non-finite values so the baseline is the first usable point", () => {
+  it("skips non-finite values so gaps don't poison the series", () => {
     const rows = [{ x: null }, { x: "" }, { x: "abc" }, { x: 5 }, { x: 8 }];
-    expect(extractScorecardSeries(rows, "x")).toEqual({ values: [5, 8], baseline: 5 });
+    expect(extractScorecardSeries(rows, "x")).toEqual([5, 8]);
   });
 
   it("coerces numeric strings", () => {
     const rows = [{ x: "1" }, { x: "2.5" }, { x: "3" }];
-    expect(extractScorecardSeries(rows, "x")).toEqual({ values: [1, 2.5, 3], baseline: 1 });
+    expect(extractScorecardSeries(rows, "x")).toEqual([1, 2.5, 3]);
   });
 
-  it("returns null baseline when nothing is finite", () => {
-    expect(extractScorecardSeries([{ x: null }, { x: "abc" }], "x")).toEqual({ values: [], baseline: null });
+  it("returns an empty series when nothing is finite", () => {
+    expect(extractScorecardSeries([{ x: null }, { x: "abc" }], "x")).toEqual([]);
   });
 
-  it("returns null baseline for a single-point series", () => {
-    // A one-point series has nothing meaningful to compare against, so the
-    // widget should hide the change chip entirely rather than render `flat`.
-    expect(extractScorecardSeries([{ x: 42 }], "x")).toEqual({ values: [42], baseline: null });
+  it("returns a single-point series intact (anchor selection handles the length gate)", () => {
+    expect(extractScorecardSeries([{ x: 42 }], "x")).toEqual([42]);
+  });
+});
+
+describe("pickChangeAnchors", () => {
+  it("returns null when the series has fewer than two points", () => {
+    expect(pickChangeAnchors([], "last")).toBeNull();
+    expect(pickChangeAnchors([42], "last")).toBeNull();
+  });
+
+  it("uses the last two values for aggregation `last`", () => {
+    expect(pickChangeAnchors([10, 20, 30], "last")).toEqual({ current: 30, previous: 20 });
+  });
+
+  it("uses the first two values for aggregation `first`", () => {
+    // Runs / executions surface newest-first, so `first` means "latest" and
+    // its natural neighbor is the next-most-recent row.
+    expect(pickChangeAnchors([30, 20, 10], "first")).toEqual({ current: 30, previous: 20 });
+  });
+
+  it("returns null for combining aggregations that have no natural previous", () => {
+    // sum / avg / min / max / count don't point at a single row, so the
+    // scorecard has to hide the change chip.
+    expect(pickChangeAnchors([10, 20, 30], "sum")).toBeNull();
+    expect(pickChangeAnchors([10, 20, 30], "avg")).toBeNull();
+    expect(pickChangeAnchors([10, 20, 30], "min")).toBeNull();
+    expect(pickChangeAnchors([10, 20, 30], "max")).toBeNull();
+    expect(pickChangeAnchors([10, 20, 30], "count")).toBeNull();
   });
 });
 
@@ -96,12 +122,14 @@ describe("computeScorecardProgress", () => {
     expect(result).toMatchObject({ percent: 150, barPercent: 100, met: true });
   });
 
-  it("reports 100% when meeting or beating a lower-is-better goal", () => {
+  it("uses current/target for lower-is-better direction and marks met when under the ceiling", () => {
+    // 80 / 100 = 80% of a lower-is-better budget. Bar fills 80%, met=true
+    // (we're under the ceiling), coloring stays green via `met`.
     expect(computeScorecardProgress(80, 100, "down")).toEqual({
       current: 80,
       target: 100,
-      percent: 100,
-      barPercent: 100,
+      percent: 80,
+      barPercent: 80,
       met: true,
     });
     expect(computeScorecardProgress(100, 100, "down")).toEqual({
@@ -113,9 +141,16 @@ describe("computeScorecardProgress", () => {
     });
   });
 
-  it("shrinks the bar as the value drifts above a lower-is-better goal", () => {
+  it("clamps the bar but reports the raw percent when overshooting a lower-is-better goal", () => {
+    // 200 / 100 = 200% — we've blown past the ceiling. Label still reports
+    // the raw 200%, bar clamps at 100%, met flips to false so status colors red.
     const result = computeScorecardProgress(200, 100, "down");
-    expect(result).toEqual({ current: 200, target: 100, percent: 50, barPercent: 50, met: false });
+    expect(result).toEqual({ current: 200, target: 100, percent: 200, barPercent: 100, met: false });
+  });
+
+  it("regression: 429 vs 500 with better:down reports 85.8% (not 100%)", () => {
+    const result = computeScorecardProgress(429, 500, "down");
+    expect(result).toMatchObject({ current: 429, target: 500, percent: 85.8, barPercent: 85.8, met: true });
   });
 
   it("defaults to higher-is-better when no direction is given", () => {
@@ -125,26 +160,32 @@ describe("computeScorecardProgress", () => {
 });
 
 describe("computeScorecardChange", () => {
-  it("returns null when either value is missing", () => {
-    expect(computeScorecardChange(null, 10, "up")).toBeNull();
-    expect(computeScorecardChange(10, null, "down")).toBeNull();
+  it("returns null when no anchors are provided", () => {
+    expect(computeScorecardChange(null, "up")).toBeNull();
   });
 
   it("delegates to computeTrend with percent display", () => {
-    expect(computeScorecardChange(98, 127, "down")).toEqual(
+    expect(computeScorecardChange({ current: 98, previous: 127 }, "down")).toEqual(
       computeTrend(98, 127, { better: "down", display: "percent" }),
+    );
+  });
+
+  it("wires anchors picked from the series", () => {
+    const anchors = pickChangeAnchors([127, 120, 105, 98], "last");
+    expect(computeScorecardChange(anchors, "down")).toEqual(
+      computeTrend(98, 105, { better: "down", display: "percent" }),
     );
   });
 });
 
 describe("resolveScorecardStatus", () => {
   it("prioritizes change polarity when available", () => {
-    const change = computeScorecardChange(11, 10, "up");
+    const change = computeScorecardChange({ current: 11, previous: 10 }, "up");
     expect(resolveScorecardStatus(change, null)).toBe("better");
   });
 
   it("treats flat change as its own status (not better)", () => {
-    const change = computeScorecardChange(10, 10, "up");
+    const change = computeScorecardChange({ current: 10, previous: 10 }, "up");
     expect(resolveScorecardStatus(change, null)).toBe("flat");
   });
 

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataSourceForm } from "./DataSourceForm";
 import { useConsoleContext } from "./ConsoleContext";
 import { NUMBER_PANEL_AGGREGATIONS, NUMBER_PANEL_FORMATS } from "./numberPanelFormConstants";
-import type { ScorecardPanelContent } from "./panelTypes";
+import type { ScorecardPanelContent, TablePanelDataSource } from "./panelTypes";
 import type {
   WidgetColumnFormat,
   WidgetNumberAggregation,
@@ -18,16 +18,33 @@ import { WIDGET_SCORECARD_SHOW_CHANGES } from "./widget/types";
 import { useMemoryCatalog } from "./widget/useMemoryCatalog";
 
 const SHOW_CHANGE_LABELS: Record<WidgetScorecardShowChange, string> = {
-  percent: "Percent (-22.8%)",
-  number: "Number (-29)",
-  both: "Both (-29 (-22.8%))",
-  none: "None (arrow only)",
+  percent: "Percent",
+  number: "Number",
+  both: "Both",
+  none: "None",
 };
 
 const BETTER_LABELS: Record<WidgetTrendBetter, string> = {
   up: "Higher is better",
   down: "Lower is better",
 };
+
+/**
+ * Runs and executions come from the API newest-first, so the persisted
+ * `first` aggregation actually picks the *latest* record, and `last`
+ * picks the earliest. Memory rows land in insertion order (oldest-first),
+ * so the mapping flips. Persisted YAML always stores `first`/`last`;
+ * this map only affects the labels rendered in the form.
+ */
+function aggregationLabel(
+  aggregation: WidgetNumberAggregation,
+  sourceKind: TablePanelDataSource["kind"] | undefined,
+): string {
+  const newestFirst = sourceKind === "runs" || sourceKind === "executions";
+  if (aggregation === "first") return newestFirst ? "Latest" : "Earliest";
+  if (aggregation === "last") return newestFirst ? "Earliest" : "Latest";
+  return aggregation;
+}
 
 interface ScorecardPanelFormProps {
   value: ScorecardPanelContent;
@@ -93,6 +110,7 @@ function AggregationFields({
   const fieldListId = memoryNamespace ? `scorecard-fields-${memoryNamespace}` : undefined;
   const aggregation = render.aggregation ?? "last";
   const aggregationNeedsField = aggregation !== "count";
+  const sourceKind = value.dataSource?.kind;
 
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -105,7 +123,7 @@ function AggregationFields({
           <SelectContent>
             {NUMBER_PANEL_AGGREGATIONS.map((a) => (
               <SelectItem key={a} value={a}>
-                {a}
+                {aggregationLabel(a, sourceKind)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -220,7 +238,7 @@ function SeriesFields({
         data-testid="scorecard-sparkline-field"
       />
       <p className="text-[11px] text-slate-500 dark:text-gray-400">
-        Powers the sparkline and the change baseline (first point in the range).
+        Draws the sparkline. When empty, the change chip still renders using the primary field.
       </p>
     </div>
   );
@@ -280,7 +298,7 @@ function ChangeFields({
         <Input
           value={render.changeCaption ?? ""}
           onChange={(e) => onChange({ changeCaption: e.target.value || undefined })}
-          placeholder="e.g. vs start of range"
+          placeholder="e.g. vs previous"
         />
       </div>
     </div>

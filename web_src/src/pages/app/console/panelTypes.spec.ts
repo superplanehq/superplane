@@ -96,7 +96,7 @@ describe("templateForPanelType", () => {
       aggregation: "count",
       better: "up",
       showChange: "both",
-      changeCaption: "vs start of range",
+      changeCaption: "vs previous",
     });
   });
 });

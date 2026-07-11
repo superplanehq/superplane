@@ -302,7 +302,7 @@ const DEFAULT_SCORECARD_RENDER: WidgetScorecardRender = {
   aggregation: "count",
   better: "up",
   showChange: "both",
-  changeCaption: "vs start of range",
+  changeCaption: "vs previous",
 };
 
 /**

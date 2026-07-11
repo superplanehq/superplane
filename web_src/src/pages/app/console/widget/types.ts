@@ -288,10 +288,11 @@ export type WidgetScorecardShowChange = "percent" | "number" | "both" | "none";
 export const WIDGET_SCORECARD_SHOW_CHANGES: WidgetScorecardShowChange[] = ["percent", "number", "both", "none"];
 
 /**
- * Scorecard render: single KPI value plus optional change vs the first
- * series point, direction-aware target/progress, and a status-colored
- * sparkline. Composite memory and multi-KPI shapes are intentionally not
- * supported — the dedicated `number` panel already covers those cases.
+ * Scorecard render: single KPI value plus optional change vs the
+ * immediately-previous value in the series, direction-aware
+ * target/progress, and a status-colored sparkline. Composite memory and
+ * multi-KPI shapes are intentionally not supported — the dedicated
+ * `number` panel already covers those cases.
  */
 export interface WidgetScorecardRender {
   kind: "scorecard";
@@ -322,14 +323,14 @@ export interface WidgetScorecardRender {
   /** When true and the target resolves, render a direction-aware progress bar. */
   showProgress?: boolean;
   /**
-   * Field extracted from each filtered row (in order) to build the series
-   * driving both the sparkline and the "vs start of range" change baseline.
-   * When omitted the scorecard hides the change chip and sparkline.
+   * Field extracted from each filtered row (in order) to draw the
+   * sparkline. When omitted the sparkline is hidden — the change chip
+   * still renders using the primary `field` as its fallback series.
    */
   sparklineField?: string;
   /** What the change chip prints alongside its arrow. Defaults to `both`. */
   showChange?: WidgetScorecardShowChange;
-  /** Optional short caption rendered next to the change chip (e.g. "vs start of range"). */
+  /** Optional short caption rendered next to the change chip (e.g. "vs previous"). */
   changeCaption?: string;
 }
 

@@ -17,6 +17,7 @@ import {
   computeScorecardProgress,
   extractScorecardSeries,
   formatScorecardChangeLabel,
+  pickChangeAnchors,
   resolveScorecardStatus,
   resolveScorecardTarget,
   type ScorecardProgress,
@@ -82,9 +83,17 @@ export function WidgetScorecard({ render, rows, isLoading, totalCount }: WidgetS
     return aggregateNumber(filtered, render.aggregation, render.field);
   }, [filtered, render.aggregation, render.field, render.filters, totalCount]);
 
-  const series = useMemo(
+  // Sparkline reads `sparklineField` only. The change chip falls back to
+  // the primary aggregation `field` so authors get a "vs previous" chip
+  // out of the box even when they haven't opted into a sparkline.
+  const sparklineSeries = useMemo(
     () => extractScorecardSeries(filtered, render.sparklineField),
     [filtered, render.sparklineField],
+  );
+  const changeSeriesField = render.sparklineField ?? render.field;
+  const changeSeries = useMemo(
+    () => extractScorecardSeries(filtered, changeSeriesField),
+    [filtered, changeSeriesField],
   );
 
   // The target expression evaluates against the last filtered row so authors
@@ -103,8 +112,8 @@ export function WidgetScorecard({ render, rows, isLoading, totalCount }: WidgetS
   }, [render.showProgress, render.better, target, value]);
 
   const change = useMemo(
-    () => computeScorecardChange(value, series.baseline, render.better),
-    [value, series.baseline, render.better],
+    () => computeScorecardChange(pickChangeAnchors(changeSeries, render.aggregation), render.better),
+    [changeSeries, render.aggregation, render.better],
   );
 
   // Progress used purely for status coloring — computed even when the bar
@@ -136,7 +145,7 @@ export function WidgetScorecard({ render, rows, isLoading, totalCount }: WidgetS
       change={change}
       progress={progress}
       status={status}
-      series={series.values}
+      series={sparklineSeries}
     />
   );
 }
@@ -284,7 +293,7 @@ function ChangeChip({
   if (!caption) return wrappedChip;
 
   return (
-    <span className="inline-flex flex-wrap items-baseline gap-x-2">
+    <span className="inline-flex flex-wrap items-end gap-x-2">
       {wrappedChip}
       <span className="text-xs text-slate-500 dark:text-gray-400" data-testid="widget-scorecard-caption">
         {caption}

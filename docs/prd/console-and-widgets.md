@@ -574,7 +574,7 @@ The editor exposes a Single / Multiple toggle in the Number panel form. Switchin
 
 Scorecard panels are a single-KPI variant of the number panel with three extra affordances baked in:
 
-- **Change chip** comparing the current aggregated value to the first finite point of the loaded series (`sparklineField`).
+- **Change chip** comparing the current aggregated value to the immediately previous value in the series (`sparklineField`, or the primary `field` as a fallback).
 - **Target** (literal number or `{{ CEL }}`) that drives an optional progress bar and — when the change is incomputable — a fallback status color.
 - **Status direction** (`better: "up" | "down"`) that colors the value change, the sparkline, and the vs-target polarity.
 
@@ -598,18 +598,24 @@ content:
     showProgress: true
     sparklineField: openCount
     showChange: both
-    changeCaption: vs start of range
+    changeCaption: vs previous
 ```
 
 ### Value pipeline
 
 Value resolution is the single-source number pipeline: `dataSource` (`memory` | `executions` | `runs`) + `aggregation` + `field` (when needed) + `format` / `label` / `prefix` / `suffix`. Aggregations follow the standard number vocabulary (`count`, `sum`, `avg`, `min`, `max`, `first`, `last`). Aggregations other than `count` require a non-empty `field`.
 
-To keep the change chip meaningful, most scorecards use `aggregation: last` on the same field as `sparklineField` so the primary value matches the end of the series.
+`runs` and `executions` return newest-first, while `memory` is oldest-first. The scorecard form relabels the two directional aggregations accordingly (`Latest` / `Earliest`), but the persisted YAML always uses `first` / `last`. Pick the aggregation that anchors the current value to the record you care about — typically the latest one.
 
-### Change vs the start of the range
+### Change vs the previous record
 
-When `sparklineField` is set, the scorecard extracts the first finite value from the filtered rows and compares the current value against it using the same math as the table trend chip (`computeTrend`). The direction of "better" is controlled by `better`:
+The scorecard extracts a numeric series from the filtered rows using `sparklineField`; when it isn't set, the change chip falls back to the primary `field`. The chip compares the current value against the immediately previous value in that series, using the same math as the table trend chip (`computeTrend`). The pair is picked by aggregation:
+
+- `last` → current = last point in the series, previous = second-to-last point.
+- `first` → current = first point, previous = second point.
+- `sum` / `avg` / `min` / `max` / `count` → the chip is hidden. Combining aggregations don't point at a single record, so there is no coherent "previous" to compare against.
+
+The `better` direction controls the polarity:
 
 - `better: up` → an increase is good (green), a decrease is bad (red).
 - `better: down` → a decrease is good (green), an increase is bad (red).
@@ -621,18 +627,22 @@ When `sparklineField` is set, the scorecard extracts the first finite value from
 - `both` (default) — `-29 (-22.8%)`.
 - `none` — arrow only.
 
-`render.changeCaption` (optional) prints a short caption next to the chip (e.g. `vs start of range`). When the series has fewer than two finite points, the chip is hidden entirely.
+`render.changeCaption` (optional) prints a short caption next to the chip (e.g. `vs previous`). When the series has fewer than two finite points, the chip is hidden entirely.
+
+The sparkline is fully independent from the chip: it only draws when `sparklineField` is set. A scorecard can render a change chip without a sparkline (rely on the `field` fallback) and a sparkline without a chip (pick a non-directional aggregation).
 
 ### Target and progress
 
 `render.target` accepts a numeric literal or a full `{{ CEL }}` expression. The expression is evaluated once against the last filtered row plus the shared `now` global, so authors can bind to memory / execution fields (`{{ goal }}`) or compute a target (`{{ base * 1.1 }}`).
 
-When `render.showProgress` is `true` and the target resolves to a finite positive number, the scorecard renders a thin direction-aware progress bar under the value:
+When `render.showProgress` is `true` and the target resolves to a finite positive number, the scorecard renders a thin direction-aware progress bar under the value.
 
-- `better: up` — bar = `clamp(current / target, 0, 100%)`; the goal is met when `current >= target`.
-- `better: down` — the goal is met when `current <= target` (bar fills to 100%); overshoot uses `target / current` so the bar shrinks as the value drifts further from the goal.
+The bar always fills to `clamp(current / target, 0, 100%)` — the fraction of the target the current value covers. The percentage label under the bar uses the raw ratio so authors see overshoot values above 100%. Only `met` (and therefore the bar color) depends on direction:
 
-The percentage label under the bar always uses the raw ratio (so authors still see overshoot values above 100%).
+- `better: up` — met when `current >= target`.
+- `better: down` — met when `current <= target`.
+
+This keeps the label honest for budget-style metrics: `429 vs 500` with `better: down` reads as `85.8% of 500` and colors green (still under the ceiling), rather than misleadingly reporting `100% of 500`.
 
 ### Status color priority
 

@@ -2,7 +2,8 @@
  * Pure math + resolution helpers for the scorecard panel.
  *
  * The scorecard combines a KPI value with two independent comparisons:
- *  - Change vs the first finite point in the loaded series (`sparklineField`).
+ *  - Change vs the *immediately previous* value in the series
+ *    (`sparklineField` when set, otherwise the primary aggregation `field`).
  *  - Target (literal or `{{ CEL }}`), used for optional progress and — when
  *    the change is incomputable — a fallback status color.
  *
@@ -12,33 +13,58 @@
 
 import { buildEnv, compileMaybeExpr, evalRowField } from "./celExpr";
 import { getValueAtPath } from "./fieldPath";
-import type { WidgetScorecardRender, WidgetTrendBetter } from "./types";
+import type { WidgetNumberAggregation, WidgetScorecardRender, WidgetTrendBetter } from "./types";
 import { computeTrend, type TrendResult } from "./widgetTrend";
 
-/** Numeric series extracted from filtered rows using `render.sparklineField`. */
-export interface ScorecardSeries {
-  values: number[];
-  /** First finite value in `values`, `null` when the series is empty. */
-  baseline: number | null;
+/**
+ * Extract the numeric series driving the sparkline and change chip.
+ *
+ * Non-finite entries are dropped so a `null` / `""` / non-numeric row
+ * doesn't poison the anchor selection — callers get a densely-packed
+ * `number[]` where index 0 is the first usable point in row order.
+ */
+export function extractScorecardSeries(rows: unknown[], seriesField: string | undefined): number[] {
+  if (!seriesField) return [];
+  const values: number[] = [];
+  for (const row of rows) {
+    const n = toFiniteNumber(getValueAtPath(row, seriesField));
+    if (n !== null) values.push(n);
+  }
+  return values;
+}
+
+/** Pair of values consumed by {@link computeScorecardChange}. */
+export interface ScorecardChangeAnchors {
+  current: number;
+  previous: number;
 }
 
 /**
- * Extract the series driving both the sparkline and the change baseline.
- * Non-finite values are dropped so the baseline is the first *usable*
- * point — not the first row with a `null`/`""` entry.
+ * Pick the (current, previous) anchor pair used by the change chip.
+ *
+ * Only aggregations that select a single record from the series have a
+ * natural "immediate previous" neighbor:
+ *  - `last`  → current = `series[N-1]`, previous = `series[N-2]`.
+ *  - `first` → current = `series[0]`,   previous = `series[1]`.
+ *
+ * Combining aggregations (`sum`, `avg`, `min`, `max`, `count`) do not
+ * point at a single row, so there is no coherent "previous" — the widget
+ * hides the chip in those cases. Returns `null` when the anchor cannot
+ * be resolved (unsupported aggregation, or series with fewer than two
+ * finite points).
  */
-export function extractScorecardSeries(rows: unknown[], sparklineField: string | undefined): ScorecardSeries {
-  if (!sparklineField) return { values: [], baseline: null };
-  const values: number[] = [];
-  for (const row of rows) {
-    const raw = getValueAtPath(row, sparklineField);
-    const n = toFiniteNumber(raw);
-    if (n !== null) values.push(n);
+export function pickChangeAnchors(
+  series: number[],
+  aggregation: WidgetNumberAggregation,
+): ScorecardChangeAnchors | null {
+  if (series.length < 2) return null;
+  if (aggregation === "last") {
+    return { current: series[series.length - 1], previous: series[series.length - 2] };
   }
-  // Baseline is only meaningful when the series has at least two points —
-  // a single-point series has no earlier value to compare against, so the
-  // change chip should hide entirely rather than render a spurious `flat`.
-  return { values, baseline: values.length > 1 ? values[0] : null };
+  if (aggregation === "first") {
+    return { current: series[0], previous: series[1] };
+  }
+  return null;
 }
 
 /**
@@ -73,11 +99,14 @@ export function resolveScorecardTarget(target: string | undefined, contextRow: u
 /**
  * Direction-aware progress values for the scorecard's optional progress bar.
  *
- * - `better: "up"` (higher is better): progress = `current / target`, so a
- *   value at or above target reaches 100%.
- * - `better: "down"` (lower is better): meeting or beating the target is
- *   100%; overshoot uses `target / current` so the bar shrinks as the
- *   value drifts further away from the goal.
+ * In both directions the bar visualizes `current / target` — the fraction
+ * of the target the current value covers — clamped to `[0, 100]` for the
+ * visible width. This keeps the label honest ("429 covers 85.8% of a
+ * ceiling of 500", not a misleading "100% of 500"). The direction only
+ * affects `met` and the color the widget picks:
+ *
+ * - `better: "up"`   (higher is better): `met = current >= target`.
+ * - `better: "down"` (lower is better):  `met = current <= target`.
  *
  * Returns `null` when either input can't be coerced to a finite number, or
  * the target is <= 0 (division-by-zero / meaningless goal).
@@ -85,7 +114,7 @@ export function resolveScorecardTarget(target: string | undefined, contextRow: u
 export interface ScorecardProgress {
   current: number;
   target: number;
-  /** Signed percent. May be > 100 when overshooting a `better: up` goal. */
+  /** Raw signed percent. May be > 100 when the value exceeds the target. */
   percent: number;
   /** Clamped `[0, 100]` — drives the bar width. */
   barPercent: number;
@@ -103,53 +132,34 @@ export function computeScorecardProgress(
   if (currentNum === null || targetNum === null) return null;
   if (targetNum <= 0) return null;
 
-  if ((better ?? "up") === "up") {
-    const percent = (currentNum / targetNum) * 100;
-    return {
-      current: currentNum,
-      target: targetNum,
-      percent,
-      barPercent: Math.max(0, Math.min(100, percent)),
-      met: currentNum >= targetNum,
-    };
-  }
-
-  // "down": meeting or beating a low-is-better goal is 100%.
-  if (currentNum <= targetNum) {
-    return { current: currentNum, target: targetNum, percent: 100, barPercent: 100, met: true };
-  }
-  const percent = (targetNum / currentNum) * 100;
-  return {
-    current: currentNum,
-    target: targetNum,
-    percent,
-    barPercent: Math.max(0, Math.min(100, percent)),
-    met: false,
-  };
+  const percent = (currentNum / targetNum) * 100;
+  const barPercent = Math.max(0, Math.min(100, percent));
+  const met = (better ?? "up") === "down" ? currentNum <= targetNum : currentNum >= targetNum;
+  return { current: currentNum, target: targetNum, percent, barPercent, met };
 }
 
 /**
- * Compute the change chip vs the series baseline (first finite point).
- * Reuses `computeTrend` so the arrow / percent / color semantics stay
- * identical to the table `format: trend` chip.
+ * Compute the change chip given the resolved anchor pair. Reuses
+ * `computeTrend` so the arrow / percent / color semantics stay identical
+ * to the table `format: trend` chip.
  *
- * Returns `null` when the baseline is missing (single-point or empty
- * series) — the widget hides the chip and falls back to target-based
- * status coloring.
+ * Returns `null` when the anchor pair is missing (single-point series,
+ * empty series, or an aggregation with no natural "previous" — see
+ * {@link pickChangeAnchors}). The widget hides the chip in those cases
+ * and falls back to target-based status coloring.
  */
 export function computeScorecardChange(
-  current: number | null,
-  baseline: number | null,
+  anchors: ScorecardChangeAnchors | null,
   better: WidgetTrendBetter | undefined,
 ): TrendResult | null {
-  if (current == null || baseline == null) return null;
-  return computeTrend(current, baseline, { better, display: "percent" });
+  if (!anchors) return null;
+  return computeTrend(anchors.current, anchors.previous, { better, display: "percent" });
 }
 
 /**
  * Priority-ordered status polarity for coloring the value, sparkline, and
  * target line:
- *  1. Change vs baseline (when both present) — `better` / `worse` / `flat`.
+ *  1. Change vs previous (when present) — `better` / `worse` / `flat`.
  *  2. Target comparison (when target resolvable) — `met` → better,
  *     otherwise worse.
  *  3. Neutral.

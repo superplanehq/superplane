@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { WidgetScorecard } from "./WidgetScorecard";
 
+// Six rows in chronological order (oldest first, newest last). With
+// `aggregation: last` the current value is 98 and the immediately
+// previous value is 105 — delta -7, ~-6.7%.
 const openCountRows = [
   { openCount: 127 },
   { openCount: 120 },
@@ -27,7 +30,7 @@ describe("WidgetScorecard", () => {
           better: "down",
           sparklineField: "openCount",
           showChange: "both",
-          changeCaption: "vs start of range",
+          changeCaption: "vs previous",
         }}
       />,
     );
@@ -35,10 +38,53 @@ describe("WidgetScorecard", () => {
     const root = screen.getByTestId("widget-scorecard");
     expect(root).toHaveTextContent("98");
     const change = screen.getByTestId("widget-scorecard-change");
-    expect(change).toHaveTextContent("-29 (-22.8%)");
+    expect(change).toHaveTextContent("-7 (-6.7%)");
     // "down" + shrinking value → better polarity → green.
     expect(root).toHaveAttribute("data-scorecard-status", "better");
-    expect(screen.getByTestId("widget-scorecard-caption")).toHaveTextContent("vs start of range");
+    expect(screen.getByTestId("widget-scorecard-caption")).toHaveTextContent("vs previous");
+  });
+
+  it("renders the change chip using the primary field when sparklineField is not set", () => {
+    render(
+      <WidgetScorecard
+        rows={openCountRows}
+        isLoading={false}
+        render={{
+          kind: "scorecard",
+          aggregation: "last",
+          field: "openCount",
+          better: "down",
+          showChange: "both",
+        }}
+      />,
+    );
+
+    const change = screen.getByTestId("widget-scorecard-change");
+    expect(change).toHaveTextContent("-7 (-6.7%)");
+    // Sparkline is opt-in via sparklineField; without it the widget draws
+    // no polyline (arrow icons still use <svg>, but the sparkline is the
+    // only element that renders a <polyline>).
+    expect(screen.getByTestId("widget-scorecard").querySelector("polyline")).toBeNull();
+  });
+
+  it("hides the change chip for combining aggregations like sum", () => {
+    render(
+      <WidgetScorecard
+        rows={openCountRows}
+        isLoading={false}
+        render={{
+          kind: "scorecard",
+          aggregation: "sum",
+          field: "openCount",
+          better: "down",
+          sparklineField: "openCount",
+        }}
+      />,
+    );
+
+    // sum has no natural "immediate previous", so the chip is hidden even
+    // though the sparkline still renders from `sparklineField`.
+    expect(screen.queryByTestId("widget-scorecard-change")).toBeNull();
   });
 
   it("hides the change chip when only one point is loaded", () => {
@@ -77,10 +123,12 @@ describe("WidgetScorecard", () => {
     );
 
     const root = screen.getByTestId("widget-scorecard");
-    // 42 <= target 80 → met for "down" direction → green.
+    // 42 <= target 80 → met for "down" direction → green. Label shows the
+    // raw ratio (42 / 80 = 52.5%) so authors can see how much headroom
+    // they have before the ceiling.
     expect(root).toHaveAttribute("data-scorecard-status", "better");
     expect(screen.getByTestId("widget-scorecard-progress")).toBeInTheDocument();
-    expect(screen.getByTestId("widget-scorecard-progress-label")).toHaveTextContent("100% of 80");
+    expect(screen.getByTestId("widget-scorecard-progress-label")).toHaveTextContent("52.5% of 80");
   });
 
   it("colors the sparkline and value red when the change is worse", () => {
