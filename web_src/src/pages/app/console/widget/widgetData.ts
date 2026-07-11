@@ -100,8 +100,8 @@ export function aggregateNumber(
   const numeric: number[] = [];
   for (const row of rows) {
     const raw = field ? getValueAtPath(row, field) : row;
-    const value = typeof raw === "number" ? raw : Number(raw);
-    if (Number.isFinite(value)) numeric.push(value);
+    const value = toFiniteNumber(raw);
+    if (value !== null) numeric.push(value);
   }
   if (numeric.length === 0) return null;
   switch (aggregation) {

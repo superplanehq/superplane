@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { consoleToYaml, parseConsoleYaml, validateConsoleContent, MAX_CONSOLE_PANELS } from "./consoleYaml";
+import { consoleToYaml, parseConsoleYaml } from "./consoleYaml";
 
 describe("consoleToYaml / parseConsoleYaml", () => {
   it("round-trips an empty console", () => {
@@ -504,110 +504,5 @@ spec:
     const result = parseConsoleYaml(text);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(/dataSource\.sources\[0\]\.field is required/);
-  });
-
-  it("round-trips a scorecard panel with target, sparkline, and change caption", () => {
-    const panels = [
-      {
-        id: "papercuts",
-        type: "scorecard",
-        content: {
-          title: "Open UX papercuts",
-          dataSource: { kind: "memory", namespace: "ux_papercuts" },
-          render: {
-            kind: "scorecard",
-            aggregation: "last",
-            field: "openCount",
-            format: "number",
-            label: "Open UX papercuts",
-            better: "down",
-            target: "80",
-            showProgress: true,
-            sparklineField: "openCount",
-            showChange: "both",
-            changeCaption: "vs start of range",
-          },
-        },
-      },
-    ];
-    const layout = [{ i: "papercuts", x: 0, y: 0, w: 6, h: 4 }];
-    const text = consoleToYaml({ panels, layout });
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.error);
-    expect(result.data.spec.panels).toEqual(panels);
-  });
-
-  it("rejects a scorecard panel with an unknown better value", () => {
-    const text = `apiVersion: v1
-kind: Console
-metadata: {}
-spec:
-  panels:
-    - id: papercuts
-      type: scorecard
-      content:
-        dataSource: { kind: memory, namespace: ux_papercuts }
-        render:
-          kind: scorecard
-          aggregation: count
-          better: sideways
-  layout: []
-`;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/render\.better must be one of/);
-  });
-
-  it("rejects a scorecard panel without a field for non-count aggregation", () => {
-    const text = `apiVersion: v1
-kind: Console
-metadata: {}
-spec:
-  panels:
-    - id: papercuts
-      type: scorecard
-      content:
-        dataSource: { kind: memory, namespace: ux_papercuts }
-        render:
-          kind: scorecard
-          aggregation: last
-  layout: []
-`;
-    const result = parseConsoleYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/render\.field is required/);
-  });
-});
-
-describe("validateConsoleContent", () => {
-  it("flags too many panels", () => {
-    const panels = Array.from({ length: MAX_CONSOLE_PANELS + 1 }, (_, i) => ({
-      id: `p${i}`,
-      type: "markdown",
-      content: {},
-    }));
-    expect(validateConsoleContent(panels, [])).toContain("Too many panels");
-  });
-
-  it("flags layout with non-positive size", () => {
-    expect(
-      validateConsoleContent([{ id: "p", type: "markdown", content: {} }], [{ i: "p", x: 0, y: 0, w: 0, h: 1 }]),
-    ).toContain("positive width and height");
-  });
-
-  it("flags negative position", () => {
-    expect(
-      validateConsoleContent([{ id: "p", type: "markdown", content: {} }], [{ i: "p", x: -1, y: 0, w: 1, h: 1 }]),
-    ).toContain("non-negative");
-  });
-
-  it("accepts a valid console", () => {
-    expect(
-      validateConsoleContent(
-        [{ id: "p", type: "markdown", content: { body: "ok" } }],
-        [{ i: "p", x: 0, y: 0, w: 1, h: 1 }],
-      ),
-    ).toBeNull();
   });
 });

@@ -143,9 +143,9 @@ Editor memory hints: `MemoryDiscoveryPanel.tsx`, `useMemoryCatalog.ts` (suggesti
 **Scorecard** shares the number aggregation vocabulary but is single-KPI only (no multi-KPI / composite memory). Comparison model:
 
 - **Change** = current value vs the immediately previous value in the series. The series is derived from `sparklineField` when set, or the primary `field` as a fallback. Only `first` / `last` aggregations expose a natural "previous" (adjacent anchor via `pickChangeAnchors`); combining aggregations (`sum` / `avg` / `min` / `max` / `count`) hide the chip. Reuses `computeTrend` (`widgetTrend.ts`) for percent/absolute math.
-- **Target** = literal number or `{{ CEL }}` (evaluated against the last filtered row + `now`), used for optional `showProgress` and fallback status color.
+- **Target** = literal number or `{{ CEL }}` (evaluated against the newest filtered row + `now`), used for optional `showProgress` and fallback status color.
 - `better: "up" | "down"` controls the polarity for the value change, the sparkline, and the vs-target status.
-- The form relabels the two directional aggregations as `Latest` / `Earliest` based on the data source order (runs/executions are newest-first; memory is oldest-first). Persisted YAML still uses `first` / `last`.
+- The form relabels the two directional aggregations as `Latest` / `Earliest` because all data sources are newest-first (`first` → Latest, `last` → Earliest). Persisted YAML still uses `first` / `last`.
 
 Helpers live in `widget/scorecardMath.ts` (`extractScorecardSeries`, `pickChangeAnchors`, `resolveScorecardTarget`, `computeScorecardProgress`, `computeScorecardChange`, `resolveScorecardStatus`, `formatScorecardChangeLabel`). Rendering is in `widget/WidgetScorecard.tsx`; the sparkline itself comes from the shared `widget/Sparkline.tsx` (shared with `WidgetNumber`) with a `className` prop for status coloring.
 

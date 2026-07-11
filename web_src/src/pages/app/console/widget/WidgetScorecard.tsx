@@ -96,11 +96,12 @@ export function WidgetScorecard({ render, rows, isLoading, totalCount }: WidgetS
     [filtered, changeSeriesField],
   );
 
-  // The target expression evaluates against the last filtered row so authors
+  // The target expression evaluates against the newest filtered row so authors
   // can reference the most recent memory / execution snapshot (e.g. bind to
-  // `{{ goal }}` on the latest entry). Falling back to `{}` keeps the CEL
-  // env stable when the dataset is empty — the resolver simply returns null.
-  const targetContextRow = filtered.length > 0 ? filtered[filtered.length - 1] : null;
+  // `{{ goal }}` on the latest entry). Widget data sources return newest-first,
+  // so index 0 is current. Falling back to `{}` keeps the CEL env stable when
+  // the dataset is empty — the resolver simply returns null.
+  const targetContextRow = filtered.length > 0 ? filtered[0] : null;
   const target = useMemo(
     () => resolveScorecardTarget(render.target, targetContextRow),
     [render.target, targetContextRow],
@@ -112,8 +113,8 @@ export function WidgetScorecard({ render, rows, isLoading, totalCount }: WidgetS
   }, [render.showProgress, render.better, target, value]);
 
   const change = useMemo(
-    () => computeScorecardChange(pickChangeAnchors(changeSeries, render.aggregation), render.better),
-    [changeSeries, render.aggregation, render.better],
+    () => computeScorecardChange(pickChangeAnchors(changeSeries, render.aggregation), render.better, render.showChange),
+    [changeSeries, render.aggregation, render.better, render.showChange],
   );
 
   // Progress used purely for status coloring — computed even when the bar
@@ -252,7 +253,7 @@ function ChangeChip({
   render: WidgetScorecardRender;
   status: ScorecardStatusPolarity;
 }) {
-  if (!result || result.kind === "no-baseline") return null;
+  if (!result || result.kind === "no-baseline" || result.kind === "incomparable") return null;
 
   const showChange = render.showChange ?? "both";
   const label = formatScorecardChangeLabel(result, showChange);

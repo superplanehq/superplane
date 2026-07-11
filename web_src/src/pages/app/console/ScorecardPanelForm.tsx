@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataSourceForm } from "./DataSourceForm";
 import { useConsoleContext } from "./ConsoleContext";
 import { NUMBER_PANEL_AGGREGATIONS, NUMBER_PANEL_FORMATS } from "./numberPanelFormConstants";
-import type { ScorecardPanelContent, TablePanelDataSource } from "./panelTypes";
+import type { ScorecardPanelContent } from "./panelTypes";
 import type {
   WidgetColumnFormat,
   WidgetNumberAggregation,
@@ -30,19 +32,14 @@ const BETTER_LABELS: Record<WidgetTrendBetter, string> = {
 };
 
 /**
- * Runs and executions come from the API newest-first, so the persisted
- * `first` aggregation actually picks the *latest* record, and `last`
- * picks the earliest. Memory rows land in insertion order (oldest-first),
- * so the mapping flips. Persisted YAML always stores `first`/`last`;
- * this map only affects the labels rendered in the form.
+ * All widget data sources (memory, runs, executions) come from the API
+ * newest-first, so the persisted `first` aggregation picks the *latest*
+ * record and `last` picks the earliest. Persisted YAML always stores
+ * `first`/`last`; this map only affects the labels rendered in the form.
  */
-function aggregationLabel(
-  aggregation: WidgetNumberAggregation,
-  sourceKind: TablePanelDataSource["kind"] | undefined,
-): string {
-  const newestFirst = sourceKind === "runs" || sourceKind === "executions";
-  if (aggregation === "first") return newestFirst ? "Latest" : "Earliest";
-  if (aggregation === "last") return newestFirst ? "Earliest" : "Latest";
+function aggregationLabel(aggregation: WidgetNumberAggregation): string {
+  if (aggregation === "first") return "Latest";
+  if (aggregation === "last") return "Earliest";
   return aggregation;
 }
 
@@ -110,7 +107,6 @@ function AggregationFields({
   const fieldListId = memoryNamespace ? `scorecard-fields-${memoryNamespace}` : undefined;
   const aggregation = render.aggregation ?? "last";
   const aggregationNeedsField = aggregation !== "count";
-  const sourceKind = value.dataSource?.kind;
 
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -123,7 +119,7 @@ function AggregationFields({
           <SelectContent>
             {NUMBER_PANEL_AGGREGATIONS.map((a) => (
               <SelectItem key={a} value={a}>
-                {aggregationLabel(a, sourceKind)}
+                {aggregationLabel(a)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -313,6 +309,7 @@ function TargetFields({
   onChange: (patch: Partial<WidgetScorecardRender>) => void;
 }) {
   const showProgress = render.showProgress ?? false;
+  const showProgressId = useId();
   return (
     <div className="space-y-2 rounded-lg bg-slate-100 p-3 dark:bg-gray-800">
       <div className="space-y-1.5">
@@ -329,14 +326,17 @@ function TargetFields({
           expression.
         </p>
       </div>
-      <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-gray-300">
+      <div className="flex items-center gap-2">
         <Checkbox
+          id={showProgressId}
           checked={showProgress}
           onChange={(e) => onChange({ showProgress: e.target.checked ? true : undefined })}
           data-testid="scorecard-show-progress"
         />
-        Show progress bar toward target
-      </label>
+        <Label htmlFor={showProgressId} className="text-xs text-slate-700 dark:text-gray-300">
+          Show progress bar toward target
+        </Label>
+      </div>
     </div>
   );
 }

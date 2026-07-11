@@ -74,9 +74,9 @@ export function pickChangeAnchors(
  * or a full CEL expression (`{{ base + delta }}`).
  *
  * `contextRow` is the row used as the CEL environment. Scorecards pass the
- * last filtered row (best proxy for "current state") so expressions like
- * `{{ target }}` or `{{ base * 1.1 }}` resolve against the most recent
- * memory / execution entry.
+ * newest filtered row (index 0 — all widget data sources are newest-first)
+ * so expressions like `{{ target }}` or `{{ base * 1.1 }}` resolve against
+ * the most recent memory / execution entry.
  *
  * Returns `null` when the target is empty, unparseable, or resolves to
  * something that isn't a finite number.
@@ -151,9 +151,21 @@ export function computeScorecardProgress(
 export function computeScorecardChange(
   anchors: ScorecardChangeAnchors | null,
   better: WidgetTrendBetter | undefined,
+  showChange?: WidgetScorecardRender["showChange"],
 ): TrendResult | null {
   if (!anchors) return null;
-  return computeTrend(anchors.current, anchors.previous, { better, display: "percent" });
+  // Map scorecard `showChange` onto trend `display`. Prefer `value` whenever
+  // a numeric delta is useful (`number` / `both` / default) so a zero
+  // previous still yields a signed change instead of `incomparable`.
+  // Percent-only keeps percent math (and its zero-baseline incomparable).
+  const display = showChangeToTrendDisplay(showChange);
+  return computeTrend(anchors.current, anchors.previous, { better, display });
+}
+
+function showChangeToTrendDisplay(showChange: WidgetScorecardRender["showChange"]): "percent" | "value" | "none" {
+  if (showChange === "percent") return "percent";
+  if (showChange === "none") return "none";
+  return "value";
 }
 
 /**
@@ -190,10 +202,11 @@ export function resolveScorecardStatus(
  *  - `none`    → empty string (arrow only)
  *
  * Falls back to just the delta when percent is unavailable (previous = 0).
- * Returns `""` for non-`changed` trend results so the caller only renders
- * the muted `-` icon that `WidgetTableCell` already uses.
+ * Returns `"0"` for a flat trend (mirrors `formatTrendLabel` / table chips)
+ * and `""` for other non-`changed` results so the caller can render icon-only.
  */
 export function formatScorecardChangeLabel(result: TrendResult, mode: WidgetScorecardRender["showChange"]): string {
+  if (result.kind === "flat") return "0";
   if (result.kind !== "changed") return "";
   const displayMode = mode ?? "both";
   if (displayMode === "none") return "";

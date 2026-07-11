@@ -1,14 +1,6 @@
 /**
  * Typed panel content schemas, templates, and validators.
- *
- * Each panel kind owns its own JSON-shape under `panel.content`. Validation is
- * shared between three callers:
- *  - `dashboardYaml.ts` — validates content during YAML import / round-trip
- *  - `useConsolePanelState` — seeds new panels via `templateForPanelType`
- *  - Per-type form editors — validate the in-memory draft before commit
- *
- * Keep the backend Go validator (`pkg/models/canvas_dashboard_yml.go`) in
- * lockstep with the shapes declared here.
+ * Keep the backend Go validator (`pkg/models/console_yml.go`) in lockstep.
  */
 
 import type {
@@ -25,19 +17,18 @@ import {
   normalizeRowAction,
   WIDGET_FILTER_OPS,
   WIDGET_PROGRESS_LABELS,
-  WIDGET_SCORECARD_SHOW_CHANGES,
   WIDGET_SORT_ORDERS,
   WIDGET_TREND_BETTER,
   WIDGET_TREND_DISPLAYS,
 } from "./widget/types";
-import type { WidgetProgressLabel, WidgetSort, WidgetSortOrder, WidgetTrendBetter } from "./widget/types";
+import type { WidgetProgressLabel, WidgetSort, WidgetSortOrder } from "./widget/types";
 import { validateChartRender } from "./chartRenderValidation";
 import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
-import { validateNumberDataSource } from "./numberDataSourceValidation";
-import { validateNumberMetrics } from "./numberMetricsValidation";
+import { validateNumberContent } from "./numberContentValidation";
 import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
 import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
+import { validateScorecardContent } from "./scorecardRenderValidation";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
@@ -109,7 +100,7 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
   scorecard: {
     type: "scorecard",
     label: "Scorecard",
-    description: "A KPI with target, change vs the start of the range, and a status-colored sparkline.",
+    description: "A KPI with target, change vs the previous value, and a status-colored sparkline.",
   },
 };
 
@@ -177,9 +168,8 @@ export interface NumberPanelContent {
 }
 
 /**
- * Content shape for the `scorecard` panel. Single-KPI variant of the
- * number panel with target/change/progress. Composite memory and
- * multi-KPI shapes are intentionally not supported (`number` covers those).
+ * Content shape for the `scorecard` panel. Single-KPI only — use `number`
+ * for composite memory / multi-KPI.
  */
 export interface ScorecardPanelContent {
   title?: string;
@@ -187,14 +177,7 @@ export interface ScorecardPanelContent {
   render: WidgetScorecardRender;
 }
 
-/**
- * One number inside a multi-number panel. Each metric has its own data
- * source and aggregation; metrics render side-by-side in a wrapping row.
- *
- * Multi-number mode is disjoint from the composite-combine mode: each
- * metric uses a simple (single-namespace) data source, not a composite
- * memory source.
- */
+/** One number inside a multi-number panel (own data source + aggregation). */
 export interface NumberMetric {
   dataSource: TablePanelDataSource;
   render: WidgetNumberRender;
@@ -211,9 +194,8 @@ export type WidgetNumberCombine = "sum" | "min" | "max" | "avg";
 export const WIDGET_NUMBER_COMBINE_OPS: WidgetNumberCombine[] = ["sum", "min", "max", "avg"];
 
 /**
- * Single source of truth for the aggregations a number render accepts. Reused
- * by every number validator (single, composite, multi-number) and the form
- * controls so the allowed set cannot silently drift between paths.
+ * Aggregations accepted by number / scorecard renders. Shared by validators
+ * and form controls so the allowed set cannot drift.
  */
 export const WIDGET_NUMBER_AGGREGATIONS: WidgetNumberAggregation[] = [
   "count",
@@ -294,9 +276,8 @@ const DEFAULT_NUMBER_RENDER: WidgetNumberRender = {
   label: "Runs",
 };
 
-// Seed a valid, drop-in template: `count` requires no `field`, so a freshly
-// added scorecard passes validation before the author picks a data source or
-// switches to an aggregation like `sum` / `last` (which do need a field).
+// `count` needs no field, so a fresh scorecard validates before the author
+// picks a data source or switches to a field-backed aggregation.
 const DEFAULT_SCORECARD_RENDER: WidgetScorecardRender = {
   kind: "scorecard",
   aggregation: "count",
@@ -305,11 +286,7 @@ const DEFAULT_SCORECARD_RENDER: WidgetScorecardRender = {
   changeCaption: "vs previous",
 };
 
-/**
- * Default content for a newly-added panel of the given kind. The default node
- * reference is left blank; the form editor pre-selects the first canvas node
- * when one is available.
- */
+/** Default content for a newly-added panel of the given kind. */
 export function templateForPanelType(type: PanelType, defaultTitle?: string): Record<string, unknown> {
   switch (type) {
     case "markdown":
@@ -639,98 +616,11 @@ export function validateSort(sort: unknown): string | null {
   return null;
 }
 
-function validateNumberContent(content: unknown): string | null {
-  const obj = asObject(content);
-  if (!obj) return "content must be an object.";
-  // Match the backend: presence of `metrics` selects the multi-number path,
-  // and `validateNumberMetrics` reports a clear error when it is not an array.
-  if ("metrics" in obj) {
-    return validateNumberMetrics(obj.metrics);
-  }
-  const dsError = validateNumberDataSource(obj.dataSource);
-  if (dsError) return dsError;
-  const render = asObject(obj.render);
-  if (!render) return "render must be an object.";
-  if (render.kind !== "number") return 'render.kind must be "number".';
-  const symbolError = validateNumberRenderSymbols(render);
-  if (symbolError) return symbolError;
-  const dataSource = asObject(obj.dataSource);
-  if (dataSource && hasCompositeMemorySourcesKey(dataSource)) {
-    return validateCompositeNumberRenderExclusions(render);
-  }
-  return validateSimpleNumberRender(render);
-}
-
-function validateCompositeNumberRenderExclusions(render: Record<string, unknown>): string | null {
-  if (render.aggregation !== undefined) {
-    return "render.aggregation must not be set when dataSource.sources is used (each source defines its own aggregation).";
-  }
-  if (render.field !== undefined) {
-    return "render.field must not be set when dataSource.sources is used (each source defines its own field).";
-  }
-  return null;
-}
-
-function validateSimpleNumberRender(render: Record<string, unknown>): string | null {
-  if (typeof render.aggregation !== "string" || !isAllowedNumberAggregation(render.aggregation)) {
-    return `render.aggregation must be one of ${WIDGET_NUMBER_AGGREGATIONS.join(", ")}.`;
-  }
-  if (render.aggregation !== "count" && (typeof render.field !== "string" || render.field.trim() === "")) {
-    return `render.field is required when aggregation is "${render.aggregation}".`;
-  }
-  return null;
-}
-
 export function validateNumberRenderSymbols(render: Record<string, unknown>): string | null {
   for (const key of ["prefix", "suffix"] as const) {
     const value = render[key];
     if (value !== undefined && value !== null && typeof value !== "string") {
       return `render.${key} must be a string.`;
-    }
-  }
-  return null;
-}
-
-function validateScorecardContent(content: unknown): string | null {
-  const obj = asObject(content);
-  if (!obj) return "content must be an object.";
-  const dsError = validateDataSource(obj.dataSource);
-  if (dsError) return dsError;
-  const render = asObject(obj.render);
-  if (!render) return "render must be an object.";
-  if (render.kind !== "scorecard") return 'render.kind must be "scorecard".';
-  return validateScorecardRender(render);
-}
-
-function validateScorecardRender(render: Record<string, unknown>): string | null {
-  if (typeof render.aggregation !== "string" || !isAllowedNumberAggregation(render.aggregation)) {
-    return `render.aggregation must be one of ${WIDGET_NUMBER_AGGREGATIONS.join(", ")}.`;
-  }
-  if (render.aggregation !== "count" && (typeof render.field !== "string" || render.field.trim() === "")) {
-    return `render.field is required when aggregation is "${render.aggregation}".`;
-  }
-  const symbolError = validateNumberRenderSymbols(render);
-  if (symbolError) return symbolError;
-  const stringError =
-    optionalStringError("render.label", render.label) ??
-    optionalStringError("render.format", render.format) ??
-    optionalStringError("render.sparklineField", render.sparklineField) ??
-    optionalStringError("render.target", render.target) ??
-    optionalStringError("render.changeCaption", render.changeCaption);
-  if (stringError) return stringError;
-  const boolError = optionalBooleanError("render.showProgress", render.showProgress);
-  if (boolError) return boolError;
-  if (render.better !== undefined && render.better !== null) {
-    if (typeof render.better !== "string" || !WIDGET_TREND_BETTER.includes(render.better as WidgetTrendBetter)) {
-      return `render.better must be one of ${WIDGET_TREND_BETTER.join(", ")}.`;
-    }
-  }
-  if (render.showChange !== undefined && render.showChange !== null) {
-    if (
-      typeof render.showChange !== "string" ||
-      !WIDGET_SCORECARD_SHOW_CHANGES.includes(render.showChange as (typeof WIDGET_SCORECARD_SHOW_CHANGES)[number])
-    ) {
-      return `render.showChange must be one of ${WIDGET_SCORECARD_SHOW_CHANGES.join(", ")}.`;
     }
   }
   return null;

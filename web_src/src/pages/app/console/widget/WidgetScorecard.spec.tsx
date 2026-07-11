@@ -152,6 +152,54 @@ describe("WidgetScorecard", () => {
     expect(root).toHaveAttribute("data-scorecard-status", "worse");
   });
 
+  it("shows 0 on the change chip when the delta is flat", () => {
+    render(
+      <WidgetScorecard
+        rows={[{ openCount: 42 }, { openCount: 42 }, { openCount: 42 }]}
+        isLoading={false}
+        render={{
+          kind: "scorecard",
+          aggregation: "last",
+          field: "openCount",
+          better: "up",
+          showChange: "both",
+          changeCaption: "vs previous",
+        }}
+      />,
+    );
+
+    const change = screen.getByTestId("widget-scorecard-change");
+    expect(change).toHaveAttribute("data-scorecard-change-kind", "flat");
+    expect(change).toHaveTextContent("0");
+    expect(screen.getByTestId("widget-scorecard")).toHaveAttribute("data-scorecard-status", "flat");
+  });
+
+  it("evaluates a dynamic target against the newest filtered row", () => {
+    // Widget data sources return newest-first, so index 0 is current.
+    const newestFirstRows = [
+      { openCount: 98, goal: 80 },
+      { openCount: 105, goal: 90 },
+      { openCount: 112, goal: 100 },
+    ];
+    render(
+      <WidgetScorecard
+        rows={newestFirstRows}
+        isLoading={false}
+        render={{
+          kind: "scorecard",
+          aggregation: "first",
+          field: "openCount",
+          better: "down",
+          target: "{{ goal }}",
+          showProgress: true,
+        }}
+      />,
+    );
+
+    // Target must come from the newest row (goal: 80), not the oldest (100).
+    expect(screen.getByTestId("widget-scorecard-progress-label")).toHaveTextContent("122.5% of 80");
+  });
+
   it("renders the empty state when no value can be aggregated", () => {
     render(
       <WidgetScorecard

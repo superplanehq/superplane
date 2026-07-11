@@ -589,7 +589,7 @@ content:
     namespace: ux_papercuts
   render:
     kind: scorecard
-    aggregation: last
+    aggregation: first
     field: openCount
     format: number
     label: Open UX papercuts
@@ -605,7 +605,7 @@ content:
 
 Value resolution is the single-source number pipeline: `dataSource` (`memory` | `executions` | `runs`) + `aggregation` + `field` (when needed) + `format` / `label` / `prefix` / `suffix`. Aggregations follow the standard number vocabulary (`count`, `sum`, `avg`, `min`, `max`, `first`, `last`). Aggregations other than `count` require a non-empty `field`.
 
-`runs` and `executions` return newest-first, while `memory` is oldest-first. The scorecard form relabels the two directional aggregations accordingly (`Latest` / `Earliest`), but the persisted YAML always uses `first` / `last`. Pick the aggregation that anchors the current value to the record you care about — typically the latest one.
+`runs`, `executions`, and `memory` all return newest-first (`created_at DESC`). The scorecard form relabels the two directional aggregations accordingly (`first` → `Latest`, `last` → `Earliest`), but the persisted YAML always uses `first` / `last`. Pick the aggregation that anchors the current value to the record you care about — typically `first` for the latest KPI.
 
 ### Change vs the previous record
 
@@ -633,7 +633,7 @@ The sparkline is fully independent from the chip: it only draws when `sparklineF
 
 ### Target and progress
 
-`render.target` accepts a numeric literal or a full `{{ CEL }}` expression. The expression is evaluated once against the last filtered row plus the shared `now` global, so authors can bind to memory / execution fields (`{{ goal }}`) or compute a target (`{{ base * 1.1 }}`).
+`render.target` accepts a numeric literal or a full `{{ CEL }}` expression. The expression is evaluated once against the newest filtered row (index 0 — all widget data sources are newest-first) plus the shared `now` global, so authors can bind to memory / execution fields (`{{ goal }}`) or compute a target (`{{ base * 1.1 }}`).
 
 When `render.showProgress` is `true` and the target resolves to a finite positive number, the scorecard renders a thin direction-aware progress bar under the value.
 

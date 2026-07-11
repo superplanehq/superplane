@@ -164,16 +164,33 @@ describe("computeScorecardChange", () => {
     expect(computeScorecardChange(null, "up")).toBeNull();
   });
 
-  it("delegates to computeTrend with percent display", () => {
+  it("defaults to value display so a numeric delta is always available", () => {
     expect(computeScorecardChange({ current: 98, previous: 127 }, "down")).toEqual(
+      computeTrend(98, 127, { better: "down", display: "value" }),
+    );
+  });
+
+  it("uses percent display when showChange is percent-only", () => {
+    expect(computeScorecardChange({ current: 98, previous: 127 }, "down", "percent")).toEqual(
       computeTrend(98, 127, { better: "down", display: "percent" }),
     );
+  });
+
+  it("returns a signed change against a zero baseline for number/both modes", () => {
+    const change = computeScorecardChange({ current: 5, previous: 0 }, "up", "both");
+    expect(change).toMatchObject({ kind: "changed", delta: 5, percent: null });
+  });
+
+  it("returns incomparable against a zero baseline for percent-only mode", () => {
+    expect(computeScorecardChange({ current: 5, previous: 0 }, "up", "percent")).toEqual({
+      kind: "incomparable",
+    });
   });
 
   it("wires anchors picked from the series", () => {
     const anchors = pickChangeAnchors([127, 120, 105, 98], "last");
     expect(computeScorecardChange(anchors, "down")).toEqual(
-      computeTrend(98, 105, { better: "down", display: "percent" }),
+      computeTrend(98, 105, { better: "down", display: "value" }),
     );
   });
 });
@@ -222,7 +239,7 @@ describe("formatScorecardChangeLabel", () => {
   });
 
   it("returns empty for non-changed trend results", () => {
-    expect(formatScorecardChangeLabel({ kind: "flat", current: 10, previous: 10 }, "both")).toBe("");
+    expect(formatScorecardChangeLabel({ kind: "flat", current: 10, previous: 10 }, "both")).toBe("0");
     expect(formatScorecardChangeLabel({ kind: "no-baseline" }, "both")).toBe("");
     expect(formatScorecardChangeLabel({ kind: "incomparable" }, "both")).toBe("");
   });
