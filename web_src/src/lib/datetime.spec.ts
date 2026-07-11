@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAbsolute, formatISO, formatRelative, formatUTC, toDate } from "@/lib/datetime";
+import { formatAbsolute, formatDate, formatISO, formatRelative, formatUTC, toDate } from "@/lib/datetime";
 
 describe("datetime", () => {
   const iso = "2026-06-02T10:01:10.561Z";
@@ -37,6 +37,21 @@ describe("datetime", () => {
       const formatted = formatAbsolute(iso, "en-GB");
       expect(formatted).toMatch(/Jun 2026/);
       expect(formatted.trim().length).toBeGreaterThan("02 Jun 2026, 10:01:10".length);
+    });
+  });
+
+  describe("formatDate", () => {
+    it("renders the calendar day without time-of-day", () => {
+      // Locale fixed to keep the assertion deterministic; the date itself is
+      // rendered in the local timezone and won't cross midnight for this iso.
+      const formatted = formatDate(iso, "en-GB");
+      expect(formatted).toMatch(/Jun/);
+      expect(formatted).toMatch(/2026/);
+      expect(formatted).not.toMatch(/\d{2}:\d{2}/);
+    });
+
+    it("returns an empty string for invalid input", () => {
+      expect(formatDate("nope", "en-GB")).toBe("");
     });
   });
 
