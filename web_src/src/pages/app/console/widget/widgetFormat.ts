@@ -55,6 +55,57 @@ function isPlausibleEpochNumber(n: number): boolean {
 }
 
 /**
+ * Resolved progress values for a table cell.
+ *
+ * - `percent` is the raw ratio in percent points and may be < 0 or > 100 when
+ *   the current value under- or overshoots the target. UI code uses this for
+ *   the tooltip / percentage label so users still see the real overshoot.
+ * - `barPercent` is clamped to `[0, 100]` and drives the bar fill width.
+ * - `current` and `target` are the coerced numeric values (never null when
+ *   `computeProgress` returns a non-null result).
+ */
+export interface WidgetProgress {
+  current: number;
+  target: number;
+  percent: number;
+  barPercent: number;
+}
+
+/**
+ * Coerce a raw current/target pair into progress values for a bar cell.
+ *
+ * Returns `null` when either value can't be coerced to a finite number or the
+ * target is <= 0 — the caller renders the empty-state placeholder in that
+ * case. Both inputs are treated as absolute numbers; unlike `percent`
+ * formatting, `0.5` is not silently promoted to 50%.
+ */
+export function computeProgress(current: unknown, target: unknown): WidgetProgress | null {
+  const currentNum = toFiniteNumber(current);
+  const targetNum = toFiniteNumber(target);
+  if (currentNum === null || targetNum === null) return null;
+  if (targetNum <= 0) return null;
+  const percent = (currentNum / targetNum) * 100;
+  const barPercent = Math.max(0, Math.min(100, percent));
+  return { current: currentNum, target: targetNum, percent, barPercent };
+}
+
+/** Format a raw percentage number using the same rounding rules as `formatPercent`. */
+export function formatPercentageDisplay(percent: number): string {
+  return `${percent.toFixed(percent % 1 === 0 ? 0 : 1)}%`;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/**
  * Format a raw value for display, consistent with the format hints declared in
  * the widget YAML. Falls back to the value's string representation when the
  * format doesn't fit (e.g. asking for `date` on a non-string value).
@@ -84,6 +135,8 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case undefined:
       return String(value);
     default:
+      // `progress` falls through here — its ProgressCell renders bespoke UI
+      // instead of the formatted string, so there is nothing extra to do.
       return String(value);
   }
 }
