@@ -7,6 +7,7 @@ import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import { WidgetEmptyState } from "../WidgetEmptyState";
 import { CONSOLE_WIDGET_LABEL_CLASSES } from "../consoleTableStyles";
 
+import { Sparkline } from "./Sparkline";
 import { aggregateNumber, aggregateNumberPerSource, applyFilters, combinePartials } from "./widgetData";
 import { coerceWidgetTimestamp, formatValue } from "./widgetFormat";
 import { getValueAtPath } from "./fieldPath";
@@ -193,51 +194,5 @@ function NumberDisplay({ render, value, sparkline, variant }: NumberDisplayProps
         valueBlock
       )}
     </div>
-  );
-}
-
-function Sparkline({ values }: { values: number[] }) {
-  const width = 120;
-  const height = 28;
-  const strokeWidth = 1.5;
-  // Inset the plot so round joins / stroke width aren't clipped at the SVG edges.
-  const padY = Math.ceil(strokeWidth / 2) + 1;
-  const plotTop = padY;
-  const plotBottom = height - padY;
-  const plotHeight = plotBottom - plotTop;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const stepX = values.length > 1 ? width / (values.length - 1) : 0;
-  // Compute the line points and close the path back along the baseline so
-  // the SVG renders as a filled area underneath the line.
-  const linePoints = values.map((v, i) => {
-    const x = i * stepX;
-    const y = plotTop + plotHeight - ((v - min) / range) * plotHeight;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const lineCoords = linePoints.join(" ");
-  const firstX = (0).toFixed(1);
-  const lastX = ((values.length - 1) * stepX).toFixed(1);
-  const baselineY = plotBottom.toFixed(1);
-  const areaPath = `M${linePoints[0]} L${linePoints.slice(1).join(" L")} L${lastX},${baselineY} L${firstX},${baselineY} Z`;
-  return (
-    <svg
-      width={width}
-      height={height}
-      className="block text-sky-500 dark:text-indigo-400"
-      viewBox={`0 0 ${width} ${height}`}
-      aria-hidden
-    >
-      <path d={areaPath} fill="currentColor" fillOpacity={0.2} stroke="none" />
-      <polyline
-        points={lineCoords}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={strokeWidth}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

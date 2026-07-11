@@ -5,6 +5,7 @@ import { HtmlPanelCard } from "./HtmlPanelCard";
 import { MarkdownPanelCard } from "./MarkdownPanelCard";
 import { NodesPanelCard } from "./NodesPanelCard";
 import { NumberPanelCard } from "./NumberPanelCard";
+import { ScorecardPanelCard } from "./ScorecardPanelCard";
 import { TablePanelCard } from "./TablePanelCard";
 
 export function PanelCardRouter({
@@ -58,6 +59,16 @@ export function PanelCardRouter({
     case "number":
       return (
         <NumberPanelCard
+          panel={panel}
+          readOnly={readOnly}
+          onDelete={onDelete}
+          onChange={onChange}
+          onEditingChange={onEditingChange}
+        />
+      );
+    case "scorecard":
+      return (
+        <ScorecardPanelCard
           panel={panel}
           readOnly={readOnly}
           onDelete={onDelete}
