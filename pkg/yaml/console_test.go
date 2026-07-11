@@ -749,6 +749,45 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			contains: "render.rowActions[0].node",
 		},
 		{
+			name: "progress column without target",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{"field": "current", "format": "progress"},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].progressTarget must be a non-empty string for progress columns",
+		},
+		{
+			name: "progress column with unknown label",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{
+								"field":          "current",
+								"format":         "progress",
+								"progressTarget": "total",
+								"progressLabel":  "fraction",
+							},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].progressLabel must be one of",
+		},
+		{
 			name: "row style with unknown tone",
 			panel: ConsolePanel{
 				ID:   "table",
@@ -1193,6 +1232,37 @@ func TestValidateConsoleContent_AcceptsTableRowStyles(t *testing.T) {
 						map[string]any{"field": "status", "op": "eq", "value": "error", "tone": "red-soft"},
 						map[string]any{"field": "status", "op": "eq", "value": "deploying", "tone": "orange-soft"},
 						map[string]any{"field": "deployedAt", "op": "not_exists", "tone": "dimmed"},
+					},
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_AcceptsProgressColumn(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "table",
+			Type: ConsolePanelTypeTable,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+				"render": map[string]any{
+					"kind": "table",
+					"columns": []any{
+						map[string]any{
+							"field":          "completed",
+							"format":         "progress",
+							"progressTarget": "total",
+							"progressLabel":  "number",
+						},
+						map[string]any{
+							"field":          "score",
+							"format":         "progress",
+							"progressTarget": "100",
+						},
 					},
 				},
 			},
