@@ -108,6 +108,12 @@
     :versions: []
     :when: 2026-05-13 00:00:00.000000000 Z
 - - :approve
+  - "@csstools/css-syntax-patches-for-csstree"
+  - :who: SuperPlane maintainers
+    :why: MIT-0; transitive jsdom/css-tree dependency, compatible with Apache-2.0 project license.
+    :versions: []
+    :when: 2026-07-12 00:00:00.000000000 Z
+- - :approve
   - argparse
   - :who: SuperPlane maintainers
     :why: Python-2.0 license; bundled tooling dependency, compatible with Apache-2.0.
