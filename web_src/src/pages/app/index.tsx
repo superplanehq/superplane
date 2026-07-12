@@ -960,7 +960,7 @@ export function AppPage() {
     editBootstrapReady: isEditBootstrapReady,
   });
 
-  useDefaultAppTab({ canvasId, urlViewFlags, searchParams, setSearchParams });
+  useDefaultAppTab({ canvasId, urlViewFlags, searchParams });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
