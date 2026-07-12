@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { makeRunsFlightKey, runsRenderIsTotalCountOnly } from "./useWidgetData";
+import { makeRunsFlightKey, runsRenderIsTotalCountOnly } from "./runsWidgetQuery";
 import type { WidgetDataSource, WidgetNumberRender, WidgetScorecardRender } from "./types";
 
 const runsSource: WidgetDataSource = { kind: "runs", limit: 1000 };

@@ -8,7 +8,8 @@ import { ScorecardPanelForm } from "./ScorecardPanelForm";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { useConsoleContext } from "./ConsoleContext";
 import type { ScorecardPanelContent, TablePanelDataSource } from "./panelTypes";
-import { renderNeedsRunNodeOutputs, runsRenderIsTotalCountOnly, useWidgetData } from "./widget/useWidgetData";
+import { runsRenderIsTotalCountOnly } from "./widget/runsWidgetQuery";
+import { renderNeedsRunNodeOutputs, useWidgetData } from "./widget/useWidgetData";
 import type { WidgetScorecardRender } from "./widget/types";
 import { WidgetScorecard } from "./widget/WidgetScorecard";
 

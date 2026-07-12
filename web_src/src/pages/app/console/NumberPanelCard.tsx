@@ -17,7 +17,8 @@ import {
   type NumberPanelContent,
   type TablePanelDataSource,
 } from "./panelTypes";
-import { renderNeedsRunNodeOutputs, runsRenderIsTotalCountOnly, useWidgetData } from "./widget/useWidgetData";
+import { runsRenderIsTotalCountOnly } from "./widget/runsWidgetQuery";
+import { renderNeedsRunNodeOutputs, useWidgetData } from "./widget/useWidgetData";
 import { WidgetNumber } from "./widget/WidgetNumber";
 
 interface NumberPanelCardProps {
