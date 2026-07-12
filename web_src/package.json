@@ -87,7 +87,7 @@
     "react-grid-layout": "^1.5.3",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^3.0.6",
-    "react-router-dom": "^7.13.0",
+    "react-router-dom": "7.18.1",
     "react-use-websocket": "^4.0.0",
     "recharts": "^3.8.1",
     "rehype-raw": "^7.0.0",
