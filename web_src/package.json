@@ -79,7 +79,7 @@
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.545.0",
     "mermaid": "^11.15.0",
-    "posthog-js": "^1.368.2",
+    "posthog-js": "^1.399.2",
     "react": "^19.1.0",
     "react-day-picker": "^9.11.0",
     "react-diff-view": "^3.3.2",
