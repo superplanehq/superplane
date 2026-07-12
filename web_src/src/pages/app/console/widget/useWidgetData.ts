@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
-import { useCanvasMemoryEntries, useEventExecutionsBatch, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import {
+  canvasKeys,
+  useCanvasMemoryEntries,
+  useEventExecutionsBatch,
+  useInfiniteCanvasRuns,
+} from "@/hooks/useCanvasData";
 
 import { resolveConsoleNode, useConsoleContext, type ConsoleContextValue } from "../ConsoleContext";
 import { flattenMemoryEntries } from "./memoryRow";
@@ -111,12 +116,19 @@ export interface WidgetDataResult {
  * up to the configured `limit` (or unbounded when blank). Charts and numbers
  * stay non-progressive — they always aggregate against the full configured
  * limit at once, since partial aggregates would flash incorrect KPIs.
+ *
+ * `skipEagerFill` short-circuits the runs/executions eager pagination for
+ * callers that only consume the API `totalCount` (see
+ * {@link runsRenderIsTotalCountOnly}). Page 1 is still fetched by the
+ * underlying infinite query and delivers `totalCount`; we just skip
+ * dragging the shared cache to the full `limit` when no rows are used.
  */
 export function useWidgetData(
   canvasId: string,
   dataSource: WidgetDataSource,
   needsNodeOutputs: boolean = true,
   progressive: boolean = false,
+  skipEagerFill: boolean = false,
 ): WidgetDataResult {
   const ctx = useConsoleContext();
   const rawLimit = dataSource.kind === "memory" ? undefined : dataSource.limit;
@@ -140,6 +152,7 @@ export function useWidgetData(
     effectiveLimit,
     initialFillTarget,
     loadMore,
+    skipEagerFill,
   });
   const runsResult = useRunsDataSourceResult({
     canvasId,
@@ -152,11 +165,46 @@ export function useWidgetData(
     effectiveLimit,
     initialFillTarget,
     loadMore,
+    skipEagerFill,
   });
 
   if (dataSource.kind === "memory") return memoryResult;
   if (dataSource.kind === "runs") return runsResult;
   return executionsResult;
+}
+
+/**
+ * Stable string identifier for the shared `useInfiniteCanvasRuns` cache
+ * entry a widget participates in. Passed to `useEagerInfinitePagination`
+ * so N widgets on the same key coordinate through a single-flight mutex
+ * and can't race `fetchNextPage()` on the same cursor.
+ *
+ * We serialize the exact `canvasKeys.infiniteRuns` array so widgets on
+ * different filter combinations (e.g. `{}` vs `states=STATE_STARTED`)
+ * get distinct flight keys.
+ */
+export function makeRunsFlightKey(canvasId: string, filters: Parameters<typeof canvasKeys.infiniteRuns>[1]): string {
+  return JSON.stringify(canvasKeys.infiniteRuns(canvasId, filters));
+}
+
+/**
+ * True when a runs-backed number/scorecard render only needs the API
+ * `totalCount` — i.e. a `count` aggregation with no row filters and no
+ * sparkline. In that case the widget can skip eager pagination because
+ * page 1 of the shared infinite query already carries `totalCount`.
+ *
+ * Table and chart renders always need rows, so this returns `false` for
+ * them regardless of aggregation. Executions data sources are excluded
+ * because their `totalCount` (when reported) is per-run, not per-execution.
+ */
+export function runsRenderIsTotalCountOnly(dataSource: WidgetDataSource, render: WidgetRender | undefined): boolean {
+  if (dataSource.kind !== "runs") return false;
+  if (!render) return false;
+  if (render.kind !== "number" && render.kind !== "scorecard") return false;
+  if (render.aggregation !== "count") return false;
+  if (render.filters && render.filters.length > 0) return false;
+  if ("sparklineField" in render && render.sparklineField) return false;
+  return true;
 }
 
 /**
@@ -260,6 +308,7 @@ function useExecutionsDataSourceResult({
   effectiveLimit,
   initialFillTarget,
   loadMore,
+  skipEagerFill,
 }: {
   canvasId: string;
   dataSource: WidgetDataSource;
@@ -270,6 +319,7 @@ function useExecutionsDataSourceResult({
   effectiveLimit: number;
   initialFillTarget: number;
   loadMore: () => void;
+  skipEagerFill: boolean;
 }): WidgetDataResult {
   const enabled = dataSource.kind === "executions";
   const query = useInfiniteCanvasRuns(canvasId, {}, enabled);
@@ -301,8 +351,9 @@ function useExecutionsDataSourceResult({
     return count;
   }, [enabled, pages, targetNodeId]);
 
+  const executionsFlightKey = useMemo(() => makeRunsFlightKey(canvasId, {}), [canvasId]);
   useEagerInfinitePagination({
-    enabled,
+    enabled: enabled && !skipEagerFill,
     fillTarget: displaySlice,
     loadedRowCount,
     pageCount,
@@ -310,6 +361,7 @@ function useExecutionsDataSourceResult({
     isFetchingNextPage: query.isFetchingNextPage,
     isFetching: query.isFetching,
     fetchNextPage: query.fetchNextPage,
+    flightKey: executionsFlightKey,
   });
 
   const rows = useMemo(() => {
@@ -357,6 +409,7 @@ function useRunsDataSourceResult({
   effectiveLimit,
   initialFillTarget,
   loadMore,
+  skipEagerFill,
 }: {
   canvasId: string;
   dataSource: WidgetDataSource;
@@ -368,6 +421,7 @@ function useRunsDataSourceResult({
   effectiveLimit: number;
   initialFillTarget: number;
   loadMore: () => void;
+  skipEagerFill: boolean;
 }): WidgetDataResult {
   const enabled = dataSource.kind === "runs";
   const query = useInfiniteCanvasRuns(canvasId, {}, enabled);
@@ -383,8 +437,9 @@ function useRunsDataSourceResult({
     return count;
   }, [enabled, pages]);
 
+  const runsFlightKey = useMemo(() => makeRunsFlightKey(canvasId, {}), [canvasId]);
   useEagerInfinitePagination({
-    enabled,
+    enabled: enabled && !skipEagerFill,
     fillTarget: displaySlice,
     loadedRowCount,
     pageCount,
@@ -392,6 +447,7 @@ function useRunsDataSourceResult({
     isFetchingNextPage: query.isFetchingNextPage,
     isFetching: query.isFetching,
     fetchNextPage: query.fetchNextPage,
+    flightKey: runsFlightKey,
   });
 
   // Collect unique root-event ids for the visible run page so we can lazy-
