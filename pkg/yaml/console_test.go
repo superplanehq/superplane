@@ -1691,3 +1691,183 @@ func TestValidateConsoleContent_AcceptsMultiNumberPanel(t *testing.T) {
 	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
 }
+
+func TestValidateConsoleContent_AcceptsScorecardPanel(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"title":      "Open UX papercuts",
+				"dataSource": map[string]any{"kind": "memory", "namespace": "ux_papercuts"},
+				"render": map[string]any{
+					"kind":           "scorecard",
+					"aggregation":    "last",
+					"field":          "openCount",
+					"format":         "number",
+					"label":          "Open UX papercuts",
+					"better":         "down",
+					"target":         "80",
+					"showProgress":   true,
+					"sparklineField": "openCount",
+					"showChange":     "both",
+					"changeCaption":  "vs start of range",
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_AcceptsCountScorecardWithoutField(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "runs",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "runs", "limit": 100},
+				"render": map[string]any{
+					"kind":        "scorecard",
+					"aggregation": "count",
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithoutContent(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content is required")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithWrongRenderKind(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "number", "aggregation": "count"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `render.kind must be "scorecard"`)
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithUnknownAggregation(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "median"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.aggregation must be one of")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithoutFieldForNonCount(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "last"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.field is required")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithInvalidBetter(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "count", "better": "sideways"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.better must be one of")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithInvalidShowChange(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "count", "showChange": "chart"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.showChange must be one of")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithNonBooleanShowProgress(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "count", "showProgress": "yes"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.showProgress must be a boolean")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithNonStringTarget(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "count", "target": 42},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.target must be a string")
+}
