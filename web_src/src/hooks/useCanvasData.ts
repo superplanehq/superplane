@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
-import type { QueryClient } from "@tanstack/react-query";
-import { upsertRunIntoDescribeRunData } from "./canvasInfiniteCache";
+import type { InfiniteData, QueryClient } from "@tanstack/react-query";
+import { upsertRunIntoDescribeRunData, type InfiniteRunsPage } from "./canvasInfiniteCache";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
@@ -1019,10 +1019,32 @@ export const useDescribeRun = (canvasId: string, runId: string | null, enabled =
 
 export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {
   const limit = 25;
+  const queryClient = useQueryClient();
+  const queryKey = canvasKeys.infiniteRuns(canvasId, filters);
 
   return useInfiniteQuery({
-    queryKey: canvasKeys.infiniteRuns(canvasId, filters),
+    queryKey,
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      // Full refetches (poll / invalidate / refetch()) walk every already-
+      // loaded cursor sequentially — TanStack Query's infinite behavior. To
+      // avoid re-issuing N ListRuns calls each minute for a canvas whose
+      // shared cache holds many pages, we reuse any page that already lives
+      // in the cache for its cursor. Page 1 (pageParam == null) always hits
+      // the network so fresh runs and totalCount stay current; fetchNextPage
+      // arrives with a cursor not yet in `pageParams`, so it also hits the
+      // network naturally. See the console-runs analysis for context.
+      if (pageParam != null) {
+        const cached = queryClient.getQueryData<InfiniteData<InfiniteRunsPage>>(queryKey);
+        if (cached) {
+          const index = cached.pageParams.findIndex((p) => p === pageParam);
+          if (index >= 0) {
+            const cachedPage = cached.pages[index];
+            if (cachedPage !== undefined) {
+              return cachedPage;
+            }
+          }
+        }
+      }
       const response = await canvasesListRuns(
         withOrganizationHeader({
           path: { canvasId },
