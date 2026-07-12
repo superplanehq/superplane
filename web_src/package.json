@@ -29,7 +29,6 @@
     "@emotion/styled": "^11.14.0",
     "@floating-ui/react": "^0.27.12",
     "@headlessui/react": "^2.2.4",
-    "@hey-api/client-fetch": "^0.10.1",
     "@monaco-editor/react": "^4.7.0",
     "@pierre/diffs": "^1.2.2",
     "@pierre/trees": "^1.0.0-beta.4",
@@ -105,7 +104,7 @@
   "devDependencies": {
     "@chromatic-com/storybook": "^4.1.1",
     "@eslint/js": "^9.25.0",
-    "@hey-api/openapi-ts": "^0.92.3",
+    "@hey-api/openapi-ts": "^0.99.0",
     "@storybook/addon-a11y": "^10.4.6",
     "@storybook/addon-docs": "^10.4.6",
     "@storybook/addon-onboarding": "^10.4.6",

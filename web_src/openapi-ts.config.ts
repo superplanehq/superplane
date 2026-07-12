@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [
     {
       name: "@hey-api/client-fetch",
+      baseUrl: false,
       throwOnError: true,
     },
   ],
