@@ -65,7 +65,15 @@ function compareSortValues(a: unknown, b: unknown): number {
   return String(a).localeCompare(String(b));
 }
 
-function toFiniteNumber(value: unknown): number | null {
+/**
+ * Coerce a cell value to a finite number, or `null` when it isn't numeric.
+ *
+ * Blank strings, `null`, `undefined`, and non-numeric strings return `null`
+ * — they are *not* coerced to `0` (unlike bare `Number(raw)`). Booleans map
+ * to `1` / `0`. Shared by aggregations, chart series, and sparkline extraction
+ * so headline KPIs and sparklines agree on the same filtered rows.
+ */
+export function toFiniteNumber(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "boolean") return value ? 1 : 0;
   if (typeof value === "string" && value.trim() !== "") {
@@ -73,6 +81,21 @@ function toFiniteNumber(value: unknown): number | null {
     return Number.isFinite(n) ? n : null;
   }
   return null;
+}
+
+/**
+ * Extract a densely-packed numeric series from `rows` at `field`.
+ * Non-finite / blank / null entries are skipped so they never appear as
+ * zero points on a sparkline or as change-chip anchors.
+ */
+export function extractNumericSeries(rows: unknown[], field: string | undefined): number[] {
+  if (!field) return [];
+  const values: number[] = [];
+  for (const row of rows) {
+    const n = toFiniteNumber(getValueAtPath(row, field));
+    if (n !== null) values.push(n);
+  }
+  return values;
 }
 
 function toEpochMillis(value: unknown): number | null {
@@ -100,8 +123,8 @@ export function aggregateNumber(
   const numeric: number[] = [];
   for (const row of rows) {
     const raw = field ? getValueAtPath(row, field) : row;
-    const value = typeof raw === "number" ? raw : Number(raw);
-    if (Number.isFinite(value)) numeric.push(value);
+    const value = toFiniteNumber(raw);
+    if (value !== null) numeric.push(value);
   }
   if (numeric.length === 0) return null;
   switch (aggregation) {
