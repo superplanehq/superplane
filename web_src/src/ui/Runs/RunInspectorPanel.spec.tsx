@@ -118,7 +118,7 @@ describe("RunInspectorPanel", () => {
   it("shows input as the fixed triggered event for the selected node", () => {
     renderInspector({ selectedNodeId: "action-2" });
 
-    const inputHeader = screen.getByRole("button", { name: /Triggered\s+Input\s+Add Grade Label/i });
+    const inputHeader = screen.getByRole("button", { name: /Triggered.*Input.*Add Grade Label/i });
     expect(within(inputHeader).getByText("Triggered")).toBeInTheDocument();
     expect(within(inputHeader).queryByText("error")).not.toBeInTheDocument();
   });
