@@ -8,9 +8,14 @@ import { WidgetEmptyState } from "../WidgetEmptyState";
 import { CONSOLE_WIDGET_LABEL_CLASSES } from "../consoleTableStyles";
 
 import { Sparkline } from "./Sparkline";
-import { aggregateNumber, aggregateNumberPerSource, applyFilters, combinePartials } from "./widgetData";
+import {
+  aggregateNumber,
+  aggregateNumberPerSource,
+  applyFilters,
+  combinePartials,
+  extractNumericSeries,
+} from "./widgetData";
 import { coerceWidgetTimestamp, formatValue } from "./widgetFormat";
-import { getValueAtPath } from "./fieldPath";
 import type { WidgetColumnFormat, WidgetNumberRender } from "./types";
 import type { MemoryNumberSource, WidgetNumberCombine } from "../panelTypes";
 
@@ -64,13 +69,8 @@ export function WidgetNumber({ render, rows, isLoading, totalCount, composite, v
   }, [composite, filtered, render.aggregation, render.field, render.filters, totalCount]);
   const sparkline = useMemo(() => {
     if (!render.sparklineField || composite) return null;
-    return filtered
-      .map((row) => {
-        const raw = getValueAtPath(row, render.sparklineField!);
-        const n = typeof raw === "number" ? raw : Number(raw);
-        return Number.isFinite(n) ? n : null;
-      })
-      .filter((n): n is number => n != null);
+    // Same coercion as aggregateNumber — skip null/blank instead of Number()→0.
+    return extractNumericSeries(filtered, render.sparklineField);
   }, [composite, filtered, render.sparklineField]);
 
   if (isLoading) {

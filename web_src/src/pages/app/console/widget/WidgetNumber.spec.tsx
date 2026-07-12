@@ -62,4 +62,28 @@ describe("WidgetNumber", () => {
     expect(valueRow!.className).toContain("gap-0.5");
     expect(root).toHaveTextContent("$42 /mo");
   });
+
+  it("omits null/blank sparkline points so the series matches aggregateNumber", () => {
+    // Bare Number(null)/Number("") would inject two zero points and draw a
+    // 4-point sparkline that disagrees with sum=13 over the same rows.
+    render(
+      <WidgetNumber
+        rows={[{ total: null }, { total: "" }, { total: 5 }, { total: 8 }]}
+        isLoading={false}
+        render={{
+          kind: "number",
+          aggregation: "sum",
+          field: "total",
+          sparklineField: "total",
+        }}
+      />,
+    );
+
+    const root = screen.getByTestId("widget-number");
+    expect(root).toHaveTextContent("13");
+    const polyline = root.querySelector("polyline");
+    expect(polyline).not.toBeNull();
+    // Two finite points → one segment (two "x,y" pairs), not four from coerced zeros.
+    expect(polyline!.getAttribute("points")!.trim().split(/\s+/)).toHaveLength(2);
+  });
 });

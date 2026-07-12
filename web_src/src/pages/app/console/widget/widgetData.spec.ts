@@ -9,6 +9,7 @@ import {
   buildChartData,
   combinePartials,
   distinctSeriesKeys,
+  extractNumericSeries,
 } from "./widgetData";
 
 const entries: CanvasMemoryEntry[] = [
@@ -29,6 +30,21 @@ describe("aggregateNumber", () => {
 
   it("returns null when every value is non-numeric", () => {
     expect(aggregateNumber([{ n: null }, { n: "" }, { n: "x" }], "sum", "n")).toBeNull();
+  });
+});
+
+describe("extractNumericSeries", () => {
+  it("skips null and blank values instead of coercing them to 0", () => {
+    const rows = [{ n: null }, { n: "" }, { n: 5 }, { n: 8 }];
+    expect(extractNumericSeries(rows, "n")).toEqual([5, 8]);
+  });
+
+  it("returns an empty array when the field is unset", () => {
+    expect(extractNumericSeries([{ n: 1 }], undefined)).toEqual([]);
+  });
+
+  it("coerces numeric strings", () => {
+    expect(extractNumericSeries([{ n: "1" }, { n: "2.5" }], "n")).toEqual([1, 2.5]);
   });
 });
 

@@ -14,6 +14,7 @@
 import { buildEnv, compileMaybeExpr, evalRowField } from "./celExpr";
 import { getValueAtPath } from "./fieldPath";
 import type { WidgetNumberAggregation, WidgetScorecardRender, WidgetTrendBetter } from "./types";
+import { extractNumericSeries, toFiniteNumber } from "./widgetData";
 import { computeTrend, type TrendResult } from "./widgetTrend";
 
 /**
@@ -24,13 +25,7 @@ import { computeTrend, type TrendResult } from "./widgetTrend";
  * `number[]` where index 0 is the first usable point in row order.
  */
 export function extractScorecardSeries(rows: unknown[], seriesField: string | undefined): number[] {
-  if (!seriesField) return [];
-  const values: number[] = [];
-  for (const row of rows) {
-    const n = toFiniteNumber(getValueAtPath(row, seriesField));
-    if (n !== null) values.push(n);
-  }
-  return values;
+  return extractNumericSeries(rows, seriesField);
 }
 
 /** Pair of values consumed by {@link computeScorecardChange}. */
@@ -232,15 +227,4 @@ function formatSignedNumber(value: number): string {
   const formatted =
     rounded % 1 === 0 ? rounded.toLocaleString() : rounded.toLocaleString(undefined, { maximumFractionDigits: 2 });
   return `${sign}${formatted}`;
-}
-
-function toFiniteNumber(value: unknown): number | null {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed === "") return null;
-    const n = Number(trimmed);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
 }
