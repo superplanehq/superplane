@@ -24,7 +24,7 @@
     "format:check": "prettier --check '**/*.{ts,tsx}'"
   },
   "dependencies": {
-    "@dash0/sdk-web": "^0.21.0",
+    "@dash0/sdk-web": "^0.22.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@floating-ui/react": "^0.27.12",
