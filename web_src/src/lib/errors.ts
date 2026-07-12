@@ -1,6 +1,6 @@
 /**
  * Extract error message from API error response
- * Handles the structure returned by @hey-api/client-fetch
+ * Handles the structure returned by the generated OpenAPI client
  */
 export function getApiErrorMessage(error: unknown, fallback = "An error occurred"): string {
   return (
