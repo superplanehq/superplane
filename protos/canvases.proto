@@ -469,7 +469,7 @@ message PutCanvasStagingRequest {
 }
 
 message PutCanvasStagingResponse {
-  StagingSummary staging_summary = 1;
+  Staging staging = 1;
 }
 
 message GetCanvasStagingRequest {
@@ -477,7 +477,7 @@ message GetCanvasStagingRequest {
 }
 
 message GetCanvasStagingResponse {
-  StagingSummary staging_summary = 1;
+  Staging staging = 1;
 }
 
 message DeleteCanvasStagingRequest {
@@ -486,7 +486,7 @@ message DeleteCanvasStagingRequest {
 }
 
 message DeleteCanvasStagingResponse {
-  StagingSummary staging_summary = 1;
+  Staging staging = 1;
 }
 
 message ListCanvasVersionsRequest {
@@ -511,12 +511,12 @@ message DescribeCanvasVersionResponse {
   CanvasVersion version = 1;
 }
 
-// StagingSummary reports the uncommitted spec edits held in workflow_staged_files for the current user.
-message StagingSummary {
+message Staging {
   bool has_staging = 1;
   string base_version_id = 2;
   repeated string staged_paths = 3;
   bool stale = 4;
+  Canvas.Spec spec = 5;
 }
 
 message CommitCanvasStagingRequest {
@@ -526,7 +526,7 @@ message CommitCanvasStagingRequest {
 
 message CommitCanvasStagingResponse {
   CanvasVersion version = 1;
-  StagingSummary staging_summary = 2;
+  Staging staging = 2;
 }
 
 message DeleteCanvasRequest {
@@ -579,11 +579,14 @@ message Canvas {
     google.protobuf.Timestamp updated_at = 6;
     UserRef created_by = 7;
     string folder_id = 8;
+    string version_id = 9;
   }
 
   message Spec {
     repeated Components.Node nodes = 1;
     repeated Components.Edge edges = 2;
+    repeated Console.Panel panels = 3;
+    repeated Console.LayoutItem layout = 4;
   }
 
   message Status {
@@ -600,7 +603,7 @@ message CanvasVersion {
   message Metadata {
     string id = 1;
     string canvas_id = 2;
-    UserRef owner = 3;
+    UserRef author = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
     string commit_message = 6;
