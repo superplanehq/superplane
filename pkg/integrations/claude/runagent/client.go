@@ -576,9 +576,10 @@ func (c *Client) ListSessionFiles(sessionID string) ([]SessionFile, error) {
 	return files, nil
 }
 
-// ListSessionFilesWithRetry lists session files, retrying when the listing
-// succeeds but is still empty — outputs can take a few seconds to be indexed
-// after the session goes idle.
+// ListSessionFilesWithRetry lists session files, retrying while the listing
+// has no downloadable entries — the agent's outputs can take a few seconds to
+// be indexed after the session goes idle, and mounted input copies (which are
+// never downloadable) may appear before them.
 func (c *Client) ListSessionFilesWithRetry(sessionID string, attempts int, delay time.Duration) ([]SessionFile, error) {
 	if attempts < 1 {
 		attempts = 1
@@ -591,7 +592,7 @@ func (c *Client) ListSessionFilesWithRetry(sessionID string, attempts int, delay
 		if err != nil {
 			return nil, err
 		}
-		if len(files) > 0 {
+		if hasDownloadableFile(files) {
 			return files, nil
 		}
 		if i < attempts-1 {
@@ -599,6 +600,15 @@ func (c *Client) ListSessionFilesWithRetry(sessionID string, attempts int, delay
 		}
 	}
 	return files, nil
+}
+
+func hasDownloadableFile(files []SessionFile) bool {
+	for _, f := range files {
+		if f.Downloadable {
+			return true
+		}
+	}
+	return false
 }
 
 // FileContentURL returns the programmatic download link for a file. Requests

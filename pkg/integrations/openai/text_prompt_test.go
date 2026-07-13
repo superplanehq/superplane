@@ -303,6 +303,13 @@ func Test__CreateResponse__Execute__codeInterpreter(t *testing.T) {
 				}`,
 				`{"id": "cfile_1", "object": "container.file", "container_id": "cntr_1", "path": "/mnt/data/plot.png", "bytes": 8, "source": "assistant"}`,
 				"\x89PNG\r\n\x1a\n",
+				// The container sweep also runs so files the model generated
+				// but did not cite are included; cited files are deduplicated.
+				`{"object": "list", "data": [
+					{"id": "cfile_1", "object": "container.file", "container_id": "cntr_1", "path": "/mnt/data/plot.png", "bytes": 8, "source": "assistant"},
+					{"id": "cfile_2", "object": "container.file", "container_id": "cntr_1", "path": "/mnt/data/report.csv", "bytes": 8, "source": "assistant"}
+				]}`,
+				"a,b\n1,2\n",
 			},
 		)
 
@@ -311,8 +318,8 @@ func Test__CreateResponse__Execute__codeInterpreter(t *testing.T) {
 			t.Fatalf("expected code_interpreter auto tool in request body, got %s", string(body))
 		}
 
-		if len(payload.Artifacts) != 1 {
-			t.Fatalf("expected 1 artifact, got %d", len(payload.Artifacts))
+		if len(payload.Artifacts) != 2 {
+			t.Fatalf("expected 2 artifacts, got %d", len(payload.Artifacts))
 		}
 		artifact := payload.Artifacts[0]
 		if artifact.FileID != "cfile_1" || artifact.ContainerID != "cntr_1" || artifact.Filename != "plot.png" {
@@ -323,6 +330,15 @@ func Test__CreateResponse__Execute__codeInterpreter(t *testing.T) {
 		}
 		if artifact.Bytes != 8 || artifact.Encoding != "base64" || artifact.Content == "" {
 			t.Errorf("expected inlined base64 content, got %+v", artifact)
+		}
+
+		// The uncited assistant file from the container sweep.
+		uncited := payload.Artifacts[1]
+		if uncited.FileID != "cfile_2" || uncited.Filename != "report.csv" {
+			t.Errorf("unexpected uncited artifact: %+v", uncited)
+		}
+		if uncited.Encoding != "text" || uncited.Content != "a,b\n1,2\n" {
+			t.Errorf("expected inlined text content for uncited artifact, got %+v", uncited)
 		}
 	})
 

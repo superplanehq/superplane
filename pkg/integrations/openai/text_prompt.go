@@ -420,11 +420,12 @@ func extractResponseText(response *OpenAIResponse) string {
 }
 
 // extractArtifacts collects the files the code interpreter generated and
-// embeds their content in the payload. Generated files normally arrive as
-// container_file_citation annotations on the output text; when annotations
-// are missing (a known gap when combined with structured output), it falls
-// back to listing the container's assistant-generated files. Content fetches
-// are best-effort: a failure degrades the artifact to metadata + download URL.
+// embeds their content in the payload. Cited files arrive as
+// container_file_citation annotations on the output text; the containers of
+// code_interpreter_call items are additionally swept for assistant-generated
+// files the model didn't cite (annotations can be partial, or entirely missing
+// when combined with structured output). Content fetches are best-effort: a
+// failure degrades the artifact to metadata + download URL.
 func extractArtifacts(client *Client, response *OpenAIResponse, codeInterpreter bool) []Artifact {
 	if response == nil {
 		return nil
@@ -457,7 +458,7 @@ func extractArtifacts(client *Client, response *OpenAIResponse, codeInterpreter 
 		}
 	}
 
-	if len(artifacts) > 0 || !codeInterpreter {
+	if !codeInterpreter {
 		return artifacts
 	}
 

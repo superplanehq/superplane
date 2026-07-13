@@ -351,6 +351,22 @@ func TestClient_ListSessionFiles(t *testing.T) {
 		require.Len(t, files, 1)
 		require.Len(t, httpCtx.Requests, 2)
 	})
+
+	t.Run("retry re-lists when only mounted inputs are indexed", func(t *testing.T) {
+		// Mounted inputs (never downloadable) can be indexed before the
+		// agent's outputs; a listing with only inputs must not stop the retry.
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"file_in1","filename":"input.txt","downloadable":false}]}`))},
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"file_in1","filename":"input.txt","downloadable":false},{"id":"file_out1","filename":"report.md","downloadable":true}]}`))},
+			},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+		files, err := client.ListSessionFilesWithRetry("sess_1", 2, 0)
+		require.NoError(t, err)
+		require.Len(t, files, 2)
+		require.Len(t, httpCtx.Requests, 2)
+	})
 }
 
 func TestCollectSessionArtifacts_listingErrorYieldsNoArtifacts(t *testing.T) {
