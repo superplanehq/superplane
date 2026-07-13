@@ -536,4 +536,12 @@ func Test__SendTextMessage__StructuredFileEntries(t *testing.T) {
 		require.ErrorContains(t, validateFiles([]FileAttachment{{Source: "ftp"}}), "source must be")
 		require.ErrorContains(t, validateFiles([]FileAttachment{{Source: "content", Encoding: "hex"}}), "encoding must be")
 	})
+
+	t.Run("validate allows an expression-driven encoding", func(t *testing.T) {
+		require.NoError(t, validateFiles([]FileAttachment{{
+			Source:   "content",
+			Content:  "{{ $['Text Prompt'].data.artifacts[0].content }}",
+			Encoding: "{{ $['Text Prompt'].data.artifacts[0].encoding }}",
+		}}))
+	})
 }

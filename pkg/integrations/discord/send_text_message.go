@@ -482,7 +482,9 @@ func validateFiles(files []FileAttachment) error {
 				return fmt.Errorf("files[%d]: invalid URL %q: must be an http(s) URL", i, file.URL)
 			}
 		case fileSourceContent:
-			if file.Encoding != "" && file.Encoding != fileEncodingText && file.Encoding != fileEncodingBase64 {
+			// The encoding can be driven by an expression (e.g. the artifact's
+			// own encoding field), which only resolves at execution.
+			if file.Encoding != "" && file.Encoding != fileEncodingText && file.Encoding != fileEncodingBase64 && !isExpressionValue(file.Encoding) {
 				return fmt.Errorf("files[%d]: encoding must be %q or %q", i, fileEncodingText, fileEncodingBase64)
 			}
 		default:
