@@ -87,9 +87,9 @@ export const SuperPlaneRelease: Story = {
 
 /**
  * Software Factory — engineering throughput with an AI vs human center of
- * gravity. Spotlights the latest merge, scorecards for AI authorship / spend /
- * active contributors, and rich tables (avatars, progress, trends) for merges,
- * per-engineer spend vs PRs, and weekly PR health.
+ * gravity. Top row pairs the latest-merge spotlight with an AI-assisted share
+ * area chart; scorecards (sparklines) cover authorship / spend / time-to-merge;
+ * tables cover merges, per-engineer spend vs PRs, and weekly PR health.
  */
 export const SoftwareFactory: Story = {
   name: "Software Factory",

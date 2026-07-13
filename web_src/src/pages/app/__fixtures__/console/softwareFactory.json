@@ -2,7 +2,7 @@
   "organizationId": "a1000001-0000-4000-8000-000000000001",
   "canvasId": "a1000001-0000-4000-8000-000000000002",
   "canvasName": "Software Factory",
-  "consoleYaml": "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: a1000001-0000-4000-8000-000000000002\n  name: Software Factory\nspec:\n  layout:\n    - i: latest-merge\n      x: 0\n      \"y\": 0\n      w: 12\n      h: 5\n      minW: 6\n      minH: 4\n    - i: ai-authored\n      x: 0\n      \"y\": 5\n      w: 4\n      h: 5\n      minW: 3\n      minH: 4\n    - i: ai-spend\n      x: 4\n      \"y\": 5\n      w: 4\n      h: 5\n      minW: 3\n      minH: 4\n    - i: active-engineers\n      x: 8\n      \"y\": 5\n      w: 4\n      h: 5\n      minW: 3\n      minH: 4\n    - i: recent-merges\n      x: 0\n      \"y\": 10\n      w: 7\n      h: 10\n      minW: 5\n      minH: 6\n    - i: spend-vs-prs\n      x: 7\n      \"y\": 10\n      w: 5\n      h: 10\n      minW: 4\n      minH: 6\n    - i: pr-health\n      x: 0\n      \"y\": 20\n      w: 12\n      h: 9\n      minW: 6\n      minH: 6\n  panels:\n    - id: latest-merge\n      type: spotlight\n      content:\n        title: Latest merge\n        dataSource:\n          kind: memory\n          namespace: recentMerges\n        kicker: Just landed\n        statusField: status\n        statusLabelField: statusLabel\n        actorNameField: authorName\n        actorAvatarField: authorAvatar\n        titleField: title\n        hrefField: href\n        subtitleField: subtitle\n        timestampField: mergedAt\n        durationField: cycleTimeMs\n        approverNameField: approver\n        approverAvatarField: approverAvatar\n        approverLabel: Approved by\n        checksField: checks\n        checkNameField: name\n        checkStatusField: status\n    - id: ai-authored\n      type: scorecard\n      content:\n        title: AI-assisted merges\n        dataSource:\n          kind: memory\n          namespace: aiAuthoredPct\n        render:\n          kind: scorecard\n          aggregation: first\n          field: value\n          label: AI-assisted PRs\n          format: percent\n          better: up\n          showChange: both\n          changeCaption: vs prior day\n          target: \"70\"\n          showProgress: true\n    - id: ai-spend\n      type: scorecard\n      content:\n        title: AI spend (7d)\n        dataSource:\n          kind: memory\n          namespace: aiSpendUsd\n        render:\n          kind: scorecard\n          aggregation: first\n          field: value\n          label: USD this week\n          format: number\n          prefix: \"$\"\n          better: down\n          showChange: both\n          changeCaption: vs prior day\n    - id: active-engineers\n      type: scorecard\n      content:\n        title: Active contributors\n        dataSource:\n          kind: memory\n          namespace: activeContributors\n        render:\n          kind: scorecard\n          aggregation: first\n          field: value\n          label: Engineers\n          format: number\n          better: up\n          showChange: number\n          changeCaption: vs prior day\n    - id: recent-merges\n      type: table\n      content:\n        title: Recent merges\n        dataSource:\n          kind: memory\n          namespace: recentMerges\n        render:\n          kind: table\n          columns:\n            - field: authorAvatar\n              label: Author\n              format: avatar\n              avatarCommitterField: authorName\n            - field: title\n              label: Pull request\n              format: link\n              href: \"{{ href }}\"\n            - field: authorship\n              label: Authorship\n              format: badge\n            - field: cycleTimeMs\n              label: Cycle time\n              format: duration\n              showTrend: true\n              trendBetter: down\n              trendDisplay: percent\n            - field: checksPassed\n              label: Checks\n              format: progress\n              progressTarget: checksTotal\n              progressLabel: number\n    - id: spend-vs-prs\n      type: table\n      content:\n        title: AI spend vs merged PRs\n        dataSource:\n          kind: memory\n          namespace: engineerThroughput\n        render:\n          kind: table\n          sort:\n            field: mergedPrs\n            order: desc\n          columns:\n            - field: avatar\n              label: Engineer\n              format: avatar\n              avatarCommitterField: person\n            - field: person\n              label: Name\n            - field: mergedPrs\n              label: Merged\n              format: number\n              showTrend: true\n              trendBetter: up\n              trendDisplay: value\n            - field: aiSpendUsd\n              label: AI $\n              format: number\n            - field: aiAssistedPct\n              label: AI %\n              format: percent\n              showTrend: true\n              trendBetter: up\n    - id: pr-health\n      type: table\n      content:\n        title: PR health (weekly)\n        dataSource:\n          kind: memory\n          namespace: prHealth\n        render:\n          kind: table\n          columns:\n            - field: week\n              label: Week\n            - field: medianReviewHours\n              label: Review latency (h)\n              format: number\n              showTrend: true\n              trendBetter: down\n              trendDisplay: percent\n            - field: medianSizeLoc\n              label: Median size (LOC)\n              format: number\n              showTrend: true\n              trendBetter: down\n            - field: reopenRate\n              label: Reopen rate\n              format: percent\n              showTrend: true\n              trendBetter: down\n            - field: mergeRate\n              label: Merge rate\n              format: percent\n              showTrend: true\n              trendBetter: up\n",
+  "consoleYaml": "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: a1000001-0000-4000-8000-000000000002\n  name: Software Factory\nspec:\n  layout:\n    - i: latest-merge\n      x: 0\n      \"y\": 0\n      w: 5\n      h: 5\n      minW: 4\n      minH: 4\n    - i: ai-share-trend\n      x: 5\n      \"y\": 0\n      w: 7\n      h: 5\n      minW: 5\n      minH: 4\n    - i: ai-authored\n      x: 0\n      \"y\": 5\n      w: 4\n      h: 5\n      minW: 3\n      minH: 4\n    - i: ai-spend\n      x: 4\n      \"y\": 5\n      w: 4\n      h: 5\n      minW: 3\n      minH: 4\n    - i: time-to-merge\n      x: 8\n      \"y\": 5\n      w: 4\n      h: 5\n      minW: 3\n      minH: 4\n    - i: recent-merges\n      x: 0\n      \"y\": 10\n      w: 7\n      h: 6\n      minW: 5\n      minH: 4\n    - i: spend-vs-prs\n      x: 7\n      \"y\": 10\n      w: 5\n      h: 6\n      minW: 4\n      minH: 4\n    - i: pr-health\n      x: 0\n      \"y\": 16\n      w: 12\n      h: 5\n      minW: 6\n      minH: 4\n  panels:\n    - id: latest-merge\n      type: spotlight\n      content:\n        title: Latest merge\n        dataSource:\n          kind: memory\n          namespace: recentMerges\n        kicker: Just landed\n        statusField: status\n        statusLabelField: statusLabel\n        actorNameField: authorName\n        actorAvatarField: authorAvatar\n        titleField: title\n        hrefField: href\n        subtitleField: subtitle\n        timestampField: mergedAt\n        durationField: cycleTimeMs\n        approverNameField: approver\n        approverAvatarField: approverAvatar\n        approverLabel: Approved by\n        checksField: checks\n        checkNameField: name\n        checkStatusField: status\n    - id: ai-share-trend\n      type: chart\n      content:\n        title: AI-assisted share\n        dataSource:\n          kind: memory\n          namespace: aiAuthoredPct\n        render:\n          kind: chart\n          type: area\n          legend: hide\n          xField: week\n          yLabel: AI-assisted %\n          yFormat: percent\n          sort:\n            field: day\n            order: asc\n          series:\n            - field: value\n              label: AI-assisted %\n              format: percent\n    - id: ai-authored\n      type: scorecard\n      content:\n        title: AI-assisted merges\n        dataSource:\n          kind: memory\n          namespace: aiAuthoredPct\n        render:\n          kind: scorecard\n          aggregation: last\n          field: value\n          label: AI-assisted PRs\n          format: percent\n          better: up\n          sparklineField: value\n          showChange: both\n          changeCaption: vs prior week\n          target: \"50\"\n          showProgress: true\n    - id: ai-spend\n      type: scorecard\n      content:\n        title: AI spend (7d)\n        dataSource:\n          kind: memory\n          namespace: aiSpendUsd\n        render:\n          kind: scorecard\n          aggregation: last\n          field: value\n          label: USD this week\n          format: number\n          prefix: \"$\"\n          better: down\n          sparklineField: value\n          showChange: both\n          changeCaption: vs prior day\n    - id: time-to-merge\n      type: scorecard\n      content:\n        title: Time to merge\n        dataSource:\n          kind: memory\n          namespace: timeToMergeMs\n        render:\n          kind: scorecard\n          aggregation: last\n          field: value\n          label: Open \u2192 merge\n          format: duration\n          better: down\n          sparklineField: value\n          showChange: percent\n          changeCaption: vs prior week\n    - id: recent-merges\n      type: table\n      content:\n        title: Recent merges\n        dataSource:\n          kind: memory\n          namespace: recentMerges\n        render:\n          kind: table\n          columns:\n            - field: authorAvatar\n              label: Author\n              format: avatar\n              avatarCommitterField: authorName\n            - field: title\n              label: Pull request\n              format: link\n              href: \"{{ href }}\"\n            - field: authorship\n              label: Authorship\n              format: badge\n            - field: cycleTimeMs\n              label: Cycle time\n              format: duration\n              showTrend: true\n              trendBetter: down\n              trendDisplay: percent\n            - field: checksPassed\n              label: Checks\n              format: progress\n              progressTarget: checksTotal\n              progressLabel: number\n    - id: spend-vs-prs\n      type: table\n      content:\n        title: AI spend vs merged PRs\n        dataSource:\n          kind: memory\n          namespace: engineerThroughput\n        render:\n          kind: table\n          sort:\n            field: mergedPrs\n            order: desc\n          columns:\n            - field: avatar\n              label: Engineer\n              format: avatar\n              avatarCommitterField: person\n            - field: person\n              label: Name\n            - field: mergedPrs\n              label: Merged\n              format: number\n              showTrend: true\n              trendBetter: up\n              trendDisplay: value\n            - field: aiSpendUsd\n              label: AI $\n              format: number\n            - field: aiAssistedPct\n              label: AI %\n              format: percent\n              showTrend: true\n              trendBetter: up\n    - id: pr-health\n      type: table\n      content:\n        title: PR health (weekly)\n        dataSource:\n          kind: memory\n          namespace: prHealth\n        render:\n          kind: table\n          columns:\n            - field: week\n              label: Week\n            - field: medianReviewHours\n              label: Review latency (h)\n              format: number\n              showTrend: true\n              trendBetter: down\n              trendDisplay: percent\n            - field: medianSizeLoc\n              label: Median size (LOC)\n              format: number\n              showTrend: true\n              trendBetter: down\n            - field: reopenRate\n              label: Reopen rate\n              format: percent\n              showTrend: true\n              trendBetter: down\n            - field: mergeRate\n              label: Merge rate\n              format: percent\n              showTrend: true\n              trendBetter: up\n",
   "canvas": {
     "canvas": {
       "metadata": {
@@ -65,6 +65,150 @@
   "memory": {
     "items": [
       {
+        "id": "b1000001-aiap-0011-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-02T10:00:00.000Z",
+        "updatedAt": "2026-07-02T10:00:00.000Z",
+        "values": {
+          "value": 5,
+          "day": "2026-04-20",
+          "week": "2026-W17"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0010-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-03T10:00:00.000Z",
+        "updatedAt": "2026-07-03T10:00:00.000Z",
+        "values": {
+          "value": 9,
+          "day": "2026-04-27",
+          "week": "2026-W18"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0009-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-04T10:00:00.000Z",
+        "updatedAt": "2026-07-04T10:00:00.000Z",
+        "values": {
+          "value": 7,
+          "day": "2026-05-04",
+          "week": "2026-W19"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0008-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-05T10:00:00.000Z",
+        "updatedAt": "2026-07-05T10:00:00.000Z",
+        "values": {
+          "value": 14,
+          "day": "2026-05-11",
+          "week": "2026-W20"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0007-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-06T10:00:00.000Z",
+        "updatedAt": "2026-07-06T10:00:00.000Z",
+        "values": {
+          "value": 18,
+          "day": "2026-05-18",
+          "week": "2026-W21"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0006-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-07T10:00:00.000Z",
+        "updatedAt": "2026-07-07T10:00:00.000Z",
+        "values": {
+          "value": 12,
+          "day": "2026-05-25",
+          "week": "2026-W22"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0005-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-08T10:00:00.000Z",
+        "updatedAt": "2026-07-08T10:00:00.000Z",
+        "values": {
+          "value": 21,
+          "day": "2026-06-01",
+          "week": "2026-W23"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0004-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-09T10:00:00.000Z",
+        "updatedAt": "2026-07-09T10:00:00.000Z",
+        "values": {
+          "value": 26,
+          "day": "2026-06-08",
+          "week": "2026-W24"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0003-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-10T10:00:00.000Z",
+        "updatedAt": "2026-07-10T10:00:00.000Z",
+        "values": {
+          "value": 22,
+          "day": "2026-06-15",
+          "week": "2026-W25"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0002-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-11T10:00:00.000Z",
+        "updatedAt": "2026-07-11T10:00:00.000Z",
+        "values": {
+          "value": 29,
+          "day": "2026-06-22",
+          "week": "2026-W26"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0001-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T10:00:00.000Z",
+        "updatedAt": "2026-07-12T10:00:00.000Z",
+        "values": {
+          "value": 33,
+          "day": "2026-06-29",
+          "week": "2026-W27"
+        }
+      },
+      {
+        "id": "b1000001-aiap-0000-4000-8000-000000000001",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T10:00:00.000Z",
+        "updatedAt": "2026-07-13T10:00:00.000Z",
+        "values": {
+          "value": 37,
+          "day": "2026-07-06",
+          "week": "2026-W28"
+        }
+      },
+      {
         "id": "b1000001-0000-4000-8000-000000000001",
         "namespace": "recentMerges",
         "source": "SOURCE_NODE",
@@ -76,19 +220,27 @@
           "subtitle": "superplanehq/superplane \u00b7 main",
           "status": "success",
           "statusLabel": "Merged",
-          "author": "octocat",
-          "authorName": "Ada Lovelace",
-          "authorAvatar": "https://github.com/octocat.png",
-          "approver": "Grace Hopper",
-          "approverAvatar": "https://github.com/octocat.png",
+          "author": "forestileao",
+          "authorName": "forestileao",
+          "authorAvatar": "https://github.com/forestileao.png",
+          "approver": "shiroyasha",
+          "approverAvatar": "https://github.com/shiroyasha.png",
           "mergedAt": "2026-07-13T05:16:38.000Z",
           "cycleTimeMs": 16200000,
           "authorship": "ai-assisted",
-          "checksPassed": 3,
-          "checksTotal": 3,
+          "checksPassed": 6,
+          "checksTotal": 6,
           "checks": [
             {
               "name": "CI",
+              "status": "success"
+            },
+            {
+              "name": "Code Quality",
+              "status": "success"
+            },
+            {
+              "name": "Security scan",
               "status": "success"
             },
             {
@@ -97,6 +249,10 @@
             },
             {
               "name": "Docs",
+              "status": "success"
+            },
+            {
+              "name": "License check",
               "status": "success"
             }
           ]
@@ -114,27 +270,39 @@
           "subtitle": "superplanehq/superplane \u00b7 main",
           "status": "success",
           "statusLabel": "Merged",
-          "author": "octocat",
-          "authorName": "Grace Hopper",
-          "authorAvatar": "https://github.com/octocat.png",
-          "approver": "Ada Lovelace",
-          "approverAvatar": "https://github.com/octocat.png",
+          "author": "shiroyasha",
+          "authorName": "shiroyasha",
+          "authorAvatar": "https://github.com/shiroyasha.png",
+          "approver": "forestileao",
+          "approverAvatar": "https://github.com/forestileao.png",
           "mergedAt": "2026-07-12T23:16:38.000Z",
           "cycleTimeMs": 32400000,
           "authorship": "human",
-          "checksPassed": 2,
-          "checksTotal": 3,
+          "checksPassed": 5,
+          "checksTotal": 6,
           "checks": [
             {
               "name": "CI",
               "status": "success"
             },
             {
-              "name": "Risk review",
+              "name": "Code Quality",
+              "status": "success"
+            },
+            {
+              "name": "Security scan",
               "status": "warning"
             },
             {
+              "name": "Risk review",
+              "status": "success"
+            },
+            {
               "name": "Docs",
+              "status": "success"
+            },
+            {
+              "name": "License check",
               "status": "success"
             }
           ]
@@ -152,19 +320,27 @@
           "subtitle": "superplanehq/superplane \u00b7 main",
           "status": "success",
           "statusLabel": "Merged",
-          "author": "octocat",
-          "authorName": "Alan Turing",
-          "authorAvatar": "https://github.com/octocat.png",
-          "approver": "Ada Lovelace",
-          "approverAvatar": "https://github.com/octocat.png",
+          "author": "lucaspin",
+          "authorName": "lucaspin",
+          "authorAvatar": "https://github.com/lucaspin.png",
+          "approver": "andrecalil",
+          "approverAvatar": "https://github.com/andrecalil.png",
           "mergedAt": "2026-07-12T13:16:38.000Z",
           "cycleTimeMs": 21600000,
           "authorship": "ai-assisted",
-          "checksPassed": 2,
-          "checksTotal": 3,
+          "checksPassed": 5,
+          "checksTotal": 6,
           "checks": [
             {
               "name": "CI",
+              "status": "success"
+            },
+            {
+              "name": "Code Quality",
+              "status": "success"
+            },
+            {
+              "name": "Security scan",
               "status": "success"
             },
             {
@@ -174,6 +350,10 @@
             {
               "name": "Docs",
               "status": "neutral"
+            },
+            {
+              "name": "License check",
+              "status": "success"
             }
           ]
         }
@@ -190,19 +370,27 @@
           "subtitle": "superplanehq/superplane \u00b7 main",
           "status": "success",
           "statusLabel": "Merged",
-          "author": "octocat",
-          "authorName": "Ada Lovelace",
-          "authorAvatar": "https://github.com/octocat.png",
-          "approver": "Alan Turing",
-          "approverAvatar": "https://github.com/octocat.png",
+          "author": "forestileao",
+          "authorName": "forestileao",
+          "authorAvatar": "https://github.com/forestileao.png",
+          "approver": "lucaspin",
+          "approverAvatar": "https://github.com/lucaspin.png",
           "mergedAt": "2026-07-12T01:16:38.000Z",
           "cycleTimeMs": 39600000,
           "authorship": "ai-assisted",
-          "checksPassed": 3,
-          "checksTotal": 3,
+          "checksPassed": 6,
+          "checksTotal": 6,
           "checks": [
             {
               "name": "CI",
+              "status": "success"
+            },
+            {
+              "name": "Code Quality",
+              "status": "success"
+            },
+            {
+              "name": "Security scan",
               "status": "success"
             },
             {
@@ -211,6 +399,10 @@
             },
             {
               "name": "Docs",
+              "status": "success"
+            },
+            {
+              "name": "License check",
               "status": "success"
             }
           ]
@@ -228,19 +420,27 @@
           "subtitle": "superplanehq/superplane \u00b7 main",
           "status": "success",
           "statusLabel": "Merged",
-          "author": "octocat",
-          "authorName": "Grace Hopper",
-          "authorAvatar": "https://github.com/octocat.png",
-          "approver": "Ada Lovelace",
-          "approverAvatar": "https://github.com/octocat.png",
+          "author": "felixgateru",
+          "authorName": "felixgateru",
+          "authorAvatar": "https://github.com/felixgateru.png",
+          "approver": "shiroyasha",
+          "approverAvatar": "https://github.com/shiroyasha.png",
           "mergedAt": "2026-07-11T15:16:38.000Z",
           "cycleTimeMs": 50400000,
           "authorship": "human",
-          "checksPassed": 2,
-          "checksTotal": 3,
+          "checksPassed": 5,
+          "checksTotal": 6,
           "checks": [
             {
               "name": "CI",
+              "status": "success"
+            },
+            {
+              "name": "Code Quality",
+              "status": "success"
+            },
+            {
+              "name": "Security scan",
               "status": "success"
             },
             {
@@ -250,107 +450,12 @@
             {
               "name": "Docs",
               "status": "failed"
+            },
+            {
+              "name": "License check",
+              "status": "success"
             }
           ]
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000006",
-        "namespace": "aiAuthoredPct",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-13T01:16:38.000Z",
-        "updatedAt": "2026-07-13T01:16:38.000Z",
-        "values": {
-          "value": 62,
-          "day": "d0"
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000007",
-        "namespace": "aiAuthoredPct",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-13T00:16:38.000Z",
-        "updatedAt": "2026-07-13T00:16:38.000Z",
-        "values": {
-          "value": 58,
-          "day": "d1"
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000008",
-        "namespace": "aiAuthoredPct",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T23:16:38.000Z",
-        "updatedAt": "2026-07-12T23:16:38.000Z",
-        "values": {
-          "value": 55,
-          "day": "d2"
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000009",
-        "namespace": "aiAuthoredPct",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T22:16:38.000Z",
-        "updatedAt": "2026-07-12T22:16:38.000Z",
-        "values": {
-          "value": 51,
-          "day": "d3"
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000010",
-        "namespace": "aiAuthoredPct",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T21:16:38.000Z",
-        "updatedAt": "2026-07-12T21:16:38.000Z",
-        "values": {
-          "value": 49,
-          "day": "d4"
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000011",
-        "namespace": "aiSpendUsd",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T20:16:38.000Z",
-        "updatedAt": "2026-07-12T20:16:38.000Z",
-        "values": {
-          "value": 1840,
-          "day": "d0"
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000012",
-        "namespace": "aiSpendUsd",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T19:16:38.000Z",
-        "updatedAt": "2026-07-12T19:16:38.000Z",
-        "values": {
-          "value": 1710,
-          "day": "d1"
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000013",
-        "namespace": "aiSpendUsd",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T18:16:38.000Z",
-        "updatedAt": "2026-07-12T18:16:38.000Z",
-        "values": {
-          "value": 1650,
-          "day": "d2"
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000014",
-        "namespace": "aiSpendUsd",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T17:16:38.000Z",
-        "updatedAt": "2026-07-12T17:16:38.000Z",
-        "values": {
-          "value": 1590,
-          "day": "d3"
         }
       },
       {
@@ -361,62 +466,51 @@
         "updatedAt": "2026-07-12T16:16:38.000Z",
         "values": {
           "value": 1480,
-          "day": "d4"
+          "day": "2026-07-09"
         }
       },
       {
-        "id": "b1000001-0000-4000-8000-000000000016",
-        "namespace": "activeContributors",
+        "id": "b1000001-0000-4000-8000-000000000014",
+        "namespace": "aiSpendUsd",
         "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T15:16:38.000Z",
-        "updatedAt": "2026-07-12T15:16:38.000Z",
+        "createdAt": "2026-07-12T17:16:38.000Z",
+        "updatedAt": "2026-07-12T17:16:38.000Z",
         "values": {
-          "value": 18,
-          "day": "d0"
+          "value": 1590,
+          "day": "2026-07-10"
         }
       },
       {
-        "id": "b1000001-0000-4000-8000-000000000017",
-        "namespace": "activeContributors",
+        "id": "b1000001-0000-4000-8000-000000000013",
+        "namespace": "aiSpendUsd",
         "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T14:16:38.000Z",
-        "updatedAt": "2026-07-12T14:16:38.000Z",
+        "createdAt": "2026-07-12T18:16:38.000Z",
+        "updatedAt": "2026-07-12T18:16:38.000Z",
         "values": {
-          "value": 17,
-          "day": "d1"
+          "value": 1650,
+          "day": "2026-07-11"
         }
       },
       {
-        "id": "b1000001-0000-4000-8000-000000000018",
-        "namespace": "activeContributors",
+        "id": "b1000001-0000-4000-8000-000000000012",
+        "namespace": "aiSpendUsd",
         "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T13:16:38.000Z",
-        "updatedAt": "2026-07-12T13:16:38.000Z",
+        "createdAt": "2026-07-12T19:16:38.000Z",
+        "updatedAt": "2026-07-12T19:16:38.000Z",
         "values": {
-          "value": 16,
-          "day": "d2"
+          "value": 1710,
+          "day": "2026-07-12"
         }
       },
       {
-        "id": "b1000001-0000-4000-8000-000000000019",
-        "namespace": "activeContributors",
+        "id": "b1000001-0000-4000-8000-000000000011",
+        "namespace": "aiSpendUsd",
         "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T12:16:38.000Z",
-        "updatedAt": "2026-07-12T12:16:38.000Z",
+        "createdAt": "2026-07-12T20:16:38.000Z",
+        "updatedAt": "2026-07-12T20:16:38.000Z",
         "values": {
-          "value": 16,
-          "day": "d3"
-        }
-      },
-      {
-        "id": "b1000001-0000-4000-8000-000000000020",
-        "namespace": "activeContributors",
-        "source": "SOURCE_NODE",
-        "createdAt": "2026-07-12T11:16:38.000Z",
-        "updatedAt": "2026-07-12T11:16:38.000Z",
-        "values": {
-          "value": 15,
-          "day": "d4"
+          "value": 1840,
+          "day": "2026-07-13"
         }
       },
       {
@@ -426,8 +520,8 @@
         "createdAt": "2026-07-12T10:16:38.000Z",
         "updatedAt": "2026-07-12T10:16:38.000Z",
         "values": {
-          "person": "Ada Lovelace",
-          "avatar": "https://github.com/octocat.png",
+          "person": "forestileao",
+          "avatar": "https://github.com/forestileao.png",
           "mergedPrs": 12,
           "aiSpendUsd": 620,
           "aiAssistedPct": 80,
@@ -441,8 +535,8 @@
         "createdAt": "2026-07-12T09:16:38.000Z",
         "updatedAt": "2026-07-12T09:16:38.000Z",
         "values": {
-          "person": "Grace Hopper",
-          "avatar": "https://github.com/octocat.png",
+          "person": "shiroyasha",
+          "avatar": "https://github.com/shiroyasha.png",
           "mergedPrs": 9,
           "aiSpendUsd": 210,
           "aiAssistedPct": 22,
@@ -456,8 +550,8 @@
         "createdAt": "2026-07-12T08:16:38.000Z",
         "updatedAt": "2026-07-12T08:16:38.000Z",
         "values": {
-          "person": "Alan Turing",
-          "avatar": "https://github.com/octocat.png",
+          "person": "lucaspin",
+          "avatar": "https://github.com/lucaspin.png",
           "mergedPrs": 8,
           "aiSpendUsd": 540,
           "aiAssistedPct": 70,
@@ -471,8 +565,8 @@
         "createdAt": "2026-07-12T07:16:38.000Z",
         "updatedAt": "2026-07-12T07:16:38.000Z",
         "values": {
-          "person": "Katherine Johnson",
-          "avatar": "https://github.com/octocat.png",
+          "person": "andrecalil",
+          "avatar": "https://github.com/andrecalil.png",
           "mergedPrs": 7,
           "aiSpendUsd": 310,
           "aiAssistedPct": 45,
@@ -486,8 +580,8 @@
         "createdAt": "2026-07-12T06:16:38.000Z",
         "updatedAt": "2026-07-12T06:16:38.000Z",
         "values": {
-          "person": "Margaret Hamilton",
-          "avatar": "https://github.com/octocat.png",
+          "person": "felixgateru",
+          "avatar": "https://github.com/felixgateru.png",
           "mergedPrs": 6,
           "aiSpendUsd": 160,
           "aiAssistedPct": 18,
@@ -562,6 +656,150 @@
           "medianSizeLoc": 260,
           "reopenRate": 0.12,
           "mergeRate": 0.65
+        }
+      },
+      {
+        "id": "b1000001-ttm-0000-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-04-20T12:00:00.000Z",
+        "updatedAt": "2026-04-20T12:00:00.000Z",
+        "values": {
+          "value": 172800000,
+          "day": "2026-04-20",
+          "week": "2026-W17"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0001-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-04-27T12:00:00.000Z",
+        "updatedAt": "2026-04-27T12:00:00.000Z",
+        "values": {
+          "value": 151200000,
+          "day": "2026-04-27",
+          "week": "2026-W18"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0002-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-05-04T12:00:00.000Z",
+        "updatedAt": "2026-05-04T12:00:00.000Z",
+        "values": {
+          "value": 162000000,
+          "day": "2026-05-04",
+          "week": "2026-W19"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0003-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-05-11T12:00:00.000Z",
+        "updatedAt": "2026-05-11T12:00:00.000Z",
+        "values": {
+          "value": 129600000,
+          "day": "2026-05-11",
+          "week": "2026-W20"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0004-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-05-18T12:00:00.000Z",
+        "updatedAt": "2026-05-18T12:00:00.000Z",
+        "values": {
+          "value": 118800000,
+          "day": "2026-05-18",
+          "week": "2026-W21"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0005-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-05-25T12:00:00.000Z",
+        "updatedAt": "2026-05-25T12:00:00.000Z",
+        "values": {
+          "value": 136800000,
+          "day": "2026-05-25",
+          "week": "2026-W22"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0006-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-06-01T12:00:00.000Z",
+        "updatedAt": "2026-06-01T12:00:00.000Z",
+        "values": {
+          "value": 104400000,
+          "day": "2026-06-01",
+          "week": "2026-W23"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0007-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-06-08T12:00:00.000Z",
+        "updatedAt": "2026-06-08T12:00:00.000Z",
+        "values": {
+          "value": 93600000,
+          "day": "2026-06-08",
+          "week": "2026-W24"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0008-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-06-15T12:00:00.000Z",
+        "updatedAt": "2026-06-15T12:00:00.000Z",
+        "values": {
+          "value": 86400000,
+          "day": "2026-06-15",
+          "week": "2026-W25"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0009-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-06-22T12:00:00.000Z",
+        "updatedAt": "2026-06-22T12:00:00.000Z",
+        "values": {
+          "value": 75600000,
+          "day": "2026-06-22",
+          "week": "2026-W26"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0010-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-06-29T12:00:00.000Z",
+        "updatedAt": "2026-06-29T12:00:00.000Z",
+        "values": {
+          "value": 64800000,
+          "day": "2026-06-29",
+          "week": "2026-W27"
+        }
+      },
+      {
+        "id": "b1000001-ttm-0011-4000-8000-000000000001",
+        "namespace": "timeToMergeMs",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-06T12:00:00.000Z",
+        "updatedAt": "2026-07-06T12:00:00.000Z",
+        "values": {
+          "value": 52200000,
+          "day": "2026-07-06",
+          "week": "2026-W28"
         }
       }
     ]
