@@ -153,6 +153,12 @@ export function useCanvasWebsocket(
     });
   }, [queryClient, canvasId]);
 
+  const invalidateCanvasRunQueries = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: [...canvasKeys.runs(), canvasId],
+    });
+  }, [queryClient, canvasId]);
+
   const invalidateMemoryEntries = useCallback(() => {
     queryClient.invalidateQueries({
       queryKey: canvasKeys.canvasMemoryEntries(canvasId),
@@ -213,7 +219,7 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             addNodeQueueItem(queueItem.nodeId!, queueItem);
-            invalidateRuns();
+            invalidateCanvasRunQueries();
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
@@ -222,6 +228,7 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId && "id" in payload && payload.id) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
+            invalidateCanvasRunQueries();
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
@@ -284,6 +291,7 @@ export function useCanvasWebsocket(
       patchExecutionInCache,
       invalidateMemoryEntries,
       invalidateRuns,
+      invalidateCanvasRunQueries,
     ],
   );
 
