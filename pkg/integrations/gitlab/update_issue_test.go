@@ -184,6 +184,58 @@ func Test__UpdateIssue__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to update issue")
 	})
 
+	t.Run("invalid assignee id", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":   "123",
+				"issueIid":  "1",
+				"assignees": []string{"not-a-number"},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+				},
+			},
+			HTTP: &contexts.HTTPContext{},
+		}
+
+		err := c.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid assignee id")
+
+		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
+		assert.Empty(t, httpCtx.Requests, "no request should be sent when an assignee id is invalid")
+	})
+
+	t.Run("invalid milestone id", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":   "123",
+				"issueIid":  "1",
+				"milestone": "not-a-number",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+				},
+			},
+			HTTP: &contexts.HTTPContext{},
+		}
+
+		err := c.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid milestone id")
+
+		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
+		assert.Empty(t, httpCtx.Requests, "no request should be sent when the milestone id is invalid")
+	})
+
 	t.Run("no fields enabled", func(t *testing.T) {
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
