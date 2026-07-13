@@ -21,9 +21,6 @@ const (
 	// anthropicFilesBeta is required to upload files and to reference a file_id
 	// from a content block on the Messages API.
 	anthropicFilesBeta = "files-api-2025-04-14"
-	// maxFileListPages caps forward pagination when listing files so a runaway
-	// has_more loop can never hang an execution.
-	maxFileListPages = 10
 )
 
 type Client struct {
@@ -123,13 +120,6 @@ type FileMetadata struct {
 	SizeBytes    int64  `json:"size_bytes"`
 	CreatedAt    string `json:"created_at"`
 	Downloadable bool   `json:"downloadable"`
-}
-
-type listFilesResponse struct {
-	Data    []FileMetadata `json:"data"`
-	FirstID string         `json:"first_id"`
-	LastID  string         `json:"last_id"`
-	HasMore bool           `json:"has_more"`
 }
 
 type claudeErrorResponse struct {
@@ -295,41 +285,6 @@ func (c *Client) DeleteFile(fileID string) error {
 	}
 	_, err := c.execRequestWithBeta(http.MethodDelete, c.BaseURL+"/files/"+url.PathEscape(fileID), nil, anthropicFilesBeta)
 	return err
-}
-
-// ListFiles lists files stored in the Files API, paginating forward with
-// after_id. An empty scopeID lists workspace files; a session ID scopes the
-// listing to that Managed Agents session.
-func (c *Client) ListFiles(scopeID string) ([]FileMetadata, error) {
-	var files []FileMetadata
-	afterID := ""
-	for range maxFileListPages {
-		params := url.Values{}
-		params.Set("limit", "1000")
-		if scopeID != "" {
-			params.Set("scope_id", scopeID)
-		}
-		if afterID != "" {
-			params.Set("after_id", afterID)
-		}
-
-		responseBody, err := c.execRequestWithBeta(http.MethodGet, c.BaseURL+"/files?"+params.Encode(), nil, anthropicFilesBeta)
-		if err != nil {
-			return nil, err
-		}
-
-		var response listFilesResponse
-		if err := json.Unmarshal(responseBody, &response); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal files response: %v", err)
-		}
-
-		files = append(files, response.Data...)
-		if !response.HasMore || response.LastID == "" {
-			break
-		}
-		afterID = response.LastID
-	}
-	return files, nil
 }
 
 // GetFileMetadata retrieves a single file's metadata (GET /v1/files/{id}).

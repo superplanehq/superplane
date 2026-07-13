@@ -165,26 +165,6 @@ func TestClaude_ListResources(t *testing.T) {
 			expectedIDs: []string{"claude-2.1", "claude-instant-1.2"},
 		},
 		{
-			name:         "List Files Success",
-			resourceType: "file",
-			config: map[string][]byte{
-				"apiKey": []byte("test"),
-			},
-			mockResponses: func(req *http.Request) *http.Response {
-				return &http.Response{
-					StatusCode: 200,
-					Body: io.NopCloser(bytes.NewBufferString(`{
-						"data": [
-							{"id": "file_1", "filename": "report.pdf"},
-							{"id": "file_2", "filename": "chart.png"}
-						],
-						"has_more": false
-					}`)),
-				}
-			},
-			expectedIDs: []string{"file_1", "file_2"},
-		},
-		{
 			name:         "Invalid Resource Type",
 			resourceType: "deployment",
 			expectedIDs:  []string{}, // Returns empty list, no error

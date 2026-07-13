@@ -52,6 +52,7 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Done"}]},{"type":"user.message","content":[{"type":"text","text":"Hello"}]}]}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"file_out1","filename":"report.md","mime_type":"text/markdown","size_bytes":4096,"downloadable":true},{"id":"file_in1","filename":"input.txt","mime_type":"text/plain","size_bytes":10,"downloadable":false}]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("# Report\n"))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
@@ -82,13 +83,16 @@ func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	assert.Equal(t, "Done", out.LastMessage)
 	assert.Equal(t, "", requestsCtx.Action)
 
-	// Only the downloadable (agent-generated) file becomes an artifact.
+	// Only the downloadable (agent-generated) file becomes an artifact, and
+	// its content is embedded in the payload.
 	require.Len(t, out.Artifacts, 1)
 	assert.Equal(t, "file_out1", out.Artifacts[0].FileID)
 	assert.Equal(t, "report.md", out.Artifacts[0].Filename)
 	assert.Equal(t, "https://api.anthropic.com/v1/files/file_out1/content", out.Artifacts[0].DownloadURL)
+	assert.Equal(t, "text", out.Artifacts[0].Encoding)
+	assert.Equal(t, "# Report\n", out.Artifacts[0].Content)
 
-	require.Len(t, httpContext.Requests, 6) // create, send, get status, get events, list files, delete
+	require.Len(t, httpContext.Requests, 7) // create, send, get status, get events, list files, download file, delete
 	assert.Equal(t, "POST", httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.Path, "/sessions")
 	assert.Equal(t, anthropicBetaManagedAgents, httpContext.Requests[0].Header.Get("anthropic-beta"))
@@ -141,6 +145,7 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Final"}]},{"type":"agent.message","content":[{"type":"text","text":"Earlier"}]}]}`))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"id":"file_out1","filename":"report.md","mime_type":"text/markdown","size_bytes":4096,"downloadable":true}]}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("# Report\n"))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
@@ -171,6 +176,8 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	assert.Equal(t, []string{"Earlier", "Final"}, out.Messages)
 	require.Len(t, out.Artifacts, 1)
 	assert.Equal(t, "file_out1", out.Artifacts[0].FileID)
+	assert.Equal(t, "text", out.Artifacts[0].Encoding)
+	assert.Equal(t, "# Report\n", out.Artifacts[0].Content)
 }
 
 func Test__RunAgent__poll__timeout(t *testing.T) {

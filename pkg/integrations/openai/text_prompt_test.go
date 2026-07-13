@@ -284,22 +284,26 @@ func Test__CreateResponse__Execute__codeInterpreter(t *testing.T) {
 		return payload, httpCtx
 	}
 
-	t.Run("enabled adds tool and extracts annotation artifacts", func(t *testing.T) {
+	t.Run("enabled adds tool and extracts annotation artifacts with content", func(t *testing.T) {
 		payload, httpCtx := run(t,
 			map[string]any{"model": "gpt-5.2", "input": "plot it", "codeInterpreter": true},
-			[]string{`{
-				"id": "resp_1",
-				"model": "gpt-5.2",
-				"output": [
-					{"type": "code_interpreter_call", "id": "ci_1", "container_id": "cntr_1"},
-					{"type": "message", "role": "assistant", "content": [
-						{"type": "output_text", "text": "Here is the chart", "annotations": [
-							{"type": "container_file_citation", "container_id": "cntr_1", "file_id": "cfile_1", "filename": "plot.png", "start_index": 0, "end_index": 0}
+			[]string{
+				`{
+					"id": "resp_1",
+					"model": "gpt-5.2",
+					"output": [
+						{"type": "code_interpreter_call", "id": "ci_1", "container_id": "cntr_1"},
+						{"type": "message", "role": "assistant", "content": [
+							{"type": "output_text", "text": "Here is the chart", "annotations": [
+								{"type": "container_file_citation", "container_id": "cntr_1", "file_id": "cfile_1", "filename": "plot.png", "start_index": 0, "end_index": 0}
+							]}
 						]}
-					]}
-				],
-				"usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
-			}`},
+					],
+					"usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
+				}`,
+				`{"id": "cfile_1", "object": "container.file", "container_id": "cntr_1", "path": "/mnt/data/plot.png", "bytes": 8, "source": "assistant"}`,
+				"\x89PNG\r\n\x1a\n",
+			},
 		)
 
 		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
@@ -316,6 +320,9 @@ func Test__CreateResponse__Execute__codeInterpreter(t *testing.T) {
 		}
 		if artifact.DownloadURL != "https://api.openai.com/v1/containers/cntr_1/files/cfile_1/content" {
 			t.Errorf("unexpected download URL: %s", artifact.DownloadURL)
+		}
+		if artifact.Bytes != 8 || artifact.Encoding != "base64" || artifact.Content == "" {
+			t.Errorf("expected inlined base64 content, got %+v", artifact)
 		}
 	})
 
@@ -336,18 +343,23 @@ func Test__CreateResponse__Execute__codeInterpreter(t *testing.T) {
 					{"id": "cfile_gen", "object": "container.file", "container_id": "cntr_1", "path": "/mnt/data/report.csv", "bytes": 10, "source": "assistant"},
 					{"id": "cfile_in", "object": "container.file", "container_id": "cntr_1", "path": "/mnt/data/input.csv", "bytes": 5, "source": "user"}
 				]}`,
+				"a,b\n1,2\n",
 			},
 		)
 
-		// Only the assistant-generated file becomes an artifact.
+		// Only the assistant-generated file becomes an artifact, with content.
 		if len(payload.Artifacts) != 1 {
 			t.Fatalf("expected 1 artifact, got %d", len(payload.Artifacts))
 		}
-		if payload.Artifacts[0].FileID != "cfile_gen" || payload.Artifacts[0].Filename != "report.csv" {
-			t.Errorf("unexpected artifact: %+v", payload.Artifacts[0])
+		artifact := payload.Artifacts[0]
+		if artifact.FileID != "cfile_gen" || artifact.Filename != "report.csv" {
+			t.Errorf("unexpected artifact: %+v", artifact)
 		}
-		if len(httpCtx.Requests) != 2 {
-			t.Fatalf("expected fallback container files listing, got %d requests", len(httpCtx.Requests))
+		if artifact.Encoding != "text" || artifact.Content != "a,b\n1,2\n" {
+			t.Errorf("expected inlined text content, got %+v", artifact)
+		}
+		if len(httpCtx.Requests) != 3 {
+			t.Fatalf("expected fallback listing and content download, got %d requests", len(httpCtx.Requests))
 		}
 		if !strings.Contains(httpCtx.Requests[1].URL.Path, "/containers/cntr_1/files") {
 			t.Errorf("unexpected fallback request: %s", httpCtx.Requests[1].URL.String())

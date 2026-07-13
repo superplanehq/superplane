@@ -2,9 +2,11 @@ package openai
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/google/uuid"
@@ -38,15 +40,25 @@ type ResponsePayload struct {
 	Response  *OpenAIResponse `json:"response"`
 }
 
-// Artifact is a file the code interpreter generated in its container.
-// Containers expire ~20 minutes after their last activity, so artifacts
-// should be downloaded promptly.
+// Artifact is a file the code interpreter generated in its container. Its
+// content is embedded in the payload — text files as a plain string,
+// everything else base64-encoded — because containers (and their files)
+// expire ~20 minutes after their last activity. Files over the inline size
+// cap carry metadata and the API download URL only.
 type Artifact struct {
 	FileID      string `json:"fileId"`
 	ContainerID string `json:"containerId"`
 	Filename    string `json:"filename"`
+	Bytes       int64  `json:"bytes,omitempty"`
+	Encoding    string `json:"encoding,omitempty"`
+	Content     string `json:"content,omitempty"`
 	DownloadURL string `json:"downloadUrl"` // {BaseURL}/containers/{cid}/files/{fid}/content
 }
+
+// maxInlineArtifactSizeBytes caps how large a generated file can be for its
+// content to be embedded in the output payload. Larger files keep their
+// metadata and download URL only.
+const maxInlineArtifactSizeBytes = 10 * 1024 * 1024
 
 // ResponseNodeMetadata is node-level metadata surfaced in the UI so the
 // configured model and options are visible on the node without opening it.
@@ -94,7 +106,7 @@ Returns the generated response including:
 - **usage**: Token usage information (prompt tokens, completion tokens, total tokens)
 - **id**: Response ID for tracking
 - **parsed**: When Structured Output is configured, the response parsed into an object.
-- **artifacts**: When Code Interpreter is enabled, the files the model generated (file ID, container ID, filename, and download URL). Containers expire about 20 minutes after their last activity, so download artifacts promptly (e.g. with the Download Container File component).
+- **artifacts**: When Code Interpreter is enabled, the files the model generated, with the file content included: text files as plain text (` + "`encoding: \"text\"`" + `), everything else base64-encoded (` + "`encoding: \"base64\"`" + `). Each artifact carries fileId, containerId, filename, bytes, and a downloadUrl; files over 10MB include metadata and the download URL only (note that containers expire about 20 minutes after their last activity).
 
 ## Notes
 
@@ -407,10 +419,12 @@ func extractResponseText(response *OpenAIResponse) string {
 	return builder.String()
 }
 
-// extractArtifacts collects the files the code interpreter generated. They
-// normally arrive as container_file_citation annotations on the output text;
-// when annotations are missing (a known gap when combined with structured
-// output), it falls back to listing the container's assistant-generated files.
+// extractArtifacts collects the files the code interpreter generated and
+// embeds their content in the payload. Generated files normally arrive as
+// container_file_citation annotations on the output text; when annotations
+// are missing (a known gap when combined with structured output), it falls
+// back to listing the container's assistant-generated files. Content fetches
+// are best-effort: a failure degrades the artifact to metadata + download URL.
 func extractArtifacts(client *Client, response *OpenAIResponse, codeInterpreter bool) []Artifact {
 	if response == nil {
 		return nil
@@ -425,12 +439,20 @@ func extractArtifacts(client *Client, response *OpenAIResponse, codeInterpreter 
 					continue
 				}
 				seen[annotation.FileID] = true
-				artifacts = append(artifacts, Artifact{
+				artifact := Artifact{
 					FileID:      annotation.FileID,
 					ContainerID: annotation.ContainerID,
 					Filename:    annotation.Filename,
 					DownloadURL: client.ContainerFileContentURL(annotation.ContainerID, annotation.FileID),
-				})
+				}
+				if file, err := client.GetContainerFile(annotation.ContainerID, annotation.FileID); err == nil {
+					artifact.Bytes = file.Bytes
+					if artifact.Filename == "" {
+						artifact.Filename = containerFileName(file.Path)
+					}
+					inlineArtifactContent(client, &artifact)
+				}
+				artifacts = append(artifacts, artifact)
 			}
 		}
 	}
@@ -452,15 +474,59 @@ func extractArtifacts(client *Client, response *OpenAIResponse, codeInterpreter 
 				continue
 			}
 			seen[file.ID] = true
-			artifacts = append(artifacts, Artifact{
+			artifact := Artifact{
 				FileID:      file.ID,
 				ContainerID: output.ContainerID,
 				Filename:    containerFileName(file.Path),
+				Bytes:       file.Bytes,
 				DownloadURL: client.ContainerFileContentURL(output.ContainerID, file.ID),
-			})
+			}
+			inlineArtifactContent(client, &artifact)
+			artifacts = append(artifacts, artifact)
 		}
 	}
 	return artifacts
+}
+
+// inlineArtifactContent embeds the artifact's content when it is within the
+// inline size cap, sniffing the content type to decide between plain text and
+// base64. Failures leave the artifact with metadata and download URL only.
+func inlineArtifactContent(client *Client, artifact *Artifact) {
+	if artifact.Bytes > maxInlineArtifactSizeBytes {
+		return
+	}
+	content, err := client.DownloadContainerFileContent(artifact.ContainerID, artifact.FileID)
+	if err != nil {
+		return
+	}
+	if isTextMIME(http.DetectContentType(content)) {
+		artifact.Encoding, artifact.Content = "text", string(content)
+		return
+	}
+	artifact.Encoding, artifact.Content = "base64", base64.StdEncoding.EncodeToString(content)
+}
+
+// containerFileName derives the file name from the container path
+// (e.g. /mnt/data/plot.png -> plot.png).
+func containerFileName(containerPath string) string {
+	if containerPath == "" {
+		return ""
+	}
+	return path.Base(containerPath)
+}
+
+// isTextMIME reports whether a MIME type is text-like and safe to emit as a
+// plain string payload.
+func isTextMIME(mimeType string) bool {
+	mt := strings.ToLower(strings.TrimSpace(strings.Split(mimeType, ";")[0]))
+	if strings.HasPrefix(mt, "text/") {
+		return true
+	}
+	switch mt {
+	case "application/json", "application/xml", "application/x-yaml", "application/yaml", "application/javascript":
+		return true
+	}
+	return strings.HasSuffix(mt, "+json") || strings.HasSuffix(mt, "+xml")
 }
 
 // extractRefusal returns the refusal message from a Responses API output, if any.

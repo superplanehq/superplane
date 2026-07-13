@@ -46,7 +46,7 @@ func (a *RunCodeAgent) Documentation() string {
 
 Emits the final **status**, the **pull request URL**, the working **branch**, and a **summary** so downstream steps can branch or post the result.
 
-Files the agent saves under ` + "`/mnt/session/outputs/`" + ` are additionally emitted as **artifacts** (file id, filename, MIME type, size, and a download link usable with the API key); consume them downstream with the **Get File** or **Download File** component.`
+Files the agent saves under ` + "`/mnt/session/outputs/`" + ` are additionally emitted as **artifacts** with their content included in the payload (text files as plain text, everything else base64-encoded; files over 10MB carry metadata and a download link only).`
 }
 
 func (a *RunCodeAgent) Icon() string { return "bot" }

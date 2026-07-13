@@ -316,62 +316,6 @@ func (c *Client) DeleteFile(fileID string) error {
 	return err
 }
 
-// File is a file object from the OpenAI Files API. Timestamps are unix seconds.
-type File struct {
-	ID        string `json:"id"`
-	Object    string `json:"object"`
-	Bytes     int64  `json:"bytes"`
-	CreatedAt int64  `json:"created_at"`
-	ExpiresAt int64  `json:"expires_at,omitempty"`
-	Filename  string `json:"filename"`
-	Purpose   string `json:"purpose"`
-	Status    string `json:"status"`
-}
-
-type FilesResponse struct {
-	Data []File `json:"data"`
-}
-
-func (c *Client) ListFiles() ([]File, error) {
-	responseBody, err := c.execRequest(http.MethodGet, c.BaseURL+"/files?limit=1000&order=desc", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response FilesResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal files response: %v", err)
-	}
-
-	return response.Data, nil
-}
-
-func (c *Client) GetFile(fileID string) (*File, error) {
-	responseBody, err := c.execRequest(http.MethodGet, c.BaseURL+"/files/"+url.PathEscape(fileID), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var file File
-	if err := json.Unmarshal(responseBody, &file); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal file response: %v", err)
-	}
-
-	return &file, nil
-}
-
-// DownloadFileContent fetches the raw bytes of a file. The API rejects some
-// purposes (e.g. assistants, user_data, vision) with a 400; that error is
-// surfaced as-is.
-func (c *Client) DownloadFileContent(fileID string) ([]byte, error) {
-	return c.execRequest(http.MethodGet, c.BaseURL+"/files/"+url.PathEscape(fileID)+"/content", nil)
-}
-
-// FileURL returns the OpenAI platform console page for a file.
-func (c *Client) FileURL(fileID string) string {
-	return "https://platform.openai.com/storage/files/" + url.PathEscape(fileID)
-}
-
 // ContainerFile is a file inside a code interpreter container. Source is
 // "assistant" for model-generated files and "user" for uploaded ones.
 type ContainerFile struct {

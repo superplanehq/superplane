@@ -330,6 +330,7 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 		resp(`{"id":"sess_1","status":"idle"}`),
 		resp(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Done. PR_URL=https://github.com/o/r/pull/7"}]}]}`),
 		resp(`{"data":[{"id":"file_out1","filename":"migration-notes.md","mime_type":"text/markdown","size_bytes":2048,"downloadable":true}]}`), // session artifacts
+		resp("# Migration notes\n"),                    // artifact content
 		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), // teardown
 	}}
 	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -353,6 +354,8 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 	require.Len(t, out.Artifacts, 1)
 	assert.Equal(t, "file_out1", out.Artifacts[0].FileID)
 	assert.Equal(t, "migration-notes.md", out.Artifacts[0].Filename)
+	assert.Equal(t, "text", out.Artifacts[0].Encoding)
+	assert.Equal(t, "# Migration notes\n", out.Artifacts[0].Content)
 }
 
 func Test__RunCodeAgent__poll__timeoutReclaims(t *testing.T) {

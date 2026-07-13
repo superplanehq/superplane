@@ -65,8 +65,6 @@ func (i *Claude) Actions() []core.Action {
 		&runagent.RunAgent{},
 		&runcodeagent.RunCodeAgent{},
 		&GetDailyUsage{},
-		&GetFile{},
-		&DownloadFile{},
 	}
 }
 
@@ -113,17 +111,10 @@ func (i *Claude) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	switch resourceType {
-	case "model":
-		return i.listModelResources(resourceType, ctx)
-	case "file":
-		return i.listFileResources(resourceType, ctx)
-	default:
+	if resourceType != "model" {
 		return []core.IntegrationResource{}, nil
 	}
-}
 
-func (i *Claude) listModelResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -144,33 +135,6 @@ func (i *Claude) listModelResources(resourceType string, ctx core.ListResourcesC
 			Type: resourceType,
 			Name: model.ID,
 			ID:   model.ID,
-		})
-	}
-
-	return resources, nil
-}
-
-func (i *Claude) listFileResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	files, err := client.ListFiles("")
-	if err != nil {
-		return nil, err
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(files))
-	for _, file := range files {
-		if file.ID == "" {
-			continue
-		}
-
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceType,
-			Name: file.Filename,
-			ID:   file.ID,
 		})
 	}
 

@@ -607,6 +607,14 @@ func (c *Client) FileContentURL(fileID string) string {
 	return c.BaseURL + "/files/" + url.PathEscape(fileID) + "/content"
 }
 
+// DownloadFileContent fetches a file's raw content (GET /v1/files/{id}/content).
+func (c *Client) DownloadFileContent(fileID string) ([]byte, error) {
+	if fileID == "" {
+		return nil, fmt.Errorf("file id is required")
+	}
+	return c.execRequestWithBeta(http.MethodGet, c.FileContentURL(fileID), nil, anthropicBetaManagedAgents)
+}
+
 // DeleteFile removes an uploaded file (DELETE /v1/files/{id}).
 func (c *Client) DeleteFile(fileID string) error {
 	if fileID == "" {

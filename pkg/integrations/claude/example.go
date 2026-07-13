@@ -16,23 +16,3 @@ var exampleOutputTextPrompt map[string]any
 func (c *TextPrompt) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputTextPromptOnce, exampleOutputTextPromptBytes, &exampleOutputTextPrompt)
 }
-
-//go:embed example_output_get_file.json
-var exampleOutputGetFileBytes []byte
-
-var exampleOutputGetFileOnce sync.Once
-var exampleOutputGetFile map[string]any
-
-func (c *GetFile) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetFileOnce, exampleOutputGetFileBytes, &exampleOutputGetFile)
-}
-
-//go:embed example_output_download_file.json
-var exampleOutputDownloadFileBytes []byte
-
-var exampleOutputDownloadFileOnce sync.Once
-var exampleOutputDownloadFile map[string]any
-
-func (c *DownloadFile) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDownloadFileOnce, exampleOutputDownloadFileBytes, &exampleOutputDownloadFile)
-}

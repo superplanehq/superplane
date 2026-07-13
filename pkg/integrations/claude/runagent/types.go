@@ -1,6 +1,10 @@
 package runagent
 
-import "time"
+import (
+	"encoding/base64"
+	"strings"
+	"time"
+)
 
 const (
 	payloadType             = "claude.runAgent.finished"
@@ -17,6 +21,10 @@ const (
 	// after the session goes idle, so an empty listing is retried once.
 	sessionFileListReads = 2
 	sessionFileListDelay = 2 * time.Second
+	// maxInlineArtifactSizeBytes caps how large a generated file can be for
+	// its content to be embedded in the output payload. Larger files keep
+	// their metadata and download link only.
+	maxInlineArtifactSizeBytes = 10 * 1024 * 1024
 )
 
 // Spec is the workflow node configuration for claude.runAgent.
@@ -65,20 +73,25 @@ type OutputPayload struct {
 }
 
 // SessionArtifact is a file the agent generated during the session (written to
-// /mnt/session/outputs/), stored in the Files API and downloadable with the
-// API key.
+// /mnt/session/outputs/). Its content is embedded in the payload — text files
+// as a plain string, everything else base64-encoded — so downstream steps can
+// consume it directly. Files over the inline size cap carry metadata and the
+// download link only.
 type SessionArtifact struct {
 	FileID      string `json:"fileId"`
 	Filename    string `json:"filename"`
 	MimeType    string `json:"mimeType"`
 	SizeBytes   int64  `json:"sizeBytes"`
+	Encoding    string `json:"encoding,omitempty"`
+	Content     string `json:"content,omitempty"`
 	DownloadURL string `json:"downloadUrl"`
 }
 
 // CollectSessionArtifacts lists the files the agent generated during the
-// session and resolves them into artifacts with download links. Collection is
-// best-effort: a listing failure is logged and yields no artifacts rather than
-// failing a run whose real output is already available.
+// session and resolves them into artifacts carrying the file content.
+// Collection is best-effort: a listing or download failure is logged and
+// degrades the artifact (or drops the list) rather than failing a run whose
+// real output is already available.
 func CollectSessionArtifacts(client *Client, sessionID string, logWarn func(string, ...any)) []SessionArtifact {
 	files, err := client.ListSessionFilesWithRetry(sessionID, sessionFileListReads, sessionFileListDelay)
 	if err != nil {
@@ -95,18 +108,64 @@ func CollectSessionArtifacts(client *Client, sessionID string, logWarn func(stri
 		if !f.Downloadable || f.ID == "" {
 			continue
 		}
-		artifacts = append(artifacts, SessionArtifact{
+
+		artifact := SessionArtifact{
 			FileID:      f.ID,
 			Filename:    f.Filename,
 			MimeType:    f.MimeType,
 			SizeBytes:   f.SizeBytes,
 			DownloadURL: client.FileContentURL(f.ID),
-		})
+		}
+		if f.SizeBytes <= maxInlineArtifactSizeBytes {
+			if content, err := client.DownloadFileContent(f.ID); err == nil {
+				artifact.Encoding, artifact.Content = encodeArtifactContent(f.MimeType, content)
+			} else if logWarn != nil {
+				logWarn("Failed to download session file %s: %v", f.ID, err)
+			}
+		}
+		artifacts = append(artifacts, artifact)
 	}
 	if len(artifacts) == 0 {
 		return nil
 	}
 	return artifacts
+}
+
+// encodeArtifactContent returns the payload encoding and content for a
+// downloaded file: text-like content passes through as a plain string,
+// everything else is base64-encoded.
+func encodeArtifactContent(mimeType string, content []byte) (string, string) {
+	if isTextMIME(mimeType) {
+		return "text", string(content)
+	}
+	return "base64", base64.StdEncoding.EncodeToString(content)
+}
+
+// isTextMIME reports whether content of the given MIME type is safe to emit as
+// plain text; anything else is base64-encoded.
+func isTextMIME(mimeType string) bool {
+	mimeType = strings.ToLower(strings.TrimSpace(mimeType))
+	if i := strings.Index(mimeType, ";"); i >= 0 {
+		mimeType = strings.TrimSpace(mimeType[:i])
+	}
+	if strings.HasPrefix(mimeType, "text/") {
+		return true
+	}
+	if strings.HasSuffix(mimeType, "+json") || strings.HasSuffix(mimeType, "+xml") {
+		return true
+	}
+	switch mimeType {
+	case "application/json",
+		"application/xml",
+		"application/x-yaml",
+		"application/yaml",
+		"application/javascript",
+		"application/x-sh",
+		"application/sql",
+		"application/csv":
+		return true
+	}
+	return false
 }
 
 func isSessionTerminal(status string) bool {

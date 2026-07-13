@@ -41,7 +41,7 @@ func (a *RunAgent) Documentation() string {
 
 Emits a finished payload with **session** status, **session id**, and the final **agent message** when available so downstream steps can branch or consume the result. For failure cases the status is still emitted when the **session** is *terminated* or the step times out.
 
-Files the agent saves under ` + "`/mnt/session/outputs/`" + ` are emitted as **artifacts** (file id, filename, MIME type, size, and a download link usable with the API key). Instruct the agent in the task to save its deliverables there, and use the **Get File** or **Download File** component to consume them downstream.`
+Files the agent saves under ` + "`/mnt/session/outputs/`" + ` are emitted as **artifacts** with their content included in the payload (text files as plain text, everything else base64-encoded; files over 10MB carry metadata and a download link only). Instruct the agent in the task to save its deliverables there.`
 }
 
 func (a *RunAgent) Icon() string { return "bot" }

@@ -35,6 +35,8 @@
         "filename": "deployment-summary.csv",
         "mimeType": "text/csv",
         "sizeBytes": 2048,
+        "encoding": "text",
+        "content": "service,status\napi,deployed\n",
         "downloadUrl": "https://api.anthropic.com/v1/files/file_011CNha8iCJcU1wXNR6q4V8w/content"
       }
     ]

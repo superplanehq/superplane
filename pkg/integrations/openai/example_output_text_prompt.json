@@ -18,6 +18,9 @@
                 "fileId": "cfile_682e0e8a43c88191a7978f477a09bdf5",
                 "containerId": "cntr_682e0e7318108198aa783fd921ff305e",
                 "filename": "plot.png",
+                "bytes": 34567,
+                "encoding": "base64",
+                "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
                 "downloadUrl": "https://api.openai.com/v1/containers/cntr_682e0e7318108198aa783fd921ff305e/files/cfile_682e0e8a43c88191a7978f477a09bdf5/content"
             }
         ]

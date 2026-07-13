@@ -2,6 +2,7 @@ package claude
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -581,11 +582,13 @@ func TestTextPrompt_CodeExecution(t *testing.T) {
 	}`
 	fileMetadataJSON := `{"id": "file_gen1", "type": "file", "filename": "chart.png", "mime_type": "image/png", "size_bytes": 34567, "created_at": "2026-07-10T12:00:00Z", "downloadable": true}`
 
-	t.Run("enabled adds tool and emits artifacts", func(t *testing.T) {
+	t.Run("enabled adds tool and emits artifacts with content", func(t *testing.T) {
+		binary := "\x89PNG\r\n\x1a\n"
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(codeExecutionResponseJSON))},
 				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(fileMetadataJSON))},
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(binary))},
 			},
 		}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -622,9 +625,9 @@ func TestTextPrompt_CodeExecution(t *testing.T) {
 			t.Errorf("expected files beta header, got %q", got)
 		}
 
-		// The follow-up metadata lookup resolves the artifact.
-		if len(httpContext.Requests) != 2 {
-			t.Fatalf("expected 2 requests, got %d", len(httpContext.Requests))
+		// The follow-up lookups resolve the artifact metadata and content.
+		if len(httpContext.Requests) != 3 {
+			t.Fatalf("expected 3 requests, got %d", len(httpContext.Requests))
 		}
 		payload := executionState.Payloads[0].(map[string]any)["data"].(MessagePayload)
 		if len(payload.Artifacts) != 1 {
@@ -636,6 +639,9 @@ func TestTextPrompt_CodeExecution(t *testing.T) {
 		}
 		if artifact.DownloadURL != "https://api.anthropic.com/v1/files/file_gen1/content" {
 			t.Errorf("unexpected download URL: %s", artifact.DownloadURL)
+		}
+		if artifact.Encoding != "base64" || artifact.Content != base64.StdEncoding.EncodeToString([]byte(binary)) {
+			t.Errorf("expected base64 inline content, got encoding %q", artifact.Encoding)
 		}
 	})
 

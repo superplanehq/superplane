@@ -108,26 +108,3 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 function hasSchema(schema: unknown): boolean {
   return typeof schema === "string" && schema.trim().length > 0;
 }
-
-// formatBytes renders a byte count in a compact human-readable unit
-// (e.g. 102400 -> "100.0 KB"). Returns undefined for missing values so
-// callers can skip the detail entry entirely.
-export function formatBytes(bytes?: number): string | undefined {
-  if (bytes == null) {
-    return undefined;
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-
-  const units = ["KB", "MB", "GB", "TB"];
-  let value = bytes;
-  let unit = units[0];
-  for (const next of units) {
-    value /= 1024;
-    unit = next;
-    if (value < 1024) break;
-  }
-
-  return `${value.toFixed(1)} ${unit}`;
-}

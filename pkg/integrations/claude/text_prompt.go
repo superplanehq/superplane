@@ -2,6 +2,7 @@ package claude
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -21,6 +22,11 @@ const MessagePayloadType = "claude.message"
 // codeExecutionToolType is the GA code execution server tool. Claude runs the
 // code in Anthropic's sandbox and generated files land in the Files API.
 const codeExecutionToolType = "code_execution_20250825"
+
+// maxInlineArtifactSizeBytes caps how large a generated file can be for its
+// content to be embedded in the output payload. Larger files keep their
+// metadata and download link only.
+const maxInlineArtifactSizeBytes = 10 * 1024 * 1024
 
 type TextPrompt struct{}
 
@@ -47,12 +53,17 @@ type MessagePayload struct {
 }
 
 // FileArtifact is a file Claude generated during the request (via code
-// execution), stored in the Files API and downloadable with the API key.
+// execution). Its content is embedded in the payload — text files as a plain
+// string, everything else base64-encoded — so downstream steps can consume it
+// directly. Files over the inline size cap carry metadata and the download
+// link only.
 type FileArtifact struct {
 	FileID      string `json:"fileId"`
 	Filename    string `json:"filename"`
 	MimeType    string `json:"mimeType"`
 	SizeBytes   int64  `json:"sizeBytes"`
+	Encoding    string `json:"encoding,omitempty"`
+	Content     string `json:"content,omitempty"`
 	DownloadURL string `json:"downloadUrl"`
 }
 
@@ -105,7 +116,7 @@ Returns a payload containing:
 - **stopReason**: Why the generation ended (e.g., "end_turn", "max_tokens").
 - **model**: The specific model version used.
 - **parsed**: When Structured Output is configured, the response parsed into an object (only on a normal end_turn completion).
-- **artifacts**: When Code Execution is enabled, the files Claude generated (fileId, filename, mimeType, sizeBytes, and a downloadUrl usable with the API key).
+- **artifacts**: When Code Execution is enabled, the files Claude generated, with the file content included: text files as plain text (` + "`encoding: \"text\"`" + `), everything else base64-encoded (` + "`encoding: \"base64\"`" + `). Each artifact carries fileId, filename, mimeType, sizeBytes, and a downloadUrl; files over 10MB include metadata and the download link only.
 
 ## Notes
 
@@ -496,8 +507,9 @@ func extractGeneratedFileIDs(response *CreateMessageResponse) []string {
 }
 
 // collectFileArtifacts resolves the files Claude generated during the request
-// into artifacts with download links. Metadata lookups are best-effort: a
-// failed lookup still yields an artifact with the file ID and download URL.
+// into artifacts carrying the file content. Lookups are best-effort: a failed
+// metadata or content fetch still yields an artifact with the file ID and
+// download URL so the run never fails over its artifacts.
 func collectFileArtifacts(client *Client, response *CreateMessageResponse) []FileArtifact {
 	fileIDs := extractGeneratedFileIDs(response)
 	if len(fileIDs) == 0 {
@@ -510,14 +522,58 @@ func collectFileArtifacts(client *Client, response *CreateMessageResponse) []Fil
 			FileID:      fileID,
 			DownloadURL: client.FileContentURL(fileID),
 		}
-		if meta, err := client.GetFileMetadata(fileID); err == nil {
+		meta, err := client.GetFileMetadata(fileID)
+		if err == nil {
 			artifact.Filename = meta.Filename
 			artifact.MimeType = meta.MimeType
 			artifact.SizeBytes = meta.SizeBytes
 		}
+
+		if err == nil && meta.SizeBytes <= maxInlineArtifactSizeBytes {
+			if content, err := client.DownloadFile(fileID); err == nil {
+				artifact.Encoding, artifact.Content = encodeArtifactContent(meta.MimeType, content)
+			}
+		}
 		artifacts = append(artifacts, artifact)
 	}
 	return artifacts
+}
+
+// encodeArtifactContent returns the payload encoding and content for a
+// downloaded file: text-like content passes through as a plain string,
+// everything else is base64-encoded.
+func encodeArtifactContent(mimeType string, content []byte) (string, string) {
+	if isTextMIME(mimeType) {
+		return "text", string(content)
+	}
+	return "base64", base64.StdEncoding.EncodeToString(content)
+}
+
+// isTextMIME reports whether content of the given MIME type is safe to emit as
+// plain text; anything else is base64-encoded.
+func isTextMIME(mimeType string) bool {
+	mimeType = strings.ToLower(strings.TrimSpace(mimeType))
+	if i := strings.Index(mimeType, ";"); i >= 0 {
+		mimeType = strings.TrimSpace(mimeType[:i])
+	}
+	if strings.HasPrefix(mimeType, "text/") {
+		return true
+	}
+	if strings.HasSuffix(mimeType, "+json") || strings.HasSuffix(mimeType, "+xml") {
+		return true
+	}
+	switch mimeType {
+	case "application/json",
+		"application/xml",
+		"application/x-yaml",
+		"application/yaml",
+		"application/javascript",
+		"application/x-sh",
+		"application/sql",
+		"application/csv":
+		return true
+	}
+	return false
 }
 
 func (c *TextPrompt) Hooks() []core.Hook {

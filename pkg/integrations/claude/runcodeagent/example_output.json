@@ -11,6 +11,8 @@
         "filename": "migration-notes.md",
         "mimeType": "text/markdown",
         "sizeBytes": 2048,
+        "encoding": "text",
+        "content": "# Migration notes\n\nRenamed the legacy column.\n",
         "downloadUrl": "https://api.anthropic.com/v1/files/file_011CNha8iCJcU1wXNR6q4V8w/content"
       }
     ]
