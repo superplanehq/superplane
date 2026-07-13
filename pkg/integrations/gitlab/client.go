@@ -222,15 +222,18 @@ func (c *Client) GetIssue(ctx context.Context, projectID, issueIID string) (*Iss
 }
 
 // UpdateIssueRequest mirrors GitLab's PUT /projects/:id/issues/:issue_iid body.
-// Only non-empty/non-nil fields are sent, so callers must omit fields they don't want to change.
+// Fields are pointers so a nil field is omitted (not changed) while a non-nil
+// field is always sent, even if it points to a zero value - e.g. a non-nil
+// pointer to "" clears the description, and a non-nil pointer to an empty
+// slice clears the assignees. Callers must leave a field nil to skip it.
 type UpdateIssueRequest struct {
-	Title       string `json:"title,omitempty"`
-	Description string `json:"description,omitempty"`
-	StateEvent  string `json:"state_event,omitempty"`
-	Labels      string `json:"labels,omitempty"`
-	AssigneeIDs []int  `json:"assignee_ids,omitempty"`
-	MilestoneID *int   `json:"milestone_id,omitempty"`
-	DueDate     string `json:"due_date,omitempty"`
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	StateEvent  *string `json:"state_event,omitempty"`
+	Labels      *string `json:"labels,omitempty"`
+	AssigneeIDs *[]int  `json:"assignee_ids,omitempty"`
+	MilestoneID *int    `json:"milestone_id,omitempty"`
+	DueDate     *string `json:"due_date,omitempty"`
 }
 
 func (c *Client) UpdateIssue(ctx context.Context, projectID, issueIID string, req *UpdateIssueRequest) (*Issue, error) {

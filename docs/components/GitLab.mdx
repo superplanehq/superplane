@@ -1887,7 +1887,7 @@ The Update Issue component modifies an existing GitLab issue: its title, descrip
 - **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
 - **Milestone** (toggle): Milestone to associate with the issue
 
-Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone.
 
 ### Output
 

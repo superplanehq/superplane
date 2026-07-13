@@ -36,14 +36,38 @@ type UpdateIssueConfiguration struct {
 	Milestone string   `mapstructure:"milestone"`
 }
 
-// hasUpdates reports whether at least one toggleable field was enabled.
-func (c UpdateIssueConfiguration) hasUpdates() bool {
-	return c.Title != "" ||
-		c.Body != "" ||
-		c.State != "" ||
-		len(c.Labels) > 0 ||
-		len(c.Assignees) > 0 ||
-		c.Milestone != ""
+// updateIssueToggles tracks which optional fields were explicitly turned on via
+// their UI toggle, independent of whether the decoded value ended up empty.
+// mapstructure decodes both "never toggled on" and "toggled on but cleared"
+// to the same Go zero value, so this reads the raw configuration map instead
+// to tell them apart - e.g. clearing all labels (toggled on, empty list)
+// must still be sent to GitLab, not treated as "no change".
+type updateIssueToggles struct {
+	Title     bool
+	Body      bool
+	State     bool
+	Labels    bool
+	Assignees bool
+	Milestone bool
+}
+
+func newUpdateIssueToggles(raw map[string]any) updateIssueToggles {
+	enabled := func(field string) bool {
+		v, ok := raw[field]
+		return ok && v != nil
+	}
+	return updateIssueToggles{
+		Title:     enabled("title"),
+		Body:      enabled("body"),
+		State:     enabled("state"),
+		Labels:    enabled("labels"),
+		Assignees: enabled("assignees"),
+		Milestone: enabled("milestone"),
+	}
+}
+
+func (t updateIssueToggles) hasUpdates() bool {
+	return t.Title || t.Body || t.State || t.Labels || t.Assignees || t.Milestone
 }
 
 func (c *UpdateIssue) Name() string {
@@ -79,7 +103,7 @@ func (c *UpdateIssue) Documentation() string {
 - **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
 - **Milestone** (toggle): Milestone to associate with the issue
 
-Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone.
 
 ## Output
 
@@ -228,7 +252,8 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("invalid state: %s", config.State)
 	}
 
-	if !config.hasUpdates() {
+	raw, _ := ctx.Configuration.(map[string]any)
+	if !newUpdateIssueToggles(raw).hasUpdates() {
 		return errors.New("at least one field must be enabled to update")
 	}
 
@@ -249,7 +274,9 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid state: %s", config.State)
 	}
 
-	if !config.hasUpdates() {
+	raw, _ := ctx.Configuration.(map[string]any)
+	toggles := newUpdateIssueToggles(raw)
+	if !toggles.hasUpdates() {
 		return errors.New("at least one field must be enabled to update")
 	}
 
@@ -258,31 +285,49 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitLab client: %w", err)
 	}
 
-	var assigneeIDs []int
-	for _, idStr := range config.Assignees {
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			return fmt.Errorf("invalid assignee id %q: %w", idStr, err)
-		}
-		assigneeIDs = append(assigneeIDs, id)
+	req := &UpdateIssueRequest{}
+
+	if toggles.Title {
+		req.Title = &config.Title
 	}
 
-	var milestoneID *int
-	if config.Milestone != "" {
-		id, err := strconv.Atoi(config.Milestone)
-		if err != nil {
-			return fmt.Errorf("invalid milestone id %q: %w", config.Milestone, err)
-		}
-		milestoneID = &id
+	if toggles.Body {
+		req.Description = &config.Body
 	}
 
-	req := &UpdateIssueRequest{
-		Title:       config.Title,
-		Description: config.Body,
-		StateEvent:  config.State,
-		Labels:      strings.Join(config.Labels, ","),
-		AssigneeIDs: assigneeIDs,
-		MilestoneID: milestoneID,
+	if toggles.State {
+		req.StateEvent = &config.State
+	}
+
+	if toggles.Labels {
+		labels := strings.Join(config.Labels, ",")
+		req.Labels = &labels
+	}
+
+	if toggles.Assignees {
+		assigneeIDs := make([]int, 0, len(config.Assignees))
+		for _, idStr := range config.Assignees {
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				return fmt.Errorf("invalid assignee id %q: %w", idStr, err)
+			}
+			assigneeIDs = append(assigneeIDs, id)
+		}
+		req.AssigneeIDs = &assigneeIDs
+	}
+
+	if toggles.Milestone {
+		if config.Milestone == "" {
+			// GitLab clears the milestone when milestone_id is explicitly set to 0.
+			unset := 0
+			req.MilestoneID = &unset
+		} else {
+			id, err := strconv.Atoi(config.Milestone)
+			if err != nil {
+				return fmt.Errorf("invalid milestone id %q: %w", config.Milestone, err)
+			}
+			req.MilestoneID = &id
+		}
 	}
 
 	issue, err := client.UpdateIssue(context.Background(), config.Project, config.IssueIID, req)
