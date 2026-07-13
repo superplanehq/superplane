@@ -21,6 +21,19 @@ function registerCoercionHelpers(env: Environment): void {
   // becomes 0, matching the legacy behavior authors relied on inside
   // templates like `{{ float(value) * 100 }}`.
   env.registerFunction("float(dyn): double", (value: unknown) => toFloat(value));
+
+  // Library `int(string)` throws on unparseable / whitespace-padded input and
+  // cannot be overridden (signature overlap). `compileExpr` rewrites
+  // `int(...)` calls to `__dashboardInt(...)` so this fail-soft dyn
+  // handler restores the legacy `0` contract for templates like
+  // `{{ int(value) / 2 }}`.
+  env.registerFunction("__dashboardInt(dyn): int", (value: unknown) => toInt(value));
+
+  // Library `string(...)` only covers scalars. Maps and lists used to
+  // JSON-serialize via the dashboard helper; restore that for
+  // `{{ string(payload) }}` cells.
+  env.registerFunction("string(map): string", (value: unknown) => stringifyCelValue(value));
+  env.registerFunction("string(list): string", (value: unknown) => stringifyCelValue(value));
 }
 
 function registerStringPredicates(env: Environment): void {
@@ -58,6 +71,8 @@ function registerDateHelpers(env: Environment): void {
   // `duration()` — the library's builtin `duration(string)` returns a
   // `google.protobuf.Duration`. We register the int/double overloads to
   // provide the "seconds → human string" formatter authors reach for.
+  // Protobuf Duration results are normalized to the same human string in
+  // `normalizeCelValue` so `{{ duration("5m") }}` still renders `5m`.
   env.registerFunction("duration(int): string", (seconds: unknown) => formatDurationSeconds(toNumber(seconds)));
   env.registerFunction("duration(double): string", (seconds: unknown) => formatDurationSeconds(toNumber(seconds)));
 
@@ -72,6 +87,21 @@ function registerDateHelpers(env: Environment): void {
     const date = coerceWidgetTimestamp(unwrapNumeric(value));
     return date ? BigInt(date.getTime()) : 0n;
   });
+}
+
+/** Exported for the eval adapter: format a protobuf-style Duration as `5m`. */
+export function formatDurationSeconds(value: number): string {
+  if (!Number.isFinite(value)) return "";
+  const total = Math.max(0, Math.trunc(value));
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60) {
+    const remSeconds = total % 60;
+    return remSeconds === 0 ? `${minutes}m` : `${minutes}m ${remSeconds}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  return remMinutes === 0 ? `${hours}h` : `${hours}h ${remMinutes}m`;
 }
 
 function registerJsonAndList(env: Environment): void {
@@ -153,6 +183,32 @@ function toFloat(value: unknown): number {
     return Number.isFinite(n) ? n : 0;
   }
   return 0;
+}
+
+function toInt(value: unknown): bigint {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? BigInt(Math.trunc(value)) : 0n;
+  if (typeof value === "boolean") return value ? 1n : 0n;
+  if (typeof value === "string") {
+    const n = Number(value);
+    return Number.isFinite(n) ? BigInt(Math.trunc(n)) : 0n;
+  }
+  return 0n;
+}
+
+function stringifyCelValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "bigint") return value.toString();
+  try {
+    return JSON.stringify(value, (_key, nested) => {
+      if (typeof nested !== "bigint") return nested;
+      return Number.isSafeInteger(Number(nested)) ? Number(nested) : nested.toString();
+    });
+  } catch {
+    return String(value);
+  }
 }
 
 function coerceToString(value: unknown): string {
@@ -316,20 +372,6 @@ function clampIndex(value: unknown, length: number): number {
   if (truncated < 0) return Math.max(0, length + truncated);
   if (truncated > length) return length;
   return truncated;
-}
-
-function formatDurationSeconds(value: number): string {
-  if (!Number.isFinite(value)) return "";
-  const total = Math.max(0, Math.trunc(value));
-  if (total < 60) return `${total}s`;
-  const minutes = Math.floor(total / 60);
-  if (minutes < 60) {
-    const remSeconds = total % 60;
-    return remSeconds === 0 ? `${minutes}m` : `${minutes}m ${remSeconds}s`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const remMinutes = minutes % 60;
-  return remMinutes === 0 ? `${hours}h` : `${hours}h ${remMinutes}m`;
 }
 
 /**

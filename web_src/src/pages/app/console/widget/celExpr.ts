@@ -4,7 +4,7 @@
 // Strings without braces use legacy dot-path semantics via callers.
 import { Environment, EvaluationError, TypeError as CelTypeError } from "@marcbachmann/cel-js";
 
-import { registerCustomFunctions } from "./celBuiltins";
+import { formatDurationSeconds, registerCustomFunctions } from "./celBuiltins";
 
 type CelRun = (context: Record<string, unknown>) => unknown;
 
@@ -21,6 +21,9 @@ type TemplateSegment = { kind: "literal"; value: string } | { kind: "expr"; expr
 
 const FULL_EXPR_RE = /^\s*\{\{([\s\S]*)\}\}\s*$/;
 const ANY_EXPR_RE = /\{\{([\s\S]*?)\}\}/g;
+
+/** Rewritten target for fail-soft `int(...)` calls — see `rewriteIntCalls`. */
+export const DASHBOARD_INT_IDENTIFIER = "__dashboardInt";
 
 function isFullExpression(raw: string): boolean {
   return FULL_EXPR_RE.test(raw);
@@ -66,6 +69,79 @@ export function rewriteDollarRefs(raw: string): string {
 }
 
 /**
+ * Rewrite `int(...)` calls to `__dashboardInt(...)` outside string literals.
+ * The library's `int(string)` throws on unparseable input and cannot be
+ * overridden; the dashboard handler is fail-soft (returns `0`) so legacy
+ * templates like `{{ int(value) / 2 }}` keep rendering.
+ */
+export function rewriteIntCalls(raw: string): string {
+  let out = "";
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === "r" && (raw[i + 1] === '"' || raw[i + 1] === "'")) {
+      const literal = copyRawStringLiteral(raw, i);
+      out += literal.value;
+      i = literal.next;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const literal = copyStringLiteral(raw, i, ch);
+      out += literal.value;
+      i = literal.next;
+      continue;
+    }
+    if (raw.startsWith("int(", i) && !isIdentifierChar(raw[i - 1]) && raw[i - 1] !== ".") {
+      out += `${DASHBOARD_INT_IDENTIFIER}(`;
+      i += 4;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+/**
+ * Preserve ChromeGG-era backslash separators in regular CEL strings.
+ *
+ * `@marcbachmann/cel-js` interprets escapes like `\?` as the bare character,
+ * while the previous library left unknown escapes as two characters. Authors
+ * who wrote `splitIndex(value, "\?", 0)` therefore depended on a literal
+ * backslash+question separator. Double those non-standard escapes so the
+ * parsed string still contains the backslash. Standard escapes (`\n`, `\r`,
+ * `\t`, `\\`, quotes) are left alone — they already match the legacy
+ * `unescapeSeparator` contract after parse.
+ */
+export function rewriteLegacyStringEscapes(raw: string): string {
+  let out = "";
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === "r" && (raw[i + 1] === '"' || raw[i + 1] === "'")) {
+      const literal = copyRawStringLiteral(raw, i);
+      out += literal.value;
+      i = literal.next;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const literal = copyLegacyCompatibleStringLiteral(raw, i, ch);
+      out += literal.value;
+      i = literal.next;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+function isIdentifierChar(ch: string | undefined): boolean {
+  if (!ch) return false;
+  return /[A-Za-z0-9_]/.test(ch);
+}
+
+/**
  * Copy a quoted string literal verbatim (preserving backslash escapes),
  * starting at the opening quote at `start`. Returns the copied text and the
  * index immediately after the closing quote (or end of input).
@@ -89,8 +165,54 @@ function copyStringLiteral(raw: string, start: number, quote: string): { value: 
   return { value, next: i };
 }
 
+/** Copy `r"..."` / `r'...'` verbatim (no escape rewriting). */
+function copyRawStringLiteral(raw: string, start: number): { value: string; next: number } {
+  const quote = raw[start + 1];
+  let value = "r" + quote;
+  let i = start + 2;
+  while (i < raw.length && raw[i] !== quote) {
+    value += raw[i];
+    i++;
+  }
+  if (i < raw.length) {
+    value += raw[i];
+    i++;
+  }
+  return { value, next: i };
+}
+
+const STANDARD_STRING_ESCAPES = new Set(["n", "r", "t", "\\", '"', "'"]);
+
+/**
+ * Copy a regular string literal, doubling backslashes before non-standard
+ * escape characters so `@marcbachmann/cel-js` preserves them as two chars.
+ */
+function copyLegacyCompatibleStringLiteral(raw: string, start: number, quote: string): { value: string; next: number } {
+  let value = quote;
+  let i = start + 1;
+  while (i < raw.length && raw[i] !== quote) {
+    if (raw[i] === "\\" && i + 1 < raw.length) {
+      const next = raw[i + 1];
+      if (STANDARD_STRING_ESCAPES.has(next)) {
+        value += "\\" + next;
+      } else {
+        value += "\\\\" + next;
+      }
+      i += 2;
+      continue;
+    }
+    value += raw[i];
+    i++;
+  }
+  if (i < raw.length) {
+    value += raw[i];
+    i++;
+  }
+  return { value, next: i };
+}
+
 export function compileExpr(raw: string): CompiledExpr {
-  const rewritten = rewriteDollarRefs(raw);
+  const rewritten = rewriteIntCalls(rewriteLegacyStringEscapes(rewriteDollarRefs(raw)));
   try {
     const compiled = ENV.parse(rewritten) as unknown as CelRun;
     return { ok: true, raw, run: compiled };
@@ -364,10 +486,22 @@ function coerceStringsInObject(value: Record<string, unknown>, mutated: [boolean
  * integer range flow through as `Number(...)` — dashboards use these
  * primarily for time deltas and counts, both of which stay comfortably
  * inside `Number.MAX_SAFE_INTEGER`.
+ *
+ * Also normalizes library temporal types that would otherwise stringify
+ * poorly in templates:
+ * - `Date` from `timestamp(...)` → ISO-8601 (legacy dashboard contract)
+ * - protobuf `Duration` from `duration("5m")` → human `5m` / `1h 5m`
  */
 function normalizeCelValue(value: unknown): unknown {
   if (typeof value === "bigint") {
     return Number(value);
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toISOString();
+  }
+  if (isProtobufDuration(value)) {
+    const totalSeconds = Number(value.seconds) + Number(value.nanos ?? 0) / 1_000_000_000;
+    return formatDurationSeconds(totalSeconds);
   }
   if (Array.isArray(value)) {
     return value.map(normalizeCelValue);
@@ -380,6 +514,24 @@ function normalizeCelValue(value: unknown): unknown {
     return out;
   }
   return value;
+}
+
+/**
+ * Detect library `google.protobuf.Duration` values without relying on
+ * `constructor.name` (which Vite/esbuild minify away in production).
+ * Plain `{ seconds, nanos }` maps from row data stay untouched — those use
+ * `Object.prototype`, while the library Duration uses a custom prototype.
+ */
+function isProtobufDuration(value: unknown): value is { seconds: bigint | number; nanos?: number | bigint } {
+  if (!value || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  if (proto === Object.prototype || proto === null) return false;
+  if (!("seconds" in value) || !("nanos" in value)) return false;
+  const seconds = (value as { seconds: unknown }).seconds;
+  const nanos = (value as { nanos: unknown }).nanos;
+  const secondsOk = typeof seconds === "bigint" || typeof seconds === "number";
+  const nanosOk = typeof nanos === "bigint" || typeof nanos === "number";
+  return secondsOk && nanosOk;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

@@ -90,6 +90,39 @@ describe("celExpr", () => {
     });
   });
 
+  describe("fail-soft coercions and temporal normalization", () => {
+    it("fail-softs int() on unparseable input to 0", () => {
+      const compiled = compileExpr("int(value) / 2");
+      expect(evalExpr(compiled, { value: "nope" }, buildEnv())).toBe(0);
+      expect(evalExpr(compiled, { value: " 12 " }, buildEnv())).toBe(6);
+    });
+
+    it("JSON-serializes maps and lists via string()", () => {
+      expect(evalExpr(compileExpr("string(payload)"), { payload: { a: 1 } }, buildEnv())).toBe('{"a":1}');
+      expect(evalExpr(compileExpr("string(tags)"), { tags: ["a", "b"] }, buildEnv())).toBe('["a","b"]');
+    });
+
+    it("renders timestamp() as ISO-8601 in templates", () => {
+      const template = compileTemplate("At {{ timestamp(1700000000) }}");
+      expect(evalTemplate(template, {}, buildEnv(), String)).toBe("At 2023-11-14T22:13:20.000Z");
+    });
+
+    it('renders duration("5m") as a human string, not a protobuf object', () => {
+      const template = compileTemplate('Took {{ duration("5m") }}');
+      expect(evalTemplate(template, {}, buildEnv(), String)).toBe("Took 5m");
+    });
+
+    it("includes sub-second nanos when normalizing duration strings", () => {
+      expect(evalExpr(compileExpr('duration("1500ms")'), {}, buildEnv())).toBe("1s");
+    });
+
+    it("does not treat plain row maps with seconds/nanos as durations", () => {
+      const compiled = compileExpr("value");
+      const row = { value: { seconds: 300, nanos: 0 } };
+      expect(evalExpr(compiled, row, buildEnv())).toEqual({ seconds: 300, nanos: 0 });
+    });
+  });
+
   describe("formatDate builtin", () => {
     it("formats an ISO timestamp using MM/dd in local time", () => {
       const local = new Date(2026, 2, 15, 14, 30); // March 15, 2026 (local TZ)
@@ -368,6 +401,14 @@ describe("celExpr", () => {
         // time, so authors who need a literal backslash separator reach
         // for a raw string (`r"\?"` compiles to two characters).
         const compiled = compileExpr('splitIndex(value, r"\\?", 0)');
+        expect(evalExpr(compiled, { value: "a\\?b" }, buildEnv())).toBe("a");
+      });
+
+      it('preserves legacy ChromeGG `"\\?"` backslash separators', () => {
+        // Pre-migration authors wrote `"\?"` expecting a two-character
+        // separator. The adapter doubles non-standard escapes so this
+        // keeps working under `@marcbachmann/cel-js`.
+        const compiled = compileExpr('splitIndex(value, "\\?", 0)');
         expect(evalExpr(compiled, { value: "a\\?b" }, buildEnv())).toBe("a");
       });
 
