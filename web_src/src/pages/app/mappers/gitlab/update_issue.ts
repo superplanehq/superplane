@@ -11,7 +11,7 @@ import type {
 import { baseProps } from "./base";
 import type { GitLabNodeMetadata, Issue } from "./types";
 import { buildGitlabExecutionSubtitle } from "./utils";
-import { getDetailsForApiIssue } from "./issue_utils";
+import { getSummaryDetailsForIssue } from "./issue_utils";
 
 interface UpdateIssueConfiguration {
   project?: string;
@@ -63,6 +63,6 @@ export const updateIssueMapper: ComponentBaseMapper = {
     }
 
     const issue = outputs.default[0].data as Issue;
-    return getDetailsForApiIssue(issue);
+    return getSummaryDetailsForIssue(context.execution, issue);
   },
 };

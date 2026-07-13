@@ -1880,14 +1880,14 @@ The Update Issue component modifies an existing GitLab issue: its title, descrip
 
 - **Project** (required): The GitLab project containing the issue
 - **Issue IID** (required): The internal ID (IID) of the issue to update (supports expressions)
-- **Title** (optional): New title for the issue
-- **Description** (optional): New description for the issue
-- **State** (optional): Close or reopen the issue. Leave unset to keep the current state.
-- **Labels** (optional): Labels to set on the issue, replacing any existing labels
-- **Assignees** (optional): Users to assign the issue to, replacing any existing assignees
-- **Milestone** (optional): Milestone to associate with the issue
+- **Title** (toggle): New title for the issue
+- **Description** (toggle): New description for the issue
+- **State** (toggle): Close or reopen the issue
+- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
+- **Milestone** (toggle): Milestone to associate with the issue
 
-Fields left empty are not changed.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled.
 
 ### Output
 

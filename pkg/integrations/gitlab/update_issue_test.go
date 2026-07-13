@@ -53,6 +53,26 @@ func Test__UpdateIssue__Setup(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid state")
 	})
 
+	t.Run("no fields enabled", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"project":  "123",
+				"issueIid": "1",
+			},
+			Integration: &contexts.IntegrationContext{
+				Metadata: Metadata{
+					Projects: []ProjectMetadata{
+						{ID: 123, Name: "repo", URL: "http://repo"},
+					},
+				},
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+		err := c.Setup(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "at least one field must be enabled")
+	})
+
 	t.Run("valid configuration", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
@@ -162,5 +182,26 @@ func Test__UpdateIssue__Execute(t *testing.T) {
 		err := c.Execute(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update issue")
+	})
+
+	t.Run("no fields enabled", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":  "123",
+				"issueIid": "1",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+				},
+			},
+		}
+
+		err := c.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "at least one field must be enabled")
 	})
 }

@@ -36,6 +36,16 @@ type UpdateIssueConfiguration struct {
 	Milestone string   `mapstructure:"milestone"`
 }
 
+// hasUpdates reports whether at least one toggleable field was enabled.
+func (c UpdateIssueConfiguration) hasUpdates() bool {
+	return c.Title != "" ||
+		c.Body != "" ||
+		c.State != "" ||
+		len(c.Labels) > 0 ||
+		len(c.Assignees) > 0 ||
+		c.Milestone != ""
+}
+
 func (c *UpdateIssue) Name() string {
 	return "gitlab.updateIssue"
 }
@@ -62,14 +72,14 @@ func (c *UpdateIssue) Documentation() string {
 
 - **Project** (required): The GitLab project containing the issue
 - **Issue IID** (required): The internal ID (IID) of the issue to update (supports expressions)
-- **Title** (optional): New title for the issue
-- **Description** (optional): New description for the issue
-- **State** (optional): Close or reopen the issue. Leave unset to keep the current state.
-- **Labels** (optional): Labels to set on the issue, replacing any existing labels
-- **Assignees** (optional): Users to assign the issue to, replacing any existing assignees
-- **Milestone** (optional): Milestone to associate with the issue
+- **Title** (toggle): New title for the issue
+- **Description** (toggle): New description for the issue
+- **State** (toggle): Close or reopen the issue
+- **Labels** (toggle): Labels to set on the issue, replacing any existing labels
+- **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
+- **Milestone** (toggle): Milestone to associate with the issue
 
-Fields left empty are not changed.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled.
 
 ## Output
 
@@ -117,23 +127,25 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			Description: "The internal ID (IID) of the issue to update",
 		},
 		{
-			Name:     "title",
-			Label:    "Title",
-			Type:     configuration.FieldTypeString,
-			Required: false,
+			Name:      "title",
+			Label:     "Title",
+			Type:      configuration.FieldTypeString,
+			Required:  false,
+			Togglable: true,
 		},
 		{
-			Name:     "body",
-			Label:    "Description",
-			Type:     configuration.FieldTypeText,
-			Required: false,
+			Name:      "body",
+			Label:     "Description",
+			Type:      configuration.FieldTypeText,
+			Required:  false,
+			Togglable: true,
 		},
 		{
-			Name:        "state",
-			Label:       "State",
-			Type:        configuration.FieldTypeSelect,
-			Required:    false,
-			Description: "Leave unset to keep the current state",
+			Name:      "state",
+			Label:     "State",
+			Type:      configuration.FieldTypeSelect,
+			Required:  false,
+			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -144,10 +156,11 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "labels",
-			Label:    "Labels",
-			Type:     configuration.FieldTypeList,
-			Required: false,
+			Name:      "labels",
+			Label:     "Labels",
+			Type:      configuration.FieldTypeList,
+			Required:  false,
+			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Label",
@@ -158,10 +171,11 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "assignees",
-			Label:    "Assignees",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: false,
+			Name:      "assignees",
+			Label:     "Assignees",
+			Type:      configuration.FieldTypeIntegrationResource,
+			Required:  false,
+			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:  ResourceTypeMember,
@@ -176,10 +190,11 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "milestone",
-			Label:    "Milestone",
-			Type:     configuration.FieldTypeIntegrationResource,
-			Required: false,
+			Name:      "milestone",
+			Label:     "Milestone",
+			Type:      configuration.FieldTypeIntegrationResource,
+			Required:  false,
+			Togglable: true,
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeMilestone,
@@ -213,6 +228,10 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("invalid state: %s", config.State)
 	}
 
+	if !config.hasUpdates() {
+		return errors.New("at least one field must be enabled to update")
+	}
+
 	return ensureProjectInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
@@ -228,6 +247,10 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 
 	if config.State != "" && config.State != IssueStateEventClose && config.State != IssueStateEventReopen {
 		return fmt.Errorf("invalid state: %s", config.State)
+	}
+
+	if !config.hasUpdates() {
+		return errors.New("at least one field must be enabled to update")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
