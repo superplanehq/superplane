@@ -1,0 +1,22 @@
+{
+  "data": {
+    "id": 302,
+    "body": "This is an example comment created via SuperPlane",
+    "author": {
+      "id": 1,
+      "name": "Administrator",
+      "username": "root",
+      "state": "active",
+      "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80&d=identicon",
+      "web_url": "http://gitlab.example.com/root"
+    },
+    "created_at": "2023-01-01T10:00:00.000Z",
+    "updated_at": "2023-01-01T10:00:00.000Z",
+    "system": false,
+    "noteable_id": 1,
+    "noteable_iid": 1,
+    "noteable_type": "Issue"
+  },
+  "timestamp": "2023-01-01T10:00:00.000Z",
+  "type": "gitlab.createIssueComment"
+}
