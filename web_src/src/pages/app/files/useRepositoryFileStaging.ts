@@ -131,6 +131,17 @@ export function useRepositoryFileStaging({
     stagedPathsRef.current = new Set();
   }, [versionId]);
 
+  // Leaving edit mode clears in-memory pendingChanges but keeps server staging.
+  // Drop local bookkeeping so re-entry does not treat persisted staged paths as
+  // reverted edits and DELETE them from staging.
+  useEffect(() => {
+    if (enabled) {
+      return;
+    }
+
+    stagedPathsRef.current = new Set();
+  }, [enabled]);
+
   useEffect(() => {
     if (!enabled || !canvasId || !versionId) {
       return;
