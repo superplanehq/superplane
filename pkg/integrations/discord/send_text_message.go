@@ -291,10 +291,9 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 								Type:        configuration.FieldTypeSelect,
 								Required:    false,
 								Default:     "application/octet-stream",
-								Description: "Used to name the attachment when no filename is set. Also accepts an expression, e.g. the artifact's mimeType.",
+								Description: "Used to name the attachment when no filename is set",
 								TypeOptions: &configuration.TypeOptions{
 									Select: &configuration.SelectTypeOptions{
-										AllowExpressions: true,
 										Options: []configuration.FieldOption{
 											{Label: "PNG image", Value: "image/png"},
 											{Label: "JPEG image", Value: "image/jpeg"},

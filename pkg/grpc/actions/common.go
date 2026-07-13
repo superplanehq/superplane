@@ -130,8 +130,7 @@ func selectTypeOptionsToProto(opts *configuration.SelectTypeOptions) *configpb.S
 	}
 
 	pbOpts := &configpb.SelectTypeOptions{
-		Options:          make([]*configpb.SelectOption, len(opts.Options)),
-		AllowExpressions: opts.AllowExpressions,
+		Options: make([]*configpb.SelectOption, len(opts.Options)),
 	}
 	for i, opt := range opts.Options {
 		pbOpts.Options[i] = &configpb.SelectOption{
@@ -430,8 +429,7 @@ func protoToSelectTypeOptions(pbOpts *configpb.SelectTypeOptions) *configuration
 	}
 
 	opts := &configuration.SelectTypeOptions{
-		Options:          make([]configuration.FieldOption, len(pbOpts.Options)),
-		AllowExpressions: pbOpts.AllowExpressions,
+		Options: make([]configuration.FieldOption, len(pbOpts.Options)),
 	}
 	for i, pbOpt := range pbOpts.Options {
 		opts.Options[i] = configuration.FieldOption{

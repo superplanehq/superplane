@@ -190,9 +190,6 @@ type DateTimeTypeOptions struct {
  */
 type SelectTypeOptions struct {
 	Options []FieldOption `json:"options"`
-	// AllowExpressions lets the field accept an expression instead of a fixed
-	// option, resolved at execution (e.g. an upstream payload value).
-	AllowExpressions bool `json:"allowExpressions,omitempty"`
 }
 
 /*
