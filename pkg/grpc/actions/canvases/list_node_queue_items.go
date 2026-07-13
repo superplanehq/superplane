@@ -52,22 +52,31 @@ func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workfl
 }
 
 func SerializeNodeQueueItems(db *gorm.DB, queueItems []models.CanvasNodeQueueItem) ([]*pb.CanvasNodeQueueItem, error) {
-	//
-	// Fetch all input records
-	//
+	inputEvents, err := loadInputEventsForQueueItems(db, queueItems)
+	if err != nil {
+		return nil, err
+	}
+
+	return serializeNodeQueueItemsWithInputEvents(queueItems, inputEvents)
+}
+
+func loadInputEventsForQueueItems(db *gorm.DB, queueItems []models.CanvasNodeQueueItem) ([]models.CanvasEvent, error) {
 	inputEvents, err := models.FindCanvasEvents(db, eventIDsFromQueueItems(queueItems))
 	if err != nil {
 		return nil, fmt.Errorf("error find input events: %v", err)
 	}
 
-	//
-	// Combine everything into the response
-	//
+	return inputEvents, nil
+}
+
+func serializeNodeQueueItemsWithInputEvents(queueItems []models.CanvasNodeQueueItem, inputEvents []models.CanvasEvent) ([]*pb.CanvasNodeQueueItem, error) {
+	inputEventsByID := indexEventsByID(inputEvents)
 	result := make([]*pb.CanvasNodeQueueItem, 0, len(queueItems))
 	for _, queueItem := range queueItems {
-		input, err := getInputForQueueItem(queueItem, inputEvents)
+		input, err := getInputForQueueItem(queueItem, inputEventsByID)
 		if err != nil {
-			return nil, err
+			log.WithError(err).Warnf("Skipping queue item %s while serializing", queueItem.ID.String())
+			continue
 		}
 
 		serializedQueueItem := &pb.CanvasNodeQueueItem{
@@ -92,6 +101,15 @@ func SerializeNodeQueueItems(db *gorm.DB, queueItems []models.CanvasNodeQueueIte
 	return result, nil
 }
 
+func indexEventsByID(events []models.CanvasEvent) map[string]models.CanvasEvent {
+	eventsByID := make(map[string]models.CanvasEvent, len(events))
+	for _, event := range events {
+		eventsByID[event.ID.String()] = event
+	}
+
+	return eventsByID
+}
+
 func getLastQueueItemTimestamp(queueItems []models.CanvasNodeQueueItem) *timestamppb.Timestamp {
 	if len(queueItems) > 0 {
 		return timestamppb.New(*queueItems[len(queueItems)-1].CreatedAt)
@@ -108,22 +126,21 @@ func eventIDsFromQueueItems(queueItems []models.CanvasNodeQueueItem) []string {
 	return ids
 }
 
-func getInputForQueueItem(queueItem models.CanvasNodeQueueItem, events []models.CanvasEvent) (*structpb.Struct, error) {
-	for _, event := range events {
-		if event.ID.String() == queueItem.EventID.String() {
-			eventData, ok := event.Data.Data().(map[string]any)
-			if !ok {
-				return nil, fmt.Errorf("event data cannot be turned into input for queue item %s", queueItem.ID.String())
-			}
-
-			data, err := newStructpbStruct(eventData)
-			if err != nil {
-				return nil, err
-			}
-
-			return data, nil
-		}
+func getInputForQueueItem(queueItem models.CanvasNodeQueueItem, eventsByID map[string]models.CanvasEvent) (*structpb.Struct, error) {
+	event, ok := eventsByID[queueItem.EventID.String()]
+	if !ok {
+		return nil, fmt.Errorf("input not found for queue item %s", queueItem.ID.String())
 	}
 
-	return nil, fmt.Errorf("input not found for queue item %s", queueItem.ID.String())
+	eventData, ok := event.Data.Data().(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("event data cannot be turned into input for queue item %s", queueItem.ID.String())
+	}
+
+	data, err := newStructpbStruct(eventData)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }

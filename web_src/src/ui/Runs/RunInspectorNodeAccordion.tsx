@@ -74,7 +74,7 @@ export function RunInspectorNodeAccordion({
   return (
     <AccordionItem
       ref={itemRef}
-      value={section.nodeId}
+      value={section.sectionValue}
       className="scroll-mt-8 border-slate-950/10 dark:border-gray-800"
     >
       <AccordionPrimitive.Header
@@ -130,12 +130,21 @@ function NodeActions({
   currentUser?: RunInspectorCurrentUser;
 }) {
   const actionableApproval = findActionableApprovalRecord(section.actions.approvalRecords, currentUser ?? null);
-  const hasActions = section.actions.canStop || section.actions.canPushThrough || actionableApproval;
+  const hasActions =
+    section.queueItem || section.actions.canStop || section.actions.canPushThrough || actionableApproval;
 
   if (!hasActions) return null;
 
   return (
     <div className="flex shrink-0 items-center gap-2 pl-3">
+      {section.queueItem ? (
+        <NodeActionButton
+          label="Cancel"
+          tone="danger"
+          disabled={actions.cancelQueuedItemPending}
+          onClick={() => actions.cancelQueuedItem(section)}
+        />
+      ) : null}
       {actionableApproval ? (
         <>
           <NodeActionButton
@@ -257,7 +266,7 @@ function NodeMetadata({
           {rerunPending ? "Rerun..." : "Rerun"}
         </button>
       ) : null}
-      {section.isTrigger && section.createdAt ? (
+      {(section.isTrigger || section.isQueued) && section.createdAt ? (
         <span>{formatEventTimestamp(section.createdAt)}</span>
       ) : section.durationMs !== undefined ? (
         <span>{formatStepDuration(section.durationMs)}</span>

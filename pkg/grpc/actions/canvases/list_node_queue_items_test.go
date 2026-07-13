@@ -286,3 +286,40 @@ func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, result)
 }
+
+func Test__SerializeNodeQueueItemsWithInputEvents__SkipsItemsWithMissingInput(t *testing.T) {
+	now := time.Now()
+	validEventID := uuid.New()
+	missingEventID := uuid.New()
+	validQueueItemID := uuid.New()
+
+	result, err := serializeNodeQueueItemsWithInputEvents(
+		[]models.CanvasNodeQueueItem{
+			{
+				ID:         missingEventID,
+				WorkflowID: uuid.New(),
+				NodeID:     "node-1",
+				EventID:    missingEventID,
+				CreatedAt:  &now,
+			},
+			{
+				ID:         validQueueItemID,
+				WorkflowID: uuid.New(),
+				NodeID:     "node-1",
+				EventID:    validEventID,
+				CreatedAt:  &now,
+			},
+		},
+		[]models.CanvasEvent{
+			{
+				ID:   validEventID,
+				Data: models.NewJSONValue(map[string]any{"message": "queued"}),
+			},
+		},
+	)
+
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, validQueueItemID.String(), result[0].Id)
+	assert.Equal(t, "queued", result[0].Input.AsMap()["message"])
+}

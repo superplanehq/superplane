@@ -191,6 +191,43 @@ describe("RunInspectorPanel", () => {
     });
   });
 
+  it("jumps from a queued section to the failed execution for the same node", () => {
+    mockedExecutions = executions.map((execution) =>
+      execution.nodeId === "action-1"
+        ? {
+            ...execution,
+            outputs: { default: [{ data: { error: "details" } }] },
+          }
+        : execution,
+    );
+
+    renderInspector({
+      run: {
+        ...runningRun,
+        queueItems: [
+          {
+            id: "queue-failed-node",
+            nodeId: "action-1",
+            rootEvent: { id: "event-running", nodeId: "trigger-1" },
+            input: { request: "retry after approval" },
+            createdAt: "2026-05-01T12:00:05Z",
+          },
+        ],
+      },
+      selectedNodeId: "action-1",
+    });
+
+    const queuedHeader = screen.getByRole("heading", { name: /queued/i });
+    fireEvent.click(within(queuedHeader).getByRole("button", { name: /Add Grade Label/i }));
+
+    expect(screen.getByRole("button", { name: /Input/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Output/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Jump to error" }));
+
+    expect(screen.getByRole("button", { name: /Output/i })).toBeInTheDocument();
+  });
+
   it("smoothly scrolls an opened node accordion to the steps top", async () => {
     const scrollIntoView = vi.fn();
     window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
@@ -339,19 +376,21 @@ describe("RunInspectorPanel", () => {
 
   it("stops running executions and queued items for the inspected run", async () => {
     mockedExecutions = runningExecutions;
-    listNodeQueueItemsMock.mockImplementation(({ path }: { path: { nodeId: string } }) => ({
-      data: {
-        items:
-          path.nodeId === "action-2"
-            ? [
-                { id: "queue-1", rootEvent: { id: "event-running" } },
-                { id: "queue-other", rootEvent: { id: "other-event" } },
-              ]
-            : [],
-      },
-    }));
 
-    renderInspector({ run: runningRun });
+    renderInspector({
+      run: {
+        ...runningRun,
+        queueItems: [
+          {
+            id: "queue-1",
+            nodeId: "action-2",
+            rootEvent: { id: "event-running" },
+            input: { approval: "pending" },
+            createdAt: "2026-05-01T12:00:04Z",
+          },
+        ],
+      },
+    });
 
     fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]);
 
@@ -376,6 +415,70 @@ describe("RunInspectorPanel", () => {
     });
 
     expect(deleteNodeQueueItemMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders queued items as queued steps with only input", () => {
+    mockedExecutions = [];
+
+    renderInspector({
+      run: {
+        ...runningRun,
+        queueItems: [
+          {
+            id: "queue-approval",
+            nodeId: "approval-1",
+            rootEvent: { id: "event-running", nodeId: "trigger-1" },
+            input: { request: "approve deploy" },
+            createdAt: "2026-05-01T12:00:05Z",
+          },
+        ],
+      },
+      selectedNodeId: "approval-1",
+    });
+
+    expect(screen.getByRole("button", { name: /Await Approval/i })).toBeInTheDocument();
+    expect(screen.getAllByText("queued").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /Input/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Runtime config/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Output/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Input/i }));
+
+    expect(screen.getByTestId("json-view")).toHaveTextContent(/"request":"approve deploy"/);
+  });
+
+  it("cancels a queued step from the node accordion header", async () => {
+    mockedExecutions = [];
+
+    renderInspector({
+      run: {
+        ...runningRun,
+        queueItems: [
+          {
+            id: "queue-approval",
+            nodeId: "approval-1",
+            rootEvent: { id: "event-running", nodeId: "trigger-1" },
+            input: { request: "approve deploy" },
+            createdAt: "2026-05-01T12:00:05Z",
+          },
+        ],
+      },
+      selectedNodeId: "approval-1",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(deleteNodeQueueItemMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: {
+            canvasId: "canvas-1",
+            nodeId: "approval-1",
+            itemId: "queue-approval",
+          },
+        }),
+      );
+    });
   });
 
   it("stops an active node execution from the node accordion header", async () => {
