@@ -106,6 +106,11 @@ To connect with a **Personal Access Token**:
 2. Paste the token into the **Access Token** field and click **Save**.
 
 **Note:** Triggers (On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor.
+
+**Component permissions:** components act as the connected user, so that user needs the matching project role:
+- **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
+- **Approve Merge Request** requires the user to be an eligible approver: a direct project or group member with at least the **Developer** role. By default, users cannot approve their own merge requests.
+- **Get Issue** requires at least the **Guest** role (**Planner/Reporter** for confidential issues).
 `, strings.Join(scopeList, ","), strings.Join(scopeList, ", "))
 }
 
@@ -173,12 +178,15 @@ func (g *GitLab) Configuration() []configuration.Field {
 func (g *GitLab) Actions() []core.Action {
 	return []core.Action{
 		&CreateIssue{},
+		&GetIssue{},
 		&RunPipeline{},
 		&GetPipeline{},
 		&GetLatestPipeline{},
 		&GetTestReportSummary{},
 		&CreateMergeComment{},
 		&AddReaction{},
+		&AcceptMergeRequest{},
+		&ApproveMergeRequest{},
 	}
 }
 
