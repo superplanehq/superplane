@@ -2,9 +2,11 @@ package openai
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/google/uuid"
@@ -21,26 +23,49 @@ const ResponsePayloadType = "openai.response"
 type CreateResponse struct{}
 
 type CreateResponseSpec struct {
-	Model        string   `json:"model"`
-	Input        string   `json:"input"`
-	Files        []string `json:"files"`
-	OutputSchema string   `json:"outputSchema"`
+	Model           string   `json:"model"`
+	Input           string   `json:"input"`
+	Files           []string `json:"files"`
+	CodeInterpreter bool     `json:"codeInterpreter"`
+	OutputSchema    string   `json:"outputSchema"`
 }
 
 type ResponsePayload struct {
-	ID       string          `json:"id"`
-	Model    string          `json:"model"`
-	Text     string          `json:"text"`
-	Parsed   any             `json:"parsed,omitempty"`
-	Usage    *ResponseUsage  `json:"usage,omitempty"`
-	Response *OpenAIResponse `json:"response"`
+	ID        string          `json:"id"`
+	Model     string          `json:"model"`
+	Text      string          `json:"text"`
+	Parsed    any             `json:"parsed,omitempty"`
+	Usage     *ResponseUsage  `json:"usage,omitempty"`
+	Artifacts []Artifact      `json:"artifacts,omitempty"`
+	Response  *OpenAIResponse `json:"response"`
 }
+
+// Artifact is a file the code interpreter generated in its container. Its
+// content is embedded in the payload — text files as a plain string,
+// everything else base64-encoded — because containers (and their files)
+// expire ~20 minutes after their last activity. Files over the inline size
+// cap carry metadata and the API download URL only.
+type Artifact struct {
+	FileID      string `json:"fileId"`
+	ContainerID string `json:"containerId"`
+	Filename    string `json:"filename"`
+	Bytes       int64  `json:"bytes,omitempty"`
+	Encoding    string `json:"encoding,omitempty"`
+	Content     string `json:"content,omitempty"`
+	DownloadURL string `json:"downloadUrl"` // {BaseURL}/containers/{cid}/files/{fid}/content
+}
+
+// maxInlineArtifactSizeBytes caps how large a generated file can be for its
+// content to be embedded in the output payload. Larger files keep their
+// metadata and download URL only.
+const maxInlineArtifactSizeBytes = 10 * 1024 * 1024
 
 // ResponseNodeMetadata is node-level metadata surfaced in the UI so the
 // configured model and options are visible on the node without opening it.
 type ResponseNodeMetadata struct {
 	Model            string `json:"model" mapstructure:"model"`
 	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
+	CodeInterpreter  bool   `json:"codeInterpreter" mapstructure:"codeInterpreter"`
 }
 
 func (c *CreateResponse) Name() string {
@@ -70,6 +95,7 @@ func (c *CreateResponse) Documentation() string {
 - **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
 - **Prompt**: The text prompt to send to the model (supports expressions)
 - **Files**: (Optional) Attach files from the Files tab (images, PDFs, or text). They are uploaded to the OpenAI Files API and sent alongside the prompt.
+- **Code Interpreter**: (Optional) Let the model write and run Python in a sandboxed container. Files it creates are emitted as artifacts.
 - **Structured Output**: (Optional) Provide a JSON Schema for the response and the model returns JSON matching it, available on the parsed output. The schema is validated before the request and sent in OpenAI strict mode; strict mode marks every property required, so express optional fields by making their type nullable.
 
 ## Output
@@ -80,6 +106,7 @@ Returns the generated response including:
 - **usage**: Token usage information (prompt tokens, completion tokens, total tokens)
 - **id**: Response ID for tracking
 - **parsed**: When Structured Output is configured, the response parsed into an object.
+- **artifacts**: When Code Interpreter is enabled, the files the model generated, with the file content included: text files as plain text (` + "`encoding: \"text\"`" + `), everything else base64-encoded (` + "`encoding: \"base64\"`" + `). Each artifact carries fileId, containerId, filename, bytes, and a downloadUrl; files over 10MB include metadata and the download URL only (note that containers expire about 20 minutes after their last activity).
 
 ## Notes
 
@@ -137,6 +164,14 @@ func (c *CreateResponse) Configuration() []configuration.Field {
 					},
 				},
 			},
+		},
+		{
+			Name:        "codeInterpreter",
+			Label:       "Code Interpreter",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Let the model write and run Python in a sandboxed container. Files it creates are emitted as artifacts.",
 		},
 		structuredoutput.ConfigField(
 			"outputSchema",
@@ -205,6 +240,7 @@ func (c *CreateResponse) Setup(ctx core.SetupContext) error {
 		_ = ctx.Metadata.Set(ResponseNodeMetadata{
 			Model:            spec.Model,
 			StructuredOutput: hasSchema,
+			CodeInterpreter:  spec.CodeInterpreter,
 		})
 	}
 
@@ -248,6 +284,9 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 	defer cleanupFiles(client, fileIDs)
 
 	req := CreateResponseRequest{Model: spec.Model, Input: input}
+	if spec.CodeInterpreter {
+		req.Tools = []any{map[string]any{"type": "code_interpreter", "container": map[string]any{"type": "auto"}}}
+	}
 	if schema != nil {
 		req.Text = &ResponseTextConfig{
 			Format: &ResponseFormat{
@@ -266,11 +305,12 @@ func (c *CreateResponse) Execute(ctx core.ExecutionContext) error {
 
 	text := extractResponseText(response)
 	payload := ResponsePayload{
-		ID:       response.ID,
-		Model:    response.Model,
-		Text:     text,
-		Usage:    response.Usage,
-		Response: response,
+		ID:        response.ID,
+		Model:     response.Model,
+		Text:      text,
+		Usage:     response.Usage,
+		Artifacts: extractArtifacts(client, response, spec.CodeInterpreter),
+		Response:  response,
 	}
 
 	// When a schema is configured, surface a refusal as text (it arrives on a
@@ -377,6 +417,117 @@ func extractResponseText(response *OpenAIResponse) string {
 	}
 
 	return builder.String()
+}
+
+// extractArtifacts collects the files the code interpreter generated and
+// embeds their content in the payload. Cited files arrive as
+// container_file_citation annotations on the output text; the containers of
+// code_interpreter_call items are additionally swept for assistant-generated
+// files the model didn't cite (annotations can be partial, or entirely missing
+// when combined with structured output). Content fetches are best-effort: a
+// failure degrades the artifact to metadata + download URL.
+func extractArtifacts(client *Client, response *OpenAIResponse, codeInterpreter bool) []Artifact {
+	if response == nil {
+		return nil
+	}
+
+	var artifacts []Artifact
+	seen := map[string]bool{}
+	for _, output := range response.Output {
+		for _, content := range output.Content {
+			for _, annotation := range content.Annotations {
+				if annotation.Type != "container_file_citation" || annotation.FileID == "" || seen[annotation.FileID] {
+					continue
+				}
+				seen[annotation.FileID] = true
+				artifact := Artifact{
+					FileID:      annotation.FileID,
+					ContainerID: annotation.ContainerID,
+					Filename:    annotation.Filename,
+					DownloadURL: client.ContainerFileContentURL(annotation.ContainerID, annotation.FileID),
+				}
+				if file, err := client.GetContainerFile(annotation.ContainerID, annotation.FileID); err == nil {
+					artifact.Bytes = file.Bytes
+					if artifact.Filename == "" {
+						artifact.Filename = containerFileName(file.Path)
+					}
+					inlineArtifactContent(client, &artifact)
+				}
+				artifacts = append(artifacts, artifact)
+			}
+		}
+	}
+
+	if !codeInterpreter {
+		return artifacts
+	}
+
+	for _, output := range response.Output {
+		if output.Type != "code_interpreter_call" || output.ContainerID == "" {
+			continue
+		}
+		files, err := client.ListContainerFiles(output.ContainerID)
+		if err != nil {
+			continue
+		}
+		for _, file := range files {
+			if file.Source != "assistant" || file.ID == "" || seen[file.ID] {
+				continue
+			}
+			seen[file.ID] = true
+			artifact := Artifact{
+				FileID:      file.ID,
+				ContainerID: output.ContainerID,
+				Filename:    containerFileName(file.Path),
+				Bytes:       file.Bytes,
+				DownloadURL: client.ContainerFileContentURL(output.ContainerID, file.ID),
+			}
+			inlineArtifactContent(client, &artifact)
+			artifacts = append(artifacts, artifact)
+		}
+	}
+	return artifacts
+}
+
+// inlineArtifactContent embeds the artifact's content when it is within the
+// inline size cap, sniffing the content type to decide between plain text and
+// base64. Failures leave the artifact with metadata and download URL only.
+func inlineArtifactContent(client *Client, artifact *Artifact) {
+	if artifact.Bytes > maxInlineArtifactSizeBytes {
+		return
+	}
+	content, err := client.DownloadContainerFileContent(artifact.ContainerID, artifact.FileID)
+	if err != nil {
+		return
+	}
+	if isTextMIME(http.DetectContentType(content)) {
+		artifact.Encoding, artifact.Content = "text", string(content)
+		return
+	}
+	artifact.Encoding, artifact.Content = "base64", base64.StdEncoding.EncodeToString(content)
+}
+
+// containerFileName derives the file name from the container path
+// (e.g. /mnt/data/plot.png -> plot.png).
+func containerFileName(containerPath string) string {
+	if containerPath == "" {
+		return ""
+	}
+	return path.Base(containerPath)
+}
+
+// isTextMIME reports whether a MIME type is text-like and safe to emit as a
+// plain string payload.
+func isTextMIME(mimeType string) bool {
+	mt := strings.ToLower(strings.TrimSpace(strings.Split(mimeType, ";")[0]))
+	if strings.HasPrefix(mt, "text/") {
+		return true
+	}
+	switch mt {
+	case "application/json", "application/xml", "application/x-yaml", "application/yaml", "application/javascript":
+		return true
+	}
+	return strings.HasSuffix(mt, "+json") || strings.HasSuffix(mt, "+xml")
 }
 
 // extractRefusal returns the refusal message from a Responses API output, if any.

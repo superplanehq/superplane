@@ -74,7 +74,11 @@ func (i *Claude) Triggers() []core.Trigger {
 }
 
 func (i *Claude) Instructions() string {
-	return "To get new Claude API key, go to [platform.claude.com](https://platform.claude.com)."
+	return `To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
+
+## Files & artifacts
+
+The Files API is in beta: SuperPlane enables it per request via the ` + "`anthropic-beta`" + ` header, so no console toggle is needed and a standard API key suffices. Files and sessions are scoped to the API key's workspace. For **Run Claude Agent** artifacts, the agent must save its deliverables under ` + "`/mnt/session/outputs/`" + `.`
 }
 
 func (i *Claude) Cleanup(ctx core.IntegrationCleanupContext) error {

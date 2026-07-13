@@ -429,3 +429,129 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "channel is required")
 	})
 }
+
+func Test__SendTextMessage__DataURIFiles(t *testing.T) {
+	t.Run("validateFiles accepts data URIs", func(t *testing.T) {
+		require.NoError(t, validateFiles([]FileAttachment{{Raw: "data:text/csv;base64,YSxiCjEsMgo="}}))
+		require.NoError(t, validateFiles([]FileAttachment{{Raw: "data:text/plain,hello%20world"}}))
+	})
+
+	t.Run("validateFiles rejects malformed data URIs", func(t *testing.T) {
+		require.ErrorContains(t, validateFiles([]FileAttachment{{Raw: "data:text/csv;base64"}}), "invalid data URI")
+		require.ErrorContains(t, validateFiles([]FileAttachment{{Raw: "data:text/csv;base64,%%%"}}), "invalid data URI")
+	})
+
+	t.Run("parseDataURI keeps undecodable plain data as-is", func(t *testing.T) {
+		mediaType, content, err := parseDataURI("data:text/csv,discount\n50% off")
+		require.NoError(t, err)
+		require.Equal(t, "text/csv", mediaType)
+		require.Equal(t, []byte("discount\n50% off"), content)
+	})
+
+	t.Run("parseDataURI decodes base64 and plain content", func(t *testing.T) {
+		mediaType, content, err := parseDataURI("data:image/png;base64,aGVsbG8=")
+		require.NoError(t, err)
+		require.Equal(t, "image/png", mediaType)
+		require.Equal(t, []byte("hello"), content)
+
+		mediaType, content, err = parseDataURI("data:text/plain,hello%20world")
+		require.NoError(t, err)
+		require.Equal(t, "text/plain", mediaType)
+		require.Equal(t, []byte("hello world"), content)
+	})
+
+	t.Run("dataURIFileName derives extension from media type", func(t *testing.T) {
+		require.Equal(t, "file-1.png", dataURIFileName("image/png", 0))
+		require.Equal(t, "file-2", dataURIFileName("", 1))
+	})
+}
+
+func Test__SendTextMessage__SchemelessFileEntry(t *testing.T) {
+	t.Run("raw content without a scheme fails with guidance", func(t *testing.T) {
+		client := &Client{BotToken: "t"}
+		_, err := sendMessage(client, &contexts.HTTPContext{}, SendTextMessageConfiguration{
+			Channel: "chan",
+			Content: "hi",
+			Files:   []FileAttachment{{Raw: "iVBORw0KGgoAAAANSUhEUg=="}},
+		}, CreateMessageRequest{Content: "hi"})
+		require.ErrorContains(t, err, "neither an http(s) URL nor a data: URI")
+	})
+
+	t.Run("data URI with whitespace-padded base64 decodes", func(t *testing.T) {
+		mediaType, content, err := parseDataURI("data:image/png;base64, aGVsbG8= ")
+		require.NoError(t, err)
+		require.Equal(t, "image/png", mediaType)
+		require.Equal(t, []byte("hello"), content)
+	})
+}
+
+func Test__SendTextMessage__StructuredFileEntries(t *testing.T) {
+	t.Run("decode accepts strings and objects", func(t *testing.T) {
+		entries, err := decodeFileAttachments([]any{
+			"https://example.com/report.pdf",
+			map[string]any{"source": "content", "content": "a,b\n1,2\n", "encoding": "text", "mimeType": "text/csv"},
+		})
+		require.NoError(t, err)
+		require.Len(t, entries, 2)
+		require.Equal(t, "https://example.com/report.pdf", entries[0].Raw)
+		require.Equal(t, "content", entries[1].Source)
+		require.Equal(t, "text/csv", entries[1].MimeType)
+	})
+
+	t.Run("content entry with base64 encoding decodes bytes", func(t *testing.T) {
+		client := &Client{BotToken: "t"}
+		file, err := resolveFileAttachment(client, &contexts.HTTPContext{}, FileAttachment{
+			Source:   "content",
+			Content:  " aGVsbG8= ",
+			Encoding: "base64",
+			MimeType: "image/png",
+		}, 0)
+		require.NoError(t, err)
+		require.Equal(t, []byte("hello"), file.Content)
+		require.Equal(t, "file-1.png", file.Name)
+	})
+
+	t.Run("content entry with text encoding keeps raw content and filename override", func(t *testing.T) {
+		client := &Client{BotToken: "t"}
+		file, err := resolveFileAttachment(client, &contexts.HTTPContext{}, FileAttachment{
+			Source:   "content",
+			Content:  "a,b\n1,2",
+			Filename: "export.csv",
+		}, 0)
+		require.NoError(t, err)
+		require.Equal(t, []byte("a,b\n1,2"), file.Content)
+		require.Equal(t, "export.csv", file.Name)
+	})
+
+	t.Run("url entry without scheme fails with guidance", func(t *testing.T) {
+		client := &Client{BotToken: "t"}
+		_, err := resolveFileAttachment(client, &contexts.HTTPContext{}, FileAttachment{
+			Source: "url",
+			URL:    "iVBORw0KGgo=",
+		}, 0)
+		require.ErrorContains(t, err, "set the entry's source to content")
+	})
+
+	t.Run("validate rejects unknown source and encoding", func(t *testing.T) {
+		require.ErrorContains(t, validateFiles([]FileAttachment{{Source: "ftp"}}), "source must be")
+		require.ErrorContains(t, validateFiles([]FileAttachment{{Source: "content", Encoding: "hex"}}), "encoding must be")
+	})
+
+	t.Run("validate allows an expression-driven encoding", func(t *testing.T) {
+		require.NoError(t, validateFiles([]FileAttachment{{
+			Source:   "content",
+			Content:  "{{ $['Text Prompt'].data.artifacts[0].content }}",
+			Encoding: "{{ $['Text Prompt'].data.artifacts[0].encoding }}",
+		}}))
+	})
+}
+
+func Test__SendTextMessage__InlineFileSizeLimit(t *testing.T) {
+	client := &Client{BotToken: "t"}
+	oversized := strings.Repeat("a", maxMessageFileSize+1)
+	_, err := sendMessage(client, &contexts.HTTPContext{}, SendTextMessageConfiguration{
+		Channel: "chan",
+		Files:   []FileAttachment{{Source: "content", Content: oversized, Filename: "big.txt"}},
+	}, CreateMessageRequest{})
+	require.ErrorContains(t, err, "per-file limit")
+}
