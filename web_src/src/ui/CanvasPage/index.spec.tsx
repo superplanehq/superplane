@@ -168,6 +168,94 @@ describe("CanvasNodeErrorBoundary", () => {
     consoleSpy.mockRestore();
   });
 
+  it("keeps the fallback when nodeData gets a new object identity with the same content", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const brokenMetadata = { id: "model-id", name: "claude-opus-4-6", type: "model" };
+
+    const { rerender } = render(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          component: {
+            title: "Claude",
+            iconSlug: "sparkles",
+            metadata: [{ icon: "sparkles", label: brokenMetadata as unknown as string }],
+          },
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          component: {
+            title: "Claude",
+            iconSlug: "sparkles",
+            metadata: [{ icon: "sparkles", label: { ...brokenMetadata } as unknown as string }],
+          },
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+
+  it("retries rendering after a meaningful nodeData content change", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    let shouldThrow = true;
+
+    function ConditionalThrow(): ReactElement {
+      if (shouldThrow) {
+        throw new Error("render failed");
+      }
+      return <div>recovered node</div>;
+    }
+
+    const { rerender } = render(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{ label: "Broken", state: "pending", type: "component" }}
+        fallback={<div>node fallback</div>}
+      >
+        <ConditionalThrow />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+
+    shouldThrow = false;
+    rerender(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{ label: "Fixed", state: "pending", type: "component" }}
+        fallback={<div>node fallback</div>}
+      >
+        <ConditionalThrow />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("recovered node")).toBeInTheDocument();
+    consoleSpy.mockRestore();
+  });
+
   it("keeps the boundary alive when node data has an unknown runtime type", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const invalidNodeData = { label: "Broken", state: "pending", type: "unexpected" } as unknown as BlockData;

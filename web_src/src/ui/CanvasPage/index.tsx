@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Search, Trash2, CircleAlert } from "lucide-react";
 import {
   Component,
+  isValidElement,
   memo,
   useCallback,
   useEffect,
@@ -630,18 +631,40 @@ function areOutputChannelsEqual(previous: string[] | undefined, next: string[] |
   return previous.every((channel, index) => channel === next[index]);
 }
 
+/**
+ * Stable key for deciding whether a failed node should retry rendering.
+ * Reference identity alone must not clear the fallback — post-commit flushSync
+ * re-prepares every node with new object identities and would otherwise rethrow
+ * the same child render error outside the boundary recovery window.
+ */
+function nodeErrorBoundaryRecoveryKey(data: BlockData): string {
+  try {
+    return JSON.stringify(data, (_key, value) => {
+      if (typeof value === "function") {
+        return undefined;
+      }
+      if (isValidElement(value)) {
+        return "[ReactElement]";
+      }
+      return value;
+    });
+  } catch {
+    return `${data.type}:${data.label}`;
+  }
+}
+
 function didNodeErrorBoundaryDataChange(previous: BlockData, next: BlockData) {
-  return (
+  if (
     previous.type !== next.type ||
     previous.label !== next.label ||
-    previous.trigger !== next.trigger ||
-    previous.component !== next.component ||
-    previous.composite !== next.composite ||
-    previous.annotation !== next.annotation ||
     previous.renderFallback?.source !== next.renderFallback?.source ||
     previous.renderFallback?.message !== next.renderFallback?.message ||
     !areOutputChannelsEqual(previous.outputChannels, next.outputChannels)
-  );
+  ) {
+    return true;
+  }
+
+  return nodeErrorBoundaryRecoveryKey(previous) !== nodeErrorBoundaryRecoveryKey(next);
 }
 
 function getNodeAction<TArgs extends unknown[]>(
