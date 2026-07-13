@@ -93,6 +93,26 @@ func Test__UpdateIssue__Setup(t *testing.T) {
 		err := c.Setup(ctx)
 		require.NoError(t, err)
 	})
+
+	t.Run("labels toggled on but empty still counts as an update", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"project":  "123",
+				"issueIid": "1",
+				"labels":   []string{},
+			},
+			Integration: &contexts.IntegrationContext{
+				Metadata: Metadata{
+					Projects: []ProjectMetadata{
+						{ID: 123, Name: "repo", URL: "http://repo"},
+					},
+				},
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+		err := c.Setup(ctx)
+		require.NoError(t, err)
+	})
 }
 
 func Test__UpdateIssue__Execute(t *testing.T) {
@@ -255,5 +275,52 @@ func Test__UpdateIssue__Execute(t *testing.T) {
 		err := c.Execute(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "at least one field must be enabled")
+	})
+
+	t.Run("clears description, labels, assignees and milestone when toggled on but empty", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":   "123",
+				"issueIid":  "1",
+				"body":      "",
+				"labels":    []string{},
+				"assignees": []string{},
+				"milestone": "",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+				},
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					GitlabMockResponse(http.StatusOK, `{"id": 101, "iid": 1, "title": "Issue"}`),
+				},
+			},
+			ExecutionState: executionState,
+		}
+
+		err := c.Execute(ctx)
+		require.NoError(t, err)
+
+		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
+		require.Len(t, httpCtx.Requests, 1)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		var reqBody map[string]any
+		json.Unmarshal(body, &reqBody)
+
+		assert.Equal(t, "", reqBody["description"])
+		assert.Equal(t, "", reqBody["labels"])
+		assert.Equal(t, []any{}, reqBody["assignee_ids"])
+		assert.Equal(t, float64(0), reqBody["milestone_id"])
+
+		// Fields that were never toggled on must be omitted entirely, not
+		// just empty, since the toggle is the only signal this component has.
+		assert.NotContains(t, reqBody, "title")
+		assert.NotContains(t, reqBody, "state_event")
 	})
 }

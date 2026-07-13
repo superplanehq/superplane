@@ -1188,7 +1188,8 @@ func Test__Client__UpdateIssue(t *testing.T) {
 			httpClient: mockClient,
 		}
 
-		req := &UpdateIssueRequest{Title: "Updated Title", StateEvent: "close"}
+		title, stateEvent := "Updated Title", "close"
+		req := &UpdateIssueRequest{Title: &title, StateEvent: &stateEvent}
 		result, err := client.UpdateIssue(context.Background(), "1", "1", req)
 
 		require.NoError(t, err)
@@ -1217,7 +1218,8 @@ func Test__Client__UpdateIssue(t *testing.T) {
 			httpClient: mockClient,
 		}
 
-		_, err := client.UpdateIssue(context.Background(), "1", "1", &UpdateIssueRequest{Title: "x"})
+		title := "x"
+		_, err := client.UpdateIssue(context.Background(), "1", "1", &UpdateIssueRequest{Title: &title})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to update issue")
 	})
