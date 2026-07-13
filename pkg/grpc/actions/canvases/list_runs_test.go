@@ -51,6 +51,58 @@ func Test__ListRuns__ReturnsRunsWithRootEventsAndExecutionRefs(t *testing.T) {
 	assert.False(t, response.HasNextPage)
 }
 
+func Test__ListRuns__ReturnsRunsWithQueueItems(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{NodeID: "node-1", Type: models.NodeTypeComponent},
+			{NodeID: "node-2", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+	otherCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
+
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "trigger", "default", nil, map[string]any{
+		"review": "pending",
+	})
+	run := createStartedRun(t, rootEvent)
+	queueItem := support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
+
+	emptyRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	emptyRun := createStartedRun(t, emptyRootEvent)
+
+	otherRootEvent := support.EmitCanvasEventForNode(t, otherCanvas.ID, "trigger", "default", nil)
+	createStartedRun(t, otherRootEvent)
+	support.CreateQueueItem(t, otherCanvas.ID, "trigger", otherRootEvent.ID, otherRootEvent.ID)
+
+	response, err := ListRuns(context.Background(), r.Registry, canvas.ID, 0, nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, response.Runs, 2)
+
+	runsByID := map[string]*pb.CanvasRun{}
+	for _, serializedRun := range response.Runs {
+		runsByID[serializedRun.Id] = serializedRun
+	}
+
+	serializedRun := runsByID[run.ID.String()]
+	require.NotNil(t, serializedRun)
+	require.Len(t, serializedRun.QueueItems, 1)
+	assert.Equal(t, queueItem.ID.String(), serializedRun.QueueItems[0].Id)
+	assert.Equal(t, "node-1", serializedRun.QueueItems[0].NodeId)
+	assert.NotNil(t, serializedRun.QueueItems[0].CreatedAt)
+	require.NotNil(t, serializedRun.QueueItems[0].RootEvent)
+	assert.Equal(t, rootEvent.ID.String(), serializedRun.QueueItems[0].RootEvent.Id)
+	require.NotNil(t, serializedRun.QueueItems[0].Input)
+	assert.Equal(t, "pending", serializedRun.QueueItems[0].Input.AsMap()["review"])
+
+	require.NotNil(t, runsByID[emptyRun.ID.String()])
+	assert.Empty(t, runsByID[emptyRun.ID.String()].QueueItems)
+}
+
 func Test__ListRuns__ScopesRunsToCanvas(t *testing.T) {
 	r := support.Setup(t)
 	canvasOne, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
