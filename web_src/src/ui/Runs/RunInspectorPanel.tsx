@@ -106,6 +106,7 @@ export function RunInspectorPanel({
   const errorSummaries = useMemo(() => findRunInspectorErrorSummaries(sections), [sections]);
   const inspectorWidth = useResizableInspectorWidth();
   const [errorScrollRequest, setErrorScrollRequest] = useState<{ nodeId: string; requestId: number } | null>(null);
+  const [selectedSectionValue, setSelectedSectionValue] = useState<string | null>(null);
   const actions = useRunInspectorActions({
     canvasId,
     run,
@@ -113,14 +114,25 @@ export function RunInspectorPanel({
     executionsLoading: executionsQuery.isLoading,
     onRerunCreated,
   });
+  const accordionValue = useMemo(
+    () => resolveSelectedSectionValue(sections, selectedNodeId, selectedSectionValue),
+    [sections, selectedNodeId, selectedSectionValue],
+  );
 
   const handleValueChange = (value: string) => {
-    if (value) return onSelectNode(value);
+    if (value) {
+      const section = sections.find((item) => item.sectionValue === value);
+      setSelectedSectionValue(value);
+      return onSelectNode(section?.nodeId ?? value);
+    }
+
+    setSelectedSectionValue(null);
     onClearSelectedNode?.();
   };
 
   const jumpToErrorOutput = (nodeId: string) => {
     setErrorScrollRequest({ nodeId, requestId: Date.now() });
+    setSelectedSectionValue(null);
     onSelectNode(nodeId);
   };
 
@@ -158,7 +170,7 @@ export function RunInspectorPanel({
         status={presentation.status}
         sections={sections}
         isLoading={executionsQuery.isLoading}
-        selectedValue={selectedNodeId ?? ""}
+        selectedValue={accordionValue}
         componentIconMap={componentIconMap}
         organizationId={organizationId}
         canShowExpressionTemplates={hasRunVersionSpec}
@@ -174,6 +186,21 @@ export function RunInspectorPanel({
       />
     </aside>
   );
+}
+
+function resolveSelectedSectionValue(
+  sections: ReturnType<typeof buildRunInspectorNodeSections>,
+  selectedNodeId: string | null,
+  selectedSectionValue: string | null,
+): string {
+  if (!selectedNodeId) return "";
+
+  const selectedSection = selectedSectionValue
+    ? sections.find((section) => section.sectionValue === selectedSectionValue && section.nodeId === selectedNodeId)
+    : undefined;
+  if (selectedSection) return selectedSection.sectionValue;
+
+  return sections.find((section) => section.nodeId === selectedNodeId)?.sectionValue ?? "";
 }
 
 function selectInspectorWorkflowNodes(
