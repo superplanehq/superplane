@@ -31,14 +31,12 @@ describe("getIssueMapper", () => {
     );
 
     expect(details).toEqual({
-      IID: "1",
-      ID: "101",
-      State: "opened",
-      URL: "https://gitlab.com/felixgateru/hello-world/-/issues/1",
+      "Executed At": expect.any(String),
       Title: "Bug report",
-      "Created At": expect.any(String),
+      State: "opened",
       "Created By": "root",
       Labels: "bug",
+      URL: "https://gitlab.com/felixgateru/hello-world/-/issues/1",
     });
   });
 

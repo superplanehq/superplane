@@ -25,6 +25,7 @@ describe("updateIssueMapper", () => {
                 created_at: "2026-06-11T14:30:00Z",
                 closed_by: { username: "root" },
                 closed_at: "2026-06-11T15:00:00Z",
+                labels: ["bug"],
               },
             },
           ],
@@ -33,15 +34,12 @@ describe("updateIssueMapper", () => {
     );
 
     expect(details).toEqual({
-      IID: "1",
-      ID: "101",
-      State: "closed",
-      URL: "https://gitlab.com/felixgateru/hello-world/-/issues/1",
+      "Executed At": expect.any(String),
       Title: "Bug report",
-      "Created At": expect.any(String),
+      State: "closed",
       "Created By": "root",
-      "Closed By": "root",
-      "Closed At": expect.any(String),
+      Labels: "bug",
+      URL: "https://gitlab.com/felixgateru/hello-world/-/issues/1",
     });
   });
 
