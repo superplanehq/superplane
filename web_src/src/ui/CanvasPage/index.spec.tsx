@@ -218,6 +218,52 @@ describe("CanvasNodeErrorBoundary", () => {
     consoleSpy.mockRestore();
   });
 
+  it("keeps the fallback when only ephemeral canvas chrome changes", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { rerender } = render(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          _isHighlighted: false,
+          _allEdges: [],
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          _isHighlighted: true,
+          _hoveredEdge: { source: "node-1", target: "node-2" },
+          _connectingFrom: { nodeId: "node-1", handleType: "source" },
+          _allEdges: [{ source: "node-1", sourceHandle: "default", target: "node-2" }],
+          isPendingConnection: true,
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+
   it("retries rendering after a meaningful nodeData content change", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     let shouldThrow = true;
