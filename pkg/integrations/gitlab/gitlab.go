@@ -179,6 +179,9 @@ func (g *GitLab) Actions() []core.Action {
 		&GetTestReportSummary{},
 		&CreateMergeComment{},
 		&AddReaction{},
+		&GetIssue{},
+		&UpdateIssue{},
+		&CreateIssueComment{},
 	}
 }
 
