@@ -1,5 +1,7 @@
 import React from "react";
+import { integrationResourceDisplayLabel } from "@/lib/integrationResourceLabel";
 import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { MetadataItem } from "@/ui/metadataList";
 import type { TriggerProps } from "@/ui/trigger";
 import type {
   ComponentBaseContext,
@@ -76,7 +78,35 @@ function sanitizeReactNodeValue(node: React.ReactNode): React.ReactNode {
     return node;
   }
 
-  return null;
+  // Plain objects (e.g. IntegrationResourceRef) are not valid React children.
+  return integrationResourceDisplayLabel(node) ?? null;
+}
+
+function sanitizeMetadataLabel(label: unknown): React.ReactNode {
+  return sanitizeReactNodeValue(label as React.ReactNode);
+}
+
+function sanitizeMetadataItems(value: unknown): MetadataItem[] | undefined {
+  const items = sanitizeArray<unknown>(value);
+  if (!items) {
+    return undefined;
+  }
+
+  return items.map((item) => {
+    if (!isRecord(item)) {
+      return item as MetadataItem;
+    }
+
+    if (!("label" in item)) {
+      return item as MetadataItem;
+    }
+
+    return {
+      ...item,
+      icon: typeof item.icon === "string" ? item.icon : "circle",
+      label: sanitizeMetadataLabel(item.label),
+    };
+  }) as MetadataItem[];
 }
 
 function sanitizeCustomField(
@@ -140,7 +170,7 @@ function buildNormalizedComponentBaseProps(
     collapsedBackground: asString(record.collapsedBackground),
     eventSections: sanitizeArray(record.eventSections),
     selected: asBoolean(record.selected),
-    metadata: sanitizeArray(record.metadata),
+    metadata: sanitizeMetadataItems(record.metadata),
     customField: sanitizeCustomField(record.customField as ComponentBaseProps["customField"], fallbackTitle),
     customFieldPosition: record.customFieldPosition === "before" ? "before" : "after",
     customFieldVisibility: record.customFieldVisibility === "live-only" ? "live-only" : "always",
@@ -243,7 +273,7 @@ function buildNormalizedTriggerProps(
   context: TriggerRendererContext,
   fallbackProps: TriggerProps,
 ): TriggerProps {
-  const metadata = sanitizeArray<TriggerProps["metadata"][number]>(record.metadata) || [];
+  const metadata = sanitizeMetadataItems(record.metadata) || [];
   const normalizedTitle = sanitizeNonEmptyString(record.title, fallbackProps.title);
   const normalizedIconSlug = sanitizeNonEmptyString(record.iconSlug, fallbackProps.iconSlug);
 
