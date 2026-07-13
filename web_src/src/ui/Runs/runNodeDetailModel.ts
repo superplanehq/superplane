@@ -2,6 +2,7 @@ import type {
   ActionsAction,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
+  CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
   ComponentsEdge,
   ConfigurationField,
@@ -24,6 +25,7 @@ import {
   normalizeExecutionOutputsForDisplay,
 } from "./runNodeDetailOutputs";
 import { buildExecutionTabData, buildTriggerTabData } from "./runNodeDetailTabs";
+import { buildQueuedNodeSections } from "./runQueuedNodeSections";
 export { hasObjectValue } from "./runNodeDetailOutputs";
 export { buildExecutionTabData, buildTriggerTabData, isErrorValue } from "./runNodeDetailTabs";
 
@@ -118,12 +120,15 @@ export type RunInspectorUpstreamSection = {
 };
 
 export type RunInspectorNodeSection = {
+  sectionValue: string;
   nodeId: string;
   nodeName: string;
   workflowNode?: ComponentsNode;
   execution?: CanvasesCanvasNodeExecution;
   executionRef?: CanvasesCanvasNodeExecutionRef;
+  queueItem?: CanvasesCanvasNodeQueueItem;
   isTrigger: boolean;
+  isQueued: boolean;
   createdAt?: string;
   durationMs?: number;
   badge: { badgeColor: string; label: string } | null;
@@ -241,7 +246,7 @@ export function buildRunInspectorNodeSections({
   const componentDefinitionsByName = buildComponentDefinitionsByName(componentDefinitions);
   const triggerDefinitionsByName = buildTriggerDefinitionsByName(triggerDefinitions);
 
-  return executionChain.map((nodeId, index) => {
+  const executionSections = executionChain.map((nodeId, index) => {
     const workflowNode = workflowNodes.find((node) => node.id === nodeId);
     const execution = executions.find((item) => item.nodeId === nodeId);
     const executionRef = run.executions?.find((item) => item.nodeId === nodeId) ?? execution;
@@ -266,12 +271,14 @@ export function buildRunInspectorNodeSections({
         });
 
     return {
+      sectionValue: nodeId,
       nodeId,
       nodeName: workflowNode?.name || nodeId,
       workflowNode,
       execution,
       executionRef,
       isTrigger,
+      isQueued: false,
       createdAt: isTrigger ? run.rootEvent?.createdAt : (execution?.createdAt ?? executionRef?.createdAt),
       durationMs: execution
         ? calculateExecutionDuration(execution)
@@ -312,6 +319,8 @@ export function buildRunInspectorNodeSections({
       }),
     };
   });
+
+  return [...executionSections, ...buildQueuedNodeSections({ run, workflowNodes })];
 }
 
 export function findRunInspectorErrorSummaries(sections: RunInspectorNodeSection[]): RunInspectorErrorSummary[] {

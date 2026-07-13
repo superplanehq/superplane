@@ -49,6 +49,39 @@ func Test__DescribeRun(t *testing.T) {
 		assert.Equal(t, execution.ID.String(), serializedRun.Executions[0].Id)
 	})
 
+	t.Run("returns run with queue items", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{NodeID: "trigger", Type: models.NodeTypeTrigger},
+				{NodeID: "node-1", Type: models.NodeTypeComponent},
+			},
+			[]models.Edge{},
+		)
+
+		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "trigger", "default", nil, map[string]any{
+			"approval": "waiting",
+		})
+		run := createStartedRun(t, rootEvent)
+		queueItem := support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
+
+		response, err := DescribeRun(context.Background(), r.Registry, canvas.ID, run.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Run)
+		require.Len(t, response.Run.QueueItems, 1)
+
+		serializedQueueItem := response.Run.QueueItems[0]
+		assert.Equal(t, queueItem.ID.String(), serializedQueueItem.Id)
+		assert.Equal(t, "node-1", serializedQueueItem.NodeId)
+		assert.NotNil(t, serializedQueueItem.CreatedAt)
+		require.NotNil(t, serializedQueueItem.RootEvent)
+		assert.Equal(t, rootEvent.ID.String(), serializedQueueItem.RootEvent.Id)
+		require.NotNil(t, serializedQueueItem.Input)
+		assert.Equal(t, "waiting", serializedQueueItem.Input.AsMap()["approval"])
+	})
+
 	t.Run("scopes run to canvas", func(t *testing.T) {
 		canvasOne, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
 		canvasTwo, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
