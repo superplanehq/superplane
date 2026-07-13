@@ -57,6 +57,7 @@ function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecut
   return (
     <div
       ref={scrollRef}
+      data-testid="run-inspector-runner-logs-terminal"
       className="max-h-80 overflow-y-auto rounded-sm bg-slate-950 px-4 py-3 text-slate-100 shadow-inner ring-1 ring-slate-900/10 dark:bg-black dark:ring-gray-800"
     >
       <pre className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed">{lines.join("\n")}</pre>
