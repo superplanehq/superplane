@@ -80,6 +80,10 @@ function getInvalidationCalls(invalidateQueriesSpy: ReturnType<typeof vi.spyOn>,
   });
 }
 
+function canvasRunQueriesKey() {
+  return [...canvasKeys.runs(), testCanvasId] as const;
+}
+
 type QueryPredicate = (query: { queryKey: readonly unknown[] }) => boolean;
 
 function getInvalidationPredicates(invalidateQueriesSpy: ReturnType<typeof vi.spyOn>) {
@@ -134,7 +138,7 @@ describe("useCanvasWebsocket", () => {
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
   });
 
-  it("invalidates infinite runs query for queue_item_created", async () => {
+  it("invalidates canvas run queries for queue_item_created", async () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
 
@@ -146,10 +150,10 @@ describe("useCanvasWebsocket", () => {
 
     await flushMessageQueue();
 
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasRunQueriesKey())).toHaveLength(1);
   });
 
-  it("does not invalidate infinite runs query for queue_item_consumed", async () => {
+  it("invalidates canvas run queries for queue_item_consumed", async () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
 
@@ -161,7 +165,7 @@ describe("useCanvasWebsocket", () => {
 
     await flushMessageQueue();
 
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasRunQueriesKey())).toHaveLength(1);
   });
 
   it("patches execution events into infinite runs cache", async () => {
