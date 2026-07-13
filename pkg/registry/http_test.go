@@ -549,3 +549,24 @@ func Test__HTTPContext__ClientSelection(t *testing.T) {
 		assert.Same(t, httpContext.longClient, httpContext.clientFor(req))
 	})
 }
+
+func Test__HTTPContext__ClientInTransactionTimeout(t *testing.T) {
+	httpContext, err := NewHTTPContext(HTTPOptions{})
+	require.NoError(t, err)
+
+	t.Run("no deadline keeps the default timeout", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		client := httpContext.clientInTransaction(req, &gorm.DB{})
+		assert.Equal(t, defaultRequestTimeout, client.Timeout)
+	})
+
+	t.Run("deadline beyond the default gets the long timeout", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		client := httpContext.clientInTransaction(req, &gorm.DB{})
+		assert.Equal(t, maxLongRequestTimeout, client.Timeout)
+	})
+}

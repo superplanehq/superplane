@@ -111,9 +111,13 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 	return httpCtx, nil
 }
 
-func (c *HTTPContext) clientInTransaction(tx *gorm.DB) *http.Client {
+func (c *HTTPContext) clientInTransaction(request *http.Request, tx *gorm.DB) *http.Client {
+	timeout := defaultRequestTimeout
+	if wantsLongTimeout(request) {
+		timeout = maxLongRequestTimeout
+	}
 	return &http.Client{
-		Timeout:   30 * time.Second,
+		Timeout:   timeout,
 		Transport: c.transport(tx, true),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return c.checkRedirect(req, via, tx)
@@ -189,10 +193,17 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 // an explicit deadline beyond the default timeout use the long-request client
 // (the http.Client timeout would otherwise override the caller's deadline).
 func (c *HTTPContext) clientFor(request *http.Request) *http.Client {
-	if deadline, ok := request.Context().Deadline(); ok && time.Until(deadline) > defaultRequestTimeout {
+	if wantsLongTimeout(request) {
 		return c.longClient
 	}
 	return c.client
+}
+
+// wantsLongTimeout reports whether the request's context carries an explicit
+// deadline beyond the default timeout (e.g. LLM generation calls).
+func wantsLongTimeout(request *http.Request) bool {
+	deadline, ok := request.Context().Deadline()
+	return ok && time.Until(deadline) > defaultRequestTimeout
 }
 
 func (c *HTTPContextInTransaction) Do(request *http.Request) (*http.Response, error) {
@@ -226,7 +237,7 @@ func (c *HTTPContext) InvalidatePolicyCache() {
 func (c *HTTPContext) do(request *http.Request, tx *gorm.DB) (*http.Response, error) {
 	client := c.clientFor(request)
 	if tx != nil {
-		client = c.clientInTransaction(tx)
+		client = c.clientInTransaction(request, tx)
 	}
 
 	resp, err := client.Do(request)
