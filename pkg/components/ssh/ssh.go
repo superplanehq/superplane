@@ -855,11 +855,12 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 }
 
 // buildExecutionCommand assembles the final command sent to the remote host
-// and, for file mode, returns the script body to stream as stdin.
+// and returns a stdin payload when the command should be streamed as a script.
 //
-// Inline mode keeps the long-standing behavior of stripping blank lines and
-// joining the rest with `&&` so a list of one-liners runs as a chain. The
-// remote shell receives a single string and no stdin payload.
+// Inline mode keeps one-line commands on the command line, preserving the
+// long-standing behavior for simple invocations. Multi-line inline scripts are
+// streamed to `bash -s` so shell syntax that depends on real newlines (shebangs,
+// comments, conditionals, here-docs) is not flattened into invalid `&&` chains.
 //
 // File mode pipes the (already-loaded) script body to `bash -s` over stdin.
 // This avoids embedding the whole script in the command line — argv has size
@@ -877,6 +878,11 @@ func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBod
 		return command, strings.NewReader(payload), nil
 	}
 
+	if isMultilineInlineScript(metadata.Commands) {
+		command, payload := c.buildInlineScriptCommand(metadata.WorkingDirectory, metadata.Environment, metadata.Commands)
+		return command, strings.NewReader(payload), nil
+	}
+
 	combined := buildCombinedCommands(metadata.Commands)
 	if combined == "" {
 		return "", nil, errors.New("commands is required")
@@ -889,12 +895,20 @@ func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBod
 // prepended on its own line (followed by `|| exit 1`) so a leading shebang or
 // comment in the script cannot swallow the `cd` via `#`-to-end-of-line.
 func (c *SSHCommand) buildScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
+	return c.buildScriptCommandWithShell("bash -s", workingDirectory, environment, script)
+}
+
+func (c *SSHCommand) buildInlineScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
+	return c.buildScriptCommandWithShell("bash -e -s", workingDirectory, environment, script)
+}
+
+func (c *SSHCommand) buildScriptCommandWithShell(shellCommand string, workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
 	payload := normalizeScriptLineEndings(script)
 	if workingDirectory != "" {
 		payload = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), payload)
 	}
 
-	command := "bash -s"
+	command := shellCommand
 	if len(environment) > 0 {
 		envAssignments := make([]string, 0, len(environment))
 		for _, variable := range environment {
@@ -971,6 +985,22 @@ func buildCombinedCommands(commands string) string {
 		return ""
 	}
 	return strings.Join(parts, " && ")
+}
+
+func isMultilineInlineScript(commands string) bool {
+	lines := strings.Split(normalizeScriptLineEndings(commands), "\n")
+	nonEmptyLines := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		nonEmptyLines++
+		if nonEmptyLines > 1 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func normalizeScriptLineEndings(script string) string {
