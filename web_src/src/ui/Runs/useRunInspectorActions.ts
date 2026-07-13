@@ -3,8 +3,8 @@ import { useCallback, useMemo } from "react";
 import {
   canvasesCancelExecution,
   canvasesDeleteNodeQueueItem,
+  canvasesDescribeRun,
   canvasesInvokeNodeExecutionHook,
-  canvasesListNodeQueueItems,
   canvasesReemitTriggerEvent,
   type CanvasesCanvasRun,
 } from "@/api-client";
@@ -38,7 +38,10 @@ export function useRunInspectorActions({
     () => sections.some((section) => !section.isTrigger && section.execution),
     [sections],
   );
-  const stoppableNodeIds = useMemo(() => [...new Set(sections.map((section) => section.nodeId))], [sections]);
+  const queuedItems = useMemo(
+    () => run.queueItems?.filter(hasQueueItemIdentity).map(toQueuedItemReference) ?? [],
+    [run.queueItems],
+  );
 
   const refreshRunQueries = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["canvases"] });
@@ -47,13 +50,14 @@ export function useRunInspectorActions({
   const rerunMutation = useRerunMutation({ canvasId, run, refreshRunQueries, onRerunCreated });
   const stopMutation = useStopMutation({
     canvasId,
+    runId: run.id ?? null,
     runningExecutionIds,
-    stoppableNodeIds,
-    rootEventId: run.rootEvent?.id,
+    queuedItems,
     refreshRunQueries,
   });
   const stopNodeMutation = useStopNodeMutation({ canvasId, refreshRunQueries });
   const executionHookMutation = useExecutionHookMutation({ canvasId, refreshRunQueries });
+  const cancelQueuedItemMutation = useCancelQueuedItemMutation({ canvasId, refreshRunQueries });
 
   return {
     rerun: () => rerunMutation.mutate(),
@@ -63,12 +67,17 @@ export function useRunInspectorActions({
     stopDisabled:
       executionsLoading ||
       stopMutation.isPending ||
-      (runningExecutionIds.length === 0 && (!run.rootEvent?.id || !hasLoadedActionSection)),
+      (runningExecutionIds.length === 0 && queuedItems.length === 0 && (!run.rootEvent?.id || !hasLoadedActionSection)),
     stopNode: (section: RunInspectorNodeSection) => {
       if (!section.execution?.id) return;
       stopNodeMutation.mutate(section.execution.id);
     },
     stopNodePending: stopNodeMutation.isPending,
+    cancelQueuedItem: (section: RunInspectorNodeSection) => {
+      if (!section.queueItem?.nodeId || !section.queueItem.id) return;
+      cancelQueuedItemMutation.mutate({ nodeId: section.queueItem.nodeId, itemId: section.queueItem.id });
+    },
+    cancelQueuedItemPending: cancelQueuedItemMutation.isPending,
     invokeNodeHook: (
       section: RunInspectorNodeSection,
       hookName: string,
@@ -126,32 +135,29 @@ function useRerunMutation({
 
 function useStopMutation({
   canvasId,
+  runId,
   runningExecutionIds,
-  stoppableNodeIds,
-  rootEventId,
+  queuedItems,
   refreshRunQueries,
 }: {
   canvasId: string;
+  runId: string | null;
   runningExecutionIds: string[];
-  stoppableNodeIds: string[];
-  rootEventId?: string;
+  queuedItems: QueuedItemReference[];
   refreshRunQueries: () => Promise<void>;
 }) {
   return useMutation({
     mutationFn: async () => {
-      const queuedItems = await listQueuedItemsForRun({
-        canvasId,
-        nodeIds: stoppableNodeIds,
-        rootEventId,
-      });
+      const freshQueuedItems = await fetchQueuedItemsForRun(canvasId, runId);
+      const queuedItemsToCancel = mergeQueuedItemReferences(queuedItems, freshQueuedItems);
 
-      if (runningExecutionIds.length === 0 && queuedItems.length === 0) {
+      if (runningExecutionIds.length === 0 && queuedItemsToCancel.length === 0) {
         throw new Error("No running or queued steps to stop");
       }
 
       await Promise.all([
         ...runningExecutionIds.map((executionId) => cancelExecution(canvasId, executionId)),
-        ...queuedItems.map((item) => deleteQueuedItem(canvasId, item.nodeId, item.itemId)),
+        ...queuedItemsToCancel.map((item) => deleteQueuedItem(canvasId, item.nodeId, item.itemId)),
       ]);
     },
     onSuccess: async () => {
@@ -161,6 +167,26 @@ function useStopMutation({
     onError: (error) => {
       console.error("Failed to stop run", error);
       showErrorToast("Failed to stop run");
+    },
+  });
+}
+
+function useCancelQueuedItemMutation({
+  canvasId,
+  refreshRunQueries,
+}: {
+  canvasId: string;
+  refreshRunQueries: () => Promise<void>;
+}) {
+  return useMutation({
+    mutationFn: (queueItem: QueuedItemReference) => deleteQueuedItem(canvasId, queueItem.nodeId, queueItem.itemId),
+    onSuccess: async () => {
+      await refreshRunQueries();
+      showSuccessToast("Queued step cancelled");
+    },
+    onError: (error) => {
+      console.error("Failed to cancel queued step", error);
+      showErrorToast("Failed to cancel queued step");
     },
   });
 }
@@ -242,6 +268,31 @@ async function deleteQueuedItem(canvasId: string, nodeId: string, itemId: string
   );
 }
 
+async function fetchQueuedItemsForRun(canvasId: string, runId: string | null): Promise<QueuedItemReference[]> {
+  if (!runId) {
+    return [];
+  }
+
+  const response = await canvasesDescribeRun(
+    withOrganizationHeader({
+      path: { canvasId, runId },
+    }),
+  );
+  return response.data?.run?.queueItems?.filter(hasQueueItemIdentity).map(toQueuedItemReference) ?? [];
+}
+
+function mergeQueuedItemReferences(
+  cachedItems: QueuedItemReference[],
+  freshItems: QueuedItemReference[],
+): QueuedItemReference[] {
+  const itemsByKey = new Map<string, QueuedItemReference>();
+  for (const item of [...cachedItems, ...freshItems]) {
+    itemsByKey.set(`${item.nodeId}:${item.itemId}`, item);
+  }
+
+  return [...itemsByKey.values()];
+}
+
 function invokeExecutionHook(canvasId: string) {
   return async ({
     executionId,
@@ -267,35 +318,22 @@ function invokeExecutionHook(canvasId: string) {
   };
 }
 
-async function listQueuedItemsForRun({
-  canvasId,
-  nodeIds,
-  rootEventId,
-}: {
-  canvasId: string;
-  nodeIds: string[];
-  rootEventId?: string;
-}) {
-  if (!rootEventId || nodeIds.length === 0) {
-    return [];
-  }
+type QueueItemWithIdentity = {
+  id: string;
+  nodeId: string;
+};
 
-  const responses = await Promise.all(
-    nodeIds.map(async (nodeId) => {
-      const response = await canvasesListNodeQueueItems(
-        withOrganizationHeader({
-          path: { canvasId, nodeId },
-          query: { limit: 100 },
-        }),
-      );
+type QueuedItemReference = {
+  nodeId: string;
+  itemId: string;
+};
 
-      return (
-        response.data?.items
-          ?.filter((item) => item.id && item.rootEvent?.id === rootEventId)
-          .map((item) => ({ nodeId, itemId: item.id! })) ?? []
-      );
-    }),
-  );
+function hasQueueItemIdentity(
+  queueItem: NonNullable<CanvasesCanvasRun["queueItems"]>[number],
+): queueItem is QueueItemWithIdentity {
+  return Boolean(queueItem.id && queueItem.nodeId);
+}
 
-  return responses.flat();
+function toQueuedItemReference(queueItem: QueueItemWithIdentity): QueuedItemReference {
+  return { nodeId: queueItem.nodeId, itemId: queueItem.id };
 }
