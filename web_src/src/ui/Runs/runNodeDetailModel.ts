@@ -2,6 +2,7 @@ import type {
   ActionsAction,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
+  CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
   ComponentsEdge,
   ConfigurationField,
@@ -118,12 +119,15 @@ export type RunInspectorUpstreamSection = {
 };
 
 export type RunInspectorNodeSection = {
+  sectionValue: string;
   nodeId: string;
   nodeName: string;
   workflowNode?: ComponentsNode;
   execution?: CanvasesCanvasNodeExecution;
   executionRef?: CanvasesCanvasNodeExecutionRef;
+  queueItem?: CanvasesCanvasNodeQueueItem;
   isTrigger: boolean;
+  isQueued: boolean;
   createdAt?: string;
   durationMs?: number;
   badge: { badgeColor: string; label: string } | null;
@@ -185,6 +189,11 @@ export function eventBadgeForExecutionRef(
   });
 }
 
+export function eventBadgeForQueuedItem(): { badgeColor: string; label: string } {
+  const style = DEFAULT_EVENT_STATE_MAP.queued;
+  return { badgeColor: style.badgeColor, label: style.label ?? "queued" };
+}
+
 export function buildExecutionChain(
   executions: CanvasesCanvasNodeExecution[],
   triggerNodeId?: string | null,
@@ -241,7 +250,7 @@ export function buildRunInspectorNodeSections({
   const componentDefinitionsByName = buildComponentDefinitionsByName(componentDefinitions);
   const triggerDefinitionsByName = buildTriggerDefinitionsByName(triggerDefinitions);
 
-  return executionChain.map((nodeId, index) => {
+  const executionSections = executionChain.map((nodeId, index) => {
     const workflowNode = workflowNodes.find((node) => node.id === nodeId);
     const execution = executions.find((item) => item.nodeId === nodeId);
     const executionRef = run.executions?.find((item) => item.nodeId === nodeId) ?? execution;
@@ -266,12 +275,14 @@ export function buildRunInspectorNodeSections({
         });
 
     return {
+      sectionValue: nodeId,
       nodeId,
       nodeName: workflowNode?.name || nodeId,
       workflowNode,
       execution,
       executionRef,
       isTrigger,
+      isQueued: false,
       createdAt: isTrigger ? run.rootEvent?.createdAt : (execution?.createdAt ?? executionRef?.createdAt),
       durationMs: execution
         ? calculateExecutionDuration(execution)
@@ -312,6 +323,8 @@ export function buildRunInspectorNodeSections({
       }),
     };
   });
+
+  return [...executionSections, ...buildQueuedNodeSections({ run, workflowNodes })];
 }
 
 export function findRunInspectorErrorSummaries(sections: RunInspectorNodeSection[]): RunInspectorErrorSummary[] {
@@ -344,6 +357,63 @@ function calculateDuration(start?: string, end?: string): number | null {
   if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt) || endedAt < startedAt) return null;
 
   return endedAt - startedAt;
+}
+
+function buildQueuedNodeSections({
+  run,
+  workflowNodes,
+}: {
+  run: CanvasesCanvasRun;
+  workflowNodes: ComponentsNode[];
+}): RunInspectorNodeSection[] {
+  return [...(run.queueItems ?? [])]
+    .filter((queueItem) => queueItem.id && queueItem.nodeId)
+    .sort(compareQueueItemCreatedAt)
+    .map((queueItem) => {
+      const nodeId = queueItem.nodeId!;
+      const workflowNode = workflowNodes.find((node) => node.id === nodeId);
+
+      return {
+        sectionValue: queuedSectionValue(queueItem),
+        nodeId,
+        nodeName: workflowNode?.name || nodeId,
+        workflowNode,
+        queueItem,
+        isTrigger: false,
+        isQueued: true,
+        createdAt: queueItem.createdAt,
+        badge: eventBadgeForQueuedItem(),
+        tabData: null,
+        upstreamSections: [
+          {
+            nodeId: queueItem.rootEvent?.nodeId || run.rootEvent?.nodeId || "input",
+            nodeName: "Queued input",
+            badge: eventBadgeForQueuedItem(),
+            output: queueItem.input ?? {},
+          },
+        ],
+        outputSections: [],
+        actions: {
+          canStop: false,
+          canPushThrough: false,
+          approvalRecords: [],
+        },
+        configurationFields: [],
+      };
+    });
+}
+
+function queuedSectionValue(queueItem: CanvasesCanvasNodeQueueItem): string {
+  return `queue:${queueItem.nodeId}:${queueItem.id}`;
+}
+
+function compareQueueItemCreatedAt(left: CanvasesCanvasNodeQueueItem, right: CanvasesCanvasNodeQueueItem): number {
+  return queueItemCreatedAt(left) - queueItemCreatedAt(right);
+}
+
+function queueItemCreatedAt(queueItem: CanvasesCanvasNodeQueueItem): number {
+  const timestamp = queueItem.createdAt ? new Date(queueItem.createdAt).getTime() : Number.POSITIVE_INFINITY;
+  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
 }
 
 function buildUpstreamSections({
