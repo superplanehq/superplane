@@ -1,8 +1,10 @@
 package discord
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"mime"
 	"net/url"
 	"path"
 	"strconv"
@@ -65,7 +67,7 @@ func (c *SendTextMessage) Documentation() string {
 - **Embed Description**: Optional description for a rich embed
 - **Embed Color**: Hex color code for the embed (e.g., #5865F2)
 - **Embed URL**: Optional URL to link from the embed title
-- **Files**: Optional URLs of files to attach. Each file is downloaded and uploaded to Discord as an attachment — for example, an artifact link produced by Cursor's Download Artifact component.
+- **Files**: Optional files to attach. Each entry is either a public http(s) URL (downloaded and uploaded to Discord) or a ` + "`data:`" + ` URI carrying the content inline — e.g. an AI component artifact: ` + "`data:image/png;base64,{{ $['Text Prompt'].data.artifacts[0].content }}`" + `.
 
 ## Output
 
@@ -297,13 +299,64 @@ func validateFiles(files []string) error {
 		if file == "" || isExpressionValue(file) {
 			continue
 		}
+		if strings.HasPrefix(file, "data:") {
+			if _, _, err := parseDataURI(file); err != nil {
+				return fmt.Errorf("invalid data URI: %v", err)
+			}
+			continue
+		}
 		parsed, err := url.Parse(file)
 		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-			return fmt.Errorf("invalid file URL %q: must be an http(s) URL", file)
+			return fmt.Errorf("invalid file URL %q: must be an http(s) URL or a data: URI", file)
 		}
 	}
 
 	return nil
+}
+
+// parseDataURI decodes a data: URI (data:[<mediatype>][;base64],<data>) into
+// its media type and content bytes. It lets inline payload data — like the
+// artifacts AI components emit — be attached without a publicly fetchable URL.
+func parseDataURI(uri string) (string, []byte, error) {
+	rest, ok := strings.CutPrefix(uri, "data:")
+	if !ok {
+		return "", nil, fmt.Errorf("missing data: prefix")
+	}
+	meta, data, ok := strings.Cut(rest, ",")
+	if !ok {
+		return "", nil, fmt.Errorf("missing comma separator")
+	}
+
+	mediaType := meta
+	isBase64 := false
+	if encoded, found := strings.CutSuffix(meta, ";base64"); found {
+		mediaType = encoded
+		isBase64 = true
+	}
+
+	if isBase64 {
+		content, err := base64.StdEncoding.DecodeString(data)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid base64 content: %v", err)
+		}
+		return mediaType, content, nil
+	}
+
+	content, err := url.PathUnescape(data)
+	if err != nil {
+		return "", nil, fmt.Errorf("invalid percent-encoded content: %v", err)
+	}
+	return mediaType, []byte(content), nil
+}
+
+// dataURIFileName derives an attachment filename from a data URI's media type
+// (e.g. image/png -> file-1.png).
+func dataURIFileName(mediaType string, index int) string {
+	name := fmt.Sprintf("file-%d", index+1)
+	if exts, err := mime.ExtensionsByType(mediaType); err == nil && len(exts) > 0 {
+		return name + exts[0]
+	}
+	return name
 }
 
 // hasAttachableFile reports whether the list has at least one non-empty entry.
@@ -340,6 +393,14 @@ func sendMessage(client *Client, httpCtx core.HTTPContext, config SendTextMessag
 	files := make([]MessageFile, 0, len(config.Files))
 	for i, fileURL := range config.Files {
 		if fileURL == "" {
+			continue
+		}
+		if strings.HasPrefix(fileURL, "data:") {
+			mediaType, content, err := parseDataURI(fileURL)
+			if err != nil {
+				return nil, fmt.Errorf("invalid data URI in files[%d]: %v", i, err)
+			}
+			files = append(files, MessageFile{Name: dataURIFileName(mediaType, i), Content: content})
 			continue
 		}
 		content, err := client.FetchFile(httpCtx, fileURL)

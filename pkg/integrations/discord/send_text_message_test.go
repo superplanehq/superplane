@@ -429,3 +429,32 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "channel is required")
 	})
 }
+
+func Test__SendTextMessage__DataURIFiles(t *testing.T) {
+	t.Run("validateFiles accepts data URIs", func(t *testing.T) {
+		require.NoError(t, validateFiles([]string{"data:text/csv;base64,YSxiCjEsMgo="}))
+		require.NoError(t, validateFiles([]string{"data:text/plain,hello%20world"}))
+	})
+
+	t.Run("validateFiles rejects malformed data URIs", func(t *testing.T) {
+		require.ErrorContains(t, validateFiles([]string{"data:text/csv;base64"}), "invalid data URI")
+		require.ErrorContains(t, validateFiles([]string{"data:text/csv;base64,%%%"}), "invalid data URI")
+	})
+
+	t.Run("parseDataURI decodes base64 and plain content", func(t *testing.T) {
+		mediaType, content, err := parseDataURI("data:image/png;base64,aGVsbG8=")
+		require.NoError(t, err)
+		require.Equal(t, "image/png", mediaType)
+		require.Equal(t, []byte("hello"), content)
+
+		mediaType, content, err = parseDataURI("data:text/plain,hello%20world")
+		require.NoError(t, err)
+		require.Equal(t, "text/plain", mediaType)
+		require.Equal(t, []byte("hello world"), content)
+	})
+
+	t.Run("dataURIFileName derives extension from media type", func(t *testing.T) {
+		require.Equal(t, "file-1.png", dataURIFileName("image/png", 0))
+		require.Equal(t, "file-2", dataURIFileName("", 1))
+	})
+}
