@@ -31,6 +31,14 @@ Create an [Admin API key](https://platform.openai.com/settings/organization/admi
 - Only **Organization Owners** can create admin keys.
 - Admin keys can read organization usage and costs but cannot call model endpoints.
 
+## Restricted API keys
+
+Unrestricted project keys work by default. If you use a restricted key, grant it:
+
+- **Model capabilities** → **Request** — required for Text Prompt.
+- **Responses API** → **Write** — required for Text Prompt.
+- **Files** → **Write** — required when you attach files to Text Prompt.
+
 > **Note:** Both keys are shown only once — store them somewhere safe before continuing.
 
 <a id="get-usage-data"></a>
@@ -127,6 +135,7 @@ The Text Prompt component generates text responses using OpenAI's language model
 - **Model**: Select the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)
 - **Prompt**: The text prompt to send to the model (supports expressions)
 - **Files**: (Optional) Attach files from the Files tab (images, PDFs, or text). They are uploaded to the OpenAI Files API and sent alongside the prompt.
+- **Code Interpreter**: (Optional) Let the model write and run Python in a sandboxed container. Files it creates are emitted as artifacts.
 - **Structured Output**: (Optional) Provide a JSON Schema for the response and the model returns JSON matching it, available on the parsed output. The schema is validated before the request and sent in OpenAI strict mode; strict mode marks every property required, so express optional fields by making their type nullable.
 
 ### Output
@@ -137,6 +146,7 @@ Returns the generated response including:
 - **usage**: Token usage information (prompt tokens, completion tokens, total tokens)
 - **id**: Response ID for tracking
 - **parsed**: When Structured Output is configured, the response parsed into an object.
+- **artifacts**: When Code Interpreter is enabled, the files the model generated, with the file content included: text files as plain text (`encoding: "text"`), everything else base64-encoded (`encoding: "base64"`). Each artifact carries fileId, containerId, filename, bytes, and a downloadUrl; files over 10MB include metadata and the download URL only (note that containers expire about 20 minutes after their last activity).
 
 ### Notes
 
@@ -150,6 +160,17 @@ Returns the generated response including:
 ```json
 {
   "data": {
+    "artifacts": [
+      {
+        "bytes": 34567,
+        "containerId": "cntr_682e0e7318108198aa783fd921ff305e",
+        "content": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+        "downloadUrl": "https://api.openai.com/v1/containers/cntr_682e0e7318108198aa783fd921ff305e/files/cfile_682e0e8a43c88191a7978f477a09bdf5/content",
+        "encoding": "base64",
+        "fileId": "cfile_682e0e8a43c88191a7978f477a09bdf5",
+        "filename": "plot.png"
+      }
+    ],
     "id": "cmpl-1234567890",
     "model": "gpt-5.2",
     "parsed": {

@@ -429,3 +429,58 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "channel is required")
 	})
 }
+
+func Test__SendTextMessage__DataURIFiles(t *testing.T) {
+	t.Run("validateFiles accepts data URIs", func(t *testing.T) {
+		require.NoError(t, validateFiles([]string{"data:text/csv;base64,YSxiCjEsMgo="}))
+		require.NoError(t, validateFiles([]string{"data:text/plain,hello%20world"}))
+	})
+
+	t.Run("validateFiles rejects malformed data URIs", func(t *testing.T) {
+		require.ErrorContains(t, validateFiles([]string{"data:text/csv;base64"}), "invalid data URI")
+		require.ErrorContains(t, validateFiles([]string{"data:text/csv;base64,%%%"}), "invalid data URI")
+	})
+
+	t.Run("parseDataURI keeps undecodable plain data as-is", func(t *testing.T) {
+		mediaType, content, err := parseDataURI("data:text/csv,discount\n50% off")
+		require.NoError(t, err)
+		require.Equal(t, "text/csv", mediaType)
+		require.Equal(t, []byte("discount\n50% off"), content)
+	})
+
+	t.Run("parseDataURI decodes base64 and plain content", func(t *testing.T) {
+		mediaType, content, err := parseDataURI("data:image/png;base64,aGVsbG8=")
+		require.NoError(t, err)
+		require.Equal(t, "image/png", mediaType)
+		require.Equal(t, []byte("hello"), content)
+
+		mediaType, content, err = parseDataURI("data:text/plain,hello%20world")
+		require.NoError(t, err)
+		require.Equal(t, "text/plain", mediaType)
+		require.Equal(t, []byte("hello world"), content)
+	})
+
+	t.Run("dataURIFileName derives extension from media type", func(t *testing.T) {
+		require.Equal(t, "file-1.png", dataURIFileName("image/png", 0))
+		require.Equal(t, "file-2", dataURIFileName("", 1))
+	})
+}
+
+func Test__SendTextMessage__SchemelessFileEntry(t *testing.T) {
+	t.Run("raw content without a scheme fails with guidance", func(t *testing.T) {
+		client := &Client{BotToken: "t"}
+		_, err := sendMessage(client, &contexts.HTTPContext{}, SendTextMessageConfiguration{
+			Channel: "chan",
+			Content: "hi",
+			Files:   []string{" iVBORw0KGgoAAAANSUhEUg== "},
+		}, CreateMessageRequest{Content: "hi"})
+		require.ErrorContains(t, err, "neither an http(s) URL nor a data: URI")
+	})
+
+	t.Run("data URI with whitespace-padded base64 decodes", func(t *testing.T) {
+		mediaType, content, err := parseDataURI("data:image/png;base64, aGVsbG8= ")
+		require.NoError(t, err)
+		require.Equal(t, "image/png", mediaType)
+		require.Equal(t, []byte("hello"), content)
+	})
+}
