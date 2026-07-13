@@ -26,6 +26,9 @@ type Client struct {
 	APIKey  string
 	BaseURL string
 	http    core.HTTPContext
+	// sawSessionOutputs records whether an events page mentioned the session
+	// outputs directory; set while paging in GetSessionMessages.
+	sawSessionOutputs bool
 }
 
 type claudeErrorResponse struct {
@@ -235,14 +238,28 @@ func (c *Client) listManagedSessionEventsPage(sessionID, page string) ([]Managed
 	if err := json.Unmarshal(responseBody, &out); err != nil {
 		return nil, "", fmt.Errorf("failed to unmarshal session events: %w", err)
 	}
+
+	// The raw page is scanned for the session outputs directory: tool inputs
+	// (and messages) mention it whenever the agent wrote deliverables, and our
+	// event structs only decode text blocks.
+	if strings.Contains(string(responseBody), sessionOutputsDir) {
+		c.sawSessionOutputs = true
+	}
 	return out.Data, out.NextPage, nil
 }
+
+// sessionOutputsDir is where agents must save deliverables for them to be
+// captured by the Files API.
+const sessionOutputsDir = "/mnt/session/outputs"
 
 // SessionMessages holds all agent messages and completion status from a session's events.
 type SessionMessages struct {
 	Messages    []string // all agent.message texts in chronological order
 	LastMessage string   // the final agent.message text
 	Complete    bool     // true if session.status_idle or session.status_terminated is in the events
+	// ExpectsArtifacts is true when the session events mention the outputs
+	// directory, i.e. the agent (very likely) wrote deliverables.
+	ExpectsArtifacts bool
 }
 
 func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) {
@@ -251,6 +268,7 @@ func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) 
 	var allEvents []ManagedSessionEvent
 
 	// Fetch all events (desc order from API)
+	c.sawSessionOutputs = false
 	for {
 		events, nextPage, err := c.listManagedSessionEventsPage(sessionID, page)
 		if err != nil {
@@ -262,6 +280,7 @@ func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) 
 		}
 		page = nextPage
 	}
+	result.ExpectsArtifacts = c.sawSessionOutputs
 
 	// Check for terminal event (events are in desc order, so status_idle is first)
 	for _, e := range allEvents {

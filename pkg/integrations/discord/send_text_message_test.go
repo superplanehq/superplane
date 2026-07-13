@@ -545,3 +545,13 @@ func Test__SendTextMessage__StructuredFileEntries(t *testing.T) {
 		}}))
 	})
 }
+
+func Test__SendTextMessage__InlineFileSizeLimit(t *testing.T) {
+	client := &Client{BotToken: "t"}
+	oversized := strings.Repeat("a", maxMessageFileSize+1)
+	_, err := sendMessage(client, &contexts.HTTPContext{}, SendTextMessageConfiguration{
+		Channel: "chan",
+		Files:   []FileAttachment{{Source: "content", Content: oversized, Filename: "big.txt"}},
+	}, CreateMessageRequest{})
+	require.ErrorContains(t, err, "per-file limit")
+}

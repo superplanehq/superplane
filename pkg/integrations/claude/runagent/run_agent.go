@@ -315,7 +315,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v. Scheduling poll.", session.ID, err)
 		} else if sm != nil && sm.Complete {
 			out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
-			out.Artifacts = CollectSessionArtifacts(client, session.ID, ctx.Logger.Warnf)
+			out.Artifacts = CollectSessionArtifacts(client, session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 				cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 				return emitErr

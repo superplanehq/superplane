@@ -71,6 +71,8 @@ message DateTimeTypeOptions {
 
 message SelectTypeOptions {
   repeated SelectOption options = 1;
+  // When true, the field also accepts an expression instead of a fixed option.
+  bool allow_expressions = 2;
 }
 
 message MultiSelectTypeOptions {

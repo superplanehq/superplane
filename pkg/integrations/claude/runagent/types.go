@@ -18,8 +18,10 @@ const (
 	finalMessageReads       = 15
 	finalMessageDelay       = 2 * time.Second
 	// Session outputs can take a few seconds to be indexed by the Files API
-	// after the session goes idle, so an empty listing is retried once.
-	sessionFileListReads = 2
+	// after the session goes idle (~1-3s documented), so when the session is
+	// expected to have written outputs, a listing without them is retried
+	// with a budget beyond that lag.
+	sessionFileListReads = 3
 	sessionFileListDelay = 2 * time.Second
 	// maxInlineArtifactSizeBytes caps how large a generated file can be for
 	// its content to be embedded in the output payload. Larger files keep
@@ -91,9 +93,15 @@ type SessionArtifact struct {
 // session and resolves them into artifacts carrying the file content.
 // Collection is best-effort: a listing or download failure is logged and
 // degrades the artifact (or drops the list) rather than failing a run whose
-// real output is already available.
-func CollectSessionArtifacts(client *Client, sessionID string, logWarn func(string, ...any)) []SessionArtifact {
-	files, err := client.ListSessionFilesWithRetry(sessionID, sessionFileListReads, sessionFileListDelay)
+// real output is already available. The listing is only retried (to cover
+// the Files API indexing lag) when the session events indicate the agent
+// wrote outputs, so artifact-less runs finish without extra delay.
+func CollectSessionArtifacts(client *Client, sessionID string, expectsArtifacts bool, logWarn func(string, ...any)) []SessionArtifact {
+	attempts := 1
+	if expectsArtifacts {
+		attempts = sessionFileListReads
+	}
+	files, err := client.ListSessionFilesWithRetry(sessionID, attempts, sessionFileListDelay)
 	if err != nil {
 		if logWarn != nil {
 			logWarn("Failed to list session files for %s: %v", sessionID, err)

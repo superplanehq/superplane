@@ -338,7 +338,7 @@ func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagen
 	}
 
 	out := buildOutput(session.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
-	out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, ctx.Logger.Warnf)
+	out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
 		ctx.Logger.Warnf("Failed to emit result for session %s: %v; scheduling poll.", meta.Session.ID, err)
 		return false, nil

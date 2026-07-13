@@ -376,6 +376,47 @@ func TestCollectSessionArtifacts_listingErrorYieldsNoArtifacts(t *testing.T) {
 		},
 	}
 	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
-	artifacts := CollectSessionArtifacts(client, "sess_1", nil)
+	artifacts := CollectSessionArtifacts(client, "sess_1", true, nil)
 	assert.Nil(t, artifacts)
+}
+
+func Test__SessionMessages__ExpectsArtifacts(t *testing.T) {
+	t.Run("set when events mention the outputs directory", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Saved the report to /mnt/session/outputs/report.md"}]}]}`))},
+			},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+		sm, err := client.GetSessionMessages("sess_1")
+		require.NoError(t, err)
+		assert.True(t, sm.ExpectsArtifacts)
+	})
+
+	t.Run("unset when events never mention it", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Done"}]}]}`))},
+			},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+		sm, err := client.GetSessionMessages("sess_1")
+		require.NoError(t, err)
+		assert.False(t, sm.ExpectsArtifacts)
+	})
+}
+
+func Test__CollectSessionArtifacts__retryOnlyWhenExpected(t *testing.T) {
+	t.Run("no expected artifacts lists exactly once", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[]}`))},
+			},
+		}
+		client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+		artifacts := CollectSessionArtifacts(client, "sess_1", false, nil)
+		assert.Nil(t, artifacts)
+		// A single request and no sleep: artifact-less runs finish immediately.
+		require.Len(t, httpCtx.Requests, 1)
+	})
 }

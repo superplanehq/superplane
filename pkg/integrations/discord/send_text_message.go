@@ -291,9 +291,10 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 								Type:        configuration.FieldTypeSelect,
 								Required:    false,
 								Default:     "application/octet-stream",
-								Description: "Used to name the attachment when no filename is set",
+								Description: "Used to name the attachment when no filename is set. Also accepts an expression, e.g. the artifact's mimeType.",
 								TypeOptions: &configuration.TypeOptions{
 									Select: &configuration.SelectTypeOptions{
+										AllowExpressions: true,
 										Options: []configuration.FieldOption{
 											{Label: "PNG image", Value: "image/png"},
 											{Label: "JPEG image", Value: "image/jpeg"},
@@ -662,6 +663,11 @@ func sendMessage(client *Client, httpCtx core.HTTPContext, config SendTextMessag
 		file, err := resolveFileAttachment(client, httpCtx, entry, i)
 		if err != nil {
 			return nil, err
+		}
+		// Downloads are limited while reading; inline content (data: URIs and
+		// content entries) must honor the same Discord per-file limit.
+		if int64(len(file.Content)) > maxMessageFileSize {
+			return nil, fmt.Errorf("files[%d]: %s is %d bytes, which exceeds Discord's %dMiB per-file limit", i, file.Name, len(file.Content), maxMessageFileSize/(1024*1024))
 		}
 		files = append(files, file)
 	}
