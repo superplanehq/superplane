@@ -92,21 +92,17 @@ function sanitizeMetadataItems(value: unknown): MetadataItem[] | undefined {
     return undefined;
   }
 
-  return items.map((item) => {
-    if (!isRecord(item)) {
-      return item as MetadataItem;
-    }
-
-    if (!("label" in item)) {
-      return item as MetadataItem;
+  return items.map((item): MetadataItem => {
+    if (!isRecord(item) || !("label" in item)) {
+      // Preserve unexpected shapes; MetadataList coerces labels at render time.
+      return item as unknown as MetadataItem;
     }
 
     return {
-      ...item,
       icon: typeof item.icon === "string" ? item.icon : "circle",
       label: sanitizeMetadataLabel(item.label),
     };
-  }) as MetadataItem[];
+  });
 }
 
 function sanitizeCustomField(
