@@ -518,6 +518,103 @@ func (c *Client) DeleteManagedSession(sessionID string) error {
 	return err
 }
 
+// SessionFile is a file surfaced by the Files API for a Managed Agents
+// session. Files the agent writes to /mnt/session/outputs/ are captured with
+// downloadable=true; input files mounted into the session are not downloadable.
+type SessionFile struct {
+	ID           string `json:"id"`
+	Filename     string `json:"filename"`
+	MimeType     string `json:"mime_type"`
+	SizeBytes    int64  `json:"size_bytes"`
+	CreatedAt    string `json:"created_at"`
+	Downloadable bool   `json:"downloadable"`
+}
+
+type listSessionFilesResponse struct {
+	Data    []SessionFile `json:"data"`
+	LastID  string        `json:"last_id"`
+	HasMore bool          `json:"has_more"`
+}
+
+// maxSessionFilePages caps forward pagination when listing session files so a
+// runaway has_more loop can never hang an execution.
+const maxSessionFilePages = 10
+
+// ListSessionFiles lists the files scoped to a session (GET /v1/files?scope_id=...),
+// paginating forward with after_id.
+func (c *Client) ListSessionFiles(sessionID string) ([]SessionFile, error) {
+	if sessionID == "" {
+		return nil, fmt.Errorf("session id is required")
+	}
+
+	var files []SessionFile
+	afterID := ""
+	for range maxSessionFilePages {
+		params := url.Values{}
+		params.Set("scope_id", sessionID)
+		params.Set("limit", "1000")
+		if afterID != "" {
+			params.Set("after_id", afterID)
+		}
+
+		responseBody, err := c.execRequestWithBeta(http.MethodGet, c.BaseURL+"/files?"+params.Encode(), nil, anthropicBetaManagedAgents)
+		if err != nil {
+			return nil, err
+		}
+
+		var response listSessionFilesResponse
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal session files: %w", err)
+		}
+
+		files = append(files, response.Data...)
+		if !response.HasMore || response.LastID == "" {
+			break
+		}
+		afterID = response.LastID
+	}
+	return files, nil
+}
+
+// ListSessionFilesWithRetry lists session files, retrying when the listing
+// succeeds but is still empty — outputs can take a few seconds to be indexed
+// after the session goes idle.
+func (c *Client) ListSessionFilesWithRetry(sessionID string, attempts int, delay time.Duration) ([]SessionFile, error) {
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var files []SessionFile
+	for i := 0; i < attempts; i++ {
+		var err error
+		files, err = c.ListSessionFiles(sessionID)
+		if err != nil {
+			return nil, err
+		}
+		if len(files) > 0 {
+			return files, nil
+		}
+		if i < attempts-1 {
+			time.Sleep(delay)
+		}
+	}
+	return files, nil
+}
+
+// FileContentURL returns the programmatic download link for a file. Requests
+// to it require the API key headers, including the beta header.
+func (c *Client) FileContentURL(fileID string) string {
+	return c.BaseURL + "/files/" + url.PathEscape(fileID) + "/content"
+}
+
+// DownloadFileContent fetches a file's raw content (GET /v1/files/{id}/content).
+func (c *Client) DownloadFileContent(fileID string) ([]byte, error) {
+	if fileID == "" {
+		return nil, fmt.Errorf("file id is required")
+	}
+	return c.execRequestWithBeta(http.MethodGet, c.FileContentURL(fileID), nil, anthropicBetaManagedAgents)
+}
+
 // DeleteFile removes an uploaded file (DELETE /v1/files/{id}).
 func (c *Client) DeleteFile(fileID string) error {
 	if fileID == "" {

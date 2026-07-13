@@ -56,6 +56,7 @@ type CreateResponseRequest struct {
 	Model string              `json:"model"`
 	Input any                 `json:"input"`
 	Text  *ResponseTextConfig `json:"text,omitempty"`
+	Tools []any               `json:"tools,omitempty"`
 }
 
 // InputMessage is a role + content-parts entry in the Responses API input array.
@@ -85,15 +86,27 @@ type ResponseFormat struct {
 }
 
 type ResponseContent struct {
-	Type    string `json:"type"`
-	Text    string `json:"text"`
-	Refusal string `json:"refusal,omitempty"`
+	Type        string               `json:"type"`
+	Text        string               `json:"text"`
+	Refusal     string               `json:"refusal,omitempty"`
+	Annotations []ResponseAnnotation `json:"annotations,omitempty"`
+}
+
+// ResponseAnnotation is an annotation on output text. Code interpreter file
+// outputs arrive as "container_file_citation" annotations.
+type ResponseAnnotation struct {
+	Type        string `json:"type"`
+	ContainerID string `json:"container_id,omitempty"`
+	FileID      string `json:"file_id,omitempty"`
+	Filename    string `json:"filename,omitempty"`
 }
 
 type ResponseOutput struct {
-	Type    string            `json:"type"`
-	Role    string            `json:"role"`
-	Content []ResponseContent `json:"content"`
+	Type        string            `json:"type"`
+	ID          string            `json:"id,omitempty"`
+	Role        string            `json:"role"`
+	Content     []ResponseContent `json:"content"`
+	ContainerID string            `json:"container_id,omitempty"`
 }
 
 type ResponseUsage struct {
@@ -301,6 +314,60 @@ func (c *Client) DeleteFile(fileID string) error {
 	}
 	_, err := c.execRequest(http.MethodDelete, c.BaseURL+"/files/"+url.PathEscape(fileID), nil)
 	return err
+}
+
+// ContainerFile is a file inside a code interpreter container. Source is
+// "assistant" for model-generated files and "user" for uploaded ones.
+type ContainerFile struct {
+	ID          string `json:"id"`
+	Object      string `json:"object"`
+	ContainerID string `json:"container_id"`
+	CreatedAt   int64  `json:"created_at"`
+	Bytes       int64  `json:"bytes"`
+	Path        string `json:"path"`
+	Source      string `json:"source"`
+}
+
+type ContainerFilesResponse struct {
+	Data []ContainerFile `json:"data"`
+}
+
+func (c *Client) ListContainerFiles(containerID string) ([]ContainerFile, error) {
+	responseBody, err := c.execRequest(http.MethodGet, c.BaseURL+"/containers/"+url.PathEscape(containerID)+"/files?limit=100", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ContainerFilesResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container files response: %v", err)
+	}
+
+	return response.Data, nil
+}
+
+func (c *Client) GetContainerFile(containerID, fileID string) (*ContainerFile, error) {
+	responseBody, err := c.execRequest(http.MethodGet, c.BaseURL+"/containers/"+url.PathEscape(containerID)+"/files/"+url.PathEscape(fileID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var file ContainerFile
+	if err := json.Unmarshal(responseBody, &file); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal container file response: %v", err)
+	}
+
+	return &file, nil
+}
+
+// DownloadContainerFileContent fetches the raw bytes of a container file.
+func (c *Client) DownloadContainerFileContent(containerID, fileID string) ([]byte, error) {
+	return c.execRequest(http.MethodGet, c.ContainerFileContentURL(containerID, fileID), nil)
+}
+
+// ContainerFileContentURL returns the API download URL for a container file.
+func (c *Client) ContainerFileContentURL(containerID, fileID string) string {
+	return c.BaseURL + "/containers/" + url.PathEscape(containerID) + "/files/" + url.PathEscape(fileID) + "/content"
 }
 
 func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error) {

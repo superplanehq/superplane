@@ -260,3 +260,132 @@ func Test__CreateResponse__NodeMetadata(t *testing.T) {
 		t.Error("expected structuredOutput false (no schema)")
 	}
 }
+
+func Test__CreateResponse__Execute__codeInterpreter(t *testing.T) {
+	c := &CreateResponse{}
+
+	run := func(t *testing.T, config map[string]any, responses []string) (ResponsePayload, *contexts.HTTPContext) {
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		httpResponses := make([]*http.Response, 0, len(responses))
+		for _, body := range responses {
+			httpResponses = append(httpResponses, &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewBufferString(body))})
+		}
+		httpCtx := &contexts.HTTPContext{Responses: httpResponses}
+		ctx := core.ExecutionContext{
+			Configuration:  config,
+			ExecutionState: execState,
+			HTTP:           httpCtx,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "sk-test"}},
+		}
+		if err := c.Execute(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		payload := execState.Payloads[0].(map[string]any)["data"].(ResponsePayload)
+		return payload, httpCtx
+	}
+
+	t.Run("enabled adds tool and extracts annotation artifacts with content", func(t *testing.T) {
+		payload, httpCtx := run(t,
+			map[string]any{"model": "gpt-5.2", "input": "plot it", "codeInterpreter": true},
+			[]string{
+				`{
+					"id": "resp_1",
+					"model": "gpt-5.2",
+					"output": [
+						{"type": "code_interpreter_call", "id": "ci_1", "container_id": "cntr_1"},
+						{"type": "message", "role": "assistant", "content": [
+							{"type": "output_text", "text": "Here is the chart", "annotations": [
+								{"type": "container_file_citation", "container_id": "cntr_1", "file_id": "cfile_1", "filename": "plot.png", "start_index": 0, "end_index": 0}
+							]}
+						]}
+					],
+					"usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
+				}`,
+				`{"id": "cfile_1", "object": "container.file", "container_id": "cntr_1", "path": "/mnt/data/plot.png", "bytes": 8, "source": "assistant"}`,
+				"\x89PNG\r\n\x1a\n",
+			},
+		)
+
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		if !bytes.Contains(body, []byte(`"code_interpreter"`)) || !bytes.Contains(body, []byte(`"auto"`)) {
+			t.Fatalf("expected code_interpreter auto tool in request body, got %s", string(body))
+		}
+
+		if len(payload.Artifacts) != 1 {
+			t.Fatalf("expected 1 artifact, got %d", len(payload.Artifacts))
+		}
+		artifact := payload.Artifacts[0]
+		if artifact.FileID != "cfile_1" || artifact.ContainerID != "cntr_1" || artifact.Filename != "plot.png" {
+			t.Errorf("unexpected artifact: %+v", artifact)
+		}
+		if artifact.DownloadURL != "https://api.openai.com/v1/containers/cntr_1/files/cfile_1/content" {
+			t.Errorf("unexpected download URL: %s", artifact.DownloadURL)
+		}
+		if artifact.Bytes != 8 || artifact.Encoding != "base64" || artifact.Content == "" {
+			t.Errorf("expected inlined base64 content, got %+v", artifact)
+		}
+	})
+
+	t.Run("falls back to listing container files when annotations are missing", func(t *testing.T) {
+		payload, httpCtx := run(t,
+			map[string]any{"model": "gpt-5.2", "input": "plot it", "codeInterpreter": true},
+			[]string{
+				`{
+					"id": "resp_1",
+					"model": "gpt-5.2",
+					"output": [
+						{"type": "code_interpreter_call", "id": "ci_1", "container_id": "cntr_1"},
+						{"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "done"}]}
+					],
+					"usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
+				}`,
+				`{"object": "list", "data": [
+					{"id": "cfile_gen", "object": "container.file", "container_id": "cntr_1", "path": "/mnt/data/report.csv", "bytes": 10, "source": "assistant"},
+					{"id": "cfile_in", "object": "container.file", "container_id": "cntr_1", "path": "/mnt/data/input.csv", "bytes": 5, "source": "user"}
+				]}`,
+				"a,b\n1,2\n",
+			},
+		)
+
+		// Only the assistant-generated file becomes an artifact, with content.
+		if len(payload.Artifacts) != 1 {
+			t.Fatalf("expected 1 artifact, got %d", len(payload.Artifacts))
+		}
+		artifact := payload.Artifacts[0]
+		if artifact.FileID != "cfile_gen" || artifact.Filename != "report.csv" {
+			t.Errorf("unexpected artifact: %+v", artifact)
+		}
+		if artifact.Encoding != "text" || artifact.Content != "a,b\n1,2\n" {
+			t.Errorf("expected inlined text content, got %+v", artifact)
+		}
+		if len(httpCtx.Requests) != 3 {
+			t.Fatalf("expected fallback listing and content download, got %d requests", len(httpCtx.Requests))
+		}
+		if !strings.Contains(httpCtx.Requests[1].URL.Path, "/containers/cntr_1/files") {
+			t.Errorf("unexpected fallback request: %s", httpCtx.Requests[1].URL.String())
+		}
+	})
+
+	t.Run("disabled sends no tools and skips fallback", func(t *testing.T) {
+		payload, httpCtx := run(t,
+			map[string]any{"model": "gpt-5.2", "input": "hi"},
+			[]string{`{
+				"id": "resp_1",
+				"model": "gpt-5.2",
+				"output_text": "hello",
+				"output": [{"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "hello"}]}],
+				"usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
+			}`},
+		)
+		body, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		if bytes.Contains(body, []byte(`"tools"`)) {
+			t.Errorf("expected no tools in request body, got %s", string(body))
+		}
+		if payload.Artifacts != nil {
+			t.Errorf("expected no artifacts, got %+v", payload.Artifacts)
+		}
+		if len(httpCtx.Requests) != 1 {
+			t.Errorf("expected no fallback request, got %d requests", len(httpCtx.Requests))
+		}
+	})
+}
