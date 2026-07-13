@@ -86,6 +86,7 @@ func InvokeNodeTriggerHook(
 			"parameters": expressionParameters,
 		}).
 		WithConfigurationFields(hookProvider.Configuration()).
+		WithSecretResolver(contexts.NewRuntimeSecretResolver(tx, encryptor, models.DomainTypeOrganization, orgID)).
 		Build(contexts.WithoutRunTitleConfiguration(node.Configuration.Data()))
 	if err != nil {
 		return nil, grpcerrors.InvalidArgument(err, "failed to resolve trigger configuration")
