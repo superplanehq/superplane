@@ -6,6 +6,7 @@ import {
   canvasesInvokeNodeExecutionHook,
   canvasesListNodeQueueItems,
   canvasesReemitTriggerEvent,
+  type CanvasesCanvasNodeQueueItem,
   type CanvasesCanvasRun,
 } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -16,12 +17,14 @@ export function useRunInspectorActions({
   canvasId,
   run,
   sections,
+  queueNodeIds,
   executionsLoading,
   onRerunCreated,
 }: {
   canvasId: string;
   run: CanvasesCanvasRun;
   sections: RunInspectorNodeSection[];
+  queueNodeIds: string[];
   executionsLoading: boolean;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
 }) {
@@ -38,7 +41,10 @@ export function useRunInspectorActions({
     () => sections.some((section) => !section.isTrigger && section.execution),
     [sections],
   );
-  const stoppableNodeIds = useMemo(() => [...new Set(sections.map((section) => section.nodeId))], [sections]);
+  const queuedItems = useMemo(
+    () => run.queueItems?.filter(hasQueueItemIdentity).map(toQueuedItemReference) ?? [],
+    [run.queueItems],
+  );
 
   const refreshRunQueries = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["canvases"] });
@@ -47,13 +53,15 @@ export function useRunInspectorActions({
   const rerunMutation = useRerunMutation({ canvasId, run, refreshRunQueries, onRerunCreated });
   const stopMutation = useStopMutation({
     canvasId,
+    rootEventId: run.rootEvent?.id ?? null,
     runningExecutionIds,
-    stoppableNodeIds,
-    rootEventId: run.rootEvent?.id,
+    queuedItems,
+    queueNodeIds,
     refreshRunQueries,
   });
   const stopNodeMutation = useStopNodeMutation({ canvasId, refreshRunQueries });
   const executionHookMutation = useExecutionHookMutation({ canvasId, refreshRunQueries });
+  const cancelQueuedItemMutation = useCancelQueuedItemMutation({ canvasId, refreshRunQueries });
 
   return {
     rerun: () => rerunMutation.mutate(),
@@ -63,12 +71,17 @@ export function useRunInspectorActions({
     stopDisabled:
       executionsLoading ||
       stopMutation.isPending ||
-      (runningExecutionIds.length === 0 && (!run.rootEvent?.id || !hasLoadedActionSection)),
+      (runningExecutionIds.length === 0 && queuedItems.length === 0 && (!run.rootEvent?.id || !hasLoadedActionSection)),
     stopNode: (section: RunInspectorNodeSection) => {
       if (!section.execution?.id) return;
       stopNodeMutation.mutate(section.execution.id);
     },
     stopNodePending: stopNodeMutation.isPending,
+    cancelQueuedItem: (section: RunInspectorNodeSection) => {
+      if (!section.queueItem?.nodeId || !section.queueItem.id) return;
+      cancelQueuedItemMutation.mutate({ nodeId: section.queueItem.nodeId, itemId: section.queueItem.id });
+    },
+    cancelQueuedItemPending: cancelQueuedItemMutation.isPending,
     invokeNodeHook: (
       section: RunInspectorNodeSection,
       hookName: string,
@@ -126,32 +139,31 @@ function useRerunMutation({
 
 function useStopMutation({
   canvasId,
-  runningExecutionIds,
-  stoppableNodeIds,
   rootEventId,
+  runningExecutionIds,
+  queuedItems,
+  queueNodeIds,
   refreshRunQueries,
 }: {
   canvasId: string;
+  rootEventId: string | null;
   runningExecutionIds: string[];
-  stoppableNodeIds: string[];
-  rootEventId?: string;
+  queuedItems: QueuedItemReference[];
+  queueNodeIds: string[];
   refreshRunQueries: () => Promise<void>;
 }) {
   return useMutation({
     mutationFn: async () => {
-      const queuedItems = await listQueuedItemsForRun({
-        canvasId,
-        nodeIds: stoppableNodeIds,
-        rootEventId,
-      });
+      const freshQueuedItems = await fetchQueuedItemsForRun(canvasId, rootEventId, queueNodeIds);
+      const queuedItemsToCancel = mergeQueuedItemReferences(queuedItems, freshQueuedItems);
 
-      if (runningExecutionIds.length === 0 && queuedItems.length === 0) {
+      if (runningExecutionIds.length === 0 && queuedItemsToCancel.length === 0) {
         throw new Error("No running or queued steps to stop");
       }
 
       await Promise.all([
         ...runningExecutionIds.map((executionId) => cancelExecution(canvasId, executionId)),
-        ...queuedItems.map((item) => deleteQueuedItem(canvasId, item.nodeId, item.itemId)),
+        ...queuedItemsToCancel.map((item) => deleteQueuedItem(canvasId, item.nodeId, item.itemId)),
       ]);
     },
     onSuccess: async () => {
@@ -161,6 +173,26 @@ function useStopMutation({
     onError: (error) => {
       console.error("Failed to stop run", error);
       showErrorToast("Failed to stop run");
+    },
+  });
+}
+
+function useCancelQueuedItemMutation({
+  canvasId,
+  refreshRunQueries,
+}: {
+  canvasId: string;
+  refreshRunQueries: () => Promise<void>;
+}) {
+  return useMutation({
+    mutationFn: (queueItem: QueuedItemReference) => deleteQueuedItem(canvasId, queueItem.nodeId, queueItem.itemId),
+    onSuccess: async () => {
+      await refreshRunQueries();
+      showSuccessToast("Queued step cancelled");
+    },
+    onError: (error) => {
+      console.error("Failed to cancel queued step", error);
+      showErrorToast("Failed to cancel queued step");
     },
   });
 }
@@ -242,6 +274,63 @@ async function deleteQueuedItem(canvasId: string, nodeId: string, itemId: string
   );
 }
 
+async function fetchQueuedItemsForRun(
+  canvasId: string,
+  rootEventId: string | null,
+  nodeIds: string[],
+): Promise<QueuedItemReference[]> {
+  if (!rootEventId || nodeIds.length === 0) {
+    return [];
+  }
+
+  const queueItemLists = await Promise.all(
+    nodeIds.map((nodeId) => fetchNodeQueueItemsForRun(canvasId, nodeId, rootEventId)),
+  );
+  return queueItemLists.flat();
+}
+
+async function fetchNodeQueueItemsForRun(
+  canvasId: string,
+  nodeId: string,
+  rootEventId: string,
+): Promise<QueuedItemReference[]> {
+  const result: QueuedItemReference[] = [];
+  let before: string | undefined;
+
+  do {
+    const response = await canvasesListNodeQueueItems(
+      withOrganizationHeader({
+        path: { canvasId, nodeId },
+        query: { limit: 25, before },
+      }),
+    );
+    const items = response.data?.items ?? [];
+    result.push(...items.filter((item) => isQueueItemForRootEvent(item, rootEventId)).map(toQueuedItemReference));
+    before = response.data?.hasNextPage ? response.data.lastTimestamp : undefined;
+  } while (before);
+
+  return result;
+}
+
+function isQueueItemForRootEvent(
+  queueItem: CanvasesCanvasNodeQueueItem,
+  rootEventId: string,
+): queueItem is CanvasesCanvasNodeQueueItem & QueueItemWithIdentity {
+  return queueItem.rootEvent?.id === rootEventId && hasQueueItemIdentity(queueItem);
+}
+
+function mergeQueuedItemReferences(
+  cachedItems: QueuedItemReference[],
+  freshItems: QueuedItemReference[],
+): QueuedItemReference[] {
+  const itemsByKey = new Map<string, QueuedItemReference>();
+  for (const item of [...cachedItems, ...freshItems]) {
+    itemsByKey.set(`${item.nodeId}:${item.itemId}`, item);
+  }
+
+  return [...itemsByKey.values()];
+}
+
 function invokeExecutionHook(canvasId: string) {
   return async ({
     executionId,
@@ -267,35 +356,22 @@ function invokeExecutionHook(canvasId: string) {
   };
 }
 
-async function listQueuedItemsForRun({
-  canvasId,
-  nodeIds,
-  rootEventId,
-}: {
-  canvasId: string;
-  nodeIds: string[];
-  rootEventId?: string;
-}) {
-  if (!rootEventId || nodeIds.length === 0) {
-    return [];
-  }
+type QueueItemWithIdentity = {
+  id: string;
+  nodeId: string;
+};
 
-  const responses = await Promise.all(
-    nodeIds.map(async (nodeId) => {
-      const response = await canvasesListNodeQueueItems(
-        withOrganizationHeader({
-          path: { canvasId, nodeId },
-          query: { limit: 100 },
-        }),
-      );
+type QueuedItemReference = {
+  nodeId: string;
+  itemId: string;
+};
 
-      return (
-        response.data?.items
-          ?.filter((item) => item.id && item.rootEvent?.id === rootEventId)
-          .map((item) => ({ nodeId, itemId: item.id! })) ?? []
-      );
-    }),
-  );
+function hasQueueItemIdentity(
+  queueItem: NonNullable<CanvasesCanvasRun["queueItems"]>[number],
+): queueItem is QueueItemWithIdentity {
+  return Boolean(queueItem.id && queueItem.nodeId);
+}
 
-  return responses.flat();
+function toQueuedItemReference(queueItem: QueueItemWithIdentity): QueuedItemReference {
+  return { nodeId: queueItem.nodeId, itemId: queueItem.id };
 }

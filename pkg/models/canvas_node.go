@@ -473,6 +473,26 @@ func CountNodeQueueItemsForRootEventInTransaction(tx *gorm.DB, rootEventID uuid.
 	return count, nil
 }
 
+func ListNodeQueueItemsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeQueueItem, error) {
+	if len(runIDs) == 0 {
+		return []CanvasNodeQueueItem{}, nil
+	}
+
+	var queueItems []CanvasNodeQueueItem
+	err := tx.
+		Preload("RootEvent").
+		Where("workflow_id = ?", workflowID).
+		Where("run_id IN ?", runIDs).
+		Order("created_at ASC").
+		Find(&queueItems).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return queueItems, nil
+}
+
 func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*CanvasNodeQueueItem, error) {
 	var queueItem CanvasNodeQueueItem
 	err := database.Conn().

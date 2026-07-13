@@ -27,6 +27,7 @@ function renderActions(sections: RunInspectorNodeSection[], executionsLoading = 
         canvasId: "canvas-1",
         run,
         sections,
+        queueNodeIds: ["action-1"],
         executionsLoading,
       }),
     {
@@ -39,9 +40,11 @@ function renderActions(sections: RunInspectorNodeSection[], executionsLoading = 
 
 function actionSection(overrides: Partial<RunInspectorNodeSection> = {}): RunInspectorNodeSection {
   return {
+    sectionValue: "action-1",
     nodeId: "action-1",
     nodeName: "Action 1",
     isTrigger: false,
+    isQueued: false,
     badge: null,
     tabData: null,
     upstreamSections: [],
