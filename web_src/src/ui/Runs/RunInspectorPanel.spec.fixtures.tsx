@@ -58,6 +58,21 @@ export const runningExecutions: CanvasesCanvasNodeExecution[] = [
   },
 ];
 
+export const runnerExecution: CanvasesCanvasNodeExecution = {
+  id: "execution-runner-1",
+  nodeId: "runner-1",
+  previousExecutionId: "execution-1",
+  state: "STATE_FINISHED",
+  result: "RESULT_PASSED",
+  resultReason: "RESULT_REASON_OK",
+  resultMessage: "",
+  createdAt: "2026-05-01T12:00:03Z",
+  updatedAt: "2026-05-01T12:00:55Z",
+  outputs: { passed: [{ data: { status: "succeeded", exit_code: 0 } }] },
+  metadata: { runner_broker_task_id: "task-runner-1" },
+  configuration: { script: "npm run build" },
+};
+
 export function renderInspector({
   selectedNodeId = null,
   onSelectNode = vi.fn(),
@@ -241,6 +256,13 @@ export const workflowNodes: SuperplaneComponentsNode[] = [
     component: "approval",
   },
 ];
+
+export const runnerNode: SuperplaneComponentsNode = {
+  id: "runner-1",
+  name: "Run Bash",
+  type: "TYPE_ACTION",
+  component: "runnerBash",
+};
 
 const componentDefinitions: ActionsAction[] = [
   {
