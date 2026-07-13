@@ -139,11 +139,42 @@ export function computeWidgetHasMore({
 }
 
 /**
+ * Module-level set of `flightKey`s that currently have a `fetchNextPage`
+ * call in flight. React Query dedupes network requests per query key, but
+ * it flips `isFetchingNextPage` asynchronously — so N widgets that pass
+ * `shouldFetchNextWidgetPage` in the same commit will each call
+ * `fetchNextPage()` before the flag reaches them, producing duplicate
+ * `before=` requests for the same cursor (live capture on the SaaS console
+ * showed 4× duplicates on the first pagination steps).
+ *
+ * This set gives us a synchronous single-flight guarantee across all widget
+ * effects that share the same infinite-query key. It is intentionally
+ * module-scoped (per browser tab) — pagination is a global concern of the
+ * shared cache, not a per-widget one.
+ */
+const inFlightEagerPagination = new Set<string>();
+
+/**
+ * Test-only escape hatch: clears the module-level in-flight set. Guarded
+ * so it stays a no-op in production bundles.
+ */
+export function __resetEagerPaginationInFlight(): void {
+  inFlightEagerPagination.clear();
+}
+
+/**
  * Drives widget-owned eager pagination of an infinite query: fetches pages
  * until the current `fillTarget` is reached, the source runs out of pages,
  * or `WIDGET_MAX_EAGER_PAGES` is hit. Re-runs after each page arrives so
  * `loadMore` (bumping `fillTarget`) flows through the same mechanism with
  * no special-case fetch path.
+ *
+ * `flightKey` is a stable string identifying the shared infinite-query
+ * cache entry (typically `JSON.stringify(queryKey)`). Widget effects on the
+ * same key coordinate through the module-level `inFlightEagerPagination`
+ * set so only one `fetchNextPage()` call is dispatched per cursor advance
+ * even when multiple widgets satisfy `shouldFetchNextWidgetPage` in the
+ * same React commit.
  */
 export function useEagerInfinitePagination({
   enabled,
@@ -154,6 +185,7 @@ export function useEagerInfinitePagination({
   isFetchingNextPage,
   isFetching,
   fetchNextPage,
+  flightKey,
 }: {
   enabled: boolean;
   fillTarget: number;
@@ -162,7 +194,8 @@ export function useEagerInfinitePagination({
   hasNextPage: boolean | undefined;
   isFetchingNextPage: boolean;
   isFetching: boolean;
-  fetchNextPage: () => unknown;
+  fetchNextPage: () => Promise<unknown> | unknown;
+  flightKey: string;
 }) {
   useEffect(() => {
     if (
@@ -178,8 +211,34 @@ export function useEagerInfinitePagination({
     ) {
       return;
     }
-    void fetchNextPage();
-  }, [enabled, fillTarget, loadedRowCount, pageCount, hasNextPage, isFetchingNextPage, isFetching, fetchNextPage]);
+    if (inFlightEagerPagination.has(flightKey)) return;
+    inFlightEagerPagination.add(flightKey);
+    const clear = () => {
+      inFlightEagerPagination.delete(flightKey);
+    };
+    let result: Promise<unknown> | unknown;
+    try {
+      result = fetchNextPage();
+    } catch {
+      clear();
+      return;
+    }
+    if (result && typeof (result as Promise<unknown>).then === "function") {
+      (result as Promise<unknown>).then(clear, clear);
+      return;
+    }
+    clear();
+  }, [
+    enabled,
+    fillTarget,
+    loadedRowCount,
+    pageCount,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetching,
+    fetchNextPage,
+    flightKey,
+  ]);
 }
 
 export function shouldFetchNextWidgetPage({
