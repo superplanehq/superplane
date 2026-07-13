@@ -8,8 +8,12 @@ import {
   applySort,
   buildChartData,
   combinePartials,
+  distinctChartSeries,
   distinctSeriesKeys,
   extractNumericSeries,
+  RESERVED_CHART_SERIES_KEY_PREFIX,
+  resolveChartSeriesIdentity,
+  sanitizeChartSeriesKey,
 } from "./widgetData";
 
 const entries: CanvasMemoryEntry[] = [
@@ -220,6 +224,70 @@ describe("buildChartData", () => {
       { x: "2026-05-27", ec2: 1, s3: 0 },
     ]);
   });
+
+  it("sanitizes reserved series keys so they do not overwrite x or collide with DOM props", () => {
+    const rows = [
+      { status: "ok", style: 10, x: 3 },
+      { status: "ok", style: 5, x: 2 },
+    ];
+    const data = buildChartData(rows, "status", [
+      { key: "style", field: "style" },
+      { key: "x", field: "x" },
+    ]);
+    expect(data).toEqual([
+      {
+        x: "ok",
+        [`${RESERVED_CHART_SERIES_KEY_PREFIX}style`]: 15,
+        [`${RESERVED_CHART_SERIES_KEY_PREFIX}x`]: 5,
+      },
+    ]);
+  });
+
+  it("sanitizes reserved pivoted seriesField values", () => {
+    const rows = [
+      { date: "2026-05-26", kind: "style", cost_usd: 10 },
+      { date: "2026-05-26", kind: "class", cost_usd: 3 },
+    ];
+    const data = buildChartData(rows, "date", [{ key: "cost", field: "cost_usd" }], { seriesField: "kind" });
+    expect(data).toEqual([
+      {
+        x: "2026-05-26",
+        [`${RESERVED_CHART_SERIES_KEY_PREFIX}style`]: 10,
+        [`${RESERVED_CHART_SERIES_KEY_PREFIX}class`]: 3,
+      },
+    ]);
+  });
+});
+
+describe("sanitizeChartSeriesKey", () => {
+  it("leaves ordinary keys unchanged", () => {
+    expect(sanitizeChartSeriesKey("cost")).toBe("cost");
+    expect(sanitizeChartSeriesKey("ec2")).toBe("ec2");
+  });
+
+  it("prefixes reserved React/DOM and chart-internal keys", () => {
+    for (const key of ["style", "class", "className", "id", "key", "ref", "children", "x"]) {
+      expect(sanitizeChartSeriesKey(key)).toBe(`${RESERVED_CHART_SERIES_KEY_PREFIX}${key}`);
+    }
+  });
+
+  it("is idempotent for already-sanitized keys", () => {
+    const once = sanitizeChartSeriesKey("style");
+    expect(sanitizeChartSeriesKey(once)).toBe(once);
+  });
+});
+
+describe("resolveChartSeriesIdentity", () => {
+  it("maps empty raw values to the (empty) label and key", () => {
+    expect(resolveChartSeriesIdentity("")).toEqual({ key: "(empty)", label: "(empty)" });
+  });
+
+  it("keeps the original label when the data key must be sanitized", () => {
+    expect(resolveChartSeriesIdentity("style")).toEqual({
+      key: `${RESERVED_CHART_SERIES_KEY_PREFIX}style`,
+      label: "style",
+    });
+  });
 });
 
 describe("distinctSeriesKeys", () => {
@@ -231,6 +299,21 @@ describe("distinctSeriesKeys", () => {
   it("uses (empty) for rows where the seriesField is missing", () => {
     const rows = [{ service: "ec2" }, { other: 1 }, { service: "s3" }];
     expect(distinctSeriesKeys(rows, "service")).toEqual(["ec2", "(empty)", "s3"]);
+  });
+
+  it("returns sanitized keys for reserved seriesField values", () => {
+    const rows = [{ kind: "style" }, { kind: "ok" }, { kind: "style" }];
+    expect(distinctSeriesKeys(rows, "kind")).toEqual([`${RESERVED_CHART_SERIES_KEY_PREFIX}style`, "ok"]);
+  });
+});
+
+describe("distinctChartSeries", () => {
+  it("pairs sanitized keys with original display labels", () => {
+    const rows = [{ kind: "style" }, { kind: "ok" }];
+    expect(distinctChartSeries(rows, "kind")).toEqual([
+      { key: `${RESERVED_CHART_SERIES_KEY_PREFIX}style`, label: "style" },
+      { key: "ok", label: "ok" },
+    ]);
   });
 });
 
