@@ -873,6 +873,7 @@ message CanvasRun {
   google.protobuf.Timestamp updated_at = 8;
   google.protobuf.Timestamp finished_at = 9;
   string version_id = 10;
+  repeated CanvasNodeQueueItem queue_items = 11;
 }
 
 message ListEventExecutionsRequest {
