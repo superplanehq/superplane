@@ -41,7 +41,7 @@ func TestSSHCommandLineEndings(t *testing.T) {
 	t.Run("normalizes CRLF command files before streaming them over SSH", func(t *testing.T) {
 		steps := &sshLineEndingsSteps{t: t}
 		steps.start()
-		steps.givenAnSSHServerExpectingScript("set -eo pipefail\nprintf ok\n")
+		steps.givenAnSSHServerExpectingScript("bash -s", "set -eo pipefail\nprintf ok\n")
 		steps.givenACanvasWithCRLFSSHCommandFile()
 		steps.whenTheManualTriggerRuns()
 		steps.thenTheSSHNodeCompletedSuccessfully()
@@ -51,7 +51,7 @@ func TestSSHCommandLineEndings(t *testing.T) {
 	t.Run("normalizes CRLF inline scripts before streaming them over SSH", func(t *testing.T) {
 		steps := &sshLineEndingsSteps{t: t}
 		steps.start()
-		steps.givenAnSSHServerExpectingScript(strings.Join([]string{
+		steps.givenAnSSHServerExpectingScript("bash -e -s", strings.Join([]string{
 			"#!/bin/bash",
 			"set -euo pipefail",
 			"cd ~/preview-sso.teams.novp.com",
@@ -80,8 +80,8 @@ func (s *sshLineEndingsSteps) start() {
 	s.session.Login()
 }
 
-func (s *sshLineEndingsSteps) givenAnSSHServerExpectingScript(expectedScript string) {
-	server, err := startScriptCheckingSSHServer(sshLineEndingUser, sshLineEndingPassword, expectedScript)
+func (s *sshLineEndingsSteps) givenAnSSHServerExpectingScript(expectedCommand string, expectedScript string) {
+	server, err := startScriptCheckingSSHServer(sshLineEndingUser, sshLineEndingPassword, expectedCommand, expectedScript)
 	require.NoError(s.t, err)
 	s.t.Cleanup(server.Close)
 	s.server = server
@@ -261,14 +261,15 @@ func (s *sshLineEndingsSteps) thenTheSSHServerReceivedNormalizedScript() {
 }
 
 type scriptCheckingSSHServer struct {
-	listener net.Listener
-	config   *pwssh.ServerConfig
-	expected string
-	scripts  chan string
-	errors   chan error
+	listener        net.Listener
+	config          *pwssh.ServerConfig
+	expectedCommand string
+	expected        string
+	scripts         chan string
+	errors          chan error
 }
 
-func startScriptCheckingSSHServer(username, password, expected string) (*scriptCheckingSSHServer, error) {
+func startScriptCheckingSSHServer(username, password, expectedCommand, expected string) (*scriptCheckingSSHServer, error) {
 	hostKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
@@ -295,11 +296,12 @@ func startScriptCheckingSSHServer(username, password, expected string) (*scriptC
 	}
 
 	server := &scriptCheckingSSHServer{
-		listener: listener,
-		config:   config,
-		expected: expected,
-		scripts:  make(chan string, 1),
-		errors:   make(chan error, 1),
+		listener:        listener,
+		config:          config,
+		expectedCommand: expectedCommand,
+		expected:        expected,
+		scripts:         make(chan string, 1),
+		errors:          make(chan error, 1),
 	}
 
 	go server.accept()
@@ -388,7 +390,7 @@ func (s *scriptCheckingSSHServer) handleSession(channel pwssh.Channel, requests 
 			return
 		}
 
-		if payload.Command != "bash -s" {
+		if payload.Command != s.expectedCommand {
 			_ = request.Reply(false, nil)
 			s.reportError(fmt.Errorf("unexpected SSH command %q", payload.Command))
 			return

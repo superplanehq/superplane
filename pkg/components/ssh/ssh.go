@@ -879,7 +879,7 @@ func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBod
 	}
 
 	if isMultilineInlineScript(metadata.Commands) {
-		command, payload := c.buildScriptCommand(metadata.WorkingDirectory, metadata.Environment, metadata.Commands)
+		command, payload := c.buildInlineScriptCommand(metadata.WorkingDirectory, metadata.Environment, metadata.Commands)
 		return command, strings.NewReader(payload), nil
 	}
 
@@ -895,12 +895,20 @@ func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBod
 // prepended on its own line (followed by `|| exit 1`) so a leading shebang or
 // comment in the script cannot swallow the `cd` via `#`-to-end-of-line.
 func (c *SSHCommand) buildScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
+	return c.buildScriptCommandWithShell("bash -s", workingDirectory, environment, script)
+}
+
+func (c *SSHCommand) buildInlineScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
+	return c.buildScriptCommandWithShell("bash -e -s", workingDirectory, environment, script)
+}
+
+func (c *SSHCommand) buildScriptCommandWithShell(shellCommand string, workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
 	payload := normalizeScriptLineEndings(script)
 	if workingDirectory != "" {
 		payload = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), payload)
 	}
 
-	command := "bash -s"
+	command := shellCommand
 	if len(environment) > 0 {
 		envAssignments := make([]string, 0, len(environment))
 		for _, variable := range environment {

@@ -703,14 +703,14 @@ fi`
 func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 	c := &SSHCommand{}
 
-	t.Run("inline mode streams multi-line commands", func(t *testing.T) {
+	t.Run("inline mode streams multi-line commands with errexit", func(t *testing.T) {
 		meta := ExecutionMetadata{
 			CommandSource: CommandSourceInline,
 			Commands:      "echo 1\necho 2",
 		}
 		command, stdin, err := c.buildExecutionCommand(meta, "")
 		require.NoError(t, err)
-		assert.Equal(t, "bash -s", command)
+		assert.Equal(t, "bash -e -s", command)
 		require.NotNil(t, stdin)
 
 		body, readErr := io.ReadAll(stdin)
@@ -746,7 +746,7 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 
 		command, stdin, err := c.buildExecutionCommand(meta, "")
 		require.NoError(t, err)
-		assert.Equal(t, "bash -s", command)
+		assert.Equal(t, "bash -e -s", command)
 		require.NotNil(t, stdin)
 
 		body, readErr := io.ReadAll(stdin)
@@ -769,12 +769,28 @@ func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 
 		command, stdin, err := c.buildExecutionCommand(meta, "")
 		require.NoError(t, err)
-		assert.Equal(t, "bash -s", command)
+		assert.Equal(t, "bash -e -s", command)
 		require.NotNil(t, stdin)
 
 		body, readErr := io.ReadAll(stdin)
 		require.NoError(t, readErr)
 		assert.Equal(t, script, string(body))
+	})
+
+	t.Run("inline mode preserves fail-fast behavior when streaming line lists", func(t *testing.T) {
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceInline,
+			Commands:      "false\necho should-not-run",
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, "")
+		require.NoError(t, err)
+		assert.Equal(t, "bash -e -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, "false\necho should-not-run", string(body))
 	})
 
 	t.Run("inline mode rejects empty commands", func(t *testing.T) {
