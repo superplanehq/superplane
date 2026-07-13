@@ -335,7 +335,8 @@ func parseDataURI(uri string) (string, []byte, error) {
 	}
 
 	if isBase64 {
-		content, err := base64.StdEncoding.DecodeString(data)
+		// Tolerate whitespace around the payload, e.g. "base64, {{ expr }}".
+		content, err := base64.StdEncoding.DecodeString(strings.TrimSpace(data))
 		if err != nil {
 			return "", nil, fmt.Errorf("invalid base64 content: %v", err)
 		}
@@ -394,6 +395,8 @@ func sendMessage(client *Client, httpCtx core.HTTPContext, config SendTextMessag
 
 	files := make([]MessageFile, 0, len(config.Files))
 	for i, fileURL := range config.Files {
+		// Expression values often carry stray whitespace around the entry.
+		fileURL = strings.TrimSpace(fileURL)
 		if fileURL == "" {
 			continue
 		}
@@ -404,6 +407,11 @@ func sendMessage(client *Client, httpCtx core.HTTPContext, config SendTextMessag
 			}
 			files = append(files, MessageFile{Name: dataURIFileName(mediaType, i), Content: content})
 			continue
+		}
+		if !strings.HasPrefix(fileURL, "http://") && !strings.HasPrefix(fileURL, "https://") {
+			// A schemeless entry is almost always raw file content pasted via
+			// an expression; a fetch would only fail with a cryptic error.
+			return nil, fmt.Errorf("files[%d] is neither an http(s) URL nor a data: URI; to attach inline content, prefix it, e.g. data:image/png;base64,{{ ... }}", i)
 		}
 		content, err := client.FetchFile(httpCtx, fileURL)
 		if err != nil {

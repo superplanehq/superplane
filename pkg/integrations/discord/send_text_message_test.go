@@ -465,3 +465,22 @@ func Test__SendTextMessage__DataURIFiles(t *testing.T) {
 		require.Equal(t, "file-2", dataURIFileName("", 1))
 	})
 }
+
+func Test__SendTextMessage__SchemelessFileEntry(t *testing.T) {
+	t.Run("raw content without a scheme fails with guidance", func(t *testing.T) {
+		client := &Client{BotToken: "t"}
+		_, err := sendMessage(client, &contexts.HTTPContext{}, SendTextMessageConfiguration{
+			Channel: "chan",
+			Content: "hi",
+			Files:   []string{" iVBORw0KGgoAAAANSUhEUg== "},
+		}, CreateMessageRequest{Content: "hi"})
+		require.ErrorContains(t, err, "neither an http(s) URL nor a data: URI")
+	})
+
+	t.Run("data URI with whitespace-padded base64 decodes", func(t *testing.T) {
+		mediaType, content, err := parseDataURI("data:image/png;base64, aGVsbG8= ")
+		require.NoError(t, err)
+		require.Equal(t, "image/png", mediaType)
+		require.Equal(t, []byte("hello"), content)
+	})
+}
