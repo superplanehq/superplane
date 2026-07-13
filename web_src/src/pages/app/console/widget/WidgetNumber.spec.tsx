@@ -23,4 +23,67 @@ describe("WidgetNumber", () => {
     expect(label.className).not.toContain("text-xs");
     expect(label.className).not.toContain("font-medium");
   });
+
+  it("keeps a prefix-only currency symbol flush against the value (no flex gap)", () => {
+    render(
+      <WidgetNumber
+        rows={[{ cost: 1234 }]}
+        isLoading={false}
+        render={{ kind: "number", aggregation: "sum", field: "cost", format: "number", prefix: "R$" }}
+      />,
+    );
+
+    const root = screen.getByTestId("widget-number");
+    const valueRow = root.querySelector(".flex.items-baseline");
+    expect(valueRow).not.toBeNull();
+    expect(valueRow!.className).not.toContain("gap-");
+    expect(root).toHaveTextContent("R$1,234");
+  });
+
+  it("uses a baseline gap when a suffix is present", () => {
+    render(
+      <WidgetNumber
+        rows={[{ cost: 42 }]}
+        isLoading={false}
+        render={{
+          kind: "number",
+          aggregation: "sum",
+          field: "cost",
+          format: "number",
+          prefix: "$",
+          suffix: " /mo",
+        }}
+      />,
+    );
+
+    const root = screen.getByTestId("widget-number");
+    const valueRow = root.querySelector(".flex.items-baseline");
+    expect(valueRow).not.toBeNull();
+    expect(valueRow!.className).toContain("gap-0.5");
+    expect(root).toHaveTextContent("$42 /mo");
+  });
+
+  it("omits null/blank sparkline points so the series matches aggregateNumber", () => {
+    // Bare Number(null)/Number("") would inject two zero points and draw a
+    // 4-point sparkline that disagrees with sum=13 over the same rows.
+    render(
+      <WidgetNumber
+        rows={[{ total: null }, { total: "" }, { total: 5 }, { total: 8 }]}
+        isLoading={false}
+        render={{
+          kind: "number",
+          aggregation: "sum",
+          field: "total",
+          sparklineField: "total",
+        }}
+      />,
+    );
+
+    const root = screen.getByTestId("widget-number");
+    expect(root).toHaveTextContent("13");
+    const polyline = root.querySelector("polyline");
+    expect(polyline).not.toBeNull();
+    // Two finite points → one segment (two "x,y" pairs), not four from coerced zeros.
+    expect(polyline!.getAttribute("points")!.trim().split(/\s+/)).toHaveLength(2);
+  });
 });

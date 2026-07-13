@@ -231,11 +231,106 @@ Each column needs a non-empty `field`. Optional fields:
 | Field | Meaning |
 | --- | --- |
 | `label` | Header text. Falls back to `field`. |
-| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, or `link`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). |
+| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, `link`, `avatar`, `progress`, or `trend`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `date`, `datetime`, and `relative` render through the shared `Timestamp` component, so every timestamp cell has an identical hover card exposing Local, UTC, Relative, and raw ISO with a copy button (see [Timestamp hover](#timestamp-hover) below). `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). `avatar` renders the resolved value as a circular avatar: direct image URLs are used as the image source, GitHub usernames (or author maps with a `username`) resolve to the GitHub avatar with the person's name in a tooltip, and values without a username fall back to an initials disc; blank values render as an em-dash. Use `avatarCommitterField` to supply a secondary person map for initials. `progress` renders a horizontal bar that fills to `field / progressTarget`; see the row below. `trend` compares the row's numeric value against **the row directly below it** (after filter + sort) and renders a diagonal arrow colored by whether the change is "better" or "worse"; see the trend section below. |
 | `show` | Row expression controlling whether the cell is visible. |
 | `href` | Link template for `link` columns. Accepts `{{ cel }}` expressions and templates (e.g. `{{ prUrl }}` or `https://github.com/{{ org }}/pull/{{ prNumber }}`), legacy single-brace `{field}` placeholders, and bare static URLs. The column editor shows a dedicated href input with a field picker (values inserted as `{{ field }}`) when the format is `link`. |
+| `progressTarget` | Target (100%) for `format: progress`. Required for progress columns. Accepts a numeric literal (`"10"`, `"100.5"`), a row field path (`total`, `payload.goal`), or a full `{{ CEL }}` expression (`{{ base * 2 }}`). Resolved with the same helper as `field`. |
+| `progressLabel` | Text rendered next to the progress bar: `none`, `number` (`5/10`), or `percent` (`50%`). Defaults to `percent`. The bar itself clamps at `[0, 100]%`, but the label and hover tooltip always show the real percentage, so overshoots (`120%`, `12/10`) stay visible. |
+| `trendBetter` | For `format: trend` or numeric columns with `showTrend: true`. `up` (default) treats an increase as better (green), `down` treats a decrease as better. |
+| `trendDisplay` | For `format: trend` or numeric columns with `showTrend: true`. `percent` (default) prints a signed percent change, `value` prints a signed absolute delta, `none` renders arrow only. |
+| `showTrend` | When `true` on `number`, `percent`, or `duration`, renders the formatted value plus a trend chip in the same cell (same row-below semantics as `format: trend`). Ignored on other formats. |
 
 Column fields can be direct paths such as `status` or expression templates where supported by the widget helpers.
+
+#### Trend columns
+
+`format: trend` turns a numeric column into a **trend-only** row-to-row comparison. The cell resolves the column's `field` (path or `{{ CEL }}`) on both the current row and the row directly below it, then renders one of the following:
+
+| Case | Cell |
+| --- | --- |
+| Both values finite and different | Diagonal arrow (`↗` up / `↘` down) in green when the change is "better" and red when "worse", plus the signed magnitude according to `trendDisplay`. |
+| Delta is exactly `0` | Gray `- 0` (no change). |
+| Current or previous value isn't a finite number | Gray `-` (incomparable). |
+| Percent mode with a previous value of `0` | Gray `-` (percent undefined). |
+| Last visible row while the previous entry has not been fetched yet | Gray `...` (pending). Not used when the next row is already loaded but still hidden behind the progressive display window — that case compares against the hidden row. |
+| Last row with no more data expected | Gray `- 0` (no baseline). |
+
+The tooltip always shows both the percent change and the absolute delta when both are meaningful (e.g. `+12.5% · +4`).
+
+Notes:
+
+- **"Previous" is always the row directly below** in the current filter + sort order, so authors control what "previous" means by choosing the sort. For chronological trends, sort by `createdAt`.
+- On progressive tables, when more rows are already loaded but still hidden behind the display window, the last visible trend cell compares against that first hidden row instead of showing pending `...`. Pending is reserved for baselines that have not been fetched yet.
+- Percent math is `(current - previous) / |previous| * 100`, rounded to one decimal, capped at ±999% (values beyond the cap render as `>+999%` / `<-999%`).
+- `trend` cells never carry a link/href — combine with a separate `link` column when both are needed.
+- Prefer **`showTrend: true`** on `number` / `percent` / `duration` when you want the formatted value and the trend in one column (e.g. `4.5s  ↘ -10%`). Keep `format: trend` when you want a dedicated delta column.
+
+Example — duration and pass rate with value + trend in one column:
+
+```yaml
+render:
+  kind: table
+  sort:
+    field: createdAt
+    order: desc
+  columns:
+    - field: name
+      label: Node
+    - field: durationMs
+      label: Duration
+      format: duration
+      showTrend: true
+      trendBetter: down
+      trendDisplay: percent
+    - field: passRate
+      label: Pass rate
+      format: percent
+      showTrend: true
+      trendBetter: up
+```
+
+Example — standalone trend column where a shorter run is a win:
+
+```yaml
+render:
+  kind: table
+  sort:
+    field: createdAt
+    order: desc
+  columns:
+    - field: name
+      label: Node
+    - field: durationMs
+      label: Duration
+      format: duration
+    - field: durationMs
+      label: Trend
+      format: trend
+      trendBetter: down
+      trendDisplay: percent
+```
+
+### Timestamp hover
+
+Every timestamp-formatted surface across the console renders through the shared `Timestamp` component (`web_src/src/components/Timestamp/`), the same component used by the runs sidebar. Hovering a timestamp reveals a card with four representations of the same instant:
+
+- **Local** — locale-aware absolute time in the viewer's timezone, e.g. `10 Jul 2026, 15:46:53 CEST`
+- **UTC** — the same instant rendered in UTC without a timezone suffix
+- **Relative** — verbose live text, e.g. `5 minutes ago` / `in 3 hours`
+- **Timestamp** — the raw full-precision ISO string with a copy button
+
+The visible cell/panel label matches the column `format`:
+
+- `format: date` — locale calendar day (no time-of-day)
+- `format: datetime` — locale absolute timestamp with timezone
+- `format: relative` — compact live-updating text without an "ago" suffix (e.g. `5m`, `2h`)
+
+The presentational details block is exported as `TimestampDetails` (`@/components/Timestamp`) so tooltips that can't host a Radix hover card render an identical grid. Chart tooltips use it: whenever `xFormat` is `date`, `datetime`, or `relative`, hovering a chart point surfaces the same Local / UTC / Relative / ISO details block. Chart X-axis ticks stay short (`Jul 6` / `May 26 4:10 PM`) so densely-binned buckets keep readable.
+
+Number panels follow the same rule: setting `render.format` to `date`, `datetime`, or `relative` wraps the aggregated value in `Timestamp`, so `max(updatedAt)`-style "last event" KPIs get the same hover details as tables.
+
+Formatters and coercion live in `web_src/src/pages/app/console/widget/widgetFormat.ts` (`formatValue`, `coerceWidgetTimestamp`) and delegate to `@/lib/datetime` (`formatAbsolute`, `formatDate`, `formatRelative`, `formatISO`, `formatUTC`) plus `@/lib/date` (`formatTimeAgo`). Do not add ad-hoc `toLocale*` timestamp formatting in widget code — extend the shared helpers instead.
+
 
 ### Structured Filters
 
@@ -390,7 +485,7 @@ Tooltips show the category in the header and one row per series with `label — 
 
 Cartesian charts (`bar`, `stacked-bar`, `line`, `area`) expose three optional axis fields:
 
-- `xFormat` — display format applied to X-axis tick labels **and the hover tooltip header** (so the category in the tooltip matches the axis). Reuses the shared column-format vocabulary (`text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`). Useful when `xField` is a raw timestamp or numeric field — set `xFormat: date` instead of wrapping `xField` in a CEL expression like `{{ formatDate(createdAt, "MM/dd") }}`.
+- `xFormat` — display format applied to X-axis tick labels **and the hover tooltip header** (so the category in the tooltip matches the axis). Reuses the shared column-format vocabulary (`text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`). Useful when `xField` is a raw timestamp or numeric field — set `xFormat: date` instead of wrapping `xField` in a CEL expression like `{{ formatDate(createdAt, "MM/dd") }}`. Timestamp formats (`date`, `datetime`, `relative`) replace the tooltip header with the shared `TimestampDetails` block (Local / UTC / Relative / ISO with copy) so hovering a point exposes the exact instant — see [Timestamp hover](#timestamp-hover).
 - `yLabel` — Y-axis title rendered alongside the ticks (for example `USD`, `Errors / day`). Omitted by default.
 - `yFormat` — display format applied to Y-axis tick labels (`number`, `percent`, `duration`). Falls back to a locale-aware numeric default with thousands separators above 1k. The `format` declared on a series only affects tooltip values; configure `yFormat` to match it on the axis itself.
 
@@ -426,6 +521,8 @@ Number panels aggregate rows into a single KPI. Supported aggregations are:
 - `last`
 
 Aggregations other than `count` require a non-empty `field`.
+
+`render.format` accepts the same vocabulary as table columns. Numeric formats (`number`, `percent`, `duration`) render the raw aggregate; setting the format to `date`, `datetime`, or `relative` treats the aggregate as an epoch (ms or seconds) and wraps the visible label in the shared `Timestamp` component — this is the recommended way to build "last update" / "next run" KPIs. See [Timestamp hover](#timestamp-hover) for the shared hover behavior.
 
 ### Display Symbols
 
@@ -472,6 +569,90 @@ Rules:
 - Sparklines are only available for the single-source mode in this iteration.
 
 The editor exposes a Single / Multiple toggle in the Number panel form. Switching to Multiple seeds one source from the current single-source configuration so existing panels do not lose context.
+
+## Scorecard Panels
+
+Scorecard panels are a single-KPI variant of the number panel with three extra affordances baked in:
+
+- **Change chip** comparing the current aggregated value to the immediately previous value in the series (`sparklineField`, or the primary `field` as a fallback).
+- **Target** (literal number or `{{ CEL }}`) that drives an optional progress bar and — when the change is incomputable — a fallback status color.
+- **Status direction** (`better: "up" | "down"`) that colors the value change, the sparkline, and the vs-target polarity.
+
+Multi-KPI and composite-memory shapes are intentionally not supported on scorecards. Use the standard `number` panel when you need those.
+
+```yaml
+type: scorecard
+content:
+  title: Open UX papercuts
+  dataSource:
+    kind: memory
+    namespace: ux_papercuts
+  render:
+    kind: scorecard
+    aggregation: first
+    field: openCount
+    format: number
+    label: Open UX papercuts
+    better: down
+    target: "80"
+    showProgress: true
+    sparklineField: openCount
+    showChange: both
+    changeCaption: vs previous
+```
+
+### Value pipeline
+
+Value resolution is the single-source number pipeline: `dataSource` (`memory` | `executions` | `runs`) + `aggregation` + `field` (when needed) + `format` / `label` / `prefix` / `suffix`. Aggregations follow the standard number vocabulary (`count`, `sum`, `avg`, `min`, `max`, `first`, `last`). Aggregations other than `count` require a non-empty `field`.
+
+`runs`, `executions`, and `memory` all return newest-first (`created_at DESC`). The scorecard form relabels the two directional aggregations accordingly (`first` → `Latest`, `last` → `Earliest`), but the persisted YAML always uses `first` / `last`. Pick the aggregation that anchors the current value to the record you care about — typically `first` for the latest KPI.
+
+### Change vs the previous record
+
+The scorecard extracts a numeric series from the filtered rows using `sparklineField`; when it isn't set, the change chip falls back to the primary `field`. The chip compares the current value against the immediately previous value in that series, using the same math as the table trend chip (`computeTrend`). The pair is picked by aggregation:
+
+- `last` → current = last point in the series, previous = second-to-last point.
+- `first` → current = first point, previous = second point.
+- `sum` / `avg` / `min` / `max` / `count` → the chip is hidden. Combining aggregations don't point at a single record, so there is no coherent "previous" to compare against.
+
+The `better` direction controls the polarity:
+
+- `better: up` → an increase is good (green), a decrease is bad (red).
+- `better: down` → a decrease is good (green), an increase is bad (red).
+
+`render.showChange` controls the change chip's magnitude label:
+
+- `percent` — `-22.8%`.
+- `number` — `-29`.
+- `both` (default) — `-29 (-22.8%)`.
+- `none` — arrow only.
+
+`render.changeCaption` (optional) prints a short caption next to the chip (e.g. `vs previous`). When the series has fewer than two finite points, the chip is hidden entirely.
+
+The sparkline is fully independent from the chip: it only draws when `sparklineField` is set. A scorecard can render a change chip without a sparkline (rely on the `field` fallback) and a sparkline without a chip (pick a non-directional aggregation).
+
+### Target and progress
+
+`render.target` accepts a numeric literal or a full `{{ CEL }}` expression. The expression is evaluated once against the newest filtered row (index 0 — all widget data sources are newest-first) plus the shared `now` global, so authors can bind to memory / execution fields (`{{ goal }}`) or compute a target (`{{ base * 1.1 }}`).
+
+When `render.showProgress` is `true` and the target resolves to a finite positive number, the scorecard renders a thin direction-aware progress bar under the value.
+
+The bar always fills to `clamp(current / target, 0, 100%)` — the fraction of the target the current value covers. The percentage label under the bar uses the raw ratio so authors see overshoot values above 100%. Only `met` (and therefore the bar color) depends on direction:
+
+- `better: up` — met when `current >= target`.
+- `better: down` — met when `current <= target`.
+
+This keeps the label honest for budget-style metrics: `429 vs 500` with `better: down` reads as `85.8% of 500` and colors green (still under the ceiling), rather than misleadingly reporting `100% of 500`.
+
+### Status color priority
+
+The colored value change, sparkline, and progress bar all read from the same status polarity, resolved in priority order:
+
+1. If the change chip is computable, use its polarity (`better` → green, `worse` → red, `flat` → slate).
+2. Otherwise, if the target resolves, use target-based status (`met` → green, otherwise red).
+3. Otherwise, neutral slate.
+
+This keeps the widget legible when only one signal is available (e.g. a `count` scorecard with no `sparklineField` still colors correctly via its target).
 
 ### Multi-Number Mode
 

@@ -1,8 +1,6 @@
-import type { GooglerpcStatus } from "@/api-client/types.gen";
-
 /**
  * Extract error message from API error response
- * Handles the structure returned by @hey-api/client-fetch
+ * Handles the structure returned by the generated OpenAPI client
  */
 export function getApiErrorMessage(error: unknown, fallback = "An error occurred"): string {
   return (
@@ -57,7 +55,7 @@ function getStatusMessage(error: unknown): string | null {
     return null;
   }
 
-  return getNonEmptyString((error as GooglerpcStatus).message);
+  return getNonEmptyString((error as { message?: unknown }).message);
 }
 
 function getNonEmptyString(value: unknown): string | null {

@@ -61,4 +61,38 @@ describe("resolveRunLookupEventForNodeActivity", () => {
 
     expect(runId).toBe("run-from-latest-execution");
   });
+
+  it("resolves cached runs directly from execution activity run id", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "action-1",
+      execution({
+        id: "latest-execution",
+        nodeId: "action-1",
+        runId: "run-from-execution",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    const runId = resolveCachedNodeRunId("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null);
+
+    expect(runId).toBe("run-from-execution");
+  });
+
+  it("resolves cached runs directly from trigger event run id", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeEvent(
+      "trigger-1",
+      event({
+        id: "latest-event",
+        nodeId: "trigger-1",
+        runId: "run-from-trigger",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    const runId = resolveCachedNodeRunId("trigger-1", { id: "trigger-1", type: "TYPE_TRIGGER" }, () => null);
+
+    expect(runId).toBe("run-from-trigger");
+  });
 });

@@ -183,3 +183,34 @@ export const Empty: Story = {
     isLoading: false,
   },
 };
+
+/**
+ * Hovering a bar surfaces the shared `TimestampDetails` block (Local / UTC /
+ * Relative / ISO with a copy button) whenever the X axis represents a
+ * timestamp — activated by setting `xFormat` to `date`, `datetime`, or
+ * `relative`. Axis ticks stay short (compact `Jul 6`) so densely-binned
+ * charts still read cleanly.
+ */
+export const TimestampAxis: Story = {
+  render: (args) => <ChartPanel title="Runs by day" {...args} />,
+  args: {
+    render: {
+      kind: "chart",
+      type: "bar",
+      xField: "day",
+      xFormat: "datetime",
+      series: [
+        { field: "passed", label: "Passed" },
+        { field: "failed", label: "Failed" },
+      ],
+    },
+    rows: [
+      { day: "2026-07-05T10:00:00Z", passed: 12, failed: 1 },
+      { day: "2026-07-06T10:00:00Z", passed: 15, failed: 0 },
+      { day: "2026-07-07T10:00:00Z", passed: 9, failed: 3 },
+      { day: "2026-07-08T10:00:00Z", passed: 14, failed: 1 },
+      { day: "2026-07-09T10:00:00Z", passed: 16, failed: 0 },
+    ],
+    isLoading: false,
+  },
+};

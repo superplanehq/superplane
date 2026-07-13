@@ -1,0 +1,37 @@
+{
+  "data": {
+    "status": "ended",
+    "batchId": "msgbatch_01HkcTjaV5uDC8jWR4ZsqFqz",
+    "requestCounts": {
+      "processing": 0,
+      "succeeded": 2,
+      "errored": 0,
+      "canceled": 0,
+      "expired": 0
+    },
+    "results": [
+      {
+        "index": 0,
+        "type": "succeeded",
+        "text": "Paris is the capital of France.",
+        "stopReason": "end_turn",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 9
+        }
+      },
+      {
+        "index": 1,
+        "type": "succeeded",
+        "text": "Berlin is the capital of Germany.",
+        "stopReason": "end_turn",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 9
+        }
+      }
+    ]
+  },
+  "timestamp": "2026-07-07T12:00:00Z",
+  "type": "claude.createBatchMessage.result"
+}

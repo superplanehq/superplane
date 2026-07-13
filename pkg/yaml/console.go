@@ -15,13 +15,14 @@ import (
 )
 
 const (
-	ConsolePanelTypeMarkdown = "markdown"
-	ConsolePanelTypeHTML     = "html"
-	ConsolePanelTypeNode     = "node"
-	ConsolePanelTypeNodes    = "nodes"
-	ConsolePanelTypeTable    = "table"
-	ConsolePanelTypeChart    = "chart"
-	ConsolePanelTypeNumber   = "number"
+	ConsolePanelTypeMarkdown  = "markdown"
+	ConsolePanelTypeHTML      = "html"
+	ConsolePanelTypeNode      = "node"
+	ConsolePanelTypeNodes     = "nodes"
+	ConsolePanelTypeTable     = "table"
+	ConsolePanelTypeChart     = "chart"
+	ConsolePanelTypeNumber    = "number"
+	ConsolePanelTypeScorecard = "scorecard"
 
 	MaxConsolePanels       = 50
 	MaxConsolePayloadBytes = 1024 * 1024
@@ -38,6 +39,7 @@ var AllowedConsolePanelTypes = []string{
 	ConsolePanelTypeTable,
 	ConsolePanelTypeChart,
 	ConsolePanelTypeNumber,
+	ConsolePanelTypeScorecard,
 }
 
 type Console struct {
@@ -272,6 +274,8 @@ func validatePanelContent(panel ConsolePanel) error {
 		return validateChartPanelContent(panel)
 	case ConsolePanelTypeNumber:
 		return validateNumberPanelContent(panel)
+	case ConsolePanelTypeScorecard:
+		return validateScorecardPanelContent(panel)
 	}
 	return nil
 }
@@ -649,6 +653,12 @@ func validateTablePanelContent(panel ConsolePanel) error {
 		if !ok || field == "" {
 			return fmt.Errorf("panel %q render.columns[%d].field must be a non-empty string", panel.ID, i)
 		}
+		if err := validateTableProgressColumn(panel.ID, i, column); err != nil {
+			return err
+		}
+		if err := validateTableColumnTrend(panel.ID, i, column); err != nil {
+			return err
+		}
 	}
 	if err := validateTableWhere(panel.ID, render["where"]); err != nil {
 		return err
@@ -660,6 +670,61 @@ func validateTablePanelContent(panel ConsolePanel) error {
 		return err
 	}
 	return validateTableRowActions(panel.ID, render["rowActions"])
+}
+
+// allowedProgressLabels mirrors `WIDGET_PROGRESS_LABELS` on the FE. Keep the
+// two in lockstep so a valid YAML round-trips through either side.
+var allowedProgressLabels = []string{"none", "number", "percent"}
+
+// validateTableProgressColumn enforces the extra constraints on
+// `format: progress` columns: the target expression must be present and the
+// label enum, when set, must be one of the allowed values. Other formats
+// simply ignore these fields.
+func validateTableProgressColumn(panelID string, index int, column map[string]any) error {
+	if rawLabel, ok := column["progressLabel"]; ok && rawLabel != nil {
+		label, ok := rawLabel.(string)
+		if !ok || !slices.Contains(allowedProgressLabels, label) {
+			return fmt.Errorf("panel %q render.columns[%d].progressLabel must be one of %s", panelID, index, strings.Join(allowedProgressLabels, "/"))
+		}
+	}
+	format, _ := column["format"].(string)
+	if format != "progress" {
+		return nil
+	}
+	target, ok := column["progressTarget"].(string)
+	if !ok || strings.TrimSpace(target) == "" {
+		return fmt.Errorf("panel %q render.columns[%d].progressTarget must be a non-empty string for progress columns", panelID, index)
+	}
+	return nil
+}
+
+// allowedTrendBetter / allowedTrendDisplay must stay in lockstep with the
+// frontend `WIDGET_TREND_BETTER` / `WIDGET_TREND_DISPLAYS` enums in
+// `web_src/.../widget/types.ts`.
+var (
+	allowedTrendBetter  = []string{"up", "down"}
+	allowedTrendDisplay = []string{"percent", "value", "none"}
+)
+
+func validateTableColumnTrend(panelID string, index int, column map[string]any) error {
+	if raw, ok := column["showTrend"]; ok && raw != nil {
+		if _, isBool := raw.(bool); !isBool {
+			return fmt.Errorf("panel %q render.columns[%d].showTrend must be a boolean", panelID, index)
+		}
+	}
+	if raw, ok := column["trendBetter"]; ok && raw != nil {
+		s, isString := raw.(string)
+		if !isString || !slices.Contains(allowedTrendBetter, s) {
+			return fmt.Errorf("panel %q render.columns[%d].trendBetter must be one of %s", panelID, index, strings.Join(allowedTrendBetter, "/"))
+		}
+	}
+	if raw, ok := column["trendDisplay"]; ok && raw != nil {
+		s, isString := raw.(string)
+		if !isString || !slices.Contains(allowedTrendDisplay, s) {
+			return fmt.Errorf("panel %q render.columns[%d].trendDisplay must be one of %s", panelID, index, strings.Join(allowedTrendDisplay, "/"))
+		}
+	}
+	return nil
 }
 
 // allowedRowStyleTones must stay in lockstep with the frontend tone enum
@@ -1069,6 +1134,65 @@ func validateMemoryNumberSource(panelID string, index int, raw any) error {
 		}
 	}
 	return validateOptionalString(panelID, fmt.Sprintf("dataSource.sources[%d].fieldPath", index), source["fieldPath"])
+}
+
+// allowedScorecardBetter / allowedScorecardShowChange must stay in lockstep
+// with the frontend `WIDGET_TREND_BETTER` / `WIDGET_SCORECARD_SHOW_CHANGES`
+// enums in `web_src/.../widget/types.ts`.
+var (
+	allowedScorecardBetter     = []string{"up", "down"}
+	allowedScorecardShowChange = []string{"percent", "number", "both", "none"}
+)
+
+// validateScorecardPanelContent enforces the shape of a `scorecard` panel.
+// It reuses the shared data-source validator (single-source memory /
+// executions / runs), and then validates the scorecard-specific render:
+// standard number aggregation/field/format plus optional target (literal or
+// CEL string), better direction, showChange enum, progress toggle, and
+// change caption.
+func validateScorecardPanelContent(panel ConsolePanel) error {
+	if panel.Content == nil {
+		return fmt.Errorf("panel %q content is required", panel.ID)
+	}
+	if err := validateDataSource(panel.ID, panel.Content["dataSource"]); err != nil {
+		return err
+	}
+	render, err := validateRender(panel.ID, panel.Content["render"], "scorecard")
+	if err != nil {
+		return err
+	}
+	aggregation, _ := render["aggregation"].(string)
+	if !slices.Contains(allowedNumberAggregations, aggregation) {
+		return fmt.Errorf("panel %q render.aggregation must be one of %s", panel.ID, strings.Join(allowedNumberAggregations, "/"))
+	}
+	if aggregation != "count" {
+		if field, ok := render["field"].(string); !ok || field == "" {
+			return fmt.Errorf("panel %q render.field is required when aggregation is %q", panel.ID, aggregation)
+		}
+	}
+	for _, key := range []string{"prefix", "suffix", "label", "format", "sparklineField", "target", "changeCaption"} {
+		if err := validateOptionalString(panel.ID, "render."+key, render[key]); err != nil {
+			return err
+		}
+	}
+	if raw, ok := render["showProgress"]; ok && raw != nil {
+		if _, isBool := raw.(bool); !isBool {
+			return fmt.Errorf("panel %q render.showProgress must be a boolean", panel.ID)
+		}
+	}
+	if raw, ok := render["better"]; ok && raw != nil {
+		s, isString := raw.(string)
+		if !isString || !slices.Contains(allowedScorecardBetter, s) {
+			return fmt.Errorf("panel %q render.better must be one of %s", panel.ID, strings.Join(allowedScorecardBetter, "/"))
+		}
+	}
+	if raw, ok := render["showChange"]; ok && raw != nil {
+		s, isString := raw.(string)
+		if !isString || !slices.Contains(allowedScorecardShowChange, s) {
+			return fmt.Errorf("panel %q render.showChange must be one of %s", panel.ID, strings.Join(allowedScorecardShowChange, "/"))
+		}
+	}
+	return nil
 }
 
 // normalizeDashboardPanelsForExport ensures stable field order in panel

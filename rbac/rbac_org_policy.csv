@@ -9,8 +9,6 @@ p,/roles/org_viewer,/org/*,service_accounts,read
 p,/roles/org_viewer,/org/*,agents,read
 p,/roles/org_admin,/org/*,canvases,create
 p,/roles/org_admin,/org/*,canvases,update
-p,/roles/org_admin,/org/*,canvases,update_version
-p,/roles/org_admin,/org/*,canvases,publish
 p,/roles/org_admin,/org/*,canvases,delete
 p,/roles/org_admin,/org/*,members,create
 p,/roles/org_admin,/org/*,members,update

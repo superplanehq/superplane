@@ -749,6 +749,110 @@ func TestValidateConsoleContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			contains: "render.rowActions[0].node",
 		},
 		{
+			name: "progress column without target",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{"field": "current", "format": "progress"},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].progressTarget must be a non-empty string for progress columns",
+		},
+		{
+			name: "progress column with unknown label",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{
+								"field":          "current",
+								"format":         "progress",
+								"progressTarget": "total",
+								"progressLabel":  "fraction",
+							},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].progressLabel must be one of",
+		},
+		{
+			name: "table column with invalid trendBetter",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{
+								"field":        "durationMs",
+								"format":       "trend",
+								"trendBetter":  "sideways",
+								"trendDisplay": "percent",
+							},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].trendBetter must be one of",
+		},
+		{
+			name: "table column with invalid trendDisplay",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{
+								"field":        "durationMs",
+								"format":       "trend",
+								"trendBetter":  "down",
+								"trendDisplay": "chart",
+							},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].trendDisplay must be one of",
+		},
+		{
+			name: "table column with invalid showTrend",
+			panel: ConsolePanel{
+				ID:   "table",
+				Type: ConsolePanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind": "table",
+						"columns": []any{
+							map[string]any{
+								"field":     "durationMs",
+								"format":    "duration",
+								"showTrend": "yes",
+							},
+						},
+					},
+				},
+			},
+			contains: "render.columns[0].showTrend must be a boolean",
+		},
+		{
 			name: "row style with unknown tone",
 			panel: ConsolePanel{
 				ID:   "table",
@@ -1179,6 +1283,55 @@ func TestValidateConsoleContent_AcceptsChartAxisFormatting(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestValidateConsoleContent_AcceptsTableTrendColumns(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "table",
+			Type: ConsolePanelTypeTable,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+				"render": map[string]any{
+					"kind": "table",
+					"columns": []any{
+						map[string]any{
+							"field":        "durationMs",
+							"format":       "trend",
+							"trendBetter":  "down",
+							"trendDisplay": "percent",
+						},
+						map[string]any{
+							"field":        "score",
+							"format":       "trend",
+							"trendBetter":  "up",
+							"trendDisplay": "value",
+						},
+						map[string]any{
+							"field":        "coverage",
+							"format":       "trend",
+							"trendDisplay": "none",
+						},
+						map[string]any{
+							"field":        "durationMs",
+							"format":       "duration",
+							"showTrend":    true,
+							"trendBetter":  "down",
+							"trendDisplay": "percent",
+						},
+						map[string]any{
+							"field":     "passRate",
+							"format":    "percent",
+							"showTrend": true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
 func TestValidateConsoleContent_AcceptsTableRowStyles(t *testing.T) {
 	panels := []ConsolePanel{
 		{
@@ -1193,6 +1346,37 @@ func TestValidateConsoleContent_AcceptsTableRowStyles(t *testing.T) {
 						map[string]any{"field": "status", "op": "eq", "value": "error", "tone": "red-soft"},
 						map[string]any{"field": "status", "op": "eq", "value": "deploying", "tone": "orange-soft"},
 						map[string]any{"field": "deployedAt", "op": "not_exists", "tone": "dimmed"},
+					},
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_AcceptsProgressColumn(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "table",
+			Type: ConsolePanelTypeTable,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+				"render": map[string]any{
+					"kind": "table",
+					"columns": []any{
+						map[string]any{
+							"field":          "completed",
+							"format":         "progress",
+							"progressTarget": "total",
+							"progressLabel":  "number",
+						},
+						map[string]any{
+							"field":          "score",
+							"format":         "progress",
+							"progressTarget": "100",
+						},
 					},
 				},
 			},
@@ -1506,4 +1690,184 @@ func TestValidateConsoleContent_AcceptsMultiNumberPanel(t *testing.T) {
 
 	err := ValidateConsoleContent(panels, nil)
 	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_AcceptsScorecardPanel(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"title":      "Open UX papercuts",
+				"dataSource": map[string]any{"kind": "memory", "namespace": "ux_papercuts"},
+				"render": map[string]any{
+					"kind":           "scorecard",
+					"aggregation":    "last",
+					"field":          "openCount",
+					"format":         "number",
+					"label":          "Open UX papercuts",
+					"better":         "down",
+					"target":         "80",
+					"showProgress":   true,
+					"sparklineField": "openCount",
+					"showChange":     "both",
+					"changeCaption":  "vs start of range",
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_AcceptsCountScorecardWithoutField(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "runs",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "runs", "limit": 100},
+				"render": map[string]any{
+					"kind":        "scorecard",
+					"aggregation": "count",
+				},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithoutContent(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content is required")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithWrongRenderKind(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "number", "aggregation": "count"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `render.kind must be "scorecard"`)
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithUnknownAggregation(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "median"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.aggregation must be one of")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithoutFieldForNonCount(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "last"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.field is required")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithInvalidBetter(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "count", "better": "sideways"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.better must be one of")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithInvalidShowChange(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "count", "showChange": "chart"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.showChange must be one of")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithNonBooleanShowProgress(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "count", "showProgress": "yes"},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.showProgress must be a boolean")
+}
+
+func TestValidateConsoleContent_RejectsScorecardWithNonStringTarget(t *testing.T) {
+	panels := []ConsolePanel{
+		{
+			ID:   "papercuts",
+			Type: ConsolePanelTypeScorecard,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "x"},
+				"render":     map[string]any{"kind": "scorecard", "aggregation": "count", "target": 42},
+			},
+		},
+	}
+
+	err := ValidateConsoleContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "render.target must be a string")
 }

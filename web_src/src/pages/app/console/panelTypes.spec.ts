@@ -11,8 +11,8 @@ import {
 } from "./panelTypes";
 
 describe("PANEL_TYPES", () => {
-  it("includes the seven supported types", () => {
-    expect(PANEL_TYPES).toEqual(["markdown", "html", "node", "nodes", "table", "chart", "number"]);
+  it("includes the eight supported types", () => {
+    expect(PANEL_TYPES).toEqual(["markdown", "html", "node", "nodes", "table", "chart", "number", "scorecard"]);
   });
 
   it("isPanelType narrows to the union", () => {
@@ -20,6 +20,7 @@ describe("PANEL_TYPES", () => {
     expect(isPanelType("html")).toBe(true);
     expect(isPanelType("node")).toBe(true);
     expect(isPanelType("nodes")).toBe(true);
+    expect(isPanelType("scorecard")).toBe(true);
     expect(isPanelType("timeline")).toBe(false);
     expect(isPanelType(42)).toBe(false);
   });
@@ -73,6 +74,30 @@ describe("templateForPanelType", () => {
   it("defaults chart panels to count rows when no series field is set", () => {
     const tpl = templateForPanelType("chart") as { render: { series: Array<{ field?: string; label?: string }> } };
     expect(tpl.render.series).toEqual([{ label: "Count" }]);
+  });
+
+  it("seeds scorecard panels with a valid drop-in aggregation and screenshot-friendly caption", () => {
+    const tpl = templateForPanelType("scorecard") as {
+      dataSource: { kind: string; namespace?: string };
+      render: {
+        kind: string;
+        aggregation: string;
+        better: string;
+        showChange: string;
+        changeCaption: string;
+      };
+    };
+    expect(tpl.dataSource).toEqual({ kind: "memory", namespace: "" });
+    // Seed with `count` so a newly added panel passes validation before the
+    // author picks a data source / field. Authors typically switch to
+    // `last` (with a field on the same metric as `sparklineField`).
+    expect(tpl.render).toMatchObject({
+      kind: "scorecard",
+      aggregation: "count",
+      better: "up",
+      showChange: "both",
+      changeCaption: "vs previous",
+    });
   });
 });
 
@@ -227,6 +252,40 @@ describe("validatePanelContent — table", () => {
       },
     });
     expect(error).toMatch(/render\.rowStyles\[0\]\.field must be a non-empty string/);
+  });
+
+  it("requires progressTarget when format is progress", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [{ field: "done", format: "progress" }],
+      },
+    });
+    expect(error).toMatch(/render\.columns\[0\]\.progressTarget/);
+  });
+
+  it("rejects an unknown progressLabel value", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [{ field: "done", format: "progress", progressTarget: "total", progressLabel: "fraction" }],
+      },
+    });
+    expect(error).toMatch(/render\.columns\[0\]\.progressLabel must be one of/);
+  });
+
+  it("accepts a well-formed progress column", () => {
+    expect(
+      validatePanelContent("table", {
+        dataSource: { kind: "memory", namespace: "env" },
+        render: {
+          kind: "table",
+          columns: [{ field: "done", format: "progress", progressTarget: "total", progressLabel: "number" }],
+        },
+      }),
+    ).toBeNull();
   });
 });
 

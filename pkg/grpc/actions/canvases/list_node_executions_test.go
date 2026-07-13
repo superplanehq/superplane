@@ -157,8 +157,10 @@ func Test__ListNodeExecutions(t *testing.T) {
 		assert.Len(t, response.Executions, 1)
 		assert.Equal(t, uint32(1), response.TotalCount)
 		assert.Equal(t, "node-1", response.Executions[0].NodeId)
+		assert.Equal(t, rootEvent.RunID.String(), response.Executions[0].RunId)
 		require.NotNil(t, response.Executions[0].RootEvent)
 		assert.Equal(t, customName, response.Executions[0].RootEvent.CustomName)
+		assert.Equal(t, rootEvent.RunID.String(), response.Executions[0].RootEvent.RunId)
 	})
 }
 

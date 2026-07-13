@@ -100,6 +100,7 @@ import {
 import { useRefreshLatestLiveCanvasData } from "./useRefreshLatestLiveCanvasData";
 import { sortVersionsDesc } from "./lib/canvas-versions";
 import { useAppDraftStagingData } from "./useAppDraftStagingData";
+import { useDefaultAppTab } from "./useDefaultAppTab";
 import { useCanvasEditVersionState } from "./useCanvasEditVersionState";
 import { useEditSessionBootstrap } from "./useEditSessionBootstrap";
 import { useDraftCanvasSpecSync } from "./useDraftCanvasSpecSync";
@@ -109,6 +110,7 @@ import { useCanvasEchoReleaseGuards } from "./useCanvasEchoReleaseGuards";
 import { useCanvasLifecycleEventHandlers } from "./useCanvasLifecycleEventHandlers";
 import { useDraftStagingActions } from "./useDraftStagingActions";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
+import { buildDuplicatedEdges, buildDuplicatedNodes } from "./lib/duplicate-nodes";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { buildCanvasYamlExportPayload, materializeCanvasSpec } from "./lib/workflow-spec-files";
@@ -123,6 +125,7 @@ import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useRunParticipantFitRequest } from "./useRunParticipantFitRequest";
+import { useAgentNodeFocusRequest, type CanvasFocusRequest } from "./useAgentNodeFocusRequest";
 import { isRunDetailDismissed, useRunsDetailState } from "./useRunsDetailState";
 import { useComponentIconMap } from "./useComponentIconMap";
 import { useRunSidebarNavigationState } from "./useRunSidebarNavigationState";
@@ -168,73 +171,11 @@ const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_SPEC_ITEMS: never[] = [];
 const RUNNING_RUNS_FILTERS = { states: ["STATE_STARTED" as CanvasesCanvasRunState] };
 
-type DuplicatedNodesResult = {
-  newNodes: ComponentsNode[];
-  nodeIdMap: Record<string, string>;
-};
-
-function duplicateBaseName(node: ComponentsNode): string {
-  const trimmedName = node.name?.trim();
-  if (trimmedName) return trimmedName;
-  if ((node.type === "TYPE_TRIGGER" || node.type === "TYPE_ACTION") && node.component) return node.component;
-  return "node";
-}
-
-function buildDuplicatedNodes(specNodes: ComponentsNode[], nodeIds: string[]): DuplicatedNodesResult {
-  const existingNodeNames = specNodes.map((node) => node.name || "").filter(Boolean);
-  const newNodes: ComponentsNode[] = [];
-  const nodeIdMap: Record<string, string> = {};
-
-  for (const nodeId of nodeIds) {
-    const nodeToDuplicate = specNodes.find((node) => node.id === nodeId);
-    if (!nodeToDuplicate) continue;
-
-    const baseName = duplicateBaseName(nodeToDuplicate);
-    const allNames = [...existingNodeNames, ...newNodes.map((node) => node.name || "")];
-    const uniqueNodeName = generateUniqueNodeName(baseName, allNames);
-    const newNodeId = generateNodeId(baseName, uniqueNodeName);
-
-    nodeIdMap[nodeId] = newNodeId;
-    newNodes.push({
-      ...nodeToDuplicate,
-      id: newNodeId,
-      name: uniqueNodeName,
-      position: {
-        x: (nodeToDuplicate.position?.x || 0) + 50,
-        y: (nodeToDuplicate.position?.y || 0) + 50,
-      },
-      isCollapsed: false,
-    });
-  }
-
-  return { newNodes, nodeIdMap };
-}
-
-function buildDuplicatedEdges(
-  edges: ComponentsEdge[],
-  duplicatedNodeIds: Set<string>,
-  nodeIdMap: Record<string, string>,
-): ComponentsEdge[] {
-  return edges
-    .filter(
-      (edge) =>
-        edge.sourceId != null &&
-        edge.targetId != null &&
-        duplicatedNodeIds.has(edge.sourceId) &&
-        duplicatedNodeIds.has(edge.targetId),
-    )
-    .map((edge) => ({
-      ...edge,
-      sourceId: nodeIdMap[edge.sourceId!],
-      targetId: nodeIdMap[edge.targetId!],
-    }));
-}
-
 function getCanvasVersionEditPermissionState({
-  canUpdateCanvasVersion,
+  canEditCanvasDraft,
   canvasDeletedRemotely,
 }: {
-  canUpdateCanvasVersion: boolean;
+  canEditCanvasDraft: boolean;
   canvasDeletedRemotely: boolean;
 }) {
   if (canvasDeletedRemotely) {
@@ -244,7 +185,7 @@ function getCanvasVersionEditPermissionState({
     };
   }
 
-  if (!canUpdateCanvasVersion) {
+  if (!canEditCanvasDraft) {
     return {
       canStageCanvasVersion: false,
       tooltip: "You don't have permission to edit this canvas.",
@@ -255,6 +196,10 @@ function getCanvasVersionEditPermissionState({
     canStageCanvasVersion: true,
     tooltip: undefined,
   };
+}
+
+function canEditCanvasDraftVersion(canUpdateCanvas: boolean, canAct: (resource: string, action: string) => boolean) {
+  return canUpdateCanvas || canAct("canvases", "update_version");
 }
 
 function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
@@ -576,14 +521,14 @@ export function AppPage() {
   const createCanvasMemoryNamespace = useCreateCanvasMemoryNamespace(canvasId!);
   const updateCanvasMemoryNamespace = useUpdateCanvasMemoryNamespace(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
-  const canUpdateCanvasVersion = canAct("canvases", "update_version");
+  const canEditCanvasDraft = canEditCanvasDraftVersion(canUpdateCanvas, canAct);
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const canvasAccess = { canUpdateCanvas, canvasDeletedRemotely };
   const canActOnCanvas = canUpdateCanvas && !canvasDeletedRemotely;
   const canvasVersionEditPermission = getCanvasVersionEditPermissionState({
-    canUpdateCanvasVersion,
+    canEditCanvasDraft,
     canvasDeletedRemotely,
   });
   const canStageCanvasVersion = canvasVersionEditPermission.canStageCanvasVersion;
@@ -1014,6 +959,8 @@ export function AppPage() {
     committedBaselines: committedBaselinesForEdit,
     editBootstrapReady: isEditBootstrapReady,
   });
+
+  useDefaultAppTab({ canvasId, urlViewFlags, searchParams });
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
@@ -1647,12 +1594,7 @@ export function AppPage() {
   });
 
   const [currentHistoryNode, setCurrentHistoryNode] = useState<{ nodeId: string; nodeType: string } | null>(null);
-  const [focusRequest, setFocusRequest] = useState<{
-    nodeId: string;
-    requestId: number;
-    targetMode: "live" | "runs";
-    tab?: "latest" | "settings";
-  } | null>(null);
+  const [focusRequest, setFocusRequest] = useState<CanvasFocusRequest | null>(null);
   const handleSidebarChange = useCallback(
     (open: boolean, nodeId: string | null) => {
       // Use the functional updater so this composes with other concurrent
@@ -1917,7 +1859,7 @@ export function AppPage() {
     async (workflowToSave?: CanvasesCanvas, options?: { showToast?: boolean; savingVersionId?: string }) => {
       const targetWorkflow = workflowToSave || canvasRef.current;
       if (!targetWorkflow || !organizationId || !canvasId) return;
-      if (!canUpdateCanvasVersion) {
+      if (!canStageCanvasVersion) {
         if (options?.showToast !== false) {
           showErrorToast("You don't have permission to edit this canvas version");
         }
@@ -1983,7 +1925,7 @@ export function AppPage() {
       organizationId,
       canvasId,
       activeCanvasVersionId,
-      canUpdateCanvasVersion,
+      canStageCanvasVersion,
       enqueueCanvasSave,
       setLastSavedWorkflowSnapshot,
     ],
@@ -3398,6 +3340,7 @@ export function AppPage() {
   );
 
   const runInspectionChromeActive = isRunInspectionMode && !editSessionActive && !isEnteringEditSession;
+  useAgentNodeFocusRequest(setFocusRequest, runInspectionChromeActive);
   const runParticipantFit = useRunParticipantFitRequest({
     isRunInspectionMode: runInspectionChromeActive,
     selectedRunId,
@@ -4313,8 +4256,8 @@ export function AppPage() {
           onCommitStaging={whenAllowed(canUpdateCanvas, handleOpenCommitDialog)}
           commitStagingPending={commitStagingPending}
           resetStagingPending={resetStagingPending}
-          onResetStaging={whenAllowed(canUpdateCanvasVersion, handleResetStaging)}
-          onDiscardStaleStaging={whenAllowed(canUpdateCanvasVersion, handleDiscardStaleStaging)}
+          onResetStaging={whenAllowed(canStageCanvasVersion, handleResetStaging)}
+          onDiscardStaleStaging={whenAllowed(canStageCanvasVersion, handleDiscardStaleStaging)}
           discardStaleStagingPending={resetStagingPending}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}

@@ -13,11 +13,13 @@ import (
 
 func Test__SerializeCanvasEvent__ConvertsJSONNumbersForProto(t *testing.T) {
 	now := time.Now()
+	runID := uuid.New()
 	event := models.CanvasEvent{
 		ID:         uuid.New(),
 		WorkflowID: uuid.New(),
 		NodeID:     "trigger",
 		Channel:    "default",
+		RunID:      runID,
 		Data: models.NewJSONValue(map[string]any{
 			"type": "webhook",
 			"data": map[string]any{
@@ -37,6 +39,7 @@ func Test__SerializeCanvasEvent__ConvertsJSONNumbersForProto(t *testing.T) {
 
 	serialized, err := SerializeCanvasEvent(event)
 	require.NoError(t, err)
+	assert.Equal(t, runID.String(), serialized.RunId)
 
 	payload, ok := serialized.Data.AsMap()["data"].(map[string]any)
 	require.True(t, ok)

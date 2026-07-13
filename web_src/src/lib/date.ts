@@ -1,12 +1,21 @@
 export const formatTimeAgo = (date: Date, includeAgo = true): string => {
-  const suffix = includeAgo ? " ago" : "";
-  const seconds = Math.max(0, Math.floor((new Date().getTime() - date.getTime()) / 1000));
+  const deltaSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  const isFuture = deltaSeconds < 0;
+  const seconds = Math.abs(deltaSeconds);
 
-  if (seconds < 60) return `${seconds}s${suffix}`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m${suffix}`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h${suffix}`;
-  const days = Math.floor(hours / 24);
-  return `${days}d${suffix}`;
+  let unit: string;
+  if (seconds < 60) {
+    unit = `${seconds}s`;
+  } else {
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+      unit = `${minutes}m`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      unit = hours < 24 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
+    }
+  }
+
+  if (isFuture) return `in ${unit}`;
+  return includeAgo ? `${unit} ago` : unit;
 };

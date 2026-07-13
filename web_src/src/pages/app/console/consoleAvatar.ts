@@ -6,11 +6,16 @@ export interface ConsoleAvatarDisplay {
 
 /**
  * Resolve avatar image / initials for GitHub webhook author maps. Mirrors the
- * `githubAvatarOrInitial` CEL helper used in HTML panels.
+ * `githubAvatarOrInitial` CEL helper used in HTML panels. Strings that are
+ * already image URLs (e.g. an `avatar_url` field or a `{{ cel }}` expression
+ * that builds one) are passed through as the image source directly.
  */
 export function resolveConsoleAvatar(author: unknown, committer?: unknown): ConsoleAvatarDisplay {
   if (typeof author === "string") {
     const username = author.trim();
+    if (isImageUrl(username)) {
+      return { src: username, name: "" };
+    }
     if (username) {
       return { src: `https://github.com/${username}.png`, name: username };
     }
@@ -33,6 +38,10 @@ export function resolveConsoleAvatar(author: unknown, committer?: unknown): Cons
   );
 
   return { initials: initials || undefined, name };
+}
+
+function isImageUrl(value: string): boolean {
+  return value.startsWith("https://") || value.startsWith("http://");
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
