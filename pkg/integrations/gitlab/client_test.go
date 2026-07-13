@@ -735,3 +735,145 @@ func Test__Client__CreateMergeRequestAwardEmoji(t *testing.T) {
 		require.Len(t, mockClient.Requests, 1)
 	})
 }
+
+func Test__Client__GetIssue(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 101, "iid": 1, "title": "Test Issue", "state": "opened"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.GetIssue(context.Background(), "1", "1")
+		require.NoError(t, err)
+		assert.Equal(t, 101, result.ID)
+		assert.Equal(t, "Test Issue", result.Title)
+		assert.Equal(t, "opened", result.State)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/issues/1", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Issue Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.GetIssue(context.Background(), "1", "999")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get issue")
+	})
+}
+
+func Test__Client__UpdateIssue(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 101, "iid": 1, "title": "Updated Title", "state": "closed"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		req := &UpdateIssueRequest{Title: "Updated Title", StateEvent: "close"}
+		result, err := client.UpdateIssue(context.Background(), "1", "1", req)
+
+		require.NoError(t, err)
+		assert.Equal(t, "Updated Title", result.Title)
+		assert.Equal(t, "closed", result.State)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPut, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/issues/1", mockClient.Requests[0].URL.String())
+
+		body, _ := io.ReadAll(mockClient.Requests[0].Body)
+		assert.True(t, strings.Contains(string(body), `"state_event":"close"`))
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusBadRequest, `{"message": "400 Bad Request"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.UpdateIssue(context.Background(), "1", "1", &UpdateIssueRequest{Title: "x"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update issue")
+	})
+}
+
+func Test__Client__CreateIssueNote(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{"id": 55, "body": "Great work!", "noteable_type": "Issue"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		result, err := client.CreateIssueNote(context.Background(), "1", "5", &CreateNoteRequest{Body: "Great work!"})
+
+		require.NoError(t, err)
+		assert.Equal(t, 55, result.ID)
+		assert.Equal(t, "Great work!", result.Body)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/1/issues/5/notes", mockClient.Requests[0].URL.String())
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Issue Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			httpClient: mockClient,
+		}
+
+		_, err := client.CreateIssueNote(context.Background(), "1", "999", &CreateNoteRequest{Body: "x"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create issue note")
+	})
+}
