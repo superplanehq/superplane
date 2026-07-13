@@ -49,10 +49,14 @@ export function TimelineAccordionCard({
     <>
       <AccordionItem
         value={value}
+        data-testid={`run-inspector-${value}-accordion`}
         className="overflow-hidden rounded border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900"
       >
         <AccordionPrimitive.Header className="flex items-center gap-1 border-b border-slate-200 bg-slate-50 py-1.5 pr-2 dark:border-gray-800 dark:bg-gray-900">
-          <AccordionPrimitive.Trigger className="flex min-w-0 items-center gap-1.5 px-3 text-left hover:no-underline">
+          <AccordionPrimitive.Trigger
+            data-testid={`run-inspector-${value}-accordion-trigger`}
+            className="flex min-w-0 items-center gap-1.5 px-3 text-left hover:no-underline"
+          >
             <EventStatusPill {...status} />
             <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500">
               {title}
