@@ -1,18 +1,20 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun } from "@/api-client";
 import {
   useCanvasMemoryEntries,
   useEventExecutionsBatch,
   useInfiniteCanvasRuns,
   type CanvasMemoryEntry,
 } from "@/hooks/useCanvasData";
+import { hasRunStatusTriggerFilters, runMatchesStatusTriggerFilters } from "@/ui/Runs/runStatusTriggerFilter";
 
-import { useConsoleContext } from "./ConsoleContext";
+import { resolveConsoleNode, useConsoleContext } from "./ConsoleContext";
 import { markdownTemplateReferencesRunNode } from "./markdownInterpolation";
 import { DOLLAR_REWRITE_IDENTIFIER } from "./widget/celExpr";
 import { memoryEntryToRow } from "./widget/memoryRow";
 import { buildDollarNodes, buildNodeNameMap } from "./widget/useWidgetData";
+import { WIDGET_MAX_EAGER_PAGES } from "./widget/widgetPagination";
 import { applySort } from "./widget/widgetData";
 import type { MarkdownMemoryVariableSource, MarkdownRunVariableSource, MarkdownVariable } from "./panelTypes";
 
@@ -20,12 +22,12 @@ import type { MarkdownMemoryVariableSource, MarkdownRunVariableSource, MarkdownV
  * Shape we read off a `useInfiniteCanvasRuns` result. Defined locally so the
  * memoized run-id collector doesn't reach for `typeof latestQuery.data`,
  * which the eslint react-hooks plugin tracks as a dependency on the entire
- * `latestQuery` object.
+ * `latestQuery` object. Every field the run resolver consumes is optional
+ * so we can share the same shape between the sideload id collector and the
+ * status/trigger filter — both operate on the same runtime data.
  */
 interface RunsPage {
-  runs?: Array<{
-    rootEvent?: { id?: string };
-  }>;
+  runs?: RunRow[];
 }
 interface RunsQueryData {
   pages?: RunsPage[];
@@ -108,24 +110,38 @@ export function useMarkdownVariables(
   const failedRunsData = failedQuery.data as RunsQueryData | undefined;
 
   // Pick the candidate root-event ids for each enabled run query so the
-  // execution side-load fetches only the run that will actually be used as
-  // a variable value. Dedupes ids so the same root event is fetched once.
+  // execution side-load fetches only the run that will actually be used
+  // as a variable value. Every variable in the same `select` bucket shares
+  // one query, so we scan the loaded pages once per bucket and pick the
+  // first run that matches each variable's status/trigger filters (with
+  // "no filters" collapsing to today's `pages[0].runs[0]` behavior).
   const runRootEventIds = useMemo(() => {
     if (!needsRunSideload) return [] as string[];
-    const candidates: Array<RunsQueryData | undefined> = [];
-    if (wantLatest) candidates.push(latestRunsData);
-    if (wantLatestPassed) candidates.push(passedRunsData);
-    if (wantLatestFailed) candidates.push(failedRunsData);
-    return collectFirstRunRootEventIds(candidates);
-  }, [
-    needsRunSideload,
-    wantLatest,
-    wantLatestPassed,
-    wantLatestFailed,
-    latestRunsData,
-    passedRunsData,
-    failedRunsData,
-  ]);
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    const resolveTrigger = (reference: string) => resolveConsoleNode(ctx, reference)?.node.id;
+    for (const variable of list) {
+      const source = variable?.source;
+      if (source?.kind !== "run") continue;
+      const data = pickRunQueryData({ source, latestRunsData, passedRunsData, failedRunsData });
+      const run = firstMatchingRun(data, source, resolveTrigger);
+      const id = run?.rootEvent?.id;
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        ids.push(id);
+      }
+    }
+    return ids;
+  }, [needsRunSideload, list, ctx, latestRunsData, passedRunsData, failedRunsData]);
+
+  // When any variable in a `select` bucket carries a status/trigger filter,
+  // the first fetched page may not contain a matching run. Eagerly page
+  // through the shared infinite query until a match surfaces, the source
+  // runs out of pages, or we hit `WIDGET_MAX_EAGER_PAGES` — same safety cap
+  // the widget runs data source uses.
+  useEagerFilterPagination({ query: latestQuery, list, select: "latest", data: latestRunsData, ctx });
+  useEagerFilterPagination({ query: passedQuery, list, select: "latest_passed", data: passedRunsData, ctx });
+  useEagerFilterPagination({ query: failedQuery, list, select: "latest_failed", data: failedRunsData, ctx });
 
   const { queries: runExecutionQueries, isLoading: runExecutionsLoading } = useEventExecutionsBatch(
     canvasId,
@@ -154,6 +170,7 @@ export function useMarkdownVariables(
     // last-wins here while save keeps the first, letting authors preview one
     // value and save a different one.
     const seen = new Set<string>();
+    const resolveTrigger = (reference: string) => resolveConsoleNode(ctx, reference)?.node.id;
     for (const variable of list) {
       if (!variable?.name || !variable?.source) continue;
       if (seen.has(variable.name)) continue;
@@ -166,6 +183,7 @@ export function useMarkdownVariables(
         failedQuery,
         executionsByRootEventId,
         nodeNameById,
+        resolveTrigger,
       });
       out[variable.name] = resolved.value;
       if (resolved.error) errs.push({ name: variable.name, message: resolved.error });
@@ -180,6 +198,7 @@ export function useMarkdownVariables(
     failedQuery,
     executionsByRootEventId,
     nodeNameById,
+    ctx,
   ]);
 
   const baseLoading =
@@ -194,31 +213,109 @@ export function useMarkdownVariables(
 }
 
 /**
- * Collect unique `rootEvent.id` values from the first run of each provided
- * runs query. Pure helper extracted from `useMarkdownVariables` so the
- * memoized version stays inside the eslint complexity budget.
+ * Pick the right runs query data based on the variable's `select` value.
+ * Extracted so the sideload id collector and the resolver share the same
+ * bucket routing without duplicating the switch.
  */
-function collectFirstRunRootEventIds(candidates: Array<RunsQueryData | undefined>): string[] {
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  for (const data of candidates) {
-    const id = data?.pages?.[0]?.runs?.[0]?.rootEvent?.id;
-    if (id && !seen.has(id)) {
-      seen.add(id);
-      ids.push(id);
+function pickRunQueryData(args: {
+  source: MarkdownRunVariableSource;
+  latestRunsData: RunsQueryData | undefined;
+  passedRunsData: RunsQueryData | undefined;
+  failedRunsData: RunsQueryData | undefined;
+}): RunsQueryData | undefined {
+  if (args.source.select === "latest_passed") return args.passedRunsData;
+  if (args.source.select === "latest_failed") return args.failedRunsData;
+  return args.latestRunsData;
+}
+
+interface InfiniteRunsQuery {
+  hasNextPage?: boolean;
+  isFetching: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => unknown;
+}
+
+/**
+ * Fetch additional pages of the shared `select` bucket until every
+ * filter-carrying variable in that bucket resolves to a match — or the
+ * source runs out of pages / we hit the widget page cap. No-op when no
+ * variable in the bucket has filters set so unfiltered variables keep
+ * their fast single-page behavior.
+ */
+function useEagerFilterPagination(args: {
+  query: InfiniteRunsQuery;
+  list: MarkdownVariable[];
+  select: MarkdownRunVariableSource["select"];
+  data: RunsQueryData | undefined;
+  ctx: ReturnType<typeof useConsoleContext>;
+}) {
+  const { query, list, select, data, ctx } = args;
+  const filteredVariables = useMemo(
+    () =>
+      list.filter(
+        (variable): variable is MarkdownVariable & { source: MarkdownRunVariableSource } =>
+          variable?.source?.kind === "run" &&
+          variable.source.select === select &&
+          hasRunStatusTriggerFilters({
+            statuses: variable.source.statuses,
+            triggers: variable.source.triggers,
+          }),
+      ),
+    [list, select],
+  );
+
+  const pageCount = data?.pages?.length ?? 0;
+  const anyUnresolved = useMemo(() => {
+    if (filteredVariables.length === 0) return false;
+    const resolveTrigger = (reference: string) => resolveConsoleNode(ctx, reference)?.node.id;
+    return filteredVariables.some((variable) => firstMatchingRun(data, variable.source, resolveTrigger) === undefined);
+  }, [filteredVariables, data, ctx]);
+
+  // Break the query object into primitives so the effect only re-runs when
+  // pagination-relevant fields actually change — the full query object is
+  // a fresh identity on every render.
+  const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } = query;
+  useEffect(() => {
+    if (!anyUnresolved) return;
+    if (!hasNextPage) return;
+    if (isFetching || isFetchingNextPage) return;
+    if (pageCount >= WIDGET_MAX_EAGER_PAGES) return;
+    fetchNextPage();
+  }, [anyUnresolved, pageCount, hasNextPage, isFetching, isFetchingNextPage, fetchNextPage]);
+}
+
+/**
+ * Scan every already-loaded page and return the first run that matches
+ * the variable's optional status + trigger filters. Falls back to
+ * `pages[0].runs[0]` when no filters are configured so behavior is
+ * identical to the pre-filter world for existing variables.
+ */
+function firstMatchingRun(
+  data: RunsQueryData | undefined,
+  source: MarkdownRunVariableSource,
+  resolveTrigger: (reference: string) => string | undefined,
+): RunRow | undefined {
+  const pages = data?.pages ?? [];
+  const filters = { statuses: source.statuses, triggers: source.triggers };
+  const active = hasRunStatusTriggerFilters(filters);
+  for (const page of pages) {
+    for (const run of page?.runs ?? []) {
+      if (!active) return run;
+      if (runMatchesStatusTriggerFilters(run as CanvasesCanvasRun, filters, resolveTrigger)) return run;
     }
   }
-  return ids;
+  return undefined;
 }
 
 interface ResolveContext {
   memoryEntries: CanvasMemoryEntry[];
   memoryLoading: boolean;
-  latestQuery: { isLoading: boolean; data?: RunsQueryDataWithRoot };
-  passedQuery: { isLoading: boolean; data?: RunsQueryDataWithRoot };
-  failedQuery: { isLoading: boolean; data?: RunsQueryDataWithRoot };
+  latestQuery: { isLoading: boolean; data?: RunsQueryData };
+  passedQuery: { isLoading: boolean; data?: RunsQueryData };
+  failedQuery: { isLoading: boolean; data?: RunsQueryData };
   executionsByRootEventId: Map<string, CanvasesCanvasNodeExecution[]>;
   nodeNameById: Map<string, string>;
+  resolveTrigger: (reference: string) => string | undefined;
 }
 
 /** Resolve a single variable to a `{ value, error? }` pair. */
@@ -237,13 +334,6 @@ interface RunRow extends Record<string, unknown> {
   rootEvent?: { id?: string; nodeId?: string; data?: Record<string, unknown> };
 }
 
-interface RunsPageWithRoot {
-  runs?: RunRow[];
-}
-interface RunsQueryDataWithRoot {
-  pages?: RunsPageWithRoot[];
-}
-
 function pickRunQuery(select: MarkdownRunVariableSource["select"], ctx: ResolveContext) {
   if (select === "latest_passed") return ctx.passedQuery;
   if (select === "latest_failed") return ctx.failedQuery;
@@ -255,10 +345,10 @@ function resolveRunVariable(
   ctx: ResolveContext,
 ): { value: unknown; error?: string } {
   const query = pickRunQuery(source.select, ctx);
-  const firstRun = query.data?.pages?.[0]?.runs?.[0];
+  const firstRun = firstMatchingRun(query.data, source, ctx.resolveTrigger);
   if (!firstRun) {
     if (query.isLoading) return { value: null };
-    return { value: null, error: noRunFoundMessage(source.select) };
+    return { value: null, error: noRunFoundMessage(source) };
   }
   return { value: buildRunVariableValue(firstRun, ctx) };
 }
@@ -282,8 +372,10 @@ function buildRunVariableValue(firstRun: RunRow, ctx: ResolveContext): Record<st
   };
 }
 
-function noRunFoundMessage(select: MarkdownRunVariableSource["select"]): string {
-  switch (select) {
+function noRunFoundMessage(source: MarkdownRunVariableSource): string {
+  const filtered = hasRunStatusTriggerFilters({ statuses: source.statuses, triggers: source.triggers });
+  if (filtered) return "No run matched the configured filters yet.";
+  switch (source.select) {
     case "latest_passed":
       return "No successful run found yet.";
     case "latest_failed":

@@ -141,7 +141,7 @@ Table, chart, and number panels share these data sources:
 ```ts
 { kind: "memory", namespace: string, fieldPath?: string }
 { kind: "executions", node?: string, limit?: number }
-{ kind: "runs", limit?: number }
+{ kind: "runs", limit?: number, statuses?: RunStatusFilter[], triggers?: string[] }
 ```
 
 | Source | Query | Result rows |
@@ -151,6 +151,15 @@ Table, chart, and number panels share these data sources:
 | `runs` | `useInfiniteCanvasRuns` (+ `useEventExecutionsBatch` for `$`) | Raw run objects plus derived `status`, `nodeName` (the node that initiated the run, resolved from `rootEvent.nodeId`), `payload` (alias for `rootEvent.data`, the initial payload that triggered the run), `durationMs` (created-to-finished elapsed time in milliseconds — pair with `format: duration`), and `$` (a map keyed by node display name with each node's full execution including `outputs` — see [Addressing per-node outputs](#addressing-per-node-outputs)). Number widgets can use API `totalCount` for count KPIs. |
 
 Execution widgets eager-load more event pages until they have enough execution rows for the configured `limit`, or until a bounded page cap is reached. This avoids count widgets flashing an intermediate value when the first event page has few executions.
+
+### Runs data source filters
+
+The `runs` data source accepts optional `statuses` and `triggers` arrays that scope the widget to a subset of canvas runs. Empty (or omitted) means "all", matching the runs sidebar Clear behavior. Both arrays are optional and can be edited together in the collapsible **Filters** panel of the data source editor.
+
+- `statuses` — any subset of `"running" | "passed" | "failed" | "cancelled"`. Applied client-side after the runs query returns, so `limit` still bounds the fetch and filtered results may be shorter than `limit`.
+- `triggers` — each entry references a trigger node by id or by name. References are resolved against the current canvas nodes so renaming a trigger keeps existing widgets working when the YAML uses the id.
+
+When either filter dimension carries a selection, number panels stop using the server-reported `totalCount` for `aggregation: "count"` and switch to the filtered row count so the KPI reflects the visible subset rather than the whole canvas.
 
 ## Table Panels
 
@@ -757,6 +766,8 @@ Two source kinds are supported:
   - `status` — normalized to `passed | failed | cancelled | running | unknown`.
   - `nodeName`, `payload`, `durationMs` — convenience fields mirroring what the table widget exposes.
   - `$` — a map of node-execution outputs keyed by node display name. Use it as `{{ run.$["Node Name"].data.field }}` for run-level output references.
+
+  Optional `statuses` and `triggers` arrays scope the selection to a subset of runs (same vocabulary and semantics as the [runs data source filters](#runs-data-source-filters)). When set, the hook scans loaded pages for a match and eagerly fetches more pages (up to the shared widget page cap) so `select: latest_passed` combined with `triggers: [deploy]` can find a match beyond the first page. Empty or omitted arrays mean "all", matching today's behavior.
 
 Variables resolve to `null` when no row matches (or `[]` in list mode); CEL access on `null` renders as an empty string, so a partial template never throws. The in-card editor surfaces a per-variable preview with one-click "insert" buttons, plus a live rendered preview that mirrors what the saved panel will display.
 

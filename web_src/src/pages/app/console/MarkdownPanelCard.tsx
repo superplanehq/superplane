@@ -23,7 +23,12 @@ import {
 } from "./markdownInterpolation";
 import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
 import { MarkdownPanelEditor } from "./MarkdownPanelEditor";
-import { validateMarkdownVariables, type MarkdownVariable } from "./panelTypes";
+import {
+  normalizeRunVariableStatuses,
+  normalizeRunVariableTriggers,
+  validateMarkdownVariables,
+  type MarkdownVariable,
+} from "./panelTypes";
 
 /**
  * Stable empty list passed to `useMarkdownVariables` while the panel is being
@@ -435,7 +440,14 @@ function normalizeVariableSource(source: MarkdownVariable["source"]): MarkdownVa
       ...(hasLimit ? { limit: source.limit } : {}),
     };
   }
-  return { kind: "run", select: source.select };
+  const statuses = normalizeRunVariableStatuses(source.statuses);
+  const triggers = normalizeRunVariableTriggers(source.triggers);
+  return {
+    kind: "run",
+    select: source.select,
+    ...(statuses ? { statuses } : {}),
+    ...(triggers ? { triggers } : {}),
+  };
 }
 
 /**

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun } from "@/api-client";
 import { useCanvasMemoryEntries, useEventExecutionsBatch, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import { hasRunStatusTriggerFilters, runMatchesStatusTriggerFilters } from "@/ui/Runs/runStatusTriggerFilter";
 
 import { resolveConsoleNode, useConsoleContext, type ConsoleContextValue } from "../ConsoleContext";
 import { flattenMemoryEntries } from "./memoryRow";
@@ -438,11 +439,26 @@ function useRunsDataSourceResult({
     return map;
   }, [runRootEventIds, runExecutionQueries]);
 
+  const runsFilters = useMemo(() => {
+    if (dataSource.kind !== "runs") return undefined;
+    return { statuses: dataSource.statuses, triggers: dataSource.triggers };
+  }, [dataSource]);
+  const filtersActive = hasRunStatusTriggerFilters(runsFilters);
+
   const rows = useMemo(() => {
     if (dataSource.kind !== "runs") return [];
     const nodeNameById = buildNodeNameMap(ctx?.nodes);
-    return collectRunRows(pages, nodeNameById, collectLimit, executionsByRootEventId);
-  }, [dataSource, pages, ctx, collectLimit, executionsByRootEventId]);
+    const collected = collectRunRows(pages, nodeNameById, collectLimit, executionsByRootEventId);
+    if (!filtersActive) return collected;
+    const resolveTrigger = (reference: string) => resolveConsoleNode(ctx, reference)?.node.id;
+    // Every row `collectRunRows` produces spreads the original run object
+    // (state/result/rootEvent) plus derived fields, so the runtime shape
+    // still satisfies `CanvasesCanvasRun` for filter purposes even though
+    // the return type is intentionally opaque (`unknown[]`).
+    return collected.filter((row) =>
+      runMatchesStatusTriggerFilters(row as CanvasesCanvasRun, runsFilters, resolveTrigger),
+    );
+  }, [dataSource, pages, ctx, collectLimit, executionsByRootEventId, filtersActive, runsFilters]);
 
   const initialFillLoading = isWidgetQueryLoading({
     queryIsLoading: query.isLoading,
@@ -477,11 +493,17 @@ function useRunsDataSourceResult({
 
   const isFetchingMore = enabled && query.isFetchingNextPage && !isLoading && hasMore;
   const paginationFields = progressive ? { hasMore, isFetchingMore, loadMore, displayCount: displaySlice } : {};
+  // When datasource filters are set the server-reported `totalCount` no
+  // longer matches what the widget actually shows (the API returns every
+  // run, filters happen client-side). Suppressing it forces count KPIs
+  // and totals to use the filtered `rows.length` instead of leaking the
+  // unfiltered canvas total.
+  const totalCount = filtersActive ? undefined : query.data?.pages?.[0]?.totalCount;
   return {
     rows,
     isLoading,
     error: errorMessage(query.error),
-    totalCount: query.data?.pages?.[0]?.totalCount,
+    totalCount,
     ...paginationFields,
   };
 }

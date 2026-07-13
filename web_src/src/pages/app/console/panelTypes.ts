@@ -3,6 +3,7 @@
  * Keep the backend Go validator (`pkg/models/console_yml.go`) in lockstep.
  */
 
+import { RUN_STATUS_FILTER_IDS, isRunStatusFilter, type RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
 import type {
   WidgetChartRender,
   WidgetNumberAggregation,
@@ -186,7 +187,14 @@ export interface NumberMetric {
 export type TablePanelDataSource =
   | { kind: "memory"; namespace: string; fieldPath?: string }
   | { kind: "executions"; node?: string; limit?: number }
-  | { kind: "runs"; limit?: number };
+  | {
+      kind: "runs";
+      limit?: number;
+      /** See {@link WidgetRunsDataSource.statuses}. */
+      statuses?: RunStatusFilter[];
+      /** See {@link WidgetRunsDataSource.triggers}. */
+      triggers?: string[];
+    };
 export type ChartPanelDataSource = TablePanelDataSource;
 
 /** How partial aggregates from a composite memory data source are combined into a single value. */
@@ -377,7 +385,7 @@ export function validateDataSource(value: unknown): string | null {
   if (!obj) return "dataSource must be an object.";
   if (obj.kind === "memory") return validateMemoryDataSource(obj);
   if (obj.kind === "executions") return validateExecutionsDataSource(obj);
-  if (obj.kind === "runs") return validateLimit(obj);
+  if (obj.kind === "runs") return validateRunsDataSource(obj);
   return 'dataSource.kind must be "memory", "executions", or "runs".';
 }
 
@@ -394,6 +402,51 @@ function validateMemoryDataSource(obj: Record<string, unknown>): string | null {
 function validateLimit(obj: Record<string, unknown>): string | null {
   if (obj.limit != null && (typeof obj.limit !== "number" || !Number.isFinite(obj.limit))) {
     return "dataSource.limit must be a number.";
+  }
+  return null;
+}
+
+function validateRunsDataSource(obj: Record<string, unknown>): string | null {
+  const limitError = validateLimit(obj);
+  if (limitError) return limitError;
+  const statusesError = validateRunStatusesArray(obj.statuses, "dataSource.statuses");
+  if (statusesError) return statusesError;
+  return validateRunTriggersArray(obj.triggers, "dataSource.triggers");
+}
+
+/**
+ * Validate a persisted runs status filter array. Accepts undefined /
+ * null / empty (meaning "all statuses") and any subset of the shared
+ * {@link RunStatusFilter} vocabulary; anything else is rejected with a
+ * message listing the allowed values.
+ */
+export function validateRunStatusesArray(value: unknown, fieldPath: string): string | null {
+  if (value == null) return null;
+  if (!Array.isArray(value)) return `${fieldPath} must be an array.`;
+  for (let i = 0; i < value.length; i += 1) {
+    const item = value[i];
+    if (!isRunStatusFilter(item)) {
+      return `${fieldPath}[${i}] must be one of ${RUN_STATUS_FILTER_IDS.join(", ")}.`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Validate a persisted runs trigger filter array. Accepts undefined /
+ * null / empty (meaning "all triggers") and any list of non-empty
+ * strings; individual entries are matched at runtime against the
+ * canvas nodes so unknown ids simply fail to match rather than fail
+ * validation.
+ */
+export function validateRunTriggersArray(value: unknown, fieldPath: string): string | null {
+  if (value == null) return null;
+  if (!Array.isArray(value)) return `${fieldPath} must be an array.`;
+  for (let i = 0; i < value.length; i += 1) {
+    const item = value[i];
+    if (typeof item !== "string" || item.trim() === "") {
+      return `${fieldPath}[${i}] must be a non-empty string.`;
+    }
   }
   return null;
 }
@@ -520,9 +573,57 @@ function normalizeTableWhere(raw: unknown): WidgetTableFilter[] | undefined {
 function normalizeTableDataSource(raw: unknown): TablePanelDataSource {
   const ds = asObject(raw);
   if (ds?.kind === "executions") return normalizeExecutionsDataSource(ds);
-  if (ds?.kind === "runs") return { kind: "runs", limit: optionalNumber(ds.limit) };
+  if (ds?.kind === "runs") return normalizeRunsDataSource(ds);
   if (ds?.kind === "memory") return normalizeMemoryDataSource(ds);
   return { kind: "memory", namespace: "" };
+}
+
+export function normalizeRunsDataSource(ds: Record<string, unknown>): TablePanelDataSource {
+  const statuses = normalizeRunStatuses(ds.statuses);
+  const triggers = normalizeRunTriggers(ds.triggers);
+  return {
+    kind: "runs",
+    limit: optionalNumber(ds.limit),
+    ...(statuses ? { statuses } : {}),
+    ...(triggers ? { triggers } : {}),
+  };
+}
+
+/**
+ * Coerce a persisted statuses array into a typed subset of the shared
+ * {@link RunStatusFilter} vocabulary. Returns `undefined` when the result
+ * would be empty so YAML round-trips stay clean (empty === "all").
+ */
+export function normalizeRunStatuses(raw: unknown): RunStatusFilter[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: RunStatusFilter[] = [];
+  const seen = new Set<RunStatusFilter>();
+  for (const item of raw) {
+    if (!isRunStatusFilter(item)) continue;
+    if (seen.has(item)) continue;
+    seen.add(item);
+    out.push(item);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/**
+ * Coerce a persisted triggers array into a normalized list of non-empty
+ * strings (trimmed, deduped). Returns `undefined` when the result would
+ * be empty so YAML round-trips stay clean (empty === "all").
+ */
+export function normalizeRunTriggers(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 function normalizeExecutionsDataSource(ds: Record<string, unknown>): TablePanelDataSource {
