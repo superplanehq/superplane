@@ -2,12 +2,13 @@
 //
 // Strings wrapped in `{{ ... }}` are compiled once and evaluated per row.
 // Strings without braces use legacy dot-path semantics via callers.
-import { type CstNode } from "chevrotain";
-import { CelTypeError, evaluate as celEvaluate, parse as celParse } from "cel-js";
+import { Environment, EvaluationError, TypeError as CelTypeError } from "@marcbachmann/cel-js";
 
-import { coerceWidgetTimestamp } from "./widgetFormat";
+import { formatDurationSeconds, registerCustomFunctions } from "./celBuiltins";
 
-export type CompiledExpr = { ok: true; raw: string; cst: CstNode } | { ok: false; raw: string; error: string };
+type CelRun = (context: Record<string, unknown>) => unknown;
+
+export type CompiledExpr = { ok: true; raw: string; run: CelRun } | { ok: false; raw: string; error: string };
 
 export type MaybeExpr = { kind: "literal"; value: string } | { kind: "expr"; expr: CompiledExpr };
 
@@ -21,12 +22,15 @@ type TemplateSegment = { kind: "literal"; value: string } | { kind: "expr"; expr
 const FULL_EXPR_RE = /^\s*\{\{([\s\S]*)\}\}\s*$/;
 const ANY_EXPR_RE = /\{\{([\s\S]*?)\}\}/g;
 
+/** Rewritten target for fail-soft `int(...)` calls — see `rewriteIntCalls`. */
+export const DASHBOARD_INT_IDENTIFIER = "__dashboardInt";
+
 function isFullExpression(raw: string): boolean {
   return FULL_EXPR_RE.test(raw);
 }
 
 /**
- * Identifier substituted for bare `$` so cel-js (which only accepts
+ * Identifier substituted for bare `$` so CEL (whose grammar only accepts
  * `[a-zA-Z_][a-zA-Z0-9_]*` identifiers) can parse canvas-style node refs
  * like `$["deploy-prod"].outputs.url`. Rows that need to resolve those
  * references must carry the same map under this key.
@@ -35,12 +39,12 @@ export const DOLLAR_REWRITE_IDENTIFIER = "__runNodes__";
 
 /**
  * Rewrite bare `$` tokens to `DOLLAR_REWRITE_IDENTIFIER` outside of string
- * literals so cel-js can parse expressions like `$["node name"].outputs.x`.
+ * literals so CEL can parse expressions like `$["node name"].outputs.x`.
  * Single- and double-quoted strings are copied verbatim (with backslash
  * escapes preserved) so a `$` inside a string literal is left alone.
  *
- * The rewrite is purely additive: cel-js's lexer rejects bare `$` today,
- * so no existing expression depended on the previous behavior.
+ * The rewrite is purely additive: CEL's lexer rejects bare `$` today, so
+ * no existing expression depended on the previous behavior.
  */
 export function rewriteDollarRefs(raw: string): string {
   let out = "";
@@ -62,6 +66,79 @@ export function rewriteDollarRefs(raw: string): string {
     i++;
   }
   return out;
+}
+
+/**
+ * Rewrite `int(...)` calls to `__dashboardInt(...)` outside string literals.
+ * The library's `int(string)` throws on unparseable input and cannot be
+ * overridden; the dashboard handler is fail-soft (returns `0`) so legacy
+ * templates like `{{ int(value) / 2 }}` keep rendering.
+ */
+export function rewriteIntCalls(raw: string): string {
+  let out = "";
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === "r" && (raw[i + 1] === '"' || raw[i + 1] === "'")) {
+      const literal = copyRawStringLiteral(raw, i);
+      out += literal.value;
+      i = literal.next;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const literal = copyStringLiteral(raw, i, ch);
+      out += literal.value;
+      i = literal.next;
+      continue;
+    }
+    if (raw.startsWith("int(", i) && !isIdentifierChar(raw[i - 1]) && raw[i - 1] !== ".") {
+      out += `${DASHBOARD_INT_IDENTIFIER}(`;
+      i += 4;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+/**
+ * Preserve ChromeGG-era backslash separators in regular CEL strings.
+ *
+ * `@marcbachmann/cel-js` interprets escapes like `\?` as the bare character,
+ * while the previous library left unknown escapes as two characters. Authors
+ * who wrote `splitIndex(value, "\?", 0)` therefore depended on a literal
+ * backslash+question separator. Double those non-standard escapes so the
+ * parsed string still contains the backslash. Standard escapes (`\n`, `\r`,
+ * `\t`, `\\`, quotes) are left alone — they already match the legacy
+ * `unescapeSeparator` contract after parse.
+ */
+export function rewriteLegacyStringEscapes(raw: string): string {
+  let out = "";
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === "r" && (raw[i + 1] === '"' || raw[i + 1] === "'")) {
+      const literal = copyRawStringLiteral(raw, i);
+      out += literal.value;
+      i = literal.next;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const literal = copyLegacyCompatibleStringLiteral(raw, i, ch);
+      out += literal.value;
+      i = literal.next;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+function isIdentifierChar(ch: string | undefined): boolean {
+  if (!ch) return false;
+  return /[A-Za-z0-9_]/.test(ch);
 }
 
 /**
@@ -88,14 +165,61 @@ function copyStringLiteral(raw: string, start: number, quote: string): { value: 
   return { value, next: i };
 }
 
+/** Copy `r"..."` / `r'...'` verbatim (no escape rewriting). */
+function copyRawStringLiteral(raw: string, start: number): { value: string; next: number } {
+  const quote = raw[start + 1];
+  let value = "r" + quote;
+  let i = start + 2;
+  while (i < raw.length && raw[i] !== quote) {
+    value += raw[i];
+    i++;
+  }
+  if (i < raw.length) {
+    value += raw[i];
+    i++;
+  }
+  return { value, next: i };
+}
+
+const STANDARD_STRING_ESCAPES = new Set(["n", "r", "t", "\\", '"', "'"]);
+
+/**
+ * Copy a regular string literal, doubling backslashes before non-standard
+ * escape characters so `@marcbachmann/cel-js` preserves them as two chars.
+ */
+function copyLegacyCompatibleStringLiteral(raw: string, start: number, quote: string): { value: string; next: number } {
+  let value = quote;
+  let i = start + 1;
+  while (i < raw.length && raw[i] !== quote) {
+    if (raw[i] === "\\" && i + 1 < raw.length) {
+      const next = raw[i + 1];
+      if (STANDARD_STRING_ESCAPES.has(next)) {
+        value += "\\" + next;
+      } else {
+        value += "\\\\" + next;
+      }
+      i += 2;
+      continue;
+    }
+    value += raw[i];
+    i++;
+  }
+  if (i < raw.length) {
+    value += raw[i];
+    i++;
+  }
+  return { value, next: i };
+}
+
 export function compileExpr(raw: string): CompiledExpr {
-  const rewritten = rewriteDollarRefs(raw);
-  const result = celParse(rewritten);
-  if (!result.isSuccess) {
-    const message = result.errors.join("; ");
+  const rewritten = rewriteIntCalls(rewriteLegacyStringEscapes(rewriteDollarRefs(raw)));
+  try {
+    const compiled = ENV.parse(rewritten) as unknown as CelRun;
+    return { ok: true, raw, run: compiled };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     return { ok: false, raw, error: message };
   }
-  return { ok: true, raw, cst: result.cst };
 }
 
 export function compileMaybeExpr(raw: string): MaybeExpr {
@@ -131,6 +255,11 @@ export function compileTemplate(raw: string): CompiledTemplate {
 
 export interface ExprEnv {
   globals: Record<string, unknown>;
+  /**
+   * Preserved for backward compatibility with legacy callers. Custom
+   * functions are now registered on the shared module-level `Environment`
+   * and this field is unused at eval time.
+   */
   functions: Record<string, CallableFunction>;
 }
 
@@ -139,379 +268,7 @@ export function buildEnv(globals?: Record<string, unknown>): ExprEnv {
     now: Math.floor(Date.now() / 1000),
     ...(globals ?? {}),
   };
-  return { globals: merged, functions: BUILTIN_FUNCTIONS };
-}
-
-const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
-  int: toInt,
-  float: toFloat,
-  string: toStringValue,
-  contains: (s: unknown, sub: unknown) => typeof s === "string" && typeof sub === "string" && s.includes(sub),
-  startsWith: (s: unknown, p: unknown) => typeof s === "string" && typeof p === "string" && s.startsWith(p),
-  endsWith: (s: unknown, p: unknown) => typeof s === "string" && typeof p === "string" && s.endsWith(p),
-  matches: (s: unknown, re: unknown) => {
-    if (typeof s !== "string" || typeof re !== "string") return false;
-    try {
-      return new RegExp(re).test(s);
-    } catch {
-      return false;
-    }
-  },
-  lower: (s: unknown) => (s == null ? "" : String(s).toLowerCase()),
-  upper: (s: unknown) => (s == null ? "" : String(s).toUpperCase()),
-  duration: (seconds: unknown) => formatDurationSeconds(Number(seconds)),
-  timestamp: (seconds: unknown) => formatTimestampSeconds(Number(seconds)),
-  formatDate,
-  // Convert any date-like value (ISO string, Date, epoch number) to
-  // ms-since-epoch. Returns 0 for unparseable input so arithmetic doesn't
-  // blow up — authors checking `epochMs(x) > 0` can still detect missing
-  // values. Pairs with `duration()` for human-friendly output, e.g.
-  // `{{ duration((epochMs(finishedAt) - epochMs(createdAt)) / 1000) }}`.
-  epochMs: (value: unknown): number => {
-    const date = coerceWidgetTimestamp(value);
-    return date ? date.getTime() : 0;
-  },
-  // Parse a JSON-encoded string into a structured CEL value (list, map, or
-  // scalar) so authors can `.map`, `.filter`, or dot-access the result. Already
-  // parsed non-string inputs pass through unchanged, and any parse failure
-  // returns `null` so downstream operations fail soft — matching the
-  // graceful-degrade convention used by `epochMs`, `matches`, and friends.
-  parseJson: (value: unknown): unknown => {
-    if (value === null || value === undefined) return null;
-    if (typeof value !== "string") return value;
-    try {
-      return JSON.parse(value) as unknown;
-    } catch {
-      return null;
-    }
-  },
-  // Join the elements of a list with a separator. Exposed as a builtin (not a
-  // method) because cel-js's parser refuses `.foo()` chains after a
-  // function-call result — so `list.map(x, expr).join("")` would not parse.
-  // Authors instead write `join(list.map(x, expr), "")`. Fail-soft: anything
-  // that isn't a list returns the empty string, missing/non-string separators
-  // collapse to "", and null/undefined elements become "" so a careless map
-  // doesn't smear `null` strings into the output.
-  join: (list: unknown, sep: unknown): string => {
-    if (!Array.isArray(list)) return "";
-    const separator = typeof sep === "string" ? sep : "";
-    return list.map((item) => stringifyJoinItem(item)).join(separator);
-  },
-  // String-trimming helpers below all return scalars directly. They exist
-  // because cel-js doesn't allow postfix `[i]` / `.method()` after a
-  // function-call result, so an author can't write `split(s, "\n")[0]` or
-  // `s.substring(0, 80)` — they have to call a single helper that already
-  // returns the scalar they want. This matches the expr-lang surface used at
-  // node-config / write time (see `web_src/src/lib/exprEvaluator.ts`).
-  // Fail-soft: non-string `s` coerces via `String(s)` (matching `lower`/
-  // `upper`); `null` / `undefined` input returns `""`.
-  substring: (s: unknown, start: unknown, end?: unknown): string => {
-    const text = coerceToString(s);
-    if (text === "") return "";
-    const startIndex = clampIndex(start, text.length);
-    if (end === undefined) return text.slice(startIndex);
-    const endIndex = clampIndex(end, text.length);
-    if (endIndex <= startIndex) return "";
-    return text.slice(startIndex, endIndex);
-  },
-  // First `n` characters of `s`, with an optional suffix (e.g. "…") appended
-  // only when truncation actually happened. Authors reach for this to keep
-  // long run outputs from blowing up table cells while still hinting that the
-  // value was clipped.
-  truncate: (s: unknown, n: unknown, suffix?: unknown): string => {
-    const text = coerceToString(s);
-    const limit = Number(n);
-    if (!Number.isFinite(limit) || limit < 0) return text;
-    if (text.length <= limit) return text;
-    const tail = typeof suffix === "string" ? suffix : "";
-    return text.slice(0, Math.trunc(limit)) + tail;
-  },
-  // Text before the first newline. Treats `\r\n` and bare `\r` the same as
-  // `\n` so Windows / classic-Mac line endings don't sneak through. Empty
-  // input stays empty.
-  firstLine: (s: unknown): string => {
-    const text = coerceToString(s);
-    if (text === "") return "";
-    const newline = text.search(/\r\n|\r|\n/);
-    return newline === -1 ? text : text.slice(0, newline);
-  },
-  // Nth segment of `split(s, sep)`, returned as a scalar so authors don't run
-  // into the no-postfix-after-call-result limitation. Negative `i` counts
-  // from the end (`-1` = last). Out-of-range / non-numeric `i` returns "".
-  //
-  // The separator is run through `unescapeSeparator` because cel-js does
-  // **not** interpret backslash escapes in string literals — `"\n"` written
-  // in a CEL expression is the literal two-character string `\n`. Without
-  // unescaping, the natural `splitIndex(message, "\n", 0)` form would never
-  // match an actual newline. We translate `\n`, `\r`, `\t`, and `\\` so the
-  // common cases just work.
-  //
-  // When the separator is a bare newline we split on `/\r\n|\r|\n/` so that
-  // `\r\n` (Windows) and bare `\r` (classic Mac) line endings are treated the
-  // same as `\n`. This keeps `splitIndex(value, "\n", 0)` in agreement with
-  // `firstLine` — otherwise CRLF text would leave a trailing `\r` on segments.
-  splitIndex: (s: unknown, sep: unknown, i: unknown): string => {
-    const text = coerceToString(s);
-    const separator = unescapeSeparator(typeof sep === "string" ? sep : String(sep ?? ""));
-    if (separator === "") return text;
-    const parts = separator === "\n" ? text.split(/\r\n|\r|\n/) : text.split(separator);
-    const raw = Number(i);
-    if (!Number.isFinite(raw)) return "";
-    const index = raw < 0 ? parts.length + Math.trunc(raw) : Math.trunc(raw);
-    if (index < 0 || index >= parts.length) return "";
-    return parts[index];
-  },
-  // Rounds out string parity with expr-lang. `trim` removes leading /
-  // trailing whitespace (or, when `chars` is supplied, leading / trailing
-  // characters from `chars`). `replace` swaps every `old` with `new`.
-  // `indexOf` returns -1 when missing, matching JS / expr-lang behavior.
-  trim: (s: unknown, chars?: unknown): string => {
-    const text = coerceToString(s);
-    if (chars === undefined) return text.trim();
-    const charset = coerceToString(chars);
-    if (charset === "") return text;
-    let start = 0;
-    let end = text.length;
-    while (start < end && charset.includes(text[start])) start++;
-    while (end > start && charset.includes(text[end - 1])) end--;
-    return text.slice(start, end);
-  },
-  replace: (s: unknown, oldStr: unknown, newStr: unknown): string => {
-    const text = coerceToString(s);
-    const search = coerceToString(oldStr);
-    if (search === "") return text;
-    const replacement = coerceToString(newStr);
-    return text.split(search).join(replacement);
-  },
-  indexOf: (s: unknown, sub: unknown): number => {
-    const text = coerceToString(s);
-    const needle = coerceToString(sub);
-    return text.indexOf(needle);
-  },
-  // First letter of a display name, uppercased. Skips leading whitespace and
-  // prefers the first alphanumeric character so values like "cloud-robot"
-  // render as "C". Returns "" for missing / empty input.
-  initial: (value: unknown): string => initialLetter(value),
-  // Walks the provided values in order and returns the first non-empty
-  // initial. Authors use this for avatar fallbacks when a GitHub username is
-  // unavailable but a human/bot display name is still present.
-  firstInitial: (a: unknown, b?: unknown, c?: unknown, d?: unknown): string => firstInitialFromValues(a, b, c, d),
-  // Renders a deployer avatar for GitHub webhook author/committer maps.
-  // Uses the GitHub avatar image when `author.username` is present; otherwise
-  // falls back to an initial-letter badge derived from the available names.
-  githubAvatarOrInitial: (author: unknown, committer?: unknown): string => {
-    const authorRecord = asRecord(author);
-    const committerRecord = asRecord(committer);
-    const username = coerceToString(authorRecord?.username).trim();
-    if (username) {
-      return `<img class="avatar avatar-image" src="https://github.com/${username}.png" alt="" />`;
-    }
-    const letter = firstInitialFromValues(
-      authorRecord?.name,
-      committerRecord?.name,
-      authorRecord?.username,
-      committerRecord?.username,
-    );
-    if (!letter) return "";
-    return `<div class="avatar avatar-fallback">${letter}</div>`;
-  },
-};
-
-function coerceToString(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string") return value;
-  return String(value);
-}
-
-function initialLetter(value: unknown): string {
-  const text = coerceToString(value).trim();
-  if (text === "") return "";
-  const match = text.match(/[A-Za-z0-9]/);
-  return match ? match[0].toUpperCase() : text.charAt(0).toUpperCase();
-}
-
-function firstInitialFromValues(a: unknown, b?: unknown, c?: unknown, d?: unknown): string {
-  for (const candidate of [a, b, c, d]) {
-    if (candidate === undefined) continue;
-    const letter = initialLetter(candidate);
-    if (letter) return letter;
-  }
-  return "";
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
-}
-
-function clampIndex(value: unknown, length: number): number {
-  const raw = Number(value);
-  if (!Number.isFinite(raw)) return 0;
-  const truncated = Math.trunc(raw);
-  if (truncated < 0) return Math.max(0, length + truncated);
-  if (truncated > length) return length;
-  return truncated;
-}
-
-/**
- * Translate the common backslash escapes (`\n`, `\r`, `\t`, `\\`) in a
- * separator string into their literal characters. cel-js's lexer copies
- * string literals verbatim — it does not honor escape sequences — so a
- * separator authored as `"\n"` arrives here as two characters. Anything
- * other than the recognized pair is preserved as-is so a literal `\` in
- * (for example) a Windows path separator still works.
- */
-function unescapeSeparator(raw: string): string {
-  if (!raw.includes("\\")) return raw;
-  let out = "";
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (ch !== "\\" || i + 1 >= raw.length) {
-      out += ch;
-      continue;
-    }
-    const next = raw[i + 1];
-    if (next === "n") {
-      out += "\n";
-      i++;
-    } else if (next === "r") {
-      out += "\r";
-      i++;
-    } else if (next === "t") {
-      out += "\t";
-      i++;
-    } else if (next === "\\") {
-      out += "\\";
-      i++;
-    } else {
-      out += ch;
-    }
-  }
-  return out;
-}
-
-function stringifyJoinItem(item: unknown): string {
-  if (item === null || item === undefined) return "";
-  if (typeof item === "string") return item;
-  return String(item);
-}
-
-function toInt(value: unknown): number {
-  if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : 0;
-  if (typeof value === "boolean") return value ? 1 : 0;
-  if (typeof value === "string") {
-    const n = Number(value);
-    return Number.isFinite(n) ? Math.trunc(n) : 0;
-  }
-  return 0;
-}
-
-function toFloat(value: unknown): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "boolean") return value ? 1 : 0;
-  if (typeof value === "string") {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
-  }
-  return 0;
-}
-
-function toStringValue(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function formatDurationSeconds(value: number): string {
-  if (!Number.isFinite(value)) return "";
-  const total = Math.max(0, Math.trunc(value));
-  if (total < 60) return `${total}s`;
-  const minutes = Math.floor(total / 60);
-  if (minutes < 60) {
-    const remSeconds = total % 60;
-    return remSeconds === 0 ? `${minutes}m` : `${minutes}m ${remSeconds}s`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const remMinutes = minutes % 60;
-  return remMinutes === 0 ? `${hours}h` : `${hours}h ${remMinutes}m`;
-}
-
-function formatTimestampSeconds(value: number): string {
-  if (!Number.isFinite(value)) return "";
-  const ms = Math.trunc(value) * 1000;
-  const date = new Date(ms);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString();
-}
-
-/**
- * Format a date value using a small token pattern (e.g. `MM/dd`, `yyyy-MM-dd HH:mm`).
- *
- * The value may be an ISO-8601 string, a `Date` instance, an epoch number in
- * seconds (`< 1e11`), or an epoch number in milliseconds (`>= 1e11`). All
- * tokens render in the viewer's local time, matching the rest of the
- * dashboard's display conventions (`widgetFormat.ts` also uses `toLocale*`).
- *
- * Returns an empty string when the value cannot be parsed or when the pattern
- * is missing — this is consistent with the other builtins and keeps widgets
- * resilient to malformed source data.
- *
- * Supported tokens (longest matched first):
- *   yyyy, yy        – four / two digit year
- *   MM, M           – two / one-or-two digit month (1-12)
- *   dd, d           – two / one-or-two digit day of month
- *   HH, H           – two / one-or-two digit hour (0-23)
- *   mm, m           – two / one-or-two digit minute
- *   ss, s           – two / one-or-two digit second
- *
- * Other characters in the pattern are preserved literally. Authors who need a
- * literal letter that overlaps a token should pick a different separator.
- */
-function formatDate(value: unknown, pattern: unknown): string {
-  if (typeof pattern !== "string" || pattern === "") return "";
-  const date = coerceWidgetTimestamp(value);
-  if (!date) return "";
-  return formatDateTokens(date, pattern);
-}
-
-const DATE_TOKEN_RE = /yyyy|yy|MM|M|dd|d|HH|H|mm|m|ss|s/g;
-
-function formatDateTokens(date: Date, pattern: string): string {
-  return pattern.replace(DATE_TOKEN_RE, (token) => {
-    switch (token) {
-      case "yyyy":
-        return String(date.getFullYear());
-      case "yy":
-        return String(date.getFullYear() % 100).padStart(2, "0");
-      case "MM":
-        return String(date.getMonth() + 1).padStart(2, "0");
-      case "M":
-        return String(date.getMonth() + 1);
-      case "dd":
-        return String(date.getDate()).padStart(2, "0");
-      case "d":
-        return String(date.getDate());
-      case "HH":
-        return String(date.getHours()).padStart(2, "0");
-      case "H":
-        return String(date.getHours());
-      case "mm":
-        return String(date.getMinutes()).padStart(2, "0");
-      case "m":
-        return String(date.getMinutes());
-      case "ss":
-        return String(date.getSeconds()).padStart(2, "0");
-      case "s":
-        return String(date.getSeconds());
-      default:
-        return token;
-    }
-  });
+  return { globals: merged, functions: {} };
 }
 
 export type EvalResult = { ok: true; value: unknown } | { ok: false; error: string };
@@ -519,9 +276,7 @@ export type EvalResult = { ok: true; value: unknown } | { ok: false; error: stri
 /**
  * Evaluate a compiled CEL expression. Returns `undefined` on any error so
  * existing callers (column rendering, payload merging, etc.) keep failing
- * gracefully. Numeric-looking string fields are silently retried as numbers
- * when a `CelTypeError` is raised — memory rows commonly stringify scalars,
- * and authors expect `{{ value / 2 }}` to "just work" on those rows.
+ * gracefully.
  */
 export function evalExpr(compiled: CompiledExpr, row: Record<string, unknown>, env: ExprEnv): unknown {
   const detailed = evalExprDetailed(compiled, row, env);
@@ -530,52 +285,46 @@ export function evalExpr(compiled: CompiledExpr, row: Record<string, unknown>, e
 
 /**
  * Same as `evalExpr` but surfaces compile/eval errors so the editor can
- * display them in inline previews. The error string is the first compile
- * error or the message from the underlying eval error.
+ * display them in inline previews.
+ *
+ * `@marcbachmann/cel-js` requires integer arithmetic to run on `BigInt`
+ * values (`10n / 2` works, `10 / 2` throws `dyn<double> / int`), so we
+ * upfront-coerce safe-integer JS numbers to BigInt before evaluation and
+ * fall back to a broader retry that also converts numeric-looking strings
+ * — memory rows commonly stringify scalars, and authors expect
+ * `{{ value / 2 }}` to "just work" on those rows. Non-numeric strings stay
+ * as strings so equality checks like `name == "42"` keep their semantics.
+ * Results are normalized so safe-integer BigInts flow back out as plain
+ * JS numbers for downstream formatters, aggregators, and `JSON.stringify`.
  */
 export function evalExprDetailed(compiled: CompiledExpr, row: Record<string, unknown>, env: ExprEnv): EvalResult {
   if (!compiled.ok) return { ok: false, error: compiled.error };
-  const vars = { ...env.globals, ...row };
+  const merged = { ...env.globals, ...row };
+  const upfront = coerceNumbers(merged) as Record<string, unknown>;
   try {
-    return { ok: true, value: celEvaluate(compiled.cst, vars, env.functions) };
+    return { ok: true, value: normalizeCelValue(compiled.run(upfront)) };
   } catch (initial) {
-    if (!(initial instanceof CelTypeError)) {
-      return { ok: false, error: initial instanceof Error ? initial.message : String(initial) };
+    if (!isEvalRetryable(initial)) {
+      return { ok: false, error: errorMessage(initial) };
     }
-    const coerced = coerceNumericStrings(vars);
-    if (coerced === vars) {
-      return { ok: false, error: initial.message };
+    const coerced = coerceNumericStrings(upfront);
+    if (coerced === upfront) {
+      return { ok: false, error: errorMessage(initial) };
     }
     try {
-      return { ok: true, value: celEvaluate(compiled.cst, coerced, env.functions) };
+      return { ok: true, value: normalizeCelValue(compiled.run(coerced as Record<string, unknown>)) };
     } catch (retry) {
-      const message = retry instanceof Error ? retry.message : String(retry);
-      return { ok: false, error: message };
+      return { ok: false, error: errorMessage(retry) };
     }
   }
 }
 
-/**
- * Returns a new vars object with string values that parse cleanly as finite
- * numbers replaced with their numeric form. Non-numeric strings are left
- * alone so equality and substring checks still work. When nothing changes
- * the original object is returned so callers can short-circuit.
- */
-function coerceNumericStrings(vars: Record<string, unknown>): Record<string, unknown> {
-  let changed = false;
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(vars)) {
-    if (typeof value === "string" && value.trim() !== "") {
-      const n = Number(value);
-      if (Number.isFinite(n)) {
-        out[key] = n;
-        changed = true;
-        continue;
-      }
-    }
-    out[key] = value;
-  }
-  return changed ? out : vars;
+function isEvalRetryable(err: unknown): boolean {
+  return err instanceof EvaluationError || err instanceof CelTypeError;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 export function evalRowField(
@@ -647,3 +396,160 @@ export function evalBoolExpr(raw: string | undefined, row: Record<string, unknow
   }
   return false;
 }
+
+/**
+ * Recursively upgrade safe-integer JS `number` values in the context to
+ * `BigInt` so CEL's int-typed operators (division, modulo, comparison with
+ * int literals) can dispatch. Fractional or non-safe-integer numbers are
+ * left alone so double arithmetic still works. Strings, arrays, and plain
+ * objects are traversed; `Date` instances and primitives pass through
+ * unchanged.
+ */
+function coerceNumbers(value: unknown): unknown {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && Number.isSafeInteger(value) ? BigInt(value) : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(coerceNumbers);
+  }
+  if (isPlainObject(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      out[key] = coerceNumbers(val);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Retry-time coercion: convert numeric-looking strings into `BigInt` (for
+ * integer strings that fit safely) or `number` (for decimal strings) so
+ * `{{ value / 2 }}` works on stringified memory rows. Non-numeric strings
+ * are preserved verbatim to keep string equality checks like `name == "42"`
+ * intact. Returns the original reference when nothing changed so callers
+ * can short-circuit.
+ */
+function coerceNumericStrings(value: unknown): unknown {
+  return coerceStringsDeep(value, [false]);
+}
+
+function coerceStringsDeep(value: unknown, mutated: [boolean]): unknown {
+  if (typeof value === "string") return coerceNumericString(value, mutated);
+  if (Array.isArray(value)) return coerceStringsInArray(value, mutated);
+  if (isPlainObject(value)) return coerceStringsInObject(value, mutated);
+  return value;
+}
+
+function coerceNumericString(value: string, mutated: [boolean]): string | number | bigint {
+  const trimmed = value.trim();
+  if (trimmed === "") return value;
+  if (/^-?\d+$/.test(trimmed)) {
+    const asNumber = Number(trimmed);
+    if (Number.isSafeInteger(asNumber)) {
+      mutated[0] = true;
+      return BigInt(asNumber);
+    }
+    return value;
+  }
+  const decimal = Number(trimmed);
+  if (Number.isFinite(decimal)) {
+    mutated[0] = true;
+    return decimal;
+  }
+  return value;
+}
+
+function coerceStringsInArray(value: unknown[], mutated: [boolean]): unknown[] {
+  const child: [boolean] = [false];
+  const out = value.map((item) => coerceStringsDeep(item, child));
+  if (!child[0]) return value;
+  mutated[0] = true;
+  return out;
+}
+
+function coerceStringsInObject(value: Record<string, unknown>, mutated: [boolean]): Record<string, unknown> {
+  const child: [boolean] = [false];
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(value)) {
+    out[key] = coerceStringsDeep(val, child);
+  }
+  if (!child[0]) return value;
+  mutated[0] = true;
+  return out;
+}
+
+/**
+ * Convert safe-integer `BigInt` values in the eval result back to plain JS
+ * `number` so downstream formatters (`toFiniteNumber`, `JSON.stringify` on
+ * row keys, chart aggregators) continue to work. BigInts outside safe
+ * integer range flow through as `Number(...)` — dashboards use these
+ * primarily for time deltas and counts, both of which stay comfortably
+ * inside `Number.MAX_SAFE_INTEGER`.
+ *
+ * Also normalizes library temporal types that would otherwise stringify
+ * poorly in templates:
+ * - `Date` from `timestamp(...)` → ISO-8601 (legacy dashboard contract)
+ * - protobuf `Duration` from `duration("5m")` → human `5m` / `1h 5m`
+ */
+function normalizeCelValue(value: unknown): unknown {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toISOString();
+  }
+  if (isProtobufDuration(value)) {
+    const totalSeconds = Number(value.seconds) + Number(value.nanos ?? 0) / 1_000_000_000;
+    return formatDurationSeconds(totalSeconds);
+  }
+  if (Array.isArray(value)) {
+    return value.map(normalizeCelValue);
+  }
+  if (isPlainObject(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      out[key] = normalizeCelValue(val);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Detect library `google.protobuf.Duration` values without relying on
+ * `constructor.name` (which Vite/esbuild minify away in production).
+ * Plain `{ seconds, nanos }` maps from row data stay untouched — those use
+ * `Object.prototype`, while the library Duration uses a custom prototype.
+ */
+function isProtobufDuration(value: unknown): value is { seconds: bigint | number; nanos?: number | bigint } {
+  if (!value || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  if (proto === Object.prototype || proto === null) return false;
+  if (!("seconds" in value) || !("nanos" in value)) return false;
+  const seconds = (value as { seconds: unknown }).seconds;
+  const nanos = (value as { nanos: unknown }).nanos;
+  const secondsOk = typeof seconds === "bigint" || typeof seconds === "number";
+  const nanosOk = typeof nanos === "bigint" || typeof nanos === "number";
+  return secondsOk && nanosOk;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object") return false;
+  if (Array.isArray(value)) return false;
+  if (value instanceof Date) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Shared CEL environment. Instantiated once because `new Environment(...)`
+ * plus function registration is measurably expensive; the library docs
+ * flag it as a hot-path concern.
+ */
+const ENV = new Environment({
+  unlistedVariablesAreDyn: true,
+  homogeneousAggregateLiterals: false,
+});
+
+registerCustomFunctions(ENV);

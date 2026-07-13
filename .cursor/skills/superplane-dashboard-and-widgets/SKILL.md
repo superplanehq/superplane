@@ -110,7 +110,7 @@ Manual-run gate: only the built-in `start` and `schedule` triggers expose a user
 
 ### Expressions
 
-- **`{{ CEL }}`** — `cel-js` via `widget/celExpr.ts`; row env + `now` (Unix seconds).
+- **`{{ CEL }}`** — `@marcbachmann/cel-js` via `widget/celExpr.ts`; row env + `now` (Unix seconds). The adapter upfront-coerces safe-integer JS numbers (and, on retry, numeric strings) to `BigInt` for int arithmetic, and normalizes safe-integer BigInt results back to plain `number` on the way out.
 - **Legacy** `show` — e.g. `status == "running"` (`showExpression.ts`, `rowVisibility.ts`).
 - Prefer structured `where` for simple validated filters.
 
