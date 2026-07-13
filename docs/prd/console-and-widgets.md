@@ -131,6 +131,8 @@ The panel `content` object is intentionally flexible, but every known panel type
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
 | `number` | Render one aggregate KPI, or several KPIs side-by-side via `metrics[]` | `title?`, (`dataSource` + `render.kind: "number"`) or `metrics[]` |
+| `scorecard` | Single KPI with change chip, optional target/progress, and status color | `title?`, `dataSource`, `render.kind: "scorecard"` |
+| `spotlight` | Hero banner for the top data-source row (who / what / when / checks) | `title?`, `dataSource`, slot `*Field` mappings |
 
 New panels start as valid drafts where possible. For example, a new table panel may have an empty memory namespace and no columns while the user is still configuring it.
 
@@ -688,6 +690,39 @@ Rules:
 - Each metric's `render.kind` is `number`. `render.aggregation` is required (one of `count`/`sum`/`avg`/`min`/`max`/`first`/`last`), and `render.field` is required for aggregations other than `count`.
 - Use `render.label` as the metric's name (it renders above the value).
 - Multi-number mode is disjoint from the composite-combine mode: a panel is either single-value, composite-combined, or multi-number. The Number panel form exposes a Single / Multiple memory sources / Multiple numbers toggle that seeds the new mode from whatever is currently configured.
+
+## Spotlight Panels
+
+Spotlight panels blow up the **top row** of a data source into a hero banner: who, what (linked title), when + duration, an optional secondary person (approver/reviewer), and a strip of status checks.
+
+Unlike scorecards/tables, spotlight does not aggregate — it maps configured field paths / `{{ CEL }}` expressions off `rows[0]` into display slots.
+
+```yaml
+type: spotlight
+content:
+  title: Latest merge
+  dataSource:
+    kind: memory
+    namespace: recentMerges
+  kicker: Just landed
+  statusField: status
+  statusLabelField: statusLabel
+  actorNameField: authorName
+  actorAvatarField: authorAvatar
+  titleField: title
+  hrefField: href
+  subtitleField: subtitle
+  timestampField: mergedAt
+  durationField: cycleTimeMs
+  approverNameField: approver
+  approverAvatarField: approverAvatar
+  approverLabel: Approved by
+  checksField: checks
+  checkNameField: name
+  checkStatusField: status
+```
+
+Slot fields are optional strings, but at least `titleField` or `actorNameField` must be set so the banner has a headline. Status strings are normalized (`passed` → `success`, `RESULT_FAILED` → `failed`, etc.).
 
 ## Markdown Panels
 

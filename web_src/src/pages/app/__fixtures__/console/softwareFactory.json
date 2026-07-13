@@ -1,0 +1,559 @@
+{
+  "organizationId": "a1000001-0000-4000-8000-000000000001",
+  "canvasId": "a1000001-0000-4000-8000-000000000002",
+  "canvasName": "Software Factory",
+  "consoleYaml": "apiVersion: v1\nkind: Console\nmetadata:\n  canvasId: a1000001-0000-4000-8000-000000000002\n  name: Software Factory\nspec:\n  layout:\n    - i: latest-merge\n      x: 0\n      \"y\": 0\n      w: 8\n      h: 4\n      minW: 4\n      minH: 3\n    - i: ai-authored\n      x: 8\n      \"y\": 0\n      w: 2\n      h: 4\n      minW: 2\n      minH: 2\n    - i: ai-spend\n      x: 10\n      \"y\": 0\n      w: 2\n      h: 2\n      minW: 2\n      minH: 2\n    - i: active-engineers\n      x: 10\n      \"y\": 2\n      w: 2\n      h: 2\n      minW: 2\n      minH: 2\n    - i: recent-merges\n      x: 0\n      \"y\": 4\n      w: 7\n      h: 8\n      minW: 4\n      minH: 4\n    - i: spend-vs-prs\n      x: 7\n      \"y\": 4\n      w: 5\n      h: 8\n      minW: 3\n      minH: 4\n    - i: pr-health\n      x: 0\n      \"y\": 12\n      w: 12\n      h: 7\n      minW: 6\n      minH: 4\n  panels:\n    - id: latest-merge\n      type: spotlight\n      content:\n        title: Latest merge\n        dataSource:\n          kind: memory\n          namespace: recentMerges\n        kicker: Just landed\n        statusField: status\n        statusLabelField: statusLabel\n        actorNameField: authorName\n        actorAvatarField: authorAvatar\n        titleField: title\n        hrefField: href\n        subtitleField: subtitle\n        timestampField: mergedAt\n        durationField: cycleTimeMs\n        approverNameField: approver\n        approverAvatarField: approverAvatar\n        approverLabel: Approved by\n        checksField: checks\n        checkNameField: name\n        checkStatusField: status\n    - id: ai-authored\n      type: scorecard\n      content:\n        title: AI-assisted merges\n        dataSource:\n          kind: memory\n          namespace: aiAuthoredPct\n        render:\n          kind: scorecard\n          aggregation: first\n          field: value\n          label: AI-assisted PRs\n          format: percent\n          better: up\n          showChange: both\n          changeCaption: vs prior day\n          target: \"70\"\n          showProgress: true\n    - id: ai-spend\n      type: scorecard\n      content:\n        title: AI spend (7d)\n        dataSource:\n          kind: memory\n          namespace: aiSpendUsd\n        render:\n          kind: scorecard\n          aggregation: first\n          field: value\n          label: USD\n          format: number\n          prefix: \"$\"\n          better: down\n          showChange: both\n          changeCaption: vs prior day\n    - id: active-engineers\n      type: scorecard\n      content:\n        title: Active contributors\n        dataSource:\n          kind: memory\n          namespace: activeContributors\n        render:\n          kind: scorecard\n          aggregation: first\n          field: value\n          label: Engineers\n          format: number\n          better: up\n          showChange: number\n          changeCaption: vs prior day\n    - id: recent-merges\n      type: table\n      content:\n        title: Recent merges\n        dataSource:\n          kind: memory\n          namespace: recentMerges\n        render:\n          kind: table\n          columns:\n            - field: authorName\n              label: Author\n              format: avatar\n            - field: title\n              label: Pull request\n              format: link\n              href: \"{{ href }}\"\n            - field: authorship\n              label: Authorship\n              format: badge\n            - field: cycleTimeMs\n              label: Cycle time\n              format: duration\n              showTrend: true\n              trendBetter: down\n              trendDisplay: percent\n            - field: \"{{ checks.size() }}\"\n              label: Checks\n              format: progress\n              progressTarget: \"3\"\n              progressLabel: number\n    - id: spend-vs-prs\n      type: table\n      content:\n        title: AI spend vs merged PRs\n        dataSource:\n          kind: memory\n          namespace: engineerThroughput\n        render:\n          kind: table\n          sort:\n            field: mergedPrs\n            order: desc\n          columns:\n            - field: person\n              label: Engineer\n              format: avatar\n            - field: mergedPrs\n              label: Merged PRs\n              format: number\n              showTrend: true\n              trendBetter: up\n              trendDisplay: value\n            - field: aiSpendUsd\n              label: AI spend\n              format: number\n            - field: aiAssistedPct\n              label: AI-assisted\n              format: percent\n              showTrend: true\n              trendBetter: up\n            - field: reviewHours\n              label: Median review\n              format: number\n    - id: pr-health\n      type: table\n      content:\n        title: PR health (weekly)\n        dataSource:\n          kind: memory\n          namespace: prHealth\n        render:\n          kind: table\n          columns:\n            - field: week\n              label: Week\n            - field: medianReviewHours\n              label: Review latency (h)\n              format: number\n              showTrend: true\n              trendBetter: down\n              trendDisplay: percent\n            - field: medianSizeLoc\n              label: Median size (LOC)\n              format: number\n              showTrend: true\n              trendBetter: down\n            - field: reopenRate\n              label: Reopen rate\n              format: percent\n              showTrend: true\n              trendBetter: down\n            - field: mergeRate\n              label: Merge rate\n              format: percent\n              showTrend: true\n              trendBetter: up\n",
+  "canvas": {
+    "canvas": {
+      "metadata": {
+        "id": "a1000001-0000-4000-8000-000000000002",
+        "name": "Software Factory",
+        "organizationId": "a1000001-0000-4000-8000-000000000001",
+        "createdAt": "2026-07-09T06:00:00.000Z",
+        "updatedAt": "2026-07-13T09:00:00.000Z"
+      },
+      "spec": {
+        "name": "Software Factory",
+        "description": "Engineering throughput and AI vs human factory metrics"
+      },
+      "status": {}
+    }
+  },
+  "versions": {
+    "versions": [
+      {
+        "metadata": {
+          "id": "a1000001-0000-4000-8000-000000000003",
+          "canvasId": "a1000001-0000-4000-8000-000000000002",
+          "createdAt": "2026-07-13T08:00:00.000Z",
+          "updatedAt": "2026-07-13T09:00:00.000Z",
+          "commitMessage": "Seed software factory console",
+          "owner": {
+            "id": "a1000001-0000-4000-8000-000000000004",
+            "name": "Ada Lovelace"
+          }
+        }
+      }
+    ],
+    "totalCount": 1,
+    "hasNextPage": false
+  },
+  "versionsLatest": {
+    "versions": [
+      {
+        "metadata": {
+          "id": "a1000001-0000-4000-8000-000000000003",
+          "canvasId": "a1000001-0000-4000-8000-000000000002",
+          "createdAt": "2026-07-13T08:00:00.000Z",
+          "updatedAt": "2026-07-13T09:00:00.000Z",
+          "commitMessage": "Seed software factory console",
+          "owner": {
+            "id": "a1000001-0000-4000-8000-000000000004",
+            "name": "Ada Lovelace"
+          }
+        }
+      }
+    ],
+    "totalCount": 1,
+    "hasNextPage": false
+  },
+  "runs": {
+    "runs": [],
+    "totalCount": 0,
+    "hasNextPage": false
+  },
+  "memory": {
+    "items": [
+      {
+        "id": "b1000001-0000-4000-8000-000000000001",
+        "namespace": "recentMerges",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T09:00:00.000Z",
+        "updatedAt": "2026-07-13T09:00:00.000Z",
+        "values": {
+          "title": "feat: stream deploy status to console spotlights",
+          "href": "https://github.com/example/superplane/pull/1201",
+          "subtitle": "superplanehq/superplane \u00b7 main",
+          "status": "success",
+          "statusLabel": "Merged",
+          "author": "ada",
+          "authorName": "Ada Lovelace",
+          "authorAvatar": "https://github.com/octocat.png",
+          "approver": "Grace Hopper",
+          "approverAvatar": "https://github.com/octocat.png",
+          "mergedAt": "2026-07-13T09:00:00.000Z",
+          "cycleTimeMs": 16200000.0,
+          "authorship": "ai-assisted",
+          "checks": [
+            {
+              "name": "CI",
+              "status": "success"
+            },
+            {
+              "name": "Risk review",
+              "status": "success"
+            },
+            {
+              "name": "Docs",
+              "status": "success"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000002",
+        "namespace": "recentMerges",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T08:00:00.000Z",
+        "updatedAt": "2026-07-13T08:00:00.000Z",
+        "values": {
+          "title": "fix: clamp scorecard change chip for zero baselines",
+          "href": "https://github.com/example/superplane/pull/1198",
+          "subtitle": "superplanehq/superplane \u00b7 main",
+          "status": "success",
+          "statusLabel": "Merged",
+          "author": "grace",
+          "authorName": "Grace Hopper",
+          "authorAvatar": "https://github.com/octocat.png",
+          "approver": "Ada Lovelace",
+          "approverAvatar": "https://github.com/octocat.png",
+          "mergedAt": "2026-07-13T05:00:00.000Z",
+          "cycleTimeMs": 32400000,
+          "authorship": "human",
+          "checks": [
+            {
+              "name": "CI",
+              "status": "success"
+            },
+            {
+              "name": "Risk review",
+              "status": "warning"
+            },
+            {
+              "name": "Docs",
+              "status": "success"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000003",
+        "namespace": "recentMerges",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T07:00:00.000Z",
+        "updatedAt": "2026-07-13T07:00:00.000Z",
+        "values": {
+          "title": "chore: bump agent spend dashboards",
+          "href": "https://github.com/example/superplane/pull/1194",
+          "subtitle": "superplanehq/superplane \u00b7 main",
+          "status": "success",
+          "statusLabel": "Merged",
+          "author": "alan",
+          "authorName": "Alan Turing",
+          "authorAvatar": "https://github.com/octocat.png",
+          "approver": "Ada Lovelace",
+          "approverAvatar": "https://github.com/octocat.png",
+          "mergedAt": "2026-07-12T22:00:00.000Z",
+          "cycleTimeMs": 21600000,
+          "authorship": "ai-assisted",
+          "checks": [
+            {
+              "name": "CI",
+              "status": "success"
+            },
+            {
+              "name": "Risk review",
+              "status": "success"
+            },
+            {
+              "name": "Docs",
+              "status": "neutral"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000004",
+        "namespace": "recentMerges",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T06:00:00.000Z",
+        "updatedAt": "2026-07-13T06:00:00.000Z",
+        "values": {
+          "title": "feat: memory catalog field picker for spotlights",
+          "href": "https://github.com/example/superplane/pull/1189",
+          "subtitle": "superplanehq/superplane \u00b7 main",
+          "status": "success",
+          "statusLabel": "Merged",
+          "author": "ada",
+          "authorName": "Ada Lovelace",
+          "authorAvatar": "https://github.com/octocat.png",
+          "approver": "Alan Turing",
+          "approverAvatar": "https://github.com/octocat.png",
+          "mergedAt": "2026-07-12T14:00:00.000Z",
+          "cycleTimeMs": 39600000,
+          "authorship": "ai-assisted",
+          "checks": [
+            {
+              "name": "CI",
+              "status": "success"
+            },
+            {
+              "name": "Risk review",
+              "status": "success"
+            },
+            {
+              "name": "Docs",
+              "status": "success"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000005",
+        "namespace": "recentMerges",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T05:00:00.000Z",
+        "updatedAt": "2026-07-13T05:00:00.000Z",
+        "values": {
+          "title": "refactor: extract table trend chip",
+          "href": "https://github.com/example/superplane/pull/1182",
+          "subtitle": "superplanehq/superplane \u00b7 main",
+          "status": "success",
+          "statusLabel": "Merged",
+          "author": "grace",
+          "authorName": "Grace Hopper",
+          "authorAvatar": "https://github.com/octocat.png",
+          "approver": "Ada Lovelace",
+          "approverAvatar": "https://github.com/octocat.png",
+          "mergedAt": "2026-07-12T06:00:00.000Z",
+          "cycleTimeMs": 50400000,
+          "authorship": "human",
+          "checks": [
+            {
+              "name": "CI",
+              "status": "success"
+            },
+            {
+              "name": "Risk review",
+              "status": "success"
+            },
+            {
+              "name": "Docs",
+              "status": "failed"
+            }
+          ]
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000006",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T04:00:00.000Z",
+        "updatedAt": "2026-07-13T04:00:00.000Z",
+        "values": {
+          "value": 62,
+          "day": "2026-07-13"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000007",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T03:00:00.000Z",
+        "updatedAt": "2026-07-13T03:00:00.000Z",
+        "values": {
+          "value": 58,
+          "day": "2026-07-12"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000008",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T02:00:00.000Z",
+        "updatedAt": "2026-07-13T02:00:00.000Z",
+        "values": {
+          "value": 55,
+          "day": "2026-07-11"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000009",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T01:00:00.000Z",
+        "updatedAt": "2026-07-13T01:00:00.000Z",
+        "values": {
+          "value": 51,
+          "day": "2026-07-10"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000010",
+        "namespace": "aiAuthoredPct",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-13T00:00:00.000Z",
+        "updatedAt": "2026-07-13T00:00:00.000Z",
+        "values": {
+          "value": 49,
+          "day": "2026-07-09"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000011",
+        "namespace": "aiSpendUsd",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T23:00:00.000Z",
+        "updatedAt": "2026-07-12T23:00:00.000Z",
+        "values": {
+          "value": 1840,
+          "day": "2026-07-13"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000012",
+        "namespace": "aiSpendUsd",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T22:00:00.000Z",
+        "updatedAt": "2026-07-12T22:00:00.000Z",
+        "values": {
+          "value": 1710,
+          "day": "2026-07-12"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000013",
+        "namespace": "aiSpendUsd",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T21:00:00.000Z",
+        "updatedAt": "2026-07-12T21:00:00.000Z",
+        "values": {
+          "value": 1650,
+          "day": "2026-07-11"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000014",
+        "namespace": "aiSpendUsd",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T20:00:00.000Z",
+        "updatedAt": "2026-07-12T20:00:00.000Z",
+        "values": {
+          "value": 1590,
+          "day": "2026-07-10"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000015",
+        "namespace": "aiSpendUsd",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T19:00:00.000Z",
+        "updatedAt": "2026-07-12T19:00:00.000Z",
+        "values": {
+          "value": 1480,
+          "day": "2026-07-09"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000016",
+        "namespace": "activeContributors",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T18:00:00.000Z",
+        "updatedAt": "2026-07-12T18:00:00.000Z",
+        "values": {
+          "value": 18,
+          "day": "2026-07-13"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000017",
+        "namespace": "activeContributors",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T17:00:00.000Z",
+        "updatedAt": "2026-07-12T17:00:00.000Z",
+        "values": {
+          "value": 17,
+          "day": "2026-07-12"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000018",
+        "namespace": "activeContributors",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T16:00:00.000Z",
+        "updatedAt": "2026-07-12T16:00:00.000Z",
+        "values": {
+          "value": 16,
+          "day": "2026-07-11"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000019",
+        "namespace": "activeContributors",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T15:00:00.000Z",
+        "updatedAt": "2026-07-12T15:00:00.000Z",
+        "values": {
+          "value": 16,
+          "day": "2026-07-10"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000020",
+        "namespace": "activeContributors",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T14:00:00.000Z",
+        "updatedAt": "2026-07-12T14:00:00.000Z",
+        "values": {
+          "value": 15,
+          "day": "2026-07-09"
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000021",
+        "namespace": "engineerThroughput",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T13:00:00.000Z",
+        "updatedAt": "2026-07-12T13:00:00.000Z",
+        "values": {
+          "person": "Ada Lovelace",
+          "avatar": "https://github.com/octocat.png",
+          "mergedPrs": 12,
+          "aiSpendUsd": 620,
+          "aiAssistedPct": 80,
+          "reviewHours": 4.2
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000022",
+        "namespace": "engineerThroughput",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T12:00:00.000Z",
+        "updatedAt": "2026-07-12T12:00:00.000Z",
+        "values": {
+          "person": "Grace Hopper",
+          "avatar": "https://github.com/octocat.png",
+          "mergedPrs": 9,
+          "aiSpendUsd": 210,
+          "aiAssistedPct": 22,
+          "reviewHours": 6.8
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000023",
+        "namespace": "engineerThroughput",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T11:00:00.000Z",
+        "updatedAt": "2026-07-12T11:00:00.000Z",
+        "values": {
+          "person": "Alan Turing",
+          "avatar": "https://github.com/octocat.png",
+          "mergedPrs": 8,
+          "aiSpendUsd": 540,
+          "aiAssistedPct": 70,
+          "reviewHours": 5.1
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000024",
+        "namespace": "engineerThroughput",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T10:00:00.000Z",
+        "updatedAt": "2026-07-12T10:00:00.000Z",
+        "values": {
+          "person": "Katherine Johnson",
+          "avatar": "https://github.com/octocat.png",
+          "mergedPrs": 7,
+          "aiSpendUsd": 310,
+          "aiAssistedPct": 45,
+          "reviewHours": 3.9
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000025",
+        "namespace": "engineerThroughput",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T09:00:00.000Z",
+        "updatedAt": "2026-07-12T09:00:00.000Z",
+        "values": {
+          "person": "Margaret Hamilton",
+          "avatar": "https://github.com/octocat.png",
+          "mergedPrs": 6,
+          "aiSpendUsd": 160,
+          "aiAssistedPct": 18,
+          "reviewHours": 7.4
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000026",
+        "namespace": "prHealth",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T08:00:00.000Z",
+        "updatedAt": "2026-07-12T08:00:00.000Z",
+        "values": {
+          "week": "2026-W28",
+          "medianReviewHours": 5.2,
+          "medianSizeLoc": 180,
+          "reopenRate": 0.08,
+          "mergeRate": 0.74
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000027",
+        "namespace": "prHealth",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T07:00:00.000Z",
+        "updatedAt": "2026-07-12T07:00:00.000Z",
+        "values": {
+          "week": "2026-W27",
+          "medianReviewHours": 5.8,
+          "medianSizeLoc": 210,
+          "reopenRate": 0.09,
+          "mergeRate": 0.71
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000028",
+        "namespace": "prHealth",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T06:00:00.000Z",
+        "updatedAt": "2026-07-12T06:00:00.000Z",
+        "values": {
+          "week": "2026-W26",
+          "medianReviewHours": 6.4,
+          "medianSizeLoc": 240,
+          "reopenRate": 0.11,
+          "mergeRate": 0.68
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000029",
+        "namespace": "prHealth",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T05:00:00.000Z",
+        "updatedAt": "2026-07-12T05:00:00.000Z",
+        "values": {
+          "week": "2026-W25",
+          "medianReviewHours": 6.1,
+          "medianSizeLoc": 230,
+          "reopenRate": 0.1,
+          "mergeRate": 0.69
+        }
+      },
+      {
+        "id": "b1000001-0000-4000-8000-000000000030",
+        "namespace": "prHealth",
+        "source": "SOURCE_NODE",
+        "createdAt": "2026-07-12T04:00:00.000Z",
+        "updatedAt": "2026-07-12T04:00:00.000Z",
+        "values": {
+          "week": "2026-W24",
+          "medianReviewHours": 7.0,
+          "medianSizeLoc": 260,
+          "reopenRate": 0.12,
+          "mergeRate": 0.65
+        }
+      }
+    ]
+  }
+}
