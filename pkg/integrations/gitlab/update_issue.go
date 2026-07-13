@@ -260,18 +260,20 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 
 	var assigneeIDs []int
 	for _, idStr := range config.Assignees {
-		var id int
-		if _, err := fmt.Sscanf(idStr, "%d", &id); err == nil {
-			assigneeIDs = append(assigneeIDs, id)
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			return fmt.Errorf("invalid assignee id %q: %w", idStr, err)
 		}
+		assigneeIDs = append(assigneeIDs, id)
 	}
 
 	var milestoneID *int
 	if config.Milestone != "" {
 		id, err := strconv.Atoi(config.Milestone)
-		if err == nil {
-			milestoneID = &id
+		if err != nil {
+			return fmt.Errorf("invalid milestone id %q: %w", config.Milestone, err)
 		}
+		milestoneID = &id
 	}
 
 	req := &UpdateIssueRequest{
