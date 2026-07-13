@@ -2,6 +2,7 @@ package claude
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,6 +29,7 @@ func TestTextPrompt_Configuration(t *testing.T) {
 		"prompt":        {true, string(configuration.FieldTypeText)},
 		"systemMessage": {false, string(configuration.FieldTypeText)},
 		"files":         {false, string(configuration.FieldTypeList)},
+		"codeExecution": {false, string(configuration.FieldTypeBool)},
 		"outputSchema":  {false, string(configuration.FieldTypeText)},
 	}
 
@@ -550,5 +552,161 @@ func TestTextPrompt_NodeMetadata(t *testing.T) {
 	}
 	if !meta.StructuredOutput {
 		t.Error("expected structuredOutput true")
+	}
+}
+
+func TestTextPrompt_CodeExecution(t *testing.T) {
+	c := &TextPrompt{}
+
+	// Response with a bash code execution tool result referencing a generated file.
+	codeExecutionResponseJSON := `{
+		"id": "msg_02",
+		"type": "message",
+		"role": "assistant",
+		"model": "claude-3-test",
+		"content": [
+			{"type": "server_tool_use", "name": "bash_code_execution"},
+			{"type": "bash_code_execution_tool_result", "content": {"type": "bash_code_execution_result", "stdout": "ok", "stderr": "", "return_code": 0, "content": [{"type": "code_execution_output", "file_id": "file_gen1"}]}},
+			{"type": "text", "text": "Chart created"}
+		],
+		"stop_reason": "end_turn",
+		"usage": {"input_tokens": 10, "output_tokens": 5}
+	}`
+	fileMetadataJSON := `{"id": "file_gen1", "type": "file", "filename": "chart.png", "mime_type": "image/png", "size_bytes": 34567, "created_at": "2026-07-10T12:00:00Z", "downloadable": true}`
+
+	t.Run("enabled adds tool and emits artifacts with content", func(t *testing.T) {
+		binary := "\x89PNG\r\n\x1a\n"
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(codeExecutionResponseJSON))},
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(fileMetadataJSON))},
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(binary))},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"model":         "claude-3-test",
+				"prompt":        "Make a chart",
+				"codeExecution": true,
+			},
+			HTTP:           httpContext,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+			ExecutionState: executionState,
+		}
+
+		if err := c.Execute(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// The request body must carry the code execution tool and the files beta header.
+		body, _ := io.ReadAll(httpContext.Requests[0].Body)
+		var req map[string]any
+		if err := json.Unmarshal(body, &req); err != nil {
+			t.Fatalf("failed to parse request body: %v", err)
+		}
+		tools, ok := req["tools"].([]any)
+		if !ok || len(tools) != 1 {
+			t.Fatalf("expected one tool in request, got %v", req["tools"])
+		}
+		tool := tools[0].(map[string]any)
+		if tool["type"] != codeExecutionToolType || tool["name"] != "code_execution" {
+			t.Errorf("unexpected tool: %v", tool)
+		}
+		if got := httpContext.Requests[0].Header.Get("anthropic-beta"); got != anthropicFilesBeta {
+			t.Errorf("expected files beta header, got %q", got)
+		}
+
+		// The follow-up lookups resolve the artifact metadata and content.
+		if len(httpContext.Requests) != 3 {
+			t.Fatalf("expected 3 requests, got %d", len(httpContext.Requests))
+		}
+		payload := executionState.Payloads[0].(map[string]any)["data"].(MessagePayload)
+		if len(payload.Artifacts) != 1 {
+			t.Fatalf("expected 1 artifact, got %d", len(payload.Artifacts))
+		}
+		artifact := payload.Artifacts[0]
+		if artifact.FileID != "file_gen1" || artifact.Filename != "chart.png" || artifact.MimeType != "image/png" || artifact.SizeBytes != 34567 {
+			t.Errorf("unexpected artifact: %+v", artifact)
+		}
+		if artifact.DownloadURL != "https://api.anthropic.com/v1/files/file_gen1/content" {
+			t.Errorf("unexpected download URL: %s", artifact.DownloadURL)
+		}
+		if artifact.Encoding != "base64" || artifact.Content != base64.StdEncoding.EncodeToString([]byte(binary)) {
+			t.Errorf("expected base64 inline content, got encoding %q", artifact.Encoding)
+		}
+	})
+
+	t.Run("metadata failure still yields artifact with id and link", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(codeExecutionResponseJSON))},
+				{StatusCode: 500, Body: io.NopCloser(strings.NewReader(`boom`))},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"model":         "claude-3-test",
+				"prompt":        "Make a chart",
+				"codeExecution": true,
+			},
+			HTTP:           httpContext,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+			ExecutionState: executionState,
+		}
+
+		if err := c.Execute(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		payload := executionState.Payloads[0].(map[string]any)["data"].(MessagePayload)
+		if len(payload.Artifacts) != 1 {
+			t.Fatalf("expected 1 artifact, got %d", len(payload.Artifacts))
+		}
+		if payload.Artifacts[0].FileID != "file_gen1" || payload.Artifacts[0].Filename != "" {
+			t.Errorf("unexpected artifact: %+v", payload.Artifacts[0])
+		}
+	})
+
+	t.Run("disabled sends no tools and no artifacts", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"id":"msg_03","content":[{"type":"text","text":"hi"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`))},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"model":  "claude-3-test",
+				"prompt": "hi",
+			},
+			HTTP:           httpContext,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+			ExecutionState: executionState,
+		}
+
+		if err := c.Execute(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		body, _ := io.ReadAll(httpContext.Requests[0].Body)
+		if strings.Contains(string(body), `"tools"`) {
+			t.Error("expected no tools in request body")
+		}
+		payload := executionState.Payloads[0].(map[string]any)["data"].(MessagePayload)
+		if payload.Artifacts != nil {
+			t.Errorf("expected no artifacts, got %+v", payload.Artifacts)
+		}
+	})
+}
+
+func TestExtractGeneratedFileIDs_LegacyBlock(t *testing.T) {
+	response := &CreateMessageResponse{
+		Content: []MessageContent{
+			{Type: "code_execution_tool_result", Content: json.RawMessage(`{"type":"code_execution_result","content":[{"type":"code_execution_output","file_id":"file_a"},{"type":"code_execution_output","file_id":"file_a"},{"type":"code_execution_output","file_id":"file_b"}]}`)},
+		},
+	}
+	ids := extractGeneratedFileIDs(response)
+	if len(ids) != 2 || ids[0] != "file_a" || ids[1] != "file_b" {
+		t.Errorf("expected deduplicated [file_a file_b], got %v", ids)
 	}
 }
