@@ -1,7 +1,11 @@
 import { useRef } from "react";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
-import { upsertRunIntoDescribeRunData, type InfiniteRunsPage } from "./canvasInfiniteCache";
+import {
+  reuseCachedInfiniteRunsPage,
+  upsertRunIntoDescribeRunData,
+  type InfiniteRunsPage,
+} from "./canvasInfiniteCache";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
@@ -1045,20 +1049,9 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
       // analysis for context.
       if (pageParam != null) {
         const cached = queryClient.getQueryData<InfiniteData<InfiniteRunsPage>>(queryKey);
-        if (cached) {
-          const index = cached.pageParams.findIndex((p) => p === pageParam);
-          if (index >= 0) {
-            const cachedPage = cached.pages[index];
-            if (cachedPage !== undefined) {
-              const authoritativeTotal = latestPage1TotalCountRef.current ?? cached.pages[0]?.totalCount;
-              if (authoritativeTotal === undefined || cachedPage.totalCount === authoritativeTotal) {
-                return authoritativeTotal === undefined
-                  ? cachedPage
-                  : { ...cachedPage, totalCount: authoritativeTotal };
-              }
-            }
-          }
-        }
+        const authoritativeTotal = latestPage1TotalCountRef.current ?? cached?.pages[0]?.totalCount;
+        const reused = reuseCachedInfiniteRunsPage(cached, pageParam, authoritativeTotal);
+        if (reused !== undefined) return reused;
       }
       const response = await canvasesListRuns(
         withOrganizationHeader({
