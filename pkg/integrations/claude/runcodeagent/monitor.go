@@ -140,7 +140,11 @@ func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client 
 	}
 
 	out := buildOutput(sess.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
-	out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
+	// Past the poll budget the events may still be unavailable (sm == nil);
+	// emit what we have and only look for artifacts when events were read.
+	if sm != nil {
+		out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
+	}
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
 		// Never tear down on an emit failure: the session still holds the agent
 		// output (PR URL, summary), so a transient emit failure must remain

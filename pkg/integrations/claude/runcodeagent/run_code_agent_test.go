@@ -551,3 +551,32 @@ func Test__RunCodeAgent__resolvePullRequestForRun__missingRef(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing its base repository or head branch")
 }
+
+func Test__RunCodeAgent__poll__terminalWithUnavailableEventsPastBudget(t *testing.T) {
+	a := &RunCodeAgent{}
+	// The session is terminal but its events are unavailable and the poll
+	// budget is exhausted: the run must still finish (no artifacts) instead
+	// of panicking on the missing session messages.
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"sess_1","status":"idle"}`),
+		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`boom`))}, // events fetch fails
+		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), // teardown
+	}}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(maxPollAttempts + 1), "errors": float64(0)},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       terminalMeta(),
+		ExecutionState: execState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, execState.Finished)
+	out := execState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status)
+	assert.Nil(t, out.Artifacts)
+}
