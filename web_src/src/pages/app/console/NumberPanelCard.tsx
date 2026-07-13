@@ -17,6 +17,7 @@ import {
   type NumberPanelContent,
   type TablePanelDataSource,
 } from "./panelTypes";
+import { runsRenderIsTotalCountOnly } from "./widget/runsWidgetQuery";
 import { renderNeedsRunNodeOutputs, useWidgetData } from "./widget/useWidgetData";
 import { WidgetNumber } from "./widget/WidgetNumber";
 
@@ -90,7 +91,13 @@ function NumberPanelDataBound({
   dataSource: Exclude<NumberPanelContent["dataSource"], CompositeMemoryNumberDataSource | undefined>;
   canvasId: string;
 }) {
-  const { rows, isLoading, error, totalCount } = useWidgetData(canvasId, dataSource, renderNeedsRunNodeOutputs(render));
+  const { rows, isLoading, error, totalCount } = useWidgetData(
+    canvasId,
+    dataSource,
+    renderNeedsRunNodeOutputs(render),
+    false,
+    runsRenderIsTotalCountOnly(dataSource, render),
+  );
   if (error) return <PanelError message={error} />;
   return <WidgetNumber render={render} rows={rows} isLoading={isLoading} totalCount={totalCount} />;
 }
@@ -112,10 +119,13 @@ function MultiNumberPanelBody({ metrics, canvasId }: { metrics: NumberMetric[]; 
 }
 
 function NumberMetricItem({ metric, canvasId }: { metric: NumberMetric; canvasId: string }) {
+  const metricDataSource = metric.dataSource as TablePanelDataSource;
   const { rows, isLoading, error, totalCount } = useWidgetData(
     canvasId,
-    metric.dataSource as TablePanelDataSource,
+    metricDataSource,
     renderNeedsRunNodeOutputs(metric.render),
+    false,
+    runsRenderIsTotalCountOnly(metricDataSource, metric.render),
   );
   if (error) {
     return (
