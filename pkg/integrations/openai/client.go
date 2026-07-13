@@ -2,6 +2,7 @@ package openai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +18,11 @@ import (
 )
 
 const defaultBaseURL = "https://api.openai.com/v1"
+
+// generationTimeout bounds model generation requests. They block until the
+// model — and any server-side tools like the code interpreter — finish, which
+// regularly takes longer than the platform's default request timeout.
+const generationTimeout = 5 * time.Minute
 
 type Client struct {
 	APIKey   string
@@ -158,7 +164,7 @@ func (c *Client) VerifyAdmin() error {
 	params := url.Values{}
 	params.Set("start_time", fmt.Sprintf("%d", time.Now().AddDate(0, 0, -1).Unix()))
 	params.Set("limit", "1")
-	_, err := c.execRequestWithKey(http.MethodGet, defaultBaseURL+"/organization/usage/completions?"+params.Encode(), nil, c.AdminKey)
+	_, err := c.execRequestWithKey(context.Background(), http.MethodGet, defaultBaseURL+"/organization/usage/completions?"+params.Encode(), nil, c.AdminKey)
 	return err
 }
 
@@ -177,7 +183,7 @@ func (c *Client) GetUsage(path string, params url.Values) ([]UsageBucket, error)
 
 	buckets := []UsageBucket{}
 	for range maxUsagePages {
-		responseBody, err := c.execRequestWithKey(http.MethodGet, defaultBaseURL+path+"?"+params.Encode(), nil, c.AdminKey)
+		responseBody, err := c.execRequestWithKey(context.Background(), http.MethodGet, defaultBaseURL+path+"?"+params.Encode(), nil, c.AdminKey)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +231,12 @@ func (c *Client) CreateResponse(req CreateResponseRequest) (*OpenAIResponse, err
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, c.BaseURL+"/responses", bytes.NewReader(body))
+	// Generations block until the model finishes, so this request asks for
+	// more time than the platform's default request timeout allows.
+	ctx, cancel := context.WithTimeout(context.Background(), generationTimeout)
+	defer cancel()
+
+	responseBody, err := c.execRequestCtx(ctx, http.MethodPost, c.BaseURL+"/responses", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -371,11 +382,15 @@ func (c *Client) ContainerFileContentURL(containerID, fileID string) string {
 }
 
 func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error) {
-	return c.execRequestWithKey(method, URL, body, c.APIKey)
+	return c.execRequestCtx(context.Background(), method, URL, body)
 }
 
-func (c *Client) execRequestWithKey(method, URL string, body io.Reader, key string) ([]byte, error) {
-	req, err := http.NewRequest(method, URL, body)
+func (c *Client) execRequestCtx(ctx context.Context, method, URL string, body io.Reader) ([]byte, error) {
+	return c.execRequestWithKey(ctx, method, URL, body, c.APIKey)
+}
+
+func (c *Client) execRequestWithKey(ctx context.Context, method, URL string, body io.Reader, key string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, method, URL, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
 	}

@@ -3,6 +3,7 @@ package claude
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -22,6 +24,10 @@ const (
 	// anthropicFilesBeta is required to upload files and to reference a file_id
 	// from a content block on the Messages API.
 	anthropicFilesBeta = "files-api-2025-04-14"
+	// generationTimeout bounds model generation requests. They block until the
+	// model — and any server-side tools like code execution — finish, which
+	// regularly takes longer than the platform's default request timeout.
+	generationTimeout = 5 * time.Minute
 )
 
 type Client struct {
@@ -182,7 +188,12 @@ func (c *Client) CreateMessage(req CreateMessageRequest) (*CreateMessageResponse
 		beta = anthropicFilesBeta
 	}
 
-	responseBody, err := c.execRequestWithBeta(http.MethodPost, c.BaseURL+"/messages", bytes.NewBuffer(reqBody), beta)
+	// Generations block until the model finishes, so this request asks for
+	// more time than the platform's default request timeout allows.
+	ctx, cancel := context.WithTimeout(context.Background(), generationTimeout)
+	defer cancel()
+
+	responseBody, err := c.doRequestCtx(ctx, http.MethodPost, c.BaseURL+"/messages", bytes.NewBuffer(reqBody), c.APIKey, beta)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +346,11 @@ func (c *Client) execAdminRequest(method, URL string, body io.Reader) ([]byte, e
 }
 
 func (c *Client) doRequest(method, URL string, body io.Reader, apiKey, beta string) ([]byte, error) {
-	req, err := http.NewRequest(method, URL, body)
+	return c.doRequestCtx(context.Background(), method, URL, body, apiKey, beta)
+}
+
+func (c *Client) doRequestCtx(ctx context.Context, method, URL string, body io.Reader, apiKey, beta string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, method, URL, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
 	}

@@ -20,8 +20,19 @@ type HTTPPolicy struct {
 	PrivateIPRanges []string
 }
 
+const (
+	// defaultRequestTimeout bounds every outbound request that does not ask
+	// for more time via a context deadline on the request.
+	defaultRequestTimeout = 30 * time.Second
+	// maxLongRequestTimeout is the hard backstop for requests that opt into a
+	// longer deadline (e.g. LLM generations); the request context's own
+	// deadline still applies below it.
+	maxLongRequestTimeout = 10 * time.Minute
+)
+
 type HTTPContext struct {
 	client                      *http.Client
+	longClient                  *http.Client
 	maxResponseBytes            int64
 	policyResolver              func() (HTTPPolicy, error)
 	policyResolverInTransaction func(*gorm.DB) (HTTPPolicy, error)
@@ -74,7 +85,19 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 	// This prevents DNS rebinding attacks by checking the resolved IP just before connecting.
 	//
 	httpCtx.client = &http.Client{
-		Timeout:   30 * time.Second,
+		Timeout:   defaultRequestTimeout,
+		Transport: httpCtx.transport(nil, false),
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return httpCtx.checkRedirect(req, via, nil)
+		},
+	}
+
+	// Requests that carry an explicit context deadline beyond the default
+	// timeout (e.g. LLM generations that block until the model finishes) are
+	// served by a client with a longer cap; the request context still
+	// enforces the caller's deadline.
+	httpCtx.longClient = &http.Client{
+		Timeout:   maxLongRequestTimeout,
 		Transport: httpCtx.transport(nil, false),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return httpCtx.checkRedirect(req, via, nil)
@@ -162,6 +185,16 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 	return c.doWithTransaction(request, nil)
 }
 
+// clientFor selects the client for a request: requests whose context carries
+// an explicit deadline beyond the default timeout use the long-request client
+// (the http.Client timeout would otherwise override the caller's deadline).
+func (c *HTTPContext) clientFor(request *http.Request) *http.Client {
+	if deadline, ok := request.Context().Deadline(); ok && time.Until(deadline) > defaultRequestTimeout {
+		return c.longClient
+	}
+	return c.client
+}
+
 func (c *HTTPContextInTransaction) Do(request *http.Request) (*http.Response, error) {
 	return c.httpCtx.doWithTransaction(request, c.tx)
 }
@@ -191,7 +224,7 @@ func (c *HTTPContext) InvalidatePolicyCache() {
 }
 
 func (c *HTTPContext) do(request *http.Request, tx *gorm.DB) (*http.Response, error) {
-	client := c.client
+	client := c.clientFor(request)
 	if tx != nil {
 		client = c.clientInTransaction(tx)
 	}
