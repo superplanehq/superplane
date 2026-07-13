@@ -41,8 +41,26 @@ func TestSSHCommandLineEndings(t *testing.T) {
 	t.Run("normalizes CRLF command files before streaming them over SSH", func(t *testing.T) {
 		steps := &sshLineEndingsSteps{t: t}
 		steps.start()
-		steps.givenAnSSHServerExpectingLFScript()
+		steps.givenAnSSHServerExpectingScript("set -eo pipefail\nprintf ok\n")
 		steps.givenACanvasWithCRLFSSHCommandFile()
+		steps.whenTheManualTriggerRuns()
+		steps.thenTheSSHNodeCompletedSuccessfully()
+		steps.thenTheSSHServerReceivedNormalizedScript()
+	})
+
+	t.Run("normalizes CRLF inline scripts before streaming them over SSH", func(t *testing.T) {
+		steps := &sshLineEndingsSteps{t: t}
+		steps.start()
+		steps.givenAnSSHServerExpectingScript(strings.Join([]string{
+			"#!/bin/bash",
+			"set -euo pipefail",
+			"cd ~/preview-sso.teams.novp.com",
+			`sed -i -E "s#([a-z0-9\-]+\.teams\.novp\.com)#${APP_HOST_PREFIX}-\1#g" .env`,
+			"docker compose down --remove-orphans && docker compose up -d",
+			"docker compose run --rm php php artisan migrate",
+			"",
+		}, "\n"))
+		steps.givenACanvasWithCRLFInlineScript()
 		steps.whenTheManualTriggerRuns()
 		steps.thenTheSSHNodeCompletedSuccessfully()
 		steps.thenTheSSHServerReceivedNormalizedScript()
@@ -62,8 +80,7 @@ func (s *sshLineEndingsSteps) start() {
 	s.session.Login()
 }
 
-func (s *sshLineEndingsSteps) givenAnSSHServerExpectingLFScript() {
-	expectedScript := "set -eo pipefail\nprintf ok\n"
+func (s *sshLineEndingsSteps) givenAnSSHServerExpectingScript(expectedScript string) {
 	server, err := startScriptCheckingSSHServer(sshLineEndingUser, sshLineEndingPassword, expectedScript)
 	require.NoError(s.t, err)
 	s.t.Cleanup(server.Close)
@@ -74,10 +91,34 @@ func (s *sshLineEndingsSteps) givenACanvasWithCRLFSSHCommandFile() {
 	require.NotNil(s.t, s.server, "SSH server must be started before creating the canvas")
 
 	s.createPasswordSecret()
-	canvas := s.createPublishedSSHCanvas()
+	canvas := s.createPublishedSSHCanvas(map[string]any{
+		"commandSource": "file",
+		"commandFile":   sshLineEndingScriptPath,
+	})
 	s.createRepositoryCommandFile(canvas, "set -eo pipefail\r\nprintf ok\r\n")
 
 	s.canvas = shared.NewCanvasSteps("SSH CRLF Line Endings", s.t, s.session)
+	s.canvas.WorkflowID = canvas.ID
+}
+
+func (s *sshLineEndingsSteps) givenACanvasWithCRLFInlineScript() {
+	require.NotNil(s.t, s.server, "SSH server must be started before creating the canvas")
+
+	s.createPasswordSecret()
+	canvas := s.createPublishedSSHCanvas(map[string]any{
+		"commandSource": "inline",
+		"commands": strings.Join([]string{
+			"#!/bin/bash",
+			"set -euo pipefail",
+			"cd ~/preview-sso.teams.novp.com",
+			`sed -i -E "s#([a-z0-9\-]+\.teams\.novp\.com)#${APP_HOST_PREFIX}-\1#g" .env`,
+			"docker compose down --remove-orphans && docker compose up -d",
+			"docker compose run --rm php php artisan migrate",
+			"",
+		}, "\r\n"),
+	})
+
+	s.canvas = shared.NewCanvasSteps("SSH Inline CRLF Line Endings", s.t, s.session)
 	s.canvas.WorkflowID = canvas.ID
 }
 
@@ -98,12 +139,29 @@ func (s *sshLineEndingsSteps) createPasswordSecret() {
 	require.NoError(s.t, err)
 }
 
-func (s *sshLineEndingsSteps) createPublishedSSHCanvas() *models.Canvas {
+func (s *sshLineEndingsSteps) createPublishedSSHCanvas(commandConfig map[string]any) *models.Canvas {
 	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
 	require.NoError(s.t, err)
 
 	startNodeID := "start-trigger"
 	sshNodeID := "ssh-command"
+	configuration := map[string]any{
+		"host":     "127.0.0.1",
+		"port":     s.server.Port(),
+		"username": sshLineEndingUser,
+		"timeout":  10,
+		"authentication": map[string]any{
+			"authMethod": "password",
+			"password": map[string]any{
+				"secret": sshLineEndingSecretName,
+				"key":    sshLineEndingSecretKey,
+			},
+		},
+	}
+	for key, value := range commandConfig {
+		configuration[key] = value
+	}
+
 	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
 		{
 			NodeID: startNodeID,
@@ -122,22 +180,8 @@ func (s *sshLineEndingsSteps) createPublishedSSHCanvas() *models.Canvas {
 			Ref: datatypes.NewJSONType(models.NodeRef{
 				Component: &models.ComponentRef{Name: "ssh"},
 			}),
-			Configuration: datatypes.NewJSONType(map[string]any{
-				"host":          "127.0.0.1",
-				"port":          s.server.Port(),
-				"username":      sshLineEndingUser,
-				"commandSource": "file",
-				"commandFile":   sshLineEndingScriptPath,
-				"timeout":       10,
-				"authentication": map[string]any{
-					"authMethod": "password",
-					"password": map[string]any{
-						"secret": sshLineEndingSecretName,
-						"key":    sshLineEndingSecretKey,
-					},
-				},
-			}),
-			Position: datatypes.NewJSONType(models.Position{X: 1000, Y: 200}),
+			Configuration: datatypes.NewJSONType(configuration),
+			Position:      datatypes.NewJSONType(models.Position{X: 1000, Y: 200}),
 		},
 	}, []models.Edge{
 		{SourceID: startNodeID, TargetID: sshNodeID, Channel: "default"},
@@ -212,7 +256,7 @@ func (s *sshLineEndingsSteps) thenTheSSHNodeCompletedSuccessfully() {
 
 func (s *sshLineEndingsSteps) thenTheSSHServerReceivedNormalizedScript() {
 	body := s.server.WaitForScript(s.t)
-	require.Equal(s.t, "set -eo pipefail\nprintf ok\n", body)
+	require.Equal(s.t, s.server.expected, body)
 	require.NotContains(s.t, body, "\r")
 }
 

@@ -855,11 +855,12 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 }
 
 // buildExecutionCommand assembles the final command sent to the remote host
-// and, for file mode, returns the script body to stream as stdin.
+// and returns a stdin payload when the command should be streamed as a script.
 //
-// Inline mode keeps the long-standing behavior of stripping blank lines and
-// joining the rest with `&&` so a list of one-liners runs as a chain. The
-// remote shell receives a single string and no stdin payload.
+// Inline mode keeps one-line commands on the command line, preserving the
+// long-standing behavior for simple invocations. Multi-line inline scripts are
+// streamed to `bash -s` so shell syntax that depends on real newlines (shebangs,
+// comments, conditionals, here-docs) is not flattened into invalid `&&` chains.
 //
 // File mode pipes the (already-loaded) script body to `bash -s` over stdin.
 // This avoids embedding the whole script in the command line — argv has size
@@ -874,6 +875,11 @@ func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBod
 			return "", nil, errors.New("command file body is required")
 		}
 		command, payload := c.buildScriptCommand(metadata.WorkingDirectory, metadata.Environment, scriptBody)
+		return command, strings.NewReader(payload), nil
+	}
+
+	if isMultilineInlineScript(metadata.Commands) {
+		command, payload := c.buildScriptCommand(metadata.WorkingDirectory, metadata.Environment, metadata.Commands)
 		return command, strings.NewReader(payload), nil
 	}
 
@@ -971,6 +977,22 @@ func buildCombinedCommands(commands string) string {
 		return ""
 	}
 	return strings.Join(parts, " && ")
+}
+
+func isMultilineInlineScript(commands string) bool {
+	lines := strings.Split(normalizeScriptLineEndings(commands), "\n")
+	nonEmptyLines := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		nonEmptyLines++
+		if nonEmptyLines > 1 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func normalizeScriptLineEndings(script string) string {

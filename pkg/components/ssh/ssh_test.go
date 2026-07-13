@@ -703,15 +703,78 @@ fi`
 func TestSSHCommand_BuildExecutionCommand(t *testing.T) {
 	c := &SSHCommand{}
 
-	t.Run("inline mode joins lines, uses sh, and has no stdin payload", func(t *testing.T) {
+	t.Run("inline mode streams multi-line commands", func(t *testing.T) {
 		meta := ExecutionMetadata{
 			CommandSource: CommandSourceInline,
 			Commands:      "echo 1\necho 2",
 		}
 		command, stdin, err := c.buildExecutionCommand(meta, "")
 		require.NoError(t, err)
+		assert.Equal(t, "bash -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, "echo 1\necho 2", string(body))
+	})
+
+	t.Run("inline mode keeps single-line commands on the command line", func(t *testing.T) {
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceInline,
+			Commands:      "echo 1 && echo 2",
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, "")
+		require.NoError(t, err)
 		assert.Equal(t, "echo 1 && echo 2", command)
 		assert.Nil(t, stdin)
+	})
+
+	t.Run("inline mode streams customer bash scripts instead of flattening them", func(t *testing.T) {
+		script := strings.Join([]string{
+			"#!/bin/bash",
+			"set -euo pipefail",
+			"cd ~/preview-sso.teams.novp.com",
+			`sed -i -E "s#([a-z0-9\-]+\.teams\.novp\.com)#${APP_HOST_PREFIX}-\1#g" .env`,
+			"docker compose down --remove-orphans && docker compose up -d",
+			"docker compose run --rm php php artisan migrate",
+		}, "\r\n")
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceInline,
+			Commands:      script,
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, "")
+		require.NoError(t, err)
+		assert.Equal(t, "bash -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, strings.ReplaceAll(script, "\r\n", "\n"), string(body))
+		assert.NotContains(t, string(body), "\r")
+		assert.Contains(t, string(body), `\1`)
+	})
+
+	t.Run("inline mode streams shell blocks that require real newlines", func(t *testing.T) {
+		script := strings.Join([]string{
+			"if [ -n \"$APP_BRANCH_NAME\" ]; then",
+			"  git switch \"$APP_BRANCH_NAME\"",
+			"fi",
+		}, "\n")
+		meta := ExecutionMetadata{
+			CommandSource: CommandSourceInline,
+			Commands:      script,
+		}
+
+		command, stdin, err := c.buildExecutionCommand(meta, "")
+		require.NoError(t, err)
+		assert.Equal(t, "bash -s", command)
+		require.NotNil(t, stdin)
+
+		body, readErr := io.ReadAll(stdin)
+		require.NoError(t, readErr)
+		assert.Equal(t, script, string(body))
 	})
 
 	t.Run("inline mode rejects empty commands", func(t *testing.T) {
