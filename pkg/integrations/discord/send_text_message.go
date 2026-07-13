@@ -342,11 +342,13 @@ func parseDataURI(uri string) (string, []byte, error) {
 		return mediaType, content, nil
 	}
 
-	content, err := url.PathUnescape(data)
-	if err != nil {
-		return "", nil, fmt.Errorf("invalid percent-encoded content: %v", err)
+	// Plain data is percent-decoded per the data: URI scheme, but expression
+	// values paste raw content in, so undecodable data is kept as-is rather
+	// than rejected (e.g. a CSV containing a literal "%").
+	if content, err := url.PathUnescape(data); err == nil {
+		return mediaType, []byte(content), nil
 	}
-	return mediaType, []byte(content), nil
+	return mediaType, []byte(data), nil
 }
 
 // dataURIFileName derives an attachment filename from a data URI's media type

@@ -441,6 +441,13 @@ func Test__SendTextMessage__DataURIFiles(t *testing.T) {
 		require.ErrorContains(t, validateFiles([]string{"data:text/csv;base64,%%%"}), "invalid data URI")
 	})
 
+	t.Run("parseDataURI keeps undecodable plain data as-is", func(t *testing.T) {
+		mediaType, content, err := parseDataURI("data:text/csv,discount\n50% off")
+		require.NoError(t, err)
+		require.Equal(t, "text/csv", mediaType)
+		require.Equal(t, []byte("discount\n50% off"), content)
+	})
+
 	t.Run("parseDataURI decodes base64 and plain content", func(t *testing.T) {
 		mediaType, content, err := parseDataURI("data:image/png;base64,aGVsbG8=")
 		require.NoError(t, err)
