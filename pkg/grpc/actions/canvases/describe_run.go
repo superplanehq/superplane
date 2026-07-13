@@ -32,17 +32,18 @@ func DescribeRun(ctx context.Context, registry *registry.Registry, canvasID uuid
 		return nil, grpcerrors.Internal(err, "failed to find run")
 	}
 
-	rootEventsByRunID, err := listRootEventsForRuns(ctx, canvasID, []uuid.UUID{run.ID})
+	runDetails, err := loadRunDetailsForRuns(ctx, canvasID, []uuid.UUID{run.ID})
 	if err != nil {
 		return nil, err
 	}
 
-	executions, err := models.ListExecutionsForRunsInTransaction(db, canvasID, []uuid.UUID{run.ID})
-	if err != nil {
-		return nil, err
-	}
-
-	serializedRun, err := SerializeCanvasRun(*run, rootEventsByRunID[run.ID.String()], executions)
+	serializedRun, err := SerializeCanvasRun(
+		db,
+		*run,
+		runDetails.rootEventsByRunID[run.ID.String()],
+		runDetails.executionsByRunID[run.ID.String()],
+		runDetails.queueItemsByRunID[run.ID.String()],
+	)
 	if err != nil {
 		return nil, err
 	}
