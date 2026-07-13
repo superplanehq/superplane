@@ -118,7 +118,7 @@ The Send Text Message component sends a message to a Discord channel.
 - **Embed Description**: Optional description for a rich embed
 - **Embed Color**: Hex color code for the embed (e.g., #5865F2)
 - **Embed URL**: Optional URL to link from the embed title
-- **Files**: Optional URLs of files to attach. Each file is downloaded and uploaded to Discord as an attachment — for example, an artifact link produced by Cursor's Download Artifact component.
+- **Files**: Optional files to attach. Each entry is either a public http(s) URL (downloaded and uploaded to Discord) or a `data:` URI carrying the content inline — e.g. an AI component artifact: `data:image/png;base64,{{ $['Text Prompt'].data.artifacts[0].content }}`.
 
 ### Output
 

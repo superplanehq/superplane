@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -520,4 +521,31 @@ func defaultHTTPOptions() HTTPOptions {
 			"fe80::/10",
 		},
 	}
+}
+
+func Test__HTTPContext__ClientSelection(t *testing.T) {
+	httpContext, err := NewHTTPContext(HTTPOptions{})
+	require.NoError(t, err)
+
+	t.Run("no deadline uses the default client", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		assert.Same(t, httpContext.client, httpContext.clientFor(req))
+	})
+
+	t.Run("deadline within the default timeout uses the default client", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		assert.Same(t, httpContext.client, httpContext.clientFor(req))
+	})
+
+	t.Run("deadline beyond the default timeout uses the long client", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.com", nil)
+		require.NoError(t, err)
+		assert.Same(t, httpContext.longClient, httpContext.clientFor(req))
+	})
 }
