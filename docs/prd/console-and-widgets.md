@@ -218,7 +218,7 @@ Run rows expose a `$` map keyed by **node display name** so authors can address 
 | `$["deploy-prod"].data` | Convenience shortcut for the **last** event of the `default` channel (or the first available channel) with one `data` envelope unwrapped — matches what canvas-side `$['Node'].data` resolves to. |
 | `$["deploy-prod"].state`, `$["deploy-prod"].result` | Per-node state and result fields, useful for row styling. |
 
-The same syntax works in both literal field paths (e.g. a column `field: $["deploy-prod"].data.url`) and in `{{ }}` CEL templates (e.g. `format: link, label: "{{ $['deploy-prod'].data.url }}"`). Under the hood the CEL compiler rewrites `$` to a safe identifier (cel-js doesn't accept `$` as an identifier), but authors don't need to be aware of the rewrite — string literals are preserved verbatim, so a `$` inside `"..."` or `'...'` is left alone.
+The same syntax works in both literal field paths (e.g. a column `field: $["deploy-prod"].data.url`) and in `{{ }}` CEL templates (e.g. `format: link, label: "{{ $['deploy-prod'].data.url }}"`). Under the hood the CEL compiler rewrites `$` to a safe identifier (CEL doesn't accept `$` as an identifier), but authors don't need to be aware of the rewrite — string literals are preserved verbatim, so a `$` inside `"..."` or `'...'` is left alone.
 
 **Missing nodes resolve to `undefined`** — when a given node didn't run for that run (e.g. the workflow forked and only one branch executed, or the execution hasn't reached that node yet), `$["other-node"].outputs` returns `undefined` and the widget cell renders as `-`. This is intentional and matches how missing dot paths behave elsewhere.
 
@@ -378,37 +378,36 @@ Runtime flow:
 
 Console widgets support two related expression styles:
 
-- `{{ CEL }}` templates use CEL through `cel-js`. The row environment contains row fields and `now` as Unix seconds.
+- `{{ CEL }}` templates use CEL through [`@marcbachmann/cel-js`](https://github.com/marcbachmann/cel-js). The row environment contains row fields and `now` as Unix seconds.
 - Legacy expressions such as `status == "running"` are supported in `show` and some filters.
 
 Use CEL templates for new payloads, confirmation text, and rich interpolation. Use structured `where` filters when the condition is simple and should be validated.
 
 ### CEL builtins
 
-In addition to the standard CEL functions cel-js ships with, the dashboard exposes these helpers in every expression's environment:
+In addition to the standard CEL functions the library ships with, the dashboard exposes these helpers in every expression's environment:
 
 | Builtin | Description |
 | --- | --- |
-| `int(v)`, `float(v)`, `string(v)` | Type coercions, with sensible fallbacks for nullish input. |
+| `int(v)`, `float(v)`, `string(v)` | Type coercions. `int(...)` and `string(...)` come from the CEL library (accepting `int`, `double`, `bool`, `string`); the dashboard registers `float(v)` on top with fail-soft behavior for stringified / nullish inputs. |
 | `contains(s, sub)`, `startsWith(s, p)`, `endsWith(s, p)`, `matches(s, regex)` | String / regex predicates. |
 | `lower(s)`, `upper(s)` | Case conversions. |
-| `duration(seconds)` | Format a number of seconds as `5m 30s` / `1h 5m`. |
-| `timestamp(seconds)` | Format epoch seconds as an ISO-8601 string. |
+| `duration(seconds)` | Format a number of seconds as `5m 30s` / `1h 5m`. Accepts `int` or `double` seconds; use `formatDate(...)` for ISO-formatted timestamps. |
 | `formatDate(value, pattern)` | Render any date-like value (ISO string, Date, epoch number) with tokens `yyyy yy MM M dd d HH H mm m ss s`. Renders in the viewer's local time. |
 | `epochMs(value)` | Convert any date-like value (ISO-8601 string, Date instance, epoch seconds, epoch ms) to **milliseconds since epoch**. Returns `0` for unparseable input so arithmetic stays defined. Pairs with `duration()` for human-friendly elapsed-time output. |
-| `parseJson(s)` | Parse a JSON-encoded string into a structured value (list, map, scalar). Non-string inputs pass through unchanged; invalid JSON or `null` input returns `null`. Useful as a wholesale value (`{{ parseJson(blob) }}`), wrapped in another function (`size(parseJson(tags))`), or for equality checks (`parseJson(value) == null`). |
+| `parseJson(s)` | Parse a JSON-encoded string into a structured value (list, map, scalar). Non-string inputs pass through unchanged; invalid JSON or `null` input returns `null`. You can dot-access or index the result directly (`parseJson(blob).items[0].id`), wrap it in another function (`size(parseJson(tags))`), or compare it (`parseJson(value) == null`). |
 | `join(list, sep)` | Concatenate the elements of a list into a single string with an explicit separator. Non-array `list` returns `""`; non-string `sep` collapses to `""`; `null`/`undefined` elements render as `""`. Required to splice a mapped list into the output — a bare array value renders as JSON (`["a","b"]`) so it stays inspectable. Use `join(list, "")` for seamless fragment concatenation or any other separator for delimited output. Pairs with the `.map`/`.filter` macros on list-mode memory variables (`join(rows.map(r, "- " + r.name), "\n")`) — see [List mode](#list-mode). |
 | `firstLine(s)` | Text before the first line break in `s`. Treats `\r\n` and bare `\r` the same as `\n`. Returns `""` for `null`/`undefined`. Use it to keep multi-line run outputs from blowing up table cells: `{{ firstLine(payload.message) }}`. |
 | `substring(s, start, end?)` | Slice of `s` from `start` (inclusive) to `end` (exclusive). When `end` is omitted, returns everything from `start` onward. Negative `start` counts from the end (`-3` = last 3). Indices are clamped to the string length, and `end <= start` returns `""`. Non-string input is coerced via `String(value)`; `null`/`undefined` returns `""`. |
 | `truncate(s, n, suffix?)` | First `n` characters of `s`, with `suffix` appended only when truncation actually happened. Inputs shorter than `n`, non-numeric `n`, and negative `n` return `s` unchanged. Use it for "show first 80 chars with `…`" cells: `{{ truncate(payload.message, 80, "…") }}`. |
-| `splitIndex(s, sep, i)` | Nth segment of `split(s, sep)` returned as a scalar (cel-js can't index a function-call result inline). Negative `i` counts from the end (`-1` = last). Returns `""` for out-of-range / non-numeric `i`; an empty separator returns `s` unchanged. The separator is unescaped (`\n`, `\r`, `\t`, `\\`) because cel-js's lexer copies string literals verbatim, so `splitIndex(value, "\n", 0)` and `splitIndex(value, "|", 0)` both work as you'd expect. A `"\n"` separator also matches `\r\n` and bare `\r`, so it agrees with `firstLine` on Windows line endings. |
+| `splitIndex(s, sep, i)` | Nth segment of `split(s, sep)` returned as a scalar. Negative `i` counts from the end (`-1` = last). Returns `""` for out-of-range / non-numeric `i`; an empty separator returns `s` unchanged. String escapes (`\n`, `\t`, `\\`) are interpreted at CEL parse time — write `splitIndex(value, "\n", 0)` for newline splitting. A `"\n"` separator also matches `\r\n` and bare `\r`, so it agrees with `firstLine` on Windows line endings. For a literal backslash separator use a raw string (`r"\?"`). |
 | `trim(s, chars?)` | Strip leading / trailing whitespace, or — when `chars` is supplied — strip leading / trailing characters that appear in `chars`. |
 | `replace(s, old, new)` | Replace every occurrence of `old` in `s` with `new`. Empty `old` returns `s` unchanged. |
 | `indexOf(s, sub)` | First index of `sub` in `s`, or `-1` when missing. Useful inside `where` filters / boolean expressions. |
 
-`parseJson` has a real limitation: **cel-js does not support postfix `.field` / `[i]` / `.method(...)` after a function call result.** That means expressions like `parseJson(blob).items[0].id` or `parseJson(tags).map(t, t)` will fail to parse. To iterate or dot-access parsed data, either shape it as a real list/map upstream (canvas memory values are JSON-typed, so storing `{"tags": ["a","b"]}` lets you write `tags.map(t, t)` natively) or compose with macros that take the parsed value as an argument (`size`, `string`, etc.).
+Postfix `.field` / `[i]` / `.method(...)` after a function-call result work as expected — `parseJson(blob).items[0].id` and `parseJson(tags).map(t, t)` both parse cleanly. The string-trimming helpers (`firstLine`, `substring`, `truncate`, `splitIndex`) still exist as scalar-returning convenience helpers so authors don't need to combine `split(...)` with an indexing chain, and they remain the recommended way to trim long values that come straight from the `runs` data source (raw run outputs, error messages, etc.). Equivalent expressions like `value[:80]` work in expr-lang at node-config / write time but **not** in widget cells.
 
-The string-trimming helpers (`firstLine`, `substring`, `truncate`, `splitIndex`) all return scalars **for the same reason** — authors can't write `split(s, "\n")[0]` or `s.substring(0, 80)` against cel-js. The single-call form (`firstLine(s)`, `substring(s, 0, 80)`) sidesteps the parser limitation. They are the recommended way to trim long values that come straight from the `runs` data source (raw run outputs, error messages, etc.); equivalent expressions like `value[:80]` work in expr-lang at node-config / write time but **not** in widget cells.
+**Numeric coercion:** the underlying library represents CEL `int` values as `BigInt`, so integer arithmetic (`value / 2`, `value % 3`, `value > 5`) requires the operand to be an integer. The dashboard adapter automatically upgrades safe-integer JS numbers in the row context (and, on retry, integer-looking strings like `"10"`) so `{{ value / 2 }}` "just works" on typical memory rows. Integer results are converted back to plain JS `number` on the way out so downstream formatters, aggregators, and `JSON.stringify` keep working. Non-numeric strings stay as strings, so `name == "42"` retains its usual string-equality semantics.
 
 Note that `field: finishedAt - createdAt` does **not** work directly because both values are ISO-8601 strings and CEL doesn't subtract strings. Use one of:
 
@@ -777,7 +776,7 @@ variables:
       limit: 20
 ```
 
-cel-js doesn't allow `.method()` postfix after a function-call result, so chain macros directly off the bound variable (`deploys.filter(...).map(...)`).
+Chain the macros directly off the bound variable — `deploys.filter(...).map(...)` — which reads naturally alongside standard list operations. Postfix `.method()` after a function call also works, so patterns like `parseJson(blob).items.map(...)` are supported.
 
 When an interpolated expression resolves to an array, the renderer falls back to JSON (e.g. `["a","b"]`) so a stray `{{ deploys }}` or `{{ rows }}` reference stays inspectable instead of silently flattening. To splice a mapped list of HTML/Markdown fragments into the output, wrap it in the `join(list, sep)` builtin — use `""` for seamless concatenation:
 
