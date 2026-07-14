@@ -5,8 +5,20 @@ interface SentryWindow extends Window {
   SUPERPLANE_SENTRY_ENVIRONMENT?: string;
 }
 
-// Dash0 Web SDK logs export failures to the console; captureConsoleIntegration would forward them.
-const DASH0_TELEMETRY_CONSOLE_IGNORE = /^(Failed to send telemetry to|Error sending telemetry to|Failed to fetch)/;
+// captureConsoleIntegration forwards every console.warn/error to Sentry, including noise that
+// does not originate from application code. These patterns drop known third-party sources:
+//   - Dash0 Web SDK logs telemetry export failures to the console.
+//   - Browser extensions (e.g. Vue Devtools) log conflicts detected in the user's browser.
+const IGNORED_CONSOLE_MESSAGES = [
+  /^Failed to send telemetry to/,
+  /^Error sending telemetry to/,
+  /^Failed to fetch/,
+  /^Another version of Vue Devtools/,
+];
+
+export function isIgnoredConsoleMessage(message: string): boolean {
+  return IGNORED_CONSOLE_MESSAGES.some((pattern) => pattern.test(message));
+}
 
 let dsn: string | undefined;
 let environment: string | undefined;
@@ -21,7 +33,7 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment,
-    ignoreErrors: [DASH0_TELEMETRY_CONSOLE_IGNORE],
+    ignoreErrors: IGNORED_CONSOLE_MESSAGES,
     beforeSend(event) {
       const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
       const allDash0 = frames.length > 0 && frames.every((frame) => frame.filename?.includes("@dash0/sdk-web"));
@@ -35,7 +47,7 @@ if (dsn) {
       if (
         breadcrumb.category === "console" &&
         typeof breadcrumb.message === "string" &&
-        DASH0_TELEMETRY_CONSOLE_IGNORE.test(breadcrumb.message)
+        isIgnoredConsoleMessage(breadcrumb.message)
       ) {
         return null;
       }
