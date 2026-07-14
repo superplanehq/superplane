@@ -59,6 +59,10 @@ type Spec struct {
 	Networking   string    `json:"networking" mapstructure:"networking"`
 	AllowedHosts []string  `json:"allowedHosts" mapstructure:"allowedHosts"`
 	Files        []string  `json:"files" mapstructure:"files"`
+	// PersistSession keeps the Managed Agents session (and the environment it
+	// runs in) after the run finishes so the transcript stays readable in the
+	// Anthropic Console.
+	PersistSession bool `json:"persistSession" mapstructure:"persistSession"`
 }
 
 // SecretRef references a SuperPlane secret by name and key.
