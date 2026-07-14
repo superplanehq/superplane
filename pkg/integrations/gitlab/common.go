@@ -90,6 +90,15 @@ func verifyWebhookToken(ctx core.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }
 
+// isExpressionValue reports whether a configuration value is a templated
+// expression (e.g. "{{ event.data.object_attributes.project_id }}") rather than
+// a literal value. Expressions are only resolved at runtime, so any validation
+// that depends on the concrete value must be deferred until then.
+func isExpressionValue(value string) bool {
+	value = strings.TrimSpace(value)
+	return strings.Contains(value, "{{") || strings.Contains(value, "$[")
+}
+
 func ensureProjectInMetadata(ctx core.MetadataWriter, app core.IntegrationContext, projectID string) error {
 	var nodeMetadata NodeMetadata
 	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
@@ -97,8 +106,17 @@ func ensureProjectInMetadata(ctx core.MetadataWriter, app core.IntegrationContex
 		return fmt.Errorf("failed to decode node metadata: %w", err)
 	}
 
-	if projectID == "" {
+	if strings.TrimSpace(projectID) == "" {
 		return fmt.Errorf("project is required")
+	}
+
+	//
+	// When the project is provided through an expression, its value is only
+	// known at runtime. Skip the static accessibility check and defer
+	// validation to execution time.
+	//
+	if isExpressionValue(projectID) {
+		return ctx.Set(NodeMetadata{})
 	}
 
 	//

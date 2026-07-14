@@ -56,6 +56,25 @@ func Test__AcceptMergeRequest__Setup(t *testing.T) {
 		err := c.Setup(ctx)
 		require.NoError(t, err)
 	})
+
+	t.Run("project from expression defers validation to runtime", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"project":         "{{ event.data.object_attributes.project_id }}",
+				"mergeRequestIid": "{{ event.data.object_attributes.iid }}",
+			},
+			Integration: &contexts.IntegrationContext{
+				Metadata: Metadata{
+					Projects: []ProjectMetadata{
+						{ID: 123, Name: "repo", URL: "http://repo"},
+					},
+				},
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+		err := c.Setup(ctx)
+		require.NoError(t, err)
+	})
 }
 
 func Test__AcceptMergeRequest__Execute(t *testing.T) {
