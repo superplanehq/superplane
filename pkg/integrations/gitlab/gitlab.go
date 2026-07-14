@@ -106,6 +106,8 @@ To connect with a **Personal Access Token**:
 2. Paste the token into the **Access Token** field and click **Save**.
 
 **Note:** Triggers (On Issue, On Merge Request, On Merge Comment, etc.) create project webhooks, so the connected user needs at least the **Maintainer** role on the projects you want to monitor.
+
+**Note:** Deployment actions (Create Deployment, Create Deployment Status) require at least the **Developer** role on the project. For protected environments, the connected user must also be in the environment's **Allowed to deploy** list.
 `, strings.Join(scopeList, ","), strings.Join(scopeList, ", "))
 }
 
@@ -179,6 +181,8 @@ func (g *GitLab) Actions() []core.Action {
 		&GetTestReportSummary{},
 		&CreateMergeComment{},
 		&AddReaction{},
+		&CreateDeployment{},
+		&CreateDeploymentStatus{},
 	}
 }
 
