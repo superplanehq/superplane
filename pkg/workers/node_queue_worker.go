@@ -209,6 +209,17 @@ func (w *NodeQueueWorker) ConsumeExecutionFinished(delivery tackle.Delivery) err
 func (w *NodeQueueWorker) tryProcessReadyNode(canvasID uuid.UUID, nodeID string, attemptStart time.Time) error {
 	node, err := models.FindCanvasNode(database.Conn(), canvasID, nodeID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			w.logger.Infof("Node %s not found, skipping", nodeID)
+			telemetry.RecordQueueWorkerNodeProcessing(
+				context.Background(),
+				time.Since(attemptStart),
+				executorOutcomeSkipped,
+				executorReasonNotFound,
+			)
+			return nil
+		}
+
 		w.logger.Errorf("Error finding canvas node: %v", err)
 		return err
 	}
