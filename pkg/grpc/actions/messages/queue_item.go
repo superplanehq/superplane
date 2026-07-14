@@ -8,6 +8,7 @@ import (
 const (
 	CanvasQueueItemCreatedRoutingKey  = "canvas-queue-item-created"
 	CanvasQueueItemConsumedRoutingKey = "canvas-queue-item-consumed"
+	CanvasQueueItemDeletedRoutingKey  = "canvas-queue-item-deleted"
 )
 
 type CanvasQueueItemMessage struct {
@@ -25,9 +26,19 @@ func NewCanvasQueueItemMessage(canvasId string, queueItemID, nodeID string) Canv
 	}
 }
 
+func NewCanvasQueueItemDeletedMessage(canvasID, queueItemID, nodeID, runID string) CanvasQueueItemMessage {
+	message := NewCanvasQueueItemMessage(canvasID, queueItemID, nodeID)
+	message.message.RunId = runID
+	return message
+}
+
 func (m CanvasQueueItemMessage) Publish(consumed bool) error {
 	if consumed {
 		return Publish(CanvasExchange, CanvasQueueItemConsumedRoutingKey, toBytes(m.message))
 	}
 	return Publish(CanvasExchange, CanvasQueueItemCreatedRoutingKey, toBytes(m.message))
+}
+
+func (m CanvasQueueItemMessage) PublishDeleted() error {
+	return Publish(CanvasExchange, CanvasQueueItemDeletedRoutingKey, toBytes(m.message))
 }
