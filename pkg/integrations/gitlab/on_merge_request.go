@@ -124,6 +124,12 @@ func (m *OnMergeRequest) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	// Triggers register a project webhook at setup time, so the project must be
+	// a concrete value rather than an expression resolved at runtime.
+	if err := ensureConcreteProject(config.Project); err != nil {
+		return err
+	}
+
 	if err := ensureProjectInMetadata(ctx.Metadata, ctx.Integration, config.Project); err != nil {
 		return err
 	}

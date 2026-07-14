@@ -21,6 +21,18 @@ func isExpression(s string) bool {
 	return expressionPlaceholderRegex.MatchString(s)
 }
 
+// ensureConcreteProject rejects expression-based project values for components
+// that provision a project webhook during setup (the triggers and Run Pipeline).
+// Those webhooks must be registered against a concrete GitLab project, so the
+// project cannot be deferred to runtime the way it can for components that only
+// read it when they execute.
+func ensureConcreteProject(project string) error {
+	if isExpression(project) {
+		return fmt.Errorf("project does not support expressions: this component provisions a project webhook, so it needs a concrete project")
+	}
+	return nil
+}
+
 const (
 	PipelineStatusSuccess   = "success"
 	PipelineStatusFailed    = "failed"
