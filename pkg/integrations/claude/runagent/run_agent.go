@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
@@ -36,6 +37,7 @@ func (a *RunAgent) Documentation() string {
 - **Environment ID**: The environment the session runs in.
 - **Prompt**: The user message (task) sent to the agent.
 - **Vault IDs** (optional): For MCP tools that need vault-backed credentials.
+- **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. It applies only to runs that finish — a cancelled run is always cleaned up. Kept sessions are never reclaimed automatically, so delete them yourself when you're done.
 
 ## Output
 
@@ -98,6 +100,14 @@ func (a *RunAgent) Configuration() []configuration.Field {
 				},
 			},
 			Description: "Optional vault IDs for MCP authentication (see Managed Agents docs)",
+		},
+		{
+			Name:        "persistSession",
+			Label:       "Keep Session After Run",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Keep the Managed Agents session after the run finishes so its transcript stays readable in the Anthropic Console. Sessions are deleted by default.",
 		},
 		{
 			Name:        "files",
@@ -320,9 +330,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			// Persist terminal status only after successful emit
 			mergeSessionIntoMetadata(&metadata, refreshed)
 			_ = ctx.Metadata.Set(metadata)
-			if err := client.DeleteManagedSession(session.ID); err != nil {
-				ctx.Logger.Warnf("Failed to delete managed session %s: %v", session.ID, err)
-			}
+			reclaimSession(client, session.ID, spec.PersistSession, ctx.Logger)
 			cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 			cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 			return nil
@@ -336,6 +344,42 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 }
 
 func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }
+
+// stopAndReclaim ends a run whose session may still be working: a timeout or a
+// dead poll means we stopped watching, not that the agent stopped. The interrupt
+// is what makes the delete possible — the API rejects deleting a live session —
+// and it stops the agent even when the session is kept for debugging.
+func stopAndReclaim(client *Client, sessionID string, persist bool, logger *log.Entry) {
+	if err := client.SendManagedSessionInterrupt(sessionID); err != nil {
+		logger.Warnf("Failed to interrupt managed session %s: %v", sessionID, err)
+	}
+	reclaimSession(client, sessionID, persist, logger)
+}
+
+// reclaimSession deletes the session unless the step is configured to keep it,
+// in which case the transcript stays readable in the Anthropic Console.
+func reclaimSession(client *Client, sessionID string, persist bool, logger *log.Entry) {
+	if persist {
+		logger.Infof("Keeping managed session %s: 'Keep Session After Run' is enabled", sessionID)
+		return
+	}
+	if err := client.DeleteManagedSession(sessionID); err != nil {
+		logger.Warnf("Failed to delete managed session %s: %v", sessionID, err)
+	}
+}
+
+// persistSessionFromConfig reports whether a step is configured to keep its
+// session. It defaults to deleting when the configuration cannot be decoded, and
+// says so: silently deleting a session the user asked to keep is otherwise
+// impossible to diagnose from the Console.
+func persistSessionFromConfig(config any, logger *log.Entry) bool {
+	spec, err := decodeSpec(config)
+	if err != nil {
+		logger.Warnf("Cannot read 'Keep Session After Run' from configuration (%v); reclaiming the session", err)
+		return false
+	}
+	return spec.PersistSession
+}
 
 // getUploadedFileIDs retrieves uploaded file IDs from execution state.
 func getUploadedFileIDs(state core.ExecutionStateContext) []string {

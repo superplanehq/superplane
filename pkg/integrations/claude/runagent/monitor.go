@@ -57,9 +57,15 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 			return emitErr
 		}
+		// The session is very likely still running — we gave up waiting, we did
+		// not stop it — so it must be interrupted and reclaimed here. Nothing
+		// polls this execution again.
 		if c, cErr := NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
+			stopAndReclaim(c, metadata.Session.ID, persistSessionFromConfig(ctx.Configuration, ctx.Logger), ctx.Logger)
 			cleanupUploadedFilesFromHook(c, ctx, ctx.Logger.Warnf)
 			cleanupManagedVaultFromHook(c, ctx, ctx.Logger.Warnf)
+		} else {
+			ctx.Logger.Warnf("Cannot reclaim managed session %s: client unavailable: %v", metadata.Session.ID, cErr)
 		}
 		return nil
 	}
@@ -78,6 +84,9 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 				return emitErr
 			}
+			// We can no longer see the session's status, so assume it is still
+			// running: interrupt and reclaim rather than abandon it.
+			stopAndReclaim(client, metadata.Session.ID, persistSessionFromConfig(ctx.Configuration, ctx.Logger), ctx.Logger)
 			cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 			cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 			return nil
@@ -110,9 +119,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		mergeSessionIntoMetadata(&metadata, sess)
 		_ = ctx.Metadata.Set(metadata)
 
-		if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
-			ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
-		}
+		reclaimSession(client, metadata.Session.ID, persistSessionFromConfig(ctx.Configuration, ctx.Logger), ctx.Logger)
 		cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 		cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 		return nil
@@ -149,7 +156,10 @@ func (a *RunAgent) Cancel(ctx core.ExecutionContext) error {
 	} else {
 		ctx.Logger.Infof("Sent interrupt to managed session %s", metadata.Session.ID)
 	}
-	// Best effort cleanup; may fail if session is still running.
+	// Best effort cleanup; may fail if session is still running. This ignores
+	// "Keep Session After Run" on purpose: the run never finished, and
+	// cancelling often accompanies deleting the node, which drops the only
+	// record of this session ID.
 	_ = client.DeleteManagedSession(metadata.Session.ID)
 	cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 	cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
