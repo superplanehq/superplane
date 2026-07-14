@@ -62,7 +62,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__deliversBroadcast(t *testing.
 	payload := map[string]any{"message": "hello"}
 	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, payload))
 
-	messages, err := models.ListAppMessages()
+	messages, err := models.ListAppMessages(database.Conn())
 	require.NoError(t, err)
 	require.Len(t, messages, 1)
 
@@ -128,7 +128,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWithoutSubscrib
 		map[string]any{"message": "ignored"},
 	))
 
-	messages, err := models.ListAppMessages()
+	messages, err := models.ListAppMessages(database.Conn())
 	require.NoError(t, err)
 	require.Len(t, messages, 1)
 
@@ -208,7 +208,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__skipsStaleSubscriptionAndDeli
 	payload := map[string]any{"message": "hello"}
 	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, payload))
 
-	messages, err := models.ListAppMessages()
+	messages, err := models.ListAppMessages(database.Conn())
 	require.NoError(t, err)
 	require.Len(t, messages, 1)
 
@@ -260,7 +260,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWhenSourceNodeD
 
 	require.NoError(t, models.DeleteCanvasNode(database.Conn(), sourceNodes[0]))
 
-	messages, err := models.ListAppMessages()
+	messages, err := models.ListAppMessages(database.Conn())
 	require.NoError(t, err)
 	require.Len(t, messages, 1)
 

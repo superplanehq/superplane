@@ -44,7 +44,7 @@ func (w *AppMessageWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			appMessages, err := models.ListAppMessages()
+			appMessages, err := models.ListAppMessages(database.Conn())
 			if err != nil {
 				w.logger.Errorf("Error listing pending app messages: %v", err)
 				continue
@@ -148,21 +148,7 @@ func (w *AppMessageWorker) deliverBroadcast(tx *gorm.DB, canvas *models.Canvas, 
 		node, ok := nodesByKey[nodeKey{canvasID: sub.TargetCanvasID, nodeID: sub.TargetNodeID}]
 		if !ok {
 			w.logger.Warnf(
-				"skipping broadcast subscription with missing target node %s on canvas %s",
-				sub.TargetNodeID,
-				sub.TargetCanvasID,
-			)
-
-			if err := models.DeleteCanvasSubscriptionsForNode(tx, sub.TargetCanvasID, sub.TargetNodeID); err != nil {
-				w.logger.Errorf("delete stale canvas subscription: %v", err)
-			}
-
-			continue
-		}
-
-		if node.DeletedAt.Valid {
-			w.logger.Warnf(
-				"skipping broadcast subscription for deleted target node %s on canvas %s",
+				"skipping broadcast subscription with missing or deleted target node %s on canvas %s",
 				sub.TargetNodeID,
 				sub.TargetCanvasID,
 			)

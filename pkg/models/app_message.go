@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -40,10 +39,10 @@ func CreateAppMessage(tx *gorm.DB, canvasID uuid.UUID, nodeID string, payload an
 	return tx.Create(message).Error
 }
 
-func ListAppMessages() ([]AppMessage, error) {
+func ListAppMessages(tx *gorm.DB) ([]AppMessage, error) {
 	var messages []AppMessage
 
-	query := database.Conn().
+	query := tx.
 		Table("app_messages").
 		Select("app_messages.*")
 
