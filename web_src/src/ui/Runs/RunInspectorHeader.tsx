@@ -62,20 +62,22 @@ export function RunInspectorHeader({
           </div>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                disabled={actionDisabled || actionPending}
-                onClick={onAction}
-                className={cn(
-                  status === "running" &&
-                    "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/50 dark:hover:text-red-200",
-                )}
-              >
-                {actionPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
-                {actionPending ? `${actionLabel}...` : actionLabel}
-              </Button>
+              <span className="inline-flex">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  disabled={actionDisabled || actionPending}
+                  onClick={onAction}
+                  className={cn(
+                    status === "running" &&
+                      "border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/50 dark:hover:text-red-200",
+                  )}
+                >
+                  {actionPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : null}
+                  {actionPending ? `${actionLabel}...` : actionLabel}
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent side="bottom">{actionTooltip}</TooltipContent>
           </Tooltip>
