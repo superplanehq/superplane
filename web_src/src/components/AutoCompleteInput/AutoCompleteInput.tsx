@@ -60,6 +60,20 @@ function getActiveStickyHeaderHeight(container: HTMLElement, item: HTMLElement) 
   return stackedHeight;
 }
 
+function getSuggestionListKey(suggestions: Suggestion[]) {
+  return suggestions
+    .map((suggestion) =>
+      [
+        suggestion.kind,
+        suggestion.label,
+        suggestion.insertText ?? "",
+        suggestion.nodeName ?? "",
+        suggestion.nodeId ?? "",
+      ].join("\u001f"),
+    )
+    .join("\u001e");
+}
+
 // Keep in sync with suggestion section header (`h-7`) and item row (`h-9`) classes.
 const SUGGESTION_SECTION_HEADER_HEIGHT_PX = 28;
 const SUGGESTION_ITEM_HEIGHT_PX = 36;
@@ -126,6 +140,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const dropdownWidth = 350;
     const previousWordLength = useRef<number>(0);
     const previousInputValue = useRef<string>(value);
+    const highlightedIndexRef = useRef(highlightedIndex);
+    const suggestionListKeyRef = useRef("");
+    const suggestionItemsRef = useRef<Array<ReturnType<typeof getSuggestions>[number]>>([]);
 
     const isRawExpression = expressionMode === "raw";
 
@@ -570,6 +587,30 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return suggestion.label;
     };
 
+    const getSortedSuggestions = useCallback(
+      (expressionText: string, expressionCursor: number) =>
+        getSuggestions(expressionText, expressionCursor, exampleObj ?? {}, {
+          limit: 150,
+        })
+          .filter((s) => !excludedSuggestions?.includes(s.label))
+          .sort((a, b) => {
+            const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
+            const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
+
+            if (aPriority !== undefined && bPriority !== undefined) {
+              return aPriority - bPriority;
+            }
+            if (aPriority !== undefined) {
+              return -1;
+            }
+            if (bPriority !== undefined) {
+              return 1;
+            }
+            return a.label.localeCompare(b.label);
+          }),
+      [exampleObj, excludedSuggestions],
+    );
+
     const getReplacementRange = (left: string, insertText: string) => {
       const envBracketMatch = left.match(/\$env\s*\[\s*(['"])([^'"]*)$/);
       if (envBracketMatch) {
@@ -980,10 +1021,22 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     }, [inputValue]);
 
     useEffect(() => {
+      highlightedIndexRef.current = highlightedIndex;
+    }, [highlightedIndex]);
+
+    useEffect(() => {
+      suggestionItemsRef.current = suggestions;
+    }, [suggestions]);
+
+    useEffect(() => {
       if (!isFocused) {
+        suggestionListKeyRef.current = "";
+        highlightedIndexRef.current = -1;
         setSuggestions([]);
         setIsOpen(false);
+        setHighlightedIndex(-1);
         setHighlightedValue(undefined);
+        setHighlightedSuggestion(null);
         return;
       }
 
@@ -994,37 +1047,42 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
       const context = getExpressionContext(inputValue, cursorPosition);
       if (!context || !isAllowedToSuggest(inputValue, cursorPosition)) {
+        suggestionListKeyRef.current = "";
+        highlightedIndexRef.current = -1;
         setSuggestions([]);
         setIsOpen(false);
+        setHighlightedIndex(-1);
         setHighlightedValue(undefined);
+        setHighlightedSuggestion(null);
         return;
       }
 
-      const newSuggestions = getSuggestions(context.expressionText, context.expressionCursor, exampleObj ?? {}, {
-        limit: 150,
-      })
-        .filter((s) => !excludedSuggestions?.includes(s.label))
-        .sort((a, b) => {
-          const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
-          const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
-
-          if (aPriority !== undefined && bPriority !== undefined) {
-            return aPriority - bPriority;
-          }
-          if (aPriority !== undefined) {
-            return -1;
-          }
-          if (bPriority !== undefined) {
-            return 1;
-          }
-          return a.label.localeCompare(b.label);
-        });
-      setSuggestions(newSuggestions);
+      const newSuggestions = getSortedSuggestions(context.expressionText, context.expressionCursor);
       setIsOpen(newSuggestions.length > 0);
-      const nextHighlightedIndex = showValuePreview && newSuggestions.length > 0 ? 0 : -1;
+
+      const suggestionListKey = getSuggestionListKey(newSuggestions);
+      const hasSameSuggestionList = suggestionListKeyRef.current === suggestionListKey;
+      const canPreserveHighlightedIndex =
+        hasSameSuggestionList &&
+        highlightedIndexRef.current >= 0 &&
+        highlightedIndexRef.current < newSuggestions.length;
+
+      const activeSuggestions = hasSameSuggestionList ? suggestionItemsRef.current : newSuggestions;
+      if (!hasSameSuggestionList) {
+        setSuggestions(newSuggestions);
+      }
+
+      suggestionListKeyRef.current = suggestionListKey;
+
+      const nextHighlightedIndex = canPreserveHighlightedIndex
+        ? highlightedIndexRef.current
+        : showValuePreview && newSuggestions.length > 0
+          ? 0
+          : -1;
+      highlightedIndexRef.current = nextHighlightedIndex;
       setHighlightedIndex(nextHighlightedIndex);
       if (nextHighlightedIndex >= 0) {
-        const suggestion = newSuggestions[nextHighlightedIndex];
+        const suggestion = activeSuggestions[nextHighlightedIndex] ?? newSuggestions[nextHighlightedIndex];
         setHighlightedSuggestion(suggestion);
         const value = computeHighlightedValue(suggestion, context);
         setHighlightedValue(value);
@@ -1044,6 +1102,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       excludedSuggestions,
       computeHighlightedValue,
       getExpressionContext,
+      getSortedSuggestions,
       isAllowedToSuggest,
     ]);
 
@@ -1112,6 +1171,55 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       });
     };
 
+    const isKeyboardSuggestionCommit = (key: string) =>
+      (key === "Enter" || key === "Tab") &&
+      isOpen &&
+      highlightedIndexRef.current >= 0 &&
+      highlightedIndexRef.current < suggestions.length;
+
+    const handleKeyDownCapture = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (isKeyboardSuggestionCommit(e.key)) {
+        return;
+      }
+
+      handleCursorChange();
+    };
+
+    const showFollowUpSuggestions = useCallback(
+      (
+        nextSuggestions: Array<ReturnType<typeof getSuggestions>[number]>,
+        nextContext: NonNullable<ReturnType<typeof getExpressionContext>>,
+      ) => {
+        suppressSuggestionsRef.current = false;
+        suggestionItemsRef.current = nextSuggestions;
+        suggestionListKeyRef.current = getSuggestionListKey(nextSuggestions);
+        setSuggestions(nextSuggestions);
+        setIsOpen(true);
+
+        const nextHighlightedIndex = showValuePreview ? 0 : -1;
+        highlightedIndexRef.current = nextHighlightedIndex;
+        setHighlightedIndex(nextHighlightedIndex);
+
+        if (nextHighlightedIndex >= 0) {
+          const nextSuggestion = nextSuggestions[nextHighlightedIndex];
+          setHighlightedSuggestion(nextSuggestion);
+          setHighlightedValue(computeHighlightedValue(nextSuggestion, nextContext));
+        } else {
+          setHighlightedSuggestion(null);
+          setHighlightedValue(undefined);
+        }
+      },
+      [computeHighlightedValue, showValuePreview],
+    );
+
+    const closeSuggestions = useCallback(() => {
+      highlightedIndexRef.current = -1;
+      setHighlightedIndex(-1);
+      setHighlightedSuggestion(null);
+      setHighlightedValue(undefined);
+      setIsOpen(false);
+    }, []);
+
     const handleSuggestionClick = (suggestionItem: ReturnType<typeof getSuggestions>[number]) => {
       suppressSuggestionsRef.current = true;
       const cursorPosition = inputRef.current?.selectionStart || 0;
@@ -1119,7 +1227,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       if (!context) {
         suppressSuggestionsRef.current = false;
         isInteractingWithSuggestionsRef.current = false;
-        setIsOpen(false);
+        closeSuggestions();
         return;
       }
 
@@ -1129,19 +1237,29 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       const nextExpression =
         context.expressionText.slice(0, range.start) + insertText + context.expressionText.slice(range.end);
       const newValue = inputValue.slice(0, context.startOffset) + nextExpression + inputValue.slice(context.endOffset);
+      const cursorTarget = context.startOffset + range.start + insertText.length;
+      const nextContext = getExpressionContext(newValue, cursorTarget);
+      const nextSuggestions =
+        nextContext && isAllowedToSuggest(newValue, cursorTarget)
+          ? getSortedSuggestions(nextContext.expressionText, nextContext.expressionCursor)
+          : [];
 
       setInputValue(newValue);
       onChange?.(newValue);
-      setHighlightedIndex(-1);
+      setCursorPosition(cursorTarget);
+
+      if (nextContext && nextSuggestions.length > 0) {
+        showFollowUpSuggestions(nextSuggestions, nextContext);
+      } else {
+        closeSuggestions();
+      }
+
       requestAnimationFrame(() => {
         inputRef.current?.focus();
-        const cursorTarget = context.startOffset + range.start + insertText.length;
         inputRef.current?.setSelectionRange(cursorTarget, cursorTarget);
         isInteractingWithSuggestionsRef.current = false;
         suppressSuggestionsRef.current = false;
       });
-
-      setIsOpen(false);
     };
 
     const scrollHighlightedSuggestionIntoView = useCallback((index: number) => {
@@ -1163,56 +1281,58 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       }
     }, []);
 
+    const highlightSuggestionAtIndex = useCallback(
+      (index: number) => {
+        const suggestion = suggestions[index];
+        highlightedIndexRef.current = index;
+        setHighlightedIndex(index);
+
+        if (!suggestion) {
+          setHighlightedSuggestion(null);
+          setHighlightedValue(undefined);
+          return;
+        }
+
+        setHighlightedSuggestion(suggestion);
+        const cursorPosition = inputRef.current?.selectionStart || 0;
+        const context = getExpressionContext(inputValue, cursorPosition);
+        const value = computeHighlightedValue(suggestion, context);
+        setHighlightedValue(value);
+      },
+      [computeHighlightedValue, getExpressionContext, inputValue, suggestions],
+    );
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (!isOpen || suggestions.length === 0) return;
 
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setHighlightedIndex((prev) => {
-            const newIndex = prev < suggestions.length - 1 ? prev + 1 : prev;
-            if (newIndex !== prev && suggestions[newIndex]) {
-              setHighlightedSuggestion(suggestions[newIndex]);
-              const cursorPosition = inputRef.current?.selectionStart || 0;
-              const context = getExpressionContext(inputValue, cursorPosition);
-              const value = computeHighlightedValue(suggestions[newIndex], context);
-              setHighlightedValue(value);
-            }
-            return newIndex;
-          });
+          highlightSuggestionAtIndex(Math.min(highlightedIndexRef.current + 1, suggestions.length - 1));
           break;
         case "ArrowUp":
           e.preventDefault();
-          setHighlightedIndex((prev) => {
-            const newIndex = prev > 0 ? prev - 1 : prev;
-            if (newIndex !== prev && suggestions[newIndex]) {
-              setHighlightedSuggestion(suggestions[newIndex]);
-              const cursorPosition = inputRef.current?.selectionStart || 0;
-              const context = getExpressionContext(inputValue, cursorPosition);
-              const value = computeHighlightedValue(suggestions[newIndex], context);
-              setHighlightedValue(value);
-            }
-            return newIndex;
-          });
+          highlightSuggestionAtIndex(Math.max(highlightedIndexRef.current - 1, 0));
           break;
         case "Enter":
-          if (highlightedIndex >= 0) {
+          if (isKeyboardSuggestionCommit(e.key)) {
             e.preventDefault();
-            handleSuggestionClick(suggestions[highlightedIndex]);
+            e.stopPropagation();
+            isInteractingWithSuggestionsRef.current = true;
+            handleSuggestionClick(suggestions[highlightedIndexRef.current]);
           }
           // Allow default behavior (newline) when no suggestion is highlighted
           break;
         case "Tab":
-          if (highlightedIndex >= 0) {
+          if (isKeyboardSuggestionCommit(e.key)) {
             e.preventDefault();
-            handleSuggestionClick(suggestions[highlightedIndex]);
+            e.stopPropagation();
+            isInteractingWithSuggestionsRef.current = true;
+            handleSuggestionClick(suggestions[highlightedIndexRef.current]);
           }
           break;
         case "Escape":
-          setIsOpen(false);
-          setHighlightedIndex(-1);
-          setHighlightedValue(undefined);
-          setHighlightedSuggestion(null);
+          closeSuggestions();
           break;
       }
     };
@@ -1274,7 +1394,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onKeyUp={handleCursorChange}
-            onKeyDownCapture={handleCursorChange}
+            onKeyDownCapture={handleKeyDownCapture}
             onClick={handleCursorChange}
             onSelect={handleCursorChange}
             onScroll={handleScroll}
@@ -1375,6 +1495,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           createPortal(
             <div
               ref={suggestionsRef}
+              data-testid="autocomplete-suggestions"
               className="fixed z-[9999] bg-transparent"
               style={{
                 top: `${dropdownPosition.top}px`,
@@ -1384,6 +1505,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               <div className="flex flex-col sm:flex-row">
                 {shouldShowValuePreview && isOpen && (
                   <div
+                    data-testid="autocomplete-value-preview"
                     className="border border-gray-200 dark:border-gray-600 sm:border-r-0 sm:border-t p-3 bg-white dark:bg-gray-800 sm:rounded-l-lg sm:rounded-br-none h-fit self-start shadow-lg dark:shadow-gray-950/50"
                     style={{ width: `${valuePreviewWidth}px` }}
                   >
@@ -1598,14 +1720,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         }}
                         onMouseEnter={(e) => {
                           e.stopPropagation();
-                          setHighlightedIndex(index);
-                          setHighlightedSuggestion(suggestionItem);
-                          if (exampleObj) {
-                            const cursorPosition = inputRef.current?.selectionStart || 0;
-                            const context = getExpressionContext(inputValue, cursorPosition);
-                            const value = computeHighlightedValue(suggestionItem, context);
-                            setHighlightedValue(value);
-                          }
+                          highlightSuggestionAtIndex(index);
                         }}
                       >
                         <span className="truncate min-w-0">{getSuggestionDisplayLabel(suggestionItem)}</span>
