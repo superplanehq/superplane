@@ -121,6 +121,12 @@ describe("computeWidgetHasMore", () => {
   it("treats hasNextPage===undefined the same as false", () => {
     expect(computeWidgetHasMore({ ...baseInput, hasNextPage: undefined })).toBe(false);
   });
+
+  it("returns false when callers suppress hasNextPage for unmatchable trigger filters", () => {
+    // useRunsDataSourceResult passes hasNextPage: false when triggersMatchable
+    // is false so Load more is hidden for stale trigger YAML.
+    expect(computeWidgetHasMore({ ...baseInput, hasNextPage: false, loadedRowCount: 0 })).toBe(false);
+  });
 });
 
 describe("shouldFetchNextWidgetPage", () => {
