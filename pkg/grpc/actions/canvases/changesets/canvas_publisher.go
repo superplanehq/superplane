@@ -49,6 +49,14 @@ type CanvasPublisher struct {
 	// not conflict with deleted nodes.
 	//
 	allNodes map[string]models.CanvasNode
+
+	cancelledExecutionIDs []uuid.UUID
+	finishedRunIDs        []uuid.UUID
+}
+
+type CanvasPublishResult struct {
+	CancelledExecutionIDs []uuid.UUID
+	FinishedRunIDs        []uuid.UUID
 }
 
 type CanvasPublisherOptions struct {
@@ -148,6 +156,13 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (p *CanvasPublisher) Result() CanvasPublishResult {
+	return CanvasPublishResult{
+		CancelledExecutionIDs: append([]uuid.UUID(nil), p.cancelledExecutionIDs...),
+		FinishedRunIDs:        append([]uuid.UUID(nil), p.finishedRunIDs...),
+	}
 }
 
 func (p *CanvasPublisher) edgesWithRenamedNodeIDs(edges []models.Edge) []models.Edge {
@@ -373,7 +388,14 @@ func (p *CanvasPublisher) deleteNode(change *Change) error {
 	}
 
 	delete(p.allNodes, existingNode.NodeID)
-	return models.DeleteCanvasNode(p.tx, existingNode)
+	result, err := models.DeleteCanvasNodeWithResult(p.tx, existingNode)
+	if err != nil {
+		return err
+	}
+
+	p.cancelledExecutionIDs = append(p.cancelledExecutionIDs, result.CancelledExecutionIDs...)
+	p.finishedRunIDs = append(p.finishedRunIDs, result.FinishedRunIDs...)
+	return nil
 }
 
 func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) (*uuid.UUID, error) {
