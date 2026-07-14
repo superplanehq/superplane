@@ -143,6 +143,18 @@ describe("createBatchMessageMapper.props", () => {
     ]);
   });
 
+  it("renders the model name when the model is an integration-resource object, not the raw object", () => {
+    const props = createBatchMessageMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { model: { id: "m_1", name: "claude-opus-4-6", type: "model" } } }),
+      }),
+    );
+    expect(props.metadata).toEqual([
+      { icon: "sparkles", label: "claude-opus-4-6" },
+      { icon: "layers", label: "Single prompt" },
+    ]);
+  });
+
   it("shows 'Multiple prompts' when mode is multiple", () => {
     const props = createBatchMessageMapper.props(
       buildPropsContext({

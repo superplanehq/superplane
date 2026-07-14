@@ -10,24 +10,25 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
+import { resourceLabel } from "../utils";
 import type { MetadataItem } from "@/ui/metadataList";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 type RunCodeAgentNodeMetadata = {
-  repository?: string;
-  baseBranch?: string;
-  prUrl?: string;
-  model?: string;
+  repository?: unknown;
+  baseBranch?: unknown;
+  prUrl?: unknown;
+  model?: unknown;
   sourceMode?: string;
 };
 
 type RunCodeAgentConfiguration = {
   sourceMode?: string;
-  repository?: string;
-  baseBranch?: string;
-  prUrl?: string;
-  model?: string;
+  repository?: unknown;
+  baseBranch?: unknown;
+  prUrl?: unknown;
+  model?: unknown;
 };
 
 type RunCodeAgentPayloadData = {
@@ -103,22 +104,22 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   const isPR = (meta.sourceMode ?? config.sourceMode) === "pr";
   if (isPR) {
-    const pr = meta.prUrl || config.prUrl;
+    const pr = resourceLabel(meta.prUrl) ?? resourceLabel(config.prUrl);
     if (pr) {
       items.push({ icon: "git-pull-request", label: pr });
     }
   } else {
-    const repo = meta.repository || config.repository;
+    const repo = resourceLabel(meta.repository) ?? resourceLabel(config.repository);
     if (repo) {
       items.push({ icon: "git-branch", label: repo });
     }
-    const baseBranch = meta.baseBranch || config.baseBranch;
+    const baseBranch = resourceLabel(meta.baseBranch) ?? resourceLabel(config.baseBranch);
     if (baseBranch) {
       items.push({ icon: "git-branch", label: baseBranch });
     }
   }
 
-  const model = meta.model || config.model;
+  const model = resourceLabel(meta.model) ?? resourceLabel(config.model);
   if (model) {
     items.push({ icon: "bot", label: model });
   }

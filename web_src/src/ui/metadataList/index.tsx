@@ -51,8 +51,35 @@ function renderMetadataItem(item: MetadataItem, index: number, iconSize: number,
           (underlined ? " underline underline-offset-3 decoration-dotted decoration-1" : "")
         }
       >
-        {item.label}
+        {toRenderableLabel(item.label)}
       </span>
     </div>
   );
+}
+
+// A label is normally a string or a React element, but mappers derive labels
+// from backend data that can occasionally be a plain object (e.g. an integration
+// resource reference like { id, name, type }). React throws "Objects are not
+// valid as a React child" for such values, which would crash the whole canvas.
+// Coerce those to a display string so a single bad label can never take the app down.
+function toRenderableLabel(label: string | React.ReactNode): React.ReactNode {
+  if (label === null || label === undefined || typeof label === "string" || typeof label === "number") {
+    return label;
+  }
+
+  if (React.isValidElement(label) || Array.isArray(label)) {
+    return label;
+  }
+
+  if (typeof label === "object") {
+    const ref = label as { name?: unknown; id?: unknown };
+    if (typeof ref.name === "string" && ref.name) {
+      return ref.name;
+    }
+    if (typeof ref.id === "string" && ref.id) {
+      return ref.id;
+    }
+  }
+
+  return String(label);
 }

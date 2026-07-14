@@ -120,6 +120,45 @@ export function buildExecutionSubtitle(execution: ExecutionLike, content?: strin
   return buildSubtitle(content || "", timestamp);
 }
 
+/*
+ * Resolves a value that may be a plain string or an integration-resource
+ * reference object ({ id, name, type }) into a display string.
+ *
+ * Configuration fields backed by an integration resource picker (e.g. the
+ * Claude "model" field, which loads from integrations/.../resources?type=model)
+ * can store either shape depending on how the value was set. Rendering the raw
+ * reference object directly as a React child crashes the node with
+ * "Objects are not valid as a React child (found: object with keys {id, name, type})".
+ *
+ * @param value - The string or resource reference to resolve.
+ * @returns The display string, or undefined when there is nothing to show.
+ */
+export function resourceLabel(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (typeof value === "object") {
+    const ref = value as { name?: unknown; id?: unknown };
+    if (typeof ref.name === "string" && ref.name) {
+      return ref.name;
+    }
+    if (typeof ref.id === "string" && ref.id) {
+      return ref.id;
+    }
+  }
+
+  return undefined;
+}
+
 export function formatTimestamp(value?: string, fallback?: string): string {
   const timestamp = value || fallback;
   if (!timestamp) {
