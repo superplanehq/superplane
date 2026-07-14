@@ -521,6 +521,153 @@ func (c *Client) CreateMergeRequestNote(ctx context.Context, projectID, mergeReq
 	return &note, nil
 }
 
+type MergeRequest struct {
+	ID                       int        `json:"id"`
+	IID                      int        `json:"iid"`
+	ProjectID                int        `json:"project_id"`
+	Title                    string     `json:"title"`
+	Description              string     `json:"description"`
+	State                    string     `json:"state"`
+	CreatedAt                string     `json:"created_at"`
+	UpdatedAt                string     `json:"updated_at"`
+	MergedAt                 *string    `json:"merged_at"`
+	MergeUser                *User      `json:"merge_user"`
+	ClosedAt                 *string    `json:"closed_at"`
+	ClosedBy                 *User      `json:"closed_by"`
+	SourceBranch             string     `json:"source_branch"`
+	TargetBranch             string     `json:"target_branch"`
+	Author                   User       `json:"author"`
+	Assignees                []User     `json:"assignees"`
+	Reviewers                []User     `json:"reviewers"`
+	Labels                   []string   `json:"labels"`
+	Milestone                *Milestone `json:"milestone"`
+	Draft                    bool       `json:"draft"`
+	DetailedMergeStatus      string     `json:"detailed_merge_status"`
+	MergeError               *string    `json:"merge_error"`
+	SHA                      string     `json:"sha"`
+	MergeCommitSHA           *string    `json:"merge_commit_sha"`
+	SquashCommitSHA          *string    `json:"squash_commit_sha"`
+	Squash                   bool       `json:"squash"`
+	ShouldRemoveSourceBranch bool       `json:"should_remove_source_branch"`
+	WebURL                   string     `json:"web_url"`
+}
+
+type AcceptMergeRequestRequest struct {
+	MergeCommitMessage       string `json:"merge_commit_message,omitempty"`
+	SquashCommitMessage      string `json:"squash_commit_message,omitempty"`
+	Squash                   *bool  `json:"squash,omitempty"`
+	ShouldRemoveSourceBranch *bool  `json:"should_remove_source_branch,omitempty"`
+	SHA                      string `json:"sha,omitempty"`
+}
+
+// AcceptMergeRequest merges an open merge request.
+// See https://docs.gitlab.com/api/merge_requests/#merge-a-merge-request
+func (c *Client) AcceptMergeRequest(ctx context.Context, projectID, mergeRequestIID string, req *AcceptMergeRequestRequest) (*MergeRequest, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/merge", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusUnauthorized:
+		return nil, fmt.Errorf("user does not have permission to accept this merge request")
+	case http.StatusMethodNotAllowed:
+		return nil, fmt.Errorf("merge request cannot be merged (it may be a draft, closed, already merged, or blocked): %s", parseGitlabErrorMessage(readResponseBody(resp)))
+	case http.StatusConflict:
+		return nil, errors.New(mergeRequestConflictMessage(resp))
+	case http.StatusUnprocessableEntity:
+		return nil, fmt.Errorf("branch cannot be merged: %s", parseGitlabErrorMessage(readResponseBody(resp)))
+	default:
+		return nil, fmt.Errorf("failed to accept merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var mergeRequest MergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&mergeRequest); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request: %v", err)
+	}
+
+	return &mergeRequest, nil
+}
+
+type MergeRequestApprover struct {
+	User       User   `json:"user"`
+	ApprovedAt string `json:"approved_at"`
+}
+
+type MergeRequestApproval struct {
+	ID                int                    `json:"id"`
+	IID               int                    `json:"iid"`
+	ProjectID         int                    `json:"project_id"`
+	Title             string                 `json:"title"`
+	Description       string                 `json:"description"`
+	State             string                 `json:"state"`
+	CreatedAt         string                 `json:"created_at"`
+	UpdatedAt         string                 `json:"updated_at"`
+	MergeStatus       string                 `json:"merge_status"`
+	ApprovalsRequired int                    `json:"approvals_required"`
+	ApprovalsLeft     int                    `json:"approvals_left"`
+	ApprovedBy        []MergeRequestApprover `json:"approved_by"`
+}
+
+type ApproveMergeRequestRequest struct {
+	SHA string `json:"sha,omitempty"`
+}
+
+// ApproveMergeRequest approves a merge request as the authenticated user.
+// See https://docs.gitlab.com/api/merge_request_approvals/#approve-merge-request
+func (c *Client) ApproveMergeRequest(ctx context.Context, projectID, mergeRequestIID string, req *ApproveMergeRequestRequest) (*MergeRequestApproval, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/merge_requests/%s/approve", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(mergeRequestIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusCreated:
+	case http.StatusUnauthorized:
+		return nil, fmt.Errorf("user is not allowed to approve this merge request")
+	case http.StatusConflict:
+		return nil, errors.New(mergeRequestConflictMessage(resp))
+	default:
+		return nil, fmt.Errorf("failed to approve merge request: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var approval MergeRequestApproval
+	if err := json.NewDecoder(resp.Body).Decode(&approval); err != nil {
+		return nil, fmt.Errorf("failed to decode merge request approval: %v", err)
+	}
+
+	return &approval, nil
+}
+
 type AwardEmoji struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
@@ -733,6 +880,18 @@ func (c *Client) UpdateDeployment(ctx context.Context, projectID string, deploym
 	}
 
 	return &deployment, nil
+}
+
+// mergeRequestConflictMessage extracts GitLab's error message from a 409
+// response to a merge request accept/approve call. GitLab returns 409 not only
+// for a sha guard mismatch but also e.g. when the merge request is locked or
+// another merge is in progress, so surface the server's reason and only fall
+// back to the documented SHA-mismatch message when the body is empty.
+func mergeRequestConflictMessage(resp *http.Response) string {
+	if message := parseGitlabErrorMessage(readResponseBody(resp)); message != "" {
+		return message
+	}
+	return "SHA does not match HEAD of source branch"
 }
 
 // parseGitlabErrorMessage extracts the "message" field from a GitLab JSON error
