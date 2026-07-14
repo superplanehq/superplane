@@ -57,9 +57,15 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 			return emitErr
 		}
+		// The session is very likely still running — we gave up waiting, we did
+		// not stop it — so it must be interrupted and reclaimed here. Nothing
+		// polls this execution again.
 		if c, cErr := NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
+			stopAndReclaim(c, metadata.Session.ID, persistSessionFromConfig(ctx.Configuration, ctx.Logger), ctx.Logger)
 			cleanupUploadedFilesFromHook(c, ctx, ctx.Logger.Warnf)
 			cleanupManagedVaultFromHook(c, ctx, ctx.Logger.Warnf)
+		} else {
+			ctx.Logger.Warnf("Cannot reclaim managed session %s: client unavailable: %v", metadata.Session.ID, cErr)
 		}
 		return nil
 	}
@@ -78,6 +84,9 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 				return emitErr
 			}
+			// We can no longer see the session's status, so assume it is still
+			// running: interrupt and reclaim rather than abandon it.
+			stopAndReclaim(client, metadata.Session.ID, persistSessionFromConfig(ctx.Configuration, ctx.Logger), ctx.Logger)
 			cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 			cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 			return nil
