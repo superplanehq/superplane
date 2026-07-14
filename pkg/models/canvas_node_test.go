@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test__DeleteCanvasNodeWithResult__DeletesQueueItemsAndFinishesRun(t *testing.T) {
+func Test__DeleteCanvasNodeWithResult__DeletesQueueItemsAndRequestsFinalization(t *testing.T) {
 	r := support.Setup(t)
 
 	nodeID := "node-1"
@@ -26,7 +26,7 @@ func Test__DeleteCanvasNodeWithResult__DeletesQueueItemsAndFinishesRun(t *testin
 
 	event := support.EmitCanvasEventForNode(t, canvas.ID, nodeID, "default", nil)
 	require.NoError(t, event.Routed())
-	support.CreateQueueItem(t, canvas.ID, nodeID, event.ID, event.ID)
+	queueItem := support.CreateQueueItem(t, canvas.ID, nodeID, event.ID, event.ID)
 
 	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, nodeID)
 	require.NoError(t, err)
@@ -40,8 +40,9 @@ func Test__DeleteCanvasNodeWithResult__DeletesQueueItemsAndFinishesRun(t *testin
 
 	run, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, event.RunID)
 	require.NoError(t, err)
-	assert.Equal(t, models.CanvasRunStateFinished, run.State)
-	assert.Equal(t, models.CanvasRunResultPassed, run.Result)
-	assert.Contains(t, result.FinishedRunIDs, event.RunID)
+	assert.Equal(t, models.CanvasRunStateStarted, run.State)
+	require.Len(t, result.DeletedQueueItems, 1)
+	assert.Equal(t, queueItem.ID, result.DeletedQueueItems[0].ID)
+	assert.Equal(t, event.RunID, result.DeletedQueueItems[0].RunID)
 	assert.Empty(t, result.CancelledExecutionIDs)
 }

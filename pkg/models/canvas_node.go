@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -105,7 +104,7 @@ type CanvasNode struct {
 
 type DeleteCanvasNodeResult struct {
 	CancelledExecutionIDs []uuid.UUID
-	FinishedRunIDs        []uuid.UUID
+	DeletedQueueItems     []CanvasNodeQueueItem
 }
 
 func (c *CanvasNode) TableName() string {
@@ -530,37 +529,31 @@ func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nod
 		return DeleteCanvasNodeResult{}, err
 	}
 
-	executionIDs, runIDs := nodeExecutionAndRunIDs(executions)
+	executionIDs := nodeExecutionIDs(executions)
 	cancelledExecutionIDs, err := cancelNodeExecutions(tx, workflowID, executionIDs)
 	if err != nil {
 		return DeleteCanvasNodeResult{}, err
 	}
 
-	queueItemRunIDs, err := deleteQueueItemsForNode(tx, workflowID, nodeID)
+	deletedQueueItems, err := deleteQueueItemsForNode(tx, workflowID, nodeID)
 	if err != nil {
 		return DeleteCanvasNodeResult{}, err
 	}
-	runIDs = appendUniqueRunIDs(runIDs, queueItemRunIDs...)
 
 	if err := completePendingRequestsForNodeExecutions(tx, workflowID, nodeID); err != nil {
 		return DeleteCanvasNodeResult{}, err
 	}
 
-	finishedRunIDs, err := FinishCanvasRunsWithNoOpenWork(tx, workflowID, runIDs)
-	if err != nil {
-		return DeleteCanvasNodeResult{}, err
-	}
-
 	return DeleteCanvasNodeResult{
 		CancelledExecutionIDs: cancelledExecutionIDs,
-		FinishedRunIDs:        finishedRunIDs,
+		DeletedQueueItems:     deletedQueueItems,
 	}, nil
 }
 
-func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) ([]uuid.UUID, error) {
+func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) ([]CanvasNodeQueueItem, error) {
 	var deletedQueueItems []CanvasNodeQueueItem
 	err := tx.
-		Clauses(clause.Returning{Columns: []clause.Column{{Name: "run_id"}}}).
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}}}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Delete(&deletedQueueItems).
@@ -569,35 +562,16 @@ func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (
 		return nil, err
 	}
 
-	runIDs := make([]uuid.UUID, 0, len(deletedQueueItems))
-	for _, item := range deletedQueueItems {
-		if item.RunID != uuid.Nil && !slices.Contains(runIDs, item.RunID) {
-			runIDs = append(runIDs, item.RunID)
-		}
-	}
-
-	return runIDs, nil
+	return deletedQueueItems, nil
 }
 
-func nodeExecutionAndRunIDs(executions []CanvasNodeExecution) ([]uuid.UUID, []uuid.UUID) {
+func nodeExecutionIDs(executions []CanvasNodeExecution) []uuid.UUID {
 	executionIDs := make([]uuid.UUID, 0, len(executions))
-	runIDs := make([]uuid.UUID, 0, len(executions))
 	for _, execution := range executions {
 		executionIDs = append(executionIDs, execution.ID)
-		runIDs = appendUniqueRunIDs(runIDs, execution.RunID)
 	}
 
-	return executionIDs, runIDs
-}
-
-func appendUniqueRunIDs(runIDs []uuid.UUID, ids ...uuid.UUID) []uuid.UUID {
-	for _, id := range ids {
-		if id != uuid.Nil && !slices.Contains(runIDs, id) {
-			runIDs = append(runIDs, id)
-		}
-	}
-
-	return runIDs
+	return executionIDs
 }
 
 func cancelNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, executionIDs []uuid.UUID) ([]uuid.UUID, error) {

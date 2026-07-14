@@ -51,12 +51,12 @@ type CanvasPublisher struct {
 	allNodes map[string]models.CanvasNode
 
 	cancelledExecutionIDs []uuid.UUID
-	finishedRunIDs        []uuid.UUID
+	deletedQueueItems     []models.CanvasNodeQueueItem
 }
 
 type CanvasPublishResult struct {
 	CancelledExecutionIDs []uuid.UUID
-	FinishedRunIDs        []uuid.UUID
+	DeletedQueueItems     []models.CanvasNodeQueueItem
 }
 
 type CanvasPublisherOptions struct {
@@ -161,7 +161,7 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 func (p *CanvasPublisher) Result() CanvasPublishResult {
 	return CanvasPublishResult{
 		CancelledExecutionIDs: append([]uuid.UUID(nil), p.cancelledExecutionIDs...),
-		FinishedRunIDs:        append([]uuid.UUID(nil), p.finishedRunIDs...),
+		DeletedQueueItems:     append([]models.CanvasNodeQueueItem(nil), p.deletedQueueItems...),
 	}
 }
 
@@ -394,7 +394,7 @@ func (p *CanvasPublisher) deleteNode(change *Change) error {
 	}
 
 	p.cancelledExecutionIDs = append(p.cancelledExecutionIDs, result.CancelledExecutionIDs...)
-	p.finishedRunIDs = append(p.finishedRunIDs, result.FinishedRunIDs...)
+	p.deletedQueueItems = append(p.deletedQueueItems, result.DeletedQueueItems...)
 	return nil
 }
 

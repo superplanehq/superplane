@@ -201,7 +201,7 @@ func CommitCanvasStaging(
 		log.Errorf("failed to publish canvas staging updated RabbitMQ message: %v", err)
 	}
 
-	publishCancelledExecutionAndRunMessages(canvas.ID, publishResult)
+	publishDeletedNodeCleanupMessages(canvas.ID, publishResult)
 
 	ownersByID, _ := ownersByIDForCanvasVersions(ctx, organizationID, []models.CanvasVersion{*newLiveVersion})
 
@@ -211,20 +211,26 @@ func CommitCanvasStaging(
 	}, nil
 }
 
-func publishCancelledExecutionAndRunMessages(canvasID uuid.UUID, result changesets.CanvasPublishResult) {
+func publishDeletedNodeCleanupMessages(canvasID uuid.UUID, result changesets.CanvasPublishResult) {
 	for _, executionID := range result.CancelledExecutionIDs {
 		if err := messages.PublishCanvasExecutionByID(canvasID, executionID); err != nil {
 			log.Errorf("failed to publish cancelled execution RabbitMQ message: %v", err)
 		}
 	}
 
-	publishFinishedRunMessages(canvasID, result.FinishedRunIDs)
-}
+	for _, queueItem := range result.DeletedQueueItems {
+		if queueItem.RunID == uuid.Nil {
+			continue
+		}
 
-func publishFinishedRunMessages(canvasID uuid.UUID, runIDs []uuid.UUID) {
-	for _, runID := range runIDs {
-		if err := messages.NewCanvasRunMessage(canvasID.String(), runID.String()).Publish(); err != nil {
-			log.Errorf("failed to publish finished run RabbitMQ message: %v", err)
+		message := messages.NewCanvasQueueItemDeletedMessage(
+			canvasID.String(),
+			queueItem.ID.String(),
+			queueItem.NodeID,
+			queueItem.RunID.String(),
+		)
+		if err := message.PublishDeleted(); err != nil {
+			log.Errorf("failed to publish deleted queue item RabbitMQ message: %v", err)
 		}
 	}
 }

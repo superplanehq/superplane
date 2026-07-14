@@ -204,7 +204,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
 			"state": models.CanvasNodeExecutionStateStarted,
 		}).Error)
-		support.CreateQueueItem(t, canvas.ID, "approval-node", rootEvent.ID, rootEvent.ID)
+		queueItem := support.CreateQueueItem(t, canvas.ID, "approval-node", rootEvent.ID, rootEvent.ID)
 
 		draft, err := models.CreateCommitVersionWithSpecInTransaction(
 			database.Conn(),
@@ -236,9 +236,13 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), rootEvent.ID)
 		require.NoError(t, err)
-		require.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
-		require.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
-		require.NotNil(t, updatedRun.FinishedAt)
+		require.Equal(t, models.CanvasRunStateStarted, updatedRun.State)
+
+		result := publisher.Result()
+		require.Contains(t, result.CancelledExecutionIDs, execution.ID)
+		require.Len(t, result.DeletedQueueItems, 1)
+		require.Equal(t, queueItem.ID, result.DeletedQueueItems[0].ID)
+		require.Equal(t, rootEvent.RunID, result.DeletedQueueItems[0].RunID)
 	})
 
 	t.Run("setup errors are persisted in node state and published version", func(t *testing.T) {
