@@ -39,16 +39,20 @@ export function RunDataSourceFiltersPanel({
   testIdSuffix,
 }: RunDataSourceFiltersPanelProps) {
   const ctx = useConsoleContext();
-  const nodes = ctx?.nodes ?? [];
-  const triggerOptions = useMemo(() => buildTriggerOptions(nodes), [nodes]);
+  const triggerOptions = useMemo(() => buildTriggerOptions(ctx?.nodes ?? []), [ctx?.nodes]);
 
   const selectedStatuses = useMemo(() => new Set<RunStatusFilter>(statuses ?? []), [statuses]);
   const selectedTriggerIds = useMemo(() => new Set<string>(resolveSelectedTriggerIds(triggers, ctx)), [triggers, ctx]);
 
+  // Count persisted trigger refs (not just resolvable ones) so a badge /
+  // Clear affordance still reflects stale YAML that no longer matches a
+  // canvas node — otherwise authors can be stuck with an active filter
+  // they cannot clear from the UI.
   const activeStatusCount = selectedStatuses.size;
   const activeTriggerCount = triggers?.length ?? 0;
   const activeFilterCount = activeStatusCount + activeTriggerCount;
   const hasActiveFilters = activeFilterCount > 0;
+  const hasPersistedTriggerFilter = activeTriggerCount > 0;
 
   const [open, setOpen] = useState<boolean>(hasActiveFilters);
 
@@ -111,6 +115,7 @@ export function RunDataSourceFiltersPanel({
             selectedTriggerIds={selectedTriggerIds}
             onToggleTrigger={toggleTrigger}
             onClearTriggers={clearTriggers}
+            hasFilter={hasPersistedTriggerFilter}
             headerClassName="border-t border-slate-950/10 dark:border-gray-800/70"
           />
         </div>

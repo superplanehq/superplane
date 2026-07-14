@@ -156,8 +156,8 @@ Execution widgets eager-load more event pages until they have enough execution r
 
 The `runs` data source accepts optional `statuses` and `triggers` arrays that scope the widget to a subset of canvas runs. Empty (or omitted) means "all", matching the runs sidebar Clear behavior. Both arrays are optional and can be edited together in the collapsible **Filters** panel of the data source editor.
 
-- `statuses` — any subset of `"running" | "passed" | "failed" | "cancelled"`. Applied client-side after the runs query returns, so `limit` still bounds the fetch and filtered results may be shorter than `limit`.
-- `triggers` — each entry references a trigger node by id or by name. References are resolved against the current canvas nodes so renaming a trigger keeps existing widgets working when the YAML uses the id.
+- `statuses` — any subset of `"running" | "passed" | "failed" | "cancelled"`. Applied client-side after each fetched page. When either filter dimension is set, the widget eagerly loads more pages (up to the shared page cap) until it has `limit` **matching** rows or the source is exhausted — so a tight filter still fills the panel when matches exist beyond the first page. Without filters, `limit` bounds the unfiltered fetch as before.
+- `triggers` — each entry references a trigger node by id or by name. References are resolved against the current canvas nodes so renaming a trigger keeps existing widgets working when the YAML uses the id. Fully unresolved (stale) trigger lists match nothing and skip eager pagination.
 
 When either filter dimension carries a selection, number panels stop using the server-reported `totalCount` for `aggregation: "count"` and switch to the filtered row count so the KPI reflects the visible subset rather than the whole canvas.
 

@@ -101,16 +101,23 @@ export function RunTriggerFilterSection({
   selectedTriggerIds,
   onToggleTrigger,
   onClearTriggers,
+  hasFilter,
   headerClassName,
 }: {
   triggerOptions: TriggerOption[];
   selectedTriggerIds: Set<string>;
   onToggleTrigger: (triggerId: string) => void;
   onClearTriggers: () => void;
+  /**
+   * Override for whether Clear is enabled. Defaults to
+   * `selectedTriggerIds.size > 0`. Pass the persisted trigger count when
+   * unresolved (stale) refs should still be clearable from the UI.
+   */
+  hasFilter?: boolean;
   /** Extra classes for the header (e.g. add a top border when stacked below the status section). */
   headerClassName?: string;
 }) {
-  const hasTriggerFilter = selectedTriggerIds.size > 0;
+  const hasTriggerFilter = hasFilter ?? selectedTriggerIds.size > 0;
   return (
     <>
       <RunFilterHeader

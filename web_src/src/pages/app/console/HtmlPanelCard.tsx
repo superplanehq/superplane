@@ -62,14 +62,14 @@ function useHtmlDisplay({
   const ctx = useConsoleContext();
   const canvasId = ctx?.canvasId ?? "";
   const textForSideload = useMemo(() => `${persistedTitle}\n${body}`, [persistedTitle, body]);
-  const { vars, baseLoading, sideloadLoading } = useMarkdownVariables(
+  const { vars, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
     canvasId,
     isEditing ? EMPTY_VARIABLES : variables,
     isEditing ? "" : textForSideload,
   );
 
-  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading);
-  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading);
+  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading, searchingNames);
+  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading, searchingNames);
 
   const displayTitle = useMemo(() => {
     if (titleLoading) return panelId;

@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasesCanvasRun } from "@/api-client";
 
-import { hasRunStatusTriggerFilters, runMatchesStatusTriggerFilters } from "./runStatusTriggerFilter";
+import {
+  hasRunStatusTriggerFilters,
+  runMatchesStatusTriggerFilters,
+  triggerFilterCanMatch,
+} from "./runStatusTriggerFilter";
 
 function run(overrides: Partial<CanvasesCanvasRun> = {}): CanvasesCanvasRun {
   return {
@@ -47,6 +51,11 @@ describe("runMatchesStatusTriggerFilters", () => {
     expect(runMatchesStatusTriggerFilters(run(), { triggers: ["release"] }, resolver)).toBe(false);
   });
 
+  it("rejects every run when a resolver is set but no trigger reference resolves", () => {
+    const resolver = () => undefined;
+    expect(runMatchesStatusTriggerFilters(run(), { triggers: ["gone"] }, resolver)).toBe(false);
+  });
+
   it("drops runs whose rootEvent lacks a nodeId when trigger filter is set", () => {
     const orphan = run({ rootEvent: {} });
     expect(runMatchesStatusTriggerFilters(orphan, { triggers: ["trigger-1"] })).toBe(false);
@@ -77,5 +86,25 @@ describe("hasRunStatusTriggerFilters", () => {
     expect(hasRunStatusTriggerFilters({ statuses: ["failed"] })).toBe(true);
     expect(hasRunStatusTriggerFilters({ triggers: ["deploy"] })).toBe(true);
     expect(hasRunStatusTriggerFilters({ statuses: ["running"], triggers: ["release"] })).toBe(true);
+  });
+});
+
+describe("triggerFilterCanMatch", () => {
+  it("returns true when there is no trigger filter", () => {
+    expect(triggerFilterCanMatch(undefined)).toBe(true);
+    expect(triggerFilterCanMatch([])).toBe(true);
+  });
+
+  it("returns true without a resolver (compare refs as-is)", () => {
+    expect(triggerFilterCanMatch(["deploy"])).toBe(true);
+  });
+
+  it("returns false when every reference fails to resolve", () => {
+    expect(triggerFilterCanMatch(["gone"], () => undefined)).toBe(false);
+  });
+
+  it("returns true when at least one reference resolves", () => {
+    const resolver = (reference: string) => (reference === "deploy" ? "id-1" : undefined);
+    expect(triggerFilterCanMatch(["gone", "deploy"], resolver)).toBe(true);
   });
 });

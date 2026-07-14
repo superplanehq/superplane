@@ -3,7 +3,7 @@
  * Keep the backend Go validator (`pkg/models/console_yml.go`) in lockstep.
  */
 
-import { RUN_STATUS_FILTER_IDS, isRunStatusFilter, type RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
+import type { RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
 import type {
   WidgetChartRender,
   WidgetNumberAggregation,
@@ -29,10 +29,24 @@ import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent
 import { validateNumberContent } from "./numberContentValidation";
 import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
 import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
+import {
+  normalizeTableDataSource,
+  validateRunStatusesArray,
+  validateRunTriggersArray,
+} from "./runDataSourceFilterSchema";
 import { validateScorecardContent } from "./scorecardRenderValidation";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
+
+// Re-export runs filter schema helpers so existing import paths keep working.
+export {
+  normalizeRunStatuses,
+  normalizeRunTriggers,
+  normalizeRunsDataSource,
+  validateRunStatusesArray,
+  validateRunTriggersArray,
+} from "./runDataSourceFilterSchema";
 
 // Re-export the shared object narrow so downstream validators
 // (e.g. `chartRenderValidation.ts`) keep their existing import path.
@@ -414,43 +428,6 @@ function validateRunsDataSource(obj: Record<string, unknown>): string | null {
   return validateRunTriggersArray(obj.triggers, "dataSource.triggers");
 }
 
-/**
- * Validate a persisted runs status filter array. Accepts undefined /
- * null / empty (meaning "all statuses") and any subset of the shared
- * {@link RunStatusFilter} vocabulary; anything else is rejected with a
- * message listing the allowed values.
- */
-export function validateRunStatusesArray(value: unknown, fieldPath: string): string | null {
-  if (value == null) return null;
-  if (!Array.isArray(value)) return `${fieldPath} must be an array.`;
-  for (let i = 0; i < value.length; i += 1) {
-    const item = value[i];
-    if (!isRunStatusFilter(item)) {
-      return `${fieldPath}[${i}] must be one of ${RUN_STATUS_FILTER_IDS.join(", ")}.`;
-    }
-  }
-  return null;
-}
-
-/**
- * Validate a persisted runs trigger filter array. Accepts undefined /
- * null / empty (meaning "all triggers") and any list of non-empty
- * strings; individual entries are matched at runtime against the
- * canvas nodes so unknown ids simply fail to match rather than fail
- * validation.
- */
-export function validateRunTriggersArray(value: unknown, fieldPath: string): string | null {
-  if (value == null) return null;
-  if (!Array.isArray(value)) return `${fieldPath} must be an array.`;
-  for (let i = 0; i < value.length; i += 1) {
-    const item = value[i];
-    if (typeof item !== "string" || item.trim() === "") {
-      return `${fieldPath}[${i}] must be a non-empty string.`;
-    }
-  }
-  return null;
-}
-
 function validateExecutionsDataSource(obj: Record<string, unknown>): string | null {
   if (obj.node != null && typeof obj.node !== "string") {
     return "dataSource.node must be a string.";
@@ -566,88 +543,9 @@ function normalizeTableWhere(raw: unknown): WidgetTableFilter[] | undefined {
     const op = typeof item.op === "string" ? item.op : "eq";
     const field = typeof item.field === "string" ? item.field : "";
     if (!field.trim() || !WIDGET_FILTER_OPS.includes(op as WidgetTableFilter["op"])) return [];
-    return [{ field, op: op as WidgetTableFilter["op"], value: stringOrUndefined(item.value) }];
+    const value = typeof item.value === "string" ? item.value : undefined;
+    return [{ field, op: op as WidgetTableFilter["op"], value }];
   });
-}
-
-function normalizeTableDataSource(raw: unknown): TablePanelDataSource {
-  const ds = asObject(raw);
-  if (ds?.kind === "executions") return normalizeExecutionsDataSource(ds);
-  if (ds?.kind === "runs") return normalizeRunsDataSource(ds);
-  if (ds?.kind === "memory") return normalizeMemoryDataSource(ds);
-  return { kind: "memory", namespace: "" };
-}
-
-export function normalizeRunsDataSource(ds: Record<string, unknown>): TablePanelDataSource {
-  const statuses = normalizeRunStatuses(ds.statuses);
-  const triggers = normalizeRunTriggers(ds.triggers);
-  return {
-    kind: "runs",
-    limit: optionalNumber(ds.limit),
-    ...(statuses ? { statuses } : {}),
-    ...(triggers ? { triggers } : {}),
-  };
-}
-
-/**
- * Coerce a persisted statuses array into a typed subset of the shared
- * {@link RunStatusFilter} vocabulary. Returns `undefined` when the result
- * would be empty so YAML round-trips stay clean (empty === "all").
- */
-export function normalizeRunStatuses(raw: unknown): RunStatusFilter[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
-  const out: RunStatusFilter[] = [];
-  const seen = new Set<RunStatusFilter>();
-  for (const item of raw) {
-    if (!isRunStatusFilter(item)) continue;
-    if (seen.has(item)) continue;
-    seen.add(item);
-    out.push(item);
-  }
-  return out.length > 0 ? out : undefined;
-}
-
-/**
- * Coerce a persisted triggers array into a normalized list of non-empty
- * strings (trimmed, deduped). Returns `undefined` when the result would
- * be empty so YAML round-trips stay clean (empty === "all").
- */
-export function normalizeRunTriggers(raw: unknown): string[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const item of raw) {
-    if (typeof item !== "string") continue;
-    const trimmed = item.trim();
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    out.push(trimmed);
-  }
-  return out.length > 0 ? out : undefined;
-}
-
-function normalizeExecutionsDataSource(ds: Record<string, unknown>): TablePanelDataSource {
-  return {
-    kind: "executions",
-    node: stringOrUndefined(ds.node),
-    limit: optionalNumber(ds.limit),
-  };
-}
-
-function optionalNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function normalizeMemoryDataSource(ds: Record<string, unknown>): TablePanelDataSource {
-  return {
-    kind: "memory",
-    namespace: typeof ds.namespace === "string" ? ds.namespace : "",
-    fieldPath: stringOrUndefined(ds.fieldPath),
-  };
-}
-
-function stringOrUndefined(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
 }
 
 function validateTableColumns(columns: unknown): string | null {

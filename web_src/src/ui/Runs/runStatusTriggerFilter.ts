@@ -46,15 +46,51 @@ export function runMatchesStatusTriggerFilters(
   if (triggers && triggers.length > 0) {
     const triggerNodeId = run.rootEvent?.nodeId;
     if (!triggerNodeId) return false;
-    const canonicalIds = new Set<string>();
-    for (const raw of triggers) {
-      const resolved = resolveTriggerReference?.(raw) ?? raw;
-      if (resolved) canonicalIds.add(resolved);
-    }
+    const canonicalIds = resolveTriggerFilterIds(triggers, resolveTriggerReference);
+    // Empty set means every persisted ref failed to resolve (stale/deleted
+    // node) — no run can match, so stop rather than comparing raw strings
+    // that will never equal a live node id.
+    if (canonicalIds.size === 0) return false;
     if (!canonicalIds.has(triggerNodeId)) return false;
   }
 
   return true;
+}
+
+/**
+ * Resolve a trigger-filter list to canonical node ids. When a resolver is
+ * provided, unresolved references are dropped (they cannot match any run).
+ * Without a resolver, references are compared as-is against `rootEvent.nodeId`.
+ */
+export function resolveTriggerFilterIds(
+  triggers: readonly string[],
+  resolveTriggerReference?: TriggerReferenceResolver,
+): Set<string> {
+  const canonicalIds = new Set<string>();
+  for (const raw of triggers) {
+    if (!raw) continue;
+    if (resolveTriggerReference) {
+      const resolved = resolveTriggerReference(raw);
+      if (resolved) canonicalIds.add(resolved);
+      continue;
+    }
+    canonicalIds.add(raw);
+  }
+  return canonicalIds;
+}
+
+/**
+ * True when a trigger filter can possibly match a run. Returns `true` when
+ * there is no trigger filter, or when at least one reference resolves (or
+ * no resolver is provided). Used to skip eager pagination that can never
+ * find a match for fully-stale trigger YAML.
+ */
+export function triggerFilterCanMatch(
+  triggers: readonly string[] | undefined,
+  resolveTriggerReference?: TriggerReferenceResolver,
+): boolean {
+  if (!triggers || triggers.length === 0) return true;
+  return resolveTriggerFilterIds(triggers, resolveTriggerReference).size > 0;
 }
 
 /**
