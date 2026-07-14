@@ -815,6 +815,46 @@ func Test__Client__AcceptMergeRequest(t *testing.T) {
 		require.NoError(t, readErr)
 		assert.Equal(t, "{}", string(body))
 	})
+
+	t.Run("conflict surfaces GitLab's message", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusConflict, `{"message": "Merge request is not mergeable"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.AcceptMergeRequest(context.Background(), "456", "42", &AcceptMergeRequestRequest{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Merge request is not mergeable")
+	})
+
+	t.Run("conflict with empty body falls back to SHA mismatch message", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusConflict, ``),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.AcceptMergeRequest(context.Background(), "456", "42", &AcceptMergeRequestRequest{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SHA does not match HEAD of source branch")
+	})
 }
 
 func Test__Client__ApproveMergeRequest(t *testing.T) {
