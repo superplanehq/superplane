@@ -54,6 +54,45 @@ export interface Note {
   noteable_type?: string;
 }
 
+export interface MergeRequest {
+  id: number;
+  iid: number;
+  project_id: number;
+  title: string;
+  description?: string;
+  state: string;
+  created_at?: string;
+  updated_at?: string;
+  merged_at?: string;
+  merge_user?: User;
+  source_branch?: string;
+  target_branch?: string;
+  sha?: string;
+  merge_commit_sha?: string;
+  squash_commit_sha?: string;
+  detailed_merge_status?: string;
+  draft?: boolean;
+  labels?: string[];
+  author?: User;
+  web_url?: string;
+}
+
+export interface MergeRequestApprover {
+  user?: User;
+  approved_at?: string;
+}
+
+export interface MergeRequestApproval {
+  id: number;
+  iid: number;
+  project_id: number;
+  title?: string;
+  state?: string;
+  approvals_required?: number;
+  approvals_left?: number;
+  approved_by?: MergeRequestApprover[];
+}
+
 export interface AwardEmoji {
   id: number;
   name: string;
@@ -61,4 +100,22 @@ export interface AwardEmoji {
   created_at: string;
   updated_at: string;
   awardable_id?: number;
+}
+
+export interface DeploymentEnvironment {
+  id: number;
+  name: string;
+  external_url?: string;
+}
+
+export interface Deployment {
+  id: number;
+  iid: number;
+  ref: string;
+  sha: string;
+  status: string;
+  created_at: string;
+  updated_at?: string;
+  user?: User;
+  environment?: DeploymentEnvironment;
 }

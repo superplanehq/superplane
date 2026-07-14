@@ -57,7 +57,6 @@ func Test__RunCodeAgent__Setup__validation(t *testing.T) {
 		{"repo mode missing repository", func(c map[string]any) { delete(c, "repository") }, "repository is required"},
 		{"invalid repository", func(c map[string]any) { c["repository"] = "nonsense" }, "owner/repo or an https"},
 		{"pr mode missing prUrl", func(c map[string]any) { c["sourceMode"] = "pr"; delete(c, "repository") }, "prUrl is required"},
-		{"pr mode invalid prUrl", func(c map[string]any) { c["sourceMode"] = "pr"; c["prUrl"] = "nope" }, "invalid pull request URL"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

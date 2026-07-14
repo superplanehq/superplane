@@ -8,6 +8,7 @@ import { ScorecardPanelForm } from "./ScorecardPanelForm";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { useConsoleContext } from "./ConsoleContext";
 import type { ScorecardPanelContent, TablePanelDataSource } from "./panelTypes";
+import { runsRenderIsTotalCountOnly } from "./widget/runsWidgetQuery";
 import { renderNeedsRunNodeOutputs, useWidgetData } from "./widget/useWidgetData";
 import type { WidgetScorecardRender } from "./widget/types";
 import { WidgetScorecard } from "./widget/WidgetScorecard";
@@ -69,7 +70,13 @@ function ScorecardPanelDataBound({
   dataSource: TablePanelDataSource;
   canvasId: string;
 }) {
-  const { rows, isLoading, error, totalCount } = useWidgetData(canvasId, dataSource, renderNeedsRunNodeOutputs(render));
+  const { rows, isLoading, error, totalCount } = useWidgetData(
+    canvasId,
+    dataSource,
+    renderNeedsRunNodeOutputs(render),
+    false,
+    runsRenderIsTotalCountOnly(dataSource, render),
+  );
   if (error) return <PanelError message={error} />;
   return <WidgetScorecard render={render} rows={rows} isLoading={isLoading} totalCount={totalCount} />;
 }
