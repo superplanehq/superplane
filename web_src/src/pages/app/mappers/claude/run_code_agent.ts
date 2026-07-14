@@ -13,21 +13,22 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { integrationResourceDisplayLabel } from "@/lib/integrationResourceLabel";
 
 type RunCodeAgentNodeMetadata = {
-  repository?: string;
+  repository?: unknown;
   baseBranch?: string;
   prUrl?: string;
-  model?: string;
+  model?: unknown;
   sourceMode?: string;
 };
 
 type RunCodeAgentConfiguration = {
   sourceMode?: string;
-  repository?: string;
+  repository?: unknown;
   baseBranch?: string;
   prUrl?: string;
-  model?: string;
+  model?: unknown;
 };
 
 type RunCodeAgentPayloadData = {
@@ -108,7 +109,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
       items.push({ icon: "git-pull-request", label: pr });
     }
   } else {
-    const repo = meta.repository || config.repository;
+    const repo = integrationResourceDisplayLabel(meta.repository) ?? integrationResourceDisplayLabel(config.repository);
     if (repo) {
       items.push({ icon: "git-branch", label: repo });
     }
@@ -118,7 +119,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     }
   }
 
-  const model = meta.model || config.model;
+  const model = integrationResourceDisplayLabel(meta.model) ?? integrationResourceDisplayLabel(config.model);
   if (model) {
     items.push({ icon: "bot", label: model });
   }
