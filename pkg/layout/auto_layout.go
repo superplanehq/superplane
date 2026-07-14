@@ -104,13 +104,14 @@ func applyHorizontalLayout(nodes []N, edges []E, layout *AutoLayout) ([]N, error
 	}
 
 	layoutEdges := resolveLayoutEdges(edges, layoutNodeSet)
+	layoutEdgesForPositioning := resolveForwardLayoutEdges(layoutNodes, layoutEdges)
 	components := resolveDisconnectedLayoutComponents(layoutNodes, layoutEdges)
 	if len(components) == 0 {
 		return nodes, nil
 	}
 
 	sortedComponents := sortComponentsByCurrentPosition(components)
-	layoutedPositions := resolvePackedLayoutedPositions(sortedComponents, layoutEdges)
+	layoutedPositions := resolvePackedLayoutedPositions(sortedComponents, layoutEdgesForPositioning)
 	if len(layoutedPositions.byNodeID) == 0 {
 		return nodes, nil
 	}
@@ -195,6 +196,65 @@ func resolveLayoutEdges(edges []E, nodeSet map[string]struct{}) []E {
 		layoutEdges = append(layoutEdges, edge)
 	}
 	return layoutEdges
+}
+
+func resolveForwardLayoutEdges(layoutNodes []N, layoutEdges []E) []E {
+	positionByNodeID := make(map[string]Position, len(layoutNodes))
+	for _, node := range layoutNodes {
+		positionByNodeID[node.ID] = node.Position
+	}
+
+	forwardEdges := make([]E, 0, len(layoutEdges))
+	for i, edge := range layoutEdges {
+		sourcePosition, hasSource := positionByNodeID[edge.SourceID]
+		targetPosition, hasTarget := positionByNodeID[edge.TargetID]
+		if !hasSource || !hasTarget {
+			continue
+		}
+
+		if isBackwardLayoutEdge(sourcePosition, targetPosition) && hasLayoutPath(layoutEdges, edge.TargetID, edge.SourceID, i) {
+			continue
+		}
+
+		forwardEdges = append(forwardEdges, edge)
+	}
+
+	return forwardEdges
+}
+
+func hasLayoutPath(edges []E, startNodeID, targetNodeID string, excludedEdgeIndex int) bool {
+	adjacencyByNodeID := map[string][]string{}
+	for i, edge := range edges {
+		if i == excludedEdgeIndex {
+			continue
+		}
+		adjacencyByNodeID[edge.SourceID] = append(adjacencyByNodeID[edge.SourceID], edge.TargetID)
+	}
+
+	visited := map[string]struct{}{}
+	queue := []string{startNodeID}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if current == targetNodeID {
+			return true
+		}
+		if _, ok := visited[current]; ok {
+			continue
+		}
+		visited[current] = struct{}{}
+		queue = append(queue, adjacencyByNodeID[current]...)
+	}
+
+	return false
+}
+
+func isBackwardLayoutEdge(sourcePosition Position, targetPosition Position) bool {
+	if targetPosition.X != sourcePosition.X {
+		return targetPosition.X < sourcePosition.X
+	}
+
+	return targetPosition.Y < sourcePosition.Y
 }
 
 func resolveDisconnectedLayoutComponents(layoutNodes []N, layoutEdges []E) [][]N {

@@ -105,15 +105,16 @@ func serializeCanvasSummaries(
 		preference := preferencesByCanvasID[canvas.ID]
 
 		protoCanvases[i] = &pb.CanvasSummary{
-			Id:          canvas.ID.String(),
-			Name:        canvas.Name,
-			Description: canvas.Description,
-			CreatedAt:   timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:   timestamppb.New(*canvas.UpdatedAt),
-			Edges:       actions.EdgesToProto(liveSpec.Edges),
-			Nodes:       []*pb.CanvasSummary_Node{},
-			Pinned:      preference.PinnedAt != nil,
-			Starred:     preference.StarredAt != nil,
+			Id:                        canvas.ID.String(),
+			Name:                      canvas.Name,
+			Description:               canvas.Description,
+			CreatedAt:                 timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:                 timestamppb.New(*canvas.UpdatedAt),
+			Edges:                     actions.EdgesToProto(liveSpec.Edges),
+			Nodes:                     []*pb.CanvasSummary_Node{},
+			Pinned:                    preference.PinnedAt != nil,
+			Starred:                   preference.StarredAt != nil,
+			AutoLayoutOnUpdateEnabled: preference.AutoLayoutOnUpdateEnabled,
 		}
 
 		if preference.PinnedAt != nil {
