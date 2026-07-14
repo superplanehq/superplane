@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	ResourceTypeMember    = "member"
-	ResourceTypeMilestone = "milestone"
-	ResourceTypeProject   = "project"
+	ResourceTypeMember      = "member"
+	ResourceTypeMilestone   = "milestone"
+	ResourceTypeProject     = "project"
+	ResourceTypeEnvironment = "environment"
 )
 
 func (g *GitLab) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -21,6 +22,8 @@ func (g *GitLab) ListResources(resourceType string, ctx core.ListResourcesContex
 		return ListMilestones(ctx)
 	case ResourceTypeProject:
 		return ListProjects(ctx)
+	case ResourceTypeEnvironment:
+		return ListEnvironments(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -102,6 +105,33 @@ func ListMilestones(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 			Type: ResourceTypeMilestone,
 			Name: m.Title,
 			ID:   fmt.Sprintf("%d", m.ID),
+		})
+	}
+	return resources, nil
+}
+
+func ListEnvironments(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	projectID := ctx.Parameters["project"]
+	if projectID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	environments, err := client.ListEnvironments(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list environments: %v", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(environments))
+	for _, e := range environments {
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeEnvironment,
+			Name: e.Name,
+			ID:   fmt.Sprintf("%d", e.ID),
 		})
 	}
 	return resources, nil
