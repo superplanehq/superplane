@@ -12,11 +12,8 @@ const (
 	maxPollAttempts         = 200
 	maxPollErrors           = 5
 	finalMessageReads       = 15
+	finalMessageDelay       = 2 * time.Second
 )
-
-// finalMessageDelay is the pause between event-stream reads while waiting for
-// the terminal event to be written. A var so tests can shrink it.
-var finalMessageDelay = 2 * time.Second
 
 // Spec is the workflow node configuration for claude.runAgent.
 type Spec struct {
