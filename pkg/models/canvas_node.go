@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -102,6 +103,11 @@ type CanvasNode struct {
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
 }
 
+type DeleteCanvasNodeResult struct {
+	CancelledExecutionIDs []uuid.UUID
+	FinishedRunIDs        []uuid.UUID
+}
+
 func (c *CanvasNode) TableName() string {
 	return "workflow_nodes"
 }
@@ -180,18 +186,28 @@ func randomNodeSuffix(length int) string {
 }
 
 func DeleteCanvasNode(tx *gorm.DB, node CanvasNode) error {
-	err := tx.Delete(&node).Error
+	_, err := DeleteCanvasNodeWithResult(tx, node)
+	return err
+}
+
+func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeResult, error) {
+	result, err := cancelActiveExecutionsForDeletedNode(tx, node.WorkflowID, node.NodeID)
 	if err != nil {
-		return err
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	err = tx.Delete(&node).Error
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
 	}
 
 	err = DeleteIntegrationSubscriptionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
 	if err != nil {
-		return err
+		return DeleteCanvasNodeResult{}, err
 	}
 
 	if node.WebhookID == nil {
-		return nil
+		return result, nil
 	}
 
 	//
@@ -200,21 +216,21 @@ func DeleteCanvasNode(tx *gorm.DB, node CanvasNode) error {
 	//
 	webhook, err := FindWebhookInTransaction(tx, *node.WebhookID)
 	if err != nil {
-		return err
+		return DeleteCanvasNodeResult{}, err
 	}
 
 	nodes, err := FindWebhookNodesInTransaction(tx, *node.WebhookID)
 	if err != nil {
-		return err
+		return DeleteCanvasNodeResult{}, err
 	}
 
 	if len(nodes) > 0 {
 		log.Printf("Webhook %s has %d other nodes associated with it", webhook.ID.String(), len(nodes))
-		return nil
+		return result, nil
 	}
 
 	log.Printf("Deleting webhook %s", webhook.ID.String())
-	return tx.Delete(&webhook).Error
+	return result, tx.Delete(&webhook).Error
 }
 
 func FindCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode, error) {
@@ -506,4 +522,77 @@ func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*CanvasNode
 	}
 
 	return &queueItem, nil
+}
+
+func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (DeleteCanvasNodeResult, error) {
+	executions, err := ListActiveNodeExecutions(tx, workflowID, nodeID)
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	executionIDs, runIDs := nodeExecutionAndRunIDs(executions)
+	if err := cancelNodeExecutions(tx, workflowID, executionIDs); err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	if err := completePendingRequestsForNodeExecutions(tx, workflowID, nodeID); err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	finishedRunIDs, err := FinishCanvasRunsWithNoOpenWork(tx, workflowID, runIDs)
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
+	return DeleteCanvasNodeResult{
+		CancelledExecutionIDs: executionIDs,
+		FinishedRunIDs:        finishedRunIDs,
+	}, nil
+}
+
+func nodeExecutionAndRunIDs(executions []CanvasNodeExecution) ([]uuid.UUID, []uuid.UUID) {
+	executionIDs := make([]uuid.UUID, 0, len(executions))
+	runIDs := make([]uuid.UUID, 0, len(executions))
+	for _, execution := range executions {
+		executionIDs = append(executionIDs, execution.ID)
+		if execution.RunID != uuid.Nil && !slices.Contains(runIDs, execution.RunID) {
+			runIDs = append(runIDs, execution.RunID)
+		}
+	}
+
+	return executionIDs, runIDs
+}
+
+func cancelNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, executionIDs []uuid.UUID) error {
+	if len(executionIDs) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	return tx.
+		Model(&CanvasNodeExecution{}).
+		Where("workflow_id = ?", workflowID).
+		Where("id IN ?", executionIDs).
+		Updates(map[string]any{
+			"state":        CanvasNodeExecutionStateFinished,
+			"result":       CanvasNodeExecutionResultCancelled,
+			"cancelled_by": nil,
+			"updated_at":   &now,
+		}).
+		Error
+}
+
+func completePendingRequestsForNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
+	now := time.Now()
+	return tx.
+		Model(&CanvasNodeRequest{}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("execution_id IS NOT NULL").
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Updates(map[string]any{
+			"state":      NodeExecutionRequestStateCompleted,
+			"updated_at": now,
+		}).
+		Error
 }
