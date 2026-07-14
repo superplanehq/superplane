@@ -483,9 +483,6 @@ func validateSpec(spec Spec) error {
 		if strings.TrimSpace(spec.PrURL) == "" {
 			return fmt.Errorf("prUrl is required in pull request mode")
 		}
-		if _, _, _, err := parsePRURL(spec.PrURL); err != nil {
-			return err
-		}
 	default:
 		return fmt.Errorf("invalid sourceMode %q", spec.SourceMode)
 	}
