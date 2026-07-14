@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
-import type { CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvas, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { ElkLayoutEngine } from "@/lib/layout";
+import { resolveForwardLayoutEdges } from "./layoutGraph";
+
+type ElkGraphForTest = {
+  children?: Array<{
+    id: string;
+    ports?: Array<{ id: string }>;
+  }>;
+};
+
+type ElkLayoutEngineInternals = {
+  buildElkGraph(
+    workflow: CanvasesCanvas,
+    layoutNodes: ComponentsNode[],
+    outputChannelsByNodeId: Map<string, string[]>,
+  ): ElkGraphForTest;
+};
 
 describe("ElkLayoutEngine", () => {
   it("does not crash when an edge channel is missing from outputChannelsByNodeId", async () => {
@@ -132,5 +148,98 @@ describe("ElkLayoutEngine", () => {
     const componentBMinX = Math.min(b1!.position!.x!, b2!.position!.x!);
 
     expect(Math.abs(componentAMinX - componentBMinX)).toBeLessThanOrEqual(1);
+  });
+
+  it("preserves forward flow when a component has a loop-back edge", async () => {
+    const workflow: CanvasesCanvas = {
+      metadata: {
+        id: "canvas-3",
+        name: "loop-layout",
+      },
+      spec: {
+        nodes: [
+          {
+            id: "start",
+            name: "Start",
+            type: "TYPE_ACTION",
+            component: "comp.start",
+            position: { x: 0, y: 0 },
+          },
+          {
+            id: "process",
+            name: "Process",
+            type: "TYPE_ACTION",
+            component: "comp.process",
+            position: { x: 600, y: 0 },
+          },
+          {
+            id: "check",
+            name: "Check",
+            type: "TYPE_ACTION",
+            component: "comp.check",
+            position: { x: 1200, y: 0 },
+          },
+        ],
+        edges: [
+          { sourceId: "start", targetId: "process", channel: "default" },
+          { sourceId: "process", targetId: "check", channel: "default" },
+          { sourceId: "check", targetId: "start", channel: "repeat" },
+        ],
+      },
+    };
+
+    const autoLayout = new ElkLayoutEngine();
+    const result = await autoLayout.apply(workflow, { scope: "full-canvas" });
+    const byId = new Map((result.spec?.nodes || []).map((node) => [node.id!, node]));
+
+    expect(byId.get("start")!.position!.x!).toBeLessThan(byId.get("process")!.position!.x!);
+    expect(byId.get("process")!.position!.x!).toBeLessThan(byId.get("check")!.position!.x!);
+  });
+
+  it("preserves component output channel order before edge-discovered channels", () => {
+    const workflow: CanvasesCanvas = {
+      metadata: {
+        id: "canvas-4",
+        name: "channel-order",
+      },
+      spec: {
+        nodes: [
+          {
+            id: "source",
+            name: "Source",
+            type: "TYPE_ACTION",
+            component: "runner",
+            position: { x: 0, y: 0 },
+          },
+          {
+            id: "target",
+            name: "Target",
+            type: "TYPE_ACTION",
+            component: "noop",
+            position: { x: 600, y: 0 },
+          },
+        ],
+        edges: [
+          { sourceId: "source", targetId: "target", channel: "failed" },
+          { sourceId: "source", targetId: "target", channel: "passed" },
+        ],
+      },
+    };
+
+    const autoLayout = new ElkLayoutEngine();
+    const graph = (autoLayout as unknown as ElkLayoutEngineInternals).buildElkGraph(
+      workflow,
+      workflow.spec!.nodes!,
+      new Map([["source", ["passed", "failed"]]]),
+    );
+    const source = graph.children?.find((child) => child.id === "source");
+
+    expect(source?.ports?.map((port) => port.id)).toEqual(["source__input", "source__passed", "source__failed"]);
+  });
+
+  it("keeps layout edges when node positions are missing", () => {
+    const edges = [{ sourceId: "source", targetId: "target", channel: "default" }];
+
+    expect(resolveForwardLayoutEdges([{ id: "source" }, { id: "target" }], edges)).toEqual(edges);
   });
 });
