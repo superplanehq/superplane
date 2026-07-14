@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Timestamp } from "@/components/Timestamp";
-import { cn, isUrl } from "@/lib/utils";
+import { isUrl } from "@/lib/utils";
 import { EventStatusBadge } from "@/ui/EventStatusBadge";
 import { isErrorValue } from "./runNodeDetailModel";
 
