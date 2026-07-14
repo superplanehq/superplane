@@ -108,6 +108,7 @@ func CommitCanvasStaging(
 	}
 
 	var newLiveVersion *models.CanvasVersion
+	var publishResult changesets.CanvasPublishResult
 	err = db.Transaction(func(tx *gorm.DB) error {
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
 		if err != nil {
@@ -143,7 +144,7 @@ func CommitCanvasStaging(
 		//
 		// Make the new version live.
 		//
-		err = publishCanvasVersionInTransaction(
+		publishResult, err = publishCanvasVersionInTransaction(
 			ctx,
 			tx,
 			liveVersion,
@@ -200,12 +201,28 @@ func CommitCanvasStaging(
 		log.Errorf("failed to publish canvas staging updated RabbitMQ message: %v", err)
 	}
 
+	publishCancelledExecutionAndRunMessages(canvas.ID, publishResult)
+
 	ownersByID, _ := ownersByIDForCanvasVersions(ctx, organizationID, []models.CanvasVersion{*newLiveVersion})
 
 	return &pb.CommitCanvasStagingResponse{
 		Version:        SerializeCanvasVersionMetadata(newLiveVersion, organizationID, ownersByID),
 		StagingSummary: buildStagingSummary(canvas, []models.WorkflowStagedFile{}),
 	}, nil
+}
+
+func publishCancelledExecutionAndRunMessages(canvasID uuid.UUID, result changesets.CanvasPublishResult) {
+	for _, executionID := range result.CancelledExecutionIDs {
+		if err := messages.PublishCanvasExecutionByID(canvasID, executionID); err != nil {
+			log.Errorf("failed to publish cancelled execution RabbitMQ message: %v", err)
+		}
+	}
+
+	for _, runID := range result.FinishedRunIDs {
+		if err := messages.NewCanvasRunMessage(canvasID.String(), runID.String()).Publish(); err != nil {
+			log.Errorf("failed to publish finished run RabbitMQ message: %v", err)
+		}
+	}
 }
 
 func stagedCommitOperations(rows []models.WorkflowStagedFile) (specOps, gitOps []*pb.CanvasRepositoryFileOperation) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -180,7 +181,12 @@ func randomNodeSuffix(length int) string {
 }
 
 func DeleteCanvasNode(tx *gorm.DB, node CanvasNode) error {
-	err := tx.Delete(&node).Error
+	err := cancelActiveExecutionsForDeletedNode(tx, node.WorkflowID, node.NodeID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Delete(&node).Error
 	if err != nil {
 		return err
 	}
@@ -506,4 +512,91 @@ func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*CanvasNode
 	}
 
 	return &queueItem, nil
+}
+
+func cancelActiveExecutionsForDeletedNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
+	var executions []CanvasNodeExecution
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("state IN ?", []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted}).
+		Find(&executions).
+		Error
+	if err != nil {
+		return err
+	}
+
+	runIDs := make([]uuid.UUID, 0, len(executions))
+	for i := range executions {
+		if err := executions[i].CancelInTransaction(tx, nil); err != nil {
+			return err
+		}
+
+		if executions[i].RunID != uuid.Nil && !slices.Contains(runIDs, executions[i].RunID) {
+			runIDs = append(runIDs, executions[i].RunID)
+		}
+	}
+
+	if err := completePendingRequestsForNodeExecutions(tx, workflowID, nodeID); err != nil {
+		return err
+	}
+
+	return finishRunsWithNoOpenWork(tx, runIDs)
+}
+
+func completePendingRequestsForNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
+	now := time.Now()
+	return tx.
+		Model(&CanvasNodeRequest{}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("execution_id IS NOT NULL").
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Updates(map[string]any{
+			"state":      NodeExecutionRequestStateCompleted,
+			"updated_at": now,
+		}).
+		Error
+}
+
+func finishRunsWithNoOpenWork(tx *gorm.DB, runIDs []uuid.UUID) error {
+	for _, runID := range runIDs {
+		run, err := LockCanvasRunInTransaction(tx, runID)
+		if err != nil {
+			return err
+		}
+
+		if run.State == CanvasRunStateFinished {
+			continue
+		}
+
+		openWork, err := FindOpenCanvasRunWorkInTransaction(tx, runID)
+		if err != nil {
+			return err
+		}
+
+		if openWork.HasActiveExecutions || openWork.HasQueueItems || openWork.HasPendingEvents {
+			continue
+		}
+
+		result, err := CalculateCanvasRunResultInTransaction(tx, runID)
+		if err != nil {
+			return err
+		}
+
+		now := time.Now()
+		err = tx.Model(run).
+			Updates(map[string]any{
+				"state":       CanvasRunStateFinished,
+				"result":      result,
+				"updated_at":  &now,
+				"finished_at": &now,
+			}).
+			Error
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
