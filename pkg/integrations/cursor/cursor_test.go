@@ -177,7 +177,7 @@ func Test__Cursor__Components(t *testing.T) {
 	c := &Cursor{}
 	components := c.Actions()
 
-	assert.Len(t, components, 3)
+	assert.Len(t, components, 2)
 
 	names := make([]string, len(components))
 	for i, comp := range components {
@@ -186,7 +186,6 @@ func Test__Cursor__Components(t *testing.T) {
 
 	assert.Contains(t, names, "cursor.launchAgent")
 	assert.Contains(t, names, "cursor.getDailyUsageData")
-	assert.Contains(t, names, "cursor.getLastMessage")
 }
 
 func Test__Cursor__ListResources(t *testing.T) {
@@ -220,6 +219,25 @@ func Test__Cursor__ListResources(t *testing.T) {
 		assert.Equal(t, "claude-3.5-sonnet", resources[1].ID)
 		assert.Equal(t, "gpt-4o", resources[2].ID)
 		assert.Equal(t, "o1-mini", resources[3].ID)
+	})
+
+	t.Run("list artifacts with expression agent returns empty", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"launchAgentKey": "test-key",
+			},
+		}
+
+		resources, err := c.ListResources("artifact", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters:  map[string]string{"agent": `{{ $["launch-agent"].agentId }}`},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+		assert.Empty(t, httpContext.Requests)
 	})
 
 	t.Run("unknown resource type returns empty", func(t *testing.T) {

@@ -79,6 +79,7 @@ export function Header({
             className="shrink-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
             aria-label="Delete integration"
             disabled={!canDeleteIntegrations}
+            data-testid="integration-detail-delete"
             onClick={() => {
               if (!canDeleteIntegrations) return;
               onRequestDelete();

@@ -54,7 +54,7 @@ func (a accessAction) Execute(ctx context.Context, session agents.AgentSessionCo
 		Notes: []string{
 			"Accessible API routes are the intersection of organization RBAC and the scoped agent token permissions enforced by gateway authorization.",
 			"Canvas-scoped token permissions only allow API routes whose authorization rule can resolve this session canvas_id.",
-			"Draft graph and Console edits are allowed through canvases:update_version on this canvas; publishing and live app operations are not included in the agent token.",
+			"Staging graph, Console, and repository file edits are allowed through canvases:update on this canvas; this access report also lists any other canvas-scoped update routes allowed by the same permission.",
 		},
 	}, nil
 }
@@ -69,7 +69,7 @@ func (a accessAction) apiAccess(ctx context.Context, session agents.AgentSession
 	for _, route := range routes {
 		rule := rules[route]
 		tokenAllowed, resources, tokenReason := scopedTokenAllowsRule(rule, permissions, session.CanvasID)
-		rbacAllowed, rbacReason, err := rbac.allows(rule.Resource, rule.Action)
+		rbacAllowed, rbacReason, err := rbac.allowsAny(rule.Resource, rule.AllowedActions())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -90,11 +90,12 @@ func (a accessAction) apiAccess(ctx context.Context, session agents.AgentSession
 func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessionContext, permissions []jwt.Permission) []toolAccessResult {
 	rbac := newRBACCache(ctx, a.auth, session.UserID, session.OrganizationID)
 	actions := []struct {
-		name        string
-		resource    string
-		operation   string
-		scoped      bool
-		description string
+		name             string
+		resource         string
+		operation        string
+		legacyOperations []string
+		scoped           bool
+		description      string
 	}{
 		{name: accessActionName, description: "No API permission required; reports this session's token and API route access."},
 		{name: readActionName, resource: "canvases", operation: "read", scoped: true},
@@ -103,11 +104,9 @@ func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessi
 		{name: readFileActionName, resource: "canvases", operation: "read", scoped: true},
 		{name: listIntegrationsActionName, resource: "integrations", operation: "read"},
 		{name: listResourcesActionName, resource: "integrations", operation: "read"},
-		{name: createDraftActionName, resource: "canvases", operation: "update_version", scoped: true},
-		{name: writeFileActionName, resource: "canvases", operation: "update_version", scoped: true},
-		{name: deleteFileActionName, resource: "canvases", operation: "update_version", scoped: true},
-		{name: commitFilesActionName, resource: "canvases", operation: "update_version", scoped: true},
-		{name: patchDraftActionName, resource: "canvases", operation: "update_version", scoped: true},
+		{name: writeFileActionName, resource: "canvases", operation: "update", legacyOperations: []string{"update_version"}, scoped: true},
+		{name: deleteFileActionName, resource: "canvases", operation: "update", legacyOperations: []string{"update_version"}, scoped: true},
+		{name: patchStagingActionName, resource: "canvases", operation: "update", legacyOperations: []string{"update_version"}, scoped: true},
 	}
 
 	results := make([]toolAccessResult, 0, len(actions))
@@ -118,7 +117,7 @@ func (a accessAction) toolActions(ctx context.Context, session agents.AgentSessi
 		}
 
 		allowedByToken := permissionAllows(permissions, action.resource, action.operation, action.scoped, session.CanvasID)
-		allowedByRBAC, rbacReason, err := rbac.allows(action.resource, action.operation)
+		allowedByRBAC, rbacReason, err := rbac.allowsAny(action.resource, append([]string{action.operation}, action.legacyOperations...))
 		result := toolAccessResult{
 			Action:   action.name,
 			Allowed:  allowedByToken && allowedByRBAC && err == nil,
@@ -149,8 +148,9 @@ func sortedAuthorizationRoutes(rules map[authorization.HTTPRoute]authorization.A
 }
 
 func scopedTokenAllowsRule(rule authorization.AuthorizationRule, permissions []jwt.Permission, canvasID string) (bool, []string, string) {
+	actions := rule.AllowedActions()
 	for _, permission := range permissions {
-		if permission.ResourceType != rule.Resource || permission.Action != rule.Action {
+		if permission.ResourceType != rule.Resource || !slices.Contains(actions, permission.Action) {
 			continue
 		}
 
@@ -238,6 +238,20 @@ func (c *rbacCache) allows(resource, operation string) (bool, string, error) {
 	decision := c.check(resource, operation)
 	c.decisions[key] = decision
 	return decision.allowed, decision.reason, decision.err
+}
+
+func (c *rbacCache) allowsAny(resource string, operations []string) (bool, string, error) {
+	var fallbackReason string
+	for _, operation := range operations {
+		allowed, reason, err := c.allows(resource, operation)
+		if err != nil || allowed {
+			return allowed, reason, err
+		}
+		if fallbackReason == "" {
+			fallbackReason = reason
+		}
+	}
+	return false, fallbackReason, nil
 }
 
 func (c *rbacCache) check(resource, operation string) rbacDecision {

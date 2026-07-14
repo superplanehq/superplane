@@ -239,6 +239,70 @@ func TestService_EnsureSession_IsIdempotent(t *testing.T) {
 	assert.Equal(t, 1, provider.createCalled, "second call must not provision a new upstream session")
 }
 
+func TestService_ResetSession_ReplacesSessionAndClearsMessages(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	original, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NotNil(t, original)
+
+	require.NoError(t, models.AppendAgentSessionMessage(&models.AgentSessionMessage{
+		SessionID: original.ID,
+		Role:      models.AgentMessageRoleUser,
+		Content:   "hello",
+	}))
+
+	reset, err := svc.ResetSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NotNil(t, reset)
+	assert.NotEqual(t, original.ID, reset.ID)
+	assert.Equal(t, models.AgentSessionStatusIdle, reset.Status)
+	assert.NotNil(t, reset.ContextReplayedAt, "reset sessions should not trigger rewind")
+	assert.Equal(t, 2, provider.createCalled, "reset must provision a new upstream session")
+
+	_, err = models.FindAgentSessionForUser(r.Organization.ID, r.User, original.ID)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, gorm.ErrRecordNotFound))
+
+	messages, err := models.ListAgentSessionMessagesPage(original.ID, nil, 10)
+	require.NoError(t, err)
+	assert.Empty(t, messages)
+
+	after, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	assert.Equal(t, reset.ID, after.ID, "ensure must return the reset session")
+	assert.Equal(t, 2, provider.createCalled, "ensure after reset must not provision again")
+}
+
+func TestService_ResetSession_RefusesWhileStreaming(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	original, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, models.UpdateAgentSessionStatus(original.ID, models.AgentSessionStatusStreaming))
+
+	_, err = svc.ResetSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, agents.ErrSessionBusy), "reset must refuse a streaming session")
+
+	// The streaming session must be left intact and no replacement provisioned.
+	after, err := models.FindAgentSessionForUser(r.Organization.ID, r.User, original.ID)
+	require.NoError(t, err)
+	assert.Equal(t, original.ID, after.ID)
+	assert.Equal(t, models.AgentSessionStatusStreaming, after.Status)
+	assert.Equal(t, 1, provider.createCalled, "busy reset must not provision a replacement provider session")
+}
+
 func TestService_EnsureSession_ReplacesIdleSessionWhenToolSchemaRevisionChanges(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -660,10 +724,8 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "[Canvas Snapshot]")
 	assert.Contains(t, provider.lastPreamble, "node_count:")
-	assert.Contains(t, provider.lastPreamble, "  - canvases:update_version:"+canvas.ID.String())
+	assert.Contains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "All SuperPlane access goes through the agent tools.")
-	assert.NotContains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
-	assert.NotContains(t, provider.lastPreamble, "  - canvases:publish:"+canvas.ID.String())
 	// The agent must never receive a usable API/CLI credential; everything
 	// goes through the server-side tools.
 	assert.NotContains(t, provider.lastPreamble, "api_token:")
@@ -723,9 +785,9 @@ func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "[Agent Mode: BUILD]")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Use 'superplane_app' action 'patch_draft'")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Console draft updates")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "create_draft' when 'read' returned live/no version_id")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Use 'superplane_app' action 'patch_staging'")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Console updates")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, ":::staging-actions")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ref/docs/prd/console-and-widgets.md")
 	assert.NotContains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
 	assert.NotContains(t, provider.lastOutcomeOpts.ContextPreamble, "superplane apps")

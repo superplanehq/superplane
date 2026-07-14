@@ -116,13 +116,13 @@ func LoadNodeExecutionResources(db *gorm.DB, executions []models.CanvasNodeExecu
 	wg.Wait()
 
 	if rootEventsErr != nil {
-		return nil, fmt.Errorf("error finding root events: %v", rootEventsErr)
+		return nil, fmt.Errorf("error finding root events: %w", rootEventsErr)
 	}
 	if outputEventsErr != nil {
-		return nil, fmt.Errorf("error finding output events: %v", outputEventsErr)
+		return nil, fmt.Errorf("error finding output events: %w", outputEventsErr)
 	}
 	if cancelledByUsersErr != nil {
-		return nil, fmt.Errorf("error finding cancelled-by users: %v", cancelledByUsersErr)
+		return nil, fmt.Errorf("error finding cancelled-by users: %w", cancelledByUsersErr)
 	}
 
 	cancelledByUsersByID := make(map[uuid.UUID]models.User, len(cancelledByUsers))
@@ -191,6 +191,7 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, resources 
 			Outputs:             outputs,
 			RootEvent:           rootEvent,
 			CancelledBy:         cancelledByRef(execution.CancelledBy, resources.cancelledByUsersByID),
+			RunId:               uuidStringOrEmpty(execution.RunID),
 		})
 	}
 
@@ -398,6 +399,7 @@ func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents m
 		Data:       s,
 		CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
 		Root:       rootEvent.ExecutionID == nil,
+		RunId:      uuidStringOrEmpty(rootEvent.RunID),
 	}, nil
 }
 

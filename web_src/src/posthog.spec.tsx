@@ -34,6 +34,7 @@ vi.mock("@/lib/env", () => ({
 }));
 
 import { AccountProvider } from "@/contexts/AccountProvider";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { confirmSignupAnalyticsPreference, savePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
 
@@ -234,9 +235,11 @@ describe("logout", () => {
   it("calls reset when Sign Out is clicked", async () => {
     const user = userEvent.setup();
     render(
-      <AccountProvider>
-        <OrganizationMenuButton organizationId="org-123" />
-      </AccountProvider>,
+      <ThemeProvider>
+        <AccountProvider>
+          <OrganizationMenuButton organizationId="org-123" />
+        </AccountProvider>
+      </ThemeProvider>,
     );
 
     await user.click(screen.getByLabelText("Open organization menu"));

@@ -49,6 +49,14 @@ func (s *AgentsService) GetCanvasAgentChat(ctx context.Context, req *pb.GetCanva
 	return agentsActions.GetCanvasAgentChat(ctx, s.service, orgID, userID, req)
 }
 
+func (s *AgentsService) ResetCanvasAgentChat(ctx context.Context, req *pb.ResetCanvasAgentChatRequest) (*pb.ResetCanvasAgentChatResponse, error) {
+	orgID, userID, err := s.requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return agentsActions.ResetCanvasAgentChat(ctx, s.service, orgID, userID, req)
+}
+
 func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
 	orgID, userID, err := s.requestContext(ctx)
 	if err != nil {

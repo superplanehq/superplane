@@ -3,8 +3,15 @@ import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+import { CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES } from "./consoleCodeStyles";
+import { CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES } from "./consoleLinkStyles";
 import { HTML_WIDGET_ROOT_ATTR, sanitizeHtml } from "./htmlSanitize";
 import { interpolateMarkdownTemplate } from "./markdownInterpolation";
+import {
+  MARKDOWN_HEADING_MARGIN_SELECTOR_CLASSES,
+  MARKDOWN_HEADING_TYPOGRAPHY_SELECTOR_CLASSES,
+} from "../markdownHeadingStyles";
+import { MARKDOWN_TABLE_SELECTOR_CLASSES } from "../markdownTableStyles";
 
 /**
  * Tailwind class string applied to the html widget's root element. Sets a
@@ -15,19 +22,14 @@ import { interpolateMarkdownTemplate } from "./markdownInterpolation";
  */
 const HTML_ROOT_CLASSES =
   "max-w-none text-[13px] text-slate-800 " +
-  "[&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:leading-tight [&_h1:first-child]:mt-0 " +
-  "[&_h2]:mb-1 [&_h2]:mt-1 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:leading-tight [&_h2:first-child]:mt-0 " +
-  "[&_h3]:mb-0.5 [&_h3]:mt-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:leading-tight [&_h3:first-child]:mt-0 " +
+  `${MARKDOWN_HEADING_MARGIN_SELECTOR_CLASSES} ${MARKDOWN_HEADING_TYPOGRAPHY_SELECTOR_CLASSES}` +
   "[&_p]:mb-2 [&_p]:leading-relaxed " +
   "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal " +
   "[&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1 " +
   "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
-  "[&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
   "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 " +
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
-  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
-  "[&_table]:my-2 [&_table]:text-xs [&_table]:border-collapse [&_th]:border [&_th]:border-slate-200 [&_th]:px-2 [&_th]:py-1 " +
-  "[&_td]:border [&_td]:border-slate-100 [&_td]:px-2 [&_td]:py-1";
+  `${MARKDOWN_TABLE_SELECTOR_CLASSES} `;
 
 /**
  * Render a sanitized HTML string with `{{ name.field }}` variable
@@ -56,12 +58,16 @@ export function HtmlBody({ body, vars }: { body: string; vars: Record<string, un
   if (!sanitized.trim()) return null;
 
   return (
-    <div
-      className={cn(HTML_ROOT_CLASSES)}
-      data-testid="console-html"
-      {...{ [HTML_WIDGET_ROOT_ATTR]: rootId }}
-      dangerouslySetInnerHTML={{ __html: sanitized }}
-    />
+    // Link colors live on an outer wrapper so `dark:` variants apply even though
+    // the sanitized html root uses `dark-mode-disabled` (which opts out of dark:).
+    <div className={cn(CONSOLE_LINK_ANCHOR_SELECTOR_CLASSES, CONSOLE_CODE_BADGE_ANCHOR_SELECTOR_CLASSES)}>
+      <div
+        className={cn("dark-mode-disabled", HTML_ROOT_CLASSES)}
+        data-testid="console-html"
+        {...{ [HTML_WIDGET_ROOT_ATTR]: rootId }}
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+      />
+    </div>
   );
 }
 
@@ -73,7 +79,7 @@ export function HtmlBody({ body, vars }: { body: string; vars: Record<string, un
 export function HtmlBodyLoading() {
   return (
     <div className="flex h-full min-h-[3rem] items-center justify-center" data-testid="console-html-loading">
-      <Loader2 className="size-4 animate-spin text-slate-400" />
+      <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
     </div>
   );
 }

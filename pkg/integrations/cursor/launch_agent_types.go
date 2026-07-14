@@ -27,6 +27,10 @@ const (
 	LaunchAgentMaxPollAttempts        = 100
 	LaunchAgentMaxPollErrors          = 5
 	LaunchAgentWebhookSignatureHeader = "X-Webhook-Signature"
+
+	// Conversation message types returned by GET /v0/agents/{id}/conversation.
+	ConversationMessageTypeUser      = "user_message"
+	ConversationMessageTypeAssistant = "assistant_message"
 )
 
 // --- CONFIGURATION STRUCTS ---
@@ -147,6 +151,26 @@ type LaunchAgentOutputPayload struct {
 	PrURL      string `json:"prUrl,omitempty"`
 	Summary    string `json:"summary,omitempty"`
 	BranchName string `json:"branchName,omitempty"`
+	// Messages is the agent's full conversation history (chronological), attached
+	// on successful completion. LastMessage is a convenience pointer to the final
+	// assistant reply (or the last message if none), so downstream steps can use
+	// either the array (e.g. messages[-1] via an expression) or lastMessage.
+	Messages    []ConversationMessage `json:"messages,omitempty"`
+	LastMessage *ConversationMessage  `json:"lastMessage,omitempty"`
+	// Artifacts lists the files the agent produced, attached on successful
+	// completion like the conversation, each with a presigned download link so
+	// downstream steps (e.g. Discord file attachments) can consume them directly.
+	Artifacts []LaunchAgentArtifact `json:"artifacts,omitempty"`
+}
+
+// LaunchAgentArtifact is an artifact produced by the agent run, carrying the
+// same download link the Download Artifact component returns.
+type LaunchAgentArtifact struct {
+	Path      string `json:"path"`
+	SizeBytes int64  `json:"sizeBytes,omitempty"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
+	URL       string `json:"url,omitempty"`
+	ExpiresAt string `json:"expiresAt,omitempty"`
 }
 
 // --- HELPER FUNCTIONS ---

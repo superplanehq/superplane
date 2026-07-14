@@ -13,44 +13,33 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+func canvasMetadataFromCanvas(canvas *models.Canvas) (name, description string) {
+	if canvas == nil {
+		return "", ""
+	}
+
+	return canvas.Name, canvas.Description
+}
+
 func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
 	var owner *pb.UserRef
 	if version.OwnerID != nil {
 		owner = canvasVersionOwnerRef(organizationID, version.OwnerID.String(), ownersByID)
 	}
 
-	state := pb.CanvasVersion_STATE_UNSPECIFIED
-	switch version.State {
-	case models.CanvasVersionStateDraft:
-		state = pb.CanvasVersion_STATE_DRAFT
-	case models.CanvasVersionStatePublished:
-		state = pb.CanvasVersion_STATE_PUBLISHED
-	case models.CanvasVersionStateSnapshot:
-		state = pb.CanvasVersion_STATE_SNAPSHOT
-	}
-
 	metadata := &pb.CanvasVersion_Metadata{
-		Id:          version.ID.String(),
-		CanvasId:    version.WorkflowID.String(),
-		Owner:       owner,
-		State:       state,
-		Name:        version.Name,
-		Description: version.Description,
+		Id:            version.ID.String(),
+		CanvasId:      version.WorkflowID.String(),
+		Owner:         owner,
+		CommitMessage: version.CommitMessage,
 	}
 
-	if version.PublishedAt != nil {
-		metadata.PublishedAt = timestamppb.New(*version.PublishedAt)
-	}
 	if version.CreatedAt != nil {
 		metadata.CreatedAt = timestamppb.New(*version.CreatedAt)
 	}
 	if version.UpdatedAt != nil {
 		metadata.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
-	if models.IsRegisteredDraftVersion(version) {
-		metadata.BranchName = version.GitBranch
-	}
-	metadata.DisplayName = version.DisplayName
 
 	return &pb.CanvasVersion{
 		Metadata: metadata,

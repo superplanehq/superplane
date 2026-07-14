@@ -122,6 +122,12 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 				Resource: &configuration.ResourceTypeOptions{
 					Type:  ResourceTypeMember,
 					Multi: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
 				},
 			},
 		},

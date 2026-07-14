@@ -74,6 +74,21 @@ func TestOpenDedicatedSQLDB_ConfiguresDedicatedPool(t *testing.T) {
 	require.NoError(t, db.Ping())
 }
 
+func TestIsTestDatabaseName(t *testing.T) {
+	require.True(t, isTestDatabaseName("superplane_test"))
+	require.False(t, isTestDatabaseName("superplane_dev"))
+	require.False(t, isTestDatabaseName("superplane"))
+	require.False(t, isTestDatabaseName("superplane_test_backup_dev"))
+}
+
+func TestVerifyTestDatabase(t *testing.T) {
+	if os.Getenv("DB_HOST") == "" {
+		t.Skip("DB_HOST not set (run with make test in Docker)")
+	}
+
+	require.NoError(t, VerifyTestDatabase(Conn()))
+}
+
 func TestClassifyPostgresSessionTimeout(t *testing.T) {
 	tests := []struct {
 		name string

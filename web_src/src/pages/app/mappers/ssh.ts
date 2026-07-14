@@ -255,7 +255,7 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
         label: config.commandFile,
       });
     }
-  } else if (config?.commands) {
+  } else if (typeof config?.commands === "string" && config.commands) {
     const oneline = config.commands
       .split("\n")
       .filter((l) => l.trim() !== "")

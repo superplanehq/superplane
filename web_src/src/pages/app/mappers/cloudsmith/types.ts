@@ -138,3 +138,127 @@ export interface PackageOperationResult {
   package?: string;
   data?: PackageData;
 }
+
+// List Packages
+
+export interface ListPackagesConfiguration {
+  repository?: string;
+  syncStatus?: string;
+  quarantineStatus?: string;
+  vulnerabilityStatus?: string;
+}
+
+export interface TrimmedPackageData {
+  description?: string;
+  display_name?: string;
+  format?: string;
+  is_quarantined?: boolean;
+  license?: string;
+  policy_violated?: boolean;
+  repository?: string;
+  security_scan_status?: string;
+  slug_perm?: string;
+  stage_str?: string;
+  status_str?: string;
+  tags?: Record<string, unknown>;
+}
+
+export interface ListPackagesData {
+  packages?: TrimmedPackageData[];
+}
+
+// Promote Package
+
+export interface PromotePackageConfiguration {
+  sourceRepository?: string;
+  package?: string;
+  destinationRepository?: string;
+  mode?: string;
+}
+
+export interface PromotePackageResult {
+  name?: string;
+  version?: string;
+  format?: string;
+  repository?: string;
+  namespace?: string;
+  status_str?: string;
+  stage_str?: string;
+  self_webapp_url?: string;
+  slug_perm?: string;
+}
+
+export interface ScanPackageConfiguration {
+  repository?: string;
+  package?: string;
+}
+
+export interface QuarantinePackageConfiguration {
+  repository?: string;
+  package?: string;
+  action?: string;
+}
+
+export interface GetPackageVulnerabilitiesConfiguration {
+  repository?: string;
+  package?: string;
+}
+
+export interface VulnerabilityPackageRef {
+  identifier?: string;
+  name?: string;
+  version?: string;
+  url?: string;
+}
+
+export interface VulnerabilityScanResult {
+  identifier?: string;
+  created_at?: string;
+  package?: VulnerabilityPackageRef;
+  scan_id?: string | null;
+  has_vulnerabilities?: boolean;
+  num_vulnerabilities?: number;
+  max_severity?: string;
+}
+
+// Vulnerability policy types
+
+export interface VulnerabilityPolicyNodeMetadata {
+  organizationSlug?: string;
+  organizationName?: string;
+  policyId?: string;
+  policyName?: string;
+}
+
+export interface VulnerabilityPolicyData {
+  name?: string;
+  description?: string;
+  min_severity?: string;
+  package_query_string?: string;
+  on_violation_quarantine?: boolean;
+  allow_unknown_severity?: boolean;
+  slug_perm?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DeleteVulnerabilityPolicyData {
+  organization?: string;
+  slug_perm?: string;
+  deleted?: boolean;
+}
+
+export interface CreateVulnerabilityPolicyConfiguration {
+  organization?: string;
+  name?: string;
+  description?: string;
+  minSeverity?: string;
+  packageQueryString?: string;
+  onViolationQuarantine?: boolean;
+  allowUnknownSeverity?: boolean;
+}
+
+export interface VulnerabilityPolicyConfiguration {
+  organization?: string;
+  policy?: string;
+}

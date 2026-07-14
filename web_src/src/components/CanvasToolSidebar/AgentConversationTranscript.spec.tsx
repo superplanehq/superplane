@@ -73,7 +73,7 @@ describe("ConversationTranscript command groups", () => {
 });
 
 describe("ConversationTranscript user messages", () => {
-  it("renders attached images as linked thumbnails", () => {
+  it("opens attached images in a viewport-sized lightbox", () => {
     const groups: MessageGroup[] = [
       {
         type: "message",
@@ -94,6 +94,14 @@ describe("ConversationTranscript user messages", () => {
 
     const image = screen.getByRole("img", { name: "attachment" });
     expect(image).toHaveAttribute("src", "/api/v1/agents/chats/c-1/messages/user-with-image/images/0");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open attachment" }));
+
+    expect(screen.getByRole("dialog")).toHaveClass("max-h-[calc(100dvh-2rem)]");
+    expect(screen.getByRole("link", { name: /Open original/ })).toHaveAttribute(
+      "href",
+      "/api/v1/agents/chats/c-1/messages/user-with-image/images/0",
+    );
   });
 
   it("keeps compact user messages sticky", () => {

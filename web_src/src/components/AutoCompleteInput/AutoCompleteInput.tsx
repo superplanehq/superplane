@@ -5,6 +5,7 @@ import type { Suggestion } from "./core";
 import { getSuggestions } from "./core";
 import { Eye, EyeOff } from "lucide-react";
 import { evaluateExpr, formatExprResult } from "@/lib/exprEvaluator";
+import { calculateDropdownPosition } from "./dropdownPosition";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
@@ -157,7 +158,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const suggestionsListRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
-    const mirrorRef = useRef<HTMLSpanElement>(null);
+    const mirrorRef = useRef<HTMLDivElement>(null);
     const isInteractingWithSuggestionsRef = useRef(false);
     const suppressSuggestionsRef = useRef(false);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
@@ -208,7 +209,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         // Property access with dot notation
         if (expr[i] === ".") {
           tokens.push(
-            <span key={key++} className="text-gray-500">
+            <span key={key++} className="text-gray-500 dark:text-gray-400">
               .
             </span>,
           );
@@ -436,7 +437,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           }
         } else {
           parts.push(
-            <span key={key++} className="bg-slate-100 dark:bg-slate-800 rounded-sm">
+            <span key={key++} className="bg-slate-100 dark:bg-gray-800 rounded-sm">
               <span className="text-gray-400 dark:text-gray-500">{match[1]}</span>
               {tokenizeExpression(match[2])}
               <span className="text-gray-400 dark:text-gray-500">{match[3]}</span>
@@ -458,14 +459,6 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
       return parts;
     };
-
-    // Sync scroll between textarea and backdrop
-    const handleScroll = useCallback(() => {
-      if (inputRef.current && backdropRef.current) {
-        backdropRef.current.scrollTop = inputRef.current.scrollTop;
-        backdropRef.current.scrollLeft = inputRef.current.scrollLeft;
-      }
-    }, []);
 
     const getWordAtCursor = (text: string, position: number) => {
       const beforeCursor = text.substring(0, position);
@@ -857,7 +850,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     );
 
     const valuePreviewWidth = 200;
-    const valuePreviewCodeBlockClassName = "text-xs font-mono bg-slate-100 rounded-lg px-2.5 py-2";
+    const valuePreviewCodeBlockClassName =
+      "text-xs font-mono bg-slate-100 dark:bg-gray-800 rounded-lg px-2.5 py-2 text-gray-800 dark:text-gray-200";
 
     const renderQuickTip = (tip: string) => {
       const parts = tip.split(/`([^`]+)`/g);
@@ -865,7 +859,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         index % 2 === 1 ? (
           <code
             key={`code-${index}`}
-            className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
+            className="bg-slate-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
           >
             {part}
           </code>
@@ -881,66 +875,96 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       const input = inputRef.current;
       const mirror = mirrorRef.current;
       const computed = getComputedStyle(input);
+      const inputRect = input.getBoundingClientRect();
+      const containerRect = containerRef.current?.getBoundingClientRect();
 
-      // Copy relevant styles to mirror element
       mirror.style.font = computed.font;
       mirror.style.fontSize = computed.fontSize;
       mirror.style.fontFamily = computed.fontFamily;
       mirror.style.fontWeight = computed.fontWeight;
       mirror.style.letterSpacing = computed.letterSpacing;
       mirror.style.textTransform = computed.textTransform;
+      mirror.style.lineHeight = computed.lineHeight;
+      mirror.style.padding = computed.padding;
+      mirror.style.border = computed.border;
+      mirror.style.boxSizing = computed.boxSizing;
+      mirror.style.width = `${inputRect.width}px`;
+      mirror.style.top = containerRect ? `${inputRect.top - containerRect.top}px` : "0";
+      mirror.style.left = containerRect ? `${inputRect.left - containerRect.left}px` : "0";
+      mirror.style.whiteSpace = "pre-wrap";
+      mirror.style.overflowWrap = "break-word";
+      mirror.style.wordBreak = computed.wordBreak;
+      mirror.style.overflow = "hidden";
 
-      // Set content to text before cursor
-      const textBeforeCursor = inputValue.substring(0, cursorPosition);
-      mirror.textContent = textBeforeCursor || "\u200b"; // Use zero-width space if empty
+      mirror.replaceChildren(document.createTextNode(inputValue.substring(0, cursorPosition)));
 
-      // Measure the width and account for input's left padding
-      const paddingLeft = parseFloat(computed.paddingLeft) || 0;
-      const cursorOffset = mirror.offsetWidth + paddingLeft;
+      const cursorMarker = document.createElement("span");
+      cursorMarker.textContent = "\u200b";
+      mirror.appendChild(cursorMarker);
 
-      // Calculate cursor position relative to viewport
-      const inputRect = input.getBoundingClientRect();
-      const cursorScreenX = inputRect.left + cursorOffset;
-      const viewportWidth = window.innerWidth;
-      const edgePadding = 16; // Padding from screen edge
+      const markerRect = cursorMarker.getBoundingClientRect();
+      const cursor = {
+        x: markerRect.left - input.scrollLeft,
+        y: markerRect.bottom - input.scrollTop,
+      };
 
-      // Space available on each side of cursor
-      const spaceOnRight = viewportWidth - cursorScreenX - edgePadding;
-      const spaceOnLeft = cursorScreenX - edgePadding;
-
-      // Determine if we should flip based on available space
-      // Normal: suggestions start at cursor (need dropdownWidth on right)
-      // Flipped: suggestions end at cursor (need dropdownWidth on left)
-      const shouldFlipLeft = spaceOnRight < dropdownWidth && spaceOnLeft >= dropdownWidth;
-
-      // Calculate absolute position for portal
-      const dropdownTop = inputRect.bottom + 4; // 4px gap below input
-      let dropdownLeft: number;
-
-      if (shouldFlipLeft) {
-        // Flipped: suggestions end at cursor, Value Preview extends further left
-        dropdownLeft = showValuePreview
-          ? cursorScreenX - dropdownWidth - valuePreviewWidth
-          : cursorScreenX - dropdownWidth;
-      } else {
-        // Normal: suggestions start at cursor, Value Preview is to the left of cursor
-        dropdownLeft = showValuePreview ? cursorScreenX - valuePreviewWidth : cursorScreenX;
-      }
-
-      // Clamp to screen edges to prevent overflow
-      const totalWidth = showValuePreview ? dropdownWidth + valuePreviewWidth : dropdownWidth;
-      dropdownLeft = Math.max(edgePadding, Math.min(dropdownLeft, viewportWidth - totalWidth - edgePadding));
-
-      setDropdownPosition({
-        top: dropdownTop,
-        left: dropdownLeft,
-      });
+      setDropdownPosition(
+        calculateDropdownPosition({
+          cursor,
+          viewportWidth: window.innerWidth,
+          dropdownWidth,
+          valuePreviewWidth,
+          showValuePreview,
+        }),
+      );
     }, [inputValue, cursorPosition, dropdownWidth, showValuePreview]);
 
     // Measure cursor pixel position when cursor or input changes
     useEffect(() => {
       measureCursorPixelPosition();
     }, [measureCursorPixelPosition]);
+
+    // Sync scroll between textarea and backdrop, then keep the fixed-position
+    // suggestions portal anchored to the scrolled caret.
+    const handleScroll = useCallback(() => {
+      if (inputRef.current && backdropRef.current) {
+        backdropRef.current.scrollTop = inputRef.current.scrollTop;
+        backdropRef.current.scrollLeft = inputRef.current.scrollLeft;
+      }
+
+      measureCursorPixelPosition();
+    }, [measureCursorPixelPosition]);
+
+    // Keep the fixed-position dropdown anchored to the input while any ancestor
+    // scrolls or the window resizes. Without this the dropdown detaches from the
+    // input when the surrounding panel scrolls (issue #3615).
+    useEffect(() => {
+      if (!isOpen || suggestions.length === 0) {
+        return;
+      }
+
+      let frame = 0;
+      const reposition = () => {
+        if (frame) {
+          return;
+        }
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          measureCursorPixelPosition();
+        });
+      };
+
+      // Capture phase so scrolling of any scrollable ancestor is observed, not just window.
+      window.addEventListener("scroll", reposition, true);
+      window.addEventListener("resize", reposition);
+      return () => {
+        if (frame) {
+          cancelAnimationFrame(frame);
+        }
+        window.removeEventListener("scroll", reposition, true);
+        window.removeEventListener("resize", reposition);
+      };
+    }, [isOpen, suggestions.length, measureCursorPixelPosition]);
 
     useEffect(() => {
       setInputValue(value);
@@ -1208,13 +1232,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     return (
       <div ref={containerRef} className="relative w-full">
         {/* Hidden mirror element for measuring cursor position */}
-        <span
+        <div
           ref={mirrorRef}
           aria-hidden="true"
           style={{
             position: "absolute",
             visibility: "hidden",
-            whiteSpace: "pre",
+            whiteSpace: "pre-wrap",
             pointerEvents: "none",
             top: 0,
             left: 0,
@@ -1224,7 +1248,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         <span
           data-slot="control"
           className={twMerge([
-            "relative block w-full rounded-md bg-white",
+            "relative block w-full rounded-md bg-white dark:bg-gray-800",
             "focus-within:ring-ring/50",
             "has-data-disabled:opacity-50",
             className,
@@ -1278,9 +1302,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             placeholder={placeholder}
             disabled={disabled || previewMode}
             className={twMerge([
-              "font-sm bg-transparent border-gray-300 placeholder:text-gray-500",
+              "font-sm bg-transparent border-gray-300 placeholder:text-gray-500 dark:border-gray-600/70 dark:placeholder:text-gray-500",
               "relative block w-full min-w-0 appearance-none rounded-md border outline-none resize-none overflow-hidden",
-              "focus:border-gray-500 focus:shadow-none focus:ring-0",
+              "focus:border-gray-500 focus:shadow-none focus:ring-0 dark:focus:border-gray-500",
               "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
               "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
               // Make text transparent but keep caret visible
@@ -1325,7 +1349,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     "Use ",
                     <code
                       key="default-tip"
-                      className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
+                      className="bg-slate-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
                     >
                       {"{{"}
                     </code>,
@@ -1360,7 +1384,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               <div className="flex flex-col sm:flex-row">
                 {shouldShowValuePreview && isOpen && (
                   <div
-                    className="border border-gray-200 dark:border-gray-700 sm:border-r-0 sm:border-t p-3 bg-white sm:rounded-l-lg sm:rounded-br-none h-fit self-start shadow-lg"
+                    className="border border-gray-200 dark:border-gray-600 sm:border-r-0 sm:border-t p-3 bg-white dark:bg-gray-800 sm:rounded-l-lg sm:rounded-br-none h-fit self-start shadow-lg dark:shadow-gray-950/50"
                     style={{ width: `${valuePreviewWidth}px` }}
                   >
                     {/* $ selector */}
@@ -1368,9 +1392,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">$ (Event Data)</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          Root selector for accessing payload data from all connected components.
+                          {highlightedSuggestion.description}
                         </div>
-                        <div className={twMerge(valuePreviewCodeBlockClassName, "text-sky-700")}>
+                        <div className={twMerge(valuePreviewCodeBlockClassName, "text-sky-700 dark:text-sky-400")}>
                           {highlightedSuggestion.nodeCount ?? 0} node
                           {highlightedSuggestion.nodeCount !== 1 ? "s" : ""} available
                         </div>
@@ -1388,16 +1412,16 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         )}
                         <div className={twMerge(valuePreviewCodeBlockClassName, "space-y-1")}>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Name</span>
-                            <span className="text-sky-700 truncate ml-2 max-w-[120px]">
+                            <span className="text-gray-600 dark:text-gray-400">Name</span>
+                            <span className="text-sky-700 dark:text-sky-400 truncate ml-2 max-w-[120px]">
                               {highlightedSuggestion.nodeName}
                             </span>
                           </div>
                           {highlightedSuggestion.nodeId &&
                             highlightedSuggestion.nodeId !== highlightedSuggestion.nodeName && (
                               <div className="flex justify-between">
-                                <span className="text-gray-600">ID</span>
-                                <span className="text-gray-700 truncate ml-2 max-w-[120px]">
+                                <span className="text-gray-600 dark:text-gray-400">ID</span>
+                                <span className="text-gray-700 dark:text-gray-300 truncate ml-2 max-w-[120px]">
                                   {highlightedSuggestion.nodeId}
                                 </span>
                               </div>
@@ -1416,7 +1440,12 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           </div>
                         )}
                         {highlightedSuggestion.example && (
-                          <div className={twMerge(valuePreviewCodeBlockClassName, "text-green-700 break-all")}>
+                          <div
+                            className={twMerge(
+                              valuePreviewCodeBlockClassName,
+                              "text-green-700 dark:text-green-400 break-all",
+                            )}
+                          >
                             {highlightedSuggestion.example}
                           </div>
                         )}
@@ -1440,13 +1469,13 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                             .slice(0, 5)
                             .map((key) => (
                               <div key={key} className="truncate">
-                                <span className="text-gray-500">.</span>
-                                <span className="text-sky-700">{key}</span>
+                                <span className="text-gray-500 dark:text-gray-400">.</span>
+                                <span className="text-sky-700 dark:text-sky-400">{key}</span>
                               </div>
                             ))}
                           {Object.keys(highlightedValue as Record<string, unknown>).filter((k) => !k.startsWith("__"))
                             .length > 5 && (
-                            <div className="text-gray-600 mt-1">
+                            <div className="text-gray-600 dark:text-gray-400 mt-1">
                               +
                               {Object.keys(highlightedValue as Record<string, unknown>).filter(
                                 (k) => !k.startsWith("__"),
@@ -1465,9 +1494,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         </div>
                         {highlightedValue.length > 0 && (
                           <div className={valuePreviewCodeBlockClassName}>
-                            <span className="text-gray-500">[</span>
-                            <span className="text-purple-700">{typeof highlightedValue[0]}</span>
-                            <span className="text-gray-500">, ...]</span>
+                            <span className="text-gray-500 dark:text-gray-400">[</span>
+                            <span className="text-purple-700 dark:text-purple-400">{typeof highlightedValue[0]}</span>
+                            <span className="text-gray-500 dark:text-gray-400">, ...]</span>
                           </div>
                         )}
                       </>
@@ -1481,18 +1510,20 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           </div>
                         )}
                         <div className={twMerge(valuePreviewCodeBlockClassName, "break-all")}>
-                          <span className="text-amber-700">"</span>
-                          <span className="text-amber-800">
+                          <span className="text-amber-700 dark:text-amber-400">"</span>
+                          <span className="text-amber-800 dark:text-amber-300">
                             {highlightedValue.length > 100 ? highlightedValue.slice(0, 100) + "..." : highlightedValue}
                           </span>
-                          <span className="text-amber-700">"</span>
+                          <span className="text-amber-700 dark:text-amber-400">"</span>
                         </div>
                       </>
                     ) : /* Number values */
                     typeof highlightedValue === "number" ? (
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Number</div>
-                        <div className={twMerge(valuePreviewCodeBlockClassName, "text-orange-700")}>
+                        <div
+                          className={twMerge(valuePreviewCodeBlockClassName, "text-orange-700 dark:text-orange-400")}
+                        >
                           {highlightedValue}
                         </div>
                       </>
@@ -1501,7 +1532,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Boolean</div>
                         <div className={valuePreviewCodeBlockClassName}>
-                          <span className={highlightedValue ? "text-green-700" : "text-red-600"}>
+                          <span
+                            className={
+                              highlightedValue ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                            }
+                          >
                             {String(highlightedValue)}
                           </span>
                         </div>
@@ -1510,13 +1545,17 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                     highlightedValue === null ? (
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Null</div>
-                        <div className={twMerge(valuePreviewCodeBlockClassName, "text-gray-600 italic")}>null</div>
+                        <div
+                          className={twMerge(valuePreviewCodeBlockClassName, "text-gray-600 dark:text-gray-400 italic")}
+                        >
+                          null
+                        </div>
                       </>
                     ) : (
                       /* Fallback: show type */
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">Type</div>
-                        <div className={twMerge(valuePreviewCodeBlockClassName, "text-gray-700")}>
+                        <div className={twMerge(valuePreviewCodeBlockClassName, "text-gray-700 dark:text-gray-300")}>
                           {highlightedSuggestion?.detail ?? highlightedSuggestion?.kind ?? "unknown"}
                         </div>
                       </>
@@ -1525,7 +1564,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                 )}
                 <div
                   ref={suggestionsListRef}
-                  className="overflow-auto bg-white border border-gray-200 dark:bg-slate-800 dark:border-gray-700 sm:rounded-r-lg rounded-b-lg sm:rounded-tl-none shadow-lg"
+                  className="overflow-auto bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-600 sm:rounded-r-lg rounded-b-lg sm:rounded-tl-none shadow-lg"
                   style={{
                     width: `${dropdownWidth}px`,
                     height: `${SUGGESTION_LIST_MAX_HEIGHT_PX}px`,
@@ -1549,7 +1588,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                         className={twMerge([
                           "flex h-9 shrink-0 cursor-pointer items-center gap-2 px-3 text-sm leading-none",
                           "text-gray-950 dark:text-white",
-                          highlightedIndex === index && "bg-slate-100 dark:bg-slate-700",
+                          highlightedIndex === index && "bg-slate-100 dark:bg-gray-700",
                         ])}
                         onMouseDown={(e) => {
                           isInteractingWithSuggestionsRef.current = true;
@@ -1571,7 +1610,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       >
                         <span className="truncate min-w-0">{getSuggestionDisplayLabel(suggestionItem)}</span>
                         {suggestionItem.kind === "function" && !["root", "previous"].includes(suggestionItem.label) && (
-                          <span className="text-gray-500 truncate min-w-0">
+                          <span className="text-gray-500 dark:text-gray-400 truncate min-w-0">
                             {formatFunctionSignature(suggestionItem)}
                           </span>
                         )}
@@ -1585,7 +1624,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                             node
                           </span>
                         )}
-                        <span className="inline-flex h-5 shrink-0 items-center rounded bg-slate-100 px-1.5 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300">
+                        <span className="inline-flex h-5 shrink-0 items-center rounded bg-slate-100 px-1.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                           {suggestionItem.detail ?? suggestionItem.kind}
                         </span>
                         <span className="ml-auto inline-flex h-5 shrink-0 items-center rounded border border-gray-300 px-1 text-[10px] leading-none text-gray-400 dark:border-gray-600 dark:text-gray-500">
@@ -1603,7 +1642,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           <>
                             <div
                               data-suggestion-section-header
-                              className="sticky top-0 z-10 flex h-7 shrink-0 items-center border-b border-gray-200 bg-white px-3 text-xs font-medium leading-none text-gray-500 dark:border-gray-700 dark:text-gray-400"
+                              className="sticky top-0 z-10 flex h-7 shrink-0 items-center border-b border-gray-200 bg-white dark:bg-gray-800 px-3 text-xs font-medium leading-none text-gray-500 dark:border-gray-600 dark:text-gray-400"
                             >
                               Connected nodes data
                             </div>
@@ -1616,7 +1655,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                           <>
                             <div
                               data-suggestion-section-header
-                              className="sticky top-0 z-10 flex h-7 shrink-0 items-center border-b border-gray-200 bg-white px-3 text-xs font-medium leading-none text-gray-500 dark:border-gray-700 dark:text-gray-400"
+                              className="sticky top-0 z-10 flex h-7 shrink-0 items-center border-b border-gray-200 bg-white dark:bg-gray-800 px-3 text-xs font-medium leading-none text-gray-500 dark:border-gray-600 dark:text-gray-400"
                             >
                               Expr functions
                             </div>
@@ -1639,7 +1678,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           <div
             className={twMerge([
               "absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg",
-              "dark:bg-slate-800 dark:border-gray-700",
+              "dark:bg-gray-800 dark:border-gray-600",
             ])}
           >
             <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">

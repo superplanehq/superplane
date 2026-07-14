@@ -65,7 +65,7 @@ import (
 )
 
 const (
-	// Event payload can be up to 64k in size
+	// Event payload can be up to 512k in size
 	MaxEventSize = config.MaxWebhookPayloadSize
 
 	// The size of the stage execution outputs can be up to 4k
@@ -274,7 +274,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMiddlewares(
 			grpc.GatewayRecoveryMiddleware(),
-			grpc.GatewayAuthorizationMiddleware(grpcGatewayMux, authorizer),
+			grpc.GatewayAuthorizationMiddleware(authorizer),
 		),
 		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
@@ -1308,6 +1308,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				BaseURL:        s.BaseURL,
 				Configuration:  execution.Configuration.Data(),
 				HTTP:           s.registry.HTTPContext(),
+				Integration:    integrationCtx,
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
 				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),

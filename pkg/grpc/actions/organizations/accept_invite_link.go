@@ -34,7 +34,7 @@ func AcceptInviteLinkWithUsage(
 		return nil, grpcerrors.Unauthenticated(nil, "account not found")
 	}
 
-	inviteLink, err := models.FindInviteLinkByToken(token)
+	inviteLink, err := models.FindInviteLinkByToken(database.DB(ctx), token)
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "invite link not found")
 	}
@@ -49,7 +49,7 @@ func AcceptInviteLinkWithUsage(
 	}
 
 	statusValue := "joined"
-	tx := database.Conn().Begin()
+	tx := database.DB(ctx).Begin()
 	user, err := models.FindMaybeDeletedUserByEmailInTransaction(tx, org.ID.String(), account.Email)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {

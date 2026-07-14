@@ -73,6 +73,10 @@ blocks:
           commands:
             - make check.build.ui
 
+        - name: Storybook Build
+          commands:
+            - make check.build.storybook
+
         - name: Unit Tests
           parallelism: 4
           commands:

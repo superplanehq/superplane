@@ -7,7 +7,7 @@ SuperPlane reads a small set of environment variables at runtime to tune executi
 | Variable | Default | Description |
 | --- | --- | --- |
 | `SUPERPLANE_MAX_EMIT_COUNT` | `100` | Maximum number of events a single component execution may emit at once. Applies to fan-out components such as **For Each** (one event per array item) and **Read Memory** when emit mode is **One By One**. |
-| `SUPERPLANE_MAX_PAYLOAD_SIZE` | `65536` (64 KiB) | Maximum serialized size of an emitted event payload, in bytes. |
+| `SUPERPLANE_MAX_PAYLOAD_SIZE` | `524288` (512 KiB) | Maximum serialized size of an emitted event payload, in bytes. |
 
 Invalid or non-positive values are ignored; the default is used instead.
 

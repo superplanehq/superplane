@@ -1,53 +1,116 @@
-import raw from "./canvasAppResponses.json";
+import { materializeConsoleSpec } from "../lib/workflow-spec-files";
 
-// Shape of the captured fixture (see canvasAppResponses.json). Endpoint bodies
-// are stored verbatim as the live API returned them (after trimming GitHub
-// webhook payloads and dropping unused integration definitions), so they can be
-// replayed straight back without reshaping.
-interface CanvasAppFixture {
+import defaultRaw from "./canvasAppResponses.json";
+import cleanCodeAssessmentReadme from "./repository/cleanCodeAssessment.README.md?raw";
+
+// Shape of a captured fixture. Endpoint bodies are stored verbatim as the
+// live API returned them (after trimming GitHub webhook payloads and
+// dropping unused integration definitions), so they can be replayed straight
+// back without reshaping.
+//
+// Every field is optional so a caller can seed just the endpoints their
+// story exercises — the route table falls back to a benign empty response
+// for anything that's missing.
+export interface CanvasAppFixture {
   canvasId: string;
   organizationId: string;
-  versionId: string;
-  publishedRunId: string;
-  rootEventId: string;
-  triggers: unknown;
-  actions: unknown;
-  widgets: unknown;
-  integrations: unknown;
-  canvas: { canvas?: { spec?: unknown } };
-  versions: { versions?: Array<{ metadata?: Record<string, unknown> }> };
-  runs: unknown;
-  runDetail: unknown;
-  executions: unknown;
+  versionId?: string;
+  publishedRunId?: string;
+  rootEventId?: string;
+  triggers?: unknown;
+  actions?: unknown;
+  widgets?: unknown;
+  integrations?: unknown;
+  /** GET /api/v1/canvases/{canvasId} */
+  canvas?: { canvas?: { spec?: unknown; metadata?: { name?: string } } };
+  /** GET /api/v1/canvases/{canvasId}/versions[?limit=50] */
+  versions?: { versions?: Array<{ metadata?: Record<string, unknown> }> };
+  /** GET /api/v1/canvases/{canvasId}/versions?limit=1 */
+  versionsLatest?: { versions?: Array<{ metadata?: Record<string, unknown> }> };
+  /** GET /api/v1/canvases/{canvasId}/runs (all pages collapsed into one) */
+  runs?: unknown;
+  /** GET /api/v1/canvases/{canvasId}/runs/{runId} */
+  runDetail?: unknown;
+  /** GET /api/v1/canvases/{canvasId}/events/{eventId}/executions */
+  executions?: unknown;
+  /** GET /api/v1/canvases/{canvasId}/memory (real API returns `{items: []}`) */
+  memory?: { items?: unknown[] };
+  /** GET /api/v1/canvases/{canvasId}/repository/file?path=console.yaml */
+  consoleYaml?: string;
+  /**
+   * Extra repository file bodies keyed by path (e.g. `README.md`).
+   * `console.yaml` still prefers `consoleYaml` when both are set.
+   */
+  repositoryFileContents?: Record<string, string>;
+  /**
+   * Paths returned by GET .../repository/files. Defaults to the standard
+   * app-repo trio (`README.md`, `canvas.yaml`, `console.yaml`) plus any
+   * keys from `repositoryFileContents`.
+   */
+  repositoryFilePaths?: string[];
 }
 
-const fixture = raw as CanvasAppFixture;
+const DEFAULT_REPOSITORY_FILE_PATHS = ["README.md", "canvas.yaml", "console.yaml"] as const;
+
+const capturedFixture = defaultRaw as CanvasAppFixture;
+
+// Live Canvas stories need a real console.yaml: `useCanvasConsole` treats an
+// empty/missing file as `undefined`, which TanStack Query rejects. Seed one
+// markdown panel that reuses the README showcase so Console and Files stay in
+// sync while we prototype markdown rendering.
+const defaultConsoleYaml =
+  capturedFixture.consoleYaml ??
+  materializeConsoleSpec({
+    canvasId: capturedFixture.canvasId,
+    canvasName: capturedFixture.canvas?.canvas?.metadata?.name ?? "Clean Code Assessment",
+    panels: [
+      {
+        id: "markdown-showcase",
+        type: "markdown",
+        content: {
+          title: "Markdown showcase",
+          body: cleanCodeAssessmentReadme,
+          variables: [],
+        },
+      },
+    ],
+    layout: [{ i: "markdown-showcase", x: 0, y: 0, w: 12, h: 20, minW: 4, minH: 4 }],
+  });
+
+const defaultFixture = {
+  ...capturedFixture,
+  consoleYaml: defaultConsoleYaml,
+  repositoryFileContents: {
+    "README.md": cleanCodeAssessmentReadme,
+    ...capturedFixture.repositoryFileContents,
+  },
+} satisfies CanvasAppFixture;
 
 export const canvasAppIds = {
-  organizationId: fixture.organizationId,
-  canvasId: fixture.canvasId,
-  versionId: fixture.versionId,
-  publishedRunId: fixture.publishedRunId,
-  rootEventId: fixture.rootEventId,
+  organizationId: defaultFixture.organizationId,
+  canvasId: defaultFixture.canvasId,
+  versionId: defaultFixture.versionId,
+  publishedRunId: defaultFixture.publishedRunId,
+  rootEventId: defaultFixture.rootEventId,
 };
-
-const ORG = fixture.organizationId;
 
 // A synthetic user with broad permissions so PermissionsProvider grants every
 // canAct() check AppPage makes. We never capture the real user (email/token);
 // only the permission strings matter for rendering.
-const meUser = {
-  id: "storybook-user",
-  name: "Storybook User",
-  email: "storybook@superplane.dev",
-  organizationId: ORG,
-  hasToken: true,
-  roles: ["org_admin"],
-  groups: [],
-  permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization"].flatMap((resource) =>
-    ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
-  ),
-};
+function buildMeUser(orgId: string) {
+  return {
+    id: "storybook-user",
+    name: "Storybook User",
+    email: "storybook@superplane.dev",
+    organizationId: orgId,
+    hasToken: true,
+    roles: ["org_admin"],
+    groups: [],
+    permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization"].flatMap(
+      (resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
+    ),
+  };
+}
 
 type FixtureResult = { json: unknown } | { text: string } | null;
 
@@ -55,69 +118,128 @@ const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
 const CANVAS = "/api/v1/canvases/[^/]+";
 
-// Route table mapping an API path (anchored regex) to its fixture body. Every
-// pattern is fully anchored, so the entries are mutually exclusive and order
-// doesn't matter. Anything not listed falls through to the catch-all in
-// `resolveFixture`.
-const routes: Array<{ pattern: RegExp; resolve: (match: RegExpExecArray, url: URL) => FixtureResult }> = [
-  { pattern: re("/api/v1/me"), resolve: () => ({ json: { user: meUser } }) },
-  { pattern: re("/api/v1/triggers"), resolve: () => ({ json: fixture.triggers }) },
-  { pattern: re("/api/v1/actions"), resolve: () => ({ json: fixture.actions }) },
-  { pattern: re("/api/v1/widgets"), resolve: () => ({ json: fixture.widgets }) },
-  { pattern: re("/api/v1/integrations"), resolve: () => ({ json: fixture.integrations }) },
-  { pattern: re("/api/v1/service-accounts"), resolve: () => ({ json: { serviceAccounts: [] } }) },
+interface Route {
+  pattern: RegExp;
+  resolve: (match: RegExpExecArray, url: URL) => FixtureResult;
+}
 
-  // Draft-version listing must stay empty (no open drafts); every other version
-  // query returns the published history.
-  {
-    pattern: re(`${CANVAS}/versions`),
-    resolve: (_m, url) =>
-      url.searchParams.get("state") === "STATE_DRAFT"
-        ? { json: { versions: [], totalCount: 0, hasNextPage: false } }
-        : { json: fixture.versions },
-  },
-  // Single-version detail reuses the live canvas spec (we only captured metadata
-  // for the version list, which is all the versions sidebar needs).
-  {
-    pattern: re(`${CANVAS}/versions/([^/]+)`),
-    resolve: (m) => ({
-      json: {
-        version: {
-          metadata: { ...(fixture.versions.versions?.[0]?.metadata ?? {}), id: m[1] },
-          spec: fixture.canvas.canvas?.spec ?? {},
-        },
+function buildRoutes(fixture: CanvasAppFixture): Route[] {
+  const orgId = fixture.organizationId;
+  const meUser = buildMeUser(orgId);
+
+  return [
+    { pattern: re("/api/v1/me"), resolve: () => ({ json: { user: meUser } }) },
+    { pattern: re("/api/v1/triggers"), resolve: () => ({ json: fixture.triggers ?? { triggers: [] } }) },
+    { pattern: re("/api/v1/actions"), resolve: () => ({ json: fixture.actions ?? { actions: [] } }) },
+    { pattern: re("/api/v1/widgets"), resolve: () => ({ json: fixture.widgets ?? { widgets: [] } }) },
+    { pattern: re("/api/v1/integrations"), resolve: () => ({ json: fixture.integrations ?? { integrations: [] } }) },
+    { pattern: re("/api/v1/service-accounts"), resolve: () => ({ json: { serviceAccounts: [] } }) },
+
+    // Draft-version listing must stay empty (no open drafts); every other version
+    // query returns the captured history. `?limit=1` resolves against the
+    // `versionsLatest` slot when the fixture provides one; otherwise it falls
+    // back to slicing the general versions list so a caller can seed both from
+    // a single field.
+    {
+      pattern: re(`${CANVAS}/versions`),
+      resolve: (_m, url) => {
+        if (url.searchParams.get("state") === "STATE_DRAFT") {
+          return { json: { versions: [], totalCount: 0, hasNextPage: false } };
+        }
+        const limit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+        if (limit === 1) {
+          if (fixture.versionsLatest) return { json: fixture.versionsLatest };
+          const versionsFallback = fixture.versions?.versions?.slice(0, 1) ?? [];
+          return { json: { versions: versionsFallback, totalCount: versionsFallback.length, hasNextPage: false } };
+        }
+        return { json: fixture.versions ?? { versions: [], totalCount: 0, hasNextPage: false } };
       },
-    }),
-  },
+    },
+    // Single-version detail reuses the live canvas spec (we only captured metadata
+    // for the version list, which is all the versions sidebar needs).
+    {
+      pattern: re(`${CANVAS}/versions/([^/]+)`),
+      resolve: (m) => ({
+        json: {
+          version: {
+            metadata: { ...(fixture.versions?.versions?.[0]?.metadata ?? {}), id: m[1] },
+            spec: fixture.canvas?.canvas?.spec ?? {},
+          },
+        },
+      }),
+    },
 
-  // Run detail (`/runs/:runId`) is a distinct path from the list (`/runs`).
-  { pattern: re(`${CANVAS}/runs/([^/]+)`), resolve: () => ({ json: fixture.runDetail }) },
-  { pattern: re(`${CANVAS}/runs`), resolve: () => ({ json: fixture.runs }) },
-  { pattern: re(`${CANVAS}/events/([^/]+)/executions`), resolve: () => ({ json: fixture.executions }) },
-  { pattern: re(`${CANVAS}/memory`), resolve: () => ({ json: { memory: [] } }) },
-  // Repository files (canvas.yaml / console.yaml) return raw text; empty content
-  // means "no console dashboard configured".
-  { pattern: re(`${CANVAS}/repository/file`), resolve: () => ({ text: "" }) },
-  { pattern: re(CANVAS), resolve: () => ({ json: fixture.canvas }) },
-  { pattern: re("/api/v1/canvases"), resolve: () => ({ json: { canvases: [], totalCount: 0, hasNextPage: false } }) },
+    // Run detail (`/runs/:runId`) is a distinct path from the list (`/runs`).
+    { pattern: re(`${CANVAS}/runs/([^/]+)`), resolve: () => ({ json: fixture.runDetail ?? {} }) },
+    // For paginated `?before=…` requests we return an empty page so React
+    // Query's infinite-scroll stops after the first batch. Widgets that ask
+    // for larger sets configure their own `limit`; the console tab captures
+    // enough runs on the first page to satisfy the visible panels.
+    {
+      pattern: re(`${CANVAS}/runs`),
+      resolve: (_m, url) => {
+        if (url.searchParams.get("before")) {
+          return { json: { runs: [], totalCount: 0, hasNextPage: false } };
+        }
+        return { json: fixture.runs ?? { runs: [], totalCount: 0, hasNextPage: false } };
+      },
+    },
+    {
+      pattern: re(`${CANVAS}/events/([^/]+)/executions`),
+      resolve: () => ({ json: fixture.executions ?? { executions: [] } }),
+    },
+    // Real API shape is `{items: []}`; some legacy fixtures used `{memory: []}`
+    // which no widget ever read successfully — normalize on `items` here.
+    { pattern: re(`${CANVAS}/memory`), resolve: () => ({ json: fixture.memory ?? { items: [] } }) },
+    // Files tab needs a ready repository before it will render the tree.
+    // Without this, `useCanvasRepository` returns `undefined` and TanStack
+    // Query surfaces `["canvases","repository",…] data is undefined`.
+    {
+      pattern: re(`${CANVAS}/repository/files`),
+      resolve: () => ({
+        json: {
+          files: resolveRepositoryFilePaths(fixture).map((path) => ({ path })),
+        },
+      }),
+    },
+    {
+      pattern: re(`${CANVAS}/repository/file`),
+      resolve: (_m, url) => ({ text: resolveRepositoryFileContent(fixture, url.searchParams.get("path")) }),
+    },
+    {
+      pattern: re(`${CANVAS}/repository`),
+      resolve: () => ({
+        json: {
+          repository: {
+            metadata: { canvasId: fixture.canvasId },
+            status: { state: "STATE_READY", headSha: "storybook-fixture-head" },
+          },
+        },
+      }),
+    },
+    { pattern: re(CANVAS), resolve: () => ({ json: fixture.canvas ?? { canvas: {} } }) },
+    { pattern: re("/api/v1/canvases"), resolve: () => ({ json: { canvases: [], totalCount: 0, hasNextPage: false } }) },
 
-  { pattern: re("/api/v1/organizations/[^/]+/integrations"), resolve: () => ({ json: { integrations: [] } }) },
-  { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
-  { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
-  {
-    pattern: re("/api/v1/organizations/[^/]+"),
-    resolve: () => ({ json: { organization: { metadata: { id: ORG, name: "SuperPlane" }, spec: {}, status: {} } } }),
-  },
+    { pattern: re("/api/v1/organizations/[^/]+/integrations"), resolve: () => ({ json: { integrations: [] } }) },
+    { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
+    { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
+    {
+      pattern: re("/api/v1/organizations/[^/]+"),
+      resolve: () => ({
+        json: { organization: { metadata: { id: orgId, name: "SuperPlane" }, spec: {}, status: {} } },
+      }),
+    },
 
-  // Non-versioned account endpoints hit outside the /api/v1 tree.
-  { pattern: re("/account/experimental-features"), resolve: () => ({ json: { features: [] } }) },
-  { pattern: re("/account"), resolve: () => ({ json: { id: meUser.id, email: meUser.email, name: meUser.name } }) },
-];
+    // Non-versioned account endpoints hit outside the /api/v1 tree.
+    { pattern: re("/account/experimental-features"), resolve: () => ({ json: { features: [] } }) },
+    { pattern: re("/account"), resolve: () => ({ json: { id: meUser.id, email: meUser.email, name: meUser.name } }) },
+  ];
+}
 
 // Maps an API request to its fixture body. Returns `null` for anything that
 // isn't an API call (assets, HMR, etc.) so the caller falls back to the real
 // network.
-function resolveFixture(url: URL): FixtureResult {
+function resolveFixture(url: URL, routes: Route[]): FixtureResult {
   for (const route of routes) {
     const match = route.pattern.exec(url.pathname);
     if (match) {
@@ -136,16 +258,21 @@ function resolveFixture(url: URL): FixtureResult {
  * Builds a `fetch` implementation that serves the captured canvas fixture
  * entirely in-process, falling back to `fallback` for non-API requests.
  *
+ * The fixture is injected so different stories can render different apps
+ * without touching this module. When omitted it defaults to the Clean Code
+ * Assessment capture used by the `LiveCanvas`/`RunInspection` stories.
+ *
  * We deliberately avoid MSW here: MSW intercepts via a Service Worker, which is
  * silently unavailable in non-secure contexts (e.g. opening Storybook through a
  * LAN IP like http://192.168.x.x:6006 instead of http://localhost:6006). This
- * override has no such dependency, so the AppPage stories render deterministic
- * fake data no matter how Storybook is accessed.
+ * override has no such dependency, so the stories render deterministic fake
+ * data no matter how Storybook is accessed.
  */
-export function createFixtureFetch(fallback: typeof fetch): typeof fetch {
+export function createFixtureFetch(fallback: typeof fetch, fixture: CanvasAppFixture = defaultFixture): typeof fetch {
+  const routes = buildRoutes(fixture);
   const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(requestUrl(input), globalThis.location?.href ?? "http://localhost");
-    const resolved = resolveFixture(url);
+    const resolved = resolveFixture(url, routes);
     if (!resolved) {
       return fallback(input, init);
     }
@@ -164,4 +291,28 @@ function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.href;
   return input.url;
+}
+
+function resolveRepositoryFilePaths(fixture: CanvasAppFixture): string[] {
+  if (fixture.repositoryFilePaths?.length) {
+    return [...fixture.repositoryFilePaths];
+  }
+
+  const paths = new Set<string>(DEFAULT_REPOSITORY_FILE_PATHS);
+  for (const path of Object.keys(fixture.repositoryFileContents ?? {})) {
+    paths.add(path);
+  }
+  return Array.from(paths).sort();
+}
+
+function resolveRepositoryFileContent(fixture: CanvasAppFixture, path: string | null): string {
+  if (!path) {
+    return "";
+  }
+
+  if (path === "console.yaml" && typeof fixture.consoleYaml === "string") {
+    return fixture.consoleYaml;
+  }
+
+  return fixture.repositoryFileContents?.[path] ?? "";
 }

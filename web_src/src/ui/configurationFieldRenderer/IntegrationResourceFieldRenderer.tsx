@@ -250,11 +250,9 @@ export const IntegrationResourceFieldRenderer = ({
         labelRightReady && labelRightRef?.current ? createPortal(tabsList, labelRightRef.current) : null;
 
       const handleTabChange = (v: string) => {
-        const nextExpression = v === "expression";
-        if (nextExpression !== useExpressionMode) {
-          onChange(undefined);
-        }
-        setUseExpressionMode(nextExpression);
+        // Preserve any previously entered value when switching modes so users
+        // don't lose their input just by toggling between Fixed and Expression.
+        setUseExpressionMode(v === "expression");
       };
 
       return (

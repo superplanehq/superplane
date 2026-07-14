@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -23,16 +22,11 @@ type Canvas struct {
 	LiveVersionID  *uuid.UUID
 	CanvasFolderID *uuid.UUID `gorm:"column:folder_id"`
 	Name           string
-	// The `->` tag marks fields as read-only in GORM. These values are projected
-	// from the live version via SELECT aliases; they are not stored on workflows.
-	Description            string                    `gorm:"column:description;->"`
-	Nodes                  datatypes.JSONSlice[Node] `gorm:"column:nodes;->"`
-	Edges                  datatypes.JSONSlice[Edge] `gorm:"column:edges;->"`
-	CreatedBy              *uuid.UUID
-	NextDraftDisplayNumber int `gorm:"column:next_draft_display_number;not null;default:1"`
-	CreatedAt              *time.Time
-	UpdatedAt              *time.Time
-	DeletedAt              gorm.DeletedAt `gorm:"index"`
+	Description    string
+	CreatedBy      *uuid.UUID
+	CreatedAt      *time.Time
+	UpdatedAt      *time.Time
+	DeletedAt      gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) TableName() string {
@@ -52,24 +46,28 @@ func MapCanvasNameUniqueConstraintError(err error) error {
 	return err
 }
 
-func queryCanvasWithLiveVersion(tx *gorm.DB) *gorm.DB {
-	return tx.
-		Model(&Canvas{}).
-		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
-		Select(
-			"workflows.*",
-			"live_version.description AS description",
-			"live_version.nodes AS nodes",
-			"live_version.edges AS edges",
-		)
-}
-
 func withActiveCanvas(tx *gorm.DB, workflowIDColumn string) *gorm.DB {
 	return tx.
 		Joins(fmt.Sprintf("JOIN workflows ON %s = workflows.id", workflowIDColumn)).
 		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
 		Where("workflows.deleted_at IS NULL").
 		Where("organizations.deleted_at IS NULL")
+}
+
+func LockCanvasForUpdate(tx *gorm.DB, organizationUUID, canvasID uuid.UUID) (*Canvas, error) {
+	lockedCanvas := &Canvas{}
+
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("organization_id = ?", organizationUUID).
+		Where("id = ?", canvasID).
+		First(lockedCanvas).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return lockedCanvas, nil
 }
 
 func (c *Canvas) FindNode(id string) (*CanvasNode, error) {
@@ -133,27 +131,10 @@ func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
 	timestamp := now.Unix()
 
 	newName := fmt.Sprintf("%s (deleted-%d)", c.Name, timestamp)
-	return tx.Transaction(func(innerTx *gorm.DB) error {
-		if err := innerTx.Model(c).Updates(map[string]any{
-			"name":       newName,
-			"deleted_at": now,
-		}).Error; err != nil {
-			return err
-		}
-
-		if c.LiveVersionID == nil {
-			return nil
-		}
-
-		return innerTx.
-			Model(&CanvasVersion{}).
-			Where("id = ?", *c.LiveVersionID).
-			Updates(map[string]any{
-				"name":       newName,
-				"updated_at": now,
-			}).
-			Error
-	})
+	return tx.Model(c).Updates(map[string]any{
+		"name":       newName,
+		"deleted_at": now,
+	}).Error
 }
 
 func FindCanvas(orgID, id uuid.UUID) (*Canvas, error) {
@@ -166,8 +147,8 @@ func FindCanvasByName(name string, organizationID uuid.UUID) (*Canvas, error) {
 
 func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.name = ? AND workflows.organization_id = ?", name, organizationID).
+	err := tx.
+		Where("name = ? AND organization_id = ?", name, organizationID).
 		First(&canvas).
 		Error
 
@@ -180,9 +161,9 @@ func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid
 
 func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.organization_id = ?", orgID).
-		Where("workflows.id = ?", id).
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("id = ?", id).
 		First(&canvas).
 		Error
 
@@ -214,8 +195,8 @@ func FindCanvasWithoutOrgScope(id uuid.UUID) (*Canvas, error) {
 
 func FindCanvasWithoutOrgScopeInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
-		Where("workflows.id = ?", id).
+	err := tx.
+		Where("id = ?", id).
 		First(&canvas).
 		Error
 
@@ -232,9 +213,9 @@ func FindUnscopedCanvas(id uuid.UUID) (*Canvas, error) {
 
 func FindUnscopedCanvasInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
-	err := queryCanvasWithLiveVersion(tx).
+	err := tx.
 		Unscoped().
-		Where("workflows.id = ?", id).
+		Where("id = ?", id).
 		First(&canvas).
 		Error
 
@@ -246,11 +227,10 @@ func FindUnscopedCanvasInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error)
 }
 
 func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, int64, error) {
-	query := queryCanvasWithLiveVersion(database.Conn()).
-		Where("workflows.organization_id = ?", orgID)
+	query := database.Conn().Model(&Canvas{}).Where("organization_id = ?", orgID)
 
 	if search != "" {
-		query = query.Where("live_version.name ILIKE ?", "%"+search+"%")
+		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
 
 	var total int64
@@ -267,7 +247,7 @@ func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, i
 	}
 
 	var canvases []Canvas
-	if err := query.Order("live_version.name ASC").Find(&canvases).Error; err != nil {
+	if err := query.Order("name ASC").Find(&canvases).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -276,9 +256,9 @@ func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, i
 
 func ListCanvases(orgID string) ([]Canvas, error) {
 	var canvases []Canvas
-	err := queryCanvasWithLiveVersion(database.Conn()).
-		Where("workflows.organization_id = ?", orgID).
-		Order("live_version.name ASC").
+	err := database.Conn().
+		Where("organization_id = ?", orgID).
+		Order("name ASC").
 		Find(&canvases).
 		Error
 
@@ -294,7 +274,6 @@ func ListDeletedCanvases() ([]Canvas, error) {
 	err := database.Conn().
 		Model(&Canvas{}).
 		Unscoped().
-		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
 		Joins("JOIN organizations ON organizations.id = workflows.organization_id").
 		Select(
 			"workflows.id",
@@ -302,11 +281,11 @@ func ListDeletedCanvases() ([]Canvas, error) {
 			"workflows.live_version_id",
 			"workflows.folder_id",
 			"workflows.name",
+			"workflows.description",
 			"workflows.created_by",
 			"workflows.created_at",
 			"workflows.updated_at",
 			"COALESCE(workflows.deleted_at, organizations.deleted_at) AS deleted_at",
-			"live_version.description AS description",
 		).
 		Where("workflows.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
 		Find(&canvases).
@@ -324,9 +303,9 @@ func ListMaybeDeletedCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID uuid
 
 	// Organization teardown must include every workflow for the org when deciding
 	// whether cleanup can continue.
-	err := queryCanvasWithLiveVersion(tx).
+	err := tx.
 		Unscoped().
-		Where("workflows.organization_id = ?", orgID).
+		Where("organization_id = ?", orgID).
 		Find(&canvases).
 		Error
 	if err != nil {
@@ -349,6 +328,7 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 			"workflows.live_version_id",
 			"workflows.folder_id",
 			"workflows.name",
+			"workflows.description",
 			"workflows.created_by",
 			"workflows.created_at",
 			"workflows.updated_at",
@@ -366,16 +346,6 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 
 	if err != nil {
 		return nil, err
-	}
-
-	if canvas.LiveVersionID != nil {
-		liveVersion, err := FindCanvasVersionInTransaction(tx, canvas.ID, *canvas.LiveVersionID)
-		if err != nil {
-			return nil, err
-		}
-
-		canvas.Name = liveVersion.Name
-		canvas.Description = liveVersion.Description
 	}
 
 	return &canvas, nil

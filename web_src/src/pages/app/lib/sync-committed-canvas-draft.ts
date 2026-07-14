@@ -4,7 +4,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { canvasKeys, fetchCanvasConsoleData } from "@/hooks/useCanvasData";
 
-import { fetchCanvasVersionWithSpec } from "./repository-spec-files";
+import { fetchCommittedCanvasVersionWithSpec, fetchLiveCommittedCanvasVersionWithSpec } from "./repository-spec-files";
 
 export async function syncCommittedConsoleCaches({
   queryClient,
@@ -17,16 +17,13 @@ export async function syncCommittedConsoleCaches({
 }): Promise<void> {
   const consoleData = await fetchCanvasConsoleData(canvasId, versionId, false);
   if (!consoleData) {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) }),
-      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) }),
-    ]);
+    await queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) });
     return;
   }
 
   queryClient.setQueryData(canvasKeys.console(canvasId, versionId), consoleData);
   // After commit, staging is cleared — mirror the committed console in the staged cache.
-  queryClient.setQueryData(canvasKeys.consoleStaged(canvasId, versionId), consoleData);
+  queryClient.setQueryData(canvasKeys.stagedConsole(canvasId), consoleData);
 }
 
 export async function syncCommittedCanvasDraftState({
@@ -34,27 +31,41 @@ export async function syncCommittedCanvasDraftState({
   organizationId,
   canvasId,
   versionId,
+  resolveLiveVersion = false,
+  skipVersionListUpdate = false,
 }: {
   queryClient: QueryClient;
   organizationId: string;
   canvasId: string;
   versionId: string;
+  resolveLiveVersion?: boolean;
+  skipVersionListUpdate?: boolean;
 }): Promise<CanvasesCanvasVersion | undefined> {
-  const committedVersion = await fetchCanvasVersionWithSpec(canvasId, versionId, false);
+  const committedVersion = resolveLiveVersion
+    ? await fetchLiveCommittedCanvasVersionWithSpec(canvasId)
+    : await fetchCommittedCanvasVersionWithSpec(canvasId, versionId);
   if (!committedVersion) {
     return undefined;
   }
 
-  queryClient.setQueryData(canvasKeys.versionStagedDetail(canvasId, versionId), committedVersion);
-  queryClient.setQueryData(canvasKeys.versionDetail(canvasId, versionId), committedVersion);
+  const cacheVersionId = committedVersion.metadata?.id ?? versionId;
 
-  queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
-    if (!current) {
-      return current;
-    }
+  queryClient.setQueryData(canvasKeys.stagedCanvasSpec(canvasId), committedVersion);
+  queryClient.setQueryData(canvasKeys.versionDetail(canvasId, cacheVersionId), committedVersion);
 
-    return current.map((item) => (item.metadata?.id === versionId ? { ...item, spec: committedVersion.spec } : item));
-  });
+  if (!skipVersionListUpdate) {
+    queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
+      const existing = current ?? [];
+      const index = existing.findIndex((item) => item.metadata?.id === cacheVersionId);
+      if (index === -1) {
+        return [committedVersion, ...existing];
+      }
+
+      return existing.map((item) =>
+        item.metadata?.id === cacheVersionId ? { ...item, spec: committedVersion.spec } : item,
+      );
+    });
+  }
 
   if (committedVersion.spec) {
     queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
@@ -70,40 +81,6 @@ export async function syncCommittedCanvasDraftState({
   }
 
   return committedVersion;
-}
-
-export async function refreshCachesAfterCommit({
-  queryClient,
-  organizationId,
-  canvasId,
-  versionId,
-}: {
-  queryClient: QueryClient;
-  organizationId: string;
-  canvasId: string;
-  versionId: string;
-}): Promise<void> {
-  try {
-    await syncCommittedCanvasDraftState({
-      queryClient,
-      organizationId,
-      canvasId,
-      versionId,
-    });
-    await syncCommittedConsoleCaches({
-      queryClient,
-      canvasId,
-      versionId,
-    });
-  } catch {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, versionId) }),
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionStagedDetail(canvasId, versionId) }),
-      queryClient.invalidateQueries({ queryKey: canvasKeys.console(canvasId, versionId) }),
-      queryClient.invalidateQueries({ queryKey: canvasKeys.consoleStaged(canvasId, versionId) }),
-      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) }),
-    ]);
-  }
 }
 
 type DraftSpec = CanvasesCanvas["spec"] | null;

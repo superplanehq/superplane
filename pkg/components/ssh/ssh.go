@@ -138,7 +138,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 - **Host**, **Port** (default 22), **Username**: Connection details.
 - **Command source**: Choose **Inline** to type commands directly, or **From file** to load them from a file in the app's repository (e.g. scripts/deploy.sh).
 - **Commands** (inline mode): One or more commands to run, one per line (supports expressions). Each non-empty line becomes a command joined with &&. The output payload is based on the last command.
-- **Command file** (file mode): Path to a file in the Files tab.
+- **Command file** (file mode): Path to a file in the app's repository (e.g. ` + "`scripts/deploy.sh`" + `).
 - **Working directory**: Optional; Changes to this directory before running the command.
 - **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).
@@ -287,7 +287,7 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Name:                 "commandFile",
 			Label:                "Command file",
 			Type:                 configuration.FieldTypeRepositoryFile,
-			Description:          "Path to a file in the app's repository whose contents are run as the SSH command (e.g. scripts/deploy.sh). The file is piped to bash on the remote host (bash -s), so the whole script is always interpreted by bash regardless of any #! shebang line — write bash, not another language. Multi-line scripts, comments, and bash features (pipefail, declare -A, process substitution) all work. {{ ... }} syntax inside the script (Docker inspect, Helm, Go templates) is preserved. Use Environment variables below to inject values from upstream nodes.",
+			Description:          "Path to a file in the app's repository (e.g. scripts/deploy.sh).",
 			Required:             false,
 			VisibilityConditions: []configuration.VisibilityCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
 			RequiredConditions:   []configuration.RequiredCondition{{Field: "commandSource", Values: []string{CommandSourceFile}}},
@@ -579,9 +579,9 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 }
 
 // loadCommandFile reads, size-limits, and validates the command file referenced
-// by rawPath, returning its content verbatim. It rejects empty or
-// whitespace-only files so both Setup (publish time) and Execute (run time)
-// agree on what counts as a runnable script.
+// by rawPath, returning its content with shell-safe line endings. It rejects
+// empty or whitespace-only files so both Setup (publish time) and Execute (run
+// time) agree on what counts as a runnable script.
 func loadCommandFile(files core.RepositoryFilesContext, rawPath string) (string, error) {
 	path := strings.TrimSpace(rawPath)
 	if path == "" {
@@ -610,7 +610,7 @@ func loadCommandFile(files core.RepositoryFilesContext, rawPath string) (string,
 	if strings.TrimSpace(string(data)) == "" {
 		return "", fmt.Errorf("command file %q is empty", path)
 	}
-	return string(data), nil
+	return normalizeScriptLineEndings(string(data)), nil
 }
 
 func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
@@ -855,25 +855,31 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 }
 
 // buildExecutionCommand assembles the final command sent to the remote host
-// and, for file mode, returns the script body to stream as stdin.
+// and returns a stdin payload when the command should be streamed as a script.
 //
-// Inline mode keeps the long-standing behavior of stripping blank lines and
-// joining the rest with `&&` so a list of one-liners runs as a chain. The
-// remote shell receives a single string and no stdin payload.
+// Inline mode keeps one-line commands on the command line, preserving the
+// long-standing behavior for simple invocations. Multi-line inline scripts are
+// streamed to `bash -s` so shell syntax that depends on real newlines (shebangs,
+// comments, conditionals, here-docs) is not flattened into invalid `&&` chains.
 //
 // File mode pipes the (already-loaded) script body to `bash -s` over stdin.
 // This avoids embedding the whole script in the command line — argv has size
 // limits and nested quoting is fragile — while preserving multi-line
-// constructs, comments, and bash-only features (pipefail, declare -A,
-// here-docs, process substitution) exactly as written. The stream is always
-// interpreted by bash, so any leading `#!` line is just a comment: non-bash
-// shebangs are not honored.
+// constructs, comments, and bash-only features (pipefail, declare -A, here-docs,
+// process substitution) except for normalizing CRLF/CR line endings to LF. The
+// stream is always interpreted by bash, so any leading `#!` line is just a
+// comment: non-bash shebangs are not honored.
 func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBody string) (string, io.Reader, error) {
 	if metadata.CommandSource == CommandSourceFile {
 		if scriptBody == "" {
 			return "", nil, errors.New("command file body is required")
 		}
 		command, payload := c.buildScriptCommand(metadata.WorkingDirectory, metadata.Environment, scriptBody)
+		return command, strings.NewReader(payload), nil
+	}
+
+	if isMultilineInlineScript(metadata.Commands) {
+		command, payload := c.buildInlineScriptCommand(metadata.WorkingDirectory, metadata.Environment, metadata.Commands)
 		return command, strings.NewReader(payload), nil
 	}
 
@@ -889,12 +895,20 @@ func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBod
 // prepended on its own line (followed by `|| exit 1`) so a leading shebang or
 // comment in the script cannot swallow the `cd` via `#`-to-end-of-line.
 func (c *SSHCommand) buildScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
-	payload := script
+	return c.buildScriptCommandWithShell("bash -s", workingDirectory, environment, script)
+}
+
+func (c *SSHCommand) buildInlineScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
+	return c.buildScriptCommandWithShell("bash -e -s", workingDirectory, environment, script)
+}
+
+func (c *SSHCommand) buildScriptCommandWithShell(shellCommand string, workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
+	payload := normalizeScriptLineEndings(script)
 	if workingDirectory != "" {
-		payload = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), script)
+		payload = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), payload)
 	}
 
-	command := "bash -s"
+	command := shellCommand
 	if len(environment) > 0 {
 		envAssignments := make([]string, 0, len(environment))
 		for _, variable := range environment {
@@ -958,7 +972,7 @@ func validateCommandSource(ctx core.SetupContext, spec Spec) error {
 }
 
 func buildCombinedCommands(commands string) string {
-	lines := strings.Split(commands, "\n")
+	lines := strings.Split(normalizeScriptLineEndings(commands), "\n")
 	parts := make([]string, 0, len(lines))
 	for _, line := range lines {
 		l := strings.TrimSpace(line)
@@ -971,6 +985,27 @@ func buildCombinedCommands(commands string) string {
 		return ""
 	}
 	return strings.Join(parts, " && ")
+}
+
+func isMultilineInlineScript(commands string) bool {
+	lines := strings.Split(normalizeScriptLineEndings(commands), "\n")
+	nonEmptyLines := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		nonEmptyLines++
+		if nonEmptyLines > 1 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func normalizeScriptLineEndings(script string) string {
+	script = strings.ReplaceAll(script, "\r\n", "\n")
+	return strings.ReplaceAll(script, "\r", "\n")
 }
 
 func shellQuote(value string) string {

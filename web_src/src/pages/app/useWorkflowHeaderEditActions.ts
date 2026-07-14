@@ -6,6 +6,7 @@ import {
   markAgentBootReady,
   PLACEHOLDER_NODE_CONTEXT_KEY,
 } from "@/lib/agentBootContext";
+import { clearRunInspectionSearchParams } from "./viewState";
 
 type PlaceholderAddHandler = (data: { position: { x: number; y: number } }) => Promise<string>;
 
@@ -13,6 +14,7 @@ interface WorkflowStartupActionsConfig {
   hasEditableVersion: boolean;
   canUpdateCanvas: boolean;
   canvas: CanvasesCanvas | null | undefined;
+  liveVersionLoading?: boolean;
   handlePlaceholderAdd?: PlaceholderAddHandler;
   searchParams: URLSearchParams;
 }
@@ -26,12 +28,6 @@ interface WorkflowHeaderEditActionsConfig {
   startup?: WorkflowStartupActionsConfig;
 }
 
-function clearRunInspectionSearchParams(current: URLSearchParams): URLSearchParams {
-  const next = new URLSearchParams(current);
-  next.delete("run");
-  return next;
-}
-
 export function useWorkflowHeaderEditActions({
   isRunInspectionMode,
   handleClearRunInspection,
@@ -42,13 +38,16 @@ export function useWorkflowHeaderEditActions({
 }: WorkflowHeaderEditActionsConfig) {
   const handleEnterEditModeFromHeader = useCallback(async () => {
     if (isRunInspectionMode) {
-      setRunDetailNodeId(null);
-      setSearchParams(clearRunInspectionSearchParams, { replace: true });
+      handleClearRunInspection();
       await Promise.resolve();
     }
 
     await handleToggleEditMode();
-  }, [handleToggleEditMode, isRunInspectionMode, setRunDetailNodeId, setSearchParams]);
+
+    if (isRunInspectionMode) {
+      handleClearRunInspection();
+    }
+  }, [handleClearRunInspection, handleToggleEditMode, isRunInspectionMode]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
     if (isRunInspectionMode) {
@@ -65,9 +64,8 @@ export function useWorkflowHeaderEditActions({
       return;
     }
 
-    setRunDetailNodeId(null);
-    setSearchParams(clearRunInspectionSearchParams, { replace: true });
-  }, [isRunInspectionMode, setRunDetailNodeId, setSearchParams]);
+    handleClearRunInspection();
+  }, [handleClearRunInspection, isRunInspectionMode]);
 
   return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader, clearRunInspectionForEdit };
 }
@@ -82,6 +80,7 @@ function useAutoEditMode(
   const hasEditableVersion = startup?.hasEditableVersion ?? false;
   const canUpdateCanvas = startup?.canUpdateCanvas ?? false;
   const canvasLoaded = Boolean(startup?.canvas);
+  const liveVersionLoading = startup?.liveVersionLoading ?? false;
   const searchParams = startup?.searchParams;
 
   useEffect(() => {
@@ -90,6 +89,7 @@ function useAutoEditMode(
     if (!canvasLoaded) return;
     if (hasEditableVersion) return;
     if (!canUpdateCanvas) return;
+    if (liveVersionLoading) return;
 
     triggeredRef.current = true;
 
@@ -101,6 +101,10 @@ function useAutoEditMode(
       }
 
       await handleToggleEditMode();
+      if (searchParams.get("run")) {
+        setRunDetailNodeId(null);
+        setSearchParams(clearRunInspectionSearchParams, { replace: true });
+      }
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);
@@ -117,6 +121,7 @@ function useAutoEditMode(
     hasEditableVersion,
     canUpdateCanvas,
     canvasLoaded,
+    liveVersionLoading,
     handleToggleEditMode,
   ]);
 }

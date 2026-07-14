@@ -38,6 +38,22 @@ type Node struct {
 	WarningMessage *string        `json:"warningMessage,omitempty"`
 }
 
+func (c *Node) ComponentName() string {
+	if c.Ref.Component != nil && c.Ref.Component.Name != "" {
+		return c.Ref.Component.Name
+	}
+
+	if c.Ref.Trigger != nil && c.Ref.Trigger.Name != "" {
+		return c.Ref.Trigger.Name
+	}
+
+	if c.Ref.Widget != nil && c.Ref.Widget.Name != "" {
+		return c.Ref.Widget.Name
+	}
+
+	return ""
+}
+
 type Position struct {
 	X int `json:"x"`
 	Y int `json:"y"`
@@ -455,6 +471,26 @@ func CountNodeQueueItemsForRootEventInTransaction(tx *gorm.DB, rootEventID uuid.
 	}
 
 	return count, nil
+}
+
+func ListNodeQueueItemsForRuns(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeQueueItem, error) {
+	if len(runIDs) == 0 {
+		return []CanvasNodeQueueItem{}, nil
+	}
+
+	var queueItems []CanvasNodeQueueItem
+	err := tx.
+		Preload("RootEvent").
+		Where("workflow_id = ?", workflowID).
+		Where("run_id IN ?", runIDs).
+		Order("created_at ASC").
+		Find(&queueItems).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return queueItems, nil
 }
 
 func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*CanvasNodeQueueItem, error) {

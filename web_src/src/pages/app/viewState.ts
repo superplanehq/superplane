@@ -87,6 +87,14 @@ export function clearComponentSidebarSearchParams(params: URLSearchParams): URLS
   return params;
 }
 
+export function clearRunInspectionSearchParams(params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.delete("run");
+  next.delete("sidebar");
+  next.delete("node");
+  return next;
+}
+
 /** Run inspection is only valid on the canvas tab; panel views must be cleared first. */
 export function clearNonCanvasViewSearchParam(params: URLSearchParams): void {
   const view = params.get("view") ?? "";
@@ -198,12 +206,12 @@ export function getExitEditModeDisabledTooltip({
   canvasDeletedRemotely: boolean;
   hasEditableVersion: boolean;
 }): string | undefined {
-  if (!canUpdateCanvas) {
-    return "You don't have permission to edit this canvas.";
-  }
-
   if (canvasDeletedRemotely) {
     return "This canvas was deleted in another session.";
+  }
+
+  if (!canUpdateCanvas) {
+    return "You don't have permission to edit this canvas.";
   }
 
   if (!hasEditableVersion) {

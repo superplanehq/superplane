@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 import { FileMonacoEditor } from "./FileMonacoEditor";
 
@@ -44,7 +45,11 @@ describe("FileMonacoEditor", () => {
   it("records the first edit after switching back to a file", async () => {
     const user = userEvent.setup();
 
-    render(<ControlledEditorHarness initialPath="README.md" initialContent="# readme" />);
+    render(
+      <ThemeProvider>
+        <ControlledEditorHarness initialPath="README.md" initialContent="# readme" />
+      </ThemeProvider>,
+    );
 
     await user.click(screen.getByRole("button", { name: "Open other" }));
     await user.click(screen.getByRole("button", { name: "Open first" }));

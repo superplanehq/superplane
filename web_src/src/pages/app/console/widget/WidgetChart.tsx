@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, type ComponentProps, type CSSProperties, type ReactNode } from "react";
 import { LineChart as LineChartIcon, Loader2 } from "lucide-react";
 import {
   Area,
@@ -17,6 +17,7 @@ import {
   type BarShapeProps,
 } from "recharts";
 
+import { TimestampDetails } from "@/components/Timestamp";
 import {
   ChartContainer,
   ChartLegend,
@@ -25,13 +26,26 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { useTheme } from "@/contexts/useTheme";
 
 import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
 import { resolveChartColor } from "./chartColors";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
-import { formatValue } from "./widgetFormat";
 import { WidgetEmptyState } from "../WidgetEmptyState";
+import {
+  buildXAxisTickShowIndices,
+  estimateYAxisWidth,
+  formatXAxisTick,
+  formatXTooltipLabel,
+  formatYTick,
+  resolveCartesianYFormat,
+} from "./widgetChartAxis";
+import { useInteractiveChartTooltip } from "./useInteractiveChartTooltip";
+import { coerceWidgetTimestamp } from "./widgetFormat";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries, WidgetColumnFormat } from "./types";
+
+const TIMESTAMP_X_FORMATS = new Set<WidgetColumnFormat>(["date", "datetime", "relative"]);
+const TOOLTIP_WRAPPER_STYLE: CSSProperties = { transition: "none" };
 
 interface WidgetChartProps {
   render: WidgetChartRender;
@@ -74,6 +88,8 @@ interface ChartSeries extends WidgetChartSeries {
  * percentages render consistently in the tooltip.
  */
 export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const filtered = useMemo(() => applyFilters(rows, render.filters), [rows, render.filters]);
   const sorted = useMemo(() => applySort(filtered, render.sort), [filtered, render.sort]);
   const seriesField = render.seriesField?.trim();
@@ -91,10 +107,10 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
         return {
           ...s,
           key,
-          color: resolveChartColor(key, idx),
+          color: resolveChartColor(key, idx, isDark),
         };
       }),
-    [render.series],
+    [render.series, isDark],
   );
   const pivotedSeries = useMemo<ChartSeries[]>(() => {
     if (!seriesField) return [];
@@ -103,9 +119,9 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
       ...valueSeries,
       key,
       label: key,
-      color: resolveChartColor(key, idx),
+      color: resolveChartColor(key, idx, isDark),
     }));
-  }, [seriesField, sorted, valueSeries]);
+  }, [seriesField, sorted, valueSeries, isDark]);
   const series = seriesField ? pivotedSeries : configuredSeries;
   const data = useMemo(() => {
     const built = buildChartData(
@@ -121,7 +137,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <Loader2 className="size-4 animate-spin text-slate-400" />
+        <Loader2 className="size-4 animate-spin text-slate-400 dark:text-gray-500" />
       </div>
     );
   }
@@ -131,10 +147,12 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-1 p-3" data-testid="widget-chart">
-      {render.title ? <div className="text-xs font-medium text-slate-600">{render.title}</div> : null}
+      {render.title ? (
+        <div className="text-xs font-medium text-slate-600 dark:text-gray-400">{render.title}</div>
+      ) : null}
       <div className="min-h-0 flex-1">
         {render.type === "donut" ? (
-          <DonutChartView data={data} series={series[0]} legendMode={render.legend ?? "auto"} />
+          <DonutChartView data={data} series={series[0]} legendMode={render.legend ?? "auto"} isDark={isDark} />
         ) : (
           <CartesianChartView
             type={render.type}
@@ -151,14 +169,64 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   );
 }
 
-const CHART_MARGIN = { top: 8, right: 8, left: 0, bottom: 0 } as const;
+const CHART_MARGIN = { top: 8, right: 8, left: 4, bottom: 0 } as const;
 // Recharts wraps the tooltip in an absolutely positioned div with a default
 // `transform 400ms ease` transition. That transition makes the tooltip slide
 // in from the chart origin (top-left) the first time it appears, which feels
 // confusing. We disable the wrapper transition and add a quick fade-in on the
 // content so the tooltip appears in place.
-const TOOLTIP_WRAPPER_STYLE: CSSProperties = { transition: "none" };
 const TOOLTIP_CONTENT_CLASS = "animate-in fade-in duration-150";
+
+/** Bridges Recharts' active point into the interactive-tooltip hook without doing work in render. */
+function RechartsActiveBridge({
+  active,
+  activeKey,
+  forceContentActive,
+  onActiveChange,
+}: {
+  active?: boolean;
+  activeKey?: string;
+  /** Re-sync when force releases so a still-hovered point re-arms `wasActive`. */
+  forceContentActive: boolean;
+  onActiveChange: (active: boolean, activeKey?: string) => void;
+}) {
+  useEffect(() => {
+    onActiveChange(Boolean(active), activeKey);
+  }, [active, activeKey, forceContentActive, onActiveChange]);
+  return null;
+}
+
+type ChartTooltipContentProps = ComponentProps<typeof ChartTooltipContent>;
+
+/**
+ * Chart tooltip content that can receive pointer events (CopyButton) and stays
+ * mounted briefly after the pointer leaves the chart point.
+ */
+function InteractiveChartTooltipContent({
+  forceContentActive,
+  syncRechartsActive,
+  onTooltipEnter,
+  onTooltipLeave,
+  ...tooltipProps
+}: ChartTooltipContentProps & {
+  forceContentActive: boolean;
+  syncRechartsActive: (active: boolean, activeKey?: string) => void;
+  onTooltipEnter: () => void;
+  onTooltipLeave: () => void;
+}) {
+  const activeKey = tooltipProps.label == null ? undefined : String(tooltipProps.label);
+  return (
+    <div onMouseEnter={onTooltipEnter} onMouseLeave={onTooltipLeave}>
+      <RechartsActiveBridge
+        active={tooltipProps.active}
+        activeKey={activeKey}
+        forceContentActive={forceContentActive}
+        onActiveChange={syncRechartsActive}
+      />
+      <ChartTooltipContent {...tooltipProps} active={Boolean(tooltipProps.active || forceContentActive)} />
+    </div>
+  );
+}
 
 function CartesianChartView({
   type,
@@ -187,14 +255,27 @@ function CartesianChartView({
   const seriesByKey = useMemo(() => new Map(series.map((s) => [s.key, s])), [series]);
   const showLegend = legendMode === "show" || (legendMode === "auto" && series.length > 1);
   const stacked = type === "stacked-bar";
+  const effectiveYFormat = resolveCartesianYFormat(yFormat, series);
+  const yAxisWidth = useMemo(
+    () =>
+      estimateYAxisWidth(
+        data,
+        series.map((s) => s.key),
+        effectiveYFormat,
+        Boolean(yLabel?.trim()),
+      ),
+    [data, series, effectiveYFormat, yLabel],
+  );
 
   const sharedAxes = (
     <CartesianFrame
+      data={data}
       stacked={stacked || type === "bar"}
       seriesByKey={seriesByKey}
       xFormat={xFormat}
       yLabel={yLabel}
-      yFormat={yFormat}
+      yFormat={effectiveYFormat}
+      yAxisWidth={yAxisWidth}
     />
   );
   const legend = showLegend ? <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" /> : null;
@@ -261,18 +342,23 @@ function CartesianChartView({
 }
 
 function CartesianFrame({
+  data,
   stacked,
   seriesByKey,
   xFormat,
   yLabel,
   yFormat,
+  yAxisWidth,
 }: {
+  data: Array<Record<string, unknown>>;
   stacked: boolean;
   seriesByKey: Map<string, ChartSeries>;
   xFormat?: WidgetColumnFormat;
   yLabel?: string;
   yFormat?: WidgetColumnFormat;
+  yAxisWidth: number;
 }) {
+  const xTickShowIndices = useMemo(() => buildXAxisTickShowIndices(data, xFormat), [data, xFormat]);
   const tooltipFormatter = (value: unknown, name: unknown) => {
     const key = String(name ?? "");
     const s = seriesByKey.get(key);
@@ -285,13 +371,23 @@ function CartesianFrame({
       </div>
     );
   };
-  const xTickFormatter = (v: unknown) => formatXTick(v, xFormat);
+  const xTickFormatter = (v: unknown, index: number) => {
+    if (xTickShowIndices && !xTickShowIndices.has(index)) return "";
+    return formatXAxisTick(v, xFormat);
+  };
+  const xTooltipLabelFormatter = (v: unknown): ReactNode => {
+    if (xFormat && TIMESTAMP_X_FORMATS.has(xFormat)) {
+      const date = coerceWidgetTimestamp(v);
+      if (date) return <TimestampDetails date={date} copyTestId="chart-tooltip-timestamp-copy" />;
+    }
+    return formatXTooltipLabel(v, xFormat);
+  };
   const yTick = (v: number) => formatYTick(v, yFormat);
   const trimmedYLabel = yLabel?.trim() ? yLabel.trim() : undefined;
-  // Widen the Y-axis gutter when a rotated label is present so the title
-  // doesn't overlap the tick numbers. The default 36px is enough for ticks
-  // alone but clips a vertical label.
-  const yWidth = trimmedYLabel ? 56 : 36;
+  const interactiveTooltip = Boolean(xFormat && TIMESTAMP_X_FORMATS.has(xFormat));
+  const { activeProp, forceContentActive, syncRechartsActive, onTooltipEnter, onTooltipLeave, wrapperStyle } =
+    useInteractiveChartTooltip(interactiveTooltip);
+
   return (
     <>
       <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -308,7 +404,7 @@ function CartesianFrame({
         tickLine={false}
         axisLine={false}
         fontSize={11}
-        width={yWidth}
+        width={yAxisWidth}
         tickFormatter={yTick}
         label={
           trimmedYLabel
@@ -323,52 +419,44 @@ function CartesianFrame({
       />
       <ChartTooltip
         cursor={stacked ? { fill: "rgba(148, 163, 184, 0.12)" } : true}
-        wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+        active={activeProp}
+        wrapperStyle={wrapperStyle}
         content={
-          <ChartTooltipContent
-            formatter={tooltipFormatter}
-            labelFormatter={xTickFormatter}
-            indicator="dot"
-            className={TOOLTIP_CONTENT_CLASS}
-          />
+          interactiveTooltip ? (
+            <InteractiveChartTooltipContent
+              forceContentActive={forceContentActive}
+              syncRechartsActive={syncRechartsActive}
+              onTooltipEnter={onTooltipEnter}
+              onTooltipLeave={onTooltipLeave}
+              formatter={tooltipFormatter}
+              labelFormatter={xTooltipLabelFormatter}
+              indicator="dot"
+              className={TOOLTIP_CONTENT_CLASS}
+            />
+          ) : (
+            <ChartTooltipContent
+              formatter={tooltipFormatter}
+              labelFormatter={xTooltipLabelFormatter}
+              indicator="dot"
+              className={TOOLTIP_CONTENT_CLASS}
+            />
+          )
         }
       />
     </>
   );
 }
 
-/**
- * Format an X-axis tick. The bucket key is always a raw string (built in
- * `buildChartData`), so we let `formatValue` decide whether the requested
- * format (date, duration, number, ...) actually applies — it falls through
- * to the raw string when it can't.
- */
-function formatXTick(value: unknown, format: WidgetColumnFormat | undefined): string {
-  if (value == null || value === "") return "";
-  if (!format) return String(value);
-  return formatValue(value, format);
-}
-
-/**
- * Format a Y-axis tick. Honors the configured `yFormat` (currency, duration,
- * percent, ...); otherwise falls back to a locale-aware numeric default with
- * thousands separators above 1k.
- */
-function formatYTick(value: number, format: WidgetColumnFormat | undefined): string {
-  if (!Number.isFinite(value)) return String(value);
-  if (format) return formatValue(value, format);
-  if (Math.abs(value) >= 1000) return value.toLocaleString();
-  return String(value);
-}
-
 function DonutChartView({
   data,
   series,
   legendMode,
+  isDark,
 }: {
   data: Array<Record<string, unknown>>;
   series: ChartSeries | undefined;
   legendMode: WidgetChartLegendMode;
+  isDark: boolean;
 }) {
   const seriesKey = series?.key ?? "";
   const sliceData = useMemo(() => {
@@ -378,10 +466,10 @@ function DonutChartView({
       return {
         x,
         value: Number(row[seriesKey]) || 0,
-        color: resolveChartColor(x, idx),
+        color: resolveChartColor(x, idx, isDark),
       };
     });
-  }, [data, seriesKey]);
+  }, [data, seriesKey, isDark]);
 
   const total = useMemo(() => sliceData.reduce((acc, slice) => acc + slice.value, 0), [sliceData]);
 
@@ -438,7 +526,7 @@ function DonutChartView({
           innerRadius="55%"
           outerRadius="85%"
           paddingAngle={1}
-          stroke="#fff"
+          stroke={isDark ? "#111827" : "#fff"}
           strokeWidth={1.5}
         >
           {sliceData.map((slice, idx) => (

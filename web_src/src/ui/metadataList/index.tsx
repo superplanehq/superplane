@@ -1,3 +1,4 @@
+import { nodeCanvasMetadataSectionClassName } from "@/lib/nodeCanvasSections";
 import { resolveIcon } from "@/lib/utils";
 import React from "react";
 
@@ -17,7 +18,7 @@ export interface MetadataListProps {
 
 export const MetadataList: React.FC<MetadataListProps> = ({
   items,
-  className = "px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1",
+  className = nodeCanvasMetadataSectionClassName,
   iconSize = 16,
   underlined = false,
   maxVisibleItems,

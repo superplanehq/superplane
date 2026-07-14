@@ -222,6 +222,30 @@ type UpdateIssueRequest struct {
 	IsSubscribed *bool  `json:"isSubscribed,omitempty"`
 }
 
+type OrganizationIntegration struct {
+	ID       string `json:"id" mapstructure:"id"`
+	Name     string `json:"name" mapstructure:"name"`
+	Status   string `json:"status" mapstructure:"status"`
+	Provider struct {
+		Key  string `json:"key" mapstructure:"key"`
+		Name string `json:"name" mapstructure:"name"`
+	} `json:"provider" mapstructure:"provider"`
+}
+
+type LinkExternalIssueRequest struct {
+	Repo          string `json:"repo"`
+	ExternalIssue any    `json:"externalIssue"`
+	Comment       string `json:"comment,omitempty"`
+}
+
+type ExternalIssueLink struct {
+	ID            any    `json:"id" mapstructure:"id"`
+	Key           string `json:"key" mapstructure:"key"`
+	URL           string `json:"url" mapstructure:"url"`
+	IntegrationID any    `json:"integrationId" mapstructure:"integrationId"`
+	DisplayName   string `json:"displayName" mapstructure:"displayName"`
+}
+
 type MetricAlertRule struct {
 	ID               string                    `json:"id" mapstructure:"id"`
 	Name             string                    `json:"name" mapstructure:"name"`
@@ -703,6 +727,48 @@ func (c *Client) UpdateIssue(issueID string, request UpdateIssueRequest) (*Issue
 	}
 
 	return c.GetIssue(issueID)
+}
+
+func (c *Client) ListOrganizationIntegrations(providerKey string) ([]OrganizationIntegration, error) {
+	path := fmt.Sprintf("/api/0/organizations/%s/integrations/", c.orgSlug)
+	if strings.TrimSpace(providerKey) != "" {
+		path += "?providerKey=" + url.QueryEscape(strings.TrimSpace(providerKey))
+	}
+
+	responseBody, err := c.doJSON(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	integrations := []OrganizationIntegration{}
+	if err := json.Unmarshal(responseBody, &integrations); err != nil {
+		return nil, err
+	}
+
+	return integrations, nil
+}
+
+func (c *Client) LinkExternalIssue(issueID, integrationID string, request LinkExternalIssueRequest) (*ExternalIssueLink, error) {
+	responseBody, err := c.doJSON(
+		http.MethodPut,
+		fmt.Sprintf(
+			"/api/0/organizations/%s/issues/%s/integrations/%s/",
+			c.orgSlug,
+			url.PathEscape(issueID),
+			url.PathEscape(integrationID),
+		),
+		request,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	link := ExternalIssueLink{}
+	if err := json.Unmarshal(responseBody, &link); err != nil {
+		return nil, err
+	}
+
+	return &link, nil
 }
 
 func (c *Client) ListAlertRules() ([]MetricAlertRule, error) {

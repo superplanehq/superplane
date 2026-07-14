@@ -11,7 +11,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
 import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import {
+  settingsEmptyStateIconClassName,
+  settingsEmptyStateSubtitleClassName,
+  settingsEmptyStateTitleClassName,
+  settingsModalClassName,
+  settingsTableCardClassName,
+  settingsTableLinkClassName,
+} from "./settingsPageStyles";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bot } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
@@ -107,8 +116,8 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
   if (isLoading) {
     return (
       <div className="space-y-6 pt-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
-          <div className="px-6 pb-6 min-h-96 flex justify-center items-center">
+        <div className={settingsTableCardClassName}>
+          <div className="flex min-h-96 items-center justify-center px-6 pb-6">
             <p className="text-gray-500 dark:text-gray-400">Loading service accounts...</p>
           </div>
         </div>
@@ -120,7 +129,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
 
   return (
     <div className="space-y-6 pt-6">
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className={settingsTableCardClassName}>
         {sorted.length > 0 && (
           <div className="px-6 pt-6 pb-4 flex items-center justify-start">
             <PermissionTooltip
@@ -142,11 +151,11 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
         <div className="px-6 pb-6 min-h-96">
           {sorted.length === 0 ? (
             <div className="flex min-h-96 flex-col items-center justify-center text-center">
-              <div className="flex justify-center items-center text-gray-800">
+              <div className={cn("flex items-center justify-center", settingsEmptyStateIconClassName)}>
                 <Bot size={32} />
               </div>
-              <p className="mt-3 text-sm text-gray-800">Create your first service account</p>
-              <p className="mt-1 text-xs text-gray-500">Service accounts provide programmatic API access.</p>
+              <p className={settingsEmptyStateTitleClassName}>Create your first service account</p>
+              <p className={settingsEmptyStateSubtitleClassName}>Service accounts provide programmatic API access.</p>
               <PermissionTooltip
                 allowed={canCreate || permissionsLoading}
                 message="You don't have permission to create service accounts."
@@ -178,10 +187,10 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                   <TableRow key={sa.id} className="last:[&>td]:border-b-0">
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Bot size={16} className="text-gray-500" />
+                        <Bot size={16} className="text-gray-500 dark:text-gray-400" />
                         <Link
                           href={getDetailPath(sa.id || "")}
-                          className="cursor-pointer text-sm !font-semibold text-gray-800 !underline underline-offset-2"
+                          className={settingsTableLinkClassName}
                           data-testid="sa-link"
                         >
                           {sa.name || "Unnamed"}
@@ -212,7 +221,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                             size="sm"
                             onClick={() => handleDelete(sa.id || "", sa.name || "")}
                             disabled={!canDelete || deleteMutation.isPending}
-                            className="text-red-600 hover:text-red-700"
+                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                             data-testid="sa-delete-btn"
                           >
                             <Icon name="trash-2" size="sm" />
@@ -231,7 +240,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
       {/* Create modal */}
       {isCreateModalOpen && !newToken && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-lg w-full mx-4">
+          <div className={cn(settingsModalClassName, "max-w-lg")}>
             <form
               className="p-6"
               onSubmit={(e) => {
@@ -292,7 +301,9 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                       <SelectItem value="org_admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="mt-1 text-xs text-gray-500">Determines what this service account can access.</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Determines what this service account can access.
+                  </p>
                 </div>
               </div>
 
@@ -332,10 +343,10 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
       {/* Token display modal */}
       {isCreateModalOpen && newToken && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-lg w-full mx-4">
+          <div className={cn(settingsModalClassName, "max-w-lg")}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <Bot className="w-6 h-6 text-green-600" />
+                <Bot className="h-6 w-6 text-green-600 dark:text-green-400" />
                 <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Service Account Created</h3>
               </div>
 

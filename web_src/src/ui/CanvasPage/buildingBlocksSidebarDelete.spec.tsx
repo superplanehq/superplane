@@ -1,7 +1,8 @@
-import { act, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { act, render as testingLibraryRender, screen } from "@testing-library/react";
+import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 const { reactFlowPropsRef } = vi.hoisted(() => ({
   reactFlowPropsRef: {
@@ -82,6 +83,10 @@ vi.mock("./Header", () => ({
 }));
 
 import { CanvasPage } from "./index";
+
+function render(ui: ReactElement) {
+  return testingLibraryRender(ui, { wrapper: ThemeProvider });
+}
 
 describe("CanvasPage building blocks sidebar delete", () => {
   beforeEach(() => {

@@ -45,12 +45,12 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 		description = groupModelMetadata.Description
 	}
 
-	updatingRole := groupSpec.Role
-	if updatingRole == "" {
-		updatingRole = currentRole
-	}
-
+	updatingRole := currentRole
 	if groupSpec != nil {
+		if groupSpec.Role != "" {
+			updatingRole = groupSpec.Role
+		}
+
 		err = authService.UpdateGroup(domainID, domainType, groupName, updatingRole, displayName, description)
 		if err != nil {
 			log.Errorf("failed to update group %s role from %s to %s: %v", groupName, currentRole, groupSpec.Role, err)

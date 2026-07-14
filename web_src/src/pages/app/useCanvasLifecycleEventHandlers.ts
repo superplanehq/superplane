@@ -1,105 +1,76 @@
-import { useCallback } from "react";
+import { useCallback, type MutableRefObject } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { consumeLocalStagingWrite } from "@/lib/canvasStagingEcho";
-import { canvasKeys, pruneDeletedDraftBranchFromCache } from "@/hooks/useCanvasData";
+import { canvasKeys } from "@/hooks/useCanvasData";
 
 import { processCanvasLifecycleEvent } from "./lib/canvas-version-lifecycle";
 
 type UseCanvasLifecycleEventHandlersOptions = {
   canvasId?: string;
-  activeCanvasVersionId: string;
-  isEditing: boolean;
-  editSessionActive: boolean;
-  isCreatingDraftBranch: boolean;
+  currentUserId?: string;
+  editSessionActiveRef: MutableRefObject<boolean>;
   hasLocalSaveActivity: boolean;
   isViewingLiveVersion: boolean;
   canvasDeletedRemotely: boolean;
   consumeIgnoredCanvasUpdatedEcho: () => boolean;
-  consumeIgnoredCreateDraftEcho: (targetCanvasId?: string, eventVersionId?: string) => boolean;
-  consumeIgnoredCanvasVersionUpdatedEcho: (versionId?: string) => boolean;
-  resyncDraftToCommitted: (versionId: string) => Promise<void>;
-  resyncDraftToStaged: (versionId: string) => Promise<void>;
+  onRemoteStagingUpdated?: () => void;
   setCanvasDeletedRemotely: (value: boolean) => void;
   setRemoteCanvasUpdatePending: (value: boolean) => void;
 };
 
 export function useCanvasLifecycleEventHandlers({
   canvasId,
-  activeCanvasVersionId,
-  isEditing,
-  editSessionActive,
-  isCreatingDraftBranch,
+  currentUserId,
+  editSessionActiveRef,
   hasLocalSaveActivity,
   isViewingLiveVersion,
   canvasDeletedRemotely,
   consumeIgnoredCanvasUpdatedEcho,
-  consumeIgnoredCreateDraftEcho,
-  consumeIgnoredCanvasVersionUpdatedEcho,
-  resyncDraftToCommitted,
-  resyncDraftToStaged,
+  onRemoteStagingUpdated,
   setCanvasDeletedRemotely,
   setRemoteCanvasUpdatePending,
 }: UseCanvasLifecycleEventHandlersOptions) {
   const queryClient = useQueryClient();
 
-  const invalidateCanvasVersionData = useCallback(
-    (targetCanvasId: string, targetVersionId?: string) => {
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(targetCanvasId) });
-      if (targetVersionId) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(targetCanvasId, targetVersionId) });
-      }
+  const invalidateCanvasStaging = useCallback(
+    (targetCanvasId: string) => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(targetCanvasId) });
     },
     [queryClient],
   );
 
-  const pruneDeletedCanvasVersion = useCallback(
-    (targetVersionId: string) => {
-      if (!canvasId) {
-        return;
-      }
-
-      void pruneDeletedDraftBranchFromCache(queryClient, canvasId, targetVersionId);
+  const invalidateLiveVersionData = useCallback(
+    (targetCanvasId: string) => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.console(targetCanvasId, undefined) });
     },
-    [canvasId, queryClient],
+    [queryClient],
   );
 
   const handleCanvasLifecycleEvent = useCallback(
-    (payload: { canvasId: string; versionId?: string }, eventName: string) =>
+    (payload: { canvasId: string }, eventName: string) =>
       processCanvasLifecycleEvent({
         payload,
         eventName,
         canvasId,
-        activeCanvasVersionId,
-        isEditing,
-        editSessionActive,
-        isCreatingDraftBranch,
+        editSessionActive: editSessionActiveRef.current,
         hasLocalSaveActivity,
         consumeIgnoredCanvasUpdatedEcho,
-        consumeIgnoredCreateDraftEcho,
-        consumeIgnoredCanvasVersionUpdatedEcho,
-        invalidateCanvasVersionData,
-        pruneDeletedCanvasVersion,
-        resyncDraftToCommitted: (versionId) => {
-          void resyncDraftToCommitted(versionId);
-        },
+        invalidateCanvasStaging,
+        invalidateLiveVersionData,
         setCanvasDeletedRemotely,
         setRemoteCanvasUpdatePending,
       }),
     [
-      activeCanvasVersionId,
+      editSessionActiveRef,
       canvasId,
       consumeIgnoredCanvasUpdatedEcho,
-      consumeIgnoredCreateDraftEcho,
-      consumeIgnoredCanvasVersionUpdatedEcho,
-      editSessionActive,
-      isCreatingDraftBranch,
       hasLocalSaveActivity,
-      invalidateCanvasVersionData,
-      isEditing,
-      pruneDeletedCanvasVersion,
-      resyncDraftToCommitted,
+      invalidateCanvasStaging,
+      invalidateLiveVersionData,
       setCanvasDeletedRemotely,
       setRemoteCanvasUpdatePending,
     ],
@@ -111,24 +82,31 @@ export function useCanvasLifecycleEventHandlers({
   );
 
   const handleCanvasStagingEvent = useCallback(
-    (payload: { canvasId: string; versionId?: string }) => {
-      if (!payload.versionId) {
+    (payload: { canvasId: string; userId?: string }) => {
+      if (payload.userId && currentUserId && payload.userId !== currentUserId) {
         return false;
       }
 
-      if (consumeLocalStagingWrite(canvasId, payload.versionId)) {
+      if (consumeLocalStagingWrite(canvasId, payload.userId)) {
         return false;
       }
 
-      if (payload.versionId === activeCanvasVersionId && hasLocalSaveActivity) {
+      if (editSessionActiveRef.current && hasLocalSaveActivity) {
         setRemoteCanvasUpdatePending(true);
-        return true;
+        return false;
       }
 
-      void resyncDraftToStaged(payload.versionId);
-      return true;
+      onRemoteStagingUpdated?.();
+      return false;
     },
-    [activeCanvasVersionId, canvasId, hasLocalSaveActivity, resyncDraftToStaged, setRemoteCanvasUpdatePending],
+    [
+      editSessionActiveRef,
+      canvasId,
+      currentUserId,
+      hasLocalSaveActivity,
+      onRemoteStagingUpdated,
+      setRemoteCanvasUpdatePending,
+    ],
   );
 
   return {

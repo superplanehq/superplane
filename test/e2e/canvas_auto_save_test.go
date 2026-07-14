@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	pw "github.com/playwright-community/playwright-go"
+	"github.com/google/uuid"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -96,25 +97,7 @@ func (s *canvasAutoSaveSteps) givenCanvas(name string) {
 }
 
 func (s *canvasAutoSaveSteps) enterEditMode() {
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
-
-	for {
-		disabled, err := editButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-
-		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.Locator(`header button:has-text("Publish")`))
+	s.canvas.EnterEditMode()
 }
 
 func (s *canvasAutoSaveSteps) addNoopNode(name string, pos models.Position) {
@@ -138,7 +121,7 @@ func (s *canvasAutoSaveSteps) startEditingNoteWithText(text string) {
 		Timeout: pw.Float(10000),
 	})
 	require.NoError(s.t, err)
-	require.NoError(s.t, note.Dblclick(pw.LocatorDblclickOptions{Timeout: pw.Float(10000)}))
+	require.NoError(s.t, note.Dblclick())
 	s.session.AssertVisible(q.Locator(`textarea[aria-label="Note note"]`))
 }
 
@@ -224,10 +207,8 @@ func (s *canvasAutoSaveSteps) nodeCenter(name string) *pw.Rect {
 	}
 }
 
-// waitForSaved waits until the current draft version reflects the latest save.
+// waitForSaved waits until the current user's staged canvas reflects the latest autosave.
 func (s *canvasAutoSaveSteps) waitForSaved() {
-	require.Eventually(s.t, func() bool {
-		return s.canvas.FindCurrentDraft() != nil
-	}, 10*time.Second, 200*time.Millisecond)
-	s.session.Sleep(500)
+	s.canvas.WaitForStaging(uuid.Nil)
+	s.session.Sleep(800)
 }

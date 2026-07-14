@@ -1,0 +1,18 @@
+{
+  "data": {
+    "created_at": "2026-01-01T02:00:00Z",
+    "has_vulnerabilities": true,
+    "identifier": "example-scan-identifier",
+    "max_severity": "High",
+    "num_vulnerabilities": 1,
+    "package": {
+      "identifier": "EXAMPLE123",
+      "name": "example-app",
+      "url": "https://api.cloudsmith.io/v1/packages/example-owner/example-repo/EXAMPLE123/",
+      "version": "example-version"
+    },
+    "scan_id": null
+  },
+  "timestamp": "2026-01-01T02:05:00Z",
+  "type": "cloudsmith.package.vulnerabilities"
+}

@@ -21,7 +21,7 @@ export function TablePanelTitleField({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Title (optional)</Label>
+      <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Title (optional)</Label>
       <Input
         value={value.title ?? ""}
         onChange={(e) => onChange({ ...value, title: e.target.value })}
@@ -66,7 +66,7 @@ export function TablePanelColumnsSection({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600">Columns</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Columns</Label>
         <div className="flex gap-1">
           {fields.length > 0 ? (
             <Button
@@ -96,7 +96,7 @@ export function TablePanelColumnsSection({
           />
         ))}
         {value.render.columns.length === 0 ? (
-          <p className="text-xs text-slate-500">{emptyColumnsHint(value.dataSource.kind)}</p>
+          <p className="text-xs text-slate-500 dark:text-gray-400">{emptyColumnsHint(value.dataSource.kind)}</p>
         ) : null}
       </div>
     </div>
@@ -127,7 +127,7 @@ function TablePanelFieldQuickAddButtons({
           type="button"
           size="sm"
           variant="ghost"
-          className="h-6 bg-slate-100 text-[10px] text-gray-800 hover:bg-slate-200"
+          className="h-6 bg-slate-100 text-[10px] text-gray-800 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
           onClick={() => onSelect(f.field)}
           title={f.sample ? `e.g. ${f.sample}` : undefined}
         >
@@ -150,7 +150,7 @@ export function TablePanelFiltersSection({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600">Filters</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Filters</Label>
         <Button type="button" size="sm" variant="outline" onClick={actions.addFilter}>
           Add filter
         </Button>
@@ -183,7 +183,7 @@ export function TablePanelRowStylesSection({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600">Row background</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Row background</Label>
         <Button
           type="button"
           size="sm"
@@ -194,7 +194,7 @@ export function TablePanelRowStylesSection({
           Add rule
         </Button>
       </div>
-      <p className="text-[11px] text-slate-500">
+      <p className="text-[11px] text-slate-500 dark:text-gray-400">
         Tint a row when its data matches a condition (e.g.{" "}
         <code className="text-[10px]">status == &quot;error&quot;</code>). First matching rule wins.
       </p>
@@ -230,7 +230,7 @@ export function TablePanelSortSection({
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Sort by (optional)</Label>
+      <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Sort by (optional)</Label>
       <div className="grid grid-cols-3 gap-2">
         <Input
           className="col-span-2 h-8"
@@ -288,12 +288,12 @@ export function TablePanelRowActionsSection({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium text-slate-600">Row actions</Label>
+        <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Row actions</Label>
         <Button type="button" size="sm" variant="outline" onClick={actions.addAction} data-testid="table-add-action">
           Add action
         </Button>
       </div>
-      <p className="max-w-xl text-xs text-slate-500">
+      <p className="max-w-xl text-xs text-slate-500 dark:text-gray-400">
         Pick the <strong className="font-semibold">trigger</strong> that starts your flow (e.g. Start). HTTP Request and
         other steps run when that trigger fires. Payload values support{" "}
         <code className="text-[11px]">{`{{ field }}`}</code> CEL — wrap numeric strings with{" "}

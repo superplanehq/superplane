@@ -22,7 +22,8 @@ vi.mock("react-use-websocket", () => ({
 }));
 
 vi.mock("@/stores/nodeExecutionStore", () => ({
-  useNodeExecutionStore: () => nodeExecutionStoreMock,
+  useNodeExecutionStore: (selector?: (state: typeof nodeExecutionStoreMock) => unknown) =>
+    selector ? selector(nodeExecutionStoreMock) : nodeExecutionStoreMock,
 }));
 
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
@@ -79,6 +80,10 @@ function getInvalidationCalls(invalidateQueriesSpy: ReturnType<typeof vi.spyOn>,
   });
 }
 
+function canvasRunQueriesKey() {
+  return [...canvasKeys.runs(), testCanvasId] as const;
+}
+
 type QueryPredicate = (query: { queryKey: readonly unknown[] }) => boolean;
 
 function getInvalidationPredicates(invalidateQueriesSpy: ReturnType<typeof vi.spyOn>) {
@@ -133,7 +138,7 @@ describe("useCanvasWebsocket", () => {
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
   });
 
-  it("invalidates infinite runs query for queue_item_created", async () => {
+  it("invalidates canvas run queries for queue_item_created", async () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
 
@@ -145,10 +150,10 @@ describe("useCanvasWebsocket", () => {
 
     await flushMessageQueue();
 
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasRunQueriesKey())).toHaveLength(1);
   });
 
-  it("does not invalidate infinite runs query for queue_item_consumed", async () => {
+  it("invalidates canvas run queries for queue_item_consumed", async () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
 
@@ -160,7 +165,7 @@ describe("useCanvasWebsocket", () => {
 
     await flushMessageQueue();
 
-    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasRunQueriesKey())).toHaveLength(1);
   });
 
   it("patches execution events into infinite runs cache", async () => {
@@ -302,46 +307,40 @@ describe("useCanvasWebsocket", () => {
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.infiniteRuns(testCanvasId))).toHaveLength(1);
   });
 
-  it("invalidates version and console queries for canvas version updates", () => {
+  it("invalidates live canvas queries for canvas updates when viewing live", () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+    const onCanvasLifecycleEvent = vi.fn().mockReturnValue(true);
 
-    renderCanvasWebsocketHook(queryClient);
-    emitWebsocketMessage("canvas_version_updated", {
+    renderHook(
+      () =>
+        useCanvasWebsocket(
+          testCanvasId,
+          testOrganizationId,
+          undefined,
+          undefined,
+          undefined,
+          onCanvasLifecycleEvent,
+          () => true,
+        ),
+      {
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(QueryClientProvider, { client: queryClient }, children),
+      },
+    );
+
+    emitWebsocketMessage("canvas_updated", {
       canvasId: testCanvasId,
-      versionId: "version-1",
     });
 
+    expect(onCanvasLifecycleEvent).toHaveBeenCalledWith({ canvasId: testCanvasId }, "canvas_updated");
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.versionList(testCanvasId),
+      queryKey: canvasKeys.detail(testOrganizationId, testCanvasId),
     });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.consoleAll(testCanvasId),
-    });
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.consoleAll(testCanvasId))).toHaveLength(0);
   });
 
-  it("invalidates draft branch queries for canvas version deletions", () => {
-    const queryClient = new QueryClient();
-    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
-
-    renderCanvasWebsocketHook(queryClient);
-    emitWebsocketMessage("canvas_version_deleted", {
-      canvasId: testCanvasId,
-      versionId: "version-1",
-    });
-
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.versionList(testCanvasId),
-    });
-    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
-      queryKey: canvasKeys.draftBranches(testCanvasId),
-    });
-    expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({
-      queryKey: canvasKeys.consoleAll(testCanvasId),
-    });
-  });
-
-  it("skips lifecycle invalidation when canvas_version_updated echo is consumed", () => {
+  it("skips lifecycle invalidation when canvas_updated echo is consumed", () => {
     const queryClient = new QueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
     const onCanvasLifecycleEvent = vi.fn().mockReturnValue(false);
@@ -355,15 +354,11 @@ describe("useCanvasWebsocket", () => {
       },
     );
 
-    emitWebsocketMessage("canvas_version_updated", {
+    emitWebsocketMessage("canvas_updated", {
       canvasId: testCanvasId,
-      versionId: "version-1",
     });
 
-    expect(onCanvasLifecycleEvent).toHaveBeenCalledWith(
-      { canvasId: testCanvasId, versionId: "version-1" },
-      "canvas_version_updated",
-    );
+    expect(onCanvasLifecycleEvent).toHaveBeenCalledWith({ canvasId: testCanvasId }, "canvas_updated");
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionList(testCanvasId))).toHaveLength(0);
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.consoleAll(testCanvasId))).toHaveLength(0);
   });
@@ -395,22 +390,18 @@ describe("useCanvasWebsocket", () => {
 
     emitWebsocketMessage("staging_updated", {
       canvasId: testCanvasId,
-      versionId: "version-1",
+      userId: "user-1",
     });
 
-    expect(onCanvasStagingEvent).toHaveBeenCalledWith(
-      { canvasId: testCanvasId, versionId: "version-1" },
-      "staging_updated",
-    );
-    expect(
-      getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionStaging(testCanvasId, "version-1")),
-    ).toHaveLength(1);
+    expect(onCanvasStagingEvent).toHaveBeenCalledWith({ canvasId: testCanvasId, userId: "user-1" }, "staging_updated");
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.canvasStaging(testCanvasId))).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.stagedCanvasSpec(testCanvasId))).toHaveLength(1);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.stagedConsole(testCanvasId))).toHaveLength(1);
     expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.repositoryFiles(testCanvasId))).toHaveLength(1);
 
     const [stagedPredicate] = getInvalidationPredicates(invalidateQueriesSpy);
     expect(stagedPredicate).toBeDefined();
-    expect(stagedPredicate({ queryKey: canvasKeys.versionStagedDetail(testCanvasId, "version-1") })).toBe(true);
-    expect(stagedPredicate({ queryKey: canvasKeys.consoleStaged(testCanvasId, "version-1") })).toBe(true);
+    expect(stagedPredicate({ queryKey: canvasKeys.stagedConsole(testCanvasId) })).toBe(true);
     expect(stagedPredicate({ queryKey: canvasKeys.repositoryFile(testCanvasId, "README.md", "version-1", true) })).toBe(
       true,
     );
@@ -453,12 +444,10 @@ describe("useCanvasWebsocket", () => {
 
     emitWebsocketMessage("staging_updated", {
       canvasId: testCanvasId,
-      versionId: "version-1",
+      userId: "user-1",
     });
 
     expect(onCanvasStagingEvent).toHaveBeenCalledOnce();
-    expect(
-      getInvalidationCalls(invalidateQueriesSpy, canvasKeys.versionStaging(testCanvasId, "version-1")),
-    ).toHaveLength(0);
+    expect(getInvalidationCalls(invalidateQueriesSpy, canvasKeys.canvasStaging(testCanvasId))).toHaveLength(0);
   });
 });

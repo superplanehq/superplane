@@ -7,11 +7,10 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
-type getCommand struct {
-	draftID *string
-}
+type getCommand struct{}
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
 	if len(ctx.Args) > 1 {
@@ -33,21 +32,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	draftID := ""
-	if c.draftID != nil {
-		draftID = strings.TrimSpace(*c.draftID)
-	}
-
-	useDraft := draftID != ""
-	versionID := ""
-	if useDraft {
-		versionID, err = common.ResolveDraftVersionID(ctx, canvasID, draftID)
-		if err != nil {
-			return err
-		}
-	}
-
-	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, versionID)
+	yamlBytes, err := common.FetchRepositoryFile(ctx, canvasID, common.ConsoleYAMLRepositoryPath, "")
 	if err != nil {
 		return err
 	}
@@ -55,34 +40,26 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("app %q has no console", canvasID)
 	}
 
-	resource, err := ParseConsoleYAML(yamlBytes)
+	console, err := yaml.ConsoleFromYML(yamlBytes)
 	if err != nil {
 		return fmt.Errorf("invalid console yaml from server: %w", err)
 	}
-	if strings.TrimSpace(resource.Metadata.Name) == "" {
-		resource.Metadata.Name = canvasName
+	if strings.TrimSpace(console.Metadata.Name) == "" {
+		console.Metadata.Name = canvasName
 	}
-	if strings.TrimSpace(resource.Metadata.CanvasID) == "" {
-		resource.Metadata.CanvasID = canvasID
+	if strings.TrimSpace(console.Metadata.CanvasID) == "" {
+		console.Metadata.CanvasID = canvasID
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(resource)
+		return ctx.Renderer.Render(console)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		source := "live"
-		if useDraft {
-			source = "draft"
-		}
 		_, _ = fmt.Fprintf(stdout, "App: %s\n", canvasName)
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", canvasID)
-		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
-		if versionID != "" {
-			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
-		}
-		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(resource.Spec.Panels))
-		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(resource.Spec.Layout))
+		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(console.Spec.Panels))
+		_, err := fmt.Fprintf(stdout, "Layout items: %d\n", len(console.Spec.Layout))
 		return err
 	})
 }

@@ -1,6 +1,33 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AutoCompleteInput } from "./AutoCompleteInput";
+import { calculateDropdownPosition } from "./dropdownPosition";
+
+describe("calculateDropdownPosition", () => {
+  it("anchors the dropdown top to the cursor y coordinate", () => {
+    const position = calculateDropdownPosition({
+      cursor: { x: 120, y: 240 },
+      viewportWidth: 1000,
+      dropdownWidth: 350,
+      valuePreviewWidth: 200,
+      showValuePreview: false,
+    });
+
+    expect(position.top).toBe(244);
+  });
+
+  it("keeps the dropdown inside the viewport horizontally", () => {
+    const position = calculateDropdownPosition({
+      cursor: { x: 980, y: 80 },
+      viewportWidth: 1000,
+      dropdownWidth: 350,
+      valuePreviewWidth: 200,
+      showValuePreview: false,
+    });
+
+    expect(position.left).toBe(630);
+  });
+});
 
 describe("AutoCompleteInput preview toggle", () => {
   it("shows preview for blank inputs when value preview is enabled", () => {

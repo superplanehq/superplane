@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
-import { aggregateNumberPerSource, applySort, buildChartData, combinePartials, distinctSeriesKeys } from "./widgetData";
+import {
+  aggregateNumber,
+  aggregateNumberPerSource,
+  applySort,
+  buildChartData,
+  combinePartials,
+  distinctSeriesKeys,
+  extractNumericSeries,
+} from "./widgetData";
 
 const entries: CanvasMemoryEntry[] = [
   { id: "1", namespace: "expenses", values: { amount: 10 }, source: "node" },
@@ -11,6 +19,34 @@ const entries: CanvasMemoryEntry[] = [
   { id: "4", namespace: "tests", values: { name: "b" }, source: "node" },
   { id: "5", namespace: "tests", values: { name: "c" }, source: "node" },
 ];
+
+describe("aggregateNumber", () => {
+  it("skips null and blank values instead of coercing them to 0", () => {
+    const rows = [{ n: null }, { n: "" }, { n: 5 }, { n: 8 }];
+    expect(aggregateNumber(rows, "first", "n")).toBe(5);
+    expect(aggregateNumber(rows, "last", "n")).toBe(8);
+    expect(aggregateNumber(rows, "sum", "n")).toBe(13);
+  });
+
+  it("returns null when every value is non-numeric", () => {
+    expect(aggregateNumber([{ n: null }, { n: "" }, { n: "x" }], "sum", "n")).toBeNull();
+  });
+});
+
+describe("extractNumericSeries", () => {
+  it("skips null and blank values instead of coercing them to 0", () => {
+    const rows = [{ n: null }, { n: "" }, { n: 5 }, { n: 8 }];
+    expect(extractNumericSeries(rows, "n")).toEqual([5, 8]);
+  });
+
+  it("returns an empty array when the field is unset", () => {
+    expect(extractNumericSeries([{ n: 1 }], undefined)).toEqual([]);
+  });
+
+  it("coerces numeric strings", () => {
+    expect(extractNumericSeries([{ n: "1" }, { n: "2.5" }], "n")).toEqual([1, 2.5]);
+  });
+});
 
 describe("aggregateNumberPerSource", () => {
   it("sums a numeric field across rows of the same namespace", () => {

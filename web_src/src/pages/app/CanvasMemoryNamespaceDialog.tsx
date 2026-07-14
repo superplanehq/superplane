@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTheme } from "@/contexts/useTheme";
 
 const EDITOR_OPTIONS = {
   minimap: { enabled: false },
@@ -59,6 +60,8 @@ export function CanvasMemoryNamespaceDialog({
   isSubmitting,
   onSubmit,
 }: CanvasMemoryNamespaceDialogProps) {
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
   const initialJson = useMemo(() => stringifyEntries(initialEntries), [initialEntries]);
   const [namespace, setNamespace] = useState<string>(originalNamespace ?? "");
   const [jsonValue, setJsonValue] = useState<string>(initialJson);
@@ -117,7 +120,7 @@ export function CanvasMemoryNamespaceDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="large" className="flex h-[80vh] w-[90vw] max-w-3xl flex-col gap-0 overflow-hidden p-0">
-        <div className="flex flex-col gap-1 border-b border-slate-950/10 px-4 py-4">
+        <div className="flex flex-col gap-1 border-b border-slate-950/10 px-4 py-4 dark:border-gray-700/70">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </div>
@@ -139,11 +142,13 @@ export function CanvasMemoryNamespaceDialog({
           <div className="flex min-h-0 flex-1 flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="memory-namespace-entries">Entries (JSON array)</Label>
-              <span className="text-xs text-gray-500">Each element becomes a row in the namespace.</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Each element becomes a row in the namespace.
+              </span>
             </div>
             <div
               id="memory-namespace-entries"
-              className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border border-gray-300 bg-white dark:border-gray-700"
+              className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border border-gray-300 bg-white dark:border-gray-700/70 dark:bg-gray-900"
               data-testid="memory-namespace-entries-editor"
             >
               <Editor
@@ -151,7 +156,7 @@ export function CanvasMemoryNamespaceDialog({
                 language="json"
                 value={jsonValue}
                 onChange={(value) => setJsonValue(value ?? "")}
-                theme="vs"
+                theme={monacoTheme}
                 options={EDITOR_OPTIONS}
               />
             </div>
@@ -164,7 +169,7 @@ export function CanvasMemoryNamespaceDialog({
           ) : null}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-950/10 px-4 py-3">
+        <div className="flex justify-end gap-2 border-t border-slate-950/10 px-4 py-3 dark:border-gray-700/70">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
           </Button>

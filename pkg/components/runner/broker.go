@@ -69,11 +69,11 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 //
 // Example request:
 // {
-//   "fleet_id": "aws-standard-1",
+//   "fleet_id": "e1-large-amd64",
 //   "commands": ["echo \"Hello, World!\""],
 //   "environment": [{"name": "APP_ENV", "value": "production"}],
 //   "webhook_url": "https://example.com/webhook",
-//   "webhook_payload_size_limit": 65536,
+//   "webhook_payload_size_limit": 524288,
 //   "execution_mode": "host",
 //   "docker_image": "debian:bookworm-slim",
 //   "execution_timeout_seconds": 600

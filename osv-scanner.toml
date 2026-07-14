@@ -8,6 +8,12 @@ license.override = ["MIT"]
 reason = "Package is MIT-0 (MIT No Attribution); permissive and compatible with Apache-2.0."
 
 [[PackageOverrides]]
+name = "@csstools/css-syntax-patches-for-csstree"
+ecosystem = "npm"
+license.override = ["MIT"]
+reason = "Package is MIT-0 (MIT No Attribution); transitive jsdom/css-tree dependency, compatible with Apache-2.0."
+
+[[PackageOverrides]]
 name = "argparse"
 ecosystem = "npm"
 license.ignore = true

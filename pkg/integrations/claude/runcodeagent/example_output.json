@@ -1,0 +1,11 @@
+{
+  "data": {
+    "status": "idle",
+    "sessionId": "sess_01ExampleCodeSession",
+    "prUrl": "https://github.com/owner/repo/pull/42",
+    "branch": "claude/agent-1a2b3c4d5e6f",
+    "lastMessage": "Done. PR_URL=https://github.com/owner/repo/pull/42"
+  },
+  "timestamp": "2026-07-02T12:00:00Z",
+  "type": "claude.runCodeAgent"
+}

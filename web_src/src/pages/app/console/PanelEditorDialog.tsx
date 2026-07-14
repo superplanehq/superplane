@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTheme } from "@/contexts/useTheme";
 
 import { PANEL_TYPE_META, validatePanelContent, type PanelType } from "./panelTypes";
 
@@ -123,7 +124,10 @@ export function PanelEditorDialog<T extends object>({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="gap-0 overflow-hidden sm:max-w-3xl" closeButtonClassName="top-2 right-2">
+        <DialogContent
+          className="gap-0 overflow-hidden sm:max-w-3xl dark:border-gray-600 dark:bg-gray-900"
+          closeButtonClassName="top-2 right-2"
+        >
           <PanelEditorTabs
             tab={tab}
             onTabChange={setTab}
@@ -178,10 +182,13 @@ function PanelEditorTabs({
   onYamlChange: (value: string | undefined) => void;
   footer: ReactNode;
 }) {
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+
   return (
     <div className="flex w-full flex-col">
       <Tabs value={tab} onValueChange={(value) => onTabChange(value as EditorTab)} className="flex w-full flex-col">
-        <div className="-mx-6 -mt-6 border-b border-slate-950/10 bg-background px-6 pb-3 pt-5">
+        <div className="-mx-6 -mt-6 border-b border-slate-950/10 bg-background px-6 pb-3 pt-5 dark:border-gray-600">
           <PanelEditorHeader panelType={panelType} hasYamlChanges={hasYamlChanges} onShowDiff={onShowDiff} />
           <TabsList className="mt-3">
             <TabsTrigger value="form" data-testid="panel-editor-tab-form">
@@ -196,12 +203,13 @@ function PanelEditorTabs({
           {formContent}
         </TabsContent>
         <TabsContent value="yaml" className="mt-3">
-          <div className="overflow-hidden rounded-md border border-slate-200">
+          <div className="overflow-hidden rounded-md border border-slate-200 dark:border-gray-600">
             <Editor
               height="50vh"
               language="yaml"
               value={yamlDraft}
               onChange={onYamlChange}
+              theme={monacoTheme}
               options={{
                 minimap: { enabled: false },
                 fontSize: 12,
@@ -213,7 +221,7 @@ function PanelEditorTabs({
           </div>
         </TabsContent>
       </Tabs>
-      <div className="-mx-6 -mb-6 flex flex-col gap-2 border-t border-slate-950/10 bg-background px-6 py-4">
+      <div className="-mx-6 -mb-6 flex flex-col gap-2 border-t border-slate-950/10 bg-background px-6 py-4 dark:border-gray-600">
         {footer}
       </div>
     </div>
@@ -236,7 +244,9 @@ function PanelEditorHeader({
           <DialogTitle className="mb-1 text-base font-medium">
             Edit {PANEL_TYPE_META[panelType].label} panel
           </DialogTitle>
-          <DialogDescription className="text-gray-800">{PANEL_TYPE_META[panelType].description}</DialogDescription>
+          <DialogDescription className="text-gray-800 dark:text-gray-400">
+            {PANEL_TYPE_META[panelType].description}
+          </DialogDescription>
         </div>
         {hasYamlChanges ? (
           <Button
@@ -261,7 +271,7 @@ function PanelEditorError({ message }: { message: string | null }) {
 
   return (
     <div
-      className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+      className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
       data-testid="panel-editor-error"
     >
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

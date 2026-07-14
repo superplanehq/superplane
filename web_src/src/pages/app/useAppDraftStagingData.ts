@@ -1,120 +1,85 @@
-import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
-import { useCanvasVersionStaging, useCommitCanvasStaging, useDiscardCanvasStaging } from "@/hooks/useCanvasData";
+import type { CanvasesCanvas } from "@/api-client";
+import { useCanvasStaging, useCommitCanvasStaging, useDiscardCanvasStaging } from "@/hooks/useCanvasData";
 
 import { useCanvasConsoleVersionDiff } from "./useCanvasConsoleVersionDiff";
-import { useCommittedDraftBaselines } from "./useCommittedDraftBaselines";
+import type { useCommittedDraftBaselines } from "./useCommittedDraftBaselines";
 import { useDraftStagingIndicators } from "./useDraftStagingIndicators";
-import { useDraftVersionGraphDiff } from "./useDraftVersionGraphDiff";
+
+type CommittedBaselines = ReturnType<typeof useCommittedDraftBaselines>;
 
 type UseAppDraftStagingDataOptions = {
-  organizationId: string;
   canvasId: string;
   activeCanvasVersionId: string;
   liveCanvasVersionId: string | undefined;
-  liveCanvasVersion: CanvasesCanvasVersion | undefined;
-  latestDraftVersion: CanvasesCanvasVersion | undefined;
   isEditing: boolean;
   hasEditableVersion: boolean;
   stagingResetNonce: number;
   draftSpecToRender: CanvasesCanvas["spec"] | null | undefined;
   canvas: CanvasesCanvas | null | undefined;
-  draftVersionsFromBranches: CanvasesCanvasVersion[];
-  selectedCanvasVersion: CanvasesCanvasVersion | null;
-  draftBranches: CanvasesCanvasVersion[];
-  suppressUnpublishedDraftDiscard: boolean;
-  registerIgnoredCanvasVersionUpdatedEcho: (savingVersionId?: string) => () => void;
   getConsoleMutationGeneration: () => number;
+  committedBaselines: CommittedBaselines;
+  editBootstrapReady: boolean;
 };
 
 export function useAppDraftStagingData({
-  organizationId,
   canvasId,
   activeCanvasVersionId,
   liveCanvasVersionId,
-  liveCanvasVersion,
-  latestDraftVersion,
   isEditing,
   hasEditableVersion,
   stagingResetNonce,
   draftSpecToRender,
   canvas,
-  draftVersionsFromBranches,
-  selectedCanvasVersion,
-  draftBranches,
-  suppressUnpublishedDraftDiscard,
-  registerIgnoredCanvasVersionUpdatedEcho,
   getConsoleMutationGeneration,
+  committedBaselines,
+  editBootstrapReady,
 }: UseAppDraftStagingDataOptions) {
-  const canvasVersionStagingQuery = useCanvasVersionStaging(
-    canvasId,
-    activeCanvasVersionId || undefined,
-    hasEditableVersion,
-  );
-  const committedBaselines = useCommittedDraftBaselines({
-    canvasId,
-    versionId: activeCanvasVersionId || undefined,
-    enabled: isEditing,
-    stagingResetNonce,
-  });
-  const { draftVersionForGraphDiff, hasDraftGraphDiffVersusLive, liveVersionForGraphDiff } = useDraftVersionGraphDiff({
-    organizationId,
-    canvasId,
-    isEditing,
-    activeCanvasVersionId,
-    liveCanvasVersionId: liveCanvasVersionId || "",
-    liveCanvasVersion,
-    draftVersionsFromBranches,
-    selectedCanvasVersion,
-    latestDraftVersion,
-    committedBaselines,
-  });
-  const commitCanvasStagingMutation = useCommitCanvasStaging(canvasId, activeCanvasVersionId);
-  const discardCanvasStagingMutation = useDiscardCanvasStaging(canvasId, activeCanvasVersionId);
+  const canvasStagingQuery = useCanvasStaging(canvasId, hasEditableVersion);
+  const commitCanvasStagingMutation = useCommitCanvasStaging(canvasId);
+  const discardCanvasStagingMutation = useDiscardCanvasStaging(canvasId);
 
   const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({
     canvasId,
     versionIds: {
       active: activeCanvasVersionId,
-      draft: activeCanvasVersionId || latestDraftVersion?.metadata?.id,
+      draft: activeCanvasVersionId,
       live: liveCanvasVersionId,
     },
-    hasDraftGraphDiffVersusLive,
-    suppressUnpublishedDraftDiscard,
+    hasDraftGraphDiffVersusLive: false,
+    suppressUnpublishedDraftDiscard: true,
     enabled: true,
     stageActiveConsole: hasEditableVersion,
-    registerIgnoredCanvasVersionUpdatedEcho,
     getConsoleMutationGeneration,
   });
-  const { consoleQuery, updateConsoleMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
-    canvasConsoleVersionDiff;
+  const { consoleQuery, updateConsoleMutation, draftChangeIndicators } = canvasConsoleVersionDiff;
 
-  const effectiveCanvasSpec = draftSpecToRender ?? canvas?.spec ?? undefined;
+  const effectiveCanvasSpec = editBootstrapReady ? (draftSpecToRender ?? canvas?.spec ?? undefined) : undefined;
   const stagingIndicators = useDraftStagingIndicators({
     isEditing,
+    editBootstrapReady,
     canvasId,
     activeCanvasVersionId,
-    liveCanvasVersionId: liveCanvasVersionId || "",
     stagingResetNonce,
-    canvasVersionStagingQuery,
+    canvasStagingQuery,
     committedBaselines,
     effectiveCanvasSpec,
     consoleQueryData: consoleQuery.data,
-    draftVersionsFromBranches,
-    draftVersionForGraphDiff,
-    liveVersionForGraphDiff,
-    draftBranches,
-    hasDraftDiffVersusLive,
     draftChangeIndicators,
   });
 
   return {
-    hasDraftGraphDiffVersusLive,
+    stagingBaselinesReady: committedBaselines.ready,
+    stagingStale: !!canvasStagingQuery.data?.stale,
     commitCanvasStagingMutation,
     discardCanvasStagingMutation,
     consoleQuery,
     updateConsoleMutation,
-    draftChangeIndicators,
-    hasDraftDiffVersusLive,
+    draftChangeIndicators: {
+      hasUnpublishedDraftChanges: false,
+      hasUnpublishedCanvasDraftChanges: false,
+      hasUnpublishedConsoleDraftChanges: false,
+    },
+    hasDraftDiffVersusLive: false,
     canvasConsoleVersionDiff,
     ...stagingIndicators,
   };

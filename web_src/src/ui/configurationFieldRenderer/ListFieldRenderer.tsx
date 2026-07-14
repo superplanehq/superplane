@@ -47,12 +47,13 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   fieldPath = field.name || "",
   autocompleteExampleObj,
   allowExpressions = false,
+  readOnly = false,
 }) => {
   const listOptions = field.typeOptions?.list;
   const itemDefinition = listOptions?.itemDefinition;
   const maxItems = listOptions?.maxItems;
   const useAccordion = listOptions?.accordion === true;
-  const allowReorder = listOptions?.reorderable === true;
+  const allowReorder = listOptions?.reorderable === true && !readOnly;
   const items = Array.isArray(value)
     ? itemDefinition?.type === "day-in-year"
       ? value.filter((item) => typeof item === "string" && item.trim().length > 0)
@@ -68,7 +69,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     itemDefinition.schema.some((schemaField) => schemaField.name === "type") &&
     itemDefinition.schema.some((schemaField) => ["user", "role", "group"].includes(schemaField.name || ""));
 
-  const [openItem, setOpenItem] = React.useState<string | undefined>(undefined);
+  // Keep Accordion controlled for its full lifetime: use "" as the "closed" value.
+  const [openItem, setOpenItem] = React.useState<string>("");
   const rowRefs = React.useRef<Array<HTMLDivElement | null>>([]);
   const {
     dragState,
@@ -85,9 +87,9 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
 
   React.useEffect(() => {
     if (items.length === 0) {
-      setOpenItem(undefined);
-    } else if (openItem !== undefined && Number(openItem) >= items.length) {
-      setOpenItem(undefined);
+      setOpenItem("");
+    } else if (openItem !== "" && Number(openItem) >= items.length) {
+      setOpenItem("");
     }
   }, [items.length, openItem]);
 
@@ -115,9 +117,9 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     if (!useAccordion) return;
 
     setOpenItem((current) => {
-      if (newItems.length === 0 || current === undefined) return undefined;
+      if (newItems.length === 0 || current === "") return "";
       const openIndex = Number(current);
-      if (openIndex === index) return undefined;
+      if (openIndex === index) return "";
       if (openIndex > index) return String(openIndex - 1);
       return current;
     });
@@ -186,6 +188,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           organizationId={organizationId}
           hasError={hasNestedError}
           autocompleteExampleObj={autocompleteExampleObj}
+          readOnly={readOnly}
         />
       );
     });
@@ -220,6 +223,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
       <Input
         type={itemDefinition?.type === "number" ? "number" : "text"}
         value={(item as string | number) ?? ""}
+        readOnly={readOnly}
+        disabled={readOnly}
         onChange={(e) => {
           const val =
             itemDefinition?.type === "number"
@@ -289,7 +294,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                   className="flex items-start gap-2"
                 >
                   {renderDragHandle(index)}
-                  <div className="relative min-w-0 flex-1 rounded-md border border-gray-300 dark:border-gray-700">
+                  <div className="relative min-w-0 flex-1 rounded-md border border-gray-300 dark:border-gray-600">
                     <AccordionPrimitive.Header
                       className={cn(
                         "relative z-10 flex h-11 shrink-0",
@@ -319,16 +324,18 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                       {renderListItemBody(item, index)}
                     </AccordionContent>
                   </div>
-                  {renderRemoveButton(index, "mt-1 shrink-0")}
+                  {readOnly ? null : renderRemoveButton(index, "mt-1 shrink-0")}
                 </div>
               </AccordionItem>
             );
           })}
         </Accordion>
-        <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
-          <Plus />
-          Add {itemLabel}
-        </Button>
+        {readOnly ? null : (
+          <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
+            <Plus />
+            Add {itemLabel}
+          </Button>
+        )}
       </div>
     );
   }
@@ -348,19 +355,23 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
             {renderDragHandle(index)}
             <div className="flex-1">
               {itemDefinition?.type === "object" && itemDefinition.schema ? (
-                <div className="rounded-md bg-slate-100 p-4 space-y-4">{renderObjectItemFields(item, index)}</div>
+                <div className="rounded-md bg-slate-100 p-4 space-y-4 dark:bg-gray-800">
+                  {renderObjectItemFields(item, index)}
+                </div>
               ) : (
                 renderListItemBody(item, index)
               )}
             </div>
-            {renderRemoveButton(index, "mt-1")}
+            {readOnly ? null : renderRemoveButton(index, "mt-1")}
           </div>
         );
       })}
-      <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
-        <Plus />
-        Add {itemLabel}
-      </Button>
+      {readOnly ? null : (
+        <Button variant="outline" size="sm" onClick={addItem} className="mt-3 w-full" disabled={!canAddMore}>
+          <Plus />
+          Add {itemLabel}
+        </Button>
+      )}
     </div>
   );
 };

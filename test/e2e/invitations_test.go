@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	pw "github.com/playwright-community/playwright-go"
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -93,7 +93,7 @@ func (s *invitationSteps) createInviteLink() string {
 		require.NoError(s.t, err)
 	}
 
-	inviteLink, err = models.CreateInviteLink(s.session.OrgID)
+	inviteLink, err = models.CreateInviteLink(database.DB(s.t.Context()), s.session.OrgID)
 	require.NoError(s.t, err)
 	return inviteLink.Token.String()
 }
@@ -166,10 +166,11 @@ func (s *invitationSteps) submitSignup() {
 }
 
 func (s *invitationSteps) disableInviteLink(token string) {
-	inviteLink, err := models.FindInviteLinkByToken(token)
+	tx := database.DB(s.t.Context())
+	inviteLink, err := models.FindInviteLinkByToken(tx, token)
 	require.NoError(s.t, err)
 	inviteLink.Enabled = false
-	require.NoError(s.t, models.SaveInviteLink(inviteLink))
+	require.NoError(s.t, models.SaveInviteLink(tx, inviteLink))
 }
 
 func (s *invitationSteps) assertInviteLinkDisabled() {

@@ -2,40 +2,17 @@ import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/ui/switch";
 import type { FieldRendererProps, ValidationError } from "./types";
-import { StringFieldRenderer } from "./StringFieldRenderer";
-import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
-import { TextFieldRenderer } from "./TextFieldRenderer";
-import { XMLFieldRenderer } from "./XMLFieldRenderer";
-import { NumberFieldRenderer } from "./NumberFieldRenderer";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
-import { SelectFieldRenderer } from "./SelectFieldRenderer";
-import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
-import { DateFieldRenderer } from "./DateFieldRenderer";
-import { DateTimeFieldRenderer } from "./DateTimeFieldRenderer";
-import { UrlFieldRenderer } from "./UrlFieldRenderer";
-import { ListFieldRenderer } from "./ListFieldRenderer";
-import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
-import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
-import { TimeFieldRenderer } from "./TimeFieldRenderer";
-import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
-import { CronFieldRenderer } from "./CronFieldRenderer";
-import { UserFieldRenderer } from "./UserFieldRenderer";
-import { RoleFieldRenderer } from "./RoleFieldRenderer";
-import { GroupFieldRenderer } from "./GroupFieldRenderer";
-import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
-import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
-import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
-import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
-import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
-import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
-import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
 import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSubmission } from "../../lib/components";
 import type { AuthorizationDomainType } from "@/api-client";
 import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
 import { getRunTitlePresentation, RUN_TITLE_EXCLUDED_SUGGESTIONS } from "./runTitlePresentation";
+import { ReadonlyConfigurationField } from "./ReadonlyFieldRenderer";
+import { ConfigurationFieldInput } from "./ConfigurationFieldInput";
+import { buildReadonlyExpressionPreview } from "./expressionPreview";
 
 const REQUIRED_FIELD_BADGE_CLASS =
-  "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
+  "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50 dark:border-orange-400/50 dark:bg-orange-950/30 dark:text-orange-300";
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   allowExpressions?: boolean;
@@ -140,6 +117,10 @@ export const ConfigurationFieldRenderer = ({
   enableRealtimeValidation = false,
   autocompleteExampleObj,
   allowExpressions = false,
+  readOnly = false,
+  expressionPreviewContext,
+  expressionErrorMessage,
+  expressionTemplateValue,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -302,168 +283,52 @@ export const ConfigurationFieldRenderer = ({
     integrationId,
     organizationId,
     allowExpressions: fieldAllowsExpressions,
+    readOnly,
     excludedSuggestions: runTitlePresentation ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
     valuePreviewLabel: runTitlePresentation?.previewLabel,
+    expressionPreviewContext,
+    expressionErrorMessage,
+    expressionTemplateValue,
   };
 
-  const renderField = () => {
-    switch (field.type) {
-      case "string":
-        return <StringFieldRenderer {...commonProps} />;
+  if (readOnly && !shouldRenderFieldForReadOnly(field)) {
+    const expressionPreview = buildReadonlyExpressionPreview({
+      field,
+      value,
+      templateValue: expressionTemplateValue,
+      context: expressionPreviewContext,
+      errorMessage: expressionErrorMessage,
+    });
 
-      case "expression":
-        return <ExpressionFieldRenderer {...commonProps} />;
+    return (
+      <ReadonlyConfigurationField
+        field={field}
+        label={fieldLabel}
+        description={fieldDescription}
+        value={value}
+        isTogglable={isTogglable}
+        isEnabled={isEnabled}
+        expressionPreview={expressionPreview}
+      />
+    );
+  }
 
-      case "text":
-        return <TextFieldRenderer {...commonProps} />;
-
-      case "xml":
-        return <XMLFieldRenderer {...commonProps} />;
-
-      case "number":
-        return <NumberFieldRenderer {...commonProps} />;
-
-      case "boolean":
-        return <BooleanFieldRenderer {...commonProps} />;
-
-      case "select":
-        return <SelectFieldRenderer {...commonProps} />;
-
-      case "multi-select":
-        return <MultiSelectFieldRenderer {...commonProps} />;
-
-      case "days-of-week":
-        return <DaysOfWeekFieldRenderer {...commonProps} />;
-
-      case "date":
-        return <DateFieldRenderer {...commonProps} />;
-
-      case "datetime":
-        return <DateTimeFieldRenderer {...commonProps} />;
-
-      case "url":
-        return <UrlFieldRenderer {...commonProps} />;
-
-      case "time":
-        return <TimeFieldRenderer {...commonProps} />;
-
-      case "time-range":
-        return <TimeRangeFieldRenderer {...commonProps} />;
-
-      case "day-in-year":
-        return <DayInYearFieldRenderer {...commonProps} />;
-
-      case "cron":
-        return <CronFieldRenderer {...commonProps} />;
-
-      case "integration-resource":
-        return (
-          <IntegrationResourceFieldRenderer
-            field={field}
-            value={value as string | string[] | undefined}
-            onChange={onChange}
-            allValues={allValues}
-            organizationId={organizationId}
-            integrationId={integrationId}
-            allowExpressions={allowExpressions}
-            autocompleteExampleObj={autocompleteExampleObj}
-            labelRightRef={allowExpressions ? labelRightRef : undefined}
-            labelRightReady={allowExpressions ? labelRightReady : false}
-          />
-        );
-
-      case "git-ref":
-        return <GitRefFieldRenderer {...commonProps} />;
-
-      case "repository-file":
-        return <RepositoryFileFieldRenderer {...commonProps} />;
-
-      case "user":
-        if (!domainId) {
-          return <div className="text-sm text-red-500 dark:text-red-400">User field requires domainId prop</div>;
-        }
-        return (
-          <UserFieldRenderer
-            field={field}
-            value={value as string}
-            onChange={onChange}
-            domainId={domainId}
-            allValues={allValues}
-          />
-        );
-
-      case "role":
-        if (!domainId) {
-          return <div className="text-sm text-red-500 dark:text-red-400">Role field requires domainId prop</div>;
-        }
-        return (
-          <RoleFieldRenderer
-            field={field}
-            value={value as string}
-            onChange={onChange}
-            domainId={domainId}
-            allValues={allValues}
-          />
-        );
-
-      case "group":
-        if (!domainId) {
-          return <div className="text-sm text-red-500 dark:text-red-400">Group field requires domainId prop</div>;
-        }
-        return (
-          <GroupFieldRenderer
-            {...commonProps}
-            field={field}
-            value={value as string}
-            onChange={onChange}
-            domainId={domainId}
-            allValues={allValues}
-          />
-        );
-
-      case "list":
-        return (
-          <ListFieldRenderer
-            {...commonProps}
-            domainId={domainId}
-            domainType={domainType}
-            validationErrors={validationErrors}
-            fieldPath={fieldPath || field.name}
-          />
-        );
-
-      case "any-predicate-list":
-        return <AnyPredicateListFieldRenderer {...commonProps} />;
-
-      case "object":
-        return <ObjectFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} />;
-
-      case "timezone":
-        return <TimezoneFieldRenderer {...commonProps} />;
-
-      case "secret-key":
-        if (!domainId && !organizationId) {
-          return (
-            <div className="text-sm text-red-500 dark:text-red-400">
-              Secret key field requires domain or organization context.
-            </div>
-          );
-        }
-        return (
-          <SecretKeyFieldRenderer
-            field={field}
-            isRequired={isRequired}
-            value={value as SecretKeyRefValue}
-            onChange={(v) => onChange(v)}
-            organizationId={organizationId ?? domainId}
-          />
-        );
-
-      default:
-        // Fallback to text input
-        return <StringFieldRenderer {...commonProps} />;
-    }
-  };
+  const renderField = () => (
+    <ConfigurationFieldInput
+      commonProps={commonProps}
+      domainId={domainId}
+      domainType={domainType}
+      integrationId={integrationId}
+      organizationId={organizationId}
+      allowExpressions={allowExpressions}
+      autocompleteExampleObj={autocompleteExampleObj}
+      isRequired={isRequired}
+      validationErrors={validationErrors}
+      fieldPath={fieldPath}
+      labelRightRef={labelRightRef}
+      labelRightReady={labelRightReady}
+    />
+  );
 
   // Togglable booleans use the standard label row plus an optional labeled value switch.
   if (field.type === "boolean" && isTogglable) {
@@ -473,7 +338,7 @@ export const ConfigurationFieldRenderer = ({
           <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
           <Label className="block text-left flex-1 min-w-0">
             {fieldLabel}
-            {isRequired && <span className="text-gray-800 ml-1">*</span>}
+            {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -518,7 +383,7 @@ export const ConfigurationFieldRenderer = ({
           {renderField()}
           <Label className="text-left cursor-pointer">
             {fieldLabel}
-            {isRequired && <span className="text-gray-800 ml-1">*</span>}
+            {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -557,7 +422,7 @@ export const ConfigurationFieldRenderer = ({
         {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
         <Label className="block text-left flex-1 min-w-0">
           {fieldLabel}
-          {isRequired && <span className="text-gray-800 ml-1">*</span>}
+          {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
           {hasFieldError &&
             ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
               (!enableRealtimeValidation &&
@@ -571,7 +436,7 @@ export const ConfigurationFieldRenderer = ({
       </div>
       {isEnabled && (
         <div className="flex items-center gap-2">
-          <div className="flex-1">{renderField()}</div>
+          <div className="flex-1 min-w-0">{renderField()}</div>
         </div>
       )}
 
@@ -596,3 +461,15 @@ export const ConfigurationFieldRenderer = ({
     </div>
   );
 };
+
+function shouldRenderFieldForReadOnly(field: ConfigurationField): boolean {
+  return (
+    field.type === "list" ||
+    field.type === "select" ||
+    field.type === "multi-select" ||
+    field.type === "user" ||
+    field.type === "role" ||
+    field.type === "group" ||
+    (field.type === "object" && Boolean(field.typeOptions?.object?.schema?.length))
+  );
+}

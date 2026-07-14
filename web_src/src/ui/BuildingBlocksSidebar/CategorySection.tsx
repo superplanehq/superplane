@@ -1,10 +1,11 @@
+import type { OrganizationsIntegration } from "@/api-client";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Plug } from "lucide-react";
 import { memo, useState, type DragEvent } from "react";
 import { toTestId } from "../../lib/testID";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIconMaps";
-import { filterBlocksInCategory, type TypeFilter } from "./filter";
+import { filterBlocksInCategory, normalizeIntegrationName, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 const TYPE_HOVER_BG: Record<string, string> = {
@@ -56,7 +57,7 @@ function renderCategoryIcon(
     return <img src={categoryIconSrc} alt={categoryName} className="size-4" />;
   }
   if (CategoryIcon) {
-    return <CategoryIcon size={14} className="text-gray-500" />;
+    return <CategoryIcon size={14} className="text-gray-500 dark:text-gray-400" />;
   }
   return null;
 }
@@ -90,7 +91,7 @@ const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProp
         {appIconSrc ? (
           <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
         ) : (
-          <IconComponent size={14} className="text-gray-500" />
+          <IconComponent size={14} className="text-gray-500 dark:text-gray-400" />
         )}
       </ItemMedia>
 
@@ -112,12 +113,30 @@ const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProp
 
 export interface CategorySectionProps {
   category: BuildingBlockCategory;
+  integrations?: OrganizationsIntegration[];
+  showIntegrationSetupStatus?: boolean;
   searchTerm?: string;
   typeFilter?: TypeFilter;
   onBlockClick?: (block: BuildingBlock) => void;
 }
 
-export function CategorySection({ category, searchTerm = "", typeFilter = "all", onBlockClick }: CategorySectionProps) {
+type IntegrationState = "ready" | "error" | "pending" | "notConfigured";
+
+const INTEGRATION_STATE_COLOR: Record<IntegrationState, string> = {
+  ready: "text-green-500",
+  error: "text-red-500",
+  pending: "text-amber-600",
+  notConfigured: "text-gray-500",
+};
+
+export function CategorySection({
+  category,
+  integrations = [],
+  showIntegrationSetupStatus = false,
+  searchTerm = "",
+  typeFilter = "all",
+  onBlockClick,
+}: CategorySectionProps) {
   const sortedBlocks = filterBlocksInCategory(category, searchTerm, typeFilter);
 
   const isCoreCategory = category.name === "Core";
@@ -133,6 +152,8 @@ export function CategorySection({ category, searchTerm = "", typeFilter = "all",
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
   const CategoryIcon = categoryIconSrc ? null : resolveCategoryIcon(category.name, integrationName);
+  const integrationStatusColorClass =
+    INTEGRATION_STATE_COLOR[resolveIntegrationState(category, integrations, firstBlock)];
 
   return (
     <details
@@ -149,8 +170,13 @@ export function CategorySection({ category, searchTerm = "", typeFilter = "all",
         <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
           <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
           {renderCategoryIcon(categoryIconSrc, category.name, CategoryIcon)}
-          <span className="text-[13px] text-gray-800 font-medium pl-1">{category.name}</span>
+          <span className="text-[13px] text-gray-800 font-medium pl-1 dark:text-gray-100">{category.name}</span>
         </span>
+        {showIntegrationSetupStatus && (
+          <span className="relative z-10 shrink-0 bg-white dark:bg-gray-900 pl-3">
+            <Plug size={14} className={integrationStatusColorClass} />
+          </span>
+        )}
       </summary>
 
       <ItemGroup>
@@ -160,4 +186,30 @@ export function CategorySection({ category, searchTerm = "", typeFilter = "all",
       </ItemGroup>
     </details>
   );
+}
+
+function resolveIntegrationState(
+  category: BuildingBlockCategory,
+  integrations: OrganizationsIntegration[],
+  firstBlock: BuildingBlock,
+): IntegrationState {
+  if (category.name === "Core" || category.name === "Memory" || category.name === "Debugging") {
+    return "ready";
+  }
+
+  const name = normalizeIntegrationName(firstBlock?.integrationName);
+  const matchingStates = integrations
+    .filter((integration) => normalizeIntegrationName(integration.metadata?.integrationName) === name)
+    .map((integration) => integration.status?.state);
+
+  if (matchingStates.includes("ready")) {
+    return "ready";
+  }
+  if (matchingStates.includes("error")) {
+    return "error";
+  }
+  if (matchingStates.includes("pending")) {
+    return "pending";
+  }
+  return "notConfigured";
 }

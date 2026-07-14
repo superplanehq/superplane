@@ -1,14 +1,17 @@
-import { Bot, ChevronRight, Loader2, Terminal } from "lucide-react";
+import { Bot, ChevronRight, ExternalLink, Loader2, Maximize2, Terminal } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { isSystemNotification } from "@/components/AgentSidebar/systemMessages";
 import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { AgentMessage } from "./types";
 import type { MessageGroup } from "./agentMessageGroups";
 
 const STICKY_USER_MESSAGE_MAX_CHARS = 240;
 const STICKY_USER_MESSAGE_MAX_LINES = 4;
+type MessageImage = NonNullable<AgentMessage["images"]>[number];
 
 export const ConversationTranscript = memo(function ConversationTranscript({
   error,
@@ -187,15 +190,15 @@ const MessageRow = memo(function MessageRow({
         // Compact user bubbles stick to the top of the scrollable transcript so the current prompt
         // remains visible while a long agent reply scrolls past. Long prompts must scroll normally;
         // otherwise the sticky bubble can cover the active Thinking or command rows.
-        shouldStickUserMessage && "sticky top-0 z-10 bg-white",
+        shouldStickUserMessage && "sticky top-0 z-10 bg-white dark:bg-gray-900",
       )}
     >
       <div
         className={cn(
           "min-w-0 break-words text-sm",
           isUser
-            ? "max-w-[85%] rounded-lg bg-slate-100 px-3 py-1.5 whitespace-pre-wrap text-slate-900"
-            : "w-full max-w-[720px] text-slate-900",
+            ? "max-w-[85%] rounded-lg bg-slate-100 px-3 py-1.5 whitespace-pre-wrap text-slate-900 dark:bg-gray-800 dark:text-gray-100"
+            : "w-full max-w-[720px] text-slate-900 dark:text-gray-100",
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
@@ -209,29 +212,70 @@ const MessageRow = memo(function MessageRow({
         />
       </div>
       {message.createdAt ? (
-        <span className="mt-0.5 text-[10px] text-slate-500">{formatTime(message.createdAt)}</span>
+        <span className="mt-0.5 text-[10px] text-slate-500 dark:text-gray-400">{formatTime(message.createdAt)}</span>
       ) : null}
     </div>
   );
 });
 
 function MessageImages({ images }: { images: AgentMessage["images"] }) {
+  const [selectedImage, setSelectedImage] = useState<MessageImage | null>(null);
+
   if (!images || images.length === 0) return null;
 
   return (
-    <div className="mb-1.5 flex flex-wrap gap-1.5" data-testid="agent-message-images">
-      {images.map((image, index) => (
-        <a
-          key={index}
-          href={image.url}
-          target="_blank"
-          rel="noreferrer"
-          className="block overflow-hidden rounded-md border border-slate-200"
-        >
-          <img src={image.url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
-        </a>
-      ))}
-    </div>
+    <>
+      <div className="mb-1.5 flex flex-wrap gap-1.5" data-testid="agent-message-images">
+        {images.map((image, index) => (
+          <button
+            key={index}
+            type="button"
+            onClick={() => setSelectedImage(image)}
+            className="group relative block cursor-zoom-in overflow-hidden rounded-md border border-slate-200 dark:border-gray-700"
+            aria-label="Open attachment"
+          >
+            <img src={image.url} alt="attachment" className="max-h-40 max-w-[200px] object-contain" />
+            <span className="absolute right-1 bottom-1 rounded bg-slate-950/70 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+              <Maximize2 className="size-3" aria-hidden />
+            </span>
+          </button>
+        ))}
+      </div>
+      <ImageLightbox image={selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)} />
+    </>
+  );
+}
+
+function ImageLightbox({ image, onOpenChange }: { image: MessageImage | null; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={!!image} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="large"
+        className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[1400px] grid-rows-none flex-col gap-3 overflow-hidden p-3 sm:max-h-[calc(100dvh-4rem)] sm:w-[calc(100vw-4rem)] sm:p-4"
+      >
+        <DialogTitle className="sr-only">Image attachment</DialogTitle>
+        <DialogDescription className="sr-only">Expanded image attachment from the agent session.</DialogDescription>
+        {image ? (
+          <>
+            <div className="min-h-0 flex-1 overflow-auto rounded-md bg-slate-950/5 dark:bg-black/30">
+              <img
+                src={image.url}
+                alt="attachment"
+                className="mx-auto h-auto max-h-[calc(100dvh-7rem)] max-w-full object-contain sm:max-h-[calc(100dvh-9rem)]"
+              />
+            </div>
+            <div className="flex shrink-0 justify-end">
+              <Button asChild variant="outline" size="sm">
+                <a href={image.url} target="_blank" rel="noreferrer">
+                  <ExternalLink className="size-3.5" />
+                  Open original
+                </a>
+              </Button>
+            </div>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -261,7 +305,7 @@ function SubagentCard({ messages }: { messages: AgentMessage[] }) {
       <button
         type="button"
         onClick={toggleExpanded}
-        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900"
+        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900 dark:text-gray-300 dark:hover:text-gray-100"
       >
         <Bot className="size-4 shrink-0" />
         <span>{agentName}</span>
@@ -295,10 +339,12 @@ function SubagentStatus({ isRunning }: { isRunning: boolean }) {
 function SubagentDetails({ question, response }: { question: string; response: string }) {
   return (
     <div className="mt-2 space-y-2 pl-6">
-      {question ? <p className="text-xs italic text-slate-500">"{truncateQuestion(question)}"</p> : null}
+      {question ? (
+        <p className="text-xs italic text-slate-500 dark:text-gray-400">"{truncateQuestion(question)}"</p>
+      ) : null}
       {response ? (
         <div className="max-h-60 overflow-y-auto">
-          <p className="whitespace-pre-wrap text-xs text-slate-700">{response}</p>
+          <p className="whitespace-pre-wrap text-xs text-slate-700 dark:text-gray-300">{response}</p>
         </div>
       ) : null}
     </div>
@@ -309,14 +355,14 @@ function truncateQuestion(question: string): string {
   return question.length > 200 ? `${question.slice(0, 200)}…` : question;
 }
 
-// The `superplane_app` tool's `patch_draft` action edits the canvas — label it
+// The `superplane_app` tool's `patch_staging` action edits the canvas — label it
 // "Editing canvas" rather than a generic "Running command".
 function isCanvasEditMessage(message: AgentMessage): boolean {
   if (message.toolName !== "superplane_app") return false;
   try {
-    return (JSON.parse(message.content) as { action?: string })?.action === "patch_draft";
+    return (JSON.parse(message.content) as { action?: string })?.action === "patch_staging";
   } catch {
-    return message.content.includes("patch_draft");
+    return message.content.includes("patch_staging");
   }
 }
 
@@ -346,11 +392,13 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
         onClick={() => setExpanded((current) => !current)}
         className="group flex cursor-pointer items-center gap-2"
       >
-        <Terminal className="size-4 shrink-0 text-slate-500 group-hover:text-slate-800" />
-        <span className="text-slate-500 group-hover:text-slate-800">{label}</span>
+        <Terminal className="size-4 shrink-0 text-slate-500 group-hover:text-slate-800 dark:text-gray-400 dark:group-hover:text-gray-200" />
+        <span className="text-slate-500 group-hover:text-slate-800 dark:text-gray-400 dark:group-hover:text-gray-200">
+          {label}
+        </span>
         <ChevronRight
           className={cn(
-            "size-3 text-slate-500 transition-transform group-hover:text-slate-800",
+            "size-3 text-slate-500 transition-transform group-hover:text-slate-800 dark:text-gray-400 dark:group-hover:text-gray-200",
             expanded && "rotate-90",
           )}
         />
@@ -385,19 +433,21 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
         disabled={!canExpand}
         className={cn(
           "flex w-full items-center gap-1.5 text-left",
-          running ? "text-slate-700" : "text-slate-600",
-          canExpand && "cursor-pointer hover:text-slate-900",
+          running ? "text-slate-700 dark:text-gray-300" : "text-slate-600 dark:text-gray-400",
+          canExpand && "cursor-pointer hover:text-slate-900 dark:hover:text-gray-200",
         )}
       >
         <span className="shrink-0 text-[10px]">{running ? "▶" : "✓"}</span>
         <span className="truncate">{running ? "Running..." : preview}</span>
       </button>
       {expanded && command ? (
-        <div className="mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">bash</span>
+        <div className="mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-800/70 dark:bg-gray-900">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 dark:border-gray-800/70 dark:bg-gray-900">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-gray-400">
+              bash
+            </span>
           </div>
-          <pre className="max-h-[200px] overflow-auto break-words whitespace-pre-wrap p-3 font-mono text-xs text-slate-700">
+          <pre className="max-h-[200px] overflow-auto break-words whitespace-pre-wrap p-3 font-mono text-xs text-slate-700 dark:text-gray-300">
             {command}
           </pre>
         </div>
@@ -408,7 +458,10 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
 
 function ThinkingRow() {
   return (
-    <div className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-slate-500" data-testid="agent-thinking">
+    <div
+      className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-slate-500 dark:text-gray-400"
+      data-testid="agent-thinking"
+    >
       <Loader2 className="size-4 shrink-0 animate-spin" />
       <span>Thinking…</span>
     </div>

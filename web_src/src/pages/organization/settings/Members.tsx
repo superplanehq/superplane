@@ -21,7 +21,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/ui/switch";
 import { getApiErrorMessage } from "@/lib/errors";
+import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import {
+  settingsCardClassName,
+  settingsErrorClassName,
+  settingsRowMenuClassName,
+  settingsTableCardClassName,
+} from "./settingsPageStyles";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useMe } from "@/hooks/useMe";
 
@@ -229,7 +236,7 @@ export function Members({ organizationId }: MembersProps) {
   return (
     <div className="space-y-6 pt-6">
       {error && (
-        <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
+        <div className={settingsErrorClassName}>
           <p>{error instanceof Error ? error.message : "Failed to fetch data"}</p>
         </div>
       )}
@@ -240,7 +247,7 @@ export function Members({ organizationId }: MembersProps) {
           message="You don't have permission to invite members."
           className="w-full"
         >
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+          <div className={settingsCardClassName}>
             <div className="flex items-start justify-between gap-6">
               <div>
                 <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">
@@ -256,7 +263,7 @@ export function Members({ organizationId }: MembersProps) {
                       You can also{" "}
                       <button
                         type="button"
-                        className="text-sky-600 hover:underline disabled:text-gray-400"
+                        className="text-blue-600 hover:underline hover:text-blue-700 disabled:text-gray-400 dark:text-indigo-300 dark:hover:text-indigo-200 dark:disabled:text-gray-500"
                         onClick={handleInviteLinkReset}
                         disabled={loadingInviteLink || inviteLinkBusy || !canManageInviteLink}
                       >
@@ -278,7 +285,7 @@ export function Members({ organizationId }: MembersProps) {
             </div>
 
             {inviteLinkErrorMessage && inviteLinkErrorMessage !== "Not found" && (
-              <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mt-4">
+              <div className={cn(settingsErrorClassName, "mt-4")}>
                 <p className="text-sm">{inviteLinkErrorMessage}</p>
               </div>
             )}
@@ -307,7 +314,7 @@ export function Members({ organizationId }: MembersProps) {
           </div>
         </PermissionTooltip>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
+        <div className={settingsCardClassName}>
           <Text className="text-left font-semibold text-gray-800 dark:text-white mb-1">Invite link to add members</Text>
           <Text className="text-sm text-gray-500 dark:text-gray-400">
             Reach out to an organization owner or admin to invite new members.
@@ -316,7 +323,7 @@ export function Members({ organizationId }: MembersProps) {
       )}
 
       {/* Members List */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
+      <div className={settingsTableCardClassName}>
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center justify-between mb-4">
             <Text className="text-sm font-medium text-gray-600 dark:text-gray-300">Members ({members.length})</Text>
@@ -325,7 +332,7 @@ export function Members({ organizationId }: MembersProps) {
 
         <div className="px-6 pb-6">
           {removalError && (
-            <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded mb-4">
+            <div className={cn(settingsErrorClassName, "mb-4")}>
               <p>{removalError}</p>
             </div>
           )}
@@ -334,7 +341,7 @@ export function Members({ organizationId }: MembersProps) {
               <p className="text-gray-500 dark:text-gray-400">Loading...</p>
             </div>
           ) : (
-            <Table dense>
+            <Table dense className="!overflow-x-hidden !whitespace-normal">
               <TableHead>
                 <TableRow>
                   <TableHeader
@@ -343,7 +350,7 @@ export function Members({ organizationId }: MembersProps) {
                   >
                     <div className="flex items-center gap-2">
                       Name
-                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400" />
+                      <Icon name={getSortIcon("name")} size="sm" className="text-gray-400 dark:text-gray-500" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -352,7 +359,7 @@ export function Members({ organizationId }: MembersProps) {
                   >
                     <div className="flex items-center gap-2">
                       Email
-                      <Icon name={getSortIcon("email")} size="sm" className="text-gray-400" />
+                      <Icon name={getSortIcon("email")} size="sm" className="text-gray-400 dark:text-gray-500" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -361,7 +368,7 @@ export function Members({ organizationId }: MembersProps) {
                   >
                     <div className="flex items-center gap-2">
                       Role
-                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400" />
+                      <Icon name={getSortIcon("role")} size="sm" className="text-gray-400 dark:text-gray-500" />
                     </div>
                   </TableHeader>
                   <TableHeader
@@ -370,7 +377,7 @@ export function Members({ organizationId }: MembersProps) {
                   >
                     <div className="flex items-center gap-2">
                       Status
-                      <Icon name={getSortIcon("status")} size="sm" className="text-gray-400" />
+                      <Icon name={getSortIcon("status")} size="sm" className="text-gray-400 dark:text-gray-500" />
                     </div>
                   </TableHeader>
                   <TableHeader></TableHeader>
@@ -387,7 +394,11 @@ export function Members({ organizationId }: MembersProps) {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{member.email}</TableCell>
+                    <TableCell className="min-w-0">
+                      <div className="max-w-[26rem] truncate" title={member.email}>
+                        {member.email}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {(() => {
                         const isSelf = me?.id === member.id;
@@ -401,7 +412,10 @@ export function Members({ organizationId }: MembersProps) {
                           <PermissionTooltip allowed={tooltipAllowed} message={tooltipMessage}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="flex items-center gap-2 text-sm" disabled={!roleChangeAllowed}>
+                                <button
+                                  className={cn("flex items-center gap-2 text-sm", settingsRowMenuClassName)}
+                                  disabled={!roleChangeAllowed}
+                                >
                                   {member.role}
                                   <Icon name="chevron-down" />
                                 </button>
@@ -438,7 +452,7 @@ export function Members({ organizationId }: MembersProps) {
                         {ownerIds.has(member.id) && ownerIds.size <= 1 ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <button className="flex items-center gap-2 text-sm">
+                              <button className={cn("flex items-center gap-2 text-sm", settingsRowMenuClassName)}>
                                 <Icon name="ellipsis-vertical" size="sm" />
                               </button>
                             </DropdownMenuTrigger>
@@ -456,7 +470,13 @@ export function Members({ organizationId }: MembersProps) {
                           >
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="flex items-center gap-2 text-sm" disabled={!canDeleteMembers}>
+                                <button
+                                  className={cn(
+                                    "flex items-center gap-2 text-sm disabled:opacity-50",
+                                    settingsRowMenuClassName,
+                                  )}
+                                  disabled={!canDeleteMembers}
+                                >
                                   <Icon name="ellipsis-vertical" size="sm" />
                                 </button>
                               </DropdownMenuTrigger>
@@ -481,7 +501,7 @@ export function Members({ organizationId }: MembersProps) {
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
                       <div className="text-gray-500 dark:text-gray-400">
-                        <Icon name="search" className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <Icon name="search" className="mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600" />
                         <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">No members yet</p>
                         <p className="text-sm">Add members to get started</p>
                       </div>

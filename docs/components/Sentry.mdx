@@ -21,6 +21,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Alert" href="#delete-alert" description="Delete a Sentry metric alert rule" />
   <LinkCard title="Get Alert" href="#get-alert" description="Retrieve a Sentry metric alert rule with its thresholds, projects, and actions" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Sentry issue with tags, frequency, assignee, and recent events" />
+  <LinkCard title="Link GitHub Issue" href="#link-git-hub-issue" description="Link an existing GitHub issue to a Sentry issue through the Sentry GitHub integration" />
   <LinkCard title="List Alerts" href="#list-alerts" description="List Sentry metric alert rules for the connected organization or a selected project" />
   <LinkCard title="Update Alert" href="#update-alert" description="Update a Sentry metric alert rule with new thresholds, conditions, or notification targets" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue status, priority, assignee, or visibility flags" />
@@ -498,6 +499,53 @@ Returns the Sentry issue object including:
   },
   "timestamp": "2026-03-24T13:03:56Z",
   "type": "sentry.issue"
+}
+```
+
+<a id="link-git-hub-issue"></a>
+
+## Link GitHub Issue
+
+**Component key:** `sentry.linkGitHubIssue`
+
+The Link GitHub Issue component connects a Sentry issue to an existing GitHub issue using the GitHub integration installed in your Sentry organization.
+
+### Use Cases
+
+- **Automated triage**: link a GitHub issue created by an upstream workflow to the triggering Sentry exception
+- **Cross-tool traceability**: connect incident tickets to the Sentry issues that caused them
+- **Release follow-up**: associate remediation tasks in GitHub with unresolved Sentry errors
+
+### Prerequisites
+
+- A GitHub integration must be installed in your Sentry organization (**Settings → Integrations → GitHub**)
+- The Sentry personal token must include **Issue & Event → Read & Write**
+
+### Configuration
+
+- **Issue**: Select the Sentry issue to link
+- **GitHub Integration**: Select the GitHub integration installed in Sentry
+- **Repository**: GitHub repository in owner/repo format
+- **GitHub Issue Number**: The number of the existing GitHub issue to link
+- **Comment**: Optional comment added when the link is created
+
+### Output
+
+Returns the external issue link object created by Sentry, including the linked issue URL and display name.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "displayName": "example-org/example-repo#42",
+    "id": 5,
+    "integrationId": 123456,
+    "key": "42",
+    "url": "https://github.com/example-org/example-repo/issues/42"
+  },
+  "timestamp": "2026-07-05T15:00:00.000000Z",
+  "type": "sentry.externalIssue"
 }
 ```
 

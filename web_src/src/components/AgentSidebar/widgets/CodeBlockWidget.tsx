@@ -1,7 +1,10 @@
 import { Check, Copy, Maximize2 } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+import { useTheme } from "@/contexts/useTheme";
+import { FullscreenContentDialog } from "@/ui/FullscreenContentDialog";
+import { HeaderIconButton } from "@/ui/HeaderIconButton";
 
 interface CodeBlockWidgetProps {
   code: string;
@@ -56,27 +59,36 @@ function calcHeight(code: string, maxPx = 250): number {
 
 export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
   const [copied, setCopied] = useState(false);
+  const [modalCopied, setModalCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const { resolvedTheme } = useTheme();
   const monacoLang = mapLanguage(language);
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
+  const title = (language || "code").toUpperCase();
 
-  const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [code]);
+  const copyCode = useCallback(
+    async (markCopied: (value: boolean) => void) => {
+      await navigator.clipboard.writeText(code);
+      markCopied(true);
+      setTimeout(() => markCopied(false), 2000);
+    },
+    [code],
+  );
 
   const height = calcHeight(code);
 
   return (
     <>
-      <div className="my-4 w-full min-w-0 rounded-lg border border-slate-200 overflow-hidden bg-white group">
-        <div className="flex items-center justify-between px-3 py-1 bg-slate-50 border-b border-slate-200">
-          <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">{language || "code"}</span>
+      <div className="group my-4 w-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 dark:border-gray-700 dark:bg-gray-900/60">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-gray-400">
+            {language || "code"}
+          </span>
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={handleCopy}
-              className="p-1 rounded hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              onClick={() => void copyCode(setCopied)}
+              className="cursor-pointer rounded p-1 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               aria-label="Copy code"
             >
               {copied ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}
@@ -84,7 +96,7 @@ export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }:
             <button
               type="button"
               onClick={() => setExpanded(true)}
-              className="p-1 rounded hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              className="cursor-pointer rounded p-1 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               aria-label="Expand code"
             >
               <Maximize2 className="size-3.5" />
@@ -97,39 +109,36 @@ export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }:
             width="100%"
             defaultLanguage={monacoLang}
             value={code}
-            theme="vs"
+            theme={monacoTheme}
             options={MONACO_OPTIONS}
           />
         </div>
       </div>
 
-      <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogContent size="large" className="w-[90vw] max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span className="text-sm font-medium">{language || "Code"}</span>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                aria-label="Copy code"
-              >
-                {copied ? <Check className="size-4 text-green-600" /> : <Copy className="size-4" />}
-              </button>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 min-h-0 rounded-lg border border-slate-200 overflow-hidden">
-            <Editor
-              height={`${Math.min(Math.max(code.split("\n").length * 19 + 20, 200), window.innerHeight * 0.7)}px`}
-              width="100%"
-              defaultLanguage={monacoLang}
-              value={code}
-              theme="vs"
-              options={{ ...MONACO_OPTIONS, lineNumbers: "on", fontSize: 13 }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FullscreenContentDialog
+        open={expanded}
+        onOpenChange={setExpanded}
+        title={title}
+        bodyClassName="overflow-hidden"
+        headerActions={
+          <HeaderIconButton
+            label={modalCopied ? "Copied" : "Copy"}
+            icon={modalCopied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+            onClick={() => void copyCode(setModalCopied)}
+          />
+        }
+      >
+        <div className="h-full min-h-0 overflow-hidden rounded border border-slate-200 dark:border-gray-700">
+          <Editor
+            height="100%"
+            width="100%"
+            defaultLanguage={monacoLang}
+            value={code}
+            theme={monacoTheme}
+            options={{ ...MONACO_OPTIONS, lineNumbers: "on", fontSize: 13 }}
+          />
+        </div>
+      </FullscreenContentDialog>
     </>
   );
 });

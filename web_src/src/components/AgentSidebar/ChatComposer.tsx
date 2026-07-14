@@ -14,6 +14,8 @@ import type { CanvasesCanvasRun } from "@/api-client";
 type ChatComposerProps = {
   onSend: (content: string, images: AgentOutgoingImage[]) => Promise<void>;
   onStop: () => void;
+  onClearChat: () => void;
+  clearing: boolean;
   sending: boolean;
   sendPending: boolean;
   stopping?: boolean;
@@ -33,6 +35,8 @@ const modePlaceholder = {
 export function ChatComposer({
   onSend,
   onStop,
+  onClearChat,
+  clearing,
   sending,
   sendPending,
   stopping,
@@ -49,7 +53,7 @@ export function ChatComposer({
     <footer className="px-3 pb-3 pt-2">
       <div
         ref={c.containerRef}
-        className="mx-auto w-full max-w-[800px] overflow-hidden rounded-lg bg-white shadow-sm outline outline-1 outline-slate-950/15"
+        className="mx-auto w-full max-w-[800px] overflow-hidden rounded-lg bg-white shadow-sm outline outline-1 outline-slate-950/15 dark:bg-gray-800 dark:outline-gray-700"
       >
         <ImageAttachmentPreviews images={c.images} onRemove={c.removeImage} />
         <MentionTextarea
@@ -67,6 +71,8 @@ export function ChatComposer({
           agentMode={agentMode}
           onModeSwitch={onModeSwitch}
           modeDisabled={modeDisabled}
+          onClearChat={onClearChat}
+          clearing={clearing}
           sending={sending}
           stopping={stopping}
           statusLabel={statusLabel}

@@ -134,6 +134,7 @@ export const ZoomSlider = memo(function ZoomSlider({
 
   const baseClassName = cn(
     "bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-0.5 rounded-md p-0.5 h-7",
+    "dark:bg-gray-800 dark:text-gray-100 dark:outline-gray-600/70 [&_[data-slot=button]]:dark:hover:bg-gray-700",
     orientation === "horizontal" ? "flex-row" : "flex-col",
     className,
   );
