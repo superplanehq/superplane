@@ -162,6 +162,12 @@ type TextTypeOptions struct {
 	MaxLength *int `json:"maxLength,omitempty"`
 	// Language is the Monaco editor language id (e.g. "javascript", "python").
 	Language string `json:"language,omitempty"`
+
+	// When false, SuperPlane does not resolve expression placeholders in this
+	// field (they are left as literal text) and the UI does not offer expression
+	// autocomplete. Unlike StringTypeOptions.AllowExpressions=false, this does
+	// not reject values that contain expression placeholders.
+	AllowExpressions *bool `json:"allowExpressions,omitempty"`
 }
 
 /*

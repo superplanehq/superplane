@@ -111,6 +111,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
   value,
   onChange,
   autocompleteExampleObj,
+  allowExpressions = false,
   language,
 }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -118,7 +119,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
   const { resolvedTheme } = useTheme();
   const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
-    autocompleteExampleObj,
+    autocompleteExampleObj: allowExpressions ? autocompleteExampleObj : null,
     languageId: language,
   });
 
@@ -156,7 +157,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
             defaultLanguage={language}
             value={editorValue}
             onChange={handleEditorChange}
-            onMount={handleEditorMount}
+            onMount={allowExpressions ? handleEditorMount : undefined}
             theme={monacoTheme}
             options={CODE_EDITOR_OPTIONS}
           />
@@ -194,7 +195,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
               defaultLanguage={language}
               value={editorValue}
               onChange={handleEditorChange}
-              onMount={handleEditorMount}
+              onMount={allowExpressions ? handleEditorMount : undefined}
               theme={monacoTheme}
               options={{
                 ...CODE_EDITOR_OPTIONS,

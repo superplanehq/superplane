@@ -9,29 +9,35 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
-func codeTextField(name, language string) configuration.Field {
+func boolPtr(v bool) *bool {
+	return &v
+}
+
+func textField(name, language string, allowExpressions *bool) configuration.Field {
 	return configuration.Field{
 		Name: name,
 		Type: configuration.FieldTypeText,
 		TypeOptions: &configuration.TypeOptions{
 			Text: &configuration.TextTypeOptions{
-				Language: language,
+				Language:         language,
+				AllowExpressions: allowExpressions,
 			},
 		},
 	}
 }
 
-// Regression test: {{ ... }} expressions in code fields (runner scripts) are
-// left untouched as literal text instead of being resolved, since naive
-// substitution can produce syntactically invalid or unsafe code.
-func Test_NodeConfigurationBuilder_CodeField_ExpressionsAreNotResolved(t *testing.T) {
+// Regression test: text fields with AllowExpressions=false leave {{ ... }}
+// placeholders as literal text instead of resolving them.
+func Test_NodeConfigurationBuilder_TextField_ExpressionsNotResolvedWhenDisabled(t *testing.T) {
 	for _, language := range []string{"javascript", "python", "shell"} {
 		t.Run(language, func(t *testing.T) {
 			builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 				WithRootPayload(map[string]any{
 					"timestamp": "2026-07-02T08:53:06.174546542Z",
 				}).
-				WithConfigurationFields([]configuration.Field{codeTextField("script", language)})
+				WithConfigurationFields([]configuration.Field{
+					textField("script", language, boolPtr(false)),
+				})
 
 			result, err := builder.Build(map[string]any{
 				"script": "console.log({{ root().timestamp }});",
@@ -43,7 +49,7 @@ func Test_NodeConfigurationBuilder_CodeField_ExpressionsAreNotResolved(t *testin
 	}
 }
 
-func Test_NodeConfigurationBuilder_NonCodeFieldsKeepResolvingExpressions(t *testing.T) {
+func Test_NodeConfigurationBuilder_TextField_ExpressionsResolvedByDefault(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithRootPayload(map[string]any{
 			"name": "john",
@@ -51,15 +57,18 @@ func Test_NodeConfigurationBuilder_NonCodeFieldsKeepResolvingExpressions(t *test
 
 	fields := []configuration.Field{
 		{Name: "message", Type: configuration.FieldTypeText},
-		codeTextField("body", "json"),
+		textField("body", "json", nil),
+		textField("script", "javascript", nil),
 	}
 
 	result, err := builder.WithConfigurationFields(fields).Build(map[string]any{
 		"message": "Hello {{ root().name }}",
 		"body":    `{"name": "{{ root().name }}"}`,
+		"script":  "const name = {{ root().name }};",
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "Hello john", result["message"])
 	assert.Equal(t, `{"name": "john"}`, result["body"])
+	assert.Equal(t, "const name = john;", result["script"])
 }
