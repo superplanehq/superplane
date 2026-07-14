@@ -350,6 +350,55 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 	assert.Equal(t, "claude/agent-abc", out.Branch)
 }
 
+func Test__RunCodeAgent__poll__persistSessionKeepsSessionAndEnvironment(t *testing.T) {
+	a := &RunCodeAgent{}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"sess_1","status":"idle"}`),
+		resp(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Done. PR_URL=https://github.com/o/r/pull/7"}]}]}`),
+		resp(`{}`), resp(`{}`), // teardown: vault delete + agent archive only
+	}}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	hookCtx := core.ActionHookContext{
+		Name:       "poll",
+		Parameters: map[string]any{"attempt": float64(1), "errors": float64(0)},
+		Configuration: map[string]any{
+			"sourceMode":     "repository",
+			"repository":     "o/r",
+			"task":           "do it",
+			"githubToken":    map[string]any{"secret": "gh", "key": "token"},
+			"persistSession": true,
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       terminalMeta(),
+		ExecutionState: execState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, execState.Finished)
+	assert.Equal(t, "idle", execState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+
+	var sessionDeleted, envDeleted, vaultDeleted bool
+	for _, r := range httpCtx.Requests {
+		if r.Method != http.MethodDelete {
+			continue
+		}
+		switch {
+		case strings.Contains(r.URL.Path, "/sessions/sess_1"):
+			sessionDeleted = true
+		case strings.Contains(r.URL.Path, "/environments/env_1"):
+			envDeleted = true
+		case strings.Contains(r.URL.Path, "/vaults/vault_1"):
+			vaultDeleted = true
+		}
+	}
+	assert.False(t, sessionDeleted, "session must be kept when persistSession is enabled")
+	assert.False(t, envDeleted, "environment must outlive a kept session")
+	assert.True(t, vaultDeleted, "vault holds the GitHub token and must always be reclaimed")
+}
+
 func Test__RunCodeAgent__poll__timeoutReclaims(t *testing.T) {
 	a := &RunCodeAgent{}
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{

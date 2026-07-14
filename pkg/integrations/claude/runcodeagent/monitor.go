@@ -40,7 +40,7 @@ func (a *RunCodeAgent) poll(ctx core.ActionHookContext) error {
 		// finish as an error instead of leaving the node running indefinitely.
 		ctx.Logger.Errorf("poll: execution metadata has no session id; finishing as error")
 		if client, err := runagent.NewClient(ctx.HTTP, ctx.Integration); err == nil {
-			a.teardown(client, meta, false, ctx.Logger.Warnf)
+			a.teardown(client, meta, false, persistSession(ctx.Configuration), ctx.Logger.Warnf)
 		}
 		out := buildOutput("error", "", meta.Branch, nil, meta.PrURL)
 		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
@@ -86,7 +86,7 @@ func (a *RunCodeAgent) emitFinal(ctx core.ActionHookContext, client *runagent.Cl
 		ctx.Logger.Warnf("Failed to emit result for session %s: %v.", meta.Session.ID, err)
 		return err
 	}
-	a.teardown(client, meta, interrupt, ctx.Logger.Warnf)
+	a.teardown(client, meta, interrupt, persistSession(ctx.Configuration), ctx.Logger.Warnf)
 	return nil
 }
 
@@ -121,7 +121,7 @@ func (a *RunCodeAgent) handleClientError(ctx core.ActionHookContext, meta *Execu
 	}
 	// Best-effort reclaim: retry building a client now that the run is finished.
 	if client, cErr := runagent.NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
-		a.teardown(client, meta, true, ctx.Logger.Warnf)
+		a.teardown(client, meta, true, persistSession(ctx.Configuration), ctx.Logger.Warnf)
 	} else {
 		ctx.Logger.Warnf("Cannot reclaim resources for session %s: client unavailable: %v", meta.Session.ID, cErr)
 	}
@@ -154,7 +154,7 @@ func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client 
 
 	mergeSessionIntoMetadata(meta, sess)
 	_ = ctx.Metadata.Set(*meta)
-	a.teardown(client, meta, false, ctx.Logger.Warnf)
+	a.teardown(client, meta, false, persistSession(ctx.Configuration), ctx.Logger.Warnf)
 	return nil
 }
 
@@ -176,6 +176,6 @@ func (a *RunCodeAgent) Cancel(ctx core.ExecutionContext) error {
 		ctx.Logger.Warnf("Cancel: cannot build client to reclaim managed agent resources: %v", err)
 		return nil
 	}
-	a.teardown(client, meta, true, ctx.Logger.Warnf)
+	a.teardown(client, meta, true, persistSession(ctx.Configuration), ctx.Logger.Warnf)
 	return nil
 }
