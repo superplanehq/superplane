@@ -722,6 +722,7 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first", nil)
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
+	assert.Contains(t, provider.lastPreamble, "auto_layout_on_update_enabled: false")
 	assert.Contains(t, provider.lastPreamble, "[Canvas Snapshot]")
 	assert.Contains(t, provider.lastPreamble, "node_count:")
 	assert.Contains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
@@ -739,6 +740,33 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String(),
 		"the session context must be re-injected on every turn")
+}
+
+func TestService_SendMessage_IncludesAutoLayoutPreferenceInPreamble(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	_, err = svc.SendMessage(
+		context.Background(),
+		r.Organization.ID,
+		r.User,
+		session.ID,
+		"build with my canvas settings",
+		nil,
+		agents.SendMessageRequestOptions{
+			Mode:                      string(agents.ModeBuilder),
+			AutoLayoutOnUpdateEnabled: true,
+		},
+	)
+	require.NoError(t, err)
+	assert.Contains(t, provider.lastPreamble, "auto_layout_on_update_enabled: true")
 }
 
 func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing.T) {
@@ -785,6 +813,7 @@ func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "[Agent Mode: BUILD]")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "auto_layout_on_update_enabled: false")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Use 'superplane_app' action 'patch_staging'")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Console updates")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, ":::staging-actions")
