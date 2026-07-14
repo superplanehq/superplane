@@ -845,6 +845,7 @@ function CanvasPage(props: CanvasPageProps) {
     liveCanvasVersionId: props.liveCanvasVersionId,
     headerMode: props.headerMode,
     isRunInspectionMode: props.isRunInspectionMode,
+    isAutoLayoutOnUpdateEnabled: props.isAutoLayoutOnUpdateEnabled ?? false,
     onAgentStagingReady: props.onAgentStagingReady,
     onAgentStagingCommit: props.onAgentStagingCommit,
   });
