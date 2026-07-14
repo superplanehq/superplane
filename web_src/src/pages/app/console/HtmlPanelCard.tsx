@@ -23,7 +23,12 @@ import {
 } from "./markdownInterpolation";
 import { HtmlBody, HtmlBodyLoading } from "./HtmlBody";
 import { HtmlPanelEditor, type HtmlCodeEditorHandle } from "./HtmlPanelEditor";
-import { validateMarkdownVariables, type MarkdownVariable } from "./panelTypes";
+import {
+  normalizeRunStatuses,
+  normalizeRunTriggers,
+  validateMarkdownVariables,
+  type MarkdownVariable,
+} from "./panelTypes";
 
 /**
  * Stable empty list passed to `useMarkdownVariables` while the panel is being
@@ -57,14 +62,14 @@ function useHtmlDisplay({
   const ctx = useConsoleContext();
   const canvasId = ctx?.canvasId ?? "";
   const textForSideload = useMemo(() => `${persistedTitle}\n${body}`, [persistedTitle, body]);
-  const { vars, baseLoading, sideloadLoading } = useMarkdownVariables(
+  const { vars, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
     canvasId,
     isEditing ? EMPTY_VARIABLES : variables,
     isEditing ? "" : textForSideload,
   );
 
-  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading);
-  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading);
+  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading, searchingNames);
+  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading, searchingNames);
 
   const displayTitle = useMemo(() => {
     if (titleLoading) return panelId;
@@ -394,7 +399,14 @@ function normalizeVariableSource(source: MarkdownVariable["source"]): MarkdownVa
       ...(hasLimit ? { limit: source.limit } : {}),
     };
   }
-  return { kind: "run", select: source.select };
+  const statuses = normalizeRunStatuses(source.statuses);
+  const triggers = normalizeRunTriggers(source.triggers);
+  return {
+    kind: "run",
+    select: source.select,
+    ...(statuses ? { statuses } : {}),
+    ...(triggers ? { triggers } : {}),
+  };
 }
 
 function variablesEqual(a: MarkdownVariable[], b: MarkdownVariable[]): boolean {

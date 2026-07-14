@@ -81,6 +81,49 @@ describe("validateMarkdownVariables", () => {
     ).toMatch(/select/);
   });
 
+  describe("run source status/trigger filters", () => {
+    it("accepts empty and populated status arrays", () => {
+      expect(
+        validateMarkdownVariables([{ name: "ok", source: { kind: "run", select: "latest", statuses: [] } }]),
+      ).toBeNull();
+      expect(
+        validateMarkdownVariables([
+          { name: "ok", source: { kind: "run", select: "latest", statuses: ["running", "failed"] } },
+        ]),
+      ).toBeNull();
+    });
+
+    it("accepts empty and populated trigger arrays", () => {
+      expect(
+        validateMarkdownVariables([{ name: "ok", source: { kind: "run", select: "latest", triggers: [] } }]),
+      ).toBeNull();
+      expect(
+        validateMarkdownVariables([
+          { name: "ok", source: { kind: "run", select: "latest", triggers: ["deploy", "release"] } },
+        ]),
+      ).toBeNull();
+    });
+
+    it("rejects unknown status values", () => {
+      expect(
+        validateMarkdownVariables([
+          {
+            name: "bad",
+            source: { kind: "run", select: "latest", statuses: ["running", "flaky"] as unknown as never },
+          },
+        ]),
+      ).toMatch(/statuses/);
+    });
+
+    it("rejects non-string trigger entries", () => {
+      expect(
+        validateMarkdownVariables([
+          { name: "bad", source: { kind: "run", select: "latest", triggers: [""] as unknown as never } },
+        ]),
+      ).toMatch(/triggers/);
+    });
+  });
+
   describe("memory list mode", () => {
     it("accepts mode: list with no limit", () => {
       expect(
