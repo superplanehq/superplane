@@ -242,7 +242,6 @@ export function AppPage() {
     runDetailNodeId,
     setRunDetailNodeId,
     clearDismissedRunDetail,
-    maybeOpenRunDetailForRun,
     detailDismissedForRunId,
     handleBackToRunList,
   } = useRunsDetailState(searchParams, isRunInspectionMode, selectedRunId, preserveRunDetailNodeOnNextRunChangeRef, {
@@ -3495,7 +3494,7 @@ export function AppPage() {
   const handleSelectRun = useCallback(
     (runId: string) => {
       exitEditableVersionForRunInspection();
-      maybeOpenRunDetailForRun(runId);
+      clearDismissedRunDetail({ persistAutoOpen: true });
       setRunDetailNodeId(null);
       setFocusRequest(null);
       requestRunFitRef.current(runId);
@@ -3503,7 +3502,7 @@ export function AppPage() {
         setSearchParams((current) => applyRunInspectionNavigationSearchParams(current, { runId }), { replace: true });
       });
     },
-    [exitEditableVersionForRunInspection, maybeOpenRunDetailForRun, setRunDetailNodeId, setSearchParams],
+    [clearDismissedRunDetail, exitEditableVersionForRunInspection, setRunDetailNodeId, setSearchParams],
   );
 
   const { resolveRunIdForSidebarEvent, fetchRunIdForSidebarEvent } = useSidebarEventRunLookup({
