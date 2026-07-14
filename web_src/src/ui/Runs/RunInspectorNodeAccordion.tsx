@@ -1,6 +1,6 @@
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronRight } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ export function RunInspectorNodeAccordion({
   currentUser,
   errorScrollRequestId,
   onErrorScrolled,
+  onSelectSection,
 }: {
   section: RunInspectorNodeSection;
   componentIconMap: Record<string, string>;
@@ -42,6 +43,7 @@ export function RunInspectorNodeAccordion({
   currentUser?: RunInspectorCurrentUser;
   errorScrollRequestId?: number | null;
   onErrorScrolled?: () => void;
+  onSelectSection: (sectionValue: string) => void;
 }) {
   const iconSrc = getHeaderIconSrc(section.workflowNode?.component);
   const iconSlug = section.workflowNode?.component ? componentIconMap[section.workflowNode.component] : undefined;
@@ -75,23 +77,31 @@ export function RunInspectorNodeAccordion({
   return (
     <AccordionItem
       ref={itemRef}
-      value={section.nodeId}
-      className="scroll-mt-8 border-slate-950/10 dark:border-gray-800"
+      value={section.sectionValue}
+      className={cn(
+        "scroll-mt-8 border-slate-950/10 dark:border-gray-800",
+        section.isQueued && "border-l-2 border-l-amber-400 dark:border-l-amber-500",
+      )}
     >
       <AccordionPrimitive.Header
         className={cn(
           "flex items-center bg-white transition-colors hover:bg-slate-50 dark:bg-gray-950 dark:hover:bg-gray-900",
-          isOpen &&
+          section.isQueued && "bg-amber-50/80 hover:bg-amber-100/80 dark:bg-amber-950/20 dark:hover:bg-amber-950/30",
+          section.isQueued && isOpen && "bg-amber-100/80 text-slate-950 dark:bg-amber-950/40 dark:text-gray-100",
+          !section.isQueued &&
+            isOpen &&
             "sticky top-8 z-20 bg-[#e1f5ff] text-slate-950 shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:bg-indigo-950 dark:text-gray-100 dark:shadow-[0_1px_0_rgba(31,41,55,0.8)]",
         )}
       >
-        <AccordionPrimitive.Trigger className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left hover:no-underline">
-          <ChevronRight
-            className={cn(
-              "h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200",
-              isOpen && "rotate-90 text-slate-600 dark:text-gray-300",
-            )}
-          />
+        <NodeHeaderButton section={section} onSelectSection={onSelectSection}>
+          {section.isQueued ? null : (
+            <ChevronRight
+              className={cn(
+                "h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200",
+                isOpen && "rotate-90 text-slate-600 dark:text-gray-300",
+              )}
+            />
+          )}
           <RunNodeIcon
             iconSrc={iconSrc}
             iconSlug={iconSlug}
@@ -102,22 +112,52 @@ export function RunInspectorNodeAccordion({
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-900 dark:text-gray-100">
             {section.nodeName}
           </span>
-        </AccordionPrimitive.Trigger>
+        </NodeHeaderButton>
         <NodeActions section={section} actions={actions} currentUser={currentUser} />
         <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
       </AccordionPrimitive.Header>
-      <AccordionContent className="bg-slate-50 px-3 pb-3 pt-3 dark:bg-gray-950">
-        <RunInspectorStepTimeline
-          section={section}
-          componentIconMap={componentIconMap}
-          organizationId={organizationId}
-          canShowExpressionTemplates={canShowExpressionTemplates}
-          onEditNode={onEditNode}
-          errorScrollRequestId={errorScrollRequestId}
-          onErrorScrolled={onErrorScrolled}
-        />
-      </AccordionContent>
+      {section.isQueued ? null : (
+        <AccordionContent className="bg-slate-50 px-3 pb-3 pt-3 dark:bg-gray-950">
+          <RunInspectorStepTimeline
+            section={section}
+            componentIconMap={componentIconMap}
+            organizationId={organizationId}
+            canShowExpressionTemplates={canShowExpressionTemplates}
+            onEditNode={onEditNode}
+            errorScrollRequestId={errorScrollRequestId}
+            onErrorScrolled={onErrorScrolled}
+          />
+        </AccordionContent>
+      )}
     </AccordionItem>
+  );
+}
+
+function NodeHeaderButton({
+  section,
+  children,
+  onSelectSection,
+}: {
+  section: RunInspectorNodeSection;
+  children: ReactNode;
+  onSelectSection: (sectionValue: string) => void;
+}) {
+  if (section.isQueued) {
+    return (
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
+        onClick={() => onSelectSection(section.sectionValue)}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <AccordionPrimitive.Trigger className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left hover:no-underline">
+      {children}
+    </AccordionPrimitive.Trigger>
   );
 }
 
@@ -131,12 +171,21 @@ function NodeActions({
   currentUser?: RunInspectorCurrentUser;
 }) {
   const actionableApproval = findActionableApprovalRecord(section.actions.approvalRecords, currentUser ?? null);
-  const hasActions = section.actions.canStop || section.actions.canPushThrough || actionableApproval;
+  const hasActions =
+    section.queueItem || section.actions.canStop || section.actions.canPushThrough || actionableApproval;
 
   if (!hasActions) return null;
 
   return (
     <div className="flex shrink-0 items-center gap-2 pl-3">
+      {section.queueItem ? (
+        <NodeActionButton
+          label="Cancel"
+          tone="danger"
+          disabled={actions.cancelQueuedItemPending}
+          onClick={() => actions.cancelQueuedItem(section)}
+        />
+      ) : null}
       {actionableApproval ? (
         <>
           <NodeActionButton
@@ -259,7 +308,7 @@ function NodeMetadata({
           {rerunPending ? "Rerun..." : "Rerun"}
         </Button>
       ) : null}
-      {section.isTrigger && section.createdAt ? (
+      {(section.isTrigger || section.isQueued) && section.createdAt ? (
         <span>{formatEventTimestamp(section.createdAt)}</span>
       ) : section.durationMs !== undefined ? (
         <span>{formatStepDuration(section.durationMs)}</span>

@@ -13,7 +13,7 @@ type CanvasStagingQuery = ReturnType<typeof useCanvasStaging>;
 type ConsoleVersionDiff = ReturnType<typeof useCanvasConsoleVersionDiff>;
 type ConsoleQueryData = ConsoleVersionDiff["consoleQuery"]["data"];
 
-function resolveEditingStagingFlags({
+export function resolveEditingStagingFlags({
   isEditing,
   editBootstrapReady,
   committedBaselinesReady,
@@ -130,6 +130,17 @@ export function useDraftStagingIndicators({
     setFilesLocalStagingActive(false);
     setLocalHasFilesStaging(false);
   }, [stagingResetNonce]);
+
+  // Leaving edit mode clears in-memory pendingChanges. Drop the local-files latch
+  // so re-entry can fall back to server staging for Reset/Commit enablement.
+  useEffect(() => {
+    if (isEditing) {
+      return;
+    }
+
+    setFilesLocalStagingActive(false);
+    setLocalHasFilesStaging(false);
+  }, [isEditing]);
 
   useEffect(() => {
     if (consoleQueryData) {

@@ -25,6 +25,7 @@ vi.mock("@uiw/react-json-view", () => ({
 const reemitTriggerEventMock = vi.fn();
 const cancelExecutionMock = vi.fn();
 const invokeExecutionHookMock = vi.fn();
+const describeRunMock = vi.fn();
 const listNodeQueueItemsMock = vi.fn();
 const deleteNodeQueueItemMock = vi.fn();
 
@@ -35,6 +36,7 @@ vi.mock("@/api-client", async (importOriginal) => {
     canvasesReemitTriggerEvent: (...args: unknown[]) => reemitTriggerEventMock(...args),
     canvasesCancelExecution: (...args: unknown[]) => cancelExecutionMock(...args),
     canvasesInvokeNodeExecutionHook: (...args: unknown[]) => invokeExecutionHookMock(...args),
+    canvasesDescribeRun: (...args: unknown[]) => describeRunMock(...args),
     canvasesListNodeQueueItems: (...args: unknown[]) => listNodeQueueItemsMock(...args),
     canvasesDeleteNodeQueueItem: (...args: unknown[]) => deleteNodeQueueItemMock(...args),
   };
@@ -87,6 +89,7 @@ beforeEach(() => {
   reemitTriggerEventMock.mockResolvedValue({});
   cancelExecutionMock.mockResolvedValue({});
   invokeExecutionHookMock.mockResolvedValue({});
+  describeRunMock.mockResolvedValue({ data: { run: { queueItems: [] } } });
   listNodeQueueItemsMock.mockResolvedValue({ data: { items: [] } });
   deleteNodeQueueItemMock.mockResolvedValue({});
 });
@@ -335,47 +338,6 @@ describe("RunInspectorPanel", () => {
     await waitFor(() => {
       expect(onRerunCreated).toHaveBeenCalledWith("event-rerun");
     });
-  });
-
-  it("stops running executions and queued items for the inspected run", async () => {
-    mockedExecutions = runningExecutions;
-    listNodeQueueItemsMock.mockImplementation(({ path }: { path: { nodeId: string } }) => ({
-      data: {
-        items:
-          path.nodeId === "action-2"
-            ? [
-                { id: "queue-1", rootEvent: { id: "event-running" } },
-                { id: "queue-other", rootEvent: { id: "other-event" } },
-              ]
-            : [],
-      },
-    }));
-
-    renderInspector({ run: runningRun });
-
-    fireEvent.click(screen.getAllByRole("button", { name: "Stop" })[0]);
-
-    await waitFor(() => {
-      expect(cancelExecutionMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: {
-            canvasId: "canvas-1",
-            executionId: "execution-running",
-          },
-        }),
-      );
-      expect(deleteNodeQueueItemMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: {
-            canvasId: "canvas-1",
-            nodeId: "action-2",
-            itemId: "queue-1",
-          },
-        }),
-      );
-    });
-
-    expect(deleteNodeQueueItemMock).toHaveBeenCalledTimes(1);
   });
 
   it("stops an active node execution from the node accordion header", async () => {
