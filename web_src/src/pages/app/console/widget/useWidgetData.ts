@@ -12,6 +12,7 @@ import {
 
 import { resolveConsoleNode, useConsoleContext, type ConsoleContextValue } from "../ConsoleContext";
 import { flattenMemoryEntries } from "./memoryRow";
+import { makeRunsFlightKey } from "./runsWidgetQuery";
 import type { WidgetDataSource, WidgetRender } from "./types";
 import {
   LOAD_MORE_STEP,
@@ -119,12 +120,19 @@ export interface WidgetDataResult {
  * up to the configured `limit` (or unbounded when blank). Charts and numbers
  * stay non-progressive — they always aggregate against the full configured
  * limit at once, since partial aggregates would flash incorrect KPIs.
+ *
+ * `skipEagerFill` short-circuits the runs/executions eager pagination for
+ * callers that only consume the API `totalCount` (see
+ * {@link runsRenderIsTotalCountOnly}). Page 1 is still fetched by the
+ * underlying infinite query and delivers `totalCount`; we just skip
+ * dragging the shared cache to the full `limit` when no rows are used.
  */
 export function useWidgetData(
   canvasId: string,
   dataSource: WidgetDataSource,
   needsNodeOutputs: boolean = true,
   progressive: boolean = false,
+  skipEagerFill: boolean = false,
 ): WidgetDataResult {
   const ctx = useConsoleContext();
   const rawLimit = dataSource.kind === "memory" ? undefined : dataSource.limit;
@@ -148,6 +156,7 @@ export function useWidgetData(
     effectiveLimit,
     initialFillTarget,
     loadMore,
+    skipEagerFill,
   });
   const runsResult = useRunsDataSourceResult({
     canvasId,
@@ -160,6 +169,7 @@ export function useWidgetData(
     effectiveLimit,
     initialFillTarget,
     loadMore,
+    skipEagerFill,
   });
 
   if (dataSource.kind === "memory") return memoryResult;
@@ -268,6 +278,7 @@ function useExecutionsDataSourceResult({
   effectiveLimit,
   initialFillTarget,
   loadMore,
+  skipEagerFill,
 }: {
   canvasId: string;
   dataSource: WidgetDataSource;
@@ -278,6 +289,7 @@ function useExecutionsDataSourceResult({
   effectiveLimit: number;
   initialFillTarget: number;
   loadMore: () => void;
+  skipEagerFill: boolean;
 }): WidgetDataResult {
   const enabled = dataSource.kind === "executions";
   const query = useInfiniteCanvasRuns(canvasId, {}, enabled);
@@ -309,8 +321,9 @@ function useExecutionsDataSourceResult({
     return count;
   }, [enabled, pages, targetNodeId]);
 
+  const executionsFlightKey = useMemo(() => makeRunsFlightKey(canvasId, {}), [canvasId]);
   useEagerInfinitePagination({
-    enabled,
+    enabled: enabled && !skipEagerFill,
     fillTarget: displaySlice,
     loadedRowCount,
     pageCount,
@@ -318,6 +331,7 @@ function useExecutionsDataSourceResult({
     isFetchingNextPage: query.isFetchingNextPage,
     isFetching: query.isFetching,
     fetchNextPage: query.fetchNextPage,
+    flightKey: executionsFlightKey,
   });
 
   const rows = useMemo(() => {
@@ -365,6 +379,7 @@ function useRunsDataSourceResult({
   effectiveLimit,
   initialFillTarget,
   loadMore,
+  skipEagerFill,
 }: {
   canvasId: string;
   dataSource: WidgetDataSource;
@@ -376,6 +391,7 @@ function useRunsDataSourceResult({
   effectiveLimit: number;
   initialFillTarget: number;
   loadMore: () => void;
+  skipEagerFill: boolean;
 }): WidgetDataResult {
   const enabled = dataSource.kind === "runs";
   const query = useInfiniteCanvasRuns(canvasId, {}, enabled);
@@ -431,8 +447,10 @@ function useRunsDataSourceResult({
   // With filters, `limit` is the desired matching-row count — keep paging
   // until we have that many matches (or hit the shared page cap).
   const fillRowCount = filtersActive ? rows.length : loadedRowCount;
-  const eagerEnabled = enabled && triggersMatchable;
+  // Skip eager fill for totalCount-only KPIs; also require matchable triggers.
+  const eagerEnabled = enabled && triggersMatchable && !skipEagerFill;
 
+  const runsFlightKey = useMemo(() => makeRunsFlightKey(canvasId, {}), [canvasId]);
   useEagerInfinitePagination({
     enabled: eagerEnabled,
     fillTarget: displaySlice,
@@ -442,6 +460,7 @@ function useRunsDataSourceResult({
     isFetchingNextPage: query.isFetchingNextPage,
     isFetching: query.isFetching,
     fetchNextPage: query.fetchNextPage,
+    flightKey: runsFlightKey,
   });
 
   const isLoading = computeRunsDataSourceLoading({
