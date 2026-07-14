@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { pickMemoryRows, resolveMemoryVariable } from "./useMarkdownVariables";
+import { isRunQueryStillSearching, pickMemoryRows, resolveMemoryVariable } from "./useMarkdownVariables";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
-import type { MarkdownMemoryVariableSource } from "./markdownVariables";
+import type { MarkdownMemoryVariableSource, MarkdownRunVariableSource } from "./markdownVariables";
+import { WIDGET_MAX_EAGER_PAGES } from "./widget/widgetPagination";
 
 function memorySource(extra: Partial<MarkdownMemoryVariableSource>): MarkdownMemoryVariableSource {
   return { kind: "memory", namespace: "ns", ...extra };
+}
+
+function runSource(extra: Partial<MarkdownRunVariableSource> = {}): MarkdownRunVariableSource {
+  return { kind: "run", select: "latest", ...extra };
 }
 
 const rows = [{ name: "a" }, { name: "b" }, { name: "c" }];
@@ -86,5 +91,58 @@ describe("resolveMemoryVariable loading state", () => {
     const result = resolveMemoryVariable(entries, memorySource({ mode: "list" }), true);
     expect(Array.isArray(result.value)).toBe(true);
     expect((result.value as unknown[]).length).toBe(2);
+  });
+});
+
+describe("isRunQueryStillSearching", () => {
+  const idleQuery = {
+    isLoading: false,
+    isFetchingNextPage: false,
+    isError: false,
+    isFetchNextPageError: false,
+    hasNextPage: true as boolean | undefined,
+    data: { pages: [{}] },
+  };
+
+  it("keeps searching while filtered pages remain under the eager page cap", () => {
+    expect(isRunQueryStillSearching(idleQuery, runSource({ statuses: ["passed"] }))).toBe(true);
+  });
+
+  it("stops searching after a fetchNextPage failure so loading cannot stick", () => {
+    // Regression: hasNextPage stays true when pageCount does not advance after
+    // a failed next-page fetch — without the failure guard the variable stays
+    // "searching" forever and the panel never surfaces an error.
+    expect(
+      isRunQueryStillSearching(
+        { ...idleQuery, isFetchNextPageError: true },
+        runSource({ statuses: ["passed"], triggers: ["deploy"] }),
+      ),
+    ).toBe(false);
+  });
+
+  it("stops searching after a page-1 query failure", () => {
+    expect(isRunQueryStillSearching({ ...idleQuery, isError: true, data: undefined }, runSource({}))).toBe(false);
+  });
+
+  it("stops searching once the eager page cap is reached", () => {
+    expect(
+      isRunQueryStillSearching(
+        {
+          ...idleQuery,
+          data: { pages: Array.from({ length: WIDGET_MAX_EAGER_PAGES }, () => ({})) },
+        },
+        runSource({ statuses: ["failed"] }),
+      ),
+    ).toBe(false);
+  });
+
+  it("stops searching for impossible select + status combinations", () => {
+    // latest_passed hits a RESULT_PASSED bucket — filtering to failed can never match.
+    expect(isRunQueryStillSearching(idleQuery, runSource({ select: "latest_passed", statuses: ["failed"] }))).toBe(
+      false,
+    );
+    expect(isRunQueryStillSearching(idleQuery, runSource({ select: "latest_failed", statuses: ["passed"] }))).toBe(
+      false,
+    );
   });
 });

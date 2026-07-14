@@ -436,6 +436,114 @@ func TestValidateMarkdownVariables_MemoryListMode(t *testing.T) {
 	})
 }
 
+// TestValidateMarkdownVariables_RunFilters exercises the shared status /
+// trigger filter shape on `kind: run` variables. Every field is optional
+// so the accepted vocabulary must line up with the FE constants in
+// `runPresentation.ts` — mismatches would let the FE persist YAML that
+// the backend then rejects on import.
+func TestValidateMarkdownVariables_RunFilters(t *testing.T) {
+	build := func(source map[string]any) ConsolePanel {
+		return ConsolePanel{
+			ID:   "p1",
+			Type: ConsolePanelTypeMarkdown,
+			Content: map[string]any{
+				"variables": []any{
+					map[string]any{"name": "run", "source": source},
+				},
+			},
+		}
+	}
+
+	t.Run("accepts empty filter arrays (empty means all)", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "run", "select": "latest", "statuses": []any{}, "triggers": []any{},
+		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts every allowed status value", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind":     "run",
+			"select":   "latest",
+			"statuses": []any{"running", "passed", "failed", "cancelled"},
+			"triggers": []any{"deploy", "release"},
+		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects an unknown status value", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "run", "select": "latest", "statuses": []any{"running", "flaky"},
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "statuses[1]")
+	})
+
+	t.Run("rejects a non-string trigger entry", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "run", "select": "latest", "triggers": []any{"deploy", 42},
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "triggers[1]")
+	})
+
+	t.Run("rejects an empty trigger entry", func(t *testing.T) {
+		err := validateMarkdownContent(build(map[string]any{
+			"kind": "run", "select": "latest", "triggers": []any{"deploy", ""},
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "triggers[1]")
+	})
+}
+
+// TestValidateDataSource_RunsFilters exercises the runs datasource
+// status / trigger filter fields on widget panels (table / chart /
+// number / scorecard). Mirrors the markdown-variable filter tests since
+// both surfaces share `validateRunStatusesField` / `validateRunTriggersField`.
+func TestValidateDataSource_RunsFilters(t *testing.T) {
+	table := func(ds map[string]any) ConsolePanel {
+		return ConsolePanel{
+			ID:   "t1",
+			Type: ConsolePanelTypeTable,
+			Content: map[string]any{
+				"dataSource": ds,
+				"render":     map[string]any{"kind": "table", "columns": []any{map[string]any{"field": "status"}}},
+			},
+		}
+	}
+
+	t.Run("accepts populated filter arrays", func(t *testing.T) {
+		err := validateTablePanelContent(table(map[string]any{
+			"kind":     "runs",
+			"limit":    50,
+			"statuses": []any{"failed", "cancelled"},
+			"triggers": []any{"deploy"},
+		}))
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts nil filter fields (empty means all)", func(t *testing.T) {
+		err := validateTablePanelContent(table(map[string]any{"kind": "runs"}))
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects an unknown status", func(t *testing.T) {
+		err := validateTablePanelContent(table(map[string]any{
+			"kind": "runs", "statuses": []any{"flaky"},
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dataSource.statuses[0]")
+	})
+
+	t.Run("rejects a non-string trigger", func(t *testing.T) {
+		err := validateTablePanelContent(table(map[string]any{
+			"kind": "runs", "triggers": []any{7},
+		}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "dataSource.triggers[0]")
+	})
+}
+
 func TestValidateHTMLContent_AcceptsWellFormed(t *testing.T) {
 	panel := ConsolePanel{
 		ID:   "p1",
