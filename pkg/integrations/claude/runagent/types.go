@@ -12,8 +12,11 @@ const (
 	maxPollAttempts         = 200
 	maxPollErrors           = 5
 	finalMessageReads       = 15
-	finalMessageDelay       = 2 * time.Second
 )
+
+// finalMessageDelay is the pause between event-stream reads while waiting for
+// the terminal event to be written. A var so tests can shrink it.
+var finalMessageDelay = 2 * time.Second
 
 // Spec is the workflow node configuration for claude.runAgent.
 type Spec struct {
@@ -25,6 +28,9 @@ type Spec struct {
 	VaultIDs      []string        `json:"vaultIds" mapstructure:"vaultIds"`
 	Files         []string        `json:"files" mapstructure:"files"`
 	Secrets       []SecretBinding `json:"secrets" mapstructure:"secrets"`
+	// PersistSession keeps the Managed Agents session after the run finishes so
+	// its transcript stays readable in the Anthropic Console.
+	PersistSession bool `json:"persistSession" mapstructure:"persistSession"`
 }
 
 // SecretBinding maps a SuperPlane secret to an environment variable in the agent session.
