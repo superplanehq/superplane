@@ -7,6 +7,8 @@
  * for the markdown kind.
  */
 
+import { RUN_STATUS_FILTER_IDS, isRunStatusFilter, type RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
+
 /** Variable identifiers must match this regex so they can appear in `{{ }}` CEL expressions. */
 export const MARKDOWN_VARIABLE_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -62,6 +64,18 @@ export interface MarkdownRunVariableSource {
    *  - `latest_failed` — the most recent `RESULT_FAILED` run
    */
   select: MarkdownRunSelect;
+  /**
+   * Optional status filter (running / passed / failed / cancelled) applied
+   * on top of `select`. Empty or omitted means "all statuses". Applied
+   * client-side after the underlying runs query returns so the same
+   * `select` bucket is shared across variables regardless of filter.
+   */
+  statuses?: RunStatusFilter[];
+  /**
+   * Optional trigger filter — each entry references a trigger node by id
+   * or name. Empty or omitted means "all triggers".
+   */
+  triggers?: string[];
 }
 
 export type MarkdownVariableSource = MarkdownMemoryVariableSource | MarkdownRunVariableSource;
@@ -190,5 +204,68 @@ function validateMarkdownRunSource(source: Record<string, unknown>, index: numbe
   if (typeof source.select !== "string" || !(MARKDOWN_RUN_SELECTS as readonly string[]).includes(source.select)) {
     return `content.variables[${index}].source.select must be one of ${MARKDOWN_RUN_SELECTS.join(", ")}.`;
   }
+  const statusesError = validateRunStatusesField(source.statuses, index);
+  if (statusesError) return statusesError;
+  return validateRunTriggersField(source.triggers, index);
+}
+
+function validateRunStatusesField(raw: unknown, index: number): string | null {
+  if (raw === undefined || raw === null) return null;
+  if (!Array.isArray(raw)) return `content.variables[${index}].source.statuses must be an array.`;
+  for (let j = 0; j < raw.length; j += 1) {
+    const item = raw[j];
+    if (!isRunStatusFilter(item)) {
+      return `content.variables[${index}].source.statuses[${j}] must be one of ${RUN_STATUS_FILTER_IDS.join(", ")}.`;
+    }
+  }
   return null;
+}
+
+function validateRunTriggersField(raw: unknown, index: number): string | null {
+  if (raw === undefined || raw === null) return null;
+  if (!Array.isArray(raw)) return `content.variables[${index}].source.triggers must be an array.`;
+  for (let j = 0; j < raw.length; j += 1) {
+    const item = raw[j];
+    if (typeof item !== "string" || item.trim() === "") {
+      return `content.variables[${index}].source.triggers[${j}] must be a non-empty string.`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Coerce a persisted statuses array into a typed subset of
+ * {@link RunStatusFilter}. Returns `undefined` when the array is missing
+ * or would end up empty so persistence stays clean (empty === "all").
+ */
+export function normalizeRunVariableStatuses(raw: unknown): RunStatusFilter[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: RunStatusFilter[] = [];
+  const seen = new Set<RunStatusFilter>();
+  for (const item of raw) {
+    if (!isRunStatusFilter(item)) continue;
+    if (seen.has(item)) continue;
+    seen.add(item);
+    out.push(item);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/**
+ * Coerce a persisted triggers array into a normalized list (trimmed,
+ * deduped). Returns `undefined` when the array is missing or empty so
+ * persistence stays clean (empty === "all").
+ */
+export function normalizeRunVariableTriggers(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out.length > 0 ? out : undefined;
 }
