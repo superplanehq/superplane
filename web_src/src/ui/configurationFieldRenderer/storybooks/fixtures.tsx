@@ -617,12 +617,12 @@ export const rendererExamples: RendererExample[] = [
     source: "Special field type",
     goType: "FieldTypeGitRef",
     docsDescription:
-      "Use `git-ref` when downstream integrations need a normalized Git reference in `refs/heads/*` or `refs/tags/*` form.",
+      "Use `git-ref` when downstream integrations need a normalized Git reference in `refs/heads/*`, `refs/tags/*`, or `refs/pull/*` form.",
     field: baseField({
       name: "deployRef",
       label: "Deploy ref",
       type: "git-ref",
-      description: "Use when the stored value must be a normalized Git branch or tag reference.",
+      description: "Use when the stored value must be a normalized Git branch, tag, or pull request reference.",
     }),
     initialValue: "refs/heads/main",
   },

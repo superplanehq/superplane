@@ -4,13 +4,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 )
 
 func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
@@ -64,6 +67,50 @@ func Test__RunFinalizer_FinalizesRunAfterTerminalExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
 	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
+	assert.NotNil(t, updatedRun.FinishedAt)
+}
+
+func Test__RunFinalizer_FinalizesRunAfterQueueItemDeleted(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	finalizer := NewRunFinalizer(amqpURL)
+	r := support.Setup(t)
+
+	node := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: node, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, node, "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), event)
+	require.NoError(t, err)
+	require.NoError(t, event.Routed())
+
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, event.ID, event.ID)
+	execution.RunID = run.ID
+	require.NoError(t, database.Conn().Save(execution).Error)
+	require.NoError(t, execution.Cancel(nil))
+
+	body, err := proto.Marshal(&pb.CanvasNodeQueueItemMessage{
+		Id:       event.ID.String(),
+		CanvasId: canvas.ID.String(),
+		NodeId:   node,
+		RunId:    run.ID.String(),
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, finalizer.consumeQueueItemDeleted(tackle.NewFakeDelivery(body)))
+
+	updatedRun, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
 	assert.NotNil(t, updatedRun.FinishedAt)
 }
 
