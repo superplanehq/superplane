@@ -1,4 +1,4 @@
-import { SquareCheckBig } from "lucide-react";
+import { ScrollText, SquareCheckBig } from "lucide-react";
 import type { ReactNode } from "react";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
@@ -103,5 +103,6 @@ function OutputStepIcon({ className }: { className?: string }) {
 const stepMarkerIcons = {
   input: InputStepIcon,
   runtime: SquareCheckBig,
+  logs: ScrollText,
   output: OutputStepIcon,
 } satisfies Record<TimelineStepType, ({ className }: { className?: string }) => ReactNode>;

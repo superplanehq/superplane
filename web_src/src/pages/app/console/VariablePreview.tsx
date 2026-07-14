@@ -66,8 +66,8 @@ export function VariablePreview({
  * Preview block for a list-mode variable. Shows the item count, the fields of
  * the first row (so authors know what each element looks like), and insert
  * snippets that wrap the list in `join(name.map(item, …), ", ")` — the
- * canonical way to render a list since cel-js can't chain `.method()` after a
- * function call and a bare `{{ name }}` would dump raw JSON.
+ * canonical way to render a list, since a bare `{{ name }}` would dump raw
+ * JSON.
  */
 function ListVariablePreviewBlock({
   name,

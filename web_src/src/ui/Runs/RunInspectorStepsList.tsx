@@ -72,12 +72,12 @@ export function RunInspectorStepsList({
         <Accordion type="single" collapsible value={selectedValue} onValueChange={onValueChange}>
           {sections.map((section) => (
             <RunInspectorNodeAccordion
-              key={section.nodeId}
+              key={section.sectionValue}
               section={section}
               componentIconMap={componentIconMap}
               organizationId={organizationId}
               canShowExpressionTemplates={canShowExpressionTemplates}
-              isOpen={selectedValue === section.nodeId}
+              isOpen={selectedValue === section.sectionValue}
               onRerun={onRerun}
               onEditNode={onEditNode}
               rerunPending={rerunPending}
@@ -85,6 +85,7 @@ export function RunInspectorStepsList({
               currentUser={currentUser}
               errorScrollRequestId={errorScrollRequest?.nodeId === section.nodeId ? errorScrollRequest.requestId : null}
               onErrorScrolled={onErrorScrolled}
+              onSelectSection={onValueChange}
             />
           ))}
         </Accordion>

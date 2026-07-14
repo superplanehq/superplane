@@ -324,11 +324,16 @@ function rowKeyForRow(row: Record<string, unknown>, index: number): string {
   const id = row.id;
   if (typeof id === "string" && id.length > 0) return id;
   if (typeof id === "number") return String(id);
+  if (typeof id === "bigint") return id.toString();
   try {
-    return `row:${index}:${JSON.stringify(row)}`;
+    return `row:${index}:${JSON.stringify(row, jsonBigIntReplacer)}`;
   } catch {
     return `row:${index}`;
   }
+}
+
+function jsonBigIntReplacer(_key: string, value: unknown): unknown {
+  return typeof value === "bigint" ? value.toString() : value;
 }
 
 function disabledTooltip(reason: ActionDisabledReason, node: string): string | undefined {
