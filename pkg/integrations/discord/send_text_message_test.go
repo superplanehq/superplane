@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -460,9 +461,52 @@ func Test__SendTextMessage__DataURIFiles(t *testing.T) {
 		require.Equal(t, []byte("hello world"), content)
 	})
 
-	t.Run("dataURIFileName derives extension from media type", func(t *testing.T) {
-		require.Equal(t, "file-1.png", dataURIFileName("image/png", 0))
-		require.Equal(t, "file-2", dataURIFileName("", 1))
+	t.Run("attachmentName appends the content-type extension when missing", func(t *testing.T) {
+		require.Equal(t, "file-1.png", attachmentName("", "image/png", 0))
+		require.Equal(t, "chart.png", attachmentName("chart", "image/png", 0))
+		// A user-provided name that already carries an extension is kept.
+		require.Equal(t, "report.pdf", attachmentName("report.pdf", "image/png", 0))
+	})
+
+	t.Run("extensionForType avoids the obscure jpeg alias", func(t *testing.T) {
+		// mime.ExtensionsByType would return ".jfif" first for image/jpeg,
+		// which Discord will not preview; the canonical map returns ".jpg".
+		require.Equal(t, ".jpg", extensionForType("image/jpeg"))
+		require.Equal(t, ".png", extensionForType("image/png"))
+	})
+}
+
+func Test__SendTextMessage__InlineImageIsRenderable(t *testing.T) {
+	// A minimal but valid PNG (1x1 transparent pixel).
+	pngBytes := []byte{
+		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+		0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+		0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89,
+	}
+	pngB64 := base64.StdEncoding.EncodeToString(pngBytes)
+
+	t.Run("content without mime or filename still gets a png extension from the bytes", func(t *testing.T) {
+		// Mirrors an OpenAI container-file artifact: base64 content, no mimeType.
+		file, err := resolveFileAttachment(&Client{BotToken: "t"}, &contexts.HTTPContext{}, FileAttachment{
+			Source:   "content",
+			Content:  pngB64,
+			Encoding: "base64",
+		}, 1)
+		require.NoError(t, err)
+		require.Equal(t, "file-2.png", file.Name)
+		require.Equal(t, "image/png", file.ContentType)
+		require.Equal(t, pngBytes, file.Content)
+	})
+
+	t.Run("filename without extension gets the sniffed png extension", func(t *testing.T) {
+		file, err := resolveFileAttachment(&Client{BotToken: "t"}, &contexts.HTTPContext{}, FileAttachment{
+			Source:   "content",
+			Content:  pngB64,
+			Encoding: "base64",
+			Filename: "inventory",
+		}, 0)
+		require.NoError(t, err)
+		require.Equal(t, "inventory.png", file.Name)
 	})
 }
 

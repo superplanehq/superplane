@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"net/http"
 	"net/url"
 	"path"
 	"strconv"
@@ -550,14 +551,67 @@ func parseDataURI(uri string) (string, []byte, error) {
 	return mediaType, []byte(data), nil
 }
 
-// dataURIFileName derives an attachment filename from a data URI's media type
-// (e.g. image/png -> file-1.png).
-func dataURIFileName(mediaType string, index int) string {
-	name := fmt.Sprintf("file-%d", index+1)
-	if exts, err := mime.ExtensionsByType(mediaType); err == nil && len(exts) > 0 {
-		return name + exts[0]
+// canonicalExtensions maps common media types to the extension clients (e.g.
+// Discord) expect for inline rendering. It is preferred over
+// mime.ExtensionsByType, whose first result can be an obscure alias — for
+// example image/jpeg resolves to ".jfif", which Discord will not preview.
+var canonicalExtensions = map[string]string{
+	"image/png":        ".png",
+	"image/jpeg":       ".jpg",
+	"image/gif":        ".gif",
+	"image/webp":       ".webp",
+	"image/svg+xml":    ".svg",
+	"application/pdf":  ".pdf",
+	"application/zip":  ".zip",
+	"application/json": ".json",
+	"text/csv":         ".csv",
+	"text/plain":       ".txt",
+	"text/html":        ".html",
+	"text/markdown":    ".md",
+}
+
+// extensionForType returns the file extension (with leading dot) for a media
+// type, or "" when none is known.
+func extensionForType(mediaType string) string {
+	mediaType = strings.ToLower(strings.TrimSpace(strings.Split(mediaType, ";")[0]))
+	if ext, ok := canonicalExtensions[mediaType]; ok {
+		return ext
 	}
-	return name
+	if exts, err := mime.ExtensionsByType(mediaType); err == nil && len(exts) > 0 {
+		return exts[0]
+	}
+	return ""
+}
+
+// resolveContentType returns the effective media type of the attachment,
+// preferring what the content bytes actually are (the source of truth) over
+// the configured hint. The hint is used only when sniffing is inconclusive,
+// which matters for artifacts that carry no MIME metadata (e.g. OpenAI
+// container files).
+func resolveContentType(content []byte, hint string) string {
+	sniffed := http.DetectContentType(content)
+	base := strings.ToLower(strings.TrimSpace(strings.Split(sniffed, ";")[0]))
+	// DetectContentType falls back to these when it cannot recognize the
+	// bytes; defer to the caller's hint in that case.
+	if (base == "application/octet-stream" || base == "text/plain") && strings.TrimSpace(hint) != "" {
+		return hint
+	}
+	return sniffed
+}
+
+// attachmentName builds the attachment filename. A user-provided name that
+// already carries an extension is kept as-is; otherwise the extension for the
+// resolved content type is appended so clients render the file correctly (an
+// image without an image extension is shown as a generic download).
+func attachmentName(preferred string, contentType string, index int) string {
+	ext := extensionForType(contentType)
+	if preferred != "" {
+		if path.Ext(preferred) != "" {
+			return preferred
+		}
+		return preferred + ext
+	}
+	return fmt.Sprintf("file-%d", index+1) + ext
 }
 
 // hasAttachableFile reports whether the list has at least one non-empty entry.
@@ -589,11 +643,14 @@ func resolveFileAttachment(client *Client, httpCtx core.HTTPContext, entry FileA
 			}
 			content = decoded
 		}
-		name := entry.Filename
-		if name == "" {
-			name = dataURIFileName(entry.MimeType, index)
-		}
-		return MessageFile{Name: name, Content: content}, nil
+		// Sniff the actual bytes so the attachment renders correctly even when
+		// the artifact carries no MIME type (e.g. OpenAI container files).
+		contentType := resolveContentType(content, entry.MimeType)
+		return MessageFile{
+			Name:        attachmentName(entry.Filename, contentType, index),
+			Content:     content,
+			ContentType: contentType,
+		}, nil
 	}
 
 	fileURL := strings.TrimSpace(entry.URL)
@@ -604,11 +661,13 @@ func resolveFileAttachment(client *Client, httpCtx core.HTTPContext, entry FileA
 	if err != nil {
 		return MessageFile{}, fmt.Errorf("failed to fetch file %q: %w", fileURL, err)
 	}
+	contentType := resolveContentType(content, "")
 	name := entry.Filename
 	if name == "" {
 		name = fileNameFromURL(fileURL, index)
 	}
-	return MessageFile{Name: name, Content: content}, nil
+	name = attachmentName(name, contentType, index)
+	return MessageFile{Name: name, Content: content, ContentType: contentType}, nil
 }
 
 // resolveLegacyFileEntry handles the original string entry form: an http(s)
@@ -619,7 +678,12 @@ func resolveLegacyFileEntry(client *Client, httpCtx core.HTTPContext, value stri
 		if err != nil {
 			return MessageFile{}, fmt.Errorf("invalid data URI in files[%d]: %v", index, err)
 		}
-		return MessageFile{Name: dataURIFileName(mediaType, index), Content: content}, nil
+		contentType := resolveContentType(content, mediaType)
+		return MessageFile{
+			Name:        attachmentName("", contentType, index),
+			Content:     content,
+			ContentType: contentType,
+		}, nil
 	}
 	if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
 		// A schemeless entry is almost always raw file content pasted via
