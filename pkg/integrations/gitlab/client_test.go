@@ -890,18 +890,73 @@ func Test__Client__ApproveMergeRequest(t *testing.T) {
 	})
 }
 
-func Test__Client__GetIssue(t *testing.T) {
+func Test__Client__ListEnvironments(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				GitlabMockResponse(http.StatusOK, `{
-					"id": 41,
-					"iid": 7,
-					"project_id": 456,
-					"title": "Login page rendering issue",
-					"state": "opened",
-					"labels": ["bug"],
-					"web_url": "https://gitlab.com/group/project/-/issues/7"
+				GitlabMockResponse(http.StatusOK, `[
+					{"id": 1, "name": "production", "slug": "production", "external_url": "https://prod.example.com", "state": "available", "tier": "production"},
+					{"id": 2, "name": "staging", "slug": "staging", "external_url": "https://staging.example.com", "state": "available", "tier": "staging"}
+				]`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		environments, err := client.ListEnvironments("456")
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/environments?per_page=100&page=1&states=available", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+
+		require.Len(t, environments, 2)
+		assert.Equal(t, "production", environments[0].Name)
+		assert.Equal(t, "https://prod.example.com", environments[0].ExternalURL)
+		assert.Equal(t, "staging", environments[1].Name)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"error": "not found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.ListEnvironments("456")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "status 404")
+	})
+}
+
+func Test__Client__CreateDeployment(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{
+					"id": 42,
+					"iid": 2,
+					"ref": "main",
+					"sha": "a91957a858320c0e17f3a0eca7cfacbff50ea29a",
+					"created_at": "2016-08-11T11:32:35.444Z",
+					"status": "running",
+					"environment": {"id": 9, "name": "production", "external_url": "https://prod.example.com"},
+					"deployable": null
 				}`),
 			},
 		}
@@ -914,22 +969,38 @@ func Test__Client__GetIssue(t *testing.T) {
 			httpClient: mockClient,
 		}
 
-		issue, err := client.GetIssue("456", "7")
+		deployment, err := client.CreateDeployment(context.Background(), "456", &CreateDeploymentRequest{
+			Environment: "production",
+			Ref:         "main",
+			SHA:         "a91957a858320c0e17f3a0eca7cfacbff50ea29a",
+			Tag:         false,
+			Status:      "running",
+		})
 		require.NoError(t, err)
-		require.NotNil(t, issue)
-		assert.Equal(t, 7, issue.IID)
-		assert.Equal(t, "Login page rendering issue", issue.Title)
+		require.NotNil(t, deployment)
+		assert.Equal(t, 42, deployment.ID)
+		assert.Equal(t, "running", deployment.Status)
+		require.NotNil(t, deployment.Environment)
+		assert.Equal(t, "production", deployment.Environment.Name)
+		assert.Equal(t, "https://prod.example.com", deployment.Environment.ExternalURL)
 
 		require.Len(t, mockClient.Requests, 1)
-		assert.Equal(t, http.MethodGet, mockClient.Requests[0].Method)
-		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/issues/7", mockClient.Requests[0].URL.String())
-		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/deployments", mockClient.Requests[0].URL.String())
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		bodyString := string(body)
+		assert.Contains(t, bodyString, `"environment":"production"`)
+		assert.Contains(t, bodyString, `"ref":"main"`)
+		assert.Contains(t, bodyString, `"tag":false`)
+		assert.Contains(t, bodyString, `"status":"running"`)
 	})
 
-	t.Run("not found", func(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Not found"}`),
+				GitlabMockResponse(http.StatusBadRequest, `{"message": "sha is invalid"}`),
 			},
 		}
 
@@ -941,8 +1012,76 @@ func Test__Client__GetIssue(t *testing.T) {
 			httpClient: mockClient,
 		}
 
-		_, err := client.GetIssue("456", "999")
+		_, err := client.CreateDeployment(context.Background(), "456", &CreateDeploymentRequest{
+			Environment: "production",
+			Ref:         "main",
+			SHA:         "bad",
+			Status:      "running",
+		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get issue")
+		assert.Contains(t, err.Error(), "failed to create deployment")
+	})
+}
+
+func Test__Client__UpdateDeployment(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{
+					"id": 42,
+					"iid": 2,
+					"ref": "main",
+					"sha": "a91957a858320c0e17f3a0eca7cfacbff50ea29a",
+					"created_at": "2016-08-11T11:32:35.444Z",
+					"updated_at": "2016-08-11T11:34:00.000Z",
+					"status": "success",
+					"environment": {"id": 9, "name": "production", "external_url": "https://prod.example.com"}
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		deployment, err := client.UpdateDeployment(context.Background(), "456", 42, &UpdateDeploymentRequest{
+			Status: "success",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, deployment)
+		assert.Equal(t, 42, deployment.ID)
+		assert.Equal(t, "success", deployment.Status)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPut, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/deployments/42", mockClient.Requests[0].URL.String())
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		assert.Contains(t, string(body), `"status":"success"`)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusNotFound, `{"message": "404 Deployment Not Found"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.UpdateDeployment(context.Background(), "456", 99, &UpdateDeploymentRequest{Status: "failed"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update deployment")
 	})
 }

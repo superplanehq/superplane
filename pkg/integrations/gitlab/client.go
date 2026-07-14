@@ -208,6 +208,23 @@ func (c *Client) ListMilestones(projectID string) ([]Milestone, error) {
 	})
 }
 
+type Environment struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug,omitempty"`
+	ExternalURL string `json:"external_url,omitempty"`
+	State       string `json:"state,omitempty"`
+	Tier        string `json:"tier,omitempty"`
+}
+
+// ListEnvironments lists the available environments for a project. Only
+// available environments are returned so users pick a live deployment target.
+func (c *Client) ListEnvironments(projectID string) ([]Environment, error) {
+	return fetchAllResources[Environment](c, func(page int) string {
+		return fmt.Sprintf("%s/api/%s/projects/%s/environments?per_page=100&page=%d&states=available", c.baseURL, apiVersion, url.PathEscape(projectID), page)
+	})
+}
+
 func (c *Client) getCurrentUser() (*User, error) {
 	apiURL := fmt.Sprintf("%s/api/%s/user", c.baseURL, apiVersion)
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
@@ -651,33 +668,6 @@ func (c *Client) ApproveMergeRequest(ctx context.Context, projectID, mergeReques
 	return &approval, nil
 }
 
-// GetIssue fetches a single project issue by its IID.
-// See https://docs.gitlab.com/api/issues/#single-project-issue
-func (c *Client) GetIssue(projectID, issueIID string) (*Issue, error) {
-	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID))
-	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get issue: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
-	}
-
-	var issue Issue
-	if err := json.NewDecoder(resp.Body).Decode(&issue); err != nil {
-		return nil, fmt.Errorf("failed to decode issue: %v", err)
-	}
-
-	return &issue, nil
-}
-
 type AwardEmoji struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
@@ -792,6 +782,104 @@ func (c *Client) createAwardEmoji(ctx context.Context, apiURL string, req *Creat
 	}
 
 	return &awardEmoji, nil
+}
+
+type DeploymentEnvironment struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	ExternalURL string `json:"external_url,omitempty"`
+}
+
+type Deployment struct {
+	ID          int                    `json:"id"`
+	IID         int                    `json:"iid"`
+	Ref         string                 `json:"ref"`
+	SHA         string                 `json:"sha"`
+	Status      string                 `json:"status"`
+	CreatedAt   string                 `json:"created_at"`
+	UpdatedAt   string                 `json:"updated_at,omitempty"`
+	User        *User                  `json:"user,omitempty"`
+	Environment *DeploymentEnvironment `json:"environment,omitempty"`
+	Deployable  map[string]any         `json:"deployable,omitempty"`
+}
+
+type CreateDeploymentRequest struct {
+	Environment string `json:"environment"`
+	Ref         string `json:"ref"`
+	SHA         string `json:"sha"`
+	Tag         bool   `json:"tag"`
+	Status      string `json:"status"`
+}
+
+type UpdateDeploymentRequest struct {
+	Status string `json:"status"`
+}
+
+// CreateDeployment creates a deployment for a project environment.
+// GitLab creates the environment automatically if it does not yet exist.
+func (c *Client) CreateDeployment(ctx context.Context, projectID string, req *CreateDeploymentRequest) (*Deployment, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/deployments", c.baseURL, apiVersion, url.PathEscape(projectID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create deployment: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var deployment Deployment
+	if err := json.NewDecoder(resp.Body).Decode(&deployment); err != nil {
+		return nil, fmt.Errorf("failed to decode deployment: %v", err)
+	}
+
+	return &deployment, nil
+}
+
+// UpdateDeployment updates the status of an existing deployment.
+func (c *Client) UpdateDeployment(ctx context.Context, projectID string, deploymentID int, req *UpdateDeploymentRequest) (*Deployment, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/deployments/%d", c.baseURL, apiVersion, url.PathEscape(projectID), deploymentID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update deployment: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var deployment Deployment
+	if err := json.NewDecoder(resp.Body).Decode(&deployment); err != nil {
+		return nil, fmt.Errorf("failed to decode deployment: %v", err)
+	}
+
+	return &deployment, nil
 }
 
 // parseGitlabErrorMessage extracts the "message" field from a GitLab JSON error

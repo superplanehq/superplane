@@ -110,7 +110,7 @@ To connect with a **Personal Access Token**:
 **Component permissions:** components act as the connected user, so that user needs the matching project role:
 - **Accept Merge Request** requires permission to merge into the target branch. Protected branches (e.g. the default branch) allow only **Maintainers** to merge by default; allow Developers via the branch's **Allowed to merge** setting if needed.
 - **Approve Merge Request** requires the user to be an eligible approver: a direct project or group member with at least the **Developer** role. By default, users cannot approve their own merge requests.
-- **Get Issue** requires at least the **Guest** role (**Planner/Reporter** for confidential issues).
+- **Create Deployment** and **Create Deployment Status** require at least the **Developer** role on the project. For protected environments, the connected user must also be in the environment's **Allowed to deploy** list.
 `, strings.Join(scopeList, ","), strings.Join(scopeList, ", "))
 }
 
@@ -178,7 +178,6 @@ func (g *GitLab) Configuration() []configuration.Field {
 func (g *GitLab) Actions() []core.Action {
 	return []core.Action{
 		&CreateIssue{},
-		&GetIssue{},
 		&RunPipeline{},
 		&GetPipeline{},
 		&GetLatestPipeline{},
@@ -187,6 +186,8 @@ func (g *GitLab) Actions() []core.Action {
 		&AddReaction{},
 		&AcceptMergeRequest{},
 		&ApproveMergeRequest{},
+		&CreateDeployment{},
+		&CreateDeploymentStatus{},
 	}
 }
 
