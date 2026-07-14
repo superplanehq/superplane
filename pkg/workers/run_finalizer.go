@@ -23,6 +23,7 @@ const (
 	runFinalizerTriggerSweep             = "sweep"
 	runFinalizerTriggerExecutionFinished = "execution_finished"
 	runFinalizerTriggerEventTerminal     = "event_terminal"
+	runFinalizerTriggerQueueItemDeleted  = "queue_item_deleted"
 
 	runFinalizerReasonAlreadyFinished = "already_finished"
 	runFinalizerReasonOpenWork        = "open_work"
@@ -47,6 +48,7 @@ func (w *RunFinalizer) Name() string {
 func (w *RunFinalizer) Start(ctx context.Context) {
 	go w.startExecutionFinishedConsumer(ctx)
 	go w.startEventTerminalConsumer(ctx)
+	go w.startQueueItemDeletedConsumer(ctx)
 
 	//
 	// The database poller is supposed to catch runs that weren't finalized properly,
@@ -84,6 +86,39 @@ func (w *RunFinalizer) Start(ctx context.Context) {
 
 			telemetry.RecordRunFinalizerTickDuration(context.Background(), time.Since(tickStart))
 		}
+	}
+}
+
+func (w *RunFinalizer) startQueueItemDeletedConsumer(ctx context.Context) {
+	options := tackle.Options{
+		URL:            w.rabbitMQURL,
+		ConnectionName: w.Name() + ".queue-item-deleted",
+		RemoteExchange: messages.CanvasExchange,
+		Service:        messages.CanvasExchange + "." + messages.CanvasQueueItemDeletedRoutingKey + "." + w.Name(),
+		RoutingKey:     messages.CanvasQueueItemDeletedRoutingKey,
+	}
+
+	consumer := tackle.NewConsumer()
+	consumer.SetLogger(logging.NewTackleLogger(w.logger))
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.CanvasQueueItemDeletedRoutingKey)
+
+		err := consumer.Start(&options, w.consumeQueueItemDeleted)
+		if err != nil {
+			w.logger.Errorf("Error consuming messages from %s: %v", messages.CanvasQueueItemDeletedRoutingKey, err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.CanvasQueueItemDeletedRoutingKey)
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -203,10 +238,32 @@ func (w *RunFinalizer) consumeEventTerminal(delivery tackle.Delivery) error {
 	return w.finalizeRun(workflowID, runID, runFinalizerTriggerEventTerminal)
 }
 
+func (w *RunFinalizer) consumeQueueItemDeleted(delivery tackle.Delivery) error {
+	data := &pb.CanvasNodeQueueItemMessage{}
+	if err := proto.Unmarshal(delivery.Body(), data); err != nil {
+		w.logger.Errorf("Error unmarshaling queue item deleted message: %v", err)
+		return err
+	}
+
+	workflowID, err := uuid.Parse(data.CanvasId)
+	if err != nil {
+		w.logger.Errorf("Error parsing canvas id: %v", err)
+		return err
+	}
+
+	runID, err := uuid.Parse(data.RunId)
+	if err != nil {
+		w.logger.Errorf("Error parsing run id: %v", err)
+		return err
+	}
+
+	return w.finalizeRun(workflowID, runID, runFinalizerTriggerQueueItemDeleted)
+}
+
 func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) error {
 	//
 	// For every run we process, we track the following metrics:
-	// - trigger: sweep, execution_finished, event_terminal
+	// - trigger: sweep, execution_finished, event_terminal, queue_item_deleted
 	// - outcome: success, failed, skipped
 	// - reason: none, already_finished, open_work, locked, deadlock, not_found, internal
 	//
