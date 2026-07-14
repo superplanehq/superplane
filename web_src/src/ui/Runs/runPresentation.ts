@@ -10,16 +10,21 @@ import { getTriggerRenderer } from "@/pages/app/mappers";
 import { buildEventInfo } from "@/pages/app/utils";
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock, MinusCircle, type LucideIcon } from "lucide-react";
 
-export type RunResultFilter = "passed" | "failed" | "cancelled";
-export type RunStatusFilter = "running" | RunResultFilter;
+import { RUN_STATUS_FILTER_IDS, type RunStatusFilter } from "./runStatusFilterVocab";
+
+export type { RunStatusFilter };
+export type RunResultFilter = Exclude<RunStatusFilter, "running">;
 export type RunStatusKey = RunStatusFilter | "unknown";
 
-export const RUN_STATUS_FILTER_OPTIONS: { id: RunStatusFilter; label: string; dotClassName: string }[] = [
-  { id: "running", label: "Running", dotClassName: "bg-blue-500" },
-  { id: "passed", label: "Passed", dotClassName: "bg-emerald-500" },
-  { id: "failed", label: "Failed", dotClassName: "bg-red-500" },
-  { id: "cancelled", label: "Cancelled", dotClassName: "bg-gray-400" },
-];
+const RUN_STATUS_FILTER_OPTION_META: Record<RunStatusFilter, { label: string; dotClassName: string }> = {
+  running: { label: "Running", dotClassName: "bg-blue-500" },
+  passed: { label: "Passed", dotClassName: "bg-emerald-500" },
+  failed: { label: "Failed", dotClassName: "bg-red-500" },
+  cancelled: { label: "Cancelled", dotClassName: "bg-gray-400" },
+};
+
+export const RUN_STATUS_FILTER_OPTIONS: { id: RunStatusFilter; label: string; dotClassName: string }[] =
+  RUN_STATUS_FILTER_IDS.map((id) => ({ id, ...RUN_STATUS_FILTER_OPTION_META[id] }));
 
 export const RUN_STATUS_META = {
   running: {
