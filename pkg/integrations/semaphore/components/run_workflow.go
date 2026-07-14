@@ -193,11 +193,11 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "pipelineFile",
-			Label:       "Pipeline file",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Placeholder: "e.g. .semaphore/semaphore.yml",
+			Name:     "pipelineFile",
+			Label:    "Pipeline file",
+			Type:     configuration.FieldTypeString,
+			Required: true,
+			Default:  ".semaphore/semaphore.yml",
 		},
 		{
 			Name:     "ref",
