@@ -335,6 +335,8 @@ function useExecutionsDataSourceResult({
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     isFetching: query.isFetching,
+    isError: query.isError,
+    isFetchNextPageError: query.isFetchNextPageError,
     fetchNextPage: query.fetchNextPage,
     flightKey: executionsFlightKey,
   });
@@ -464,6 +466,8 @@ function useRunsDataSourceResult({
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     isFetching: query.isFetching,
+    isError: query.isError,
+    isFetchNextPageError: query.isFetchNextPageError,
     fetchNextPage: query.fetchNextPage,
     flightKey: runsFlightKey,
   });
@@ -496,12 +500,14 @@ function useRunsDataSourceResult({
   return { rows, isLoading, error: errorMessage(query.error), totalCount, ...paginationFields };
 }
 
-function computeRunsDataSourceLoading(args: {
+export function computeRunsDataSourceLoading(args: {
   query: {
     isLoading: boolean;
     hasNextPage: boolean | undefined;
     isFetchingNextPage: boolean;
     isFetching: boolean;
+    isError?: boolean;
+    isFetchNextPageError?: boolean;
   };
   enabled: boolean;
   fillRowCount: number;
@@ -512,6 +518,7 @@ function computeRunsDataSourceLoading(args: {
   progressive: boolean;
   runExecutionsLoading: boolean;
 }): boolean {
+  const queryFailed = args.query.isError === true || args.query.isFetchNextPageError === true;
   const initialFillLoading = isWidgetQueryLoading({
     queryIsLoading: args.query.isLoading,
     enabled: args.enabled,
@@ -523,8 +530,11 @@ function computeRunsDataSourceLoading(args: {
     isFetching: args.query.isFetching,
   });
   // Keep count KPIs loading between eager page ticks while still hunting for
-  // enough filtered matches — otherwise they flash `0` mid-search.
+  // enough filtered matches — otherwise they flash `0` mid-search. Stop once
+  // a page fails: hasNextPage stays true without advancing pageCount, which
+  // would otherwise spin forever (same guard as markdown run variables).
   const awaitingFilteredFill =
+    !queryFailed &&
     args.filtersActive &&
     args.triggersMatchable &&
     args.fillRowCount < args.initialFillTarget &&

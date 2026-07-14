@@ -216,6 +216,8 @@ export function useEagerInfinitePagination({
   hasNextPage,
   isFetchingNextPage,
   isFetching,
+  isError = false,
+  isFetchNextPageError = false,
   fetchNextPage,
   flightKey,
 }: {
@@ -226,6 +228,8 @@ export function useEagerInfinitePagination({
   hasNextPage: boolean | undefined;
   isFetchingNextPage: boolean;
   isFetching: boolean;
+  isError?: boolean;
+  isFetchNextPageError?: boolean;
   fetchNextPage: () => Promise<unknown> | unknown;
   flightKey: string;
 }) {
@@ -239,6 +243,8 @@ export function useEagerInfinitePagination({
         hasNextPage,
         isFetchingNextPage,
         isFetching,
+        isError,
+        isFetchNextPageError,
       })
     ) {
       return;
@@ -252,6 +258,8 @@ export function useEagerInfinitePagination({
     hasNextPage,
     isFetchingNextPage,
     isFetching,
+    isError,
+    isFetchNextPageError,
     fetchNextPage,
     flightKey,
   ]);
@@ -265,6 +273,8 @@ export function shouldFetchNextWidgetPage({
   hasNextPage,
   isFetchingNextPage,
   isFetching,
+  isError = false,
+  isFetchNextPageError = false,
 }: {
   enabled: boolean;
   fillTarget: number;
@@ -273,8 +283,11 @@ export function shouldFetchNextWidgetPage({
   hasNextPage: boolean | undefined;
   isFetchingNextPage: boolean;
   isFetching: boolean;
+  isError?: boolean;
+  isFetchNextPageError?: boolean;
 }): boolean {
   if (!enabled || !hasNextPage) return false;
+  if (isError || isFetchNextPageError) return false;
   if (isFetchingNextPage || isFetching) return false;
   if (loadedRowCount >= fillTarget) return false;
   return pageCount < WIDGET_MAX_EAGER_PAGES;

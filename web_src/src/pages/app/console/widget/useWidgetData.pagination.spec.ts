@@ -7,6 +7,7 @@ import {
   computeDisplaySlice,
   computeEffectiveLimit,
   computeInitialDisplayCount,
+  computeRunsDataSourceLoading,
   computeTrendCollectLimit,
   computeWidgetHasMore,
   isWidgetQueryLoading,
@@ -164,6 +165,11 @@ describe("shouldFetchNextWidgetPage", () => {
   it("does not fetch beyond the page budget", () => {
     expect(shouldFetchNextWidgetPage({ ...baseInput, pageCount: WIDGET_MAX_EAGER_PAGES })).toBe(false);
   });
+
+  it("does not fetch after a page failure", () => {
+    expect(shouldFetchNextWidgetPage({ ...baseInput, isFetchNextPageError: true })).toBe(false);
+    expect(shouldFetchNextWidgetPage({ ...baseInput, isError: true })).toBe(false);
+  });
 });
 
 describe("isWidgetQueryLoading", () => {
@@ -196,5 +202,41 @@ describe("isWidgetQueryLoading", () => {
 
   it("respects the eager-page budget", () => {
     expect(isWidgetQueryLoading({ ...baseInput, pageCount: WIDGET_MAX_EAGER_PAGES })).toBe(false);
+  });
+});
+
+describe("computeRunsDataSourceLoading", () => {
+  const baseInput = {
+    query: {
+      isLoading: false,
+      hasNextPage: true as boolean | undefined,
+      isFetchingNextPage: false,
+      isFetching: false,
+      isError: false,
+      isFetchNextPageError: false,
+    },
+    enabled: true,
+    fillRowCount: 0,
+    initialFillTarget: 100,
+    pageCount: 1,
+    filtersActive: true,
+    triggersMatchable: true,
+    progressive: false,
+    runExecutionsLoading: false,
+  };
+
+  it("keeps filtered widgets loading while more matching rows may still arrive", () => {
+    expect(computeRunsDataSourceLoading(baseInput)).toBe(true);
+  });
+
+  it("stops filtered loading after a fetchNextPage failure", () => {
+    // Regression: hasNextPage stays true when pageCount does not advance —
+    // without the failure guard the widget spins forever.
+    expect(
+      computeRunsDataSourceLoading({
+        ...baseInput,
+        query: { ...baseInput.query, isFetchNextPageError: true },
+      }),
+    ).toBe(false);
   });
 });
