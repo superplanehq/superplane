@@ -89,7 +89,7 @@ const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProp
     >
       <ItemMedia>
         {appIconSrc ? (
-          <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
+          <img src={appIconSrc} alt={block.label || block.name} className="size-3.5" />
         ) : (
           <IconComponent size={14} className="text-gray-500 dark:text-gray-400" />
         )}
