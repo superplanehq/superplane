@@ -110,7 +110,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		mergeSessionIntoMetadata(&metadata, sess)
 		_ = ctx.Metadata.Set(metadata)
 
-		reclaimSession(client, metadata.Session.ID, persistSessionFromConfig(ctx.Configuration), ctx.Logger)
+		reclaimSession(client, metadata.Session.ID, persistSessionFromConfig(ctx.Configuration, ctx.Logger), ctx.Logger)
 		cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 		cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 		return nil
@@ -147,10 +147,11 @@ func (a *RunAgent) Cancel(ctx core.ExecutionContext) error {
 	} else {
 		ctx.Logger.Infof("Sent interrupt to managed session %s", metadata.Session.ID)
 	}
-	// Best effort cleanup; may fail if session is still running.
-	if !persistSessionFromConfig(ctx.Configuration) {
-		_ = client.DeleteManagedSession(metadata.Session.ID)
-	}
+	// Best effort cleanup; may fail if session is still running. This ignores
+	// "Keep Session After Run" on purpose: the run never finished, and
+	// cancelling often accompanies deleting the node, which drops the only
+	// record of this session ID.
+	_ = client.DeleteManagedSession(metadata.Session.ID)
 	cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 	cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 	return nil

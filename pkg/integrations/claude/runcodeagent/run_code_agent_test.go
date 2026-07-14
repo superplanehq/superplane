@@ -400,6 +400,45 @@ func Test__RunCodeAgent__poll__persistSessionKeepsSessionAndEnvironment(t *testi
 	assert.True(t, vaultDeleted, "vault holds the GitHub token and must always be reclaimed")
 }
 
+// A cancelled run never finished, and cancelling often accompanies deleting the
+// node — which drops the only record of these IDs. Reclaim regardless.
+func Test__RunCodeAgent__Cancel__reclaimsDespitePersistSession(t *testing.T) {
+	a := &RunCodeAgent{}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), // interrupt, session, env, vault, archive
+	}}
+	execCtx := core.ExecutionContext{
+		Configuration: map[string]any{
+			"sourceMode":     "repository",
+			"repository":     "o/r",
+			"task":           "do it",
+			"githubToken":    map[string]any{"secret": "gh", "key": "token"},
+			"persistSession": true,
+		},
+		HTTP:        httpCtx,
+		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:    terminalMeta(),
+		Logger:      logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.Cancel(execCtx))
+
+	var sessionDeleted, envDeleted bool
+	for _, r := range httpCtx.Requests {
+		if r.Method != http.MethodDelete {
+			continue
+		}
+		switch {
+		case strings.Contains(r.URL.Path, "/sessions/sess_1"):
+			sessionDeleted = true
+		case strings.Contains(r.URL.Path, "/environments/env_1"):
+			envDeleted = true
+		}
+	}
+	assert.True(t, sessionDeleted, "cancel must reclaim the session even when persistSession is enabled")
+	assert.True(t, envDeleted, "cancel must reclaim the environment even when persistSession is enabled")
+}
+
 func Test__RunCodeAgent__poll__timeoutReclaims(t *testing.T) {
 	a := &RunCodeAgent{}
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{

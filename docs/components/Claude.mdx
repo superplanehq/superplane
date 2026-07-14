@@ -246,7 +246,7 @@ The **Run Claude Agent** component uses [Claude Managed Agents](https://platform
 - **Environment ID**: The environment the session runs in.
 - **Prompt**: The user message (task) sent to the agent.
 - **Vault IDs** (optional): For MCP tools that need vault-backed credentials.
-- **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. Kept sessions are never cleaned up automatically — delete them yourself when you're done.
+- **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. It applies only to runs that finish — a cancelled run is always cleaned up. Kept sessions are never reclaimed automatically, so delete them yourself when you're done.
 
 ### Output
 
@@ -290,7 +290,11 @@ The **Run Code Agent** component runs an autonomous Claude coding agent using [C
 
 ### Debugging
 
-By default the session and its sandbox are torn down as soon as the run finishes. Enable **Keep Session After Run** to keep them, so you can read the agent's full transcript in the Anthropic Console. The vault holding your GitHub token is deleted either way — the token never outlives the run. Kept sessions and environments are not reclaimed automatically, so delete them yourself once you're done debugging.
+By default the session and its sandbox are torn down as soon as the run finishes. Enable **Keep Session After Run** to keep them, so you can read the agent's full transcript in the Anthropic Console. The vault holding your GitHub token is always reclaimed, whether or not you keep the session.
+
+The setting applies only to runs that **finish** — including ones that fail or time out, which are usually the ones worth reading. A run that is cancelled, or that errors before the agent starts, is always torn down: there is no transcript to read, and nothing would ever reclaim the sandbox afterwards.
+
+Kept sessions and environments are not reclaimed automatically, so delete them yourself once you're done debugging.
 
 ### Output
 

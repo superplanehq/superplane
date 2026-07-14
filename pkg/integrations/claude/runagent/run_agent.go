@@ -37,7 +37,7 @@ func (a *RunAgent) Documentation() string {
 - **Environment ID**: The environment the session runs in.
 - **Prompt**: The user message (task) sent to the agent.
 - **Vault IDs** (optional): For MCP tools that need vault-backed credentials.
-- **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. Kept sessions are never cleaned up automatically — delete them yourself when you're done.
+- **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. It applies only to runs that finish — a cancelled run is always cleaned up. Kept sessions are never reclaimed automatically, so delete them yourself when you're done.
 
 ## Output
 
@@ -348,9 +348,6 @@ func (a *RunAgent) Cleanup(ctx core.SetupContext) error { return nil }
 // reclaimSession deletes the session unless the step is configured to keep it,
 // in which case the transcript stays readable in the Anthropic Console.
 func reclaimSession(client *Client, sessionID string, persist bool, logger *log.Entry) {
-	if sessionID == "" {
-		return
-	}
 	if persist {
 		logger.Infof("Keeping managed session %s: 'Keep Session After Run' is enabled", sessionID)
 		return
@@ -361,10 +358,13 @@ func reclaimSession(client *Client, sessionID string, persist bool, logger *log.
 }
 
 // persistSessionFromConfig reports whether a step is configured to keep its
-// session. It defaults to deleting when the configuration cannot be decoded.
-func persistSessionFromConfig(config any) bool {
+// session. It defaults to deleting when the configuration cannot be decoded, and
+// says so: silently deleting a session the user asked to keep is otherwise
+// impossible to diagnose from the Console.
+func persistSessionFromConfig(config any, logger *log.Entry) bool {
 	spec, err := decodeSpec(config)
 	if err != nil {
+		logger.Warnf("Cannot read 'Keep Session After Run' from configuration (%v); reclaiming the session", err)
 		return false
 	}
 	return spec.PersistSession
