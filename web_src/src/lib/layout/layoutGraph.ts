@@ -15,24 +15,26 @@ type LayoutNode = {
 };
 
 export function resolveForwardLayoutEdges<T extends LayoutEdge>(layoutNodes: LayoutNode[], layoutEdges: T[]): T[] {
-  const positionByNodeId = new Map(layoutNodes.map((node) => [node.id as string, node.position]));
+  const layoutNodeIds = new Set(layoutNodes.map((node) => node.id).filter((id): id is string => Boolean(id)));
+  const forwardEdges: T[] = [];
 
-  return layoutEdges.filter((edge, index) => {
+  for (const edge of layoutEdges) {
     if (!edge.sourceId || !edge.targetId) {
-      return false;
+      continue;
     }
 
-    const sourcePosition = positionByNodeId.get(edge.sourceId);
-    const targetPosition = positionByNodeId.get(edge.targetId);
-    if (!sourcePosition || !targetPosition) {
-      return true;
+    if (!layoutNodeIds.has(edge.sourceId) || !layoutNodeIds.has(edge.targetId)) {
+      continue;
     }
 
-    return !(
-      isBackwardLayoutEdge(sourcePosition, targetPosition) &&
-      hasLayoutPath(layoutEdges, edge.targetId, edge.sourceId, index)
-    );
-  });
+    if (hasLayoutPath(forwardEdges, edge.targetId, edge.sourceId)) {
+      continue;
+    }
+
+    forwardEdges.push(edge);
+  }
+
+  return forwardEdges;
 }
 
 export function appendUniqueChannels(first: string[], second: string[]): string[] {
@@ -51,28 +53,10 @@ export function appendUniqueChannels(first: string[], second: string[]): string[
   return result;
 }
 
-function isBackwardLayoutEdge(sourcePosition: PositionLike, targetPosition: PositionLike): boolean {
-  const sourceX = sourcePosition.x ?? 0;
-  const sourceY = sourcePosition.y ?? 0;
-  const targetX = targetPosition.x ?? 0;
-  const targetY = targetPosition.y ?? 0;
-
-  if (targetX !== sourceX) {
-    return targetX < sourceX;
-  }
-
-  return targetY < sourceY;
-}
-
-function hasLayoutPath(
-  layoutEdges: LayoutEdge[],
-  startNodeId: string,
-  targetNodeId: string,
-  excludedEdgeIndex: number,
-): boolean {
+function hasLayoutPath(layoutEdges: LayoutEdge[], startNodeId: string, targetNodeId: string): boolean {
   const adjacencyByNodeId = new Map<string, string[]>();
-  layoutEdges.forEach((edge, index) => {
-    if (index === excludedEdgeIndex || !edge.sourceId || !edge.targetId) {
+  layoutEdges.forEach((edge) => {
+    if (!edge.sourceId || !edge.targetId) {
       return;
     }
 

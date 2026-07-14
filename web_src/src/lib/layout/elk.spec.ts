@@ -242,4 +242,23 @@ describe("ElkLayoutEngine", () => {
 
     expect(resolveForwardLayoutEdges([{ id: "source" }, { id: "target" }], edges)).toEqual(edges);
   });
+
+  it("preserves a forward edge into a new node at the origin when a loop exists", () => {
+    const edges = [
+      { sourceId: "process", targetId: "check", channel: "default" },
+      { sourceId: "check", targetId: "new-node", channel: "default" },
+      { sourceId: "new-node", targetId: "process", channel: "repeat" },
+    ];
+
+    expect(
+      resolveForwardLayoutEdges(
+        [
+          { id: "process", position: { x: 600, y: 0 } },
+          { id: "check", position: { x: 1200, y: 0 } },
+          { id: "new-node", position: { x: 0, y: 0 } },
+        ],
+        edges,
+      ),
+    ).toEqual(edges.slice(0, 2));
+  });
 });

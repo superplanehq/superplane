@@ -199,20 +199,21 @@ func resolveLayoutEdges(edges []E, nodeSet map[string]struct{}) []E {
 }
 
 func resolveForwardLayoutEdges(layoutNodes []N, layoutEdges []E) []E {
-	positionByNodeID := make(map[string]Position, len(layoutNodes))
+	nodeSet := make(map[string]struct{}, len(layoutNodes))
 	for _, node := range layoutNodes {
-		positionByNodeID[node.ID] = node.Position
+		nodeSet[node.ID] = struct{}{}
 	}
 
 	forwardEdges := make([]E, 0, len(layoutEdges))
-	for i, edge := range layoutEdges {
-		sourcePosition, hasSource := positionByNodeID[edge.SourceID]
-		targetPosition, hasTarget := positionByNodeID[edge.TargetID]
-		if !hasSource || !hasTarget {
+	for _, edge := range layoutEdges {
+		if _, ok := nodeSet[edge.SourceID]; !ok {
+			continue
+		}
+		if _, ok := nodeSet[edge.TargetID]; !ok {
 			continue
 		}
 
-		if isBackwardLayoutEdge(sourcePosition, targetPosition) && hasLayoutPath(layoutEdges, edge.TargetID, edge.SourceID, i) {
+		if hasLayoutPath(forwardEdges, edge.TargetID, edge.SourceID) {
 			continue
 		}
 
@@ -222,12 +223,9 @@ func resolveForwardLayoutEdges(layoutNodes []N, layoutEdges []E) []E {
 	return forwardEdges
 }
 
-func hasLayoutPath(edges []E, startNodeID, targetNodeID string, excludedEdgeIndex int) bool {
+func hasLayoutPath(edges []E, startNodeID, targetNodeID string) bool {
 	adjacencyByNodeID := map[string][]string{}
-	for i, edge := range edges {
-		if i == excludedEdgeIndex {
-			continue
-		}
+	for _, edge := range edges {
 		adjacencyByNodeID[edge.SourceID] = append(adjacencyByNodeID[edge.SourceID], edge.TargetID)
 	}
 
@@ -247,14 +245,6 @@ func hasLayoutPath(edges []E, startNodeID, targetNodeID string, excludedEdgeInde
 	}
 
 	return false
-}
-
-func isBackwardLayoutEdge(sourcePosition Position, targetPosition Position) bool {
-	if targetPosition.X != sourcePosition.X {
-		return targetPosition.X < sourcePosition.X
-	}
-
-	return targetPosition.Y < sourcePosition.Y
 }
 
 func resolveDisconnectedLayoutComponents(layoutNodes []N, layoutEdges []E) [][]N {

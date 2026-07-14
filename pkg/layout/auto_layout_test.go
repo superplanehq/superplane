@@ -270,6 +270,21 @@ func TestApplyCanvasAutoLayoutPreservesForwardFlowForLoops(t *testing.T) {
 	require.Less(t, nodesByID["process"].Position.X, nodesByID["check"].Position.X)
 }
 
+func TestResolveForwardLayoutEdgesPreservesNewNodeForwardEdgeInLoop(t *testing.T) {
+	nodes := []N{
+		{ID: "process", Position: Position{X: 600, Y: 0}},
+		{ID: "check", Position: Position{X: 1200, Y: 0}},
+		{ID: "new-node", Position: Position{X: 0, Y: 0}},
+	}
+	edges := []E{
+		{SourceID: "process", TargetID: "check", Channel: "default"},
+		{SourceID: "check", TargetID: "new-node", Channel: "default"},
+		{SourceID: "new-node", TargetID: "process", Channel: "repeat"},
+	}
+
+	require.Equal(t, edges[:2], resolveForwardLayoutEdges(nodes, edges))
+}
+
 func mapLayoutNodesByID(nodes []N) map[string]N {
 	result := make(map[string]N, len(nodes))
 	for _, node := range nodes {
