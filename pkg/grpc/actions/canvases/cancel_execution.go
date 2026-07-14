@@ -41,8 +41,9 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 	onMemoryChanged := func() {
 		memoryChanged = true
 	}
+	var finishedRunIDs []uuid.UUID
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		node, err := models.FindCanvasNode(tx, workflowID, execution.NodeID)
 
 		if err != nil {
@@ -55,6 +56,11 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 			return grpcerrors.Internal(err, "failed to cancel execution")
 		}
 
+		finishedRunIDs, err = models.FinishCanvasRunsWithNoOpenWork(tx, workflowID, []uuid.UUID{execution.RunID})
+		if err != nil {
+			return grpcerrors.Internal(err, "failed to finish run")
+		}
+
 		return nil
 	})
 
@@ -65,6 +71,8 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 	if err := messages.PublishCanvasExecutionByID(workflowID, execution.ID); err != nil {
 		log.Errorf("failed to publish execution state RabbitMQ message: %v", err)
 	}
+
+	publishFinishedRunMessages(workflowID, finishedRunIDs)
 
 	if memoryChanged {
 		if err := messages.NewCanvasMemoryUpdatedMessage(workflowID.String()).PublishMemoryUpdated(); err != nil {
