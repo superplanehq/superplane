@@ -10,9 +10,10 @@ import type {
 import { baseProps } from "./base";
 import type { BaseNodeMetadata } from "./types";
 import { buildGithubExecutionSubtitle } from "./utils";
+import { integrationResourceDisplayLabel } from "@/lib/integrationResourceLabel";
 
 interface AddReactionConfiguration {
-  repository?: string;
+  repository?: unknown;
   content?: string;
 }
 
@@ -53,7 +54,7 @@ export const addReactionMapper: ComponentBaseMapper = {
     const configuration = (context.node.configuration as AddReactionConfiguration | undefined) ?? {};
     const metadata = (context.node.metadata as BaseNodeMetadata | undefined) ?? ({} as BaseNodeMetadata);
 
-    const repository = configuration.repository || metadata?.repository?.name;
+    const repository = integrationResourceDisplayLabel(configuration.repository) || metadata?.repository?.name;
     const reaction = configuration.content;
     const metadataItems = [];
 
