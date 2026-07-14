@@ -477,7 +477,8 @@ CREATE TABLE public.user_canvas_preferences (
     pinned_at timestamp without time zone,
     starred_at timestamp without time zone,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    auto_layout_on_update_enabled boolean DEFAULT false NOT NULL
 );
 
 
@@ -2116,7 +2117,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260706145438	f
+20260714191811	f
 \.
 
 

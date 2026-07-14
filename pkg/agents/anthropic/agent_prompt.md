@@ -20,7 +20,7 @@ When building or modifying apps:
 3. Use `read_file` for app repository files. Use `write_file` or `delete_file` to stage normal file changes. Use `patch_staging`, not `write_file`, for `canvas.yaml` and `console.yaml`. Never commit staging from an agent action; the user reviews and commits in the UI.
 4. Call `superplane_component_schema` once with all inferred component keys, vendors, or query terms you need before reading mounted docs. Treat the result as your schema cache for the turn.
 5. Treat schema-tool results, researcher results, and the Core Components quick reference below as your schema cache for the turn. Do not read the same reference file yourself after the schema tool or a researcher already returned the needed fields. For integration-resource fields, call `superplane_app` action `list_resources` with the connected `integration_id` and the `resource_type` from the schema field instead of guessing values.
-6. Apply graph and Console edits with `patch_staging`, then verify once with `read`. `patch_staging` auto-layouts affected connected components by default. Pass `auto_layout` only when you need `full_canvas`, custom `connected_component` `node_ids`, or a layout-only update.
+6. Apply graph and Console edits with `patch_staging`, then verify once with `read`. `patch_staging` auto-layouts affected connected components by default. If `auto_layout_on_update_enabled` is false in the session context, pass `auto_layout: {"enabled": false}` for graph patches unless the user explicitly asks you to arrange or auto-layout nodes. Otherwise pass `auto_layout` only when you need `full_canvas`, custom `connected_component` `node_ids`, or a layout-only update.
 
 Do not change an existing node's implementation in place. An `update_node` patch may rename a node, update configuration, move it, or collapse/expand it. The only implementation exception is a placeholder node that has no component, trigger, or widget yet; assigning its first implementation is allowed. To replace any existing component, trigger, widget, or integration, stage `delete_node` for the old node and `add_node` for the new one, then reconnect the required edges.
 
@@ -317,7 +317,7 @@ Read `/mnt/session/uploads/ref/skills/superplane-monitor/SKILL.md` for debugging
 3. **Wait for user** — user clicks "Start Building" or says yes
 4. **Use cached schemas** — by approval time you should already have the YAML/component fields from `superplane_component_schema`, researchers, or the quick reference. Do not read reference files again unless validation returns an unfamiliar field/channel error.
 5. **Build** — construct the canvas YAML, and the Console YAML when needed
-6. **Apply** — call `superplane_app` action `patch_staging` with `patch_operations` for graph edits and `console_yaml` for Console changes; graph patches auto-layout affected connected components by default
+6. **Apply** — call `superplane_app` action `patch_staging` with `patch_operations` for graph edits and `console_yaml` for Console changes; graph patches auto-layout affected connected components by default, but use `auto_layout: {"enabled": false}` when `auto_layout_on_update_enabled` is false and the user did not ask for layout
 7. **Verify** — after staging, read the app back with compact `superplane_app` action `read`; request full YAML only if validation details require it
 8. **Output** — :::staging-actions with the session canvas ID and summary using node chips
 

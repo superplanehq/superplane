@@ -48,6 +48,7 @@ func UpdateCanvasPreference(
 			canvasID,
 			req.Pinned,
 			req.Starred,
+			req.AutoLayoutOnUpdateEnabled,
 		)
 		return err
 	})
@@ -66,9 +67,10 @@ func UpdateCanvasPreference(
 
 func serializeCanvasPreference(preference *models.UserCanvasPreference) *pb.CanvasPreference {
 	serialized := &pb.CanvasPreference{
-		CanvasId: preference.CanvasID.String(),
-		Pinned:   preference.PinnedAt != nil,
-		Starred:  preference.StarredAt != nil,
+		CanvasId:                  preference.CanvasID.String(),
+		Pinned:                    preference.PinnedAt != nil,
+		Starred:                   preference.StarredAt != nil,
+		AutoLayoutOnUpdateEnabled: preference.AutoLayoutOnUpdateEnabled,
 	}
 
 	if preference.PinnedAt != nil {
