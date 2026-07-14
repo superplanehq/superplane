@@ -36,6 +36,7 @@ var errNoChangesToPublish = fmt.Errorf("no changes between live and draft versio
 type CanvasPublisher struct {
 	tx         *gorm.DB
 	options    CanvasPublisherOptions
+	canvas     *models.Canvas
 	live       *models.CanvasVersion
 	draft      *models.CanvasVersion
 	changeset  *CanvasChangeset
@@ -92,7 +93,7 @@ func (o *CanvasPublisherOptions) Validate() error {
 	return nil
 }
 
-func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *models.CanvasVersion, options CanvasPublisherOptions) (*CanvasPublisher, error) {
+func NewCanvasPublisher(tx *gorm.DB, canvas *models.Canvas, draft *models.CanvasVersion, liveVersion *models.CanvasVersion, options CanvasPublisherOptions) (*CanvasPublisher, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err
 	}
@@ -128,6 +129,7 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 	return &CanvasPublisher{
 		tx:         tx,
 		options:    options,
+		canvas:     canvas,
 		live:       liveVersion,
 		finalNodes: finalNodes,
 		draft:      draft,
@@ -498,6 +500,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Events:        contexts.NewEventContext(p.tx, node, nil),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
+		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
 	}
 
 	if node.AppInstallationID != nil {
@@ -538,6 +541,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
 		Files:         contexts.NewRepositoryFilesContextInTransaction(p.options.GitProvider, p.live.WorkflowID, p.tx),
+		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
 	}
 
 	if node.AppInstallationID != nil {

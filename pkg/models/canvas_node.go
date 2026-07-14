@@ -205,6 +205,11 @@ func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeR
 		return DeleteCanvasNodeResult{}, err
 	}
 
+	err = DeleteCanvasSubscriptionsForNode(tx, node.WorkflowID, node.NodeID)
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
 	if node.WebhookID == nil {
 		return result, nil
 	}
