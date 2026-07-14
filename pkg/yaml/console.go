@@ -288,6 +288,11 @@ var markdownVariableNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // AllowedMarkdownRunSelects mirrors `MARKDOWN_RUN_SELECTS` on the FE.
 var AllowedMarkdownRunSelects = []string{"latest", "latest_passed", "latest_failed"}
 
+// AllowedRunStatusFilters mirrors `RUN_STATUS_FILTER_OPTIONS` on the FE.
+// Shared by the widget runs datasource and markdown/html run variables so
+// the accepted vocabulary cannot drift between kinds.
+var AllowedRunStatusFilters = []string{"running", "passed", "failed", "cancelled"}
+
 // AllowedMarkdownVariableDirections mirrors `MARKDOWN_VARIABLE_DIRECTIONS` on the FE.
 var AllowedMarkdownVariableDirections = []string{"asc", "desc"}
 
@@ -483,6 +488,53 @@ func validateMarkdownRunSource(panelID string, index int, source map[string]any)
 	if !ok || !slices.Contains(AllowedMarkdownRunSelects, selectValue) {
 		return fmt.Errorf("panel %q content.variables[%d].source.select must be one of %s", panelID, index, strings.Join(AllowedMarkdownRunSelects, ", "))
 	}
+	statusesField := fmt.Sprintf("content.variables[%d].source.statuses", index)
+	if err := validateRunStatusesField(panelID, statusesField, source["statuses"]); err != nil {
+		return err
+	}
+	triggersField := fmt.Sprintf("content.variables[%d].source.triggers", index)
+	return validateRunTriggersField(panelID, triggersField, source["triggers"])
+}
+
+// validateRunStatusesField accepts undefined / nil / empty (meaning "all
+// statuses") and any subset of AllowedRunStatusFilters. Shared by the
+// widget runs datasource and markdown/html run variables so the accepted
+// vocabulary stays identical between kinds.
+func validateRunStatusesField(panelID, fieldPath string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	list, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q %s must be an array", panelID, fieldPath)
+	}
+	for i, item := range list {
+		status, ok := item.(string)
+		if !ok || !slices.Contains(AllowedRunStatusFilters, status) {
+			return fmt.Errorf("panel %q %s[%d] must be one of %s", panelID, fieldPath, i, strings.Join(AllowedRunStatusFilters, ", "))
+		}
+	}
+	return nil
+}
+
+// validateRunTriggersField accepts undefined / nil / empty (meaning "all
+// triggers") and any list of non-empty strings. Individual entries are
+// matched at runtime against the canvas nodes so unknown ids simply fail
+// to match rather than fail validation.
+func validateRunTriggersField(panelID, fieldPath string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	list, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q %s must be an array", panelID, fieldPath)
+	}
+	for i, item := range list {
+		trigger, ok := item.(string)
+		if !ok || strings.TrimSpace(trigger) == "" {
+			return fmt.Errorf("panel %q %s[%d] must be a non-empty string", panelID, fieldPath, i)
+		}
+	}
 	return nil
 }
 
@@ -603,6 +655,12 @@ func validateDataSourceField(panelID, fieldPrefix string, raw any) error {
 		}
 	case "runs":
 		if err := validateOptionalNumber(panelID, fieldPrefix+".limit", ds["limit"]); err != nil {
+			return err
+		}
+		if err := validateRunStatusesField(panelID, fieldPrefix+".statuses", ds["statuses"]); err != nil {
+			return err
+		}
+		if err := validateRunTriggersField(panelID, fieldPrefix+".triggers", ds["triggers"]); err != nil {
 			return err
 		}
 	default:

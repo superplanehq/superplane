@@ -83,16 +83,17 @@ export function markdownTemplateReferencesRunNode(input: string | undefined): bo
 
 /**
  * Decide whether a piece of templated markdown (a title or body) should be
- * held in a loading state, given the two-phase loading exposed by
+ * held in a loading state, given the loading phases exposed by
  * `useMarkdownVariables`:
  *
  *  - `baseLoading` — the memory / run queries every variable depends on. While
  *    these are in flight any templated text is unresolved, so gate it.
  *  - `sideloadLoading` — the per-run execution side-load that only backs
  *    `$["Node"]` references. Text that doesn't reference a run node resolves
- *    fully without it, so it must NOT be gated on this phase. Otherwise a
- *    title like `{{ run.status }}` would flash the panel id while an unrelated
- *    body's `$[...]` executions settle.
+ *    fully without it, so it must NOT be gated on this phase.
+ *  - `searchingNames` — run variables still eagerly paging for status/trigger
+ *    filter matches. Only text that references those names stays gated, so a
+ *    sibling unfiltered variable can render while a filtered one searches.
  *
  * Static text (no `{{ }}` expressions) is always stable and never gated.
  */
@@ -100,8 +101,28 @@ export function markdownTextIsLoading(
   input: string | undefined,
   baseLoading: boolean,
   sideloadLoading: boolean,
+  searchingNames: readonly string[] = [],
 ): boolean {
   if (!markdownTemplateHasExpressions(input)) return false;
   if (baseLoading) return true;
+  if (searchingNames.length > 0 && markdownTemplateReferencesNames(input, searchingNames)) return true;
   return sideloadLoading && markdownTemplateReferencesRunNode(input);
+}
+
+/**
+ * True when any `{{ name... }}` expression in `input` starts with one of the
+ * given variable names as a CEL root identifier.
+ */
+export function markdownTemplateReferencesNames(input: string | undefined, names: readonly string[]): boolean {
+  if (!input || names.length === 0) return false;
+  for (const name of names) {
+    if (!name) continue;
+    const re = new RegExp(`\\{\\{\\s*${escapeRegExp(name)}\\b`);
+    if (re.test(input)) return true;
+  }
+  return false;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

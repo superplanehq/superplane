@@ -2,6 +2,8 @@
  * Type definitions for dashboard widget renderers (table, chart, number).
  */
 
+import type { RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
+
 export type WidgetDataSourceKind = "memory" | "executions" | "runs";
 
 export interface WidgetMemoryDataSource {
@@ -19,6 +21,18 @@ export interface WidgetExecutionsDataSource {
 export interface WidgetRunsDataSource {
   kind: "runs";
   limit?: number;
+  /**
+   * Optional status filter. Empty or omitted means "all statuses". Filtering
+   * happens client-side after runs are fetched, so `limit` still bounds
+   * what the fetch sees.
+   */
+  statuses?: RunStatusFilter[];
+  /**
+   * Optional trigger filter — each entry references a trigger node by id
+   * or name. Resolved through the console context at match time so
+   * renames don't silently drop rows. Empty or omitted means "all triggers".
+   */
+  triggers?: string[];
 }
 
 export type WidgetDataSource = WidgetMemoryDataSource | WidgetExecutionsDataSource | WidgetRunsDataSource;
