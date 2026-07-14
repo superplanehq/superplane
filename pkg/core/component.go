@@ -46,6 +46,11 @@ type ExecutionContext struct {
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
 	OIDC           oidc.Provider
+	Apps           AppExecutionContext
+}
+
+type AppExecutionContext interface {
+	Broadcast(payload any) error
 }
 
 type ExpressionContext interface {
@@ -78,6 +83,7 @@ type SetupContext struct {
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
 	Files         RepositoryFilesContext
+	Apps          AppContext
 }
 
 type CanvasMemoryContext interface {

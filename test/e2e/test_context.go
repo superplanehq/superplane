@@ -47,6 +47,7 @@ func (s *TestContext) Start() {
 	os.Setenv("START_NODE_EXECUTOR", "yes")
 	os.Setenv("START_NODE_QUEUE_WORKER", "yes")
 	os.Setenv("START_NODE_REQUEST_WORKER", "yes")
+	os.Setenv("START_APP_MESSAGE_WORKER", "yes")
 	os.Setenv("START_WEBHOOK_PROVISIONER", "yes")
 	os.Setenv("START_WEBHOOK_CLEANUP_WORKER", "yes")
 	os.Setenv("NO_ENCRYPTION", "yes")
