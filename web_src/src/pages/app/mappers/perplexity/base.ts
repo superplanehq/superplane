@@ -13,11 +13,12 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { integrationResourceDisplayLabel } from "@/lib/integrationResourceLabel";
 
 interface RunAgentConfiguration {
   modelSource?: string;
   preset?: string;
-  model?: string;
+  model?: unknown;
 }
 
 interface AgentPayload {
@@ -38,8 +39,11 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (configuration?.preset) {
     metadata.push({ icon: "sparkles", label: configuration.preset });
-  } else if (configuration?.model) {
-    metadata.push({ icon: "cpu", label: configuration.model });
+  } else {
+    const model = integrationResourceDisplayLabel(configuration?.model);
+    if (model) {
+      metadata.push({ icon: "cpu", label: model });
+    }
   }
 
   return metadata;
