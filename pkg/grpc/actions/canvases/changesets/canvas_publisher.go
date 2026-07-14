@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -49,6 +50,14 @@ type CanvasPublisher struct {
 	// not conflict with deleted nodes.
 	//
 	allNodes map[string]models.CanvasNode
+
+	cancelledExecutionIDs []uuid.UUID
+	finishedRunIDs        []uuid.UUID
+}
+
+type CanvasPublishResult struct {
+	CancelledExecutionIDs []uuid.UUID
+	FinishedRunIDs        []uuid.UUID
 }
 
 type CanvasPublisherOptions struct {
@@ -148,6 +157,13 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (p *CanvasPublisher) Result() CanvasPublishResult {
+	return CanvasPublishResult{
+		CancelledExecutionIDs: append([]uuid.UUID(nil), p.cancelledExecutionIDs...),
+		FinishedRunIDs:        append([]uuid.UUID(nil), p.finishedRunIDs...),
+	}
 }
 
 func (p *CanvasPublisher) edgesWithRenamedNodeIDs(edges []models.Edge) []models.Edge {
@@ -372,8 +388,49 @@ func (p *CanvasPublisher) deleteNode(change *Change) error {
 		return nil
 	}
 
+	activeExecutions, err := p.activeExecutionsForNode(existingNode)
+	if err != nil {
+		return err
+	}
+
 	delete(p.allNodes, existingNode.NodeID)
-	return models.DeleteCanvasNode(p.tx, existingNode)
+	if err := models.DeleteCanvasNode(p.tx, existingNode); err != nil {
+		return err
+	}
+
+	p.trackCancelledExecutions(activeExecutions)
+	return p.trackFinishedRuns(activeExecutions)
+}
+
+func (p *CanvasPublisher) activeExecutionsForNode(node models.CanvasNode) ([]models.CanvasNodeExecution, error) {
+	return models.ListActiveNodeExecutionsInTransaction(p.tx, node.WorkflowID, node.NodeID)
+}
+
+func (p *CanvasPublisher) trackCancelledExecutions(executions []models.CanvasNodeExecution) {
+	for _, execution := range executions {
+		if !slices.Contains(p.cancelledExecutionIDs, execution.ID) {
+			p.cancelledExecutionIDs = append(p.cancelledExecutionIDs, execution.ID)
+		}
+	}
+}
+
+func (p *CanvasPublisher) trackFinishedRuns(executions []models.CanvasNodeExecution) error {
+	for _, execution := range executions {
+		if execution.RunID == uuid.Nil || slices.Contains(p.finishedRunIDs, execution.RunID) {
+			continue
+		}
+
+		run, err := models.FindCanvasRunInTransaction(p.tx, execution.WorkflowID, execution.RunID)
+		if err != nil {
+			return err
+		}
+
+		if run.State == models.CanvasRunStateFinished {
+			p.finishedRunIDs = append(p.finishedRunIDs, execution.RunID)
+		}
+	}
+
+	return nil
 }
 
 func (p *CanvasPublisher) getNodeIntegrationID(node models.Node) (*uuid.UUID, error) {
