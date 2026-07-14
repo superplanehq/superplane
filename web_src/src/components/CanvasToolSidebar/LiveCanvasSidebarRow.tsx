@@ -17,7 +17,7 @@ export function LiveCanvasSidebarRow({ isSelected, onSelect }: LiveCanvasSidebar
       className={cn(
         RUNS_SIDEBAR_ROW_CLASS,
         "w-full text-left transition-colors",
-        isSelected ? "bg-sky-100 dark:bg-gray-800" : "hover:bg-gray-50 dark:hover:bg-gray-800",
+        isSelected ? "bg-sky-100 dark:bg-indigo-950" : "hover:bg-gray-50 dark:hover:bg-gray-800",
       )}
       onClick={onSelect}
     >

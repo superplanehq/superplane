@@ -1,24 +1,10 @@
 import { useState } from "react";
 import { Timestamp } from "@/components/Timestamp";
-import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
-import { cn, isUrl } from "@/lib/utils";
+import { isUrl } from "@/lib/utils";
+import { EventStatusBadge } from "@/ui/EventStatusBadge";
 import { isErrorValue } from "./runNodeDetailModel";
 
 const DETAIL_VALUE_PREVIEW_CHARACTER_LIMIT = 160;
-
-/** Matches {@link EventSectionDisplay} status chip on canvas nodes (style + casing). */
-function EventSectionStatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded px-[5px] py-[1.5px] text-[10px] font-semibold uppercase tracking-wide text-white",
-        withEventStatusBadgeClasses(badgeColor),
-      )}
-    >
-      {label}
-    </span>
-  );
-}
 
 export function RunNodeDetailDetailsView({
   details,
@@ -34,7 +20,7 @@ export function RunNodeDetailDetailsView({
       {statusBadge ? (
         <div className="flex items-start gap-2">
           <span className="w-[120px] shrink-0 truncate text-left text-gray-500 dark:text-gray-400">Status:</span>
-          <EventSectionStatusBadge badgeColor={statusBadge.badgeColor} label={statusBadge.label} />
+          <EventStatusBadge badgeColor={statusBadge.badgeColor} label={statusBadge.label} />
         </div>
       ) : null}
       {relativeTime ? (
