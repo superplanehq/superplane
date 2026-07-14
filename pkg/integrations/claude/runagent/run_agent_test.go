@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -200,29 +201,27 @@ func Test__RunAgent__poll__persistSessionKeepsSession(t *testing.T) {
 	}
 }
 
-func Test__RunAgent__poll__timeout(t *testing.T) {
+// A client that never builds must terminate the run rather than poll forever:
+// the timeout check sits below the status read and would never be reached.
+func Test__RunAgent__poll__clientErrorReportsError(t *testing.T) {
 	a := &RunAgent{}
 	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-	metadataCtx := &contexts.MetadataContext{
-		Metadata: ExecutionMetadata{
-			Session: &SessionMetadata{ID: "sess_1", Status: "running"},
-		},
-	}
 	hookCtx := core.ActionHookContext{
 		Name: "poll",
 		Parameters: map[string]any{
-			"attempt": float64(maxPollAttempts + 1),
-			"errors":  float64(0),
+			"attempt": float64(2),
+			"errors":  float64(maxPollErrors - 1),
 		},
-		Metadata:       metadataCtx,
+		Integration:    &contexts.IntegrationContext{}, // no apiKey -> client creation fails
+		Metadata:       &contexts.MetadataContext{Metadata: ExecutionMetadata{Session: &SessionMetadata{ID: "sess_1", Status: "running"}}},
 		ExecutionState: executionState,
+		Requests:       &contexts.RequestContext{},
 		Logger:         logrus.NewEntry(logrus.New()),
 	}
 
-	err := a.HandleHook(hookCtx)
-	require.NoError(t, err)
+	require.NoError(t, a.HandleHook(hookCtx))
 	require.True(t, executionState.Finished)
-	assert.Equal(t, "timeout", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+	assert.Equal(t, "error", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
 }
 
 // sessionCalls reports whether the session was interrupted and whether it was
@@ -258,8 +257,9 @@ func timeoutHookCtx(httpContext *contexts.HTTPContext, execState *contexts.Execu
 func Test__RunAgent__poll__timeoutReclaimsSession(t *testing.T) {
 	a := &RunAgent{}
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // interrupt
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // delete session
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))}, // get session
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // interrupt
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // delete session
 	}}
 	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
@@ -278,7 +278,8 @@ func Test__RunAgent__poll__timeoutReclaimsSession(t *testing.T) {
 func Test__RunAgent__poll__timeoutPersistSessionInterruptsButKeeps(t *testing.T) {
 	a := &RunAgent{}
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, // interrupt
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"running"}`))}, // get session
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},                                 // interrupt
 	}}
 	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
@@ -290,6 +291,43 @@ func Test__RunAgent__poll__timeoutPersistSessionInterruptsButKeeps(t *testing.T)
 	interrupted, deleted := sessionCalls(httpContext)
 	assert.True(t, interrupted, "a kept session must still be interrupted so the agent stops")
 	assert.False(t, deleted, "session must be kept when persistSession is enabled")
+}
+
+// The event stream can lag the status endpoint: the session reports idle while
+// the terminal event has not been written, so sm.Complete stays false. Once the
+// retry budget is spent we must still report the real outcome — never "timeout",
+// and never destroy the transcript of a run that finished.
+func Test__RunAgent__poll__terminalWithIncompleteEventsReportsRealStatus(t *testing.T) {
+	a := &RunAgent{}
+	restore := finalMessageDelay
+	finalMessageDelay = time.Millisecond
+	t.Cleanup(func() { finalMessageDelay = restore })
+
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))}, // get session: finished
+	}}
+	// Events never include session.status_idle, so Complete never becomes true.
+	for range finalMessageReads {
+		httpContext.Responses = append(httpContext.Responses,
+			&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				`{"data":[{"type":"agent.message","content":[{"type":"text","text":"Partial work"}]}]}`))})
+	}
+	httpContext.Responses = append(httpContext.Responses,
+		&http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}) // delete session
+
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	require.NoError(t, a.HandleHook(timeoutHookCtx(httpContext, execState, map[string]any{
+		"agent": "agent_1", "environmentId": "env_1", "prompt": "do it",
+	})))
+
+	require.True(t, execState.Finished)
+	out := execState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status, "a finished session must report its real status, not timeout")
+	assert.Equal(t, "Partial work", out.LastMessage, "the messages we did collect must still be emitted")
+
+	interrupted, deleted := sessionCalls(httpContext)
+	assert.False(t, interrupted, "a session that already finished must not be interrupted")
+	assert.True(t, deleted, "a finished session is still reclaimed by default")
 }
 
 // Repeated poll failures mean we lost sight of the session, not that it ended.
