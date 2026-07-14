@@ -24,8 +24,8 @@ import {
 import { HtmlBody, HtmlBodyLoading } from "./HtmlBody";
 import { HtmlPanelEditor, type HtmlCodeEditorHandle } from "./HtmlPanelEditor";
 import {
-  normalizeRunVariableStatuses,
-  normalizeRunVariableTriggers,
+  normalizeRunStatuses,
+  normalizeRunTriggers,
   validateMarkdownVariables,
   type MarkdownVariable,
 } from "./panelTypes";
@@ -399,8 +399,8 @@ function normalizeVariableSource(source: MarkdownVariable["source"]): MarkdownVa
       ...(hasLimit ? { limit: source.limit } : {}),
     };
   }
-  const statuses = normalizeRunVariableStatuses(source.statuses);
-  const triggers = normalizeRunVariableTriggers(source.triggers);
+  const statuses = normalizeRunStatuses(source.statuses);
+  const triggers = normalizeRunTriggers(source.triggers);
   return {
     kind: "run",
     select: source.select,
