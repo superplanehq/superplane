@@ -57,7 +57,6 @@ func Test__RunCodeAgent__Setup__validation(t *testing.T) {
 		{"repo mode missing repository", func(c map[string]any) { delete(c, "repository") }, "repository is required"},
 		{"invalid repository", func(c map[string]any) { c["repository"] = "nonsense" }, "owner/repo or an https"},
 		{"pr mode missing prUrl", func(c map[string]any) { c["sourceMode"] = "pr"; delete(c, "repository") }, "prUrl is required"},
-		{"pr mode invalid prUrl", func(c map[string]any) { c["sourceMode"] = "pr"; c["prUrl"] = "nope" }, "invalid pull request URL"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -68,6 +67,23 @@ func Test__RunCodeAgent__Setup__validation(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.wantErr)
 		})
 	}
+}
+
+func Test__RunCodeAgent__Setup__prUrlAcceptedAsIs(t *testing.T) {
+	a := &RunCodeAgent{}
+	cfg := repoConfig()
+	cfg["sourceMode"] = "pr"
+	delete(cfg, "repository")
+	cfg["prUrl"] = `{{ $["Open Draft PR"].data.html_url }}`
+
+	metadataCtx := &contexts.MetadataContext{}
+	err := a.Setup(core.SetupContext{Configuration: cfg, Integration: &contexts.IntegrationContext{}, Metadata: metadataCtx})
+	require.NoError(t, err)
+
+	md := NodeMetadata{}
+	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &md))
+	assert.Equal(t, "pr", md.SourceMode)
+	assert.Equal(t, `{{ $["Open Draft PR"].data.html_url }}`, md.PrURL)
 }
 
 func Test__RunCodeAgent__validateRepository(t *testing.T) {
