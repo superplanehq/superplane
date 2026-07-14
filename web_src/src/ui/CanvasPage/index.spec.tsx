@@ -302,6 +302,111 @@ describe("CanvasNodeErrorBoundary", () => {
     consoleSpy.mockRestore();
   });
 
+  it("retries rendering when customField React element content changes", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    let shouldThrow = true;
+
+    function ConditionalThrow(): ReactElement {
+      if (shouldThrow) {
+        throw new Error("render failed");
+      }
+      return <div>recovered node</div>;
+    }
+
+    const { rerender } = render(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          component: {
+            title: "Node",
+            iconSlug: "circle",
+            customField: <div>broken field</div>,
+          },
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ConditionalThrow />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+
+    shouldThrow = false;
+    rerender(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          component: {
+            title: "Node",
+            iconSlug: "circle",
+            customField: <div>fixed field</div>,
+          },
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ConditionalThrow />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("recovered node")).toBeInTheDocument();
+    consoleSpy.mockRestore();
+  });
+
+  it("keeps the fallback when customField element identity changes but content is the same", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { rerender } = render(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          component: {
+            title: "Node",
+            iconSlug: "circle",
+            customField: <div>same field</div>,
+          },
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          component: {
+            title: "Node",
+            iconSlug: "circle",
+            customField: <div>same field</div>,
+          },
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+
   it("keeps the boundary alive when node data has an unknown runtime type", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const invalidNodeData = { label: "Broken", state: "pending", type: "unexpected" } as unknown as BlockData;

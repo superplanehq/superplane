@@ -647,6 +647,47 @@ const NODE_ERROR_BOUNDARY_EPHEMERAL_KEYS = new Set([
   "isPendingConnection",
 ]);
 
+function reactElementTypeName(type: unknown): string {
+  if (typeof type === "string") {
+    return type;
+  }
+
+  if (typeof type === "function") {
+    return type.displayName || type.name || "Anonymous";
+  }
+
+  if (typeof type === "object" && type !== null) {
+    const objectType = type as { displayName?: string; name?: string };
+    return objectType.displayName || objectType.name || "ObjectType";
+  }
+
+  return "Unknown";
+}
+
+function serializeNodeErrorBoundaryValue(key: string, value: unknown): unknown {
+  if (key && NODE_ERROR_BOUNDARY_EPHEMERAL_KEYS.has(key)) {
+    return undefined;
+  }
+
+  if (typeof value === "function") {
+    // Presence/name only — identity churns every prepare and must not recover.
+    return `[Function:${value.name || "anonymous"}]`;
+  }
+
+  if (isValidElement(value)) {
+    // Fingerprint element content so customField (and similar) changes recover,
+    // while identical trees with new object identity stay stable.
+    return {
+      __reactElement: true,
+      type: reactElementTypeName(value.type),
+      key: value.key ?? null,
+      props: value.props,
+    };
+  }
+
+  return value;
+}
+
 /**
  * Stable key for deciding whether a failed node should retry rendering.
  * Reference identity alone must not clear the fallback — post-commit flushSync
@@ -655,18 +696,7 @@ const NODE_ERROR_BOUNDARY_EPHEMERAL_KEYS = new Set([
  */
 function nodeErrorBoundaryRecoveryKey(data: BlockData): string {
   try {
-    return JSON.stringify(data, (key, value) => {
-      if (key && NODE_ERROR_BOUNDARY_EPHEMERAL_KEYS.has(key)) {
-        return undefined;
-      }
-      if (typeof value === "function") {
-        return undefined;
-      }
-      if (isValidElement(value)) {
-        return "[ReactElement]";
-      }
-      return value;
-    });
+    return JSON.stringify(data, serializeNodeErrorBoundaryValue);
   } catch {
     return `${data.type}:${data.label}`;
   }
