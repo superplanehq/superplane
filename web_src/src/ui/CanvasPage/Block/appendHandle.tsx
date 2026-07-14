@@ -14,13 +14,11 @@ const APPEND_HANDLE_STYLE: React.CSSProperties = {
   height: 24,
   borderRadius: 100,
   border: "3px solid var(--sp-handle-border, #C9D5E1)",
-  background: "white",
   pointerEvents: "auto",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  color: "#94A3B8",
 };
 
 const APPEND_PREVIEW_DOT_BASE_STYLE: React.CSSProperties = {
@@ -129,7 +127,7 @@ export function AppendHandleButton({
     <button
       type="button"
       aria-label={label}
-      className="sp-append-source-handle hover:text-slate-500"
+      className="sp-append-source-handle"
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();

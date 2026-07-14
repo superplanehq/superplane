@@ -23,7 +23,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       ? "text-green-700 bg-green-100 dark:bg-green-300/70 dark:text-green-950"
       : "text-yellow-700 bg-orange-100 dark:bg-orange-300/70 dark:text-orange-950";
   const titleClassName =
-    tone === "neutral" ? "text-green-700 dark:text-green-300" : "text-orange-700 dark:text-orange-300";
+    tone === "neutral" ? "text-green-700 dark:text-green-300" : "text-yellow-700 dark:text-orange-300/70";
   const descriptionClassName =
     tone === "neutral" ? "text-slate-400 dark:text-gray-500" : "text-gray-400 dark:text-gray-500";
 

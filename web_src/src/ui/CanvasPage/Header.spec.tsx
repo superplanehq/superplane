@@ -117,7 +117,8 @@ describe("Header", () => {
     });
 
     expect(screen.getByTestId("active-draft-branch-chip")).toHaveTextContent("Editing: Draft #1");
-    expect(screen.getByTestId("canvas-exit-edit-button")).toHaveAttribute("aria-label", "Exit edit");
+    expect(screen.getByText("Finish Editing")).toBeInTheDocument();
+    expect(screen.getByTestId("canvas-exit-edit-button")).toHaveAttribute("aria-label", "Finish editing");
     expect(screen.queryByTestId("canvas-edit-button")).not.toBeInTheDocument();
   });
 });

@@ -2,6 +2,9 @@
   --sp-handle-border: #c9d5e1;
   --sp-handle-border-hover: #94a3b8;
   --sp-handle-highlight-border: #a1aec0;
+  --sp-append-handle-bg: #ffffff;
+  --sp-append-handle-icon: #94a3b8;
+  --sp-append-handle-icon-hover: #64748b;
   --xy-edge-stroke: var(--sp-handle-border);
   --xy-edge-stroke-selected: var(--sp-handle-highlight-border);
   --xy-edge-stroke-width: 3;
@@ -11,6 +14,9 @@
   --sp-handle-border: #374151;
   --sp-handle-border-hover: #4b5563;
   --sp-handle-highlight-border: #6b7280;
+  --sp-append-handle-bg: #1f2937;
+  --sp-append-handle-icon: #9ca3af;
+  --sp-append-handle-icon-hover: #d1d5db;
 }
 
 .sp-canvas .react-flow__node {
@@ -149,11 +155,14 @@
 }
 
 .sp-canvas .sp-append-source-handle {
-  transition: border-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  background-color: var(--sp-append-handle-bg, #ffffff);
+  color: var(--sp-append-handle-icon, #94a3b8);
+  transition: border-color 0.2s ease-in-out, color 0.2s ease-in-out, background-color 0.2s ease-in-out;
 }
 
 .sp-canvas .sp-append-source-handle:hover {
   border-color: var(--sp-handle-border-hover) !important;
+  color: var(--sp-append-handle-icon-hover, #64748b);
 }
 
 .sp-canvas .sp-append-source-preview {

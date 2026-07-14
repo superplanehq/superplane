@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { withEventStatusBadgeClasses } from "./eventStatusBadge";
+import { eventStatusBadgeClassName, withEventStatusBadgeClasses } from "./eventStatusBadge";
 
 describe("withEventStatusBadgeClasses", () => {
   it("adds lighter dark fills with dark text for saturated badge colors", () => {
@@ -12,6 +12,13 @@ describe("withEventStatusBadgeClasses", () => {
   it("leaves badge colors that already include dark classes unchanged", () => {
     expect(withEventStatusBadgeClasses("bg-emerald-500 dark:bg-emerald-400 dark:text-emerald-950")).toBe(
       "bg-emerald-500 dark:bg-emerald-400 dark:text-emerald-950",
+    );
+  });
+
+  it("builds a full badge class list with an explicit line height", () => {
+    expect(eventStatusBadgeClassName("bg-violet-400")).toContain("leading-normal");
+    expect(eventStatusBadgeClassName("bg-violet-400")).toContain(
+      "bg-violet-400 dark:bg-violet-400 dark:text-violet-950",
     );
   });
 });

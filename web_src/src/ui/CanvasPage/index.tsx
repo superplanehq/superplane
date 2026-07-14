@@ -467,13 +467,13 @@ function CanvasModeFloatingBar({
 }) {
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center px-4 pt-3">
-      <div className="pointer-events-auto flex max-w-[min(100vw-2rem,34rem)] items-center gap-2 rounded-full bg-slate-500 py-1.5 pl-3 pr-1.5 shadow-sm dark:bg-slate-600">
-        <span className="min-w-0 truncate text-[13px] font-medium text-white">{label}</span>
+      <div className="pointer-events-auto flex max-w-[min(100vw-2rem,34rem)] items-center gap-2 rounded-full bg-slate-500 py-1.5 pl-3 pr-1.5 shadow-sm dark:bg-gray-800">
+        <span className="min-w-0 truncate text-[13px] font-medium text-white dark:text-gray-400">{label}</span>
         <Button
           type="button"
           variant="outline"
           size="xs"
-          className="h-7 shrink-0 rounded-full border-0 bg-white px-3 text-[13px] font-medium text-slate-800 shadow-none hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:ring-1 dark:ring-slate-500 dark:hover:bg-slate-700 dark:hover:text-white"
+          className="shrink-0 border-0 shadow-none dark:border dark:border-gray-600/70 dark:shadow-xs"
           onClick={onAction}
         >
           {actionLabel}
