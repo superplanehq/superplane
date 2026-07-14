@@ -62,3 +62,21 @@ export interface AwardEmoji {
   updated_at: string;
   awardable_id?: number;
 }
+
+export interface DeploymentEnvironment {
+  id: number;
+  name: string;
+  external_url?: string;
+}
+
+export interface Deployment {
+  id: number;
+  iid: number;
+  ref: string;
+  sha: string;
+  status: string;
+  created_at: string;
+  updated_at?: string;
+  user?: User;
+  environment?: DeploymentEnvironment;
+}
