@@ -22,7 +22,6 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		canvas.ID,
 		boolPointer(true),
 		nil,
-		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, preference.PinnedAt)
@@ -35,7 +34,6 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		canvas.ID,
 		nil,
 		boolPointer(true),
-		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, preference.PinnedAt)
@@ -47,7 +45,6 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		r.User,
 		canvas.ID,
 		boolPointer(false),
-		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -61,7 +58,6 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		canvas.ID,
 		nil,
 		boolPointer(false),
-		nil,
 	)
 	require.NoError(t, err)
 	assert.Nil(t, preference.PinnedAt)
@@ -80,7 +76,6 @@ func Test__SetUserCanvasPreference__DoesNotCreateEmptyPreference(t *testing.T) {
 		canvas.ID,
 		boolPointer(false),
 		boolPointer(false),
-		nil,
 	)
 	require.NoError(t, err)
 	assert.Nil(t, preference.PinnedAt)
@@ -92,7 +87,6 @@ func Test__SetUserCanvasPreference__DoesNotCreateEmptyPreference(t *testing.T) {
 		r.Organization.ID,
 		r.User,
 		canvas.ID,
-		nil,
 		nil,
 		nil,
 	)
@@ -113,7 +107,6 @@ func Test__SetUserCanvasPreference__RequiresExistingCanvas(t *testing.T) {
 		r.User,
 		uuid.New(),
 		boolPointer(true),
-		nil,
 		nil,
 	)
 	require.Error(t, err)
@@ -140,7 +133,6 @@ func Test__FindUserCanvasPreferencesForCanvases(t *testing.T) {
 		canvas.ID,
 		boolPointer(true),
 		boolPointer(true),
-		nil,
 	)
 	require.NoError(t, err)
 
@@ -156,37 +148,6 @@ func Test__FindUserCanvasPreferencesForCanvases(t *testing.T) {
 	assert.NotContains(t, preferences, withoutPreference.ID)
 	assert.NotNil(t, preferences[canvas.ID].PinnedAt)
 	assert.NotNil(t, preferences[canvas.ID].StarredAt)
-}
-
-func Test__SetUserCanvasPreference__StoresAutoLayoutPreference(t *testing.T) {
-	r := support.Setup(t)
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-
-	preference, err := models.SetUserCanvasPreference(
-		database.Conn(),
-		r.Organization.ID,
-		r.User,
-		canvas.ID,
-		nil,
-		nil,
-		boolPointer(true),
-	)
-	require.NoError(t, err)
-	assert.True(t, preference.AutoLayoutOnUpdateEnabled)
-	assertUserCanvasPreferenceCount(t, canvas.ID, 1)
-
-	preference, err = models.SetUserCanvasPreference(
-		database.Conn(),
-		r.Organization.ID,
-		r.User,
-		canvas.ID,
-		nil,
-		nil,
-		boolPointer(false),
-	)
-	require.NoError(t, err)
-	assert.False(t, preference.AutoLayoutOnUpdateEnabled)
-	assertUserCanvasPreferenceCount(t, canvas.ID, 0)
 }
 
 func assertUserCanvasPreferenceCount(t *testing.T, canvasID uuid.UUID, expected int64) {

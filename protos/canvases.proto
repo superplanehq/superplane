@@ -399,7 +399,6 @@ message UpdateCanvasPreferenceRequest {
   string canvas_id = 1;
   optional bool pinned = 2;
   optional bool starred = 3;
-  optional bool auto_layout_on_update_enabled = 4;
 }
 
 message UpdateCanvasPreferenceResponse {
@@ -560,7 +559,6 @@ message CanvasSummary {
   bool starred = 12;
   google.protobuf.Timestamp pinned_at = 13;
   google.protobuf.Timestamp starred_at = 14;
-  bool auto_layout_on_update_enabled = 15;
 }
 
 message CanvasPreference {
@@ -569,7 +567,6 @@ message CanvasPreference {
   bool starred = 3;
   google.protobuf.Timestamp pinned_at = 4;
   google.protobuf.Timestamp starred_at = 5;
-  bool auto_layout_on_update_enabled = 6;
 }
 
 message Canvas {

@@ -10,14 +10,13 @@ import (
 )
 
 type UserCanvasPreference struct {
-	OrganizationID            uuid.UUID `gorm:"primaryKey"`
-	UserID                    uuid.UUID `gorm:"primaryKey"`
-	CanvasID                  uuid.UUID `gorm:"primaryKey"`
-	PinnedAt                  *time.Time
-	StarredAt                 *time.Time
-	AutoLayoutOnUpdateEnabled bool
-	CreatedAt                 time.Time
-	UpdatedAt                 time.Time
+	OrganizationID uuid.UUID `gorm:"primaryKey"`
+	UserID         uuid.UUID `gorm:"primaryKey"`
+	CanvasID       uuid.UUID `gorm:"primaryKey"`
+	PinnedAt       *time.Time
+	StarredAt      *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 func (p *UserCanvasPreference) TableName() string {
@@ -60,27 +59,26 @@ func SetUserCanvasPreference(
 	canvasID uuid.UUID,
 	pinned *bool,
 	starred *bool,
-	autoLayoutOnUpdateEnabled *bool,
 ) (*UserCanvasPreference, error) {
 	if err := ensureCanvasExistsForPreference(tx, organizationID, canvasID); err != nil {
 		return nil, err
 	}
 
-	if pinned == nil && starred == nil && autoLayoutOnUpdateEnabled == nil {
+	if pinned == nil && starred == nil {
 		return findUserCanvasPreference(tx, organizationID, userID, canvasID)
 	}
 
 	preference, err := lockUserCanvasPreference(tx, organizationID, userID, canvasID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return createUserCanvasPreference(tx, organizationID, userID, canvasID, pinned, starred, autoLayoutOnUpdateEnabled)
+		return createUserCanvasPreference(tx, organizationID, userID, canvasID, pinned, starred)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	applyUserCanvasPreferenceUpdate(preference, pinned, starred, autoLayoutOnUpdateEnabled, time.Now())
-	if preference.PinnedAt == nil && preference.StarredAt == nil && !preference.AutoLayoutOnUpdateEnabled {
+	applyUserCanvasPreferenceUpdate(preference, pinned, starred, time.Now())
+	if preference.PinnedAt == nil && preference.StarredAt == nil {
 		if err := tx.Delete(preference).Error; err != nil {
 			return nil, err
 		}
@@ -150,7 +148,6 @@ func createUserCanvasPreference(
 	canvasID uuid.UUID,
 	pinned *bool,
 	starred *bool,
-	autoLayoutOnUpdateEnabled *bool,
 ) (*UserCanvasPreference, error) {
 	now := time.Now()
 	preference := &UserCanvasPreference{
@@ -160,8 +157,8 @@ func createUserCanvasPreference(
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	applyUserCanvasPreferenceUpdate(preference, pinned, starred, autoLayoutOnUpdateEnabled, now)
-	if preference.PinnedAt == nil && preference.StarredAt == nil && !preference.AutoLayoutOnUpdateEnabled {
+	applyUserCanvasPreferenceUpdate(preference, pinned, starred, now)
+	if preference.PinnedAt == nil && preference.StarredAt == nil {
 		return preference, nil
 	}
 
@@ -176,7 +173,6 @@ func applyUserCanvasPreferenceUpdate(
 	preference *UserCanvasPreference,
 	pinned *bool,
 	starred *bool,
-	autoLayoutOnUpdateEnabled *bool,
 	now time.Time,
 ) {
 	preference.UpdatedAt = now
@@ -185,9 +181,6 @@ func applyUserCanvasPreferenceUpdate(
 	}
 	if starred != nil {
 		preference.StarredAt = timestampIfEnabled(*starred, now)
-	}
-	if autoLayoutOnUpdateEnabled != nil {
-		preference.AutoLayoutOnUpdateEnabled = *autoLayoutOnUpdateEnabled
 	}
 }
 

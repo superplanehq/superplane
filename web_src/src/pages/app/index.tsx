@@ -41,9 +41,7 @@ import {
   useDescribeRun,
   useInfiniteCanvasRuns,
   useInfiniteCanvasLiveVersions,
-  useCanvases,
   useTriggers,
-  useUpdateCanvasPreference,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
@@ -208,27 +206,10 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
-function useAutoLayoutOnUpdatePreference(organizationId: string, canvasId: string | undefined) {
-  const updateCanvasPreference = useUpdateCanvasPreference(organizationId);
-  const { data: canvasSummaries = [] } = useCanvases(organizationId);
-  const serverPreference = useMemo(
-    () => canvasSummaries.find((summary) => summary.id === canvasId)?.autoLayoutOnUpdateEnabled,
-    [canvasSummaries, canvasId],
-  );
+function useAutoLayoutOnUpdatePreference() {
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
     readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
   );
-
-  useEffect(() => {
-    if (serverPreference === undefined) {
-      return;
-    }
-
-    setIsAutoLayoutOnUpdateEnabled(serverPreference);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(serverPreference));
-    }
-  }, [serverPreference]);
 
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     const newValue = !isAutoLayoutOnUpdateEnabled;
@@ -236,10 +217,7 @@ function useAutoLayoutOnUpdatePreference(organizationId: string, canvasId: strin
     if (typeof window !== "undefined") {
       window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
     }
-    if (canvasId) {
-      updateCanvasPreference.mutate({ canvasId, autoLayoutOnUpdateEnabled: newValue });
-    }
-  }, [canvasId, isAutoLayoutOnUpdateEnabled, updateCanvasPreference]);
+  }, [isAutoLayoutOnUpdateEnabled]);
 
   return { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled };
 }
@@ -629,10 +607,7 @@ export function AppPage() {
 
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
-  const { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled } = useAutoLayoutOnUpdatePreference(
-    organizationId!,
-    canvasId,
-  );
+  const { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled } = useAutoLayoutOnUpdatePreference();
 
   const lastSavedWorkflowSignatureRef = useRef("");
   const lastAppliedVersionSnapshotRef = useRef("");

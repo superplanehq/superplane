@@ -636,32 +636,15 @@ func (s *Service) archiveProviderSession(ctx context.Context, providerSessionID 
 }
 
 func (s *Service) buildPreamble(session *models.AgentSession, mode Mode) string {
-	autoLayoutOnUpdateEnabled := s.autoLayoutOnUpdateEnabled(session)
 	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
-		fmt.Sprintf("%t", autoLayoutOnUpdateEnabled),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
 	canvasSnapshot := buildCanvasSnapshot(session)
 	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode)
-}
-
-func (s *Service) autoLayoutOnUpdateEnabled(session *models.AgentSession) bool {
-	preferences, err := models.FindUserCanvasPreferencesForCanvases(
-		database.Conn(),
-		session.OrganizationID,
-		session.UserID,
-		[]uuid.UUID{session.CanvasID},
-	)
-	if err != nil {
-		log.WithError(err).WithField("canvas_id", session.CanvasID).Warn("failed to load agent canvas preferences")
-		return false
-	}
-
-	return preferences[session.CanvasID].AutoLayoutOnUpdateEnabled
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {

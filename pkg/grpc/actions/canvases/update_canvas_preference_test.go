@@ -18,16 +18,14 @@ func Test__UpdateCanvasPreference__StoresAndClearsPreferences(t *testing.T) {
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
 	response, err := UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
-		CanvasId:                  canvas.ID.String(),
-		Pinned:                    proto.Bool(true),
-		Starred:                   proto.Bool(true),
-		AutoLayoutOnUpdateEnabled: proto.Bool(true),
+		CanvasId: canvas.ID.String(),
+		Pinned:   proto.Bool(true),
+		Starred:  proto.Bool(true),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, response.Preference)
 	assert.True(t, response.Preference.Pinned)
 	assert.True(t, response.Preference.Starred)
-	assert.True(t, response.Preference.AutoLayoutOnUpdateEnabled)
 	assert.NotNil(t, response.Preference.PinnedAt)
 	assert.NotNil(t, response.Preference.StarredAt)
 
@@ -42,16 +40,14 @@ func Test__UpdateCanvasPreference__StoresAndClearsPreferences(t *testing.T) {
 	assert.Equal(t, int64(1), count)
 
 	response, err = UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
-		CanvasId:                  canvas.ID.String(),
-		Pinned:                    proto.Bool(false),
-		Starred:                   proto.Bool(false),
-		AutoLayoutOnUpdateEnabled: proto.Bool(false),
+		CanvasId: canvas.ID.String(),
+		Pinned:   proto.Bool(false),
+		Starred:  proto.Bool(false),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, response.Preference)
 	assert.False(t, response.Preference.Pinned)
 	assert.False(t, response.Preference.Starred)
-	assert.False(t, response.Preference.AutoLayoutOnUpdateEnabled)
 	assert.Nil(t, response.Preference.PinnedAt)
 	assert.Nil(t, response.Preference.StarredAt)
 
