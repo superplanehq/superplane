@@ -20,84 +20,13 @@ import (
 type SendTextMessage struct{}
 
 type SendTextMessageConfiguration struct {
-	Channel          string `json:"channel" mapstructure:"channel"`
-	Content          string `json:"content" mapstructure:"content"`
-	EmbedTitle       string `json:"embedTitle" mapstructure:"embedTitle"`
-	EmbedDescription string `json:"embedDescription" mapstructure:"embedDescription"`
-	EmbedColor       string `json:"embedColor" mapstructure:"embedColor"`
-	EmbedURL         string `json:"embedUrl" mapstructure:"embedUrl"`
-	// Files mixes the structured object form and the legacy string form
-	// (URL or data: URI), so it is decoded separately from the raw config.
-	Files []FileAttachment `json:"files" mapstructure:"-"`
-}
-
-const (
-	fileSourceURL     = "url"
-	fileSourceContent = "content"
-
-	fileEncodingText   = "text"
-	fileEncodingBase64 = "base64"
-)
-
-// FileAttachment is one entry of the Files list: either a URL to download or
-// inline content (e.g. an AI component artifact). Legacy string entries (URL
-// or data: URI) are carried in Raw.
-type FileAttachment struct {
-	Source   string `json:"source" mapstructure:"source"`
-	URL      string `json:"url" mapstructure:"url"`
-	Content  string `json:"content" mapstructure:"content"`
-	Encoding string `json:"encoding" mapstructure:"encoding"`
-	MimeType string `json:"mimeType" mapstructure:"mimeType"`
-	Filename string `json:"filename" mapstructure:"filename"`
-	Raw      string `json:"-" mapstructure:"-"`
-}
-
-func (f FileAttachment) isEmpty() bool {
-	return f.Raw == "" && f.URL == "" && f.Content == ""
-}
-
-// decodeFileAttachments accepts both entry shapes: structured objects and
-// legacy strings (http(s) URL or data: URI).
-func decodeFileAttachments(raw any) ([]FileAttachment, error) {
-	items, ok := raw.([]any)
-	if !ok {
-		if raw == nil {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("files must be a list")
-	}
-
-	entries := make([]FileAttachment, 0, len(items))
-	for i, item := range items {
-		switch v := item.(type) {
-		case string:
-			entries = append(entries, FileAttachment{Raw: strings.TrimSpace(v)})
-		case map[string]any:
-			var entry FileAttachment
-			if err := mapstructure.Decode(v, &entry); err != nil {
-				return nil, fmt.Errorf("files[%d]: %v", i, err)
-			}
-			entries = append(entries, entry)
-		default:
-			return nil, fmt.Errorf("files[%d] must be a file entry", i)
-		}
-	}
-	return entries, nil
-}
-
-func decodeSendTextMessageConfiguration(raw any) (SendTextMessageConfiguration, error) {
-	var config SendTextMessageConfiguration
-	if err := mapstructure.Decode(raw, &config); err != nil {
-		return config, fmt.Errorf("failed to decode configuration: %w", err)
-	}
-	if m, ok := raw.(map[string]any); ok {
-		files, err := decodeFileAttachments(m["files"])
-		if err != nil {
-			return config, err
-		}
-		config.Files = files
-	}
-	return config, nil
+	Channel          string   `json:"channel" mapstructure:"channel"`
+	Content          string   `json:"content" mapstructure:"content"`
+	EmbedTitle       string   `json:"embedTitle" mapstructure:"embedTitle"`
+	EmbedDescription string   `json:"embedDescription" mapstructure:"embedDescription"`
+	EmbedColor       string   `json:"embedColor" mapstructure:"embedColor"`
+	EmbedURL         string   `json:"embedUrl" mapstructure:"embedUrl"`
+	Files            []string `json:"files" mapstructure:"files"`
 }
 
 type SendTextMessageMetadata struct {
@@ -139,11 +68,9 @@ func (c *SendTextMessage) Documentation() string {
 - **Embed Description**: Optional description for a rich embed
 - **Embed Color**: Hex color code for the embed (e.g., #5865F2)
 - **Embed URL**: Optional URL to link from the embed title
-- **Files**: Optional files to attach. Each entry picks a **Source**:
-  - **URL** — a public http(s) link; the file is downloaded and attached.
-  - **Inline content** — the file content itself, e.g. an AI component artifact: set **Content** to ` + "`{{ $['Text Prompt'].data.artifacts[0].content }}`" + `, pick the **MIME Type**, and set **Encoding** to match the artifact's ` + "`encoding`" + ` field (text for plain text, base64 for binary files like images).
-
-  An optional **Filename** names the attachment; legacy plain-string entries (URL or ` + "`data:`" + ` URI) keep working.
+- **Files**: Optional files to attach. Each entry is either:
+  - a public **http(s) URL** — the file is downloaded and attached; or
+  - a **` + "`data:`" + ` URI** carrying the content inline, for content that has no public URL — e.g. an AI component artifact: ` + "`data:image/png;base64,{{ $['Text Prompt'].data.artifacts[0].content }}`" + ` (use ` + "`data:text/csv,{{ ... }}`" + ` for a text artifact). The attachment type is detected from the content itself, so images render as images.
 
 ## Output
 
@@ -223,106 +150,12 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 			Label:       "Files",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "Files to attach: download from a URL, or attach inline content such as an AI component artifact",
+			Description: "Files to attach: a public http(s) URL to download, or a data: URI carrying the content inline",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "File",
 					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeObject,
-						Schema: []configuration.Field{
-							{
-								Name:        "source",
-								Label:       "Source",
-								Type:        configuration.FieldTypeSelect,
-								Required:    true,
-								Default:     fileSourceURL,
-								Description: "Where the file comes from",
-								TypeOptions: &configuration.TypeOptions{
-									Select: &configuration.SelectTypeOptions{
-										Options: []configuration.FieldOption{
-											{Label: "URL", Value: fileSourceURL},
-											{Label: "Inline content", Value: fileSourceContent},
-										},
-									},
-								},
-							},
-							{
-								Name:        "url",
-								Label:       "URL",
-								Type:        configuration.FieldTypeString,
-								Required:    false,
-								Placeholder: "https://example.com/report.pdf",
-								Description: "Public http(s) URL; the file is downloaded and attached",
-								VisibilityConditions: []configuration.VisibilityCondition{
-									{Field: "source", Values: []string{fileSourceURL}},
-								},
-							},
-							{
-								Name:        "content",
-								Label:       "Content",
-								Type:        configuration.FieldTypeText,
-								Required:    false,
-								Description: "File content, e.g. {{ $['Text Prompt'].data.artifacts[0].content }}",
-								VisibilityConditions: []configuration.VisibilityCondition{
-									{Field: "source", Values: []string{fileSourceContent}},
-								},
-							},
-							{
-								Name:        "encoding",
-								Label:       "Encoding",
-								Type:        configuration.FieldTypeSelect,
-								Required:    false,
-								Default:     fileEncodingText,
-								Description: "Match the artifact's encoding field: text for plain text, base64 for binary files",
-								TypeOptions: &configuration.TypeOptions{
-									Select: &configuration.SelectTypeOptions{
-										Options: []configuration.FieldOption{
-											{Label: "Text", Value: fileEncodingText},
-											{Label: "Base64", Value: fileEncodingBase64},
-										},
-									},
-								},
-								VisibilityConditions: []configuration.VisibilityCondition{
-									{Field: "source", Values: []string{fileSourceContent}},
-								},
-							},
-							{
-								Name:        "mimeType",
-								Label:       "MIME Type",
-								Type:        configuration.FieldTypeSelect,
-								Required:    false,
-								Default:     "application/octet-stream",
-								Description: "Used to name the attachment when no filename is set",
-								TypeOptions: &configuration.TypeOptions{
-									Select: &configuration.SelectTypeOptions{
-										Options: []configuration.FieldOption{
-											{Label: "PNG image", Value: "image/png"},
-											{Label: "JPEG image", Value: "image/jpeg"},
-											{Label: "GIF image", Value: "image/gif"},
-											{Label: "Plain text", Value: "text/plain"},
-											{Label: "CSV", Value: "text/csv"},
-											{Label: "Markdown", Value: "text/markdown"},
-											{Label: "HTML", Value: "text/html"},
-											{Label: "JSON", Value: "application/json"},
-											{Label: "PDF", Value: "application/pdf"},
-											{Label: "ZIP", Value: "application/zip"},
-											{Label: "Binary", Value: "application/octet-stream"},
-										},
-									},
-								},
-								VisibilityConditions: []configuration.VisibilityCondition{
-									{Field: "source", Values: []string{fileSourceContent}},
-								},
-							},
-							{
-								Name:        "filename",
-								Label:       "Filename",
-								Type:        configuration.FieldTypeString,
-								Required:    false,
-								Placeholder: "report.csv",
-								Description: "Optional attachment name; defaults to a name derived from the URL or MIME type",
-							},
-						},
+						Type: configuration.FieldTypeString,
 					},
 				},
 			},
@@ -331,9 +164,9 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 }
 
 func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
-	config, err := decodeSendTextMessageConfiguration(ctx.Configuration)
-	if err != nil {
-		return err
+	var config SendTextMessageConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	if config.Channel == "" {
@@ -391,9 +224,9 @@ func (c *SendTextMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 }
 
 func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {
-	config, err := decodeSendTextMessageConfiguration(ctx.Configuration)
-	if err != nil {
-		return err
+	var config SendTextMessageConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	if config.Channel == "" {
@@ -458,58 +291,30 @@ func (c *SendTextMessage) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-// validateFiles checks the attachment list at config time. Values with
+// validateFiles checks the attachment list at config time. Entries with
 // unresolved expressions are skipped since they only resolve at execution.
-func validateFiles(files []FileAttachment) error {
+func validateFiles(files []string) error {
 	if len(files) > maxMessageFiles {
 		return fmt.Errorf("at most %d files can be attached to a message", maxMessageFiles)
 	}
 
-	for i, file := range files {
-		if file.Raw != "" {
-			if err := validateLegacyFileEntry(file.Raw); err != nil {
-				return err
+	for _, file := range files {
+		file = strings.TrimSpace(file)
+		if file == "" || isExpressionValue(file) {
+			continue
+		}
+		if strings.HasPrefix(file, "data:") {
+			if _, _, err := parseDataURI(file); err != nil {
+				return fmt.Errorf("invalid data URI: %v", err)
 			}
 			continue
 		}
-
-		switch file.Source {
-		case "", fileSourceURL:
-			if file.URL == "" || isExpressionValue(file.URL) {
-				continue
-			}
-			parsed, err := url.Parse(file.URL)
-			if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-				return fmt.Errorf("files[%d]: invalid URL %q: must be an http(s) URL", i, file.URL)
-			}
-		case fileSourceContent:
-			// The encoding can be driven by an expression (e.g. the artifact's
-			// own encoding field), which only resolves at execution.
-			if file.Encoding != "" && file.Encoding != fileEncodingText && file.Encoding != fileEncodingBase64 && !isExpressionValue(file.Encoding) {
-				return fmt.Errorf("files[%d]: encoding must be %q or %q", i, fileEncodingText, fileEncodingBase64)
-			}
-		default:
-			return fmt.Errorf("files[%d]: source must be %q or %q", i, fileSourceURL, fileSourceContent)
+		parsed, err := url.Parse(file)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return fmt.Errorf("invalid file URL %q: must be an http(s) URL or a data: URI", file)
 		}
 	}
 
-	return nil
-}
-
-func validateLegacyFileEntry(value string) error {
-	if isExpressionValue(value) {
-		return nil
-	}
-	if strings.HasPrefix(value, "data:") {
-		if _, _, err := parseDataURI(value); err != nil {
-			return fmt.Errorf("invalid data URI: %v", err)
-		}
-		return nil
-	}
-	parsed, err := url.Parse(value)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return fmt.Errorf("invalid file URL %q: must be an http(s) URL or a data: URI", value)
-	}
 	return nil
 }
 
@@ -615,64 +420,23 @@ func attachmentName(preferred string, contentType string, index int) string {
 }
 
 // hasAttachableFile reports whether the list has at least one non-empty entry.
-func hasAttachableFile(files []FileAttachment) bool {
+func hasAttachableFile(files []string) bool {
 	for _, file := range files {
-		if !file.isEmpty() {
+		if strings.TrimSpace(file) != "" {
 			return true
 		}
 	}
 	return false
 }
 
-// resolveFileAttachment turns one Files entry into attachment bytes: URL
-// entries are downloaded, content entries are decoded inline, and legacy
-// string entries keep their URL/data: URI behavior.
-func resolveFileAttachment(client *Client, httpCtx core.HTTPContext, entry FileAttachment, index int) (MessageFile, error) {
-	if entry.Raw != "" {
-		return resolveLegacyFileEntry(client, httpCtx, entry.Raw, index)
-	}
+// resolveFileEntry turns one Files entry into attachment bytes: an http(s)
+// URL is downloaded, a data: URI carries the content inline. The media type is
+// sniffed from the resulting bytes so the attachment is named (and typed)
+// correctly regardless of what the entry declared.
+func resolveFileEntry(client *Client, httpCtx core.HTTPContext, value string, index int) (MessageFile, error) {
+	// Expression values often carry stray whitespace around the entry.
+	value = strings.TrimSpace(value)
 
-	if entry.Source == fileSourceContent {
-		// Expression values often carry stray whitespace around the content.
-		data := strings.TrimSpace(entry.Content)
-		content := []byte(data)
-		if entry.Encoding == fileEncodingBase64 {
-			decoded, err := base64.StdEncoding.DecodeString(data)
-			if err != nil {
-				return MessageFile{}, fmt.Errorf("files[%d]: invalid base64 content: %v", index, err)
-			}
-			content = decoded
-		}
-		// Sniff the actual bytes so the attachment renders correctly even when
-		// the artifact carries no MIME type (e.g. OpenAI container files).
-		contentType := resolveContentType(content, entry.MimeType)
-		return MessageFile{
-			Name:        attachmentName(entry.Filename, contentType, index),
-			Content:     content,
-			ContentType: contentType,
-		}, nil
-	}
-
-	fileURL := strings.TrimSpace(entry.URL)
-	if !strings.HasPrefix(fileURL, "http://") && !strings.HasPrefix(fileURL, "https://") {
-		return MessageFile{}, fmt.Errorf("files[%d]: URL %q must be an http(s) URL; to attach inline content, set the entry's source to content", index, fileURL)
-	}
-	content, err := client.FetchFile(httpCtx, fileURL)
-	if err != nil {
-		return MessageFile{}, fmt.Errorf("failed to fetch file %q: %w", fileURL, err)
-	}
-	contentType := resolveContentType(content, "")
-	name := entry.Filename
-	if name == "" {
-		name = fileNameFromURL(fileURL, index)
-	}
-	name = attachmentName(name, contentType, index)
-	return MessageFile{Name: name, Content: content, ContentType: contentType}, nil
-}
-
-// resolveLegacyFileEntry handles the original string entry form: an http(s)
-// URL to download or a data: URI carrying the content inline.
-func resolveLegacyFileEntry(client *Client, httpCtx core.HTTPContext, value string, index int) (MessageFile, error) {
 	if strings.HasPrefix(value, "data:") {
 		mediaType, content, err := parseDataURI(value)
 		if err != nil {
@@ -685,16 +449,23 @@ func resolveLegacyFileEntry(client *Client, httpCtx core.HTTPContext, value stri
 			ContentType: contentType,
 		}, nil
 	}
+
 	if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
-		// A schemeless entry is almost always raw file content pasted via
-		// an expression; a fetch would only fail with a cryptic error.
-		return MessageFile{}, fmt.Errorf("files[%d] is neither an http(s) URL nor a data: URI; to attach inline content, use a file entry with source set to content", index)
+		// A schemeless entry is almost always raw file content pasted via an
+		// expression; a fetch would only fail with a cryptic error.
+		return MessageFile{}, fmt.Errorf("files[%d] is neither an http(s) URL nor a data: URI; to attach inline content, use a data: URI, e.g. data:image/png;base64,{{ ... }}", index)
 	}
+
 	content, err := client.FetchFile(httpCtx, value)
 	if err != nil {
 		return MessageFile{}, fmt.Errorf("failed to fetch file %q: %w", value, err)
 	}
-	return MessageFile{Name: fileNameFromURL(value, index), Content: content}, nil
+	contentType := resolveContentType(content, "")
+	return MessageFile{
+		Name:        attachmentName(fileNameFromURL(value, index), contentType, index),
+		Content:     content,
+		ContentType: contentType,
+	}, nil
 }
 
 // fileNameFromURL derives an attachment filename from the URL path, falling
@@ -720,10 +491,10 @@ func sendMessage(client *Client, httpCtx core.HTTPContext, config SendTextMessag
 
 	files := make([]MessageFile, 0, len(config.Files))
 	for i, entry := range config.Files {
-		if entry.isEmpty() {
+		if strings.TrimSpace(entry) == "" {
 			continue
 		}
-		file, err := resolveFileAttachment(client, httpCtx, entry, i)
+		file, err := resolveFileEntry(client, httpCtx, entry, i)
 		if err != nil {
 			return nil, err
 		}
