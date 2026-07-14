@@ -56,6 +56,19 @@ func Test__AcceptMergeRequest__Setup(t *testing.T) {
 		err := c.Setup(ctx)
 		require.NoError(t, err)
 	})
+
+	t.Run("expression project is allowed", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"project":         "{{ $['On Merge Request'].data.project.id }}",
+				"mergeRequestIid": "{{ $['On Merge Request'].data.object_attributes.iid }}",
+			},
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+		}
+		err := c.Setup(ctx)
+		require.NoError(t, err)
+	})
 }
 
 func Test__AcceptMergeRequest__Execute(t *testing.T) {
