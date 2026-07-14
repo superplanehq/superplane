@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 
 import {
   MARKDOWN_RUN_SELECTS,
@@ -16,6 +17,7 @@ import {
   type MarkdownVariableMatch,
   type MarkdownVariableMode,
 } from "./panelTypes";
+import { RunDataSourceFiltersPanel } from "./RunDataSourceFiltersPanel";
 import { useMemoryCatalog } from "./widget/useMemoryCatalog";
 
 const RUN_SELECT_LABELS: Record<MarkdownRunSelect, string> = {
@@ -271,24 +273,46 @@ export function RunSourceControls({
   source: MarkdownRunVariableSource;
   onChange: (next: MarkdownRunVariableSource) => void;
 }) {
+  const setStatuses = (statuses: RunStatusFilter[] | undefined) => {
+    const next = { ...source };
+    if (statuses && statuses.length > 0) next.statuses = statuses;
+    else delete next.statuses;
+    onChange(next);
+  };
+  const setTriggers = (triggers: string[] | undefined) => {
+    const next = { ...source };
+    if (triggers && triggers.length > 0) next.triggers = triggers;
+    else delete next.triggers;
+    onChange(next);
+  };
+
   return (
-    <div className="space-y-1">
-      <Label className="text-[11px] font-medium text-slate-600">Run</Label>
-      <Select
-        value={source.select}
-        onValueChange={(value) => onChange({ ...source, select: value as MarkdownRunSelect })}
-      >
-        <SelectTrigger className="h-7 text-[12px]" data-testid="markdown-variable-run-select">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {MARKDOWN_RUN_SELECTS.map((select) => (
-            <SelectItem key={select} value={select}>
-              {RUN_SELECT_LABELS[select]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <div className="space-y-2">
+      <div className="space-y-1">
+        <Label className="text-[11px] font-medium text-slate-600">Run</Label>
+        <Select
+          value={source.select}
+          onValueChange={(value) => onChange({ ...source, select: value as MarkdownRunSelect })}
+        >
+          <SelectTrigger className="h-7 text-[12px]" data-testid="markdown-variable-run-select">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MARKDOWN_RUN_SELECTS.map((select) => (
+              <SelectItem key={select} value={select}>
+                {RUN_SELECT_LABELS[select]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <RunDataSourceFiltersPanel
+        statuses={source.statuses}
+        triggers={source.triggers}
+        onStatusesChange={setStatuses}
+        onTriggersChange={setTriggers}
+        testIdSuffix="markdown-variable"
+      />
     </div>
   );
 }

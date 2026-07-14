@@ -7,6 +7,10 @@
  * for the markdown kind.
  */
 
+import type { RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
+
+import { validateRunStatusesArray, validateRunTriggersArray } from "./runDataSourceFilterSchema";
+
 /** Variable identifiers must match this regex so they can appear in `{{ }}` CEL expressions. */
 export const MARKDOWN_VARIABLE_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -62,6 +66,18 @@ export interface MarkdownRunVariableSource {
    *  - `latest_failed` — the most recent `RESULT_FAILED` run
    */
   select: MarkdownRunSelect;
+  /**
+   * Optional status filter (running / passed / failed / cancelled) applied
+   * on top of `select`. Empty or omitted means "all statuses". Applied
+   * client-side after the underlying runs query returns so the same
+   * `select` bucket is shared across variables regardless of filter.
+   */
+  statuses?: RunStatusFilter[];
+  /**
+   * Optional trigger filter — each entry references a trigger node by id
+   * or name. Empty or omitted means "all triggers".
+   */
+  triggers?: string[];
 }
 
 export type MarkdownVariableSource = MarkdownMemoryVariableSource | MarkdownRunVariableSource;
@@ -190,5 +206,8 @@ function validateMarkdownRunSource(source: Record<string, unknown>, index: numbe
   if (typeof source.select !== "string" || !(MARKDOWN_RUN_SELECTS as readonly string[]).includes(source.select)) {
     return `content.variables[${index}].source.select must be one of ${MARKDOWN_RUN_SELECTS.join(", ")}.`;
   }
-  return null;
+  const statusesPath = `content.variables[${index}].source.statuses`;
+  const statusesError = validateRunStatusesArray(source.statuses, statusesPath);
+  if (statusesError) return statusesError;
+  return validateRunTriggersArray(source.triggers, `content.variables[${index}].source.triggers`);
 }
