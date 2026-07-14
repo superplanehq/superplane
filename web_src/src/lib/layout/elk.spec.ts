@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvas, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { ElkLayoutEngine } from "@/lib/layout";
+import { resolveForwardLayoutEdges } from "./layoutGraph";
 
 type ElkGraphForTest = {
   children?: Array<{
@@ -234,5 +235,11 @@ describe("ElkLayoutEngine", () => {
     const source = graph.children?.find((child) => child.id === "source");
 
     expect(source?.ports?.map((port) => port.id)).toEqual(["source__input", "source__passed", "source__failed"]);
+  });
+
+  it("keeps layout edges when node positions are missing", () => {
+    const edges = [{ sourceId: "source", targetId: "target", channel: "default" }];
+
+    expect(resolveForwardLayoutEdges([{ id: "source" }, { id: "target" }], edges)).toEqual(edges);
   });
 });

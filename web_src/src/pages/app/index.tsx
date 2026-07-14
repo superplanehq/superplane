@@ -41,6 +41,7 @@ import {
   useDescribeRun,
   useInfiniteCanvasRuns,
   useInfiniteCanvasLiveVersions,
+  useCanvases,
   useTriggers,
   useUpdateCanvasPreference,
   useUpdateCanvasVersion,
@@ -207,6 +208,42 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
+function useAutoLayoutOnUpdatePreference(organizationId: string, canvasId: string | undefined) {
+  const updateCanvasPreference = useUpdateCanvasPreference(organizationId);
+  const { data: canvasSummaries = [] } = useCanvases(organizationId);
+  const serverPreference = useMemo(
+    () => canvasSummaries.find((summary) => summary.id === canvasId)?.autoLayoutOnUpdateEnabled,
+    [canvasSummaries, canvasId],
+  );
+  const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
+    readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
+  );
+
+  useEffect(() => {
+    if (serverPreference === undefined) {
+      return;
+    }
+
+    setIsAutoLayoutOnUpdateEnabled(serverPreference);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(serverPreference));
+    }
+  }, [serverPreference]);
+
+  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
+    const newValue = !isAutoLayoutOnUpdateEnabled;
+    setIsAutoLayoutOnUpdateEnabled(newValue);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
+    }
+    if (canvasId) {
+      updateCanvasPreference.mutate({ canvasId, autoLayoutOnUpdateEnabled: newValue });
+    }
+  }, [canvasId, isAutoLayoutOnUpdateEnabled, updateCanvasPreference]);
+
+  return { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled };
+}
+
 export function AppPage() {
   const { organizationId, appId } = useParams<{
     organizationId: string;
@@ -292,7 +329,6 @@ export function AppPage() {
   const canUpdateIntegrations = canAct("integrations", "update");
   const canUseAgents = canAct("agents", "create") && canAct("agents", "read");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
-  const updateCanvasPreference = useUpdateCanvasPreference(organizationId!);
   const {
     data: liveCanvas,
     isLoading: canvasLoading,
@@ -593,10 +629,10 @@ export function AppPage() {
 
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
-  const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
-    readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
+  const { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled } = useAutoLayoutOnUpdatePreference(
+    organizationId!,
+    canvasId,
   );
-  const syncedInitialAutoLayoutPreferenceCanvasIdRef = useRef<string | null>(null);
 
   const lastSavedWorkflowSignatureRef = useRef("");
   const lastAppliedVersionSnapshotRef = useRef("");
@@ -1151,30 +1187,6 @@ export function AppPage() {
       hasQueuedFollowUp: false,
     });
   }, []);
-
-  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
-    const newValue = !isAutoLayoutOnUpdateEnabled;
-    setIsAutoLayoutOnUpdateEnabled(newValue);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
-    }
-    if (canvasId) {
-      updateCanvasPreference.mutate({ canvasId, autoLayoutOnUpdateEnabled: newValue });
-    }
-  }, [canvasId, isAutoLayoutOnUpdateEnabled, updateCanvasPreference]);
-
-  useEffect(() => {
-    if (!canvasId || syncedInitialAutoLayoutPreferenceCanvasIdRef.current === canvasId) {
-      return;
-    }
-
-    syncedInitialAutoLayoutPreferenceCanvasIdRef.current = canvasId;
-    if (!isAutoLayoutOnUpdateEnabled) {
-      return;
-    }
-
-    updateCanvasPreference.mutate({ canvasId, autoLayoutOnUpdateEnabled: true });
-  }, [canvasId, isAutoLayoutOnUpdateEnabled, updateCanvasPreference]);
 
   const applyAutoLayoutOnAddedNode = useCallback(
     async (workflow: CanvasesCanvas, nodeID?: string): Promise<CanvasesCanvas> => {

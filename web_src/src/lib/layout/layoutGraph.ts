@@ -25,7 +25,7 @@ export function resolveForwardLayoutEdges<T extends LayoutEdge>(layoutNodes: Lay
     const sourcePosition = positionByNodeId.get(edge.sourceId);
     const targetPosition = positionByNodeId.get(edge.targetId);
     if (!sourcePosition || !targetPosition) {
-      return false;
+      return true;
     }
 
     return !(
