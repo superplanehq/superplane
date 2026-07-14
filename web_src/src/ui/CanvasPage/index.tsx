@@ -653,7 +653,8 @@ function reactElementTypeName(type: unknown): string {
   }
 
   if (typeof type === "function") {
-    return type.displayName || type.name || "Anonymous";
+    const functionType = type as { displayName?: string; name?: string };
+    return functionType.displayName || functionType.name || "Anonymous";
   }
 
   if (typeof type === "object" && type !== null) {
