@@ -736,6 +736,160 @@ func Test__Client__CreateMergeRequestAwardEmoji(t *testing.T) {
 	})
 }
 
+func Test__Client__AcceptMergeRequest(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{
+					"id": 1,
+					"iid": 42,
+					"project_id": 456,
+					"title": "feat: add login page",
+					"state": "merged",
+					"merged_at": "2026-02-13T11:16:17.520Z",
+					"source_branch": "feature/login-page",
+					"target_branch": "main",
+					"merge_commit_sha": "9999999999999999999999999999999999999999",
+					"web_url": "https://gitlab.com/group/project/-/merge_requests/42"
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		squash := true
+		removeSourceBranch := true
+		mergeRequest, err := client.AcceptMergeRequest(context.Background(), "456", "42", &AcceptMergeRequestRequest{
+			MergeCommitMessage:       "Merge login page",
+			Squash:                   &squash,
+			SquashCommitMessage:      "feat: add login page",
+			ShouldRemoveSourceBranch: &removeSourceBranch,
+			SHA:                      "8888888888888888888888888888888888888888",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, mergeRequest)
+		assert.Equal(t, 42, mergeRequest.IID)
+		assert.Equal(t, "merged", mergeRequest.State)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPut, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/merge_requests/42/merge", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		bodyString := string(body)
+		assert.True(t, strings.Contains(bodyString, `"merge_commit_message":"Merge login page"`))
+		assert.True(t, strings.Contains(bodyString, `"squash":true`))
+		assert.True(t, strings.Contains(bodyString, `"squash_commit_message":"feat: add login page"`))
+		assert.True(t, strings.Contains(bodyString, `"should_remove_source_branch":true`))
+		assert.True(t, strings.Contains(bodyString, `"sha":"8888888888888888888888888888888888888888"`))
+	})
+
+	t.Run("omits optional fields when unset", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusOK, `{"id": 1, "iid": 42, "state": "merged"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.AcceptMergeRequest(context.Background(), "456", "42", &AcceptMergeRequestRequest{})
+		require.NoError(t, err)
+
+		require.Len(t, mockClient.Requests, 1)
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		assert.Equal(t, "{}", string(body))
+	})
+}
+
+func Test__Client__ApproveMergeRequest(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusCreated, `{
+					"id": 1,
+					"iid": 42,
+					"project_id": 456,
+					"title": "feat: add login page",
+					"state": "opened",
+					"approvals_required": 2,
+					"approvals_left": 1,
+					"approved_by": [
+						{
+							"user": {"id": 1, "name": "Administrator", "username": "root"},
+							"approved_at": "2026-02-13T10:15:30.000Z"
+						}
+					]
+				}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		approval, err := client.ApproveMergeRequest(context.Background(), "456", "42", &ApproveMergeRequestRequest{
+			SHA: "8888888888888888888888888888888888888888",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, approval)
+		assert.Equal(t, 42, approval.IID)
+		assert.Equal(t, 1, approval.ApprovalsLeft)
+		require.Len(t, approval.ApprovedBy, 1)
+		assert.Equal(t, "root", approval.ApprovedBy[0].User.Username)
+
+		require.Len(t, mockClient.Requests, 1)
+		assert.Equal(t, http.MethodPost, mockClient.Requests[0].Method)
+		assert.Equal(t, "https://gitlab.com/api/v4/projects/456/merge_requests/42/approve", mockClient.Requests[0].URL.String())
+		assert.Equal(t, "token", mockClient.Requests[0].Header.Get("PRIVATE-TOKEN"))
+
+		body, readErr := io.ReadAll(mockClient.Requests[0].Body)
+		require.NoError(t, readErr)
+		assert.True(t, strings.Contains(string(body), `"sha":"8888888888888888888888888888888888888888"`))
+	})
+
+	t.Run("SHA mismatch", func(t *testing.T) {
+		mockClient := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				GitlabMockResponse(http.StatusConflict, `{"message": "SHA does not match HEAD of source branch"}`),
+			},
+		}
+
+		client := &Client{
+			baseURL:    "https://gitlab.com",
+			token:      "token",
+			authType:   AuthTypePersonalAccessToken,
+			groupID:    "123",
+			httpClient: mockClient,
+		}
+
+		_, err := client.ApproveMergeRequest(context.Background(), "456", "42", &ApproveMergeRequestRequest{
+			SHA: "0000000000000000000000000000000000000000",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SHA does not match HEAD of source branch")
+	})
+}
+
 func Test__Client__ListEnvironments(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
