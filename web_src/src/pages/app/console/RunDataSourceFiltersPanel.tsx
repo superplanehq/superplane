@@ -8,7 +8,7 @@ import { RunStatusFilterSection, RunTriggerFilterSection, type TriggerOption } f
 import { type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import type { SuperplaneComponentsNode } from "@/api-client";
 
-import { resolveConsoleNode, useConsoleContext } from "./ConsoleContext";
+import { resolveConsoleTrigger, useConsoleContext } from "./ConsoleContext";
 
 interface RunDataSourceFiltersPanelProps {
   statuses: readonly RunStatusFilter[] | undefined;
@@ -155,7 +155,7 @@ function resolveSelectedTriggerIds(
   const out: string[] = [];
   const seen = new Set<string>();
   for (const reference of triggers) {
-    const resolved = resolveConsoleNode(ctx, reference)?.node.id;
+    const resolved = resolveConsoleTrigger(ctx, reference)?.node.id;
     if (!resolved || seen.has(resolved)) continue;
     seen.add(resolved);
     out.push(resolved);

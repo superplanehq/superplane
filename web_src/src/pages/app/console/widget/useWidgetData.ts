@@ -10,7 +10,12 @@ import {
   type TriggerReferenceResolver,
 } from "@/ui/Runs/runStatusTriggerFilter";
 
-import { resolveConsoleNode, useConsoleContext, type ConsoleContextValue } from "../ConsoleContext";
+import {
+  resolveConsoleNode,
+  resolveConsoleTrigger,
+  useConsoleContext,
+  type ConsoleContextValue,
+} from "../ConsoleContext";
 import { flattenMemoryEntries } from "./memoryRow";
 import { makeRunsFlightKey } from "./runsWidgetQuery";
 import type { WidgetDataSource, WidgetRender } from "./types";
@@ -401,7 +406,7 @@ function useRunsDataSourceResult({
   const loadedRowCount = useMemo(() => countLoadedRuns(pages, enabled), [enabled, pages]);
   const runsFilters = useMemo(() => runsFiltersFromDataSource(dataSource), [dataSource]);
   const filtersActive = hasRunStatusTriggerFilters(runsFilters);
-  const resolveTrigger = useCallback((reference: string) => resolveConsoleNode(ctx, reference)?.node.id, [ctx]);
+  const resolveTrigger = useCallback((reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id, [ctx]);
   const collectLimit = computeRunsCollectLimit({
     filtersActive,
     progressive,
@@ -619,7 +624,7 @@ function buildRunsDataSourceRows(args: {
         runMatchesStatusTriggerFilters(
           row as CanvasesCanvasRun,
           args.runsFilters,
-          (reference) => resolveConsoleNode(args.ctx, reference)?.node.id,
+          (reference) => resolveConsoleTrigger(args.ctx, reference)?.node.id,
         ),
       )
     : collected;

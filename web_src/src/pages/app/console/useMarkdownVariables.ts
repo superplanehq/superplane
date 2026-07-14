@@ -13,12 +13,13 @@ import {
   triggerFilterCanMatch,
 } from "@/ui/Runs/runStatusTriggerFilter";
 
-import { resolveConsoleNode, useConsoleContext } from "./ConsoleContext";
+import { resolveConsoleTrigger, useConsoleContext } from "./ConsoleContext";
 import { markdownTemplateReferencesRunNode } from "./markdownInterpolation";
 import { DOLLAR_REWRITE_IDENTIFIER } from "./widget/celExpr";
 import { memoryEntryToRow } from "./widget/memoryRow";
+import { makeRunsFlightKey } from "./widget/runsWidgetQuery";
 import { buildDollarNodes, buildNodeNameMap } from "./widget/useWidgetData";
-import { WIDGET_MAX_EAGER_PAGES } from "./widget/widgetPagination";
+import { claimEagerPaginationFetch, WIDGET_MAX_EAGER_PAGES } from "./widget/widgetPagination";
 import { applySort } from "./widget/widgetData";
 import type { MarkdownMemoryVariableSource, MarkdownRunVariableSource, MarkdownVariable } from "./panelTypes";
 
@@ -131,9 +132,30 @@ export function useMarkdownVariables(
   // the first fetched page may not contain a matching run. Eagerly page
   // through the shared infinite query until a match surfaces, the source
   // runs out of pages, or we hit `WIDGET_MAX_EAGER_PAGES`.
-  useEagerFilterPagination({ query: latestQuery, list, select: "latest", data: latestRunsData, ctx });
-  useEagerFilterPagination({ query: passedQuery, list, select: "latest_passed", data: passedRunsData, ctx });
-  useEagerFilterPagination({ query: failedQuery, list, select: "latest_failed", data: failedRunsData, ctx });
+  useEagerFilterPagination({
+    query: latestQuery,
+    list,
+    select: "latest",
+    data: latestRunsData,
+    ctx,
+    flightKey: makeRunsFlightKey(canvasId, {}),
+  });
+  useEagerFilterPagination({
+    query: passedQuery,
+    list,
+    select: "latest_passed",
+    data: passedRunsData,
+    ctx,
+    flightKey: makeRunsFlightKey(canvasId, { results: ["RESULT_PASSED"] }),
+  });
+  useEagerFilterPagination({
+    query: failedQuery,
+    list,
+    select: "latest_failed",
+    data: failedRunsData,
+    ctx,
+    flightKey: makeRunsFlightKey(canvasId, { results: ["RESULT_FAILED"] }),
+  });
 
   const { queries: runExecutionQueries, isLoading: runExecutionsLoading } = useEventExecutionsBatch(
     canvasId,
@@ -161,7 +183,7 @@ export function useMarkdownVariables(
     // Mirror `normalizeDraftVariables` (first-wins) so the preview resolves the
     // same row that save persists.
     const seen = new Set<string>();
-    const resolveTrigger = (reference: string) => resolveConsoleNode(ctx, reference)?.node.id;
+    const resolveTrigger = (reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id;
     for (const variable of list) {
       if (!variable?.name || !variable?.source) continue;
       if (seen.has(variable.name)) continue;
@@ -225,7 +247,7 @@ function collectRunVariableRootEventIds(args: {
 }): string[] {
   const ids: string[] = [];
   const seen = new Set<string>();
-  const resolveTrigger = (reference: string) => resolveConsoleNode(args.ctx, reference)?.node.id;
+  const resolveTrigger = (reference: string) => resolveConsoleTrigger(args.ctx, reference)?.node.id;
   for (const variable of args.list) {
     const source = variable?.source;
     if (source?.kind !== "run") continue;
@@ -265,7 +287,9 @@ interface InfiniteRunsQuery {
   hasNextPage?: boolean;
   isFetching: boolean;
   isFetchingNextPage: boolean;
-  fetchNextPage: () => unknown;
+  isError: boolean;
+  isFetchNextPageError: boolean;
+  fetchNextPage: () => Promise<unknown> | unknown;
 }
 
 /**
@@ -274,6 +298,10 @@ interface InfiniteRunsQuery {
  * source runs out of pages / we hit the widget page cap. No-op when no
  * variable in the bucket has filters set so unfiltered variables keep
  * their fast single-page behavior.
+ *
+ * Joins the same `claimEagerPaginationFetch` single-flight lock widgets
+ * use so markdown/html panels and runs widgets sharing a cache entry
+ * cannot race duplicate `before=` fetches in one commit.
  */
 function useEagerFilterPagination(args: {
   query: InfiniteRunsQuery;
@@ -281,8 +309,9 @@ function useEagerFilterPagination(args: {
   select: MarkdownRunVariableSource["select"];
   data: RunsQueryData | undefined;
   ctx: ReturnType<typeof useConsoleContext>;
+  flightKey: string;
 }) {
-  const { query, list, select, data, ctx } = args;
+  const { query, list, select, data, ctx, flightKey } = args;
   const filteredVariables = useMemo(
     () =>
       list.filter(
@@ -300,7 +329,7 @@ function useEagerFilterPagination(args: {
   const pageCount = data?.pages?.length ?? 0;
   const anyUnresolved = useMemo(() => {
     if (filteredVariables.length === 0) return false;
-    const resolveTrigger = (reference: string) => resolveConsoleNode(ctx, reference)?.node.id;
+    const resolveTrigger = (reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id;
     return filteredVariables.some((variable) => {
       if (!triggerFilterCanMatch(variable.source.triggers, resolveTrigger)) return false;
       return firstMatchingRun(data, variable.source, resolveTrigger) === undefined;
@@ -310,14 +339,28 @@ function useEagerFilterPagination(args: {
   // Break the query object into primitives so the effect only re-runs when
   // pagination-relevant fields actually change — the full query object is
   // a fresh identity on every render.
-  const { hasNextPage, isFetching, isFetchingNextPage, fetchNextPage } = query;
+  const { hasNextPage, isFetching, isFetchingNextPage, isError, isFetchNextPageError, fetchNextPage } = query;
   useEffect(() => {
     if (!anyUnresolved) return;
     if (!hasNextPage) return;
+    // A failed page-1 or fetchNextPage leaves hasNextPage true without
+    // advancing pageCount — stop rather than retrying forever / sticking
+    // the variable in "searching".
+    if (isError || isFetchNextPageError) return;
     if (isFetching || isFetchingNextPage) return;
     if (pageCount >= WIDGET_MAX_EAGER_PAGES) return;
-    fetchNextPage();
-  }, [anyUnresolved, pageCount, hasNextPage, isFetching, isFetchingNextPage, fetchNextPage]);
+    claimEagerPaginationFetch(flightKey, fetchNextPage);
+  }, [
+    anyUnresolved,
+    pageCount,
+    hasNextPage,
+    isError,
+    isFetchNextPageError,
+    isFetching,
+    isFetchingNextPage,
+    fetchNextPage,
+    flightKey,
+  ]);
 }
 
 /**
@@ -357,8 +400,11 @@ interface ResolveContext {
 interface RunQuerySnapshot {
   isLoading: boolean;
   isFetchingNextPage: boolean;
+  isError: boolean;
+  isFetchNextPageError: boolean;
   hasNextPage?: boolean;
   data?: RunsQueryData;
+  error?: Error | null;
 }
 
 /** Resolve a single variable to a `{ value, error?, searching? }` pair. */
@@ -392,27 +438,46 @@ function resolveRunVariable(
 ): { value: unknown; error?: string; searching?: boolean } {
   const query = pickRunQuery(source.select, ctx);
   const firstRun = firstMatchingRun(query.data, source, ctx.resolveTrigger);
-  if (!firstRun) {
-    // Stay quiet while the initial page or eager filter pagination is still
-    // searching — otherwise the preview flashes "No run matched…" between pages.
-    if (isRunQueryStillSearching(query, source, ctx.resolveTrigger)) {
-      return { value: null, searching: true };
-    }
-    return { value: null, error: noRunFoundMessage(source) };
+  if (firstRun) {
+    return { value: buildRunVariableValue(firstRun, ctx) };
   }
-  return { value: buildRunVariableValue(firstRun, ctx) };
+  // Prefer a concrete load failure over "not found" / endless searching —
+  // a failed fetchNextPage leaves hasNextPage true without advancing pages.
+  if (isRunsQueryFailed(query)) {
+    return { value: null, error: runsLoadErrorMessage(query) };
+  }
+  // Stay quiet while the initial page or eager filter pagination is still
+  // searching — otherwise the preview flashes "No run matched…" between pages.
+  if (isRunQueryStillSearching(query, source, ctx.resolveTrigger)) {
+    return { value: null, searching: true };
+  }
+  return { value: null, error: noRunFoundMessage(source) };
+}
+
+function isRunsQueryFailed(query: RunQuerySnapshot): boolean {
+  return query.isError || query.isFetchNextPageError;
+}
+
+function runsLoadErrorMessage(query: RunQuerySnapshot): string {
+  const message = query.error?.message?.trim();
+  if (message) return `Failed to load runs: ${message}`;
+  return "Failed to load runs.";
 }
 
 /**
  * True while a run variable should defer its "not found" error: either the
  * query hasn't settled, the next filtered page is in flight, or eager
  * pagination still has pages left to try before giving up.
+ *
+ * Returns `false` once a runs query has failed so callers can surface the
+ * load error instead of sticking the panel in a perpetual loading state.
  */
-function isRunQueryStillSearching(
+export function isRunQueryStillSearching(
   query: RunQuerySnapshot,
   source: MarkdownRunVariableSource,
   resolveTrigger?: (reference: string) => string | undefined,
 ): boolean {
+  if (isRunsQueryFailed(query)) return false;
   if (query.isLoading || query.isFetchingNextPage) return true;
   if (!hasRunStatusTriggerFilters({ statuses: source.statuses, triggers: source.triggers })) return false;
   if (!triggerFilterCanMatch(source.triggers, resolveTrigger)) return false;
