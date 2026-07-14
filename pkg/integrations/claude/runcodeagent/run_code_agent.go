@@ -42,6 +42,10 @@ func (a *RunCodeAgent) Documentation() string {
 - **Repository** — start new work: the agent branches from the base branch, implements the task, and opens a PR.
 - **Pull request** — update an existing PR: the agent checks out the PR's branch, applies the task, and pushes to it. Only same-repository pull requests are supported; PRs opened from forks are rejected.
 
+## Debugging
+
+By default the session and its sandbox are torn down as soon as the run finishes. Enable **Keep Session After Run** to keep them, so you can read the agent's full transcript in the Anthropic Console. The vault holding your GitHub token is deleted either way — the token never outlives the run. Kept sessions and environments are not reclaimed automatically, so delete them yourself once you're done debugging.
+
 ## Output
 
 Emits the final **status**, the **pull request URL**, the working **branch**, and a **summary** so downstream steps can branch or post the result.`
@@ -138,6 +142,10 @@ func (a *RunCodeAgent) Configuration() []configuration.Field {
 			Name: "actAsBot", Label: "Act as Bot", Type: configuration.FieldTypeBool, Required: false, Default: true,
 			Description: "When enabled, commits are attributed to the Claude agent. Disable to attribute commits to the GitHub user that owns the token.",
 		},
+		{
+			Name: "persistSession", Label: "Keep Session After Run", Type: configuration.FieldTypeBool, Required: false, Default: false,
+			Description: "Keep the session and its sandbox environment after the run finishes so the transcript stays readable in the Anthropic Console. Sessions are deleted by default.",
+		},
 	}
 }
 
@@ -210,11 +218,11 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 
 	refreshed, err := client.GetManagedSession(meta.Session.ID)
 	if err != nil {
-		a.teardown(client, meta, true, ctx.Logger.Warnf)
+		a.teardown(client, meta, true, spec.PersistSession, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to get session: %w", err)
 	}
 
-	handled, err := a.emitIfTerminal(ctx, client, meta, refreshed)
+	handled, err := a.emitIfTerminal(ctx, client, spec, meta, refreshed)
 	if err != nil {
 		return err
 	}
@@ -226,7 +234,7 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 	if err := ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": 1, "errors": 0}, initialPoll); err != nil {
 		// Without a scheduled poll nothing will finish or reclaim the run, so
 		// tear everything down rather than leaking the running session.
-		a.teardown(client, meta, true, ctx.Logger.Warnf)
+		a.teardown(client, meta, true, spec.PersistSession, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to schedule poll: %w", err)
 	}
 	return nil
@@ -242,18 +250,18 @@ func (a *RunCodeAgent) startSession(ctx core.ExecutionContext, client *runagent.
 		Resources:     resources,
 	})
 	if err != nil {
-		a.teardown(client, meta, false, ctx.Logger.Warnf)
+		a.teardown(client, meta, false, spec.PersistSession, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to create managed agent session: %w", err)
 	}
 	mergeSessionIntoMetadata(meta, session)
 	if err := ctx.Metadata.Set(*meta); err != nil {
-		a.teardown(client, meta, false, ctx.Logger.Warnf)
+		a.teardown(client, meta, false, spec.PersistSession, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to set execution metadata: %w", err)
 	}
 
 	message := buildPrompt(spec, pr, meta.Branch, len(spec.Files) > 0, attribution)
 	if err := client.SendManagedSessionUserMessage(session.ID, message); err != nil {
-		a.teardown(client, meta, true, ctx.Logger.Warnf)
+		a.teardown(client, meta, true, spec.PersistSession, ctx.Logger.Warnf)
 		return fmt.Errorf("failed to send task to agent: %w", err)
 	}
 	return nil
@@ -277,7 +285,7 @@ func (a *RunCodeAgent) provisionResources(ctx core.ExecutionContext, client *run
 
 	envID, err := client.CreateEnvironment(fmt.Sprintf("superplane-%s", shortID(ctx.ID.String())), buildEnvironmentConfig(spec))
 	if err != nil {
-		a.teardown(client, meta, false, ctx.Logger.Warnf)
+		a.teardown(client, meta, false, spec.PersistSession, ctx.Logger.Warnf)
 		return nil, fmt.Errorf("failed to create environment: %w", err)
 	}
 	meta.EnvironmentID = envID
@@ -285,7 +293,7 @@ func (a *RunCodeAgent) provisionResources(ctx core.ExecutionContext, client *run
 	resources, err := uploadFiles(client, ctx, spec.Files)
 	if err != nil {
 		meta.FileIDs = fileIDsOf(resources)
-		a.teardown(client, meta, false, ctx.Logger.Warnf)
+		a.teardown(client, meta, false, spec.PersistSession, ctx.Logger.Warnf)
 		return nil, err
 	}
 	meta.FileIDs = fileIDsOf(resources)
@@ -293,7 +301,7 @@ func (a *RunCodeAgent) provisionResources(ctx core.ExecutionContext, client *run
 	vaultID, err := provisionVault(client, ctx, spec, token)
 	if err != nil {
 		meta.VaultID = vaultID // may be set even on partial failure
-		a.teardown(client, meta, false, ctx.Logger.Warnf)
+		a.teardown(client, meta, false, spec.PersistSession, ctx.Logger.Warnf)
 		return nil, err
 	}
 	meta.VaultID = vaultID
@@ -303,17 +311,40 @@ func (a *RunCodeAgent) provisionResources(ctx core.ExecutionContext, client *run
 
 // teardown best-effort reclaims every provisioned resource. Safe to call with a
 // partially-populated metadata (the client delete calls no-op on empty IDs).
-func (a *RunCodeAgent) teardown(client *runagent.Client, meta *ExecutionMetadata, interrupt bool, logWarn func(string, ...any)) {
+//
+// When persist is set and a session was created, the session and its environment
+// are left in place so the transcript remains readable in the Anthropic Console.
+// The vault is reclaimed either way: it holds the GitHub token, which must never
+// outlive the run.
+func (a *RunCodeAgent) teardown(client *runagent.Client, meta *ExecutionMetadata, interrupt, persist bool, logWarn func(string, ...any)) {
+	keepSession := persist && meta.Session != nil && meta.Session.ID != ""
+
 	if meta.Session != nil && meta.Session.ID != "" {
 		if interrupt {
 			warnErr(logWarn, client.SendManagedSessionInterrupt(meta.Session.ID), "interrupt session %s", meta.Session.ID)
 		}
-		warnErr(logWarn, client.DeleteManagedSession(meta.Session.ID), "delete session %s", meta.Session.ID)
+		if !keepSession {
+			warnErr(logWarn, client.DeleteManagedSession(meta.Session.ID), "delete session %s", meta.Session.ID)
+		}
 	}
-	warnErr(logWarn, client.DeleteEnvironment(meta.EnvironmentID), "delete environment %s", meta.EnvironmentID)
+	// Deleting an environment a session still references always fails, so the
+	// environment has to outlive a kept session.
+	if !keepSession {
+		warnErr(logWarn, client.DeleteEnvironment(meta.EnvironmentID), "delete environment %s", meta.EnvironmentID)
+	}
 	client.CleanupFiles(meta.FileIDs, logWarn)
 	warnErr(logWarn, client.DeleteVault(meta.VaultID), "delete vault %s", meta.VaultID)
 	warnErr(logWarn, client.ArchiveAgent(meta.AgentID), "archive agent %s", meta.AgentID)
+}
+
+// persistSession reports whether a step is configured to keep its session. It
+// defaults to reclaiming when the configuration cannot be decoded.
+func persistSession(config any) bool {
+	spec, err := decodeSpec(config)
+	if err != nil {
+		return false
+	}
+	return spec.PersistSession
 }
 
 // warnErr logs a best-effort cleanup failure without interrupting teardown.
@@ -324,7 +355,7 @@ func warnErr(logWarn func(string, ...any), err error, format string, args ...any
 }
 
 // emitIfTerminal handles fast tasks that finish before the first poll.
-func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagent.Client, meta *ExecutionMetadata, session *runagent.ManagedSession) (bool, error) {
+func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagent.Client, spec Spec, meta *ExecutionMetadata, session *runagent.ManagedSession) (bool, error) {
 	if session == nil || !isSessionTerminal(session.Status) {
 		return false, nil
 	}
@@ -342,7 +373,7 @@ func (a *RunCodeAgent) emitIfTerminal(ctx core.ExecutionContext, client *runagen
 	}
 	mergeSessionIntoMetadata(meta, session)
 	_ = ctx.Metadata.Set(*meta)
-	a.teardown(client, meta, false, ctx.Logger.Warnf)
+	a.teardown(client, meta, false, spec.PersistSession, ctx.Logger.Warnf)
 	return true, nil
 }
 

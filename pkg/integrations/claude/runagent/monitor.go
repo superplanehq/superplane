@@ -110,9 +110,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		mergeSessionIntoMetadata(&metadata, sess)
 		_ = ctx.Metadata.Set(metadata)
 
-		if err := client.DeleteManagedSession(metadata.Session.ID); err != nil {
-			ctx.Logger.Warnf("Failed to delete managed session %s: %v", metadata.Session.ID, err)
-		}
+		reclaimSession(client, metadata.Session.ID, persistSessionFromConfig(ctx.Configuration), ctx.Logger)
 		cleanupUploadedFilesFromHook(client, ctx, ctx.Logger.Warnf)
 		cleanupManagedVaultFromHook(client, ctx, ctx.Logger.Warnf)
 		return nil
@@ -150,7 +148,9 @@ func (a *RunAgent) Cancel(ctx core.ExecutionContext) error {
 		ctx.Logger.Infof("Sent interrupt to managed session %s", metadata.Session.ID)
 	}
 	// Best effort cleanup; may fail if session is still running.
-	_ = client.DeleteManagedSession(metadata.Session.ID)
+	if !persistSessionFromConfig(ctx.Configuration) {
+		_ = client.DeleteManagedSession(metadata.Session.ID)
+	}
 	cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
 	cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 	return nil
