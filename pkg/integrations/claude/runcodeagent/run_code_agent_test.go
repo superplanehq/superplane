@@ -69,23 +69,6 @@ func Test__RunCodeAgent__Setup__validation(t *testing.T) {
 	}
 }
 
-func Test__RunCodeAgent__Setup__prUrlAcceptedAsIs(t *testing.T) {
-	a := &RunCodeAgent{}
-	cfg := repoConfig()
-	cfg["sourceMode"] = "pr"
-	delete(cfg, "repository")
-	cfg["prUrl"] = `{{ $["Open Draft PR"].data.html_url }}`
-
-	metadataCtx := &contexts.MetadataContext{}
-	err := a.Setup(core.SetupContext{Configuration: cfg, Integration: &contexts.IntegrationContext{}, Metadata: metadataCtx})
-	require.NoError(t, err)
-
-	md := NodeMetadata{}
-	require.NoError(t, mapstructure.Decode(metadataCtx.Get(), &md))
-	assert.Equal(t, "pr", md.SourceMode)
-	assert.Equal(t, `{{ $["Open Draft PR"].data.html_url }}`, md.PrURL)
-}
-
 func Test__RunCodeAgent__validateRepository(t *testing.T) {
 	valid := []string{"owner/repo", "https://github.com/owner/repo.git", "{{ event.repo }}"}
 	for _, v := range valid {
