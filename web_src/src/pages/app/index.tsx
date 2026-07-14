@@ -596,7 +596,7 @@ export function AppPage() {
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
     readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
   );
-  const hasSyncedInitialAutoLayoutPreferenceRef = useRef(false);
+  const syncedInitialAutoLayoutPreferenceCanvasIdRef = useRef<string | null>(null);
 
   const lastSavedWorkflowSignatureRef = useRef("");
   const lastAppliedVersionSnapshotRef = useRef("");
@@ -1164,11 +1164,15 @@ export function AppPage() {
   }, [canvasId, isAutoLayoutOnUpdateEnabled, updateCanvasPreference]);
 
   useEffect(() => {
-    if (hasSyncedInitialAutoLayoutPreferenceRef.current || !canvasId || !isAutoLayoutOnUpdateEnabled) {
+    if (!canvasId || syncedInitialAutoLayoutPreferenceCanvasIdRef.current === canvasId) {
       return;
     }
 
-    hasSyncedInitialAutoLayoutPreferenceRef.current = true;
+    syncedInitialAutoLayoutPreferenceCanvasIdRef.current = canvasId;
+    if (!isAutoLayoutOnUpdateEnabled) {
+      return;
+    }
+
     updateCanvasPreference.mutate({ canvasId, autoLayoutOnUpdateEnabled: true });
   }, [canvasId, isAutoLayoutOnUpdateEnabled, updateCanvasPreference]);
 
