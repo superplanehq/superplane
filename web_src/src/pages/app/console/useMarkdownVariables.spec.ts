@@ -135,4 +135,14 @@ describe("isRunQueryStillSearching", () => {
       ),
     ).toBe(false);
   });
+
+  it("stops searching for impossible select + status combinations", () => {
+    // latest_passed hits a RESULT_PASSED bucket — filtering to failed can never match.
+    expect(isRunQueryStillSearching(idleQuery, runSource({ select: "latest_passed", statuses: ["failed"] }))).toBe(
+      false,
+    );
+    expect(isRunQueryStillSearching(idleQuery, runSource({ select: "latest_failed", statuses: ["passed"] }))).toBe(
+      false,
+    );
+  });
 });

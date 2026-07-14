@@ -37,13 +37,13 @@ function useMarkdownEditorPreview(
   draftVariables: MarkdownVariable[],
 ) {
   const textForSideload = useMemo(() => `${draftTitle}\n${draftBody}`, [draftTitle, draftBody]);
-  const { vars, errors, isLoading, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
+  const { vars, errors, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
     canvasId,
     draftVariables,
     textForSideload,
   );
   const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
-  return { previewVars: vars, errors, isLoading, previewLoading };
+  return { previewVars: vars, errors, baseLoading, searchingNames, previewLoading };
 }
 
 interface MarkdownPanelEditorProps {
@@ -90,7 +90,7 @@ export function MarkdownPanelEditor({
     }
   };
 
-  const { previewVars, errors, isLoading, previewLoading } = useMarkdownEditorPreview(
+  const { previewVars, errors, baseLoading, searchingNames, previewLoading } = useMarkdownEditorPreview(
     canvasId,
     draftTitle,
     draftBody,
@@ -159,7 +159,8 @@ export function MarkdownPanelEditor({
           setDraftVariables={setDraftVariables}
           previewVars={previewVars}
           errors={errors}
-          isLoading={isLoading}
+          baseLoading={baseLoading}
+          searchingNames={searchingNames}
           onInsertSnippet={insertAtCursor}
           collapsed={variablesCollapsed}
           onToggleCollapsed={toggleVariablesCollapsed}

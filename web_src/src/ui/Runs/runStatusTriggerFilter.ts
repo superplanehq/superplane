@@ -104,3 +104,40 @@ export function hasRunStatusTriggerFilters(filters: RunStatusTriggerFilters | un
   const triggers = filters.triggers;
   return (statuses?.length ?? 0) > 0 || (triggers?.length ?? 0) > 0;
 }
+
+/**
+ * Select buckets used by markdown/html `kind: "run"` variables. `latest_passed`
+ * / `latest_failed` hit server-filtered ListRuns feeds, so a client status
+ * filter that excludes the bucket's only possible status can never match.
+ */
+export type RunSelectBucket = "latest" | "latest_passed" | "latest_failed";
+
+/**
+ * True when the optional status filter can still match a run from the given
+ * select bucket. Empty / omitted statuses always can. Used to skip eager
+ * pagination for impossible combos like `latest_passed` + `statuses: [failed]`.
+ */
+export function runSelectStatusFilterCanMatch(
+  select: RunSelectBucket,
+  statuses: readonly RunStatusFilter[] | undefined,
+): boolean {
+  if (!statuses || statuses.length === 0) return true;
+  if (select === "latest_passed") return statuses.includes("passed");
+  if (select === "latest_failed") return statuses.includes("failed");
+  return true;
+}
+
+/**
+ * Drop status selections that can never appear in the given select bucket.
+ * Used when authors switch the Run dropdown so persisted YAML stays coherent.
+ */
+export function statusesCompatibleWithRunSelect(
+  select: RunSelectBucket,
+  statuses: readonly RunStatusFilter[] | undefined,
+): RunStatusFilter[] | undefined {
+  if (!statuses || statuses.length === 0) return undefined;
+  if (select === "latest") return [...statuses];
+  const required: RunStatusFilter = select === "latest_passed" ? "passed" : "failed";
+  const kept = statuses.filter((status) => status === required);
+  return kept.length > 0 ? kept : undefined;
+}

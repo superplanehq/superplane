@@ -10,6 +10,7 @@ import {
 import {
   hasRunStatusTriggerFilters,
   runMatchesStatusTriggerFilters,
+  runSelectStatusFilterCanMatch,
   triggerFilterCanMatch,
 } from "@/ui/Runs/runStatusTriggerFilter";
 
@@ -47,7 +48,11 @@ export interface MarkdownVariableError {
 export interface MarkdownVariablesResult {
   /** Map of variable name -> resolved object (or `null` when not found). */
   vars: Record<string, unknown>;
-  /** Hierarchical loading flag — `true` while any backing query hasn't settled yet. */
+  /**
+   * `true` while base memory/run queries or the execution side-load are still
+   * loading. Does **not** include per-variable filter search — use
+   * {@link searchingNames} for that so previews can gate per name.
+   */
   isLoading: boolean;
   /**
    * `true` while the base memory / run queries are still loading. Excludes the
@@ -221,7 +226,10 @@ export function useMarkdownVariables(
     (runSelects.wantLatestPassed && passedQuery.isLoading) ||
     (runSelects.wantLatestFailed && failedQuery.isLoading);
   const sideloadLoading = needsRunSideload && runExecutionsLoading;
-  const isLoading = baseLoading || sideloadLoading || searchingNames.length > 0;
+  // Searching is tracked separately via `searchingNames` so variable previews
+  // and panel text can gate per-name. Do not fold it into `isLoading` — that
+  // made every VariablePreview wait while any filtered run var was paging.
+  const isLoading = baseLoading || sideloadLoading;
 
   return { vars, isLoading, baseLoading, sideloadLoading, searchingNames, errors };
 }
@@ -331,6 +339,7 @@ function useEagerFilterPagination(args: {
     if (filteredVariables.length === 0) return false;
     const resolveTrigger = (reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id;
     return filteredVariables.some((variable) => {
+      if (!runSelectStatusFilterCanMatch(variable.source.select, variable.source.statuses)) return false;
       if (!triggerFilterCanMatch(variable.source.triggers, resolveTrigger)) return false;
       return firstMatchingRun(data, variable.source, resolveTrigger) === undefined;
     });
@@ -480,6 +489,7 @@ export function isRunQueryStillSearching(
   if (isRunsQueryFailed(query)) return false;
   if (query.isLoading || query.isFetchingNextPage) return true;
   if (!hasRunStatusTriggerFilters({ statuses: source.statuses, triggers: source.triggers })) return false;
+  if (!runSelectStatusFilterCanMatch(source.select, source.statuses)) return false;
   if (!triggerFilterCanMatch(source.triggers, resolveTrigger)) return false;
   const pageCount = query.data?.pages?.length ?? 0;
   return query.hasNextPage === true && pageCount < WIDGET_MAX_EAGER_PAGES;

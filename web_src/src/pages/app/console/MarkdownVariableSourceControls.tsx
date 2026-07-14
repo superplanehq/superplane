@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
+import { statusesCompatibleWithRunSelect } from "@/ui/Runs/runStatusTriggerFilter";
 
 import {
   MARKDOWN_RUN_SELECTS,
@@ -285,15 +286,19 @@ export function RunSourceControls({
     else delete next.triggers;
     onChange(next);
   };
+  const setSelect = (select: MarkdownRunSelect) => {
+    const next: MarkdownRunVariableSource = { ...source, select };
+    const statuses = statusesCompatibleWithRunSelect(select, source.statuses);
+    if (statuses && statuses.length > 0) next.statuses = statuses;
+    else delete next.statuses;
+    onChange(next);
+  };
 
   return (
     <div className="space-y-2">
       <div className="space-y-1">
         <Label className="text-[11px] font-medium text-slate-600">Run</Label>
-        <Select
-          value={source.select}
-          onValueChange={(value) => onChange({ ...source, select: value as MarkdownRunSelect })}
-        >
+        <Select value={source.select} onValueChange={(value) => setSelect(value as MarkdownRunSelect)}>
           <SelectTrigger className="h-7 text-[12px]" data-testid="markdown-variable-run-select">
             <SelectValue />
           </SelectTrigger>

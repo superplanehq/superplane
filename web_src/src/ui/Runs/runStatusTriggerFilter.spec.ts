@@ -5,6 +5,8 @@ import type { CanvasesCanvasRun } from "@/api-client";
 import {
   hasRunStatusTriggerFilters,
   runMatchesStatusTriggerFilters,
+  runSelectStatusFilterCanMatch,
+  statusesCompatibleWithRunSelect,
   triggerFilterCanMatch,
 } from "./runStatusTriggerFilter";
 
@@ -106,5 +108,36 @@ describe("triggerFilterCanMatch", () => {
   it("returns true when at least one reference resolves", () => {
     const resolver = (reference: string) => (reference === "deploy" ? "id-1" : undefined);
     expect(triggerFilterCanMatch(["gone", "deploy"], resolver)).toBe(true);
+  });
+});
+
+describe("runSelectStatusFilterCanMatch", () => {
+  it("allows any status filter on the unfiltered latest bucket", () => {
+    expect(runSelectStatusFilterCanMatch("latest", ["failed"])).toBe(true);
+    expect(runSelectStatusFilterCanMatch("latest", undefined)).toBe(true);
+  });
+
+  it("rejects status filters that can never appear in a passed/failed bucket", () => {
+    expect(runSelectStatusFilterCanMatch("latest_passed", ["failed"])).toBe(false);
+    expect(runSelectStatusFilterCanMatch("latest_passed", ["running", "cancelled"])).toBe(false);
+    expect(runSelectStatusFilterCanMatch("latest_failed", ["passed"])).toBe(false);
+  });
+
+  it("allows a passed/failed filter when it includes the bucket status", () => {
+    expect(runSelectStatusFilterCanMatch("latest_passed", ["passed"])).toBe(true);
+    expect(runSelectStatusFilterCanMatch("latest_passed", ["passed", "failed"])).toBe(true);
+    expect(runSelectStatusFilterCanMatch("latest_failed", ["failed", "cancelled"])).toBe(true);
+  });
+});
+
+describe("statusesCompatibleWithRunSelect", () => {
+  it("keeps only the status achievable in the selected bucket", () => {
+    expect(statusesCompatibleWithRunSelect("latest_passed", ["passed", "failed"])).toEqual(["passed"]);
+    expect(statusesCompatibleWithRunSelect("latest_failed", ["failed"])).toEqual(["failed"]);
+    expect(statusesCompatibleWithRunSelect("latest_passed", ["failed"])).toBeUndefined();
+  });
+
+  it("leaves latest selections unchanged", () => {
+    expect(statusesCompatibleWithRunSelect("latest", ["running", "failed"])).toEqual(["running", "failed"]);
   });
 });
