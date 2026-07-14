@@ -3,6 +3,7 @@ package workers
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -656,6 +657,82 @@ func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeRequests(t *testing.T
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
 	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+}
+
+func Test__NodeRequestWorker_PreservesUpdatedAtForFinishedExecution(t *testing.T) {
+	//
+	// A poll-style hook can fire after the execution is already finished (for
+	// example, a poll scheduled before an incoming webhook finished it). Such a
+	// no-op invocation must not move the execution's updated_at, which is the
+	// timestamp surfaced as the execution's finished_at.
+	//
+	componentName := "finished_poll_" + uuid.New().String()
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  componentName,
+		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			// Mirror the runner poller: finished executions are terminal, do nothing.
+			if ctx.ExecutionState.IsFinished() {
+				return nil
+			}
+			return errors.New("hook should not run work for a finished execution")
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+
+	finishedAt := time.Now().Add(-10 * time.Minute)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": finishedAt,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "poll",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var updatedExecution models.CanvasNodeExecution
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	require.NotNil(t, updatedExecution.UpdatedAt)
+	assert.WithinDuration(t, finishedAt, *updatedExecution.UpdatedAt, time.Second,
+		"finished execution updated_at must not be overwritten by a no-op hook")
 }
 
 func Test__NodeRequestWorker_CancelsExecutionForDeletedNodeWhenComponentCancelFails(t *testing.T) {

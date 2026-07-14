@@ -374,6 +374,14 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 
 	logger.Infof("Invoking component execution hook")
 
+	//
+	// A finished execution records its completion time in updated_at, which the
+	// UI surfaces as the execution's finished_at. Hooks may still be invoked on a
+	// finished execution - for example, a poll scheduled before an incoming
+	// webhook finished it - and those invocations must not move that timestamp.
+	//
+	alreadyFinished := execution.State == models.CanvasNodeExecutionStateFinished
+
 	hookCtx.Logger = logger
 	err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
@@ -381,7 +389,13 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	}
 
 	logger.Infof("Component execution hook completed")
-	err = tx.Save(&execution).Error
+
+	save := tx
+	if alreadyFinished {
+		save = tx.Omit("UpdatedAt")
+	}
+
+	err = save.Save(&execution).Error
 	if err != nil {
 		return fmt.Errorf("error saving execution after action handler: %v", err)
 	}
