@@ -37,12 +37,12 @@ function useMarkdownEditorPreview(
   draftVariables: MarkdownVariable[],
 ) {
   const textForSideload = useMemo(() => `${draftTitle}\n${draftBody}`, [draftTitle, draftBody]);
-  const { vars, errors, isLoading, baseLoading, sideloadLoading } = useMarkdownVariables(
+  const { vars, errors, isLoading, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
     canvasId,
     draftVariables,
     textForSideload,
   );
-  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading);
+  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
   return { previewVars: vars, errors, isLoading, previewLoading };
 }
 
