@@ -248,6 +248,14 @@ type OpenCanvasRunWork struct {
 	HasPendingEvents    bool
 }
 
+type canvasRunCompletionCandidate struct {
+	ID                  uuid.UUID
+	Result              string
+	HasActiveExecutions bool
+	HasQueueItems       bool
+	HasPendingEvents    bool
+}
+
 func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanvasRunWork, error) {
 	var result OpenCanvasRunWork
 	err := tx.Raw(`
@@ -323,4 +331,119 @@ func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string
 	}
 
 	return CanvasRunResultPassed, nil
+}
+
+func FinishCanvasRunsWithNoOpenWork(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]uuid.UUID, error) {
+	if len(runIDs) == 0 {
+		return []uuid.UUID{}, nil
+	}
+
+	candidates, err := listCanvasRunCompletionCandidates(tx, workflowID, runIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	finishedRunIDsByResult := map[string][]uuid.UUID{}
+	finishedRunIDs := make([]uuid.UUID, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.hasOpenWork() {
+			continue
+		}
+
+		finishedRunIDsByResult[candidate.Result] = append(finishedRunIDsByResult[candidate.Result], candidate.ID)
+		finishedRunIDs = append(finishedRunIDs, candidate.ID)
+	}
+
+	now := time.Now()
+	for result, ids := range finishedRunIDsByResult {
+		if err := finishCanvasRunsWithResult(tx, workflowID, ids, result, now); err != nil {
+			return nil, err
+		}
+	}
+
+	return finishedRunIDs, nil
+}
+
+func (c canvasRunCompletionCandidate) hasOpenWork() bool {
+	return c.HasActiveExecutions || c.HasQueueItems || c.HasPendingEvents
+}
+
+func listCanvasRunCompletionCandidates(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]canvasRunCompletionCandidate, error) {
+	var candidates []canvasRunCompletionCandidate
+	err := tx.Raw(`
+		SELECT
+			workflow_runs.id,
+			CASE
+				WHEN EXISTS (
+					SELECT 1
+					FROM workflow_node_executions
+					WHERE run_id = workflow_runs.id
+					AND result = ?
+				) THEN ?
+				WHEN EXISTS (
+					SELECT 1
+					FROM workflow_node_executions
+					WHERE run_id = workflow_runs.id
+					AND result = ?
+				) THEN ?
+				ELSE ?
+			END AS result,
+			EXISTS (
+				SELECT 1
+				FROM workflow_node_executions
+				WHERE run_id = workflow_runs.id
+				AND state IN (?, ?)
+			) AS has_active_executions,
+			EXISTS (
+				SELECT 1
+				FROM workflow_node_queue_items
+				WHERE run_id = workflow_runs.id
+			) AS has_queue_items,
+			EXISTS (
+				SELECT 1
+				FROM workflow_events
+				WHERE run_id = workflow_runs.id
+				AND state = ?
+			) AS has_pending_events
+		FROM workflow_runs
+		WHERE workflow_runs.workflow_id = ?
+		AND workflow_runs.id IN ?
+		AND workflow_runs.state != ?
+		FOR UPDATE
+	`,
+		CanvasNodeExecutionResultFailed,
+		CanvasRunResultFailed,
+		CanvasNodeExecutionResultCancelled,
+		CanvasRunResultCancelled,
+		CanvasRunResultPassed,
+		CanvasNodeExecutionStatePending,
+		CanvasNodeExecutionStateStarted,
+		CanvasEventStatePending,
+		workflowID,
+		runIDs,
+		CanvasRunStateFinished,
+	).Scan(&candidates).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return candidates, nil
+}
+
+func finishCanvasRunsWithResult(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID, result string, now time.Time) error {
+	if len(runIDs) == 0 {
+		return nil
+	}
+
+	return tx.
+		Model(&CanvasRun{}).
+		Where("workflow_id = ?", workflowID).
+		Where("id IN ?", runIDs).
+		Updates(map[string]any{
+			"state":       CanvasRunStateFinished,
+			"result":      result,
+			"updated_at":  &now,
+			"finished_at": &now,
+		}).
+		Error
 }
