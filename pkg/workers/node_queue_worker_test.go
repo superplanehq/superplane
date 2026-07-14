@@ -167,6 +167,17 @@ func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *test
 	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
+func Test__NodeQueueWorker_SkipsMissingNode(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+
+	err := worker.tryProcessReadyNode(uuid.New(), "deleted-node", time.Now())
+	require.NoError(t, err)
+}
+
 func Test__NodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
