@@ -7,7 +7,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -43,6 +47,45 @@ func Test__CancelExecution__CancelsExecutionSuccessfully(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
 	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+}
+
+func Test__CancelExecution__PublishesExecutionFinishedForRunFinalizer(t *testing.T) {
+	r := support.Setup(t)
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionFinishedConsumer := testconsumer.NewExecutions(amqpURL, messages.ExecutionFinishedRoutingKey)
+	executionFinishedConsumer.Start()
+	defer executionFinishedConsumer.Stop()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	require.NoError(t, rootEvent.Routed())
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent.ID, rootEvent.ID)
+
+	response, err := CancelExecution(context.Background(), r.AuthService, r.Encryptor, r.Organization.ID.String(), r.Registry, canvas.ID, execution.ID)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.True(t, executionFinishedConsumer.HasReceivedMessage())
+
+	run, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, rootEvent.RunID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, run.State)
 }
 
 func Test__CancelExecution__ReturnsNotFoundForNonExistentExecution(t *testing.T) {
