@@ -72,6 +72,20 @@ func Test__CreateMergeComment__Setup(t *testing.T) {
 		err := c.Setup(ctx)
 		require.NoError(t, err)
 	})
+
+	t.Run("expression project is allowed", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"project":         "{{ root().data.project.id }}",
+				"mergeRequestIid": "{{ root().data.object_attributes.iid }}",
+				"body":            "Comment body",
+			},
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+		}
+		err := c.Setup(ctx)
+		require.NoError(t, err)
+	})
 }
 
 func Test__CreateMergeComment__Execute(t *testing.T) {

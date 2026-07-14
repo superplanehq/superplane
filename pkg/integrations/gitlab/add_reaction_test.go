@@ -128,6 +128,21 @@ func Test__AddReaction__Setup(t *testing.T) {
 		err := c.Setup(ctx)
 		require.NoError(t, err)
 	})
+
+	t.Run("expression project is allowed", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"project":         "{{ root().data.project.id }}",
+				"mergeRequestIid": "{{ root().data.object_attributes.iid }}",
+				"target":          ReactionTargetMergeRequest,
+				"content":         "eyes",
+			},
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+		}
+		err := c.Setup(ctx)
+		require.NoError(t, err)
+	})
 }
 
 func Test__AddReaction__Execute(t *testing.T) {

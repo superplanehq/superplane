@@ -50,6 +50,18 @@ func Test__OnMergeComment__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "project 456 is not accessible to integration")
 	})
 
+	t.Run("expression project is rejected", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{Metadata: metadata}
+		err := trigger.Setup(core.TriggerContext{
+			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Configuration: map[string]any{"project": "{{ root().data.project.id }}"},
+		})
+
+		require.ErrorContains(t, err, "project does not support expressions")
+		require.Empty(t, integrationCtx.WebhookRequests)
+	})
+
 	t.Run("metadata is set and webhook is requested", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{Metadata: metadata}
 		metadataCtx := &contexts.MetadataContext{}
