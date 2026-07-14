@@ -456,12 +456,14 @@ function useRunsDataSourceResult({
     runExecutionsLoading,
   });
 
+  // Stale / fully-unresolved trigger filters can never match further pages —
+  // hide Load more even when the server still has a next page.
   const hasMore = computeWidgetHasMore({
     progressive,
     displayCount,
     effectiveLimit,
     loadedRowCount: fillRowCount,
-    hasNextPage: query.hasNextPage,
+    hasNextPage: triggersMatchable ? query.hasNextPage : false,
     pageCount,
   });
   const isFetchingMore = enabled && query.isFetchingNextPage && !isLoading && hasMore;

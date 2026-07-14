@@ -9,6 +9,7 @@
 
 import type { RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
 
+import { asObject } from "./panelContentValidation";
 import { validateRunStatusesArray, validateRunTriggersArray } from "./runDataSourceFilterSchema";
 
 /** Variable identifiers must match this regex so they can appear in `{{ }}` CEL expressions. */
@@ -86,11 +87,6 @@ export interface MarkdownVariable {
   /** Identifier used in the markdown body as `{{ name.field }}`. */
   name: string;
   source: MarkdownVariableSource;
-}
-
-function asObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
 }
 
 /**

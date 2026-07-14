@@ -5,6 +5,8 @@
 
 import { RUN_STATUS_FILTER_IDS, isRunStatusFilter, type RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
 
+import { asObject } from "./panelContentValidation";
+
 /**
  * Validate a persisted runs status filter array. Accepts undefined /
  * null / empty (meaning "all statuses") and any subset of the shared
@@ -140,10 +142,4 @@ function optionalNumber(value: unknown): number | undefined {
 
 function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-function asObject(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }
