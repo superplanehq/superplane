@@ -70,3 +70,38 @@ func TestHandleBrokerWebhookProcessesUnfinishedExecution(t *testing.T) {
 	assert.True(t, state.IsFinished())
 	assert.Equal(t, PassedOutputChannel, state.Channel)
 }
+
+func TestPollBrokerTaskIgnoresFinishedExecution(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	//
+	// This is the runner poller path from issue #6126: a poll scheduled while the
+	// task was running can fire after an incoming webhook already finished the
+	// execution. Once finished, the poll must be a complete no-op - it must not
+	// touch metadata, emit events, reschedule itself, or reach the broker -
+	// otherwise the follow-up execution write would move the recorded finished_at.
+	//
+	originalMetadata := map[string]any{ExecutionMetadataBrokerTaskID: "broker-1"}
+	metadata := &contexts.MetadataContext{Metadata: originalMetadata}
+	state := &contexts.ExecutionStateContext{Finished: true, KVs: map[string]string{}}
+	requests := &contexts.RequestContext{}
+	httpCtx := &contexts.HTTPContext{}
+
+	err := pollBrokerTask(core.ActionHookContext{
+		Parameters:     map[string]any{"task_id": "broker-1"},
+		Metadata:       metadata,
+		ExecutionState: state,
+		Requests:       requests,
+		HTTP:           httpCtx,
+	}, RunnerFinishedEventType)
+
+	require.NoError(t, err)
+
+	// Nothing must change and no poll must be rescheduled for a finished execution.
+	assert.Equal(t, originalMetadata, metadata.Metadata)
+	assert.Empty(t, state.Channel)
+	assert.Empty(t, state.Payloads)
+	assert.Empty(t, requests.Action)
+	assert.Empty(t, httpCtx.Requests)
+}
