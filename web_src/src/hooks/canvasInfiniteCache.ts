@@ -144,6 +144,7 @@ function mergeRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun
     state: incoming.state ?? existing.state,
     result: incoming.result ?? existing.result,
     executions: incoming.executions?.length ? incoming.executions : (existing.executions ?? incoming.executions),
+    queueItems: incoming.queueItems !== undefined ? incoming.queueItems : existing.queueItems,
     createdAt: incoming.createdAt ?? existing.createdAt,
     updatedAt: incoming.updatedAt ?? existing.updatedAt,
     finishedAt: incoming.finishedAt ?? existing.finishedAt,

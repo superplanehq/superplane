@@ -19,12 +19,16 @@ export const defaultAccordionPreferences: InternalAccordionPreferences = {
   output: false,
 };
 
-export function buildTimelineItems(section: RunInspectorNodeSection, hasRuntimeConfig: boolean, hasRunnerLogs = false) {
+export function buildTimelineItems(
+  section: RunInspectorNodeSection,
+  hasRuntimeConfig: boolean,
+  hasRunnerLogs = false,
+): Array<{ value: TimelineStepType }> {
   const items: Array<{
     value: TimelineStepType;
   }> = [];
 
-  if (!section.isTrigger) {
+  if (!section.isTrigger && !section.isQueued) {
     items.push({ value: "input" });
   }
 
