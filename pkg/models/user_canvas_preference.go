@@ -169,7 +169,12 @@ func createUserCanvasPreference(
 	return preference, nil
 }
 
-func applyUserCanvasPreferenceUpdate(preference *UserCanvasPreference, pinned *bool, starred *bool, now time.Time) {
+func applyUserCanvasPreferenceUpdate(
+	preference *UserCanvasPreference,
+	pinned *bool,
+	starred *bool,
+	now time.Time,
+) {
 	preference.UpdatedAt = now
 	if pinned != nil {
 		preference.PinnedAt = timestampIfEnabled(*pinned, now)
