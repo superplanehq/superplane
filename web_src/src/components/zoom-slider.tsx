@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo, useCallback, useEffect } from "react";
-import { Camera, CircleDot, CircleDotDashed, Eye, Minus, Plus } from "lucide-react";
+import { Camera, CircleDot, CircleDotDashed, Eye, LayoutDashboard, LayoutGrid, Minus, Plus } from "lucide-react";
 import { toPng } from "html-to-image";
 
 import {
@@ -28,6 +28,10 @@ export const ZoomSlider = memo(function ZoomSlider({
   screenshotName,
   isSnapToGridEnabled,
   onSnapToGridToggle,
+  isAutoLayoutOnUpdateEnabled,
+  onAutoLayoutOnUpdateToggle,
+  autoLayoutOnUpdateDisabled,
+  autoLayoutOnUpdateDisabledTooltip,
   usePanel = true,
   ...props
 }: Omit<PanelProps, "children"> & {
@@ -37,6 +41,10 @@ export const ZoomSlider = memo(function ZoomSlider({
   screenshotName?: string;
   isSnapToGridEnabled?: boolean;
   onSnapToGridToggle?: () => void;
+  isAutoLayoutOnUpdateEnabled?: boolean;
+  onAutoLayoutOnUpdateToggle?: () => void;
+  autoLayoutOnUpdateDisabled?: boolean;
+  autoLayoutOnUpdateDisabledTooltip?: string;
   usePanel?: boolean;
 }) {
   const { zoom } = useViewport();
@@ -138,6 +146,12 @@ export const ZoomSlider = memo(function ZoomSlider({
     orientation === "horizontal" ? "flex-row" : "flex-col",
     className,
   );
+  const isAutoLayoutToggleDisabled = !onAutoLayoutOnUpdateToggle || autoLayoutOnUpdateDisabled;
+  const autoLayoutTooltipMessage =
+    autoLayoutOnUpdateDisabledTooltip ||
+    (isAutoLayoutOnUpdateEnabled
+      ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
+      : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
 
   const content = (
     <>
@@ -222,6 +236,29 @@ export const ZoomSlider = memo(function ZoomSlider({
             </Button>
           </TooltipTrigger>
           <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>
+        </Tooltip>
+      )}
+      {onAutoLayoutOnUpdateToggle && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="h-7 w-7"
+                onClick={onAutoLayoutOnUpdateToggle}
+                disabled={isAutoLayoutToggleDisabled}
+                aria-pressed={isAutoLayoutOnUpdateEnabled}
+              >
+                {isAutoLayoutOnUpdateEnabled ? (
+                  <LayoutGrid className="h-3 w-3" />
+                ) : (
+                  <LayoutDashboard className="h-3 w-3" />
+                )}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
         </Tooltip>
       )}
       {children}
