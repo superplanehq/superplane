@@ -11,9 +11,10 @@ import type {
 import { baseProps } from "./base";
 import type { BaseNodeMetadata, Comment } from "./types";
 import { buildGithubExecutionSubtitle } from "./utils";
+import { integrationResourceDisplayLabel } from "@/lib/integrationResourceLabel";
 
 interface CreateIssueCommentConfiguration {
-  repository?: string;
+  repository?: unknown;
 }
 
 export const createIssueCommentMapper: ComponentBaseMapper = {
@@ -22,7 +23,7 @@ export const createIssueCommentMapper: ComponentBaseMapper = {
     const configuration = (context.node.configuration as CreateIssueCommentConfiguration | undefined) ?? {};
     const metadata = (context.node.metadata as BaseNodeMetadata | undefined) ?? ({} as BaseNodeMetadata);
 
-    const repository = configuration.repository || metadata?.repository?.name;
+    const repository = integrationResourceDisplayLabel(configuration.repository) || metadata?.repository?.name;
     const metadataItems: MetadataItem[] = [];
 
     if (repository) {
