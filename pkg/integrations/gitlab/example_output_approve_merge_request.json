@@ -1,0 +1,30 @@
+{
+  "data": {
+    "id": 1,
+    "iid": 42,
+    "project_id": 3,
+    "title": "feat: add login page",
+    "description": "Adds the new login page with SSO support",
+    "state": "opened",
+    "created_at": "2026-02-13T08:46:00.000Z",
+    "updated_at": "2026-02-13T10:15:30.000Z",
+    "merge_status": "can_be_merged",
+    "approvals_required": 2,
+    "approvals_left": 1,
+    "approved_by": [
+      {
+        "user": {
+          "id": 1,
+          "name": "Administrator",
+          "username": "root",
+          "state": "active",
+          "avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80&d=identicon",
+          "web_url": "https://gitlab.example.com/root"
+        },
+        "approved_at": "2026-02-13T10:15:30.000Z"
+      }
+    ]
+  },
+  "timestamp": "2026-02-13T10:15:30.000Z",
+  "type": "gitlab.mergeRequestApproval"
+}
