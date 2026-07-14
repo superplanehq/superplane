@@ -2,8 +2,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SuperplaneComponentsNode } from "@/api-client";
+import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 
 import type { ChartPanelDataSource } from "./panelTypes";
+import { RunDataSourceFiltersPanel } from "./RunDataSourceFiltersPanel";
 
 export function DataSourceRunsFields({
   value,
@@ -16,15 +18,36 @@ export function DataSourceRunsFields({
   loadAllWhenBlank?: boolean;
   onChange: (next: ChartPanelDataSource) => void;
 }) {
-  if (hideLimit) return null;
+  const setStatuses = (statuses: RunStatusFilter[] | undefined) => {
+    const next = { ...value };
+    if (statuses && statuses.length > 0) next.statuses = statuses;
+    else delete next.statuses;
+    onChange(next);
+  };
+  const setTriggers = (triggers: string[] | undefined) => {
+    const next = { ...value };
+    if (triggers && triggers.length > 0) next.triggers = triggers;
+    else delete next.triggers;
+    onChange(next);
+  };
 
   return (
-    <LimitField
-      value={value.limit}
-      loadAllWhenBlank={loadAllWhenBlank}
-      defaultPlaceholder="100"
-      onChange={(limit) => onChange({ ...value, limit })}
-    />
+    <>
+      {hideLimit ? null : (
+        <LimitField
+          value={value.limit}
+          loadAllWhenBlank={loadAllWhenBlank}
+          defaultPlaceholder="100"
+          onChange={(limit) => onChange({ ...value, limit })}
+        />
+      )}
+      <RunDataSourceFiltersPanel
+        statuses={value.statuses}
+        triggers={value.triggers}
+        onStatusesChange={setStatuses}
+        onTriggersChange={setTriggers}
+      />
+    </>
   );
 }
 
