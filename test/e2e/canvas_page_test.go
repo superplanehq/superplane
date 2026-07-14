@@ -144,6 +144,31 @@ func TestCanvasPage(t *testing.T) {
 		steps.typeExpression("$")
 		steps.assertAutocompleteNodeSuggestionVisible()
 	})
+
+	t.Run("accepting node suggestion keeps HTTP URL autocomplete visible", func(t *testing.T) {
+		steps := &CanvasPageSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists()
+		steps.addManualTrigger("Start")
+		steps.addHTTP("HTTP")
+		steps.connectNodes("Start", "HTTP")
+		steps.saveCanvas()
+		steps.waitForDraftConnection("Start", "HTTP")
+		steps.openNodeSettings("HTTP")
+		steps.typeHTTPURL("{{ $")
+		steps.assertAutocompleteSuggestionHighlighted(0)
+		steps.startTrackingAutocompleteVisibility()
+		steps.pressEnterInExpressionAutocomplete()
+		steps.assertAutocompleteRemainedVisible()
+		steps.assertHTTPURLInputContains(`$["Start"].`)
+		steps.assertAutocompleteSuggestionVisible("data")
+		steps.assertAutocompleteSuggestionHighlighted(0)
+		steps.startTrackingAutocompleteVisibility()
+		steps.pressEnterInExpressionAutocomplete()
+		steps.assertAutocompleteRemainedVisible()
+		steps.assertHTTPURLInputContains(`$["Start"].data.`)
+		steps.assertAutocompleteSuggestionVisible("message")
+	})
 }
 
 func TestCanvasPageYamlViewer(t *testing.T) {
@@ -198,6 +223,12 @@ func (s *CanvasPageSteps) addManualTrigger(name string) {
 
 func (s *CanvasPageSteps) addFilter(name string) {
 	s.canvas.AddFilter(name, models.Position{X: 900, Y: 200})
+}
+
+func (s *CanvasPageSteps) addHTTP(name string) {
+	s.canvas.AddBuildingBlockByTestID("building-block-http", models.Position{X: 900, Y: 200})
+	s.session.FillIn(q.TestID("node-name-input"), name)
+	s.session.Sleep(300)
 }
 
 func (s *CanvasPageSteps) addNoopWithDefaultName(pos models.Position) string {
@@ -463,9 +494,118 @@ func (s *CanvasPageSteps) typeExpression(value string) {
 	s.session.FillIn(q.TestID("expression-field-expression"), value)
 }
 
+func (s *CanvasPageSteps) typeHTTPURL(value string) {
+	field := q.TestID("string-field-url").Run(s.session)
+	require.NoError(s.t, field.Click(pw.LocatorClickOptions{Timeout: pw.Float(10000)}))
+	require.NoError(s.t, field.PressSequentially(value))
+}
+
+func (s *CanvasPageSteps) pressEnterInExpressionAutocomplete() {
+	s.session.PressKey("Enter")
+	s.session.Sleep(1500)
+}
+
 func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {
 	s.session.AssertVisible(q.Locator(`div[data-suggestion-index="0"]`))
 	s.session.AssertVisible(q.Locator(`div[data-suggestion-index="0"] span:has-text("node")`))
+}
+
+func (s *CanvasPageSteps) assertAutocompleteSuggestionHighlighted(index int) {
+	item := q.Locator(fmt.Sprintf(`div[data-suggestion-index="%d"]`, index)).Run(s.session)
+	require.NoError(s.t, item.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(10000),
+	}))
+
+	className, err := item.GetAttribute("class")
+	require.NoError(s.t, err)
+	require.Contains(s.t, className, "bg-slate-100", "expected suggestion %d to be highlighted", index)
+}
+
+func (s *CanvasPageSteps) assertAutocompleteSuggestionVisible(text string) {
+	s.session.AssertVisible(q.Locator(fmt.Sprintf(`div[data-suggestion-index] :text-is("%s")`, text)))
+}
+
+func (s *CanvasPageSteps) startTrackingAutocompleteVisibility() {
+	_, err := s.session.Page().Evaluate(`() => {
+		const isVisible = (element) => {
+			const style = window.getComputedStyle(element);
+			const rect = element.getBoundingClientRect();
+			return style.display !== "none" &&
+				style.visibility !== "hidden" &&
+				rect.width > 0 &&
+				rect.height > 0;
+		};
+
+		const hasVisibleSuggestion = () =>
+			Array.from(document.querySelectorAll("div[data-suggestion-index]")).some(isVisible);
+
+		const autocompleteRoot = document.querySelector("[data-testid='autocomplete-suggestions']");
+		const valuePreview = document.querySelector("[data-testid='autocomplete-value-preview']");
+		window.__autocompleteVisibilitySamples = [];
+		window.__autocompleteVisibilityObserver?.disconnect();
+
+		const sample = () => {
+			window.__autocompleteVisibilitySamples.push({
+				visible: hasVisibleSuggestion(),
+				sameRootConnected: Boolean(autocompleteRoot?.isConnected),
+				previewVisible: Boolean(valuePreview && isVisible(valuePreview)),
+				samePreviewConnected: Boolean(valuePreview?.isConnected),
+			});
+		};
+
+		sample();
+		window.__autocompleteVisibilityObserver = new MutationObserver(sample);
+		window.__autocompleteVisibilityObserver.observe(document.body, {
+			attributes: true,
+			childList: true,
+			subtree: true,
+		});
+
+		let frames = 0;
+		const sampleAnimationFrame = () => {
+			sample();
+			frames += 1;
+			if (frames < 30) {
+				window.requestAnimationFrame(sampleAnimationFrame);
+			}
+		};
+		window.requestAnimationFrame(sampleAnimationFrame);
+	}`, nil)
+	require.NoError(s.t, err)
+}
+
+func (s *CanvasPageSteps) assertAutocompleteRemainedVisible() {
+	result, err := s.session.Page().Evaluate(`() => {
+		window.__autocompleteVisibilityObserver?.disconnect();
+		return window.__autocompleteVisibilitySamples ?? [];
+	}`, nil)
+	require.NoError(s.t, err)
+
+	samples, ok := result.([]any)
+	require.True(s.t, ok, "expected autocomplete visibility samples, got %T", result)
+	require.NotEmpty(s.t, samples, "expected autocomplete visibility samples")
+
+	for i, sample := range samples {
+		entry, ok := sample.(map[string]any)
+		require.True(s.t, ok, "expected autocomplete visibility sample object, got %T", sample)
+		require.Equal(s.t, true, entry["visible"], "autocomplete disappeared at visibility sample %d: %v", i, samples)
+		require.Equal(s.t, true, entry["sameRootConnected"], "autocomplete portal remounted at sample %d: %v", i, samples)
+		require.Equal(s.t, true, entry["previewVisible"], "autocomplete preview disappeared at sample %d: %v", i, samples)
+		require.Equal(s.t, true, entry["samePreviewConnected"], "autocomplete preview remounted at sample %d: %v", i, samples)
+	}
+}
+
+func (s *CanvasPageSteps) assertExpressionInputEquals(expected string) {
+	value, err := q.TestID("expression-field-expression").Run(s.session).InputValue()
+	require.NoError(s.t, err)
+	require.Equal(s.t, expected, value)
+}
+
+func (s *CanvasPageSteps) assertHTTPURLInputContains(expected string) {
+	value, err := q.TestID("string-field-url").Run(s.session).InputValue()
+	require.NoError(s.t, err)
+	require.Contains(s.t, value, expected)
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) {
