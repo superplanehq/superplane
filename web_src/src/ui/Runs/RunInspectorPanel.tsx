@@ -127,7 +127,7 @@ export function RunInspectorPanel({
   return (
     <aside
       className={cn(
-        "relative z-20 flex h-full shrink-0 flex-col border-l bg-white shadow-sm dark:bg-gray-950",
+        "relative z-20 flex h-full shrink-0 flex-col border-l bg-white dark:bg-gray-950",
         appDarkModeClasses.sidebarEdge,
       )}
       style={{ width: inspectorWidth.width }}

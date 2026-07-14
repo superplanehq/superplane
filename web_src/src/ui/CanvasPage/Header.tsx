@@ -166,7 +166,7 @@ function PageHeader({
   const inEditSession = isEditSessionActive ?? isEditing;
 
   return (
-    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-2 sm:px-3 dark:border-gray-700/70">
+    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 pl-2 pr-1 sm:pl-3 sm:pr-1.5 dark:border-gray-700/70">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </div>
