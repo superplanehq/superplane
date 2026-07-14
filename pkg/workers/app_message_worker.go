@@ -147,7 +147,31 @@ func (w *AppMessageWorker) deliverBroadcast(tx *gorm.DB, canvas *models.Canvas, 
 	for _, sub := range subs {
 		node, ok := nodesByKey[nodeKey{canvasID: sub.TargetCanvasID, nodeID: sub.TargetNodeID}]
 		if !ok {
-			return fmt.Errorf("target node %s not found on canvas %s", sub.TargetNodeID, sub.TargetCanvasID)
+			w.logger.Warnf(
+				"skipping broadcast subscription with missing target node %s on canvas %s",
+				sub.TargetNodeID,
+				sub.TargetCanvasID,
+			)
+
+			if err := models.DeleteCanvasSubscriptionsForNode(tx, sub.TargetCanvasID, sub.TargetNodeID); err != nil {
+				w.logger.Errorf("delete stale canvas subscription: %v", err)
+			}
+
+			continue
+		}
+
+		if node.DeletedAt.Valid {
+			w.logger.Warnf(
+				"skipping broadcast subscription for deleted target node %s on canvas %s",
+				sub.TargetNodeID,
+				sub.TargetCanvasID,
+			)
+
+			if err := models.DeleteCanvasSubscriptionsForNode(tx, sub.TargetCanvasID, sub.TargetNodeID); err != nil {
+				w.logger.Errorf("delete stale canvas subscription: %v", err)
+			}
+
+			continue
 		}
 
 		ref := node.Ref.Data()

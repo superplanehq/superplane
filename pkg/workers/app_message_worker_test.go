@@ -139,6 +139,96 @@ func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWithoutSubscrib
 	assert.Equal(t, int64(0), remaining)
 }
 
+func Test__AppMessageWorker_LockAndProcessMessage__skipsStaleSubscriptionAndDeliversToHealthySubscriber(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewAppMessageWorker(r.Registry)
+
+	sourceCanvas, sourceNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        "broadcast-message",
+				Name:          "Broadcast Message",
+				Type:          models.NodeTypeComponent,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "broadcastMessage"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+
+	targetCanvas, targetNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "stale-on-broadcast",
+				Name:   "Stale On Broadcast",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"app": sourceCanvas.ID.String(),
+				}),
+			},
+			{
+				NodeID: "on-broadcast",
+				Name:   "On Broadcast",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"app": sourceCanvas.ID.String(),
+				}),
+			},
+		},
+		nil,
+	)
+
+	require.NoError(t, database.Conn().Create(&models.CanvasSubscription{
+		SourceCanvasID: sourceCanvas.ID,
+		TargetCanvasID: targetCanvas.ID,
+		TargetNodeID:   "stale-on-broadcast",
+	}).Error)
+	require.NoError(t, database.Conn().Create(&models.CanvasSubscription{
+		SourceCanvasID: sourceCanvas.ID,
+		TargetCanvasID: targetCanvas.ID,
+		TargetNodeID:   targetNodes[1].NodeID,
+	}).Error)
+
+	require.NoError(t, database.Conn().Exec(
+		"UPDATE workflow_nodes SET deleted_at = NOW() WHERE workflow_id = ? AND node_id = ?",
+		targetCanvas.ID,
+		"stale-on-broadcast",
+	).Error)
+
+	payload := map[string]any{"message": "hello"}
+	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, payload))
+
+	messages, err := models.ListAppMessages()
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+
+	require.NoError(t, worker.LockAndProcessMessage(messages[0]))
+
+	var remaining int64
+	require.NoError(t, database.Conn().Model(&models.AppMessage{}).Count(&remaining).Error)
+	assert.Equal(t, int64(0), remaining)
+
+	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 1)
+
+	var staleSubs int64
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasSubscription{}).
+		Where("source_canvas_id = ? AND target_node_id = ?", sourceCanvas.ID, "stale-on-broadcast").
+		Count(&staleSubs).
+		Error)
+	assert.Equal(t, int64(0), staleSubs)
+}
+
 func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWhenSourceNodeDeleted(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
