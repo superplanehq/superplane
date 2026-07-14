@@ -13,6 +13,7 @@ import type {
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
+import { resourceRefLabel, type IntegrationResourceRef } from "@/lib/integrationResource";
 
 export const baseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -73,12 +74,14 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 }
 
 type TextPromptNodeMetadata = {
-  model?: string;
+  // `model` can be a plain string or an unresolved integration-resource object,
+  // so it is normalized via resourceRefLabel before rendering.
+  model?: string | IntegrationResourceRef;
   structuredOutput?: boolean;
 };
 
 type TextPromptConfiguration = {
-  model?: string;
+  model?: string | IntegrationResourceRef;
   outputSchema?: string;
 };
 
@@ -92,7 +95,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const meta = node.metadata as TextPromptNodeMetadata | undefined;
   const config = node.configuration as TextPromptConfiguration | undefined;
 
-  const model = meta?.model || config?.model;
+  const model = resourceRefLabel(meta?.model ?? config?.model);
   if (model) {
     items.push({ icon: "sparkles", label: model });
   }

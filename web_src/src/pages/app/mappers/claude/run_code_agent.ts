@@ -13,21 +13,25 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { resourceRefLabel, type IntegrationResourceRef } from "@/lib/integrationResource";
 
+// Fields backed by an integration-resource picker (repository, model, ...) can
+// hold either a string or an unresolved { id, name, type } object, so they are
+// normalized via resourceRefLabel before rendering.
 type RunCodeAgentNodeMetadata = {
-  repository?: string;
-  baseBranch?: string;
-  prUrl?: string;
-  model?: string;
+  repository?: string | IntegrationResourceRef;
+  baseBranch?: string | IntegrationResourceRef;
+  prUrl?: string | IntegrationResourceRef;
+  model?: string | IntegrationResourceRef;
   sourceMode?: string;
 };
 
 type RunCodeAgentConfiguration = {
   sourceMode?: string;
-  repository?: string;
-  baseBranch?: string;
-  prUrl?: string;
-  model?: string;
+  repository?: string | IntegrationResourceRef;
+  baseBranch?: string | IntegrationResourceRef;
+  prUrl?: string | IntegrationResourceRef;
+  model?: string | IntegrationResourceRef;
 };
 
 type RunCodeAgentPayloadData = {
@@ -103,22 +107,22 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   const isPR = (meta.sourceMode ?? config.sourceMode) === "pr";
   if (isPR) {
-    const pr = meta.prUrl || config.prUrl;
+    const pr = resourceRefLabel(meta.prUrl ?? config.prUrl);
     if (pr) {
       items.push({ icon: "git-pull-request", label: pr });
     }
   } else {
-    const repo = meta.repository || config.repository;
+    const repo = resourceRefLabel(meta.repository ?? config.repository);
     if (repo) {
       items.push({ icon: "git-branch", label: repo });
     }
-    const baseBranch = meta.baseBranch || config.baseBranch;
+    const baseBranch = resourceRefLabel(meta.baseBranch ?? config.baseBranch);
     if (baseBranch) {
       items.push({ icon: "git-branch", label: baseBranch });
     }
   }
 
-  const model = meta.model || config.model;
+  const model = resourceRefLabel(meta.model ?? config.model);
   if (model) {
     items.push({ icon: "bot", label: model });
   }

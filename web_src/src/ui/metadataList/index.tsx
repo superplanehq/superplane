@@ -1,4 +1,5 @@
 import { nodeCanvasMetadataSectionClassName } from "@/lib/nodeCanvasSections";
+import { resourceRefLabel } from "@/lib/integrationResource";
 import { resolveIcon } from "@/lib/utils";
 import React from "react";
 
@@ -37,6 +38,21 @@ export const MetadataList: React.FC<MetadataListProps> = ({
   );
 };
 
+/**
+ * Guards against rendering a raw data object as a React child. A metadata label
+ * can accidentally be an unresolved integration-resource object ({ id, name,
+ * type }) instead of a string; rendering it directly throws "Objects are not
+ * valid as a React child" and crashes the whole canvas. Coerce such objects to
+ * their display name so a single bad node degrades gracefully instead.
+ */
+function renderLabel(label: string | React.ReactNode): React.ReactNode {
+  if (label !== null && typeof label === "object" && !React.isValidElement(label)) {
+    return resourceRefLabel(label) ?? "";
+  }
+
+  return label;
+}
+
 function renderMetadataItem(item: MetadataItem, index: number, iconSize: number, underlined: boolean) {
   const Icon = resolveIcon(item.icon);
 
@@ -51,7 +67,7 @@ function renderMetadataItem(item: MetadataItem, index: number, iconSize: number,
           (underlined ? " underline underline-offset-3 decoration-dotted decoration-1" : "")
         }
       >
-        {item.label}
+        {renderLabel(item.label)}
       </span>
     </div>
   );

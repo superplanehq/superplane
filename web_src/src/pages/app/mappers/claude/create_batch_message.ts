@@ -13,6 +13,7 @@ import type {
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
+import { resourceRefLabel, type IntegrationResourceRef } from "@/lib/integrationResource";
 
 type BatchRequestCounts = {
   processing?: number;
@@ -56,7 +57,8 @@ type CreateBatchMessageExecutionMetadata = {
 };
 
 type CreateBatchMessageConfiguration = {
-  model?: string;
+  // `model` may be a plain string or an unresolved integration-resource object.
+  model?: string | IntegrationResourceRef;
   outputSchema?: string;
   mode?: string;
 };
@@ -121,7 +123,7 @@ function requestsMetadata(node: NodeInfo, lastExecution: ExecutionInfo | null): 
   const config = node.configuration as CreateBatchMessageConfiguration | undefined;
   const items: MetadataItem[] = [];
 
-  const model = config?.model;
+  const model = resourceRefLabel(config?.model);
   if (model) {
     items.push({ icon: "sparkles", label: model });
   }

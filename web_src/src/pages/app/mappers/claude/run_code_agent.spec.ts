@@ -131,6 +131,28 @@ describe("runCodeAgentMapper.props", () => {
     expect(props.metadata).toEqual([{ icon: "git-pull-request", label: "https://github.com/o/r/pull/9" }]);
   });
 
+  it("normalizes resource-ref objects to their name (issue #6072)", () => {
+    // The backend may resolve a picker field into an { id, name, type } object
+    // during Setup. Rendering that raw object as a React child crashes the
+    // canvas, so metadata labels must be display strings.
+    const props = runCodeAgentMapper.props(
+      buildPropsContext({
+        node: buildNode({
+          metadata: {
+            sourceMode: "repository",
+            repository: { id: "r1", name: "acme/widgets", type: "repository" },
+            model: { id: "m1", name: "claude-opus-4-6", type: "model" },
+          },
+        }),
+      }),
+    );
+    expect(props.metadata).toEqual([
+      { icon: "git-branch", label: "acme/widgets" },
+      { icon: "bot", label: "claude-opus-4-6" },
+    ]);
+    props.metadata?.forEach((item) => expect(typeof item.label).toBe("string"));
+  });
+
   it("falls back to configuration (repository and base branch) when metadata is absent", () => {
     const props = runCodeAgentMapper.props(
       buildPropsContext({
