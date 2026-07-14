@@ -1,3 +1,4 @@
+import { integrationResourceDisplayLabel } from "@/lib/integrationResourceLabel";
 import { nodeCanvasMetadataSectionClassName } from "@/lib/nodeCanvasSections";
 import { resolveIcon } from "@/lib/utils";
 import React from "react";
@@ -37,8 +38,31 @@ export const MetadataList: React.FC<MetadataListProps> = ({
   );
 };
 
+/**
+ * Guards against IntegrationResourceRef-like objects (`{ id, name, type }`)
+ * reaching JSX as a child. Mapper bugs or stale data can leave the raw
+ * resource object in a label instead of its display string; this keeps that
+ * from crashing the whole canvas.
+ */
+function coerceMetadataLabel(label: MetadataItem["label"]): React.ReactNode {
+  if (
+    label === null ||
+    label === undefined ||
+    typeof label === "string" ||
+    typeof label === "number" ||
+    typeof label === "boolean" ||
+    React.isValidElement(label) ||
+    Array.isArray(label)
+  ) {
+    return label;
+  }
+
+  return integrationResourceDisplayLabel(label) ?? null;
+}
+
 function renderMetadataItem(item: MetadataItem, index: number, iconSize: number, underlined: boolean) {
   const Icon = resolveIcon(item.icon);
+  const label = coerceMetadataLabel(item.label);
 
   return (
     <div key={index} className="flex items-center min-w-0">
@@ -51,7 +75,7 @@ function renderMetadataItem(item: MetadataItem, index: number, iconSize: number,
           (underlined ? " underline underline-offset-3 decoration-dotted decoration-1" : "")
         }
       >
-        {item.label}
+        {label}
       </span>
     </div>
   );

@@ -182,6 +182,145 @@ describe("CanvasNodeErrorBoundary", () => {
     expect(captureException).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
   });
+
+  it("keeps the fallback when a re-render rebuilds node data with the same content but a new object identity", () => {
+    // Regression test for the post-commit flushSync crash: canvas state updates
+    // rebuild every node's data object, so `component`/`trigger` get a new
+    // reference on every render even when nothing meaningful changed. If the
+    // boundary used reference equality here, it would clear `hasError` and
+    // immediately rethrow the same render error outside of this recovery.
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const brokenLabel = { id: "model-id", name: "claude-opus-4-6", type: "model" };
+
+    const { rerender } = render(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          component: {
+            title: "Claude",
+            iconSlug: "sparkles",
+            metadata: [{ icon: "sparkles", label: brokenLabel as unknown as string }],
+          },
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          component: {
+            title: "Claude",
+            iconSlug: "sparkles",
+            metadata: [{ icon: "sparkles", label: { ...brokenLabel } as unknown as string }],
+          },
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+
+  it("ignores ephemeral canvas chrome (hover, connection drag) when deciding to retry", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { rerender } = render(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          _isHighlighted: false,
+          _allEdges: [],
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{
+          label: "Broken",
+          state: "pending",
+          type: "component",
+          _isHighlighted: true,
+          _hoveredEdge: { source: "node-1", target: "node-2" },
+          _connectingFrom: { nodeId: "node-1", handleType: "source" },
+          _allEdges: [{ source: "node-1", sourceHandle: "default", target: "node-2" }],
+          isPendingConnection: true,
+        }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+
+  it("retries rendering when node data meaningfully changes", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    let shouldThrow = true;
+
+    function ConditionalThrow(): ReactElement {
+      if (shouldThrow) {
+        throw new Error("render failed");
+      }
+      return <div>recovered node</div>;
+    }
+
+    const { rerender } = render(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{ label: "Broken", state: "pending", type: "component" }}
+        fallback={<div>node fallback</div>}
+      >
+        <ConditionalThrow />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+
+    shouldThrow = false;
+    rerender(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{ label: "Fixed", state: "pending", type: "component" }}
+        fallback={<div>node fallback</div>}
+      >
+        <ConditionalThrow />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("recovered node")).toBeInTheDocument();
+    consoleSpy.mockRestore();
+  });
 });
 
 describe("CanvasPage connection drop", () => {

@@ -216,6 +216,24 @@ describe("createSafeComponentMapper", () => {
     expect(result.includeEmptyState).toBe(true);
     expect(result.emptyStateProps?.title).toBe("Can't display");
   });
+
+  it("coerces IntegrationResourceRef-shaped metadata labels into their display name", () => {
+    const result = normalizeComponentBaseProps(
+      {
+        title: "Claude",
+        iconSlug: "sparkles",
+        metadata: [
+          {
+            icon: "sparkles",
+            label: { id: "model-id", name: "claude-opus-4-6", type: "model" },
+          },
+        ],
+      } as unknown as ComponentBaseProps,
+      makeComponentBaseContext(),
+    );
+
+    expect(result.metadata).toEqual([{ icon: "sparkles", label: "claude-opus-4-6" }]);
+  });
 });
 
 describe("createSafeTriggerRenderer core behavior", () => {

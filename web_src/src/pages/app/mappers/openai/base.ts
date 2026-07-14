@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import openAiIcon from "@/assets/icons/integrations/openai.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { integrationResourceDisplayLabel } from "@/lib/integrationResourceLabel";
 import type { MetadataItem } from "@/ui/metadataList";
 
 export const baseMapper: ComponentBaseMapper = {
@@ -73,12 +74,12 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 }
 
 type ResponseNodeMetadata = {
-  model?: string;
+  model?: unknown;
   structuredOutput?: boolean;
 };
 
 type ResponseConfiguration = {
-  model?: string;
+  model?: unknown;
   outputSchema?: string;
 };
 
@@ -92,7 +93,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const meta = node.metadata as ResponseNodeMetadata | undefined;
   const config = node.configuration as ResponseConfiguration | undefined;
 
-  const model = meta?.model || config?.model;
+  const model = integrationResourceDisplayLabel(meta?.model) ?? integrationResourceDisplayLabel(config?.model);
   if (model) {
     items.push({ icon: "sparkles", label: model });
   }

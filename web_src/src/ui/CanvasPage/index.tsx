@@ -630,18 +630,59 @@ function areOutputChannelsEqual(previous: string[] | undefined, next: string[] |
   return previous.every((channel, index) => channel === next[index]);
 }
 
-function didNodeErrorBoundaryDataChange(previous: BlockData, next: BlockData) {
-  return (
+/**
+ * Transient canvas chrome that changes on hover, connection drag, and edge
+ * updates. Including these when deciding whether a failed node should retry
+ * rendering would clear its fallback on every mouse move and rethrow the
+ * same render error.
+ */
+const NODE_ERROR_BOUNDARY_EPHEMERAL_KEYS = new Set([
+  "_hoveredEdge",
+  "_connectingFrom",
+  "_allEdges",
+  "_isHighlighted",
+  "_hasHighlightedNodes",
+  "_dimBodyBelowHeader",
+  "_draftDiffStatus",
+  "isPendingConnection",
+]);
+
+/**
+ * Content-based key used to decide whether a failed node should retry
+ * rendering. Comparing `component`/`trigger`/etc. by reference is not enough:
+ * a synchronous re-render (e.g. the flushSync exit after a canvas commit)
+ * rebuilds those objects with new identities but identical content, which
+ * would otherwise clear the fallback and immediately rethrow the same
+ * "object as React child" error outside of this render's own recovery.
+ */
+function nodeErrorBoundaryRecoveryKey(data: CanvasBlockData): string {
+  try {
+    return JSON.stringify(data, (key, value) => {
+      if (key && NODE_ERROR_BOUNDARY_EPHEMERAL_KEYS.has(key)) {
+        return undefined;
+      }
+      if (typeof value === "function") {
+        return undefined;
+      }
+      return value;
+    });
+  } catch {
+    return `${data.type}:${data.label}`;
+  }
+}
+
+function didNodeErrorBoundaryDataChange(previous: CanvasBlockData, next: CanvasBlockData) {
+  if (
     previous.type !== next.type ||
     previous.label !== next.label ||
-    previous.trigger !== next.trigger ||
-    previous.component !== next.component ||
-    previous.composite !== next.composite ||
-    previous.annotation !== next.annotation ||
     previous.renderFallback?.source !== next.renderFallback?.source ||
     previous.renderFallback?.message !== next.renderFallback?.message ||
     !areOutputChannelsEqual(previous.outputChannels, next.outputChannels)
-  );
+  ) {
+    return true;
+  }
+
+  return nodeErrorBoundaryRecoveryKey(previous) !== nodeErrorBoundaryRecoveryKey(next);
 }
 
 function getNodeAction<TArgs extends unknown[]>(
@@ -700,7 +741,7 @@ function buildDefaultNodeBlockProps(args: {
 
 type CanvasNodeErrorBoundaryProps = {
   nodeId: string;
-  nodeData: BlockData;
+  nodeData: CanvasBlockData;
   fallback: ReactNode;
   children: ReactNode;
 };

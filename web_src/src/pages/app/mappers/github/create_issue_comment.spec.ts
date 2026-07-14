@@ -7,32 +7,28 @@ import type {
   ExecutionInfo,
   NodeInfo,
 } from "../types";
-import { updateIssueCommentMapper } from "./update_issue_comment";
+import { createIssueCommentMapper } from "./create_issue_comment";
 
 const definition: ComponentDefinition = {
-  name: "github.updateIssueComment",
-  label: "Update Issue Comment",
+  name: "github.createIssueComment",
+  label: "Create Issue Comment",
   description: "",
   icon: "github",
   color: "gray",
 };
 
-describe("updateIssueCommentMapper", () => {
-  it("shows updated comment details", () => {
-    const details = updateIssueCommentMapper.getExecutionDetails(
+describe("createIssueCommentMapper.getExecutionDetails", () => {
+  it("shows created comment details", () => {
+    const details = createIssueCommentMapper.getExecutionDetails(
       buildDetailsContext({
-        configuration: {
-          repository: "superplane",
-          commentId: "1234567890",
-          body: "Updated summary",
-        },
+        configuration: { repository: "superplane", issueNumber: "42", body: "Hi" },
         outputs: {
           default: [
             {
               data: {
-                id: 1234567890,
-                html_url: "https://github.com/superplanehq/superplane/issues/42#issuecomment-1234567890",
-                updated_at: "2026-06-11T14:30:00Z",
+                id: 1,
+                html_url: "https://github.com/superplanehq/superplane/issues/42#issuecomment-1",
+                created_at: "2026-06-11T14:30:00Z",
               },
             },
           ],
@@ -41,26 +37,23 @@ describe("updateIssueCommentMapper", () => {
     );
 
     expect(details).toEqual({
-      "Updated At": expect.any(String),
-      URL: "https://github.com/superplanehq/superplane/issues/42#issuecomment-1234567890",
+      "Created At": expect.any(String),
+      URL: "https://github.com/superplanehq/superplane/issues/42#issuecomment-1",
     });
   });
 
   it("handles missing outputs", () => {
-    const details = updateIssueCommentMapper.getExecutionDetails(
-      buildDetailsContext({
-        configuration: { repository: "superplane" },
-        outputs: {},
-      }),
+    const details = createIssueCommentMapper.getExecutionDetails(
+      buildDetailsContext({ configuration: { repository: "superplane" }, outputs: {} }),
     );
 
     expect(details).toEqual({});
   });
 });
 
-describe("updateIssueCommentMapper.props", () => {
+describe("createIssueCommentMapper.props", () => {
   it("shows the repository from configuration", () => {
-    const props = updateIssueCommentMapper.props(
+    const props = createIssueCommentMapper.props(
       buildPropsContext({ node: buildNode({ configuration: { repository: "superplane" } }) }),
     );
 
@@ -68,7 +61,7 @@ describe("updateIssueCommentMapper.props", () => {
   });
 
   it("coerces an IntegrationResourceRef repository object to its display name instead of crashing", () => {
-    const props = updateIssueCommentMapper.props(
+    const props = createIssueCommentMapper.props(
       buildPropsContext({
         node: buildNode({
           configuration: { repository: { id: "repo-id", name: "superplane", type: "repository" } },
@@ -83,8 +76,8 @@ describe("updateIssueCommentMapper.props", () => {
 function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
     id: "node-1",
-    name: "Update Issue Comment",
-    componentName: "github.updateIssueComment",
+    name: "Create Issue Comment",
+    componentName: "github.createIssueComment",
     isCollapsed: false,
     configuration: {},
     metadata: {},
@@ -107,8 +100,8 @@ function buildPropsContext(overrides?: Partial<ComponentBaseContext>): Component
 function buildDetailsContext(execution: Partial<ExecutionInfo>): ExecutionDetailsContext {
   const node: NodeInfo = {
     id: "node-1",
-    name: "Update Issue Comment",
-    componentName: "github.updateIssueComment",
+    name: "Create Issue Comment",
+    componentName: "github.createIssueComment",
     isCollapsed: false,
     metadata: {
       repository: {

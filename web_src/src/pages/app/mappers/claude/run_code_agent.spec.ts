@@ -145,6 +145,24 @@ describe("runCodeAgentMapper.props", () => {
       { icon: "git-branch", label: "develop" },
     ]);
   });
+
+  it("coerces IntegrationResourceRef repository and model objects to their display names", () => {
+    const props = runCodeAgentMapper.props(
+      buildPropsContext({
+        node: buildNode({
+          metadata: {
+            sourceMode: "repository",
+            repository: { id: "repo-id", name: "acme/widgets", type: "repository" },
+            model: { id: "model-id", name: "claude-opus-4-6", type: "model" },
+          },
+        }),
+      }),
+    );
+    expect(props.metadata).toEqual([
+      { icon: "git-branch", label: "acme/widgets" },
+      { icon: "bot", label: "claude-opus-4-6" },
+    ]);
+  });
 });
 
 describe("eventStateRegistry.runCodeAgent", () => {
