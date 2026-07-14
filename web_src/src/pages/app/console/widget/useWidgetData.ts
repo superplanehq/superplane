@@ -21,10 +21,10 @@ import { makeRunsFlightKey } from "./runsWidgetQuery";
 import type { WidgetDataSource, WidgetRender } from "./types";
 import {
   LOAD_MORE_STEP,
-  WIDGET_MAX_EAGER_PAGES,
   computeDisplaySlice,
   computeEffectiveLimit,
   computeInitialDisplayCount,
+  computeRunsDataSourceLoading,
   computeTrendCollectLimit,
   computeWidgetHasMore,
   isWidgetQueryLoading,
@@ -44,6 +44,7 @@ export {
   computeDisplaySlice,
   computeEffectiveLimit,
   computeInitialDisplayCount,
+  computeRunsDataSourceLoading,
   computeTrendCollectLimit,
   computeWidgetHasMore,
   isWidgetQueryLoading,
@@ -498,49 +499,6 @@ function useRunsDataSourceResult({
   const paginationFields = progressive ? { hasMore, isFetchingMore, loadMore, displayCount: displaySlice } : {};
   const totalCount = filtersActive ? undefined : query.data?.pages?.[0]?.totalCount;
   return { rows, isLoading, error: errorMessage(query.error), totalCount, ...paginationFields };
-}
-
-export function computeRunsDataSourceLoading(args: {
-  query: {
-    isLoading: boolean;
-    hasNextPage: boolean | undefined;
-    isFetchingNextPage: boolean;
-    isFetching: boolean;
-    isError?: boolean;
-    isFetchNextPageError?: boolean;
-  };
-  enabled: boolean;
-  fillRowCount: number;
-  initialFillTarget: number;
-  pageCount: number;
-  filtersActive: boolean;
-  triggersMatchable: boolean;
-  progressive: boolean;
-  runExecutionsLoading: boolean;
-}): boolean {
-  const queryFailed = args.query.isError === true || args.query.isFetchNextPageError === true;
-  const initialFillLoading = isWidgetQueryLoading({
-    queryIsLoading: args.query.isLoading,
-    enabled: args.enabled,
-    hasNextPage: args.query.hasNextPage,
-    loadedRowCount: args.fillRowCount,
-    fillTarget: args.initialFillTarget,
-    pageCount: args.pageCount,
-    isFetchingNextPage: args.query.isFetchingNextPage,
-    isFetching: args.query.isFetching,
-  });
-  // Keep count KPIs loading between eager page ticks while still hunting for
-  // enough filtered matches — otherwise they flash `0` mid-search. Stop once
-  // a page fails: hasNextPage stays true without advancing pageCount, which
-  // would otherwise spin forever (same guard as markdown run variables).
-  const awaitingFilteredFill =
-    !queryFailed &&
-    args.filtersActive &&
-    args.triggersMatchable &&
-    args.fillRowCount < args.initialFillTarget &&
-    args.query.hasNextPage === true &&
-    args.pageCount < WIDGET_MAX_EAGER_PAGES;
-  return initialFillLoading || awaitingFilteredFill || (!args.progressive && args.runExecutionsLoading);
 }
 
 function countLoadedRuns(pages: { runs?: unknown[] }[], enabled: boolean): number {

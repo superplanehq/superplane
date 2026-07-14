@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nextPersistedTriggerRefs } from "./RunDataSourceFiltersPanel";
+import { nextPersistedTriggerRefs } from "./runDataSourceTriggerRefs";
 
 const nodes = [
   { id: "trigger-1", name: "deploy", type: "TYPE_TRIGGER" as const, component: "webhook" },

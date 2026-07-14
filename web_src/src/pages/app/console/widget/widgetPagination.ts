@@ -321,3 +321,48 @@ export function isWidgetQueryLoading({
     (isFetchingNextPage || isFetching)
   );
 }
+
+/**
+ * Loading flag for runs-backed widgets. Includes the usual initial-fill
+ * wait plus a filtered-search wait for count KPIs still hunting matches
+ * across pages. Query failures clear the filtered wait so panels settle
+ * instead of spinning forever after a failed `fetchNextPage`.
+ */
+export function computeRunsDataSourceLoading(args: {
+  query: {
+    isLoading: boolean;
+    hasNextPage: boolean | undefined;
+    isFetchingNextPage: boolean;
+    isFetching: boolean;
+    isError?: boolean;
+    isFetchNextPageError?: boolean;
+  };
+  enabled: boolean;
+  fillRowCount: number;
+  initialFillTarget: number;
+  pageCount: number;
+  filtersActive: boolean;
+  triggersMatchable: boolean;
+  progressive: boolean;
+  runExecutionsLoading: boolean;
+}): boolean {
+  const queryFailed = args.query.isError === true || args.query.isFetchNextPageError === true;
+  const initialFillLoading = isWidgetQueryLoading({
+    queryIsLoading: args.query.isLoading,
+    enabled: args.enabled,
+    hasNextPage: args.query.hasNextPage,
+    loadedRowCount: args.fillRowCount,
+    fillTarget: args.initialFillTarget,
+    pageCount: args.pageCount,
+    isFetchingNextPage: args.query.isFetchingNextPage,
+    isFetching: args.query.isFetching,
+  });
+  const awaitingFilteredFill =
+    !queryFailed &&
+    args.filtersActive &&
+    args.triggersMatchable &&
+    args.fillRowCount < args.initialFillTarget &&
+    args.query.hasNextPage === true &&
+    args.pageCount < WIDGET_MAX_EAGER_PAGES;
+  return initialFillLoading || awaitingFilteredFill || (!args.progressive && args.runExecutionsLoading);
+}
