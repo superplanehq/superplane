@@ -46,8 +46,10 @@ func (c *BroadcastMessage) Description() string {
 
 func (c *BroadcastMessage) ExampleOutput() map[string]any {
 	return map[string]any{
+		"type":      "app.broadcast",
+		"timestamp": "2024-01-01T09:00:00Z",
 		"data": map[string]any{
-			"message": "Hello, world!",
+			"message": "broadcast message",
 		},
 	}
 }

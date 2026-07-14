@@ -120,3 +120,42 @@ func Test__AppContext__Subscribe(t *testing.T) {
 		require.ErrorIs(t, err, core.ErrNotFound)
 	})
 }
+
+func Test__AppContext__Subscribe__replacesPreviousSourceApp(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	listenerCanvas, listenerNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "on-broadcast",
+				Name:   "On Broadcast",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"app": "",
+				}),
+			},
+		},
+		nil,
+	)
+
+	sourceCanvasA, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	sourceCanvasB, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	ctx := NewAppContext(database.Conn(), listenerCanvas, &listenerNodes[0])
+
+	require.NoError(t, ctx.Subscribe(sourceCanvasA.ID.String()))
+	require.NoError(t, ctx.Subscribe(sourceCanvasB.ID.String()))
+
+	var subs []models.CanvasSubscription
+	err := database.Conn().
+		Where("target_canvas_id = ? AND target_node_id = ?", listenerCanvas.ID, listenerNodes[0].NodeID).
+		Find(&subs).
+		Error
+	require.NoError(t, err)
+	require.Len(t, subs, 1)
+	assert.Equal(t, sourceCanvasB.ID, subs[0].SourceCanvasID)
+}

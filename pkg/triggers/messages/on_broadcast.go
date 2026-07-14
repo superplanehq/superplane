@@ -19,6 +19,15 @@ type OnBroadcastConfiguration struct {
 	App string `json:"app" mapstructure:"app"`
 }
 
+type OnBroadcastMetadata struct {
+	App *AppMetadata `json:"app,omitempty" mapstructure:"app,omitempty"`
+}
+
+type AppMetadata struct {
+	ID   string `json:"id" mapstructure:"id"`
+	Name string `json:"name" mapstructure:"name"`
+}
+
 func (c *OnBroadcast) Name() string {
 	return "onBroadcast"
 }
@@ -45,16 +54,20 @@ func (c *OnBroadcast) Documentation() string {
 
 func (c *OnBroadcast) ExampleData() map[string]any {
 	return map[string]any{
-		"app": map[string]any{
-			"id":   "123",
-			"name": "Another App",
-		},
-		"node": map[string]any{
-			"id":   "123",
-			"name": "Node Name",
-		},
-		"payload": map[string]any{
-			"message": "Hello, World!",
+		"type":      "app.broadcast",
+		"timestamp": "2024-01-01T09:00:00Z",
+		"data": map[string]any{
+			"app": map[string]any{
+				"id":   "123",
+				"name": "Another App",
+			},
+			"node": map[string]any{
+				"id":   "123",
+				"name": "Node Name",
+			},
+			"payload": map[string]any{
+				"message": "Hello, World!",
+			},
 		},
 	}
 }
@@ -87,7 +100,17 @@ func (c *OnBroadcast) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to get app: %w", err)
 	}
 
-	return ctx.Apps.Subscribe(app.ID)
+	err = ctx.Apps.Subscribe(app.ID)
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to app: %w", err)
+	}
+
+	return ctx.Metadata.Set(OnBroadcastMetadata{
+		App: &AppMetadata{
+			ID:   app.ID,
+			Name: app.Name,
+		},
+	})
 }
 
 func (c *OnBroadcast) OnAppMessage(ctx core.AppMessageContext) error {

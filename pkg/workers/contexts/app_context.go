@@ -7,7 +7,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type AppContext struct {
@@ -71,21 +70,16 @@ func (c *AppContext) Subscribe(id string) error {
 		return err
 	}
 
+	err = models.DeleteCanvasSubscriptionsForNode(c.tx, c.canvas.ID, c.node.NodeID)
+	if err != nil {
+		return err
+	}
+
 	sub := &models.CanvasSubscription{
 		SourceCanvasID: uuid.MustParse(sourceApp.ID),
 		TargetCanvasID: c.canvas.ID,
 		TargetNodeID:   c.node.NodeID,
 	}
 
-	return c.tx.
-		Clauses(clause.OnConflict{
-			Columns: []clause.Column{
-				{Name: "source_canvas_id"},
-				{Name: "target_canvas_id"},
-				{Name: "target_node_id"},
-			},
-			DoNothing: true,
-		}).
-		Create(sub).
-		Error
+	return c.tx.Create(sub).Error
 }
