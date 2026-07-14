@@ -160,7 +160,7 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 		return b.resolveObjectFieldValue(value, field)
 	case configuration.FieldTypeNumber, configuration.FieldTypeBool:
 		if text, ok := value.(string); ok {
-			return b.resolveTemplateExpressionsPreservingWholeValue(text)
+			return b.resolveTemplatePreservingWholeValue(text)
 		}
 	}
 
@@ -176,14 +176,16 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 }
 
 func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configuration.ListItemDefinition) ([]any, error) {
+	itemField := configuration.Field{Type: itemDef.Type}
+	if itemDef.Type == configuration.FieldTypeObject && len(itemDef.Schema) > 0 {
+		itemField.TypeOptions = &configuration.TypeOptions{
+			Object: &configuration.ObjectTypeOptions{Schema: itemDef.Schema},
+		}
+	}
+
 	result := make([]any, len(list))
 	for i, item := range list {
-		resolved, err := b.resolveFieldValue(item, configuration.Field{
-			Type: itemDef.Type,
-			TypeOptions: &configuration.TypeOptions{
-				Object: &configuration.ObjectTypeOptions{Schema: itemDef.Schema},
-			},
-		})
+		resolved, err := b.resolveFieldValue(item, itemField)
 		if err != nil {
 			return nil, fmt.Errorf("list item %d: %w", i, err)
 		}
@@ -193,25 +195,47 @@ func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configu
 	return result, nil
 }
 
+// resolveValue walks configuration values and stringifies every template result.
 func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
+	return b.walkResolvedValue(value, false)
+}
+
+// resolveValuePreservingTypes walks object/JSON trees and keeps native types
+// when a leaf is a whole {{ ... }} expression (e.g. JSON body numbers/bools).
+func (b *NodeConfigurationBuilder) resolveValuePreservingTypes(value any) (any, error) {
+	return b.walkResolvedValue(value, true)
+}
+
+func (b *NodeConfigurationBuilder) walkResolvedValue(value any, preserveTypes bool) (any, error) {
 	switch v := value.(type) {
 	case string:
+		if preserveTypes {
+			return b.resolveTemplatePreservingWholeValue(v)
+		}
 		return b.ResolveTemplateExpressions(v)
 
 	case map[string]any:
-		return b.resolve(v)
+		result := make(map[string]any, len(v))
+		for key, nested := range v {
+			resolved, err := b.walkResolvedValue(nested, preserveTypes)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = resolved
+		}
+		return result, nil
 
 	case map[string]string:
 		anyMap := make(map[string]any, len(v))
-		for key, value := range v {
-			anyMap[key] = value
+		for key, nested := range v {
+			anyMap[key] = nested
 		}
+		return b.walkResolvedValue(anyMap, preserveTypes)
 
-		return b.resolve(anyMap)
 	case []any:
 		result := make([]any, len(v))
 		for i, item := range v {
-			resolved, err := b.resolveValue(item)
+			resolved, err := b.walkResolvedValue(item, preserveTypes)
 			if err != nil {
 				return nil, err
 			}
@@ -225,17 +249,22 @@ func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
 }
 
 func (b *NodeConfigurationBuilder) resolveObjectFieldValue(value any, field configuration.Field) (any, error) {
-	schema := objectFieldSchema(field)
-	if len(schema) > 0 {
-		obj, err := b.resolveSchemaObjectValue(value)
-		if err != nil {
-			return nil, err
-		}
-
-		return b.resolveWithSchema(obj, schema)
+	normalized, err := b.normalizeObjectFieldInput(value)
+	if err != nil {
+		return nil, err
 	}
 
-	return b.resolveObjectValue(value)
+	schema := objectFieldSchema(field)
+	if len(schema) == 0 {
+		return b.resolveValuePreservingTypes(normalized)
+	}
+
+	obj, ok := asAnyMap(normalized)
+	if !ok {
+		return nil, fmt.Errorf("object field must resolve to an object")
+	}
+
+	return b.resolveWithSchema(obj, schema)
 }
 
 func objectFieldSchema(field configuration.Field) []configuration.Field {
@@ -246,38 +275,30 @@ func objectFieldSchema(field configuration.Field) []configuration.Field {
 	return field.TypeOptions.Object.Schema
 }
 
-func (b *NodeConfigurationBuilder) resolveSchemaObjectValue(value any) (map[string]any, error) {
+// normalizeObjectFieldInput turns an object field's stored value into a
+// structured value. Maps/arrays pass through; strings may be a whole
+// expression or a JSON template that still needs expression substitution.
+func (b *NodeConfigurationBuilder) normalizeObjectFieldInput(value any) (any, error) {
 	if obj, ok := asAnyMap(value); ok {
 		return obj, nil
+	}
+	if list, ok := value.([]any); ok {
+		return list, nil
 	}
 
 	text, ok := value.(string)
 	if !ok {
-		return nil, fmt.Errorf("object field must resolve to an object")
+		return value, nil
 	}
 
-	if expression, ok := unwrapExpressionTemplate(text); ok {
-		resolved, err := b.ResolveExpression(expression)
-		if err != nil {
-			return nil, err
-		}
-
-		obj, ok := asAnyMap(resolved)
-		if !ok {
-			return nil, fmt.Errorf("object field must resolve to an object")
-		}
-
-		return obj, nil
-	}
-
-	resolved, err := b.ResolveTemplateExpressions(text)
+	resolved, err := b.resolveTemplatePreservingWholeValue(text)
 	if err != nil {
 		return nil, err
 	}
 
 	resolvedText, ok := resolved.(string)
 	if !ok {
-		return nil, fmt.Errorf("object field must resolve to an object")
+		return resolved, nil
 	}
 
 	decoded, err := decodeJSONValue(resolvedText)
@@ -285,92 +306,12 @@ func (b *NodeConfigurationBuilder) resolveSchemaObjectValue(value any) (map[stri
 		return nil, fmt.Errorf("resolved object field must be valid JSON: %w", err)
 	}
 
-	obj, ok := asAnyMap(decoded)
-	if !ok {
-		return nil, fmt.Errorf("object field must resolve to an object")
-	}
-
-	return obj, nil
+	return decoded, nil
 }
 
-func (b *NodeConfigurationBuilder) resolveObjectValue(value any) (any, error) {
-	switch v := value.(type) {
-	case string:
-		return b.resolveObjectString(v)
-	case map[string]any:
-		return b.resolveValuePreservingTypes(v)
-	case map[string]string:
-		anyMap := make(map[string]any, len(v))
-		for key, value := range v {
-			anyMap[key] = value
-		}
-		return b.resolveValuePreservingTypes(anyMap)
-	case []any:
-		return b.resolveValuePreservingTypes(v)
-	default:
-		return b.resolveValuePreservingTypes(v)
-	}
-}
-
-func (b *NodeConfigurationBuilder) resolveObjectString(value string) (any, error) {
-	resolved, err := b.resolveTemplateExpressionsPreservingWholeValue(value)
-	if err != nil {
-		return nil, err
-	}
-
-	text, ok := resolved.(string)
-	if !ok {
-		return resolved, nil
-	}
-
-	decoded, err := decodeJSONValue(text)
-	if err != nil {
-		return nil, fmt.Errorf("resolved object field must be valid JSON: %w", err)
-	}
-
-	return b.resolveValuePreservingTypes(decoded)
-}
-
-func (b *NodeConfigurationBuilder) resolveValuePreservingTypes(value any) (any, error) {
-	switch v := value.(type) {
-	case string:
-		return b.resolveTemplateExpressionsPreservingWholeValue(v)
-	case map[string]any:
-		result := make(map[string]any, len(v))
-		for key, value := range v {
-			resolved, err := b.resolveValuePreservingTypes(value)
-			if err != nil {
-				return nil, err
-			}
-			result[key] = resolved
-		}
-		return result, nil
-	case map[string]string:
-		result := make(map[string]any, len(v))
-		for key, value := range v {
-			resolved, err := b.resolveTemplateExpressionsPreservingWholeValue(value)
-			if err != nil {
-				return nil, err
-			}
-			result[key] = resolved
-		}
-		return result, nil
-	case []any:
-		result := make([]any, len(v))
-		for i, item := range v {
-			resolved, err := b.resolveValuePreservingTypes(item)
-			if err != nil {
-				return nil, err
-			}
-			result[i] = resolved
-		}
-		return result, nil
-	default:
-		return v, nil
-	}
-}
-
-func (b *NodeConfigurationBuilder) resolveTemplateExpressionsPreservingWholeValue(value string) (any, error) {
+// resolveTemplatePreservingWholeValue returns the native expression result when
+// the entire string is a single {{ ... }} template; otherwise stringifies.
+func (b *NodeConfigurationBuilder) resolveTemplatePreservingWholeValue(value string) (any, error) {
 	if expression, ok := unwrapExpressionTemplate(value); ok {
 		return b.ResolveExpression(expression)
 	}
