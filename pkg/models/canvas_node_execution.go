@@ -168,6 +168,21 @@ func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, re
 	return executions, nil
 }
 
+func ListActiveNodeExecutionsInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID string) ([]CanvasNodeExecution, error) {
+	var executions []CanvasNodeExecution
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("state IN ?", []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted}).
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
 func ListParentExecutionsForRootEvents(canvasID uuid.UUID, rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
 	return ListParentExecutionsForRootEventsInTransaction(database.Conn(), canvasID, rootEventIDs)
 }
