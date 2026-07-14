@@ -147,6 +147,7 @@ func CommitCanvasStaging(
 		publishResult, err = publishCanvasVersionInTransaction(
 			ctx,
 			tx,
+			canvas,
 			liveVersion,
 			nextVersion,
 			changesets.CanvasPublisherOptions{

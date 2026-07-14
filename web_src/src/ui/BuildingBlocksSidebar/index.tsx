@@ -173,6 +173,7 @@ function OpenBuildingBlocksSidebar({
       Runners: 1,
       Debugging: 2,
       Memory: 3,
+      SuperPlane: 4,
     };
 
     const isConnectedCategory = (category: BuildingBlockCategory) => {

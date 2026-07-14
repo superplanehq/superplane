@@ -12,14 +12,40 @@ export function buildBuildingBlockCategories(
   integrations: IntegrationsIntegrationDefinition[],
 ): BuildingBlockCategory[] {
   const runnerCategory = runners(triggers, components);
+  const superplaneCategory = superplane(triggers, components);
 
   return [
     core(triggers, components),
     ...(runnerCategory ? [runnerCategory] : []),
     debugging(triggers, components),
     memory(triggers, components),
+    ...(superplaneCategory ? [superplaneCategory] : []),
     ...buildIntegrationCategories(integrations),
   ];
+}
+
+function superplane(triggers: TriggersTrigger[], components: ActionsAction[]): BuildingBlockCategory | null {
+  const blocks: BuildingBlock[] = [
+    ...triggers.filter((t) => isSuperPlaneBlock(t)).map((t) => toTriggerBlock(t)),
+    ...components.filter((c) => isSuperPlaneBlock(c)).map((c) => toComponentBlock(c)),
+  ];
+
+  if (blocks.length === 0) {
+    return null;
+  }
+
+  blocks.sort((a, b) => {
+    if (a.type !== b.type) {
+      return a.type === "trigger" ? -1 : 1;
+    }
+
+    return (a.label || a.name || "").localeCompare(b.label || b.name || "");
+  });
+
+  return {
+    name: "SuperPlane",
+    blocks,
+  };
 }
 
 function core(triggers: TriggersTrigger[], components: ActionsAction[]): BuildingBlockCategory {
@@ -165,6 +191,17 @@ function isRunnerBlock(component: { name?: string }): boolean {
   return name === "runner" || name === "runnerJS" || name === "runnerBash" || name === "runnerPython";
 }
 
+const SUPERPLANE_BLOCK_NAMES = new Set(["onbroadcast", "broadcastmessage"]);
+
+function isSuperPlaneBlock(component: { name?: string }): boolean {
+  return SUPERPLANE_BLOCK_NAMES.has((component.name || "").toLowerCase());
+}
+
 function isCoreComponent(component: { name?: string }): boolean {
-  return !isMemoryBlock(component) && !isDebuggingBlock(component) && !isRunnerBlock(component);
+  return (
+    !isMemoryBlock(component) &&
+    !isDebuggingBlock(component) &&
+    !isRunnerBlock(component) &&
+    !isSuperPlaneBlock(component)
+  );
 }
