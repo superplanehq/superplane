@@ -128,6 +128,45 @@ func TestResolvePatchDraftAutoLayout_DefaultsLayoutOnlyUpdatesToFullCanvas(t *te
 	assert.Empty(t, autoLayout.NodeIDs)
 }
 
+func TestResolvePatchDraftAutoLayout_DisabledInputSkipsLayout(t *testing.T) {
+	changeset := requireDraftChangeset(t, []PatchOperation{
+		{
+			Op: "update_node",
+			Node: &PatchNode{
+				ID:   "node-1",
+				Name: "Renamed",
+			},
+		},
+	})
+
+	autoLayout := resolvePatchStagingAutoLayout(
+		&AutoLayoutInput{Enabled: boolRef(false)},
+		changeset,
+		nil,
+		[]models.Node{{ID: "node-1"}},
+	)
+
+	assert.Nil(t, autoLayout)
+}
+
+func TestBuildDraftChangeset_AcceptsTopLevelPosition(t *testing.T) {
+	changeset := requireDraftChangeset(t, []PatchOperation{
+		{
+			Op:       "update_node",
+			NodeID:   "node-1",
+			Position: &PatchPosition{X: 120, Y: 240},
+		},
+	})
+
+	require.Len(t, changeset.Changes, 1)
+	change := changeset.Changes[0]
+	require.NotNil(t, change.Node)
+	require.NotNil(t, change.Node.Position)
+	assert.Equal(t, "node-1", change.Node.ID)
+	assert.Equal(t, int32(120), change.Node.Position.X)
+	assert.Equal(t, int32(240), change.Node.Position.Y)
+}
+
 func TestResolveLiveCanvasVersion_ResolvesLiveVersion(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -171,6 +210,10 @@ func requireLiveVersion(t *testing.T, canvasID uuid.UUID) models.CanvasVersion {
 	require.NoError(t, err)
 	require.NotNil(t, live)
 	return *live
+}
+
+func boolRef(value bool) *bool {
+	return &value
 }
 
 func upsertUserStagingYAML(t *testing.T, canvas *models.Canvas, userID uuid.UUID, content string) {

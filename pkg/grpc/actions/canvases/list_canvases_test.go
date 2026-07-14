@@ -116,8 +116,9 @@ func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
-		CanvasId: pinnedCanvas.ID.String(),
-		Pinned:   proto.Bool(true),
+		CanvasId:                  pinnedCanvas.ID.String(),
+		Pinned:                    proto.Bool(true),
+		AutoLayoutOnUpdateEnabled: proto.Bool(true),
 	})
 	require.NoError(t, err)
 
@@ -135,6 +136,7 @@ func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
 	require.NotNil(t, pinnedSummary)
 	assert.True(t, pinnedSummary.Pinned)
 	assert.False(t, pinnedSummary.Starred)
+	assert.True(t, pinnedSummary.AutoLayoutOnUpdateEnabled)
 	assert.NotNil(t, pinnedSummary.PinnedAt)
 	assert.Nil(t, pinnedSummary.StarredAt)
 
@@ -142,6 +144,7 @@ func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
 	require.NotNil(t, starredSummary)
 	assert.False(t, starredSummary.Pinned)
 	assert.True(t, starredSummary.Starred)
+	assert.False(t, starredSummary.AutoLayoutOnUpdateEnabled)
 	assert.Nil(t, starredSummary.PinnedAt)
 	assert.NotNil(t, starredSummary.StarredAt)
 }

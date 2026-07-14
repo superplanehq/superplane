@@ -552,19 +552,21 @@ type UpdateCanvasPreferenceInput = {
   canvasId: string;
   pinned?: boolean;
   starred?: boolean;
+  autoLayoutOnUpdateEnabled?: boolean;
 };
 
 export const useUpdateCanvasPreference = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ canvasId, pinned, starred }: UpdateCanvasPreferenceInput) => {
+    mutationFn: async ({ canvasId, pinned, starred, autoLayoutOnUpdateEnabled }: UpdateCanvasPreferenceInput) => {
       return await canvasesUpdateCanvasPreference(
         withOrganizationHeader({
           path: { canvasId },
           body: {
             pinned,
             starred,
+            autoLayoutOnUpdateEnabled,
           },
         }),
       );
@@ -613,6 +615,11 @@ function applyCanvasPreferenceToSummary(
       : {
           starred: preference.starred,
           starredAt: preference.starred ? timestamp : undefined,
+        }),
+    ...(preference.autoLayoutOnUpdateEnabled === undefined
+      ? {}
+      : {
+          autoLayoutOnUpdateEnabled: preference.autoLayoutOnUpdateEnabled,
         }),
   };
 }

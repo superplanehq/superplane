@@ -42,6 +42,7 @@ import {
   useInfiniteCanvasRuns,
   useInfiniteCanvasLiveVersions,
   useTriggers,
+  useUpdateCanvasPreference,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
@@ -291,6 +292,7 @@ export function AppPage() {
   const canUpdateIntegrations = canAct("integrations", "update");
   const canUseAgents = canAct("agents", "create") && canAct("agents", "read");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
+  const updateCanvasPreference = useUpdateCanvasPreference(organizationId!);
   const {
     data: liveCanvas,
     isLoading: canvasLoading,
@@ -594,6 +596,7 @@ export function AppPage() {
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
     readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
   );
+  const hasSyncedInitialAutoLayoutPreferenceRef = useRef(false);
 
   const lastSavedWorkflowSignatureRef = useRef("");
   const lastAppliedVersionSnapshotRef = useRef("");
@@ -1155,7 +1158,19 @@ export function AppPage() {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
     }
-  }, [isAutoLayoutOnUpdateEnabled]);
+    if (canvasId) {
+      updateCanvasPreference.mutate({ canvasId, autoLayoutOnUpdateEnabled: newValue });
+    }
+  }, [canvasId, isAutoLayoutOnUpdateEnabled, updateCanvasPreference]);
+
+  useEffect(() => {
+    if (hasSyncedInitialAutoLayoutPreferenceRef.current || !canvasId || !isAutoLayoutOnUpdateEnabled) {
+      return;
+    }
+
+    hasSyncedInitialAutoLayoutPreferenceRef.current = true;
+    updateCanvasPreference.mutate({ canvasId, autoLayoutOnUpdateEnabled: true });
+  }, [canvasId, isAutoLayoutOnUpdateEnabled, updateCanvasPreference]);
 
   const applyAutoLayoutOnAddedNode = useCallback(
     async (workflow: CanvasesCanvas, nodeID?: string): Promise<CanvasesCanvas> => {
