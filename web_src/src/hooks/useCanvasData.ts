@@ -1,6 +1,11 @@
+import { useRef } from "react";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
-import type { QueryClient } from "@tanstack/react-query";
-import { upsertRunIntoDescribeRunData } from "./canvasInfiniteCache";
+import type { InfiniteData, QueryClient } from "@tanstack/react-query";
+import {
+  reuseCachedInfiniteRunsPage,
+  upsertRunIntoDescribeRunData,
+  type InfiniteRunsPage,
+} from "./canvasInfiniteCache";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
@@ -1019,10 +1024,35 @@ export const useDescribeRun = (canvasId: string, runId: string | null, enabled =
 
 export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {
   const limit = 25;
+  const queryClient = useQueryClient();
+  const queryKey = canvasKeys.infiniteRuns(canvasId, filters);
+  // Page-1 totalCount from the in-flight refetch. TanStack accumulates
+  // infinite pages locally and only commits them when the full refetch
+  // finishes, so queryClient.getQueryData still sees the previous page 1
+  // while later cursors are being resolved — this ref bridges that gap.
+  const latestPage1TotalCountRef = useRef<number | undefined>(undefined);
 
   return useInfiniteQuery({
-    queryKey: canvasKeys.infiniteRuns(canvasId, filters),
+    queryKey,
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      // Full refetches (poll / invalidate / refetch()) walk every already-
+      // loaded cursor sequentially — TanStack Query's infinite behavior. To
+      // avoid re-issuing N ListRuns calls each minute for a canvas whose
+      // shared cache holds many pages, we reuse any page that already lives
+      // in the cache for its cursor *and* still matches page 1's totalCount.
+      // Page 1 (pageParam == null) always hits the network so fresh runs and
+      // totalCount stay current; fetchNextPage arrives with a cursor not yet
+      // in `pageParams`, so it also hits the network naturally. When the
+      // canvas total changes, cached tail pages are stale (wrong totalCount /
+      // run slices) and must be re-fetched — otherwise getNextPageParam and
+      // multi-page widgets see inconsistent pages. See the console-runs
+      // analysis for context.
+      if (pageParam != null) {
+        const cached = queryClient.getQueryData<InfiniteData<InfiniteRunsPage>>(queryKey);
+        const authoritativeTotal = latestPage1TotalCountRef.current ?? cached?.pages[0]?.totalCount;
+        const reused = reuseCachedInfiniteRunsPage(cached, pageParam, authoritativeTotal);
+        if (reused !== undefined) return reused;
+      }
       const response = await canvasesListRuns(
         withOrganizationHeader({
           path: { canvasId },
@@ -1034,11 +1064,16 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
           },
         }),
       );
+      if (pageParam == null) {
+        latestPage1TotalCountRef.current = response.data?.totalCount;
+      }
       return response.data;
     },
     getNextPageParam: (lastPage, allPages) => {
       const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.runs?.length || 0), 0);
-      const totalCount = lastPage?.totalCount || 0;
+      // Page 1 is the only page guaranteed to carry a fresh totalCount on
+      // poll/refetch; tail pages may be cache-reused and must not drive this.
+      const totalCount = allPages[0]?.totalCount ?? lastPage?.totalCount ?? 0;
 
       if (currentLoadedCount >= totalCount) return undefined;
       return lastPage?.lastTimestamp;

@@ -169,6 +169,7 @@ npm run lint:budget
 - Avoid `as any`. Use precise types, React utilities (`Children.toArray`, `isValidElement`), and safe fallbacks instead of broad casts.
 - Use descriptive, self-explanatory names. Eg., prefer `isScreenReaderOnly` over `isSrOnly`, `openInlineCreator` over `open` when scope is ambiguous.
 - Provide sane defaults to prevent crashes when data is incomplete.
+- After changes, ensure both `make check.lint.ui` and `make check.build.ui` are passing
 
 ### Interactive Design
 
