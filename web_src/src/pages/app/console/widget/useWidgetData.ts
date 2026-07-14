@@ -6,6 +6,8 @@ import {
   hasRunStatusTriggerFilters,
   runMatchesStatusTriggerFilters,
   triggerFilterCanMatch,
+  type RunStatusTriggerFilters,
+  type TriggerReferenceResolver,
 } from "@/ui/Runs/runStatusTriggerFilter";
 
 import { resolveConsoleNode, useConsoleContext, type ConsoleContextValue } from "../ConsoleContext";
@@ -383,6 +385,7 @@ function useRunsDataSourceResult({
   const loadedRowCount = useMemo(() => countLoadedRuns(pages, enabled), [enabled, pages]);
   const runsFilters = useMemo(() => runsFiltersFromDataSource(dataSource), [dataSource]);
   const filtersActive = hasRunStatusTriggerFilters(runsFilters);
+  const resolveTrigger = useCallback((reference: string) => resolveConsoleNode(ctx, reference)?.node.id, [ctx]);
   const collectLimit = computeRunsCollectLimit({
     filtersActive,
     progressive,
@@ -390,12 +393,23 @@ function useRunsDataSourceResult({
     loadedRowCount,
     effectiveLimit,
   });
+  // Side-load only needs executions for rows that survive filtering (and the
+  // display / trend window). Reusing `collectLimit` when filters are active
+  // would issue ListEventExecutions for every unfiltered loaded run.
+  const sideloadLimit = computeRunsSideloadLimit({
+    filtersActive,
+    progressive,
+    displaySlice,
+    collectLimit,
+  });
 
   const { executionsByRootEventId, runExecutionsLoading } = useRunsExecutionSideload({
     canvasId,
     enabled: dataSource.kind === "runs" && needsNodeOutputs,
     pages,
-    collectLimit,
+    collectLimit: sideloadLimit,
+    filters: runsFilters,
+    resolveTrigger,
   });
 
   const rows = useMemo(
@@ -413,8 +427,6 @@ function useRunsDataSourceResult({
       }),
     [dataSource, pages, ctx, collectLimit, executionsByRootEventId, runsFilters, progressive, displaySlice],
   );
-
-  const resolveTrigger = (reference: string) => resolveConsoleNode(ctx, reference)?.node.id;
   const triggersMatchable = triggerFilterCanMatch(runsFilters?.triggers, resolveTrigger);
   // With filters, `limit` is the desired matching-row count — keep paging
   // until we have that many matches (or hit the shared page cap).
@@ -522,16 +534,33 @@ function computeRunsCollectLimit(args: {
   return args.displaySlice;
 }
 
+/**
+ * Cap for execution side-load queries. When status/trigger filters are active
+ * on a non-progressive panel, only the post-filter display window needs `$`
+ * data — not every already-loaded (and soon-to-be-dropped) run.
+ */
+function computeRunsSideloadLimit(args: {
+  filtersActive: boolean;
+  progressive: boolean;
+  displaySlice: number;
+  collectLimit: number;
+}): number {
+  if (args.filtersActive && !args.progressive) return args.displaySlice;
+  return args.collectLimit;
+}
+
 function useRunsExecutionSideload(args: {
   canvasId: string;
   enabled: boolean;
-  pages: { runs?: { rootEvent?: { id?: string } }[] }[];
+  pages: { runs?: CanvasesCanvasRun[] }[];
   collectLimit: number;
+  filters?: RunStatusTriggerFilters;
+  resolveTrigger?: TriggerReferenceResolver;
 }) {
   const runRootEventIds = useMemo(() => {
     if (!args.enabled) return [] as string[];
-    return collectRunRootEventIdsFromPages(args.pages, args.collectLimit);
-  }, [args.enabled, args.pages, args.collectLimit]);
+    return collectRunRootEventIdsFromPages(args.pages, args.collectLimit, args.filters, args.resolveTrigger);
+  }, [args.enabled, args.pages, args.collectLimit, args.filters, args.resolveTrigger]);
 
   const { queries: runExecutionQueries, isLoading: runExecutionsLoading } = useEventExecutionsBatch(
     args.canvasId,
@@ -579,15 +608,24 @@ function buildRunsDataSourceRows(args: {
   return filtered;
 }
 
-function collectRunRootEventIdsFromPages(
-  pages: { runs?: { rootEvent?: { id?: string } }[] }[],
+/**
+ * Collect root-event ids for execution side-load. When filters are provided,
+ * only matching runs count toward `collectLimit` so tight status/trigger
+ * filters do not fan out ListEventExecutions across the unfiltered page set.
+ */
+export function collectRunRootEventIdsFromPages(
+  pages: { runs?: CanvasesCanvasRun[] }[],
   collectLimit: number,
+  filters?: RunStatusTriggerFilters,
+  resolveTrigger?: TriggerReferenceResolver,
 ): string[] {
+  const filterActive = hasRunStatusTriggerFilters(filters);
   const seen = new Set<string>();
   const ids: string[] = [];
   let count = 0;
   for (const page of pages) {
     for (const run of page?.runs ?? []) {
+      if (filterActive && !runMatchesStatusTriggerFilters(run, filters, resolveTrigger)) continue;
       if (count >= collectLimit) return ids;
       count += 1;
       const id = run.rootEvent?.id;
