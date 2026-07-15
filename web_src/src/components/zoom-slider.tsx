@@ -1,7 +1,18 @@
 "use client";
 
 import React, { memo, useCallback, useEffect } from "react";
-import { Camera, CircleDot, CircleDotDashed, Eye, LayoutDashboard, LayoutGrid, Minus, Plus } from "lucide-react";
+import {
+  Camera,
+  CircleDot,
+  CircleDotDashed,
+  Eye,
+  LayoutDashboard,
+  LayoutGrid,
+  Lock,
+  Minus,
+  Plus,
+  Unlock,
+} from "lucide-react";
 import { toPng } from "html-to-image";
 
 import {
@@ -56,6 +67,8 @@ export const ZoomSlider = memo(function ZoomSlider({
   onAutoLayoutOnUpdateToggle,
   autoLayoutOnUpdateDisabled,
   autoLayoutOnUpdateDisabledTooltip,
+  isViewportLocked,
+  onViewportLockToggle,
   usePanel = true,
   ...props
 }: Omit<PanelProps, "children"> & {
@@ -69,6 +82,8 @@ export const ZoomSlider = memo(function ZoomSlider({
   onAutoLayoutOnUpdateToggle?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  isViewportLocked?: boolean;
+  onViewportLockToggle?: () => void;
   usePanel?: boolean;
 }) {
   const { zoom } = useViewport();
@@ -241,6 +256,26 @@ export const ZoomSlider = memo(function ZoomSlider({
         </TooltipTrigger>
         <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
       </Tooltip>
+      {onViewportLockToggle && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className={cn("h-7 w-7", isViewportLocked && "text-blue-600 dark:text-blue-400")}
+              onClick={onViewportLockToggle}
+              aria-pressed={isViewportLocked}
+            >
+              {isViewportLocked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {isViewportLocked
+              ? "Zoom and position locked. Click to let SuperPlane fit the view automatically."
+              : "Lock zoom and position so navigating doesn't change the view."}
+          </TooltipContent>
+        </Tooltip>
+      )}
       {leadingContent}
       {screenshotName && (
         <Tooltip>

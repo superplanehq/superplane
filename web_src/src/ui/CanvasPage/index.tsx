@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
+import { useViewportLock } from "@/hooks/useViewportLock";
 import { getDraftDiffEdgeStyle } from "@/lib/draftDiff";
 import { DARK_BASE_BG_HEX } from "@/lib/darkThemeSurfaces";
 import { cn } from "@/lib/utils";
@@ -97,7 +98,7 @@ import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
-import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { resolveInitFitDecision, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
@@ -2272,6 +2273,15 @@ function CanvasContent({
 
   // Use viewport from ref as the state value
   const viewport = viewportRef.current;
+
+  // When the viewport is locked the user stays in control of zoom and position:
+  // SuperPlane skips the automatic fit-to-view it would otherwise run on
+  // navigation (mode switches, version changes, run inspection). Kept in a ref so
+  // the memoized fit callbacks don't need to be recreated when it toggles.
+  const [isViewportLocked, toggleViewportLock] = useViewportLock();
+  const isViewportLockedRef = useRef(isViewportLocked);
+  isViewportLockedRef.current = isViewportLocked;
+
   const lastReportedZoomRef = useRef<number | null>(null);
   const reportZoom = useCallback(
     (zoom: number) => {
@@ -2653,11 +2663,15 @@ function CanvasContent({
   const handleInit = useCallback(
     (reactFlowInstance: { setViewport: (viewport: Viewport) => void }) => {
       // Switching to a different canvas/version must re-fit the whole graph instead of
-      // reusing the previous content's viewport, matching the first-load behavior.
-      const needsInitialFit = shouldRefitOnInit({
+      // reusing the previous content's viewport, matching the first-load behavior. While
+      // the viewport is locked, a remount must not re-frame the canvas — the very first
+      // fit still runs so there's a sensible initial framing to lock onto.
+      const { isFirstFit, needsInitialFit, lockSuppressedRefit } = resolveInitFitDecision({
         hasFittedBefore: hasFitToViewRef.current,
         fitViewContentKey,
         lastFittedContentKey: lastFittedContentKeyRef?.current ?? null,
+        isViewportLocked: isViewportLockedRef.current,
+        hasStoredViewport: !!viewportRef.current,
       });
 
       if (needsInitialFit) {
@@ -2666,7 +2680,6 @@ function CanvasContent({
         // The URL deep-link focus (?node=) must only zoom once, on the very first
         // fit. Later canvas/version switches also enter this branch, but they should
         // frame the whole graph rather than re-zoom onto that node.
-        const isFirstFit = !hasFitToViewRef.current;
         const focusNode =
           isFirstFit && initialFocusNodeId
             ? stateRef.current.nodes?.find((node) => node.id === initialFocusNodeId)
@@ -2701,6 +2714,12 @@ function CanvasContent({
         if (viewportRef.current) {
           reactFlowInstance.setViewport(viewportRef.current);
         }
+        // When the lock suppressed the re-fit, mark this content as handled so the
+        // content-change effect doesn't fit it later; unlocking then only affects
+        // future navigation rather than snapping the current view.
+        if (lockSuppressedRefit) {
+          stampFittedContentKey(lastFittedContentKeyRef, fitViewContentKey);
+        }
         setIsInitialized(true);
         setHasReactFlowInitialized(true);
       }
@@ -2726,6 +2745,12 @@ function CanvasContent({
     if (fitViewContentKey === undefined) return;
     if ((lastFittedContentKeyRef?.current ?? null) === fitViewContentKey) return;
     if ((workflowNodes?.length ?? 0) === 0) return;
+    // Locked viewport: keep the current framing and just record this content as
+    // handled so it isn't re-fitted when the lock is later released.
+    if (isViewportLocked) {
+      stampFittedContentKey(lastFittedContentKeyRef, fitViewContentKey);
+      return;
+    }
     const id = window.setTimeout(() => {
       fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 500 });
       const viewport = getViewport();
@@ -2740,6 +2765,7 @@ function CanvasContent({
     workflowNodes,
     hasReactFlowInitialized,
     hasFitToViewRef,
+    isViewportLocked,
     fitView,
     getViewport,
     reportZoom,
@@ -2758,6 +2784,9 @@ function CanvasContent({
     if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
     if (!hasFitToViewRef.current) return;
     lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
+    // Locked viewport: record the request as handled above, then keep the current
+    // framing instead of fitting to the run participants.
+    if (isViewportLocked) return;
     let timeoutId: number | null = null;
     const runFit = (attempt: number) => {
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
@@ -2800,6 +2829,7 @@ function CanvasContent({
     getViewport,
     hasFitToViewRef,
     isRunInspectionMode,
+    isViewportLocked,
     reportZoom,
     viewportRef,
   ]);
@@ -3289,6 +3319,8 @@ function CanvasContent({
                   className="!static !m-0"
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
+                  isViewportLocked={isViewportLocked}
+                  onViewportLockToggle={toggleViewportLock}
                   isAutoLayoutOnUpdateEnabled={isEditMode ? isAutoLayoutOnUpdateEnabled : undefined}
                   onAutoLayoutOnUpdateToggle={isEditMode ? onToggleAutoLayoutOnUpdate : undefined}
                   autoLayoutOnUpdateDisabled={isReadOnly || autoLayoutOnUpdateDisabled}

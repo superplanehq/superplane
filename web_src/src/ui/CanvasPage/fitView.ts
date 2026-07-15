@@ -42,6 +42,35 @@ export function shouldRefitOnInit(params: {
   return params.lastFittedContentKey !== params.fitViewContentKey;
 }
 
+/**
+ * Decides how a ReactFlow (re)initialization should treat the viewport.
+ *
+ * Mirrors {@link shouldRefitOnInit}, but a locked viewport suppresses re-fits
+ * after the very first one so the user keeps their chosen zoom and position
+ * across remounts (mode switches, version changes). `lockSuppressedRefit`
+ * reports whether the lock is the reason a re-fit was skipped, so the caller
+ * can stamp the content as handled and avoid a later fit. `isFirstFit` is
+ * surfaced for the deep-link focus logic that only runs on the very first fit.
+ */
+export function resolveInitFitDecision(params: {
+  hasFittedBefore: boolean;
+  fitViewContentKey?: string;
+  lastFittedContentKey: string | null;
+  isViewportLocked: boolean;
+  hasStoredViewport: boolean;
+}): { isFirstFit: boolean; needsInitialFit: boolean; lockSuppressedRefit: boolean } {
+  const isFirstFit = !params.hasFittedBefore;
+  const lockSuppressedRefit = params.isViewportLocked && !isFirstFit && params.hasStoredViewport;
+  const needsInitialFit =
+    !lockSuppressedRefit &&
+    shouldRefitOnInit({
+      hasFittedBefore: params.hasFittedBefore,
+      fitViewContentKey: params.fitViewContentKey,
+      lastFittedContentKey: params.lastFittedContentKey,
+    });
+  return { isFirstFit, needsInitialFit, lockSuppressedRefit };
+}
+
 /** Records the content key that was just fitted (only once real nodes were present). */
 export function stampFittedContentKey(
   ref: { current: string | null } | undefined,

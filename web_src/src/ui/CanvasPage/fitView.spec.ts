@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveFitViewVersionId, shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { resolveFitViewVersionId, resolveInitFitDecision, shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 
 describe("resolveFitViewVersionId", () => {
   const liveParams = {
@@ -58,6 +58,56 @@ describe("shouldRefitOnInit", () => {
     expect(
       shouldRefitOnInit({ hasFittedBefore: true, fitViewContentKey: undefined, lastFittedContentKey: "c1:v1" }),
     ).toBe(false);
+  });
+});
+
+describe("resolveInitFitDecision", () => {
+  const unlocked = {
+    hasFittedBefore: true,
+    fitViewContentKey: "c1:v2",
+    lastFittedContentKey: "c1:v1",
+    isViewportLocked: false,
+    hasStoredViewport: true,
+  };
+
+  it("fits on the first initialization even when locked", () => {
+    expect(resolveInitFitDecision({ ...unlocked, hasFittedBefore: false, isViewportLocked: true })).toEqual({
+      isFirstFit: true,
+      needsInitialFit: true,
+      lockSuppressedRefit: false,
+    });
+  });
+
+  it("re-fits on a content change when the viewport is unlocked", () => {
+    expect(resolveInitFitDecision(unlocked)).toEqual({
+      isFirstFit: false,
+      needsInitialFit: true,
+      lockSuppressedRefit: false,
+    });
+  });
+
+  it("suppresses the re-fit on a content change when the viewport is locked", () => {
+    expect(resolveInitFitDecision({ ...unlocked, isViewportLocked: true })).toEqual({
+      isFirstFit: false,
+      needsInitialFit: false,
+      lockSuppressedRefit: true,
+    });
+  });
+
+  it("does not treat a lock as suppressing when there is no stored viewport to restore", () => {
+    expect(resolveInitFitDecision({ ...unlocked, isViewportLocked: true, hasStoredViewport: false })).toEqual({
+      isFirstFit: false,
+      needsInitialFit: true,
+      lockSuppressedRefit: false,
+    });
+  });
+
+  it("restores without fitting when the content is unchanged, regardless of lock", () => {
+    expect(resolveInitFitDecision({ ...unlocked, lastFittedContentKey: "c1:v2" })).toEqual({
+      isFirstFit: false,
+      needsInitialFit: false,
+      lockSuppressedRefit: false,
+    });
   });
 });
 
