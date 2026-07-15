@@ -1784,9 +1784,18 @@ function Sidebar({
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
-  const hideRunsTab = !isEditing || isAnnotationNode;
-  const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode && !hideRunsTab;
   const nodeExecutionVersion = useNodeExecutionStore((store) => store.version);
+  const selectedNodeHasActivity = useMemo(() => {
+    if (!state.componentSidebar.selectedNodeId) {
+      return false;
+    }
+
+    const nodeData = useNodeExecutionStore.getState().getNodeData(state.componentSidebar.selectedNodeId);
+    void nodeExecutionVersion;
+    return nodeData.executions.length > 0 || nodeData.events.length > 0;
+  }, [state.componentSidebar.selectedNodeId, nodeExecutionVersion]);
+  const hideRunsTab = isAnnotationNode || (!isEditing && !selectedNodeHasActivity);
+  const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode && !hideRunsTab;
   const livePreRunStatus = useMemo(() => {
     if (!formDisabled || !state.componentSidebar.selectedNodeId || !workflowNodes) {
       return undefined;

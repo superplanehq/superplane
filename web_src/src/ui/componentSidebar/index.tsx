@@ -599,9 +599,7 @@ export const ComponentSidebar = ({
                         {livePreRunStatus.description ? (
                           <>
                             <div className="mb-1.5 rounded-md bg-white/50 px-2.5 py-1.5 dark:bg-gray-900/50">
-                              <span className="text-[13px] leading-snug">
-                                {livePreRunStatus.description}
-                              </span>
+                              <span className="text-[13px] leading-snug">{livePreRunStatus.description}</span>
                             </div>
                             {livePreRunStatus.purpose === "setup" && onContinueEditing ? (
                               continueEditingDisabled && continueEditingDisabledTooltip ? (

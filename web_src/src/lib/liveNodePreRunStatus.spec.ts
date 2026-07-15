@@ -59,6 +59,18 @@ describe("resolveLiveNodePreRunStatus", () => {
       purpose: "runtime",
     });
   });
+
+  it("returns trigger-specific runtime status when events exist but no run is resolved yet", () => {
+    expect(
+      resolveLiveNodePreRunStatus(node({ type: "TYPE_TRIGGER", component: "webhook" }), {
+        executions: [],
+        events: [{ id: "event-1" }],
+      }),
+    ).toEqual({
+      title: "Inspect activity in Runs",
+      purpose: "runtime",
+    });
+  });
 });
 
 describe("formatLiveNodeConfigurationIssue", () => {

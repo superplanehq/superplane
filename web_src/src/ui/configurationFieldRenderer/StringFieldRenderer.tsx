@@ -19,11 +19,15 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
 
   // Set initial value only on first mount if no value is present but there's a default
   useEffect(() => {
+    if (readOnly) {
+      return;
+    }
+
     if (!hasInitialized.current && (value === undefined || value === null) && field.defaultValue !== undefined) {
       hasInitialized.current = true;
       onChange(String(field.defaultValue));
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [readOnly, value, field.defaultValue, onChange]);
 
   const currentValue = (value as string) ?? "";
 

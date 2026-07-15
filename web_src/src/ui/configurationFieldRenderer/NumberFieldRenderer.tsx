@@ -7,13 +7,17 @@ export const NumberFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
 
   // Set initial value on first render if no value is present but there's a default
   useEffect(() => {
+    if (readOnly) {
+      return;
+    }
+
     if ((value === undefined || value === null) && field.defaultValue !== undefined) {
       const defaultVal = Number(field.defaultValue);
       if (!isNaN(defaultVal)) {
         onChange(defaultVal);
       }
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [readOnly, value, field.defaultValue, onChange]);
 
   return (
     <Input

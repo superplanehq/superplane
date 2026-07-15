@@ -41,7 +41,11 @@ export function resolveLiveNodePreRunStatus(
     if (nodeData.events.length === 0) {
       return { title: "Waiting for the first event", purpose: "runtime" };
     }
-  } else if (nodeData.executions.length === 0) {
+
+    return { title: "Inspect activity in Runs", purpose: "runtime" };
+  }
+
+  if (nodeData.executions.length === 0) {
     return { title: "Waiting for the first run...", purpose: "runtime" };
   }
 

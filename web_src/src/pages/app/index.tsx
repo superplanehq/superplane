@@ -3784,6 +3784,8 @@ export function AppPage() {
           handleSelectRunFromSidebarEvent(runId, { nodeId });
         } catch (error) {
           console.error("Failed to inspect latest node run", error);
+          if (liveCanvasNodeClickLookupRef.current !== lookupId) return;
+          actions.openConfigurationSidebar();
         }
       })();
     },
