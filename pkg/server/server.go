@@ -160,6 +160,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_APP_MESSAGE_WORKER") == "yes" {
+		log.Println("Starting App Message Worker")
+
+		w := workers.NewAppMessageWorker(registry)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" || os.Getenv("START_INTEGRATION_REQUEST_WORKER") == "yes" {
 		log.Println("Starting Integration Request Worker")
 

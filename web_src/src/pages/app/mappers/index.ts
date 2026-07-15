@@ -263,6 +263,7 @@ import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
+import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
 
@@ -274,6 +275,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
   schedule: scheduleTriggerRenderer,
   webhook: webhookTriggerRenderer,
   start: startTriggerRenderer,
+  onBroadcast: onBroadcastTriggerRenderer,
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
