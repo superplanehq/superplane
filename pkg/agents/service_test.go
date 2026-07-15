@@ -356,6 +356,30 @@ func TestService_EnsureSession_ReturnsExistingSessionWhenStaleRefreshRacesWithSt
 	assert.Empty(t, provider.archivedSessions)
 }
 
+func TestService_EnsureSession_ReturnsExistingSessionWhenStaleRefreshProviderCreateFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{toolSchemaRevision: "revision-1"}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	provider.toolSchemaRevision = "revision-2"
+	provider.createSessionErr = errors.New("provider create failed")
+
+	refreshed, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, session.ID, refreshed.ID)
+	assert.Equal(t, session.ProviderSessionID, refreshed.ProviderSessionID)
+	assert.Equal(t, "revision-1", refreshed.AgentToolSchemaRevision)
+	assert.Equal(t, 2, provider.createCalled)
+	assert.Empty(t, provider.archivedSessions)
+}
+
 func TestService_EnsureSession_FailsWhenProviderErrors(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -492,6 +516,26 @@ func TestService_SendMessage_ProviderBusyKeepsSessionStreaming(t *testing.T) {
 	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
 }
 
+func TestService_SendMessage_InvalidRequestLeavesSessionIdle(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{sendErr: agents.ErrInvalidRequest}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello", nil)
+	require.ErrorIs(t, err, agents.ErrInvalidRequest)
+	require.Nil(t, persisted)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status)
+}
+
 func TestService_SendMessage_RecreatesUnavailableProviderSession(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -610,6 +654,35 @@ func TestService_SendMessage_RewindsAfterToolSchemaRefreshAndTrimsOldMessages(t 
 	assert.NotEqual(t, originalProviderSessionID, refreshed.ProviderSessionID)
 }
 
+func TestService_SendMessage_UsesExistingProviderSessionWhenStaleRefreshProviderCreateFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{toolSchemaRevision: "revision-1"}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	originalProviderSessionID := session.ProviderSessionID
+
+	provider.toolSchemaRevision = "revision-2"
+	provider.createSessionErr = errors.New("provider unavailable")
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "new work", nil)
+	require.NoError(t, err)
+	require.NotNil(t, persisted)
+	require.Len(t, provider.sentSessions, 1)
+	assert.Equal(t, originalProviderSessionID, provider.sentSessions[0])
+	assert.Equal(t, 2, provider.createCalled)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, originalProviderSessionID, refreshed.ProviderSessionID)
+	assert.Equal(t, "revision-1", refreshed.AgentToolSchemaRevision)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
+}
+
 func TestService_SendMessage_ReturnsBusyWhenRecoveredProviderSessionIsBusy(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -683,6 +756,34 @@ func TestService_DefineOutcome_ReturnsBusyWhenRecoveredProviderSessionIsBusy(t *
 	require.NoError(t, err)
 	require.Len(t, provider.defineSessions, 2)
 	assert.NotEqual(t, session.ProviderSessionID, refreshed.ProviderSessionID)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
+}
+
+func TestService_DefineOutcome_UsesExistingProviderSessionWhenStaleRefreshProviderCreateFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{toolSchemaRevision: "revision-1"}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	originalProviderSessionID := session.ProviderSessionID
+
+	provider.toolSchemaRevision = "revision-2"
+	provider.createSessionErr = errors.New("provider unavailable")
+
+	err = svc.DefineOutcome(context.Background(), r.Organization.ID, r.User, session.ID, "build", "- done", 1)
+	require.NoError(t, err)
+	require.Len(t, provider.defineSessions, 1)
+	assert.Equal(t, originalProviderSessionID, provider.defineSessions[0])
+	assert.Equal(t, 2, provider.createCalled)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, originalProviderSessionID, refreshed.ProviderSessionID)
+	assert.Equal(t, "revision-1", refreshed.AgentToolSchemaRevision)
 	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
 }
 

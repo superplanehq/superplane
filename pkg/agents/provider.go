@@ -212,3 +212,4 @@ type ProviderToolSchemaRevisioner interface {
 var ErrSessionAlreadyTerminated = errors.New("agent session already terminated")
 var ErrSessionBusy = errors.New("agent session is still processing")
 var ErrProviderSessionUnavailable = errors.New("provider session is unavailable")
+var ErrInvalidRequest = errors.New("invalid agent request")

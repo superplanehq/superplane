@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -71,6 +72,8 @@ const (
 	// The size of the stage execution outputs can be up to 4k
 	MaxExecutionOutputsSize = 4 * 1024
 )
+
+var errUsageServiceUnavailable = errors.New("usage service unavailable")
 
 type Server struct {
 	httpServer            *http.Server
@@ -796,7 +799,7 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 		// the full error chain here.
 		log.WithField("account_id", account.ID.String()).
 			Error("failed to load organization creation status")
-		http.Error(w, "Failed to load organization creation status", http.StatusInternalServerError)
+		writeOrganizationCreationStatusError(w, "Failed to load organization creation status", err)
 		return
 	}
 
@@ -865,6 +868,10 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 		return response, nil
 	}
 
+	if isTransientUsageServiceError(err) {
+		return nil, fmt.Errorf("%w: check account limits: %w", errUsageServiceUnavailable, err)
+	}
+
 	if status.Code(err) != codes.NotFound {
 		return nil, err
 	}
@@ -883,10 +890,31 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 			WithField("account_id", accountID).
 			WithField("grpc_code", status.Code(err).String()).
 			Error("failed to check account limits after lazy provisioning")
+		if isTransientUsageServiceError(err) {
+			return nil, fmt.Errorf("%w: check account limits after lazy provisioning: %w", errUsageServiceUnavailable, err)
+		}
 		return nil, err
 	}
 
 	return response, nil
+}
+
+func isTransientUsageServiceError(err error) bool {
+	switch status.Code(err) {
+	case codes.Unavailable, codes.DeadlineExceeded:
+		return true
+	default:
+		return false
+	}
+}
+
+func writeOrganizationCreationStatusError(w http.ResponseWriter, fallbackMessage string, err error) {
+	if errors.Is(err, errUsageServiceUnavailable) {
+		http.Error(w, "Usage service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	http.Error(w, fallbackMessage, http.StatusInternalServerError)
 }
 
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
@@ -920,7 +948,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		// error with stage-specific structured fields.
 		log.WithField("account_id", account.ID.String()).
 			Error("failed to check organization creation status before creating organization")
-		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		writeOrganizationCreationStatusError(w, "Failed to create organization", err)
 		return
 	}
 
