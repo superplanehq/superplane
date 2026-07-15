@@ -618,3 +618,61 @@ func (c *CapabilityContext) Requested() []string {
 func (c *CapabilityContext) Enabled() []string {
 	return c.EnabledCapabilities
 }
+
+type AppContext struct {
+	CanvasID         string
+	Apps             map[string]*core.App
+	GetErrFor        map[string]error
+	SubscribeErrFor  map[string]error
+	SubscribeCalls   []string
+	UnsubscribeCalls int
+}
+
+func (c *AppContext) RegisterApp(app *core.App) {
+	if c.Apps == nil {
+		c.Apps = map[string]*core.App{}
+	}
+
+	c.Apps[app.ID] = app
+	c.Apps[app.Name] = app
+}
+
+func (c *AppContext) Get(idOrName string) (*core.App, error) {
+	if c.GetErrFor != nil {
+		if err, ok := c.GetErrFor[idOrName]; ok {
+			return nil, err
+		}
+	}
+
+	app, ok := c.Apps[idOrName]
+	if !ok {
+		return nil, core.ErrNotFound
+	}
+
+	return app, nil
+}
+
+func (c *AppContext) Subscribe(id string) error {
+	if c.SubscribeErrFor != nil {
+		if err, ok := c.SubscribeErrFor[id]; ok {
+			return err
+		}
+	}
+
+	app, err := c.Get(id)
+	if err != nil {
+		return err
+	}
+
+	if app.ID == c.CanvasID {
+		return fmt.Errorf("cannot self-subscribe to messages")
+	}
+
+	c.SubscribeCalls = append(c.SubscribeCalls, id)
+	return nil
+}
+
+func (c *AppContext) Unsubscribe() error {
+	c.UnsubscribeCalls++
+	return nil
+}
