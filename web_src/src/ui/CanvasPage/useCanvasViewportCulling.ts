@@ -3,9 +3,11 @@ import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { shallow } from "zustand/shallow";
 import {
+  getPaddedViewportRendererRect,
   getVisibleEdgeIdsInPaddedViewport,
   getVisibleNodeIdsInPaddedViewport,
   includeCanvasNodesThatMustStayMounted,
+  includeEndpointsOfVisibleEdges,
   shouldKeepCanvasNodeVisible,
 } from "./canvasViewportCulling";
 
@@ -39,9 +41,16 @@ export function useCanvasViewportCulling(nodes: Node[], edges: Edge[], enabled: 
       nodes,
     );
 
-    const visibleEdgeIds = getVisibleEdgeIdsInPaddedViewport(edges, visibleNodeIds);
+    const viewportRect =
+      width === 0 || height === 0 ? undefined : getPaddedViewportRendererRect(width, height, transform);
+    const visibleEdgeIds = getVisibleEdgeIdsInPaddedViewport(edges, visibleNodeIds, nodeLookup, viewportRect);
 
-    return { visibleNodeIds, visibleEdgeIds };
+    // Edges only render while both endpoint nodes are mounted, so keep the
+    // endpoints of every visible edge mounted even when they are off-screen.
+    return {
+      visibleNodeIds: includeEndpointsOfVisibleEdges(visibleNodeIds, edges, visibleEdgeIds),
+      visibleEdgeIds,
+    };
   }, [enabled, nodeLookup, width, height, transform, nodes, edges]);
 }
 
