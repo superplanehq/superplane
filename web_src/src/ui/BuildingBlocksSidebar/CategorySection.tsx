@@ -1,4 +1,5 @@
 import type { OrganizationsIntegration } from "@/api-client";
+import SuperplaneLogo from "@/assets/superplane.svg";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
 import { ChevronRight, Plug } from "lucide-react";
@@ -54,7 +55,13 @@ function renderCategoryIcon(
   CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null,
 ) {
   if (categoryIconSrc) {
-    return <img src={categoryIconSrc} alt={categoryName} className="size-4" />;
+    return (
+      <img
+        src={categoryIconSrc}
+        alt={categoryName}
+        className={categoryName === "SuperPlane" ? "size-4 dark:brightness-0 dark:invert" : "size-4"}
+      />
+    );
   }
   if (CategoryIcon) {
     return <CategoryIcon size={14} className="text-gray-500 dark:text-gray-400" />;
@@ -150,7 +157,12 @@ export function CategorySection({
 
   const firstBlock = sortedBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
-  const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
+  const categoryIconSrc =
+    category.name === "SuperPlane"
+      ? SuperplaneLogo
+      : integrationName === "smtp"
+        ? undefined
+        : getIntegrationIconSrc(integrationName);
   const CategoryIcon = categoryIconSrc ? null : resolveCategoryIcon(category.name, integrationName);
   const integrationStatusColorClass =
     INTEGRATION_STATE_COLOR[resolveIntegrationState(category, integrations, firstBlock)];
@@ -193,7 +205,12 @@ function resolveIntegrationState(
   integrations: OrganizationsIntegration[],
   firstBlock: BuildingBlock,
 ): IntegrationState {
-  if (category.name === "Core" || category.name === "Memory" || category.name === "Debugging") {
+  if (
+    category.name === "Core" ||
+    category.name === "SuperPlane" ||
+    category.name === "Memory" ||
+    category.name === "Debugging"
+  ) {
     return "ready";
   }
 
