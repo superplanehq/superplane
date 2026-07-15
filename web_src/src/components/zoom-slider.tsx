@@ -20,6 +20,30 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { LIVE_CANVAS_FIT_VIEW_OPTIONS } from "@/ui/CanvasPage/canvasFitOptions";
 
+function hasPrimaryModifier(event: KeyboardEvent) {
+  return event.ctrlKey || event.metaKey;
+}
+
+function isZoomInShortcut(event: KeyboardEvent) {
+  return hasPrimaryModifier(event) && (event.key === "=" || event.key === "+");
+}
+
+function isZoomOutShortcut(event: KeyboardEvent) {
+  return hasPrimaryModifier(event) && event.key === "-";
+}
+
+function isResetZoomShortcut(event: KeyboardEvent) {
+  return hasPrimaryModifier(event) && event.key === "0";
+}
+
+function isFitViewShortcut(event: KeyboardEvent) {
+  return hasPrimaryModifier(event) && !event.shiftKey && event.key === "1";
+}
+
+function isScreenshotShortcut(event: KeyboardEvent, screenshotName?: string) {
+  return Boolean(screenshotName) && hasPrimaryModifier(event) && event.shiftKey && event.key === "s";
+}
+
 export const ZoomSlider = memo(function ZoomSlider({
   className,
   orientation = "horizontal",
@@ -110,27 +134,27 @@ export const ZoomSlider = memo(function ZoomSlider({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Zoom in: Ctrl/Cmd + = or Ctrl/Cmd + Plus
-      if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+      if (isZoomInShortcut(e)) {
         e.preventDefault();
         zoomIn({ duration: 300 });
       }
       // Zoom out: Ctrl/Cmd + - or Ctrl/Cmd + Minus
-      else if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+      else if (isZoomOutShortcut(e)) {
         e.preventDefault();
         zoomOut({ duration: 300 });
       }
       // Reset zoom: Ctrl/Cmd + 0
-      else if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+      else if (isResetZoomShortcut(e)) {
         e.preventDefault();
         zoomTo(1, { duration: 300 });
       }
       // Fit view: Ctrl/Cmd + 1
-      else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "1") {
+      else if (isFitViewShortcut(e)) {
         e.preventDefault();
         fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS });
       }
       // Screenshot: Ctrl/Cmd + Shift + S
-      else if (screenshotName && (e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "s") {
+      else if (isScreenshotShortcut(e, screenshotName)) {
         e.preventDefault();
         handleScreenshot();
       }
