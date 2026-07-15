@@ -50,12 +50,12 @@ export function TimelineAccordionCard({
       <AccordionItem
         value={value}
         data-testid={`run-inspector-${value}-accordion`}
-        className="overflow-hidden rounded border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+        className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900 [&[data-state=closed]>h3]:border-b-0"
       >
         <AccordionPrimitive.Header className="flex items-center gap-1 border-b border-slate-200 bg-slate-50 py-1.5 pr-2 dark:border-gray-800 dark:bg-gray-900">
           <AccordionPrimitive.Trigger
             data-testid={`run-inspector-${value}-accordion-trigger`}
-            className="flex min-w-0 items-center gap-1.5 px-3 text-left hover:no-underline"
+            className="flex min-w-0 items-center gap-1.5 pl-2 pr-3 text-left hover:no-underline"
           >
             <EventStatusPill {...status} />
             <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-gray-500">
@@ -158,7 +158,7 @@ export function JsonPayload({
 
 export function DetailBox({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-gray-800 dark:bg-gray-900">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
           {title}
@@ -172,7 +172,7 @@ export function DetailBox({ title, children }: { title: string; children: ReactN
 export function ErrorOutputCard({ nodeId, message }: { nodeId: string; message?: string }) {
   return (
     <div
-      className="overflow-hidden rounded border border-red-200 bg-red-50 text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300"
+      className="overflow-hidden rounded-lg border border-red-200 bg-red-50 text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300"
       data-run-error-output-node-id={nodeId}
     >
       <div className="flex items-center justify-between gap-1.5 border-b border-red-200 px-3 py-1.5 dark:border-red-900/70">

@@ -1,9 +1,10 @@
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
-import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
 import { cn } from "@/lib/utils";
+import { EventStatusBadge } from "@/ui/EventStatusBadge";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { AccordionContent, AccordionItem } from "@/ui/accordion";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "./RunNodeIcon";
@@ -89,7 +90,7 @@ export function RunInspectorNodeAccordion({
           section.isQueued && isOpen && "bg-amber-100/80 text-slate-950 dark:bg-amber-950/40 dark:text-gray-100",
           !section.isQueued &&
             isOpen &&
-            "sticky top-8 z-20 bg-[#e1f5ff] text-slate-950 shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:bg-sky-950 dark:text-gray-100 dark:shadow-[0_1px_0_rgba(31,41,55,0.8)]",
+            "sticky top-8 z-20 bg-[#e1f5ff] text-slate-950 shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:bg-indigo-950 dark:text-gray-100 dark:shadow-[0_1px_0_rgba(31,41,55,0.8)]",
         )}
       >
         <NodeHeaderButton section={section} onSelectSection={onSelectSection}>
@@ -108,7 +109,7 @@ export function RunInspectorNodeAccordion({
             size={RUN_NODE_ICON_SIZE}
             className="text-slate-500 dark:text-gray-400"
           />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 dark:text-gray-100">
+          <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-slate-900 dark:text-gray-100">
             {section.nodeName}
           </span>
         </NodeHeaderButton>
@@ -294,17 +295,18 @@ function NodeMetadata({
   return (
     <div className="ml-auto flex shrink-0 items-center gap-3 px-4 text-xs text-slate-500 dark:text-gray-400">
       {section.isTrigger ? (
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
           disabled={rerunPending}
-          className="inline-flex h-6 items-center rounded-sm border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-100"
           onClick={(event) => {
             event.stopPropagation();
             onRerun();
           }}
         >
           {rerunPending ? "Rerun..." : "Rerun"}
-        </button>
+        </Button>
       ) : null}
       {(section.isTrigger || section.isQueued) && section.createdAt ? (
         <span>{formatEventTimestamp(section.createdAt)}</span>
@@ -327,17 +329,4 @@ function formatEventTimestamp(timestamp: string): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${pad(date.getHours())}:${pad(date.getMinutes())} - ${date.getDate()}.${months[date.getMonth()]}`;
-}
-
-function EventStatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded px-[5px] py-[1.5px] text-[10px] font-semibold uppercase tracking-wide text-white",
-        withEventStatusBadgeClasses(badgeColor),
-      )}
-    >
-      {label}
-    </span>
-  );
 }

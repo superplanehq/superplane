@@ -101,7 +101,7 @@ export function RunInspectorStepTimeline({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-3">
       {hasDetails || section.badge || section.createdAt ? (
         <DetailBox title="Summary">
           <RunNodeDetailDetailsView
@@ -112,7 +112,12 @@ export function RunInspectorStepTimeline({
         </DetailBox>
       ) : null}
 
-      <Accordion type="multiple" value={openValues} onValueChange={handlePreferenceChange}>
+      <Accordion
+        type="multiple"
+        className="flex flex-col gap-3"
+        value={openValues}
+        onValueChange={handlePreferenceChange}
+      >
         {timelineItems.map((item, index) => (
           <TimelineRail
             key={item.value}

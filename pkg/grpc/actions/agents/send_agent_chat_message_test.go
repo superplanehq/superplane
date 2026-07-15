@@ -37,9 +37,10 @@ func TestSendAgentChatMessage_ProjectsSuccess(t *testing.T) {
 	persistedID := uuid.New()
 
 	svc := &stubService{
-		sendMessage: func(_ context.Context, _, _, sid uuid.UUID, content string, _ []agentservice.MessageImage, mode string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(_ context.Context, _, _, sid uuid.UUID, content string, _ []agentservice.MessageImage, options agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
 			assert.Equal(t, chatID, sid)
-			assert.Equal(t, "operator", mode)
+			assert.Equal(t, "operator", options.Mode)
+			assert.False(t, options.AutoLayoutOnUpdateEnabled)
 			return &models.AgentSessionMessage{
 				ID:        persistedID,
 				Role:      models.AgentMessageRoleUser,
@@ -61,7 +62,7 @@ func TestSendAgentChatMessage_TranslatesNotFound(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	svc := &stubService{
-		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
 			return nil, gorm.ErrRecordNotFound
 		},
 	}
@@ -77,7 +78,7 @@ func TestSendAgentChatMessage_TranslatesBusySession(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	svc := &stubService{
-		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
 			return nil, agentservice.ErrSessionBusy
 		},
 	}
@@ -94,8 +95,8 @@ func TestSendAgentChatMessage_MapsBuilderMode(t *testing.T) {
 	defer r.Close()
 
 	svc := &stubService{
-		sendMessage: func(_ context.Context, _, _, _ uuid.UUID, _ string, _ []agentservice.MessageImage, mode string) (*models.AgentSessionMessage, error) {
-			assert.Equal(t, "builder", mode)
+		sendMessage: func(_ context.Context, _, _, _ uuid.UUID, _ string, _ []agentservice.MessageImage, options agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
+			assert.Equal(t, "builder", options.Mode)
 			return &models.AgentSessionMessage{
 				ID:        uuid.New(),
 				Role:      models.AgentMessageRoleUser,
@@ -113,13 +114,37 @@ func TestSendAgentChatMessage_MapsBuilderMode(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestSendAgentChatMessage_ForwardsAutoLayoutPreference(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	svc := &stubService{
+		sendMessage: func(_ context.Context, _, _, _ uuid.UUID, _ string, _ []agentservice.MessageImage, options agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
+			assert.True(t, options.AutoLayoutOnUpdateEnabled)
+			return &models.AgentSessionMessage{
+				ID:        uuid.New(),
+				Role:      models.AgentMessageRoleUser,
+				Content:   "build it",
+				CreatedAt: now(),
+			}, nil
+		},
+	}
+
+	_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
+		ChatId:                    uuid.NewString(),
+		Content:                   "build it",
+		AutoLayoutOnUpdateEnabled: true,
+	})
+	require.NoError(t, err)
+}
+
 func TestSendAgentChatMessage_ForwardsAndSerializesImages(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
 	var forwarded []agentservice.MessageImage
 	svc := &stubService{
-		sendMessage: func(_ context.Context, _, _, _ uuid.UUID, content string, images []agentservice.MessageImage, _ string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(_ context.Context, _, _, _ uuid.UUID, content string, images []agentservice.MessageImage, _ agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
 			forwarded = images
 			return &models.AgentSessionMessage{
 				ID:        uuid.New(),

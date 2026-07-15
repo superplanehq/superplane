@@ -45,6 +45,7 @@ type ChatConversationProps = {
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
+  isAutoLayoutOnUpdateEnabled: boolean;
   onAgentStagingReady?: AgentStagingReadyHandler;
   onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
   liveCanvasVersionId?: string;
@@ -94,6 +95,7 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
       agentMode={toolSidebarState.agentMode}
       onModeSwitch={toolSidebarState.switchAgentMode}
       isEditing={toolSidebarState.isEditing}
+      isAutoLayoutOnUpdateEnabled={toolSidebarState.isAutoLayoutOnUpdateEnabled}
       onAgentStagingReady={toolSidebarState.onAgentStagingReady}
       onAgentStagingCommit={toolSidebarState.onAgentStagingCommit}
       liveCanvasVersionId={toolSidebarState.liveCanvasVersionId}
@@ -112,6 +114,7 @@ function ChatConversation({
   agentMode,
   onModeSwitch,
   isEditing,
+  isAutoLayoutOnUpdateEnabled,
   onAgentStagingReady,
   onAgentStagingCommit,
   liveCanvasVersionId,
@@ -136,11 +139,12 @@ function ChatConversation({
   useStreamingStatusReconciler(status, setStatus, refreshChatStatus);
 
   const showThinking = useThinkingIndicator(rawMessages, status);
-  useAgentChatBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, agentMode });
+  useAgentChatBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, agentMode, isAutoLayoutOnUpdateEnabled });
   const handlers = useAgentConversationHandlers({
     agentMode,
     chatId,
     canvasId,
+    isAutoLayoutOnUpdateEnabled,
     isBusy: status === "streaming" || outcomeMutation.isPending || isOutcomeActive(outcomeState),
     outcomeMutation,
     interruptMutation,
