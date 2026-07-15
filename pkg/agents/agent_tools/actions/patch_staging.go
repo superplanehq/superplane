@@ -333,36 +333,50 @@ func normalizePatchOp(op string) string {
 }
 
 func patchChangeNode(operation PatchOperation) (*changesets.ChangeNode, error) {
-	if operation.Node == nil {
+	if operation.Node == nil && operation.Position == nil {
 		return nil, fmt.Errorf("node is required")
 	}
 
 	node := &changesets.ChangeNode{
-		ID:            strings.TrimSpace(operation.Node.ID),
-		Name:          operation.Node.Name,
-		Block:         strings.TrimSpace(operation.Node.Component),
-		IntegrationID: strings.TrimSpace(operation.Node.IntegrationID),
-		IsCollapsed:   operation.Node.IsCollapsed,
-	}
-	if node.ID == "" {
-		node.ID = strings.TrimSpace(operation.NodeID)
+		ID: strings.TrimSpace(operation.NodeID),
 	}
 
-	if operation.Node.Configuration != nil {
+	if operation.Node != nil {
+		node.ID = strings.TrimSpace(operation.Node.ID)
+		node.Name = operation.Node.Name
+		node.Block = strings.TrimSpace(operation.Node.Component)
+		node.IntegrationID = strings.TrimSpace(operation.Node.IntegrationID)
+		node.IsCollapsed = operation.Node.IsCollapsed
+		if node.ID == "" {
+			node.ID = strings.TrimSpace(operation.NodeID)
+		}
+	}
+
+	if operation.Node != nil && operation.Node.Configuration != nil {
 		configuration, err := structpb.NewStruct(operation.Node.Configuration)
 		if err != nil {
 			return nil, fmt.Errorf("invalid node configuration: %w", err)
 		}
 		node.Configuration = configuration
 	}
-	if operation.Node.Position != nil {
+	if position := patchNodePosition(operation); position != nil {
 		node.Position = &componentpb.Position{
-			X: int32(operation.Node.Position.X),
-			Y: int32(operation.Node.Position.Y),
+			X: int32(position.X),
+			Y: int32(position.Y),
 		}
 	}
 
 	return node, nil
+}
+
+func patchNodePosition(operation PatchOperation) *PatchPosition {
+	if operation.Position != nil {
+		return operation.Position
+	}
+	if operation.Node != nil {
+		return operation.Node.Position
+	}
+	return nil
 }
 
 func patchNodeID(operation PatchOperation) string {
@@ -397,6 +411,10 @@ func resolvePatchStagingAutoLayout(
 	originalEdges []models.Edge,
 	finalNodes []models.Node,
 ) *layout.AutoLayout {
+	if input != nil && input.Enabled != nil && !*input.Enabled {
+		return nil
+	}
+
 	if input == nil {
 		nodeIDs := defaultPatchStagingAutoLayoutNodeIDs(changeset, originalEdges, finalNodes)
 		if len(nodeIDs) == 0 {
@@ -429,6 +447,7 @@ func resolvePatchStagingAutoLayout(
 
 func isEmptyAutoLayoutInput(input *AutoLayoutInput) bool {
 	return input != nil &&
+		(input.Enabled == nil || *input.Enabled) &&
 		strings.TrimSpace(input.Scope) == "" &&
 		len(input.NodeIDs) == 0
 }

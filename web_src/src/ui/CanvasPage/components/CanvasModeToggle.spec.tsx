@@ -113,9 +113,10 @@ describe("CanvasModeToggle", () => {
     const tabList = screen.getByRole("navigation", { name: "Canvas view" });
     expect(tabList.className).toContain("bg-orange-200");
     const activeTab = screen.getByRole("link", { name: "Canvas (editing)" });
-    expect(activeTab.className).toContain("bg-orange-100");
-    expect(activeTab.className).toContain("font-bold");
-    expect(activeTab.className).not.toContain("bg-white");
+    expect(activeTab.className).toContain("bg-white");
+    expect(activeTab.className).toContain("shadow-sm");
+    expect(activeTab.className).toContain("font-medium");
+    expect(activeTab.className).not.toContain("font-bold");
     expect(screen.getByTestId("canvas-view-mode-live-uncommitted-dot")).toHaveClass("bg-orange-500");
     expect(screen.getByTestId("canvas-view-mode-console-uncommitted-dot")).toHaveClass("bg-orange-500");
   });
@@ -137,7 +138,7 @@ describe("CanvasModeToggle", () => {
     expect(tabList.className).not.toContain("bg-blue-50");
 
     const consoleTab = screen.getByRole("link", { name: "Console" });
-    expect(consoleTab.className).toContain("text-orange-800/80");
+    expect(consoleTab.className).toContain("text-orange-950/80");
 
     expect(screen.getByTestId("canvas-view-mode-live-committed-dot")).toHaveClass("bg-blue-500");
   });
