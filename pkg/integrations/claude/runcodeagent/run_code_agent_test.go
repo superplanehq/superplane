@@ -328,6 +328,8 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 		resp(`{"id":"sess_1","status":"idle"}`),
 		resp(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Done. PR_URL=https://github.com/o/r/pull/7"}]}]}`),
+		resp(`{"data":[{"id":"file_out1","filename":"migration-notes.md","mime_type":"text/markdown","size_bytes":2048,"downloadable":true}]}`), // session artifacts
+		resp("# Migration notes\n"),                    // artifact content
 		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), // teardown
 	}}
 	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
@@ -348,6 +350,11 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 	assert.Equal(t, "idle", out.Status)
 	assert.Equal(t, "https://github.com/o/r/pull/7", out.PrURL)
 	assert.Equal(t, "claude/agent-abc", out.Branch)
+	require.Len(t, out.Artifacts, 1)
+	assert.Equal(t, "file_out1", out.Artifacts[0].FileID)
+	assert.Equal(t, "migration-notes.md", out.Artifacts[0].Filename)
+	assert.Equal(t, "text", out.Artifacts[0].Encoding)
+	assert.Equal(t, "# Migration notes\n", out.Artifacts[0].Content)
 }
 
 func Test__RunCodeAgent__poll__timeoutReclaims(t *testing.T) {
@@ -542,4 +549,33 @@ func Test__RunCodeAgent__resolvePullRequestForRun__missingRef(t *testing.T) {
 	_, err := resolvePullRequestForRun(ctx, Spec{PrURL: "https://github.com/o/r/pull/1"}, "tok")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing its base repository or head branch")
+}
+
+func Test__RunCodeAgent__poll__terminalWithUnavailableEventsPastBudget(t *testing.T) {
+	a := &RunCodeAgent{}
+	// The session is terminal but its events are unavailable and the poll
+	// budget is exhausted: the run must still finish (no artifacts) instead
+	// of panicking on the missing session messages.
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"sess_1","status":"idle"}`),
+		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`boom`))}, // events fetch fails
+		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`), // teardown
+	}}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(maxPollAttempts + 1), "errors": float64(0)},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       terminalMeta(),
+		ExecutionState: execState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, execState.Finished)
+	out := execState.Payloads[0].(map[string]any)["data"].(OutputPayload)
+	assert.Equal(t, "idle", out.Status)
+	assert.Nil(t, out.Artifacts)
 }

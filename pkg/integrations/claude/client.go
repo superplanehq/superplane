@@ -3,6 +3,7 @@ package claude
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -22,6 +24,10 @@ const (
 	// anthropicFilesBeta is required to upload files and to reference a file_id
 	// from a content block on the Messages API.
 	anthropicFilesBeta = "files-api-2025-04-14"
+	// generationTimeout bounds model generation requests. They block until the
+	// model — and any server-side tools like code execution — finish, which
+	// regularly takes longer than the platform's default request timeout.
+	generationTimeout = 5 * time.Minute
 )
 
 type Client struct {
@@ -64,6 +70,7 @@ type CreateMessageRequest struct {
 	MaxTokens    int           `json:"max_tokens,omitempty"`
 	Temperature  *float64      `json:"temperature,omitempty"`
 	OutputConfig *OutputConfig `json:"output_config,omitempty"`
+	Tools        []any         `json:"tools,omitempty"`
 }
 
 // OutputConfig configures Claude's response format (structured outputs).
@@ -81,6 +88,10 @@ type OutputFormat struct {
 type MessageContent struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
+	// Content carries the nested payload of tool-result blocks (e.g. code
+	// execution results referencing generated file_ids). Kept raw so unknown
+	// block shapes round-trip untouched.
+	Content json.RawMessage `json:"content,omitempty"`
 }
 
 type MessageUsage struct {
@@ -105,6 +116,17 @@ type ModelsResponse struct {
 
 type Model struct {
 	ID string `json:"id"`
+}
+
+// FileMetadata is a file stored in the Anthropic Files API.
+type FileMetadata struct {
+	ID           string `json:"id"`
+	Type         string `json:"type"`
+	Filename     string `json:"filename"`
+	MimeType     string `json:"mime_type"`
+	SizeBytes    int64  `json:"size_bytes"`
+	CreatedAt    string `json:"created_at"`
+	Downloadable bool   `json:"downloadable"`
 }
 
 type claudeErrorResponse struct {
@@ -159,12 +181,19 @@ func (c *Client) CreateMessage(req CreateMessageRequest) (*CreateMessageResponse
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
+	// The files beta is needed both to reference uploaded file_ids and to
+	// fetch the files that server tools (e.g. code execution) generate.
 	beta := ""
-	if requestReferencesFiles(req) {
+	if requestReferencesFiles(req) || len(req.Tools) > 0 {
 		beta = anthropicFilesBeta
 	}
 
-	responseBody, err := c.execRequestWithBeta(http.MethodPost, c.BaseURL+"/messages", bytes.NewBuffer(reqBody), beta)
+	// Generations block until the model finishes, so this request asks for
+	// more time than the platform's default request timeout allows.
+	ctx, cancel := context.WithTimeout(context.Background(), generationTimeout)
+	defer cancel()
+
+	responseBody, err := c.doRequestCtx(ctx, http.MethodPost, c.BaseURL+"/messages", bytes.NewBuffer(reqBody), c.APIKey, beta)
 	if err != nil {
 		return nil, err
 	}
@@ -270,6 +299,40 @@ func (c *Client) DeleteFile(fileID string) error {
 	return err
 }
 
+// GetFileMetadata retrieves a single file's metadata (GET /v1/files/{id}).
+func (c *Client) GetFileMetadata(fileID string) (*FileMetadata, error) {
+	if fileID == "" {
+		return nil, fmt.Errorf("file id is required")
+	}
+
+	responseBody, err := c.execRequestWithBeta(http.MethodGet, c.BaseURL+"/files/"+url.PathEscape(fileID), nil, anthropicFilesBeta)
+	if err != nil {
+		return nil, err
+	}
+
+	var file FileMetadata
+	if err := json.Unmarshal(responseBody, &file); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal file metadata: %v", err)
+	}
+	return &file, nil
+}
+
+// DownloadFile fetches a file's raw content (GET /v1/files/{id}/content).
+// Only files with downloadable=true (created by code execution, skills, or
+// agent sessions) can be downloaded; the API rejects user-uploaded files.
+func (c *Client) DownloadFile(fileID string) ([]byte, error) {
+	if fileID == "" {
+		return nil, fmt.Errorf("file id is required")
+	}
+	return c.execRequestWithBeta(http.MethodGet, c.FileContentURL(fileID), nil, anthropicFilesBeta)
+}
+
+// FileContentURL returns the programmatic download link for a file. Requests
+// to it require the API key headers, including the files beta.
+func (c *Client) FileContentURL(fileID string) string {
+	return c.BaseURL + "/files/" + url.PathEscape(fileID) + "/content"
+}
+
 func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error) {
 	return c.execRequestWithBeta(method, URL, body, "")
 }
@@ -283,7 +346,11 @@ func (c *Client) execAdminRequest(method, URL string, body io.Reader) ([]byte, e
 }
 
 func (c *Client) doRequest(method, URL string, body io.Reader, apiKey, beta string) ([]byte, error) {
-	req, err := http.NewRequest(method, URL, body)
+	return c.doRequestCtx(context.Background(), method, URL, body, apiKey, beta)
+}
+
+func (c *Client) doRequestCtx(ctx context.Context, method, URL string, body io.Reader, apiKey, beta string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, method, URL, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %v", err)
 	}
