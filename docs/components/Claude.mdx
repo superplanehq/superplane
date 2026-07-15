@@ -20,6 +20,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 To get new Claude API key, go to [platform.claude.com](https://platform.claude.com).
 
+## Files & artifacts
+
+The Files API is in beta: SuperPlane enables it per request via the `anthropic-beta` header, so no console toggle is needed and a standard API key suffices. Files and sessions are scoped to the API key's workspace. For **Run Claude Agent** artifacts, the agent must save its deliverables under `/mnt/session/outputs/`.
+
 <a id="create-batch-message"></a>
 
 ## Create Batch Message
@@ -251,11 +255,24 @@ The **Run Claude Agent** component uses [Claude Managed Agents](https://platform
 
 Emits a finished payload with **session** status, **session id**, and the final **agent message** when available so downstream steps can branch or consume the result. For failure cases the status is still emitted when the **session** is *terminated* or the step times out.
 
+Files the agent saves under `/mnt/session/outputs/` are emitted as **artifacts** with their content included in the payload (text files as plain text, everything else base64-encoded; files over 10MB carry metadata and a download link only). Instruct the agent in the task to save its deliverables there.
+
 ### Example Output
 
 ```json
 {
   "data": {
+    "artifacts": [
+      {
+        "content": "# Report\n\nAll checks passed.\n",
+        "downloadUrl": "https://api.anthropic.com/v1/files/file_011CNha8iCJcU1wXNR6q4V8w/content",
+        "encoding": "text",
+        "fileId": "file_011CNha8iCJcU1wXNR6q4V8w",
+        "filename": "report.md",
+        "mimeType": "text/markdown",
+        "sizeBytes": 4096
+      }
+    ],
     "lastMessage": "Finished the requested task.",
     "messages": [
       "Let me check the documentation...",
@@ -291,11 +308,24 @@ The **Run Code Agent** component runs an autonomous Claude coding agent using [C
 
 Emits the final **status**, the **pull request URL**, the working **branch**, and a **summary** so downstream steps can branch or post the result.
 
+Files the agent saves under `/mnt/session/outputs/` are additionally emitted as **artifacts** with their content included in the payload (text files as plain text, everything else base64-encoded; files over 10MB carry metadata and a download link only).
+
 ### Example Output
 
 ```json
 {
   "data": {
+    "artifacts": [
+      {
+        "content": "# Migration notes\n\nRenamed the legacy column.\n",
+        "downloadUrl": "https://api.anthropic.com/v1/files/file_011CNha8iCJcU1wXNR6q4V8w/content",
+        "encoding": "text",
+        "fileId": "file_011CNha8iCJcU1wXNR6q4V8w",
+        "filename": "migration-notes.md",
+        "mimeType": "text/markdown",
+        "sizeBytes": 2048
+      }
+    ],
     "branch": "claude/agent-1a2b3c4d5e6f",
     "lastMessage": "Done. PR_URL=https://github.com/owner/repo/pull/42",
     "prUrl": "https://github.com/owner/repo/pull/42",
@@ -327,6 +357,7 @@ The Text Prompt component uses Anthropic's Claude models to generate text respon
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
 - **Prompt**: The main user message or instruction.
 - **Files**: (Optional) Files from the Files tab (images, PDFs, or text) to attach alongside the prompt.
+- **Code Execution**: (Optional) Allow Claude to write and run code in Anthropic's sandbox. Files it creates are emitted as artifacts.
 - **Structured Output**: (Optional) A JSON Schema the response must match, available on the parsed output.
 
 ### Output
@@ -337,6 +368,7 @@ Returns a payload containing:
 - **stopReason**: Why the generation ended (e.g., "end_turn", "max_tokens").
 - **model**: The specific model version used.
 - **parsed**: When Structured Output is configured, the response parsed into an object (only on a normal end_turn completion).
+- **artifacts**: When Code Execution is enabled, the files Claude generated, with the file content included: text files as plain text (`encoding: "text"`), everything else base64-encoded (`encoding: "base64"`). Each artifact carries fileId, filename, mimeType, sizeBytes, and a downloadUrl; files over 10MB include metadata and the download link only.
 
 ### Notes
 
@@ -349,6 +381,17 @@ Returns a payload containing:
 ```json
 {
   "data": {
+    "artifacts": [
+      {
+        "content": "service,status\napi,deployed\n",
+        "downloadUrl": "https://api.anthropic.com/v1/files/file_011CNha8iCJcU1wXNR6q4V8w/content",
+        "encoding": "text",
+        "fileId": "file_011CNha8iCJcU1wXNR6q4V8w",
+        "filename": "deployment-summary.csv",
+        "mimeType": "text/csv",
+        "sizeBytes": 2048
+      }
+    ],
     "id": "msg_01X9JGt5...123456",
     "model": "claude-3-5-sonnet-latest",
     "parsed": {
