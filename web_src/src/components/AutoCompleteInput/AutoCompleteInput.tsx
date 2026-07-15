@@ -1364,7 +1364,12 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const showBottomBar = showPreviewToggle || (isFocused && !!quickTip);
 
     return (
-      <div ref={containerRef} className={twMerge(["relative w-full", fullHeight && "flex h-full flex-col"])}>
+      <div
+        ref={containerRef}
+        data-autocomplete-input=""
+        data-autocomplete-suggestions-open={isOpen && suggestions.length > 0 ? "" : undefined}
+        className={twMerge(["relative w-full", fullHeight && "flex h-full flex-col"])}
+      >
         {/* Hidden mirror element for measuring cursor position */}
         <div
           ref={mirrorRef}

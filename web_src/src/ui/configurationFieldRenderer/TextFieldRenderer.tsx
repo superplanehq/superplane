@@ -312,7 +312,6 @@ const ExpandableEditorDialogSession: React.FC<ExpandableEditorDialogSessionProps
   headerActions,
 }) => {
   const [draft, setDraft] = React.useState(initialValue);
-  const contentRef = React.useRef<HTMLDivElement>(null);
 
   const handleSave = () => {
     onSave(draft);
@@ -334,10 +333,10 @@ const ExpandableEditorDialogSession: React.FC<ExpandableEditorDialogSessionProps
   };
 
   const handleEscapeKeyDown = (event: KeyboardEvent) => {
-    const autocompleteIsFocused = contentRef.current?.contains(document.activeElement);
-    const autocompleteSuggestionsAreOpen =
-      autocompleteIsFocused && document.querySelector("[data-autocomplete-suggestions]");
     const target = event.target as Element | null;
+    const autocompleteSuggestionsAreOpen = target?.closest(
+      "[data-autocomplete-input][data-autocomplete-suggestions-open]",
+    );
     const monacoEditor = target?.closest(".monaco-editor");
     const monacoSuggestionsAreOpen = monacoEditor?.querySelector(".suggest-widget.visible");
     if (autocompleteSuggestionsAreOpen || monacoSuggestionsAreOpen) {
@@ -347,7 +346,6 @@ const ExpandableEditorDialogSession: React.FC<ExpandableEditorDialogSessionProps
 
   return (
     <DialogContent
-      ref={contentRef}
       size="90vw"
       className="flex flex-col gap-0 overflow-hidden p-0"
       onClick={(e) => e.stopPropagation()}

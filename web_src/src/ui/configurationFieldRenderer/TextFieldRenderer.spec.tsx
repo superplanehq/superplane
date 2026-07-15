@@ -185,6 +185,61 @@ describe("TextFieldRenderer expression-aware expansion", () => {
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
     expect(onChange).toHaveBeenLastCalledWith("{{ root");
   });
+
+  it("closes with Escape when inline autocomplete suggestions are still mounted", async () => {
+    const onChange = vi.fn();
+    render(
+      <ControlledText
+        field={textField({ name: "message", label: "Message" })}
+        initialValue="{{ "
+        onChange={onChange}
+        allowExpressions
+      />,
+    );
+
+    const inlineInput = screen.getByTestId("text-field-message") as HTMLTextAreaElement;
+    inlineInput.focus();
+    fireEvent.change(inlineInput, { target: { value: "{{ root" } });
+    expect(await screen.findByTestId("autocomplete-suggestions")).toBeInTheDocument();
+
+    inlineInput.blur();
+    fireEvent.click(screen.getByRole("button", { name: /expand message editor/i }));
+    const modalInput = screen.getByTestId("text-field-message-modal-input");
+    fireEvent.change(modalInput, { target: { value: "Discard me" } });
+
+    const cancelButton = screen.getByRole("button", { name: /cancel/i });
+    cancelButton.focus();
+    fireEvent.keyDown(cancelButton, { key: "Escape" });
+
+    expect(screen.queryByTestId("text-field-message-modal-input")).not.toBeInTheDocument();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith("{{ root");
+  });
+
+  it("closes with Escape after focus leaves an autocomplete whose suggestions are still mounted", async () => {
+    const onChange = vi.fn();
+    render(
+      <ControlledText
+        field={textField({ name: "message", label: "Message" })}
+        initialValue="{{ "
+        onChange={onChange}
+        allowExpressions
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /expand message editor/i }));
+    const modalInput = screen.getByTestId("text-field-message-modal-input") as HTMLTextAreaElement;
+    modalInput.focus();
+    fireEvent.change(modalInput, { target: { value: "{{ root" } });
+    expect(await screen.findByTestId("autocomplete-suggestions")).toBeInTheDocument();
+
+    const cancelButton = screen.getByRole("button", { name: /cancel/i });
+    cancelButton.focus();
+    fireEvent.keyDown(cancelButton, { key: "Escape" });
+
+    expect(screen.queryByTestId("text-field-message-modal-input")).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
 
 describe("TextFieldRenderer draft isolation edge cases", () => {
