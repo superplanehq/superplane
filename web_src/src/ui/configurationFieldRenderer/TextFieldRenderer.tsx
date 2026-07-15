@@ -329,7 +329,12 @@ const ExpandableEditorDialogSession: React.FC<ExpandableEditorDialogSessionProps
 
   const handleEscapeKeyDown = (event: KeyboardEvent) => {
     const autocompleteIsFocused = contentRef.current?.contains(document.activeElement);
-    if (autocompleteIsFocused && document.querySelector("[data-autocomplete-suggestions]")) {
+    const autocompleteSuggestionsAreOpen =
+      autocompleteIsFocused && document.querySelector("[data-autocomplete-suggestions]");
+    const target = event.target as Element | null;
+    const monacoEditor = target?.closest(".monaco-editor");
+    const monacoSuggestionsAreOpen = monacoEditor?.querySelector(".suggest-widget.visible");
+    if (autocompleteSuggestionsAreOpen || monacoSuggestionsAreOpen) {
       event.preventDefault();
     }
   };

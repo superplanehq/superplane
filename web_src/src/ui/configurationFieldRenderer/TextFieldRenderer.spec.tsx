@@ -22,15 +22,25 @@ vi.mock("@monaco-editor/react", async () => {
     }) {
       monacoRenderValues.push(value ?? "");
       const [editorValue, setEditorValue] = useMockState(value ?? "");
+      const [suggestionsVisible, setSuggestionsVisible] = useMockState(false);
       return (
-        <textarea
-          aria-label="Monaco editor"
-          value={editorValue}
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-            setEditorValue(event.currentTarget.value);
-            onChange?.(event.currentTarget.value);
-          }}
-        />
+        <div className="monaco-editor">
+          <textarea
+            aria-label="Monaco editor"
+            value={editorValue}
+            onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
+              setEditorValue(event.currentTarget.value);
+              setSuggestionsVisible(true);
+              onChange?.(event.currentTarget.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setSuggestionsVisible(false);
+              }
+            }}
+          />
+          {suggestionsVisible ? <div className="suggest-widget visible" /> : null}
+        </div>
       );
     },
   };
@@ -296,6 +306,25 @@ describe("TextFieldRenderer code editor expansion", () => {
     expect(onChange).not.toHaveBeenCalled();
     const inlineEditor = screen.getByLabelText("Monaco editor") as HTMLTextAreaElement;
     expect(inlineEditor.value).toBe("echo hi");
+  });
+
+  it("dismisses Monaco suggestions with Escape without closing the dialog or losing the draft", () => {
+    const onChange = vi.fn();
+    render(<ControlledText field={codeField} initialValue="echo hi" onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /expand script editor/i }));
+    const modalEditor = (screen.getAllByLabelText("Monaco editor") as HTMLTextAreaElement[])[1];
+    fireEvent.change(modalEditor, { target: { value: "echo staged" } });
+
+    expect(document.querySelector(".monaco-editor .suggest-widget.visible")).toBeInTheDocument();
+    fireEvent.keyDown(modalEditor, { key: "Escape" });
+
+    expect(document.querySelector(".monaco-editor .suggest-widget.visible")).not.toBeInTheDocument();
+    expect(screen.getByTestId("text-field-script-modal")).toBeInTheDocument();
+    expect(modalEditor).toHaveValue("echo staged");
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(onChange).toHaveBeenLastCalledWith("echo staged");
   });
 
   it("mounts Monaco with the latest value when the dialog is reopened", () => {
