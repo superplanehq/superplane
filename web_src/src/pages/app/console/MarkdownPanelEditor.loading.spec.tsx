@@ -21,6 +21,7 @@ function mockVariables(result: Partial<MarkdownVariablesResult>) {
     isLoading: false,
     baseLoading: false,
     sideloadLoading: false,
+    searchingNames: [],
     errors: [],
     ...result,
   });
