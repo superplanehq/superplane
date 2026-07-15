@@ -130,6 +130,29 @@ func Test__DispatchOnError(t *testing.T) {
 
 		assert.Empty(t, newEvents)
 	})
+
+	t.Run("does not emit when execution was already finished", func(t *testing.T) {
+		newEvents := []models.CanvasEvent{}
+		onNewEvents := func(events []models.CanvasEvent) {
+			newEvents = append(newEvents, events...)
+		}
+
+		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNodeID, "default", nil)
+		execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNodeID, rootEvent.ID, rootEvent.ID)
+		require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+			"state":  models.CanvasNodeExecutionStateFinished,
+			"result": models.CanvasNodeExecutionResultPassed,
+		}).Error)
+
+		ctx := NewExecutionStateContext(database.Conn(), execution, onNewEvents)
+		require.NoError(t, ctx.Fail(models.CanvasNodeExecutionResultReasonError, "late failure"))
+
+		assert.Empty(t, newEvents)
+
+		var updatedExecution models.CanvasNodeExecution
+		require.NoError(t, database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error)
+		assert.Equal(t, models.CanvasNodeExecutionResultPassed, updatedExecution.Result)
+	})
 }
 
 func Test__DispatchOnError__NoOnErrorNodes(t *testing.T) {
