@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { buildNodeMap, buildRunPresentation, type RunStatusFilter } from "@/ui/Runs/runPresentation";
+import { runMatchesStatusTriggerFilters } from "@/ui/Runs/runStatusTriggerFilter";
 import { loadPersistedFilters, savePersistedFilters } from "./filterPersistence";
 import type { TriggerOption } from "./RunFiltersPopover";
 
@@ -49,22 +50,25 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
 
   const decoratedRuns = useMemo(() => runs.map((run) => buildRunPresentation(run, nodeMap)), [runs, nodeMap]);
 
+  const statusTriggerFilters = useMemo(
+    () => ({
+      statuses: selectedStatuses.size > 0 ? Array.from(selectedStatuses) : undefined,
+      triggers: selectedTriggerIds.size > 0 ? Array.from(selectedTriggerIds) : undefined,
+    }),
+    [selectedStatuses, selectedTriggerIds],
+  );
+
   const filteredRuns = useMemo(() => {
     const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
-    return decoratedRuns.filter(({ run, status, haystack }) => {
-      if (selectedStatuses.size > 0 && (status === "unknown" || !selectedStatuses.has(status))) return false;
-
-      if (selectedTriggerIds.size > 0) {
-        const triggerNodeId = run.rootEvent?.nodeId;
-        if (!triggerNodeId || !selectedTriggerIds.has(triggerNodeId)) return false;
-      }
-
+    return decoratedRuns.filter(({ run, haystack }) => {
+      // Shared matcher with console run datasources — keeps status/trigger
+      // semantics identical across the sidebar and widget surfaces.
+      if (!runMatchesStatusTriggerFilters(run, statusTriggerFilters)) return false;
       if (normalizedSearchQuery && !haystack.includes(normalizedSearchQuery)) return false;
-
       return true;
     });
-  }, [decoratedRuns, searchQuery, selectedStatuses, selectedTriggerIds]);
+  }, [decoratedRuns, searchQuery, statusTriggerFilters]);
 
   const orderedRuns = useMemo(
     () => ({

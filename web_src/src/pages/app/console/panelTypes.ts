@@ -3,6 +3,7 @@
  * Keep the backend Go validator (`pkg/models/console_yml.go`) in lockstep.
  */
 
+import type { RunStatusFilter } from "@/ui/Runs/runStatusFilterVocab";
 import type {
   WidgetChartRender,
   WidgetNumberAggregation,
@@ -28,10 +29,24 @@ import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent
 import { validateNumberContent } from "./numberContentValidation";
 import { validateMarkdownContent, type MarkdownVariable } from "./markdownVariables";
 import { asObject, optionalBooleanError, optionalStringError } from "./panelContentValidation";
+import {
+  normalizeTableDataSource,
+  validateRunStatusesArray,
+  validateRunTriggersArray,
+} from "./runDataSourceFilterSchema";
 import { validateScorecardContent } from "./scorecardRenderValidation";
 
 // Re-export markdown-variable types so existing import paths keep working.
 export * from "./markdownVariables";
+
+// Re-export runs filter schema helpers so existing import paths keep working.
+export {
+  normalizeRunStatuses,
+  normalizeRunTriggers,
+  normalizeRunsDataSource,
+  validateRunStatusesArray,
+  validateRunTriggersArray,
+} from "./runDataSourceFilterSchema";
 
 // Re-export the shared object narrow so downstream validators
 // (e.g. `chartRenderValidation.ts`) keep their existing import path.
@@ -186,7 +201,14 @@ export interface NumberMetric {
 export type TablePanelDataSource =
   | { kind: "memory"; namespace: string; fieldPath?: string }
   | { kind: "executions"; node?: string; limit?: number }
-  | { kind: "runs"; limit?: number };
+  | {
+      kind: "runs";
+      limit?: number;
+      /** See {@link WidgetRunsDataSource.statuses}. */
+      statuses?: RunStatusFilter[];
+      /** See {@link WidgetRunsDataSource.triggers}. */
+      triggers?: string[];
+    };
 export type ChartPanelDataSource = TablePanelDataSource;
 
 /** How partial aggregates from a composite memory data source are combined into a single value. */
@@ -377,7 +399,7 @@ export function validateDataSource(value: unknown): string | null {
   if (!obj) return "dataSource must be an object.";
   if (obj.kind === "memory") return validateMemoryDataSource(obj);
   if (obj.kind === "executions") return validateExecutionsDataSource(obj);
-  if (obj.kind === "runs") return validateLimit(obj);
+  if (obj.kind === "runs") return validateRunsDataSource(obj);
   return 'dataSource.kind must be "memory", "executions", or "runs".';
 }
 
@@ -396,6 +418,14 @@ function validateLimit(obj: Record<string, unknown>): string | null {
     return "dataSource.limit must be a number.";
   }
   return null;
+}
+
+function validateRunsDataSource(obj: Record<string, unknown>): string | null {
+  const limitError = validateLimit(obj);
+  if (limitError) return limitError;
+  const statusesError = validateRunStatusesArray(obj.statuses, "dataSource.statuses");
+  if (statusesError) return statusesError;
+  return validateRunTriggersArray(obj.triggers, "dataSource.triggers");
 }
 
 function validateExecutionsDataSource(obj: Record<string, unknown>): string | null {
@@ -513,40 +543,9 @@ function normalizeTableWhere(raw: unknown): WidgetTableFilter[] | undefined {
     const op = typeof item.op === "string" ? item.op : "eq";
     const field = typeof item.field === "string" ? item.field : "";
     if (!field.trim() || !WIDGET_FILTER_OPS.includes(op as WidgetTableFilter["op"])) return [];
-    return [{ field, op: op as WidgetTableFilter["op"], value: stringOrUndefined(item.value) }];
+    const value = typeof item.value === "string" ? item.value : undefined;
+    return [{ field, op: op as WidgetTableFilter["op"], value }];
   });
-}
-
-function normalizeTableDataSource(raw: unknown): TablePanelDataSource {
-  const ds = asObject(raw);
-  if (ds?.kind === "executions") return normalizeExecutionsDataSource(ds);
-  if (ds?.kind === "runs") return { kind: "runs", limit: optionalNumber(ds.limit) };
-  if (ds?.kind === "memory") return normalizeMemoryDataSource(ds);
-  return { kind: "memory", namespace: "" };
-}
-
-function normalizeExecutionsDataSource(ds: Record<string, unknown>): TablePanelDataSource {
-  return {
-    kind: "executions",
-    node: stringOrUndefined(ds.node),
-    limit: optionalNumber(ds.limit),
-  };
-}
-
-function optionalNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function normalizeMemoryDataSource(ds: Record<string, unknown>): TablePanelDataSource {
-  return {
-    kind: "memory",
-    namespace: typeof ds.namespace === "string" ? ds.namespace : "",
-    fieldPath: stringOrUndefined(ds.fieldPath),
-  };
-}
-
-function stringOrUndefined(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
 }
 
 function validateTableColumns(columns: unknown): string | null {
