@@ -326,7 +326,7 @@ function isContextPrompt(prompt: string): boolean {
 }
 
 function isQuestionOption(option: string): boolean {
-  return option.trim().endsWith("?");
+  return stripMarkdownEmphasis(option).trim().endsWith("?");
 }
 
 function stripMarkdownEmphasis(value: string): string {

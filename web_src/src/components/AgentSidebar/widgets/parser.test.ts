@@ -218,6 +218,32 @@ Choose the question to ask next:
     ]);
   });
 
+  it("treats markdown-emphasized question bullet items as separate free-text questions", () => {
+    const segments = parseAgentContent(`:::survey
+**When you tested \`/download-report\`:**
+- **Did you first create a PR to trigger the agent and let it finish analyzing?**
+- **Did you wait for the agent to complete before commenting \`/download-report\`?**
+:::`);
+
+    expect(segments).toEqual([
+      {
+        type: "survey",
+        questions: [
+          {
+            prompt: "**Did you first create a PR to trigger the agent and let it finish analyzing?**",
+            options: [],
+            hasInput: true,
+          },
+          {
+            prompt: "**Did you wait for the agent to complete before commenting `/download-report`?**",
+            options: [],
+            hasInput: true,
+          },
+        ],
+      },
+    ]);
+  });
+
   it("preserves full markdown bodies inside categorized rubric sections", () => {
     const content = `:::rubric HTTP Monitor Spec
 ## Flow
