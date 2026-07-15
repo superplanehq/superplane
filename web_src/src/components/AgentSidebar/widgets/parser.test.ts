@@ -161,6 +161,31 @@ Which environment should we deploy to?
     ]);
   });
 
+  it("keeps multiple-choice survey question options together", () => {
+    const segments = parseAgentContent(`:::survey
+Choose the question to ask next:
+- Did the agent finish analyzing the PR?
+- Was a report generated for the run?
+- Is the download command being run on the same PR?
+:::`);
+
+    expect(segments).toEqual([
+      {
+        type: "survey",
+        questions: [
+          {
+            prompt: "Choose the question to ask next:",
+            options: [
+              "Did the agent finish analyzing the PR?",
+              "Was a report generated for the run?",
+              "Is the download command being run on the same PR?",
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
   it("treats question-like survey bullet items as separate free-text questions", () => {
     const segments = parseAgentContent(`:::survey
 **When you tested \`/download-report\`:**

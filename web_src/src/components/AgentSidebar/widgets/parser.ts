@@ -279,7 +279,7 @@ function parseSurvey(raw: string): SurveySegment {
   const flushCurrentQuestion = () => {
     if (!currentPrompt || (!currentOptions.length && !hasInput)) return;
 
-    if (!hasInput && currentOptions.length > 1 && currentOptions.every(isQuestionOption)) {
+    if (shouldSplitOptionsIntoQuestions(currentPrompt, currentOptions, hasInput)) {
       questions.push(...currentOptions.map((prompt) => ({ prompt, options: [], hasInput: true })));
       return;
     }
@@ -312,8 +312,25 @@ function parseSurvey(raw: string): SurveySegment {
   return { type: "survey", questions };
 }
 
+function shouldSplitOptionsIntoQuestions(prompt: string, options: string[], hasInput: boolean): boolean {
+  if (hasInput || options.length < 2) return false;
+
+  return isContextPrompt(prompt) && options.every(isQuestionOption);
+}
+
+function isContextPrompt(prompt: string): boolean {
+  const text = stripMarkdownEmphasis(prompt).trim();
+  if (!text.endsWith(":") || text.includes("?")) return false;
+
+  return !/^(choose|pick|select)\b/i.test(text);
+}
+
 function isQuestionOption(option: string): boolean {
   return option.trim().endsWith("?");
+}
+
+function stripMarkdownEmphasis(value: string): string {
+  return value.replace(/[*_]+/g, "");
 }
 
 function parseRubric(meta: string, raw: string): RubricSegment {
