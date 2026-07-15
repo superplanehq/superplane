@@ -1,0 +1,3 @@
+Force-push succeeded. All 12 commits now have `Signed-off-by: Fabro <noreply@fabro.sh>` trailers, which should fix the DCO check failure.
+
+**Summary:** The only CI failure was DCO — 4 commits (`fix_ci`, `verify`, `ensure_pr`, `wait_checks`) were missing the required `Signed-off-by` trailer. I rebased all branch commits with `--exec "git commit --amend --no-edit -s --allow-empty"` to add sign-offs to all commits, then force-pushed. The `policy-bot` check is a review-approval gate that's not failing — it's just pending until a reviewer approves.
