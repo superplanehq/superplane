@@ -3,19 +3,17 @@ import { applyCanvasAppPreferences } from "./canvasAppPreferencePresentation";
 import type { CanvasCardData } from "./types";
 
 describe("applyCanvasAppPreferences", () => {
-  it("annotates canvases and orders pinned, then starred, then name", () => {
+  it("orders starred first by recency, then remaining canvases by name", () => {
     const canvases = [
       makeCanvas("regular-z", "Zulu"),
       makeCanvas("starred", "Yankee", { isStarred: true, starredAt: "2026-05-04T12:00:00Z" }),
       makeCanvas("newer-starred", "Bravo", { isStarred: true, starredAt: "2026-05-05T12:00:00Z" }),
-      makeCanvas("pinned", "Xray", { isPinned: true, pinnedAt: "2026-05-05T13:00:00Z" }),
       makeCanvas("regular-a", "Alpha"),
     ];
 
     const result = applyCanvasAppPreferences(canvases);
 
-    expect(result.map((canvas) => canvas.id)).toEqual(["pinned", "newer-starred", "starred", "regular-a", "regular-z"]);
-    expect(result.find((canvas) => canvas.id === "pinned")?.isPinned).toBe(true);
+    expect(result.map((canvas) => canvas.id)).toEqual(["newer-starred", "starred", "regular-a", "regular-z"]);
     expect(result.find((canvas) => canvas.id === "starred")?.isStarred).toBe(true);
   });
 });

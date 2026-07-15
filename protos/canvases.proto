@@ -397,7 +397,6 @@ message UpdateCanvasResponse {
 
 message UpdateCanvasPreferenceRequest {
   string canvas_id = 1;
-  optional bool pinned = 2;
   optional bool starred = 3;
 }
 
@@ -555,17 +554,13 @@ message CanvasSummary {
   string folder_id = 8;
   repeated Node nodes = 9;
   repeated Components.Edge edges = 10;
-  bool pinned = 11;
   bool starred = 12;
-  google.protobuf.Timestamp pinned_at = 13;
   google.protobuf.Timestamp starred_at = 14;
 }
 
 message CanvasPreference {
   string canvas_id = 1;
-  bool pinned = 2;
   bool starred = 3;
-  google.protobuf.Timestamp pinned_at = 4;
   google.protobuf.Timestamp starred_at = 5;
 }
 

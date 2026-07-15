@@ -2,7 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useUpdateCanvasPreference } from "@/hooks/useCanvasData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { Palette, Pin } from "lucide-react";
+import { Palette } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { Heading } from "../../components/Heading/heading";
@@ -88,7 +88,6 @@ export function HomePage() {
             organizationId={organizationId}
             searchQuery={searchQuery}
             onEditCanvas={openEdit}
-            onTogglePin={(canvasId, pinned) => updateCanvasPreference.mutate({ canvasId, pinned })}
             onToggleStar={(canvasId, starred) => updateCanvasPreference.mutate({ canvasId, starred })}
             canCreateCanvases={canCreateCanvases}
             canUpdateCanvases={canUpdateCanvases}
@@ -117,7 +116,6 @@ function Content({
   organizationId,
   searchQuery,
   onEditCanvas,
-  onTogglePin,
   onToggleStar,
   canCreateCanvases,
   canUpdateCanvases,
@@ -130,14 +128,12 @@ function Content({
   organizationId: string;
   searchQuery: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
-  onTogglePin: (canvasId: string, pinned: boolean) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
   canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }) {
-  const pinnedCanvases = preferredFilteredCanvases.filter((canvas) => canvas.isPinned);
   const folderedLayout = buildFolderedLayout(
     preferredFilteredCanvases,
     preferredFilteredCanvases,
@@ -149,38 +145,12 @@ function Content({
     return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
   }
 
-  if (
-    pinnedCanvases.length === 0 &&
-    folderedLayout.visibleFolders.length === 0 &&
-    folderedLayout.unfiledCanvases.length === 0
-  ) {
+  if (folderedLayout.visibleFolders.length === 0 && folderedLayout.unfiledCanvases.length === 0) {
     return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
   }
 
   return (
     <div className="space-y-6">
-      {pinnedCanvases.length > 0 ? (
-        <section className={cn(CANVAS_FOLDER_SECTION_SHELL_CLASS, "bg-white dark:bg-white/5")}>
-          <div className="mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-100">
-            <Pin size={16} className="text-blue-600 dark:text-blue-400" aria-hidden />
-            <Heading level={3} className="mb-0 !text-base font-medium">
-              Pinned
-            </Heading>
-          </div>
-          <CanvasCardsGrid
-            canvases={pinnedCanvases}
-            canvasFolders={canvasFolders}
-            organizationId={organizationId}
-            onEditCanvas={onEditCanvas}
-            onTogglePin={onTogglePin}
-            onToggleStar={onToggleStar}
-            canUpdateCanvases={canUpdateCanvases}
-            canDeleteCanvases={canDeleteCanvases}
-            permissionsLoading={permissionsLoading}
-          />
-        </section>
-      ) : null}
-
       {folderedLayout.visibleFolders.map((folder) => (
         <CanvasFolderSection
           key={folder.id}
@@ -189,7 +159,6 @@ function Content({
           canvasFolders={canvasFolders}
           organizationId={organizationId}
           onEditCanvas={onEditCanvas}
-          onTogglePin={onTogglePin}
           onToggleStar={onToggleStar}
           canCreateCanvases={canCreateCanvases}
           canUpdateCanvases={canUpdateCanvases}
@@ -209,7 +178,6 @@ function Content({
             canvasFolders={canvasFolders}
             organizationId={organizationId}
             onEditCanvas={onEditCanvas}
-            onTogglePin={onTogglePin}
             onToggleStar={onToggleStar}
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
@@ -246,10 +214,6 @@ function buildFolderedLayout(
   for (const canvas of sectionCanvases) {
     if (canvas.canvasFolderId && folderIDs.has(canvas.canvasFolderId)) {
       canvasesByFolderID.get(canvas.canvasFolderId)?.push(canvas);
-      continue;
-    }
-
-    if (canvas.isPinned) {
       continue;
     }
 
