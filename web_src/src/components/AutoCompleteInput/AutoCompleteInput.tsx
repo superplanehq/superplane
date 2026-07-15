@@ -1510,6 +1510,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             <div
               ref={suggestionsRef}
               data-testid="autocomplete-suggestions"
+              data-autocomplete-suggestions=""
               className="fixed z-[9999] bg-transparent"
               style={{
                 top: `${dropdownPosition.top}px`,

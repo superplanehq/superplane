@@ -144,7 +144,9 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
               value={draftValue}
               onChange={(e) => setDraftValue(e.target.value)}
               placeholder={field.placeholder || ""}
-              className="h-full min-h-0 flex-1 resize-none"
+              // `field-sizing-fixed` overrides the default `field-sizing-content` from the shadcn
+              // Textarea primitive so the control fills the dialog instead of tracking content height.
+              className="h-full min-h-0 flex-1 resize-none field-sizing-fixed"
               data-testid={toTestId(`${testId}-modal-input`)}
             />
           )
@@ -297,13 +299,16 @@ const ExpandableEditorDialog: React.FC<ExpandableEditorDialogProps> = ({
   headerActions,
 }) => {
   const [draft, setDraft] = React.useState(initialValue);
+  const wasOpenRef = React.useRef(open);
 
-  // Reset the draft whenever the dialog transitions from closed to open so that
-  // Cancel/Escape/overlay-click reliably discards in-progress edits.
+  // Reset the draft only when the dialog transitions from closed to open so that
+  // Cancel/Escape/overlay-click reliably discards in-progress edits, and so that
+  // an unrelated parent-side value update while editing does not overwrite the draft.
   React.useEffect(() => {
-    if (open) {
+    if (open && !wasOpenRef.current) {
       setDraft(initialValue);
     }
+    wasOpenRef.current = open;
   }, [open, initialValue]);
 
   const handleSave = () => {
@@ -315,12 +320,25 @@ const ExpandableEditorDialog: React.FC<ExpandableEditorDialogProps> = ({
     onOpenChange(false);
   };
 
+  // Autocomplete suggestions render in a portal on `document.body`, which Radix Dialog treats
+  // as an outside interaction (and would otherwise dismiss the dialog while the user is picking
+  // a suggestion). Prevent the default close when the interaction originates in that portal.
+  const handleInteractOutside = (event: Event) => {
+    const target = event.target as Element | null;
+    if (target?.closest?.("[data-autocomplete-suggestions]")) {
+      event.preventDefault();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="90vw"
         className="flex flex-col gap-0 overflow-hidden p-0"
         onClick={(e) => e.stopPropagation()}
+        onPointerDownOutside={handleInteractOutside}
+        onFocusOutside={handleInteractOutside}
+        onInteractOutside={handleInteractOutside}
         data-testid={testId}
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 pr-12 dark:border-gray-600">

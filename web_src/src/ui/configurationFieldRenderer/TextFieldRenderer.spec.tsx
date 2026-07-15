@@ -133,6 +133,88 @@ describe("TextFieldRenderer expression-aware expansion", () => {
   });
 });
 
+describe("TextFieldRenderer draft isolation edge cases", () => {
+  function ExternalUpdater({ field, initialValue }: { field: ConfigurationField; initialValue: string }) {
+    const [value, setValue] = useState<unknown>(initialValue);
+    return (
+      <>
+        <TextFieldRenderer field={field} value={value} onChange={setValue} />
+        <button data-testid="external-update" onClick={() => setValue("EXTERNAL UPDATE")} />
+      </>
+    );
+  }
+
+  it("does not overwrite the in-progress modal draft when the parent value changes", () => {
+    render(<ExternalUpdater field={textField()} initialValue="Original" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /expand prompt editor/i }));
+    const modalInput = screen.getByTestId("text-field-prompt-modal-input") as HTMLTextAreaElement;
+    fireEvent.change(modalInput, { target: { value: "In-flight draft" } });
+
+    // Simulate the parent updating the field's value while the user is still editing in the modal.
+    fireEvent.click(screen.getByTestId("external-update"));
+
+    // The modal draft should be preserved, not overwritten by the external update.
+    const stillOpen = screen.getByTestId("text-field-prompt-modal-input") as HTMLTextAreaElement;
+    expect(stillOpen.value).toBe("In-flight draft");
+  });
+
+  it("reseeds the draft from the latest value when the dialog is reopened", () => {
+    render(<ExternalUpdater field={textField()} initialValue="Original" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /expand prompt editor/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    fireEvent.click(screen.getByTestId("external-update"));
+    fireEvent.click(screen.getByRole("button", { name: /expand prompt editor/i }));
+
+    const reopened = screen.getByTestId("text-field-prompt-modal-input") as HTMLTextAreaElement;
+    expect(reopened.value).toBe("EXTERNAL UPDATE");
+  });
+});
+
+describe("TextFieldRenderer dialog outside-interaction guard", () => {
+  it("keeps the dialog open when the user clicks inside the autocomplete suggestions portal", () => {
+    render(
+      <ControlledText field={textField({ name: "message", label: "Message" })} initialValue="Hello" allowExpressions />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /expand message editor/i }));
+    const modalInput = screen.getByTestId("text-field-message-modal-input") as HTMLTextAreaElement;
+    expect(modalInput).toBeInTheDocument();
+
+    // Simulate the autocomplete suggestions portal (Radix Dialog would otherwise treat
+    // clicks in this portal as an outside interaction and close the dialog).
+    const suggestions = document.createElement("div");
+    suggestions.setAttribute("data-autocomplete-suggestions", "");
+    const item = document.createElement("div");
+    suggestions.appendChild(item);
+    document.body.appendChild(suggestions);
+
+    try {
+      fireEvent.pointerDown(item);
+      fireEvent.mouseDown(item);
+      fireEvent.click(item);
+    } finally {
+      suggestions.remove();
+    }
+
+    expect(screen.getByTestId("text-field-message-modal-input")).toBeInTheDocument();
+  });
+});
+
+describe("TextFieldRenderer plain modal textarea sizing", () => {
+  it("forces the modal textarea to fill the dialog instead of shrinking to content", () => {
+    render(<ControlledText field={textField()} initialValue="short" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /expand prompt editor/i }));
+
+    const modalInput = screen.getByTestId("text-field-prompt-modal-input") as HTMLTextAreaElement;
+    expect(modalInput.className).toContain("field-sizing-fixed");
+    expect(modalInput.className).toContain("h-full");
+    expect(modalInput.className).toContain("flex-1");
+  });
+});
+
 describe("TextFieldRenderer code editor expansion", () => {
   const codeField = textField({
     name: "script",
