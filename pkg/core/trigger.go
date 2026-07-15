@@ -1,11 +1,14 @@
 package core
 
 import (
+	"errors"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
+
+var ErrNotFound = errors.New("not found")
 
 type Trigger interface {
 	/*
@@ -89,6 +92,32 @@ type TriggerContext struct {
 	Events        EventContext
 	Webhook       NodeWebhookContext
 	Integration   IntegrationContext
+	Apps          AppContext
+}
+
+type AppContext interface {
+	Get(idOrName string) (*App, error)
+	Subscribe(id string) error
+	Unsubscribe() error
+}
+
+type App struct {
+	ID   string
+	Name string
+}
+
+type AppTrigger interface {
+	Trigger
+	OnAppMessage(ctx AppMessageContext) error
+}
+
+type AppMessageContext struct {
+	Message       any
+	Configuration any
+	NodeMetadata  MetadataReader
+	Logger        *log.Entry
+	HTTP          HTTPContext
+	Events        EventContext
 }
 
 type EventContext interface {
