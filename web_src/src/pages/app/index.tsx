@@ -4132,6 +4132,7 @@ export function AppPage() {
             canvasName: canvas?.metadata?.name || undefined,
             organizationId: organizationId || undefined,
             canvasNodes,
+            canvasNodesLoading: canvasLoading,
             nodeStatuses: consoleNodeStatuses,
             onTriggerNode: handleConsoleTriggerNode,
             visualDiff: {
