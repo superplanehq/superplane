@@ -2,6 +2,7 @@ package claude
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,6 +19,15 @@ import (
 
 const MessagePayloadType = "claude.message"
 
+// codeExecutionToolType is the GA code execution server tool. Claude runs the
+// code in Anthropic's sandbox and generated files land in the Files API.
+const codeExecutionToolType = "code_execution_20250825"
+
+// maxInlineArtifactSizeBytes caps how large a generated file can be for its
+// content to be embedded in the output payload. Larger files keep their
+// metadata and download link only.
+const maxInlineArtifactSizeBytes = 10 * 1024 * 1024
+
 type TextPrompt struct{}
 
 type TextPromptSpec struct {
@@ -25,6 +35,7 @@ type TextPromptSpec struct {
 	SystemMessage string   `json:"systemMessage"`
 	Prompt        string   `json:"prompt"`
 	Files         []string `json:"files"`
+	CodeExecution bool     `json:"codeExecution"`
 	OutputSchema  string   `json:"outputSchema"`
 }
 
@@ -35,7 +46,23 @@ type MessagePayload struct {
 	Parsed     any                    `json:"parsed,omitempty"`
 	Usage      *MessageUsage          `json:"usage,omitempty"`
 	StopReason string                 `json:"stopReason,omitempty"`
+	Artifacts  []FileArtifact         `json:"artifacts,omitempty"`
 	Response   *CreateMessageResponse `json:"response"`
+}
+
+// FileArtifact is a file Claude generated during the request (via code
+// execution). Its content is embedded in the payload — text files as a plain
+// string, everything else base64-encoded — so downstream steps can consume it
+// directly. Files over the inline size cap carry metadata and the download
+// link only.
+type FileArtifact struct {
+	FileID      string `json:"fileId"`
+	Filename    string `json:"filename"`
+	MimeType    string `json:"mimeType"`
+	SizeBytes   int64  `json:"sizeBytes"`
+	Encoding    string `json:"encoding,omitempty"`
+	Content     string `json:"content,omitempty"`
+	DownloadURL string `json:"downloadUrl"`
 }
 
 // TextPromptNodeMetadata is node-level metadata surfaced in the UI so the
@@ -43,6 +70,7 @@ type MessagePayload struct {
 type TextPromptNodeMetadata struct {
 	Model            string `json:"model" mapstructure:"model"`
 	StructuredOutput bool   `json:"structuredOutput" mapstructure:"structuredOutput"`
+	CodeExecution    bool   `json:"codeExecution" mapstructure:"codeExecution"`
 }
 
 func (c *TextPrompt) Name() string {
@@ -72,6 +100,7 @@ func (c *TextPrompt) Documentation() string {
 - **System Message**: (Optional) Context to define the assistant's behavior or persona.
 - **Prompt**: The main user message or instruction.
 - **Files**: (Optional) Files from the Files tab (images, PDFs, or text) to attach alongside the prompt.
+- **Code Execution**: (Optional) Allow Claude to write and run code in Anthropic's sandbox. Files it creates are emitted as artifacts.
 - **Structured Output**: (Optional) A JSON Schema the response must match, available on the parsed output.
 
 ## Output
@@ -82,6 +111,7 @@ Returns a payload containing:
 - **stopReason**: Why the generation ended (e.g., "end_turn", "max_tokens").
 - **model**: The specific model version used.
 - **parsed**: When Structured Output is configured, the response parsed into an object (only on a normal end_turn completion).
+- **artifacts**: When Code Execution is enabled, the files Claude generated, with the file content included: text files as plain text (` + "`encoding: \"text\"`" + `), everything else base64-encoded (` + "`encoding: \"base64\"`" + `). Each artifact carries fileId, filename, mimeType, sizeBytes, and a downloadUrl; files over 10MB include metadata and the download link only.
 
 ## Notes
 
@@ -150,6 +180,14 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "codeExecution",
+			Label:       "Code Execution",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Allow Claude to write and run code in Anthropic's sandbox. Files it creates are emitted as artifacts.",
+		},
 		structuredoutput.ConfigField(
 			"outputSchema",
 			"Structured Output",
@@ -217,6 +255,7 @@ func (c *TextPrompt) Setup(ctx core.SetupContext) error {
 		_ = ctx.Metadata.Set(TextPromptNodeMetadata{
 			Model:            spec.Model,
 			StructuredOutput: hasSchema,
+			CodeExecution:    spec.CodeExecution,
 		})
 	}
 
@@ -268,6 +307,10 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		},
 	}
 
+	if spec.CodeExecution {
+		req.Tools = []any{map[string]any{"type": codeExecutionToolType, "name": "code_execution"}}
+	}
+
 	if spec.SystemMessage != "" {
 		req.System = spec.SystemMessage
 	}
@@ -291,6 +334,7 @@ func (c *TextPrompt) Execute(ctx core.ExecutionContext) error {
 		Text:       text,
 		Usage:      &response.Usage,
 		StopReason: response.StopReason,
+		Artifacts:  collectFileArtifacts(client, response),
 		Response:   response,
 	}
 
@@ -382,6 +426,120 @@ func cleanupFiles(client *Client, fileIDs []string) {
 	for _, id := range fileIDs {
 		_ = client.DeleteFile(id)
 	}
+}
+
+// codeExecutionResult is the nested payload of a code execution tool-result
+// block; its content lists one entry per file the executed command created.
+type codeExecutionResult struct {
+	Type    string `json:"type"`
+	Content []struct {
+		Type   string `json:"type"`
+		FileID string `json:"file_id"`
+	} `json:"content"`
+}
+
+// extractGeneratedFileIDs collects the file_ids of files Claude created via
+// the code execution tool. Current tool versions report them inside
+// bash_code_execution_tool_result blocks; the legacy Python-only tool used
+// code_execution_tool_result. Both are handled.
+func extractGeneratedFileIDs(response *CreateMessageResponse) []string {
+	if response == nil {
+		return nil
+	}
+
+	var fileIDs []string
+	seen := map[string]bool{}
+	for _, block := range response.Content {
+		if block.Type != "bash_code_execution_tool_result" && block.Type != "code_execution_tool_result" {
+			continue
+		}
+		if len(block.Content) == 0 {
+			continue
+		}
+
+		var result codeExecutionResult
+		if err := json.Unmarshal(block.Content, &result); err != nil {
+			continue
+		}
+		for _, entry := range result.Content {
+			if entry.FileID == "" || seen[entry.FileID] {
+				continue
+			}
+			seen[entry.FileID] = true
+			fileIDs = append(fileIDs, entry.FileID)
+		}
+	}
+	return fileIDs
+}
+
+// collectFileArtifacts resolves the files Claude generated during the request
+// into artifacts carrying the file content. Lookups are best-effort: a failed
+// metadata or content fetch still yields an artifact with the file ID and
+// download URL so the run never fails over its artifacts.
+func collectFileArtifacts(client *Client, response *CreateMessageResponse) []FileArtifact {
+	fileIDs := extractGeneratedFileIDs(response)
+	if len(fileIDs) == 0 {
+		return nil
+	}
+
+	artifacts := make([]FileArtifact, 0, len(fileIDs))
+	for _, fileID := range fileIDs {
+		artifact := FileArtifact{
+			FileID:      fileID,
+			DownloadURL: client.FileContentURL(fileID),
+		}
+		meta, err := client.GetFileMetadata(fileID)
+		if err == nil {
+			artifact.Filename = meta.Filename
+			artifact.MimeType = meta.MimeType
+			artifact.SizeBytes = meta.SizeBytes
+		}
+
+		if err == nil && meta.SizeBytes <= maxInlineArtifactSizeBytes {
+			if content, err := client.DownloadFile(fileID); err == nil {
+				artifact.Encoding, artifact.Content = encodeArtifactContent(meta.MimeType, content)
+			}
+		}
+		artifacts = append(artifacts, artifact)
+	}
+	return artifacts
+}
+
+// encodeArtifactContent returns the payload encoding and content for a
+// downloaded file: text-like content passes through as a plain string,
+// everything else is base64-encoded.
+func encodeArtifactContent(mimeType string, content []byte) (string, string) {
+	if isTextMIME(mimeType) {
+		return "text", string(content)
+	}
+	return "base64", base64.StdEncoding.EncodeToString(content)
+}
+
+// isTextMIME reports whether content of the given MIME type is safe to emit as
+// plain text; anything else is base64-encoded.
+func isTextMIME(mimeType string) bool {
+	mimeType = strings.ToLower(strings.TrimSpace(mimeType))
+	if i := strings.Index(mimeType, ";"); i >= 0 {
+		mimeType = strings.TrimSpace(mimeType[:i])
+	}
+	if strings.HasPrefix(mimeType, "text/") {
+		return true
+	}
+	if strings.HasSuffix(mimeType, "+json") || strings.HasSuffix(mimeType, "+xml") {
+		return true
+	}
+	switch mimeType {
+	case "application/json",
+		"application/xml",
+		"application/x-yaml",
+		"application/yaml",
+		"application/javascript",
+		"application/x-sh",
+		"application/sql",
+		"application/csv":
+		return true
+	}
+	return false
 }
 
 func (c *TextPrompt) Hooks() []core.Hook {

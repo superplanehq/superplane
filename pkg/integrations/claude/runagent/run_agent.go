@@ -41,7 +41,9 @@ func (a *RunAgent) Documentation() string {
 
 ## Output
 
-Emits a finished payload with **session** status, **session id**, and the final **agent message** when available so downstream steps can branch or consume the result. For failure cases the status is still emitted when the **session** is *terminated* or the step times out.`
+Emits a finished payload with **session** status, **session id**, and the final **agent message** when available so downstream steps can branch or consume the result. For failure cases the status is still emitted when the **session** is *terminated* or the step times out.
+
+Files the agent saves under ` + "`/mnt/session/outputs/`" + ` are emitted as **artifacts** with their content included in the payload (text files as plain text, everything else base64-encoded; files over 10MB carry metadata and a download link only). Instruct the agent in the task to save its deliverables there.`
 }
 
 func (a *RunAgent) Icon() string { return "bot" }
@@ -323,6 +325,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 			ctx.Logger.Warnf("Failed to fetch messages for managed session %s: %v. Scheduling poll.", session.ID, err)
 		} else if sm != nil && sm.Complete {
 			out := buildOutputFromSessionMessages(refreshed.Status, session.ID, sm)
+			out.Artifacts = CollectSessionArtifacts(client, session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 			if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 				cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
 				return emitErr

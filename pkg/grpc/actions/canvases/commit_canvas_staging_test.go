@@ -69,6 +69,22 @@ func Test__CommitCanvasStaging__IgnoresRenamedCanvasInYAML(t *testing.T) {
 	assert.Equal(t, canvas.Name, updatedCanvas.Name)
 }
 
+func Test__CommitCanvasStaging__RejectsInvalidConsoleYAML(t *testing.T) {
+	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
+	orgID := r.Organization.ID.String()
+
+	_, err := PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
+		{Path: ConsoleYAMLRepositoryPath, Content: []byte("just a scalar, not an object")},
+	})
+	require.NoError(t, err)
+
+	_, err = CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvas.ID.String(), "Bad console", "", r.AuthService)
+	code, msg, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, code)
+	assert.Contains(t, msg, "invalid console yaml")
+}
+
 func Test__CommitCanvasStaging__RequiresStagedChanges(t *testing.T) {
 	r, ctx, canvas, _ := setupLiveCanvasStaging(t)
 	orgID := r.Organization.ID.String()

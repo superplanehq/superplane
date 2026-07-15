@@ -105,11 +105,12 @@ type SessionMetadata struct {
 
 // OutputPayload is emitted on the default channel when the run completes.
 type OutputPayload struct {
-	Status      string `json:"status"`
-	SessionID   string `json:"sessionId"`
-	PrURL       string `json:"prUrl"`
-	Branch      string `json:"branch"`
-	LastMessage string `json:"lastMessage"`
+	Status      string                     `json:"status"`
+	SessionID   string                     `json:"sessionId"`
+	PrURL       string                     `json:"prUrl"`
+	Branch      string                     `json:"branch"`
+	LastMessage string                     `json:"lastMessage"`
+	Artifacts   []runagent.SessionArtifact `json:"artifacts,omitempty"`
 }
 
 func isSessionTerminal(status string) bool {

@@ -102,6 +102,7 @@ func (a *RunAgent) poll(ctx core.ActionHookContext) error {
 		}
 
 		out := buildOutputFromSessionMessages(sess.Status, metadata.Session.ID, sm)
+		out.Artifacts = CollectSessionArtifacts(client, metadata.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
 		if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 			return emitErr
 		}
