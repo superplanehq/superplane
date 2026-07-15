@@ -101,6 +101,7 @@ import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
+import { useDeleteSelectionShortcut } from "./useDeleteSelectionShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
 import { applyCanvasViewportCulling, useCanvasViewportCulling } from "./useCanvasViewportCulling";
@@ -2355,6 +2356,50 @@ function CanvasContent({
 
   const multiSelectedNodeIds = useMemo(() => new Set(multiSelectedNodes.map((n) => n.id)), [multiSelectedNodes]);
 
+  // Shared deletion for the selection toolbar and the Delete keyboard shortcut:
+  // confirm (deletion is irreversible), remove the nodes, then clear selection.
+  const deleteSelectedNodes = useCallback(
+    (nodeIds: string[]) => {
+      if (nodeIds.length === 0 || (!onNodesDelete && !onNodeDelete)) {
+        return;
+      }
+
+      const message =
+        nodeIds.length === 1
+          ? "Are you sure you want to delete the selected node? This action cannot be undone."
+          : "Are you sure you want to delete the selected nodes? This action cannot be undone.";
+      if (!window.confirm(message)) {
+        return;
+      }
+
+      if (onNodesDelete) {
+        onNodesDelete(nodeIds);
+      } else {
+        for (const id of nodeIds) {
+          onNodeDelete?.(id);
+        }
+      }
+
+      stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
+      setMultiSelectedNodes([]);
+    },
+    [onNodesDelete, onNodeDelete],
+  );
+
+  const getSelectedNodeIds = useCallback(
+    () =>
+      getNodes()
+        .filter((node) => node.selected)
+        .map((node) => node.id),
+    [getNodes],
+  );
+
+  useDeleteSelectionShortcut({
+    disabled: isReadOnly || (!onNodesDelete && !onNodeDelete),
+    getSelectedNodeIds,
+    onDelete: deleteSelectedNodes,
+  });
+
   const selectionToolbarFlowPos = useMemo(() => {
     if (multiSelectedNodeIds.size < 2) return null;
 
@@ -3442,25 +3487,7 @@ function CanvasContent({
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
-                                if (
-                                  !window.confirm(
-                                    "Are you sure you want to delete the selected nodes? This action cannot be undone.",
-                                  )
-                                ) {
-                                  return;
-                                }
-                                const nodeIds = multiSelectedNodes.map((n) => n.id);
-                                if (onNodesDelete) {
-                                  onNodesDelete(nodeIds);
-                                } else {
-                                  for (const id of nodeIds) {
-                                    onNodeDelete?.(id);
-                                  }
-                                }
-                                stateRef.current.setNodes((nodes) =>
-                                  nodes.map((node) => ({ ...node, selected: false })),
-                                );
-                                setMultiSelectedNodes([]);
+                                deleteSelectedNodes(multiSelectedNodes.map((n) => n.id));
                               }}
                               className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
                             >
