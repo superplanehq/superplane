@@ -24,4 +24,27 @@ describe("SettingsTab", () => {
     expect(screen.getByTestId("custom-field")).toBeInTheDocument();
     expect(screen.queryByTestId("save-node-button")).not.toBeInTheDocument();
   });
+
+  it("renders the disabled form layout when formDisabled even if readOnly", () => {
+    render(
+      <SettingsTab
+        mode="edit"
+        nodeName="Wait node"
+        configuration={{ namespace: "llmTokenCosts", enabled: true }}
+        configurationFields={[
+          { name: "namespace", label: "Namespace", type: "string" },
+          { name: "enabled", label: "Enabled", type: "boolean" },
+        ]}
+        onSave={vi.fn()}
+        readOnly
+        formDisabled
+      />,
+    );
+
+    expect(screen.queryByTestId("configuration-view")).not.toBeInTheDocument();
+    expect(screen.getByTestId("node-name-input")).toBeDisabled();
+    expect(screen.getByRole("switch")).toBeDisabled();
+    expect(screen.getByTestId("settings-tab-form")).toHaveClass("cursor-not-allowed");
+    expect(screen.getByTestId("settings-tab-form")).not.toHaveClass("opacity-70");
+  });
 });
