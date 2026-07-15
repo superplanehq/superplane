@@ -44,6 +44,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="List Check Runs For Ref" href="#list-check-runs-for-ref" description="List GitHub Checks API check runs for a commit, branch, or tag" />
+  <LinkCard title="Mark Pull Request Ready for Review" href="#mark-pull-request-ready-for-review" description="Take a draft pull request out of the draft state in a GitHub repository" />
   <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
@@ -2898,6 +2899,68 @@ Returns GitHub's check run list response, including total_count and check_runs. 
   },
   "timestamp": "2026-06-01T12:02:02Z",
   "type": "github.checkRuns"
+}
+```
+
+<a id="mark-pull-request-ready-for-review"></a>
+
+## Mark Pull Request Ready for Review
+
+**Component key:** `github.markPullRequestReadyForReview`
+
+The Mark Pull Request Ready for Review component takes a draft pull request out of the draft state, the same as clicking "Ready for review" on GitHub.
+
+### Use Cases
+
+- **Promote drafts automatically**: Mark a draft pull request ready once CI checks pass
+- **Release trains**: Open drafts early and promote them for review when the branch is ready
+- **Bot workflows**: Let an automation open work as a draft and hand it to reviewers when complete
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to mark ready for review. Expressions are supported.
+
+### Behavior
+
+This component is idempotent: if the pull request is already out of the draft state, it succeeds without calling GitHub again and emits the pull request as it is.
+
+### Permissions
+
+GitHub only exposes this operation through its GraphQL API, so the integration needs the **Pull Requests: Read & Write** permission.
+
+### Output
+
+Returns the pull request object after it has been marked ready for review.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "base": {
+      "label": "acme:main",
+      "ref": "main"
+    },
+    "created_at": "2026-04-22T10:00:00Z",
+    "draft": false,
+    "head": {
+      "label": "acme:feature-branch",
+      "ref": "feature-branch"
+    },
+    "html_url": "https://github.com/acme/widgets/pull/42",
+    "id": 1234567890,
+    "number": 42,
+    "state": "open",
+    "title": "Add new feature",
+    "user": {
+      "html_url": "https://github.com/octocat",
+      "id": 1,
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequest"
 }
 ```
 
