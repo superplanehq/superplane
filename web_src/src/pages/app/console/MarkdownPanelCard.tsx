@@ -23,7 +23,12 @@ import {
 } from "./markdownInterpolation";
 import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
 import { MarkdownPanelEditor } from "./MarkdownPanelEditor";
-import { validateMarkdownVariables, type MarkdownVariable } from "./panelTypes";
+import {
+  normalizeRunStatuses,
+  normalizeRunTriggers,
+  validateMarkdownVariables,
+  type MarkdownVariable,
+} from "./panelTypes";
 
 /**
  * Stable empty list passed to `useMarkdownVariables` while the panel is being
@@ -67,7 +72,7 @@ function useMarkdownDisplay({
   const ctx = useConsoleContext();
   const canvasId = ctx?.canvasId ?? "";
   const textForSideload = useMemo(() => `${persistedTitle}\n${body}`, [persistedTitle, body]);
-  const { vars, baseLoading, sideloadLoading } = useMarkdownVariables(
+  const { vars, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
     canvasId,
     isEditing ? EMPTY_VARIABLES : variables,
     isEditing ? "" : textForSideload,
@@ -81,8 +86,8 @@ function useMarkdownDisplay({
   // side-load as part of initial loading, and hold a loading state instead.
   // Gating is per-text and per-phase: text that doesn't reference a run node
   // resolves without the execution side-load, so it isn't held on that phase.
-  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading);
-  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading);
+  const titleLoading = markdownTextIsLoading(persistedTitle, baseLoading, sideloadLoading, searchingNames);
+  const bodyLoading = markdownTextIsLoading(body, baseLoading, sideloadLoading, searchingNames);
 
   const displayTitle = useMemo(() => {
     // A templated title can't be shown verbatim (it'd leak raw `{{ }}` syntax)
@@ -435,7 +440,14 @@ function normalizeVariableSource(source: MarkdownVariable["source"]): MarkdownVa
       ...(hasLimit ? { limit: source.limit } : {}),
     };
   }
-  return { kind: "run", select: source.select };
+  const statuses = normalizeRunStatuses(source.statuses);
+  const triggers = normalizeRunTriggers(source.triggers);
+  return {
+    kind: "run",
+    select: source.select,
+    ...(statuses ? { statuses } : {}),
+    ...(triggers ? { triggers } : {}),
+  };
 }
 
 /**
