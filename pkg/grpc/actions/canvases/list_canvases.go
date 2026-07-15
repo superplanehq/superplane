@@ -112,12 +112,7 @@ func serializeCanvasSummaries(
 			UpdatedAt:   timestamppb.New(*canvas.UpdatedAt),
 			Edges:       actions.EdgesToProto(liveSpec.Edges),
 			Nodes:       []*pb.CanvasSummary_Node{},
-			Pinned:      preference.PinnedAt != nil,
 			Starred:     preference.StarredAt != nil,
-		}
-
-		if preference.PinnedAt != nil {
-			protoCanvases[i].PinnedAt = timestamppb.New(*preference.PinnedAt)
 		}
 
 		if preference.StarredAt != nil {

@@ -180,3 +180,50 @@ describe("AutoCompleteInput suggestions", () => {
     expect(screen.getByTestId("autocomplete-value-preview")).toBeInTheDocument();
   });
 });
+
+describe("AutoCompleteInput fullHeight mode", () => {
+  it("lets the textarea fill its parent instead of auto-resizing", () => {
+    render(
+      <div style={{ height: 400 }}>
+        <AutoCompleteInput
+          aria-label="Full height editor"
+          exampleObj={{ __root: { data: { name: "DCO" } } }}
+          value={"line 1\nline 2\nline 3"}
+          onChange={vi.fn()}
+          placeholder="Type here"
+          startWord="{{"
+          prefix="{{ "
+          suffix=" }}"
+          fullHeight
+        />
+      </div>,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Full height editor" }) as HTMLTextAreaElement;
+    // Auto-resize must not set an explicit height style — the parent controls layout.
+    expect(input.style.height).toBe("");
+    expect(input.className).toContain("h-full");
+    expect(input.className).toContain("overflow-y-auto");
+  });
+
+  it("keeps auto-resize enabled when fullHeight is not requested", () => {
+    render(
+      <AutoCompleteInput
+        aria-label="Auto sized editor"
+        exampleObj={null}
+        value={"one\ntwo"}
+        onChange={vi.fn()}
+        placeholder="Type here"
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        minHeight={80}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Auto sized editor" }) as HTMLTextAreaElement;
+    // Auto-resize should still set an inline height.
+    expect(input.style.height).not.toBe("");
+    expect(input.className).not.toContain("h-full");
+  });
+});

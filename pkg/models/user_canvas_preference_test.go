@@ -21,22 +21,8 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		r.User,
 		canvas.ID,
 		boolPointer(true),
-		nil,
 	)
 	require.NoError(t, err)
-	require.NotNil(t, preference.PinnedAt)
-	assert.Nil(t, preference.StarredAt)
-
-	preference, err = models.SetUserCanvasPreference(
-		database.Conn(),
-		r.Organization.ID,
-		r.User,
-		canvas.ID,
-		nil,
-		boolPointer(true),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, preference.PinnedAt)
 	require.NotNil(t, preference.StarredAt)
 
 	preference, err = models.SetUserCanvasPreference(
@@ -45,22 +31,8 @@ func Test__SetUserCanvasPreference__StoresUpdatesAndClearsPreferences(t *testing
 		r.User,
 		canvas.ID,
 		boolPointer(false),
-		nil,
 	)
 	require.NoError(t, err)
-	assert.Nil(t, preference.PinnedAt)
-	require.NotNil(t, preference.StarredAt)
-
-	preference, err = models.SetUserCanvasPreference(
-		database.Conn(),
-		r.Organization.ID,
-		r.User,
-		canvas.ID,
-		nil,
-		boolPointer(false),
-	)
-	require.NoError(t, err)
-	assert.Nil(t, preference.PinnedAt)
 	assert.Nil(t, preference.StarredAt)
 	assertUserCanvasPreferenceCount(t, canvas.ID, 0)
 }
@@ -75,10 +47,8 @@ func Test__SetUserCanvasPreference__DoesNotCreateEmptyPreference(t *testing.T) {
 		r.User,
 		canvas.ID,
 		boolPointer(false),
-		boolPointer(false),
 	)
 	require.NoError(t, err)
-	assert.Nil(t, preference.PinnedAt)
 	assert.Nil(t, preference.StarredAt)
 	assertUserCanvasPreferenceCount(t, canvas.ID, 0)
 
@@ -88,13 +58,11 @@ func Test__SetUserCanvasPreference__DoesNotCreateEmptyPreference(t *testing.T) {
 		r.User,
 		canvas.ID,
 		nil,
-		nil,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, r.Organization.ID, preference.OrganizationID)
 	assert.Equal(t, r.User, preference.UserID)
 	assert.Equal(t, canvas.ID, preference.CanvasID)
-	assert.Nil(t, preference.PinnedAt)
 	assert.Nil(t, preference.StarredAt)
 }
 
@@ -107,7 +75,6 @@ func Test__SetUserCanvasPreference__RequiresExistingCanvas(t *testing.T) {
 		r.User,
 		uuid.New(),
 		boolPointer(true),
-		nil,
 	)
 	require.Error(t, err)
 }
@@ -132,7 +99,6 @@ func Test__FindUserCanvasPreferencesForCanvases(t *testing.T) {
 		r.User,
 		canvas.ID,
 		boolPointer(true),
-		boolPointer(true),
 	)
 	require.NoError(t, err)
 
@@ -146,7 +112,6 @@ func Test__FindUserCanvasPreferencesForCanvases(t *testing.T) {
 	require.Len(t, preferences, 1)
 	require.Contains(t, preferences, canvas.ID)
 	assert.NotContains(t, preferences, withoutPreference.ID)
-	assert.NotNil(t, preferences[canvas.ID].PinnedAt)
 	assert.NotNil(t, preferences[canvas.ID].StarredAt)
 }
 

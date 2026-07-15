@@ -46,6 +46,9 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 		if errors.Is(err, agentservice.ErrSessionBusy) {
 			return nil, grpcerrors.FailedPrecondition(nil, "agent is still processing the previous turn")
 		}
+		if errors.Is(err, agentservice.ErrInvalidRequest) {
+			return nil, grpcerrors.InvalidArgument(err, "invalid agent chat message")
+		}
 		log.WithError(err).WithField("chat_id", chatID).Error("failed to send agent chat message")
 		return nil, grpcerrors.Internal(err, "failed to send agent chat message")
 	}
