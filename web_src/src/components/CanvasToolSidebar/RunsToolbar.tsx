@@ -45,7 +45,7 @@ export function RunsToolbar({
           value={searchQuery}
           onChange={handleSearchChange}
           aria-label="Search runs"
-          placeholder="Search runs"
+          placeholder="Search…"
           className="h-7 rounded-none border-0 bg-transparent pl-7 pr-6 text-[13px] shadow-none placeholder:text-gray-400 focus:border-0 dark:bg-transparent dark:placeholder:text-gray-500"
         />
         {searchQuery && (
