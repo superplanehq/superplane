@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 
+import { isEditableTarget } from "@/lib/editableTarget";
+
 export interface UseBuildingBlocksShortcutOptions {
   /** When true (typically: read-only, live mode, embedded preview), the shortcut is inert. */
   disabled: boolean;
@@ -27,11 +29,7 @@ export function useBuildingBlocksShortcut({ disabled, isSidebarOpen, onOpen }: U
         return;
       }
 
-      const target = event.target;
-      if (
-        target instanceof Element &&
-        target.closest('input, textarea, select, [contenteditable="true"], .monaco-editor')
-      ) {
+      if (isEditableTarget(event.target)) {
         return;
       }
 
