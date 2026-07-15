@@ -28,6 +28,14 @@ var machineTypeSelectOptions = []configuration.FieldOption{
 	{Label: MachineTypeE1TinyARM64, Value: MachineTypeE1TinyARM64},
 }
 
+// MachineTypeSelectOptions returns a copy of the machine-type options so other
+// components that offload compute to a runner can render the same fleet picker.
+func MachineTypeSelectOptions() []configuration.FieldOption {
+	options := make([]configuration.FieldOption, len(machineTypeSelectOptions))
+	copy(options, machineTypeSelectOptions)
+	return options
+}
+
 func requireMachineType(machineType string) (string, error) {
 	fleet := strings.TrimSpace(machineType)
 	if fleet == "" {

@@ -344,28 +344,28 @@ func (c *RunJS) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return afterRunnerTaskCreated(ctx, taskID)
+	return AfterTaskCreated(ctx, taskID)
 }
 
 func (c *RunJS) Hooks() []core.Hook {
-	return []core.Hook{{Name: hookActionPoll, Type: core.HookTypeInternal}}
+	return []core.Hook{{Name: HookActionPoll, Type: core.HookTypeInternal}}
 }
 
 func (c *RunJS) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
-	case hookActionPoll:
-		return pollBrokerTask(ctx, RunJSFinishedEventType)
+	case HookActionPoll:
+		return PollTask(ctx, TaskOutcome{FinishedEventType: RunJSFinishedEventType})
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
 func (c *RunJS) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return handleBrokerWebhook(ctx, RunJSFinishedEventType)
+	return HandleTaskWebhook(ctx, TaskOutcome{FinishedEventType: RunJSFinishedEventType})
 }
 
 func (c *RunJS) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return CancelBrokerTask(ctx)
 }
 
 func (c *RunJS) Cleanup(ctx core.SetupContext) error { return nil }

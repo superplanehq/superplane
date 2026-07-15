@@ -10,17 +10,47 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
+// TaskOutcome maps a finished broker task onto a component's output channels and
+// finished event type. It lets components other than Runner reuse the broker
+// task lifecycle (create → poll/webhook → emit) while keeping their own channel
+// names and event types.
+type TaskOutcome struct {
+	FinishedEventType string
+	PassedChannel     string
+	FailedChannel     string
+}
+
+func (o TaskOutcome) passedChannel() string {
+	if strings.TrimSpace(o.PassedChannel) == "" {
+		return PassedOutputChannel
+	}
+	return o.PassedChannel
+}
+
+func (o TaskOutcome) failedChannel() string {
+	if strings.TrimSpace(o.FailedChannel) == "" {
+		return FailedOutputChannel
+	}
+	return o.FailedChannel
+}
+
+// AfterTaskCreated records the broker task id on the execution and schedules the
+// first status poll. Components call this right after BrokerClient.CreateTask so
+// the shared poll/webhook/cancel and live-log machinery can take over.
+func AfterTaskCreated(ctx core.ExecutionContext, taskID string) error {
 	if err := ctx.ExecutionState.SetKV("task_id", taskID); err != nil {
 		return fmt.Errorf("set task id in kv: %w", err)
 	}
 	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
 		return fmt.Errorf("runner execution metadata: %w", err)
 	}
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
+	return ctx.Requests.ScheduleActionCall(HookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
 }
 
-func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error {
+// PollTask fetches the broker task status, refreshes live-log metadata, and
+// emits the finished event once the task reaches a terminal state. It reschedules
+// itself while the task is still running.
+func PollTask(ctx core.ActionHookContext, outcome TaskOutcome) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -38,7 +68,7 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 	task, err := broker.FetchTaskStatus(taskID)
 	if err != nil {
 		ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
-		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
+		return ctx.Requests.ScheduleActionCall(HookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
 	}
 
 	sink := taskLogFromBrokerTask(task)
@@ -47,13 +77,15 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 	}
 
 	if task.IsInTerminalState() {
-		return processBrokerTaskStatus(ctx.ExecutionState, task, finishedEventType)
+		return processBrokerTaskStatus(ctx.ExecutionState, task, outcome)
 	}
 
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
+	return ctx.Requests.ScheduleActionCall(HookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
 }
 
-func handleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType string) (int, *core.WebhookResponseBody, error) {
+// HandleTaskWebhook processes a broker task webhook callback, refreshes live-log
+// metadata, and emits the finished event on the resolved execution.
+func HandleTaskWebhook(ctx core.WebhookRequestContext, outcome TaskOutcome) (int, *core.WebhookResponseBody, error) {
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("new broker client: %w", err)
@@ -88,14 +120,14 @@ func handleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType strin
 		}
 	}
 
-	if err := processBrokerTaskStatus(executionCtx.ExecutionState, task, finishedEventType); err != nil {
+	if err := processBrokerTaskStatus(executionCtx.ExecutionState, task, outcome); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("process task status: %w", err)
 	}
 
 	return http.StatusOK, nil, nil
 }
 
-func processBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finishedEventType string) error {
+func processBrokerTaskStatus(state core.ExecutionStateContext, task *Task, outcome TaskOutcome) error {
 	if state.IsFinished() {
 		return nil
 	}
@@ -104,19 +136,20 @@ func processBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finis
 		return fmt.Errorf("task is not in terminal state")
 	}
 
-	channel := FailedOutputChannel
+	channel := outcome.failedChannel()
 	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
-		channel = PassedOutputChannel
+		channel = outcome.passedChannel()
 	}
 
 	out := map[string]any{"status": task.Status, "exit_code": task.effectiveExitCode()}
 	if v := brokerResultAsAny(task.Result); v != nil {
 		out["result"] = v
 	}
-	return state.Emit(channel, finishedEventType, []any{out})
+	return state.Emit(channel, outcome.FinishedEventType, []any{out})
 }
 
-func cancelBrokerTask(ctx core.ExecutionContext) error {
+// CancelBrokerTask cancels the broker task linked to the execution, if any.
+func CancelBrokerTask(ctx core.ExecutionContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
