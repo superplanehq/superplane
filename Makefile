@@ -168,7 +168,7 @@ check.example.payloads:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_example_payloads.go"
 
 check.proto.field.numbers:
-	$(COMPOSE) run --rm app bash -c "go run scripts/check_proto_field_numbers.go"
+	python3 ./scripts/check_proto_field_numbers.py
 
 check.configuration.fields:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_configuration_fields.go"
