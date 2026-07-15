@@ -78,6 +78,7 @@ export function ConfigurationFieldInput({
         autocompleteExampleObj={autocompleteExampleObj}
         labelRightRef={allowExpressions ? labelRightRef : undefined}
         labelRightReady={allowExpressions ? labelRightReady : false}
+        readOnly={commonProps.readOnly}
       />
     );
   }

@@ -68,6 +68,7 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
   allowExpressions = false,
   excludedSuggestions,
   valuePreviewLabel,
+  readOnly = false,
 }) => {
   const resolvedValue = value ?? field.defaultValue;
   const currentValue = resolvedValue == null ? "" : String(resolvedValue);
@@ -81,6 +82,8 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
         onChange={(e) => emit(e.target.value)}
         placeholder={field.placeholder || ""}
         style={{ minHeight: PLAIN_TEXT_MIN_HEIGHT_PX }}
+        disabled={readOnly}
+        readOnly={readOnly}
         data-testid={toTestId(`text-field-${field.name}`)}
       />
     );
@@ -101,6 +104,7 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
       valuePreviewLabel={valuePreviewLabel}
       quickTip="Tip: type `{{` to start an expression."
       excludedSuggestions={excludedSuggestions}
+      disabled={readOnly}
       data-testid={toTestId(`text-field-${field.name}`)}
     />
   );
@@ -112,6 +116,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
   onChange,
   autocompleteExampleObj,
   language,
+  readOnly = false,
 }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -131,8 +136,17 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
   };
 
   const handleEditorChange = (newValue: string | undefined) => {
+    if (readOnly) {
+      return;
+    }
+
     const valueToUse = newValue || "";
     onChange(valueToUse || undefined);
+  };
+
+  const editorOptions = {
+    ...CODE_EDITOR_OPTIONS,
+    readOnly,
   };
 
   return (
@@ -145,11 +159,13 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
                 {React.createElement(resolveIcon("copy"), { size: 14 })}
               </button>
             </SimpleTooltip>
-            <SimpleTooltip content="Expand">
-              <button onClick={() => setIsModalOpen(true)} className="p-1 text-gray-500 hover:text-gray-800">
-                {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
-              </button>
-            </SimpleTooltip>
+            {!readOnly ? (
+              <SimpleTooltip content="Expand">
+                <button onClick={() => setIsModalOpen(true)} className="p-1 text-gray-500 hover:text-gray-800">
+                  {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                </button>
+              </SimpleTooltip>
+            ) : null}
           </div>
           <Editor
             height="100%"
@@ -158,7 +174,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
             onChange={handleEditorChange}
             onMount={handleEditorMount}
             theme={monacoTheme}
-            options={CODE_EDITOR_OPTIONS}
+            options={editorOptions}
           />
         </div>
       </div>
@@ -197,7 +213,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
               onMount={handleEditorMount}
               theme={monacoTheme}
               options={{
-                ...CODE_EDITOR_OPTIONS,
+                ...editorOptions,
                 automaticLayout: true,
               }}
             />
