@@ -29,7 +29,12 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
     }
   }, [readOnly, value, field.defaultValue, onChange]);
 
-  const currentValue = (value as string) ?? "";
+  const currentValue =
+    value === undefined || value === null
+      ? readOnly && field.defaultValue !== undefined
+        ? String(field.defaultValue)
+        : ""
+      : String(value);
 
   if (!allowExpressions) {
     return (
