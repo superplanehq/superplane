@@ -109,6 +109,29 @@ function getEdgeSpanRect(source: InternalNode<Node>, target: InternalNode<Node>)
   };
 }
 
+/**
+ * React Flow only renders an edge while both of its endpoint nodes are mounted.
+ * Any edge we keep visible therefore needs its source and target nodes mounted too,
+ * even when they sit outside the culled viewport — otherwise the edge disappears as
+ * soon as an endpoint scrolls off-screen (which happens sooner the more you zoom in).
+ */
+export function includeEndpointsOfVisibleEdges<EdgeType extends Edge>(
+  visibleNodeIds: Set<string>,
+  edges: EdgeType[],
+  visibleEdgeIds: Set<string>,
+): Set<string> {
+  const nextVisibleNodeIds = new Set(visibleNodeIds);
+
+  for (const edge of edges) {
+    if (visibleEdgeIds.has(edge.id)) {
+      nextVisibleNodeIds.add(edge.source);
+      nextVisibleNodeIds.add(edge.target);
+    }
+  }
+
+  return nextVisibleNodeIds;
+}
+
 export function includeCanvasNodesThatMustStayMounted<NodeType extends Node>(
   visibleNodeIds: Set<string>,
   nodeLookup: ReadonlyMap<string, InternalNode<NodeType>>,
