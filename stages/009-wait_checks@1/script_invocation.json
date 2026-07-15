@@ -1,0 +1,5 @@
+{
+  "script": "@scripts/wait-checks.sh",
+  "command": "exec 2>&1\n@scripts/wait-checks.sh",
+  "language": "shell"
+}

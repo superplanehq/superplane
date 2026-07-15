@@ -483,7 +483,7 @@
     "kind": "running"
   },
   "status_updated_at": "2026-07-15T16:21:20.998660Z",
-  "last_event_at": "2026-07-15T16:42:16.459661Z",
+  "last_event_at": "2026-07-15T16:42:23.886179Z",
   "pending_control": null,
   "checkpoints": [
     {
@@ -1657,9 +1657,9 @@
       }
     },
     {
-      "seq": 0,
+      "seq": 566,
       "checkpoint": {
-        "timestamp": "2026-07-15T16:42:16.662652Z",
+        "timestamp": "2026-07-15T16:42:23.883247Z",
         "current_node": "ensure_pr",
         "completed_nodes": [
           "start",
@@ -1673,12 +1673,302 @@
         ],
         "node_retries": {},
         "context_values": {
+          "current_node": "ensure_pr",
+          "human.gate.approve.question": "Approve Plan",
+          "internal.run_id": "01KXK8XMFVPC78HV72MX5FR3B8",
+          "graph.rankdir": "LR",
+          "command.output": "blob://sha256/4cc4ac2896b85a45674389f78b9ca4b15a72830bb407c1173ac4151bd39bb48f",
+          "internal.retry_count.approve": 0,
+          "internal.retry_count.implement": 0,
+          "last_stage": "verify",
+          "internal.retry_count.ensure_pr": 0,
+          "preferred_label": "[A] Approve",
+          "response.fix": "All checks pass. Let me summarize the fix:\n\n## Summary\n\n**Root cause:** Vite's `import-analysis` plugin resolves module file paths at *transform time* — before Vitest's runtime mock intercepts can intervene. Because `@/api-client/sdk.gen` is a generated file (gitignored, absent in the verify environment), Vite threw `\"Failed to resolve import\"` when transforming any module that imports from it (`useIntegrations.ts`, `useSecrets.ts`, `RepositoryFileFieldRenderer.tsx`, etc.). The test file `index.spec.tsx` transitively reaches these modules through `InstallProgressPanel → InstallIntegrationsSection → useIntegrations`.\n\n**Fix:** Added a custom Vite plugin (`generatedApiClientStub`) to `vitest.config.ts` with `enforce: \"pre\"`. The plugin intercepts any `resolveId` call whose path matches `api-client/(sdk|types).gen` and returns a virtual module ID. When Vite then calls `load()` for that virtual ID, it returns an empty ESM module (`export {};`). This satisfies Vite's import-analysis without requiring the generated files to exist on disk.\n\nThe plugin only runs during Vitest (not during the production Vite build) since the generated files exist in real dev/build environments after `make pb.gen`.",
+          "thread.fix.current_node": "verify",
+          "thread.start.current_node": "plan",
+          "human.gate.approve.answer": "A",
+          "internal.node_visit_count": 1,
+          "failure_signature": "ensure_pr|deterministic|script failed with exit code: <n> ## output /bin/bash: line <n>: @scripts/ensure-pr.sh: no such file or directory",
+          "response.plan": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star button as-is.\n\n### Files changed (8 total — frontend only, no backend)\n\n| File | What changes |\n|---|---|\n| `CanvasCardsGrid.tsx` | Delete the Pin `CanvasPreferenceButton`, remove `onTogglePin` prop, remove `Pin` lucide import |\n| `index.tsx` | Delete the \"Pinned\" section rendering, remove `onTogglePin` wiring and `isPinned` filtering from `buildFolderedLayout`, remove `Pin` lucide import |\n| `CanvasFolderSection.tsx` | Remove `onTogglePin` prop that it threads through to `CanvasCardsGrid` |\n| `canvasAppPreferencePresentation.ts` | Remove `isPinned`/`pinnedAt` from the sort-rank logic; starred apps become rank 0 |\n| `canvasAppPreferencePresentation.spec.ts` | Update assertions to match new sort order |\n| `index.spec.tsx` | Remove pin button interaction from the preference test |\n| `types.ts` | Remove `isPinned`/`pinnedAt` dead fields from `CanvasCardData` |\n| `useHomePageCanvasList.ts` | Remove `isPinned`/`pinnedAt` from `toCanvasCardData` |\n\n### Key decisions\n\n- **No backend changes** — the API, protos, and DB schema for `pinned` are untouched. This keeps the change minimal and reversible.\n- The `CanvasPreferenceButton` component itself is preserved (still needed for Star).\n- Existing previously-pinned canvases silently fall back into the normal layout — no data loss.\n- Verification: `make check.build.ui` + `make format.js` + manual UI check of the home page.",
+          "internal.fidelity": "compact",
+          "graph.goal": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3",
+          "human.gate.label": "[A] Approve",
+          "human.gate.selected": "A",
+          "failure_class": "deterministic",
+          "thread.implement.current_node": "verify",
+          "thread.verify.current_node": "ensure_pr",
+          "thread.approve.current_node": "implement",
+          "last_response": "All checks passed:\n\n- `make format.js` — all files unchanged (exit 0)\n- `canvasAppPreferencePresentation.spec.ts` — 1 test passed\n- `index.spec.tsx` — 23 tests passed (previously failing due to ",
+          "internal.retry_count.verify": 0,
+          "internal.thread_id": "verify",
+          "outcome": "failed",
+          "internal.retry_count.fix": 0,
+          "response.implement": "Everything looks clean. Here's a summary of all changes made:\n\n## Summary\n\n**Files changed** (8 files, all in `web_src/src/pages/home/`):\n\n1. **`CanvasCardsGrid.tsx`** — Removed `Pin` import from lucide-react; removed `onTogglePin` from `CanvasCardsGridProps`, `CanvasCardsGrid`, `CanvasCardProps`, and `CanvasCard`; removed the Pin `CanvasPreferenceButton` block from the card UI.\n\n2. **`index.tsx`** — Removed `Pin` import; removed `onTogglePin` prop from `Content`'s signature and call site; removed `pinnedCanvases` computation and the entire \"Pinned\" `<section>` block; removed the `isPinned` early-continue guard in `buildFolderedLayout` so formerly-pinned canvases fall into the regular unfiled layout; removed `onTogglePin` from all `CanvasCardsGrid` and `CanvasFolderSection` usages inside `Content`.\n\n3. **`CanvasFolderSection.tsx`** — Removed `onTogglePin` from `CanvasFolderSectionProps`, function signature, and the `CanvasCardsGrid` call inside it.\n\n4. **`canvasAppPreferencePresentation.ts`** — Simplified ranking: starred canvases are rank 0 (top), all others rank 1. Removed all `isPinned`/`pinnedAt` branches.\n\n5. **`canvasAppPreferencePresentation.spec.ts`** — Rewrote test to verify starred-first ordering without any pin references.\n\n6. **`index.spec.tsx`** — Replaced the pin/star test with a star-only test: verifies starred canvases sort to the top and the Unstar button calls `updateCanvasPreference` correctly.\n\n7. **`types.ts`** — Removed `isPinned?: boolean` and `pinnedAt?: string` from `CanvasCardData`.\n\n8. **`useHomePageCanvasList.ts`** — Removed `isPinned` and `pinnedAt` mappings from `toCanvasCardData`.\n\nNo backend changes. The API/database `pinned`/`pinnedAt` fields remain intact.",
+          "response.verify": "All checks passed:\n\n- `make format.js` — all files unchanged (exit 0)\n- `canvasAppPreferencePresentation.spec.ts` — 1 test passed\n- `index.spec.tsx` — 23 tests passed (previously failing due to missing `@/api-client/sdk.gen`; the fix in `vitest.config.ts` resolved it)\n\n```json\n{\"outcome\": \"succeeded\", \"context_updates\": {\"verify.summary\": \"format.js passed; canvasAppPreferencePresentation.spec.ts (1 test) and index.spec.tsx (23 tests) all passed with the generatedApiClientStub plugin in vitest.config.ts resolving the previously-failing sdk.gen import\"}}\n```",
+          "internal.work_dir": "/workspace/superplane",
+          "thread.plan.current_node": "approve",
+          "internal.retry_count.plan": 0,
+          "verify.summary": "format.js passed; canvasAppPreferencePresentation.spec.ts (1 test) and index.spec.tsx (23 tests) all passed with the generatedApiClientStub plugin in vitest.config.ts resolving the previously-failing sdk.gen import",
+          "internal.retry_count.start": 0,
+          "human.gate.approve.label": "[A] Approve"
+        },
+        "node_outcomes": {
+          "ensure_pr": {
+            "status": "failed",
+            "context_updates": {
+              "command.output": "blob://sha256/4cc4ac2896b85a45674389f78b9ca4b15a72830bb407c1173ac4151bd39bb48f"
+            },
+            "failure": {
+              "message": "Script failed with exit code: 127\n\n## output\n/bin/bash: line 2: @scripts/ensure-pr.sh: No such file or directory\n",
+              "category": "deterministic"
+            },
+            "usage": null,
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 0,
+              "tool_time_ms": 188,
+              "active_time_ms": 188
+            }
+          },
+          "verify": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_stage": "verify",
+              "response.verify": "All checks passed:\n\n- `make format.js` — all files unchanged (exit 0)\n- `canvasAppPreferencePresentation.spec.ts` — 1 test passed\n- `index.spec.tsx` — 23 tests passed (previously failing due to missing `@/api-client/sdk.gen`; the fix in `vitest.config.ts` resolved it)\n\n```json\n{\"outcome\": \"succeeded\", \"context_updates\": {\"verify.summary\": \"format.js passed; canvasAppPreferencePresentation.spec.ts (1 test) and index.spec.tsx (23 tests) all passed with the generatedApiClientStub plugin in vitest.config.ts resolving the previously-failing sdk.gen import\"}}\n```",
+              "last_response": "All checks passed:\n\n- `make format.js` — all files unchanged (exit 0)\n- `canvasAppPreferencePresentation.spec.ts` — 1 test passed\n- `index.spec.tsx` — 23 tests passed (previously failing due to ",
+              "verify.summary": "format.js passed; canvasAppPreferencePresentation.spec.ts (1 test) and index.spec.tsx (23 tests) all passed with the generatedApiClientStub plugin in vitest.config.ts resolving the previously-failing sdk.gen import"
+            },
+            "notes": "Stage completed: verify",
+            "usage": {
+              "input": {
+                "usage": {
+                  "model": {
+                    "provider": "anthropic",
+                    "model_id": "claude-sonnet-4-6"
+                  },
+                  "tokens": {
+                    "input_tokens": 12042,
+                    "output_tokens": 1020,
+                    "reasoning_tokens": 0,
+                    "cache_read_tokens": 55584,
+                    "cache_write_tokens": 17981
+                  }
+                },
+                "facts": {
+                  "algorithm": "anthropic",
+                  "cache_write_5m_tokens": 17981,
+                  "cache_write_1h_tokens": 0
+                }
+              },
+              "total_usd_micros": 135529
+            },
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 21583,
+              "tool_time_ms": 64422,
+              "active_time_ms": 86005
+            }
+          },
+          "plan": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_stage": "plan",
+              "last_response": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star bu",
+              "response.plan": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star button as-is.\n\n### Files changed (8 total — frontend only, no backend)\n\n| File | What changes |\n|---|---|\n| `CanvasCardsGrid.tsx` | Delete the Pin `CanvasPreferenceButton`, remove `onTogglePin` prop, remove `Pin` lucide import |\n| `index.tsx` | Delete the \"Pinned\" section rendering, remove `onTogglePin` wiring and `isPinned` filtering from `buildFolderedLayout`, remove `Pin` lucide import |\n| `CanvasFolderSection.tsx` | Remove `onTogglePin` prop that it threads through to `CanvasCardsGrid` |\n| `canvasAppPreferencePresentation.ts` | Remove `isPinned`/`pinnedAt` from the sort-rank logic; starred apps become rank 0 |\n| `canvasAppPreferencePresentation.spec.ts` | Update assertions to match new sort order |\n| `index.spec.tsx` | Remove pin button interaction from the preference test |\n| `types.ts` | Remove `isPinned`/`pinnedAt` dead fields from `CanvasCardData` |\n| `useHomePageCanvasList.ts` | Remove `isPinned`/`pinnedAt` from `toCanvasCardData` |\n\n### Key decisions\n\n- **No backend changes** — the API, protos, and DB schema for `pinned` are untouched. This keeps the change minimal and reversible.\n- The `CanvasPreferenceButton` component itself is preserved (still needed for Star).\n- Existing previously-pinned canvases silently fall back into the normal layout — no data loss.\n- Verification: `make check.build.ui` + `make format.js` + manual UI check of the home page."
+            },
+            "notes": "Stage completed: plan",
+            "usage": {
+              "input": {
+                "usage": {
+                  "model": {
+                    "provider": "anthropic",
+                    "model_id": "claude-sonnet-4-6"
+                  },
+                  "tokens": {
+                    "input_tokens": 52551,
+                    "output_tokens": 4866,
+                    "reasoning_tokens": 0,
+                    "cache_read_tokens": 428892,
+                    "cache_write_tokens": 93095
+                  }
+                },
+                "facts": {
+                  "algorithm": "anthropic",
+                  "cache_write_5m_tokens": 93095,
+                  "cache_write_1h_tokens": 0
+                }
+              },
+              "total_usd_micros": 708416
+            },
+            "files_touched": [
+              "/workspace/superplane/plan.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 102862,
+              "tool_time_ms": 2520,
+              "active_time_ms": 105382
+            }
+          },
+          "approve": {
+            "status": "succeeded",
+            "preferred_label": "[A] Approve",
+            "suggested_next_ids": [
+              "implement"
+            ],
+            "context_updates": {
+              "human.gate.approve.answer": "A",
+              "human.gate.label": "[A] Approve",
+              "human.gate.approve.label": "[A] Approve",
+              "human.gate.selected": "A",
+              "human.gate.approve.question": "Approve Plan"
+            },
+            "usage": null
+          },
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          },
+          "implement": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_stage": "implement",
+              "last_response": "Everything looks clean. Here's a summary of all changes made:\n\n## Summary\n\n**Files changed** (8 files, all in `web_src/src/pages/home/`):\n\n1. **`CanvasCardsGrid.tsx`** — Removed `Pin` import from lu",
+              "response.implement": "Everything looks clean. Here's a summary of all changes made:\n\n## Summary\n\n**Files changed** (8 files, all in `web_src/src/pages/home/`):\n\n1. **`CanvasCardsGrid.tsx`** — Removed `Pin` import from lucide-react; removed `onTogglePin` from `CanvasCardsGridProps`, `CanvasCardsGrid`, `CanvasCardProps`, and `CanvasCard`; removed the Pin `CanvasPreferenceButton` block from the card UI.\n\n2. **`index.tsx`** — Removed `Pin` import; removed `onTogglePin` prop from `Content`'s signature and call site; removed `pinnedCanvases` computation and the entire \"Pinned\" `<section>` block; removed the `isPinned` early-continue guard in `buildFolderedLayout` so formerly-pinned canvases fall into the regular unfiled layout; removed `onTogglePin` from all `CanvasCardsGrid` and `CanvasFolderSection` usages inside `Content`.\n\n3. **`CanvasFolderSection.tsx`** — Removed `onTogglePin` from `CanvasFolderSectionProps`, function signature, and the `CanvasCardsGrid` call inside it.\n\n4. **`canvasAppPreferencePresentation.ts`** — Simplified ranking: starred canvases are rank 0 (top), all others rank 1. Removed all `isPinned`/`pinnedAt` branches.\n\n5. **`canvasAppPreferencePresentation.spec.ts`** — Rewrote test to verify starred-first ordering without any pin references.\n\n6. **`index.spec.tsx`** — Replaced the pin/star test with a star-only test: verifies starred canvases sort to the top and the Unstar button calls `updateCanvasPreference` correctly.\n\n7. **`types.ts`** — Removed `isPinned?: boolean` and `pinnedAt?: string` from `CanvasCardData`.\n\n8. **`useHomePageCanvasList.ts`** — Removed `isPinned` and `pinnedAt` mappings from `toCanvasCardData`.\n\nNo backend changes. The API/database `pinned`/`pinnedAt` fields remain intact."
+            },
+            "notes": "Stage completed: implement",
+            "usage": {
+              "input": {
+                "usage": {
+                  "model": {
+                    "provider": "anthropic",
+                    "model_id": "claude-sonnet-4-6"
+                  },
+                  "tokens": {
+                    "input_tokens": 48005,
+                    "output_tokens": 10812,
+                    "reasoning_tokens": 0,
+                    "cache_read_tokens": 1312075,
+                    "cache_write_tokens": 189842
+                  }
+                },
+                "facts": {
+                  "algorithm": "anthropic",
+                  "cache_write_5m_tokens": 189842,
+                  "cache_write_1h_tokens": 0
+                }
+              },
+              "total_usd_micros": 1411724
+            },
+            "files_touched": [
+              "/workspace/superplane/web_src/src/pages/home/CanvasCardsGrid.tsx",
+              "/workspace/superplane/web_src/src/pages/home/CanvasFolderSection.tsx",
+              "/workspace/superplane/web_src/src/pages/home/canvasAppPreferencePresentation.spec.ts",
+              "/workspace/superplane/web_src/src/pages/home/canvasAppPreferencePresentation.ts",
+              "/workspace/superplane/web_src/src/pages/home/index.spec.tsx",
+              "/workspace/superplane/web_src/src/pages/home/index.tsx",
+              "/workspace/superplane/web_src/src/pages/home/types.ts",
+              "/workspace/superplane/web_src/src/pages/home/useHomePageCanvasList.ts"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 177809,
+              "tool_time_ms": 7100,
+              "active_time_ms": 184909
+            }
+          },
+          "fix": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_stage": "fix",
+              "response.fix": "All checks pass. Let me summarize the fix:\n\n## Summary\n\n**Root cause:** Vite's `import-analysis` plugin resolves module file paths at *transform time* — before Vitest's runtime mock intercepts can intervene. Because `@/api-client/sdk.gen` is a generated file (gitignored, absent in the verify environment), Vite threw `\"Failed to resolve import\"` when transforming any module that imports from it (`useIntegrations.ts`, `useSecrets.ts`, `RepositoryFileFieldRenderer.tsx`, etc.). The test file `index.spec.tsx` transitively reaches these modules through `InstallProgressPanel → InstallIntegrationsSection → useIntegrations`.\n\n**Fix:** Added a custom Vite plugin (`generatedApiClientStub`) to `vitest.config.ts` with `enforce: \"pre\"`. The plugin intercepts any `resolveId` call whose path matches `api-client/(sdk|types).gen` and returns a virtual module ID. When Vite then calls `load()` for that virtual ID, it returns an empty ESM module (`export {};`). This satisfies Vite's import-analysis without requiring the generated files to exist on disk.\n\nThe plugin only runs during Vitest (not during the production Vite build) since the generated files exist in real dev/build environments after `make pb.gen`.",
+              "last_response": "All checks pass. Let me summarize the fix:\n\n## Summary\n\n**Root cause:** Vite's `import-analysis` plugin resolves module file paths at *transform time* — before Vitest's runtime mock intercepts can i"
+            },
+            "notes": "Stage completed: fix",
+            "usage": {
+              "input": {
+                "usage": {
+                  "model": {
+                    "provider": "anthropic",
+                    "model_id": "claude-sonnet-4-6"
+                  },
+                  "tokens": {
+                    "input_tokens": 80970,
+                    "output_tokens": 38313,
+                    "reasoning_tokens": 0,
+                    "cache_read_tokens": 2290422,
+                    "cache_write_tokens": 283279
+                  }
+                },
+                "facts": {
+                  "algorithm": "anthropic",
+                  "cache_write_5m_tokens": 283279,
+                  "cache_write_1h_tokens": 0
+                }
+              },
+              "total_usd_micros": 2567027
+            },
+            "files_touched": [
+              "/workspace/superplane/web_src/src/pages/home/index.spec.tsx",
+              "/workspace/superplane/web_src/vitest.config.ts"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 718798,
+              "tool_time_ms": 56510,
+              "active_time_ms": 775308
+            }
+          }
+        },
+        "next_node_id": "wait_checks",
+        "git_commit_sha": "bdc21e8b393e16c88e15f7c32e2d95eed125048e",
+        "loop_failure_signatures": {
+          "verify|deterministic|npx vitest run src/pages/home/index.spec.tsx exited non-zero: 'failed to resolve import @/api-client/sdk.gen' — generated api client not present in this environment (pre-existing failure,identical on head~<n> before the implementation)": 1,
+          "ensure_pr|deterministic|script failed with exit code: <n> ## output /bin/bash: line <n>: @scripts/ensure-pr.sh: no such file or directory": 1
+        },
+        "node_visits": {
+          "implement": 1,
+          "approve": 1,
+          "ensure_pr": 1,
+          "start": 1,
+          "plan": 1,
+          "fix": 1,
+          "verify": 2
+        }
+      },
+      "diff": {
+        "summary": {
+          "files_changed": 10,
+          "additions": 166,
+          "deletions": 93
+        }
+      }
+    },
+    {
+      "seq": 0,
+      "checkpoint": {
+        "timestamp": "2026-07-15T16:42:24.254713Z",
+        "current_node": "wait_checks",
+        "completed_nodes": [
+          "start",
+          "plan",
+          "approve",
+          "implement",
+          "verify",
+          "fix",
+          "verify",
+          "ensure_pr",
+          "wait_checks"
+        ],
+        "node_retries": {},
+        "context_values": {
           "internal.run_id": "01KXK8XMFVPC78HV72MX5FR3B8",
           "thread.verify.current_node": "ensure_pr",
-          "command.output": "blob://sha256/4cc4ac2896b85a45674389f78b9ca4b15a72830bb407c1173ac4151bd39bb48f",
+          "command.output": "blob://sha256/a4e6c57b484dffd5e714d57f439312f97e70b1178f1a575a5fd9955de680f0bf",
+          "internal.retry_count.wait_checks": 0,
           "failure_class": "deterministic",
           "response.fix": "All checks pass. Let me summarize the fix:\n\n## Summary\n\n**Root cause:** Vite's `import-analysis` plugin resolves module file paths at *transform time* — before Vitest's runtime mock intercepts can intervene. Because `@/api-client/sdk.gen` is a generated file (gitignored, absent in the verify environment), Vite threw `\"Failed to resolve import\"` when transforming any module that imports from it (`useIntegrations.ts`, `useSecrets.ts`, `RepositoryFileFieldRenderer.tsx`, etc.). The test file `index.spec.tsx` transitively reaches these modules through `InstallProgressPanel → InstallIntegrationsSection → useIntegrations`.\n\n**Fix:** Added a custom Vite plugin (`generatedApiClientStub`) to `vitest.config.ts` with `enforce: \"pre\"`. The plugin intercepts any `resolveId` call whose path matches `api-client/(sdk|types).gen` and returns a virtual module ID. When Vite then calls `load()` for that virtual ID, it returns an empty ESM module (`export {};`). This satisfies Vite's import-analysis without requiring the generated files to exist on disk.\n\nThe plugin only runs during Vitest (not during the production Vite build) since the generated files exist in real dev/build environments after `make pb.gen`.",
-          "failure_signature": "ensure_pr|deterministic|script failed with exit code: <n> ## output /bin/bash: line <n>: @scripts/ensure-pr.sh: no such file or directory",
+          "failure_signature": "wait_checks|deterministic|script failed with exit code: <n> ## output /bin/bash: line <n>: @scripts/wait-checks.sh: no such file or directory",
           "last_response": "All checks passed:\n\n- `make format.js` — all files unchanged (exit 0)\n- `canvasAppPreferencePresentation.spec.ts` — 1 test passed\n- `index.spec.tsx` — 23 tests passed (previously failing due to ",
           "internal.retry_count.fix": 0,
           "internal.retry_count.ensure_pr": 0,
@@ -1689,7 +1979,7 @@
           "human.gate.label": "[A] Approve",
           "outcome": "failed",
           "internal.retry_count.implement": 0,
-          "current_node": "ensure_pr",
+          "current_node": "wait_checks",
           "thread.plan.current_node": "approve",
           "preferred_label": "[A] Approve",
           "response.plan": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star button as-is.\n\n### Files changed (8 total — frontend only, no backend)\n\n| File | What changes |\n|---|---|\n| `CanvasCardsGrid.tsx` | Delete the Pin `CanvasPreferenceButton`, remove `onTogglePin` prop, remove `Pin` lucide import |\n| `index.tsx` | Delete the \"Pinned\" section rendering, remove `onTogglePin` wiring and `isPinned` filtering from `buildFolderedLayout`, remove `Pin` lucide import |\n| `CanvasFolderSection.tsx` | Remove `onTogglePin` prop that it threads through to `CanvasCardsGrid` |\n| `canvasAppPreferencePresentation.ts` | Remove `isPinned`/`pinnedAt` from the sort-rank logic; starred apps become rank 0 |\n| `canvasAppPreferencePresentation.spec.ts` | Update assertions to match new sort order |\n| `index.spec.tsx` | Remove pin button interaction from the preference test |\n| `types.ts` | Remove `isPinned`/`pinnedAt` dead fields from `CanvasCardData` |\n| `useHomePageCanvasList.ts` | Remove `isPinned`/`pinnedAt` from `toCanvasCardData` |\n\n### Key decisions\n\n- **No backend changes** — the API, protos, and DB schema for `pinned` are untouched. This keeps the change minimal and reversible.\n- The `CanvasPreferenceButton` component itself is preserved (still needed for Star).\n- Existing previously-pinned canvases silently fall back into the normal layout — no data loss.\n- Verification: `make check.build.ui` + `make format.js` + manual UI check of the home page.",
@@ -1703,13 +1993,14 @@
           "internal.retry_count.plan": 0,
           "human.gate.approve.question": "Approve Plan",
           "internal.node_visit_count": 1,
+          "thread.ensure_pr.current_node": "wait_checks",
           "human.gate.selected": "A",
           "response.implement": "Everything looks clean. Here's a summary of all changes made:\n\n## Summary\n\n**Files changed** (8 files, all in `web_src/src/pages/home/`):\n\n1. **`CanvasCardsGrid.tsx`** — Removed `Pin` import from lucide-react; removed `onTogglePin` from `CanvasCardsGridProps`, `CanvasCardsGrid`, `CanvasCardProps`, and `CanvasCard`; removed the Pin `CanvasPreferenceButton` block from the card UI.\n\n2. **`index.tsx`** — Removed `Pin` import; removed `onTogglePin` prop from `Content`'s signature and call site; removed `pinnedCanvases` computation and the entire \"Pinned\" `<section>` block; removed the `isPinned` early-continue guard in `buildFolderedLayout` so formerly-pinned canvases fall into the regular unfiled layout; removed `onTogglePin` from all `CanvasCardsGrid` and `CanvasFolderSection` usages inside `Content`.\n\n3. **`CanvasFolderSection.tsx`** — Removed `onTogglePin` from `CanvasFolderSectionProps`, function signature, and the `CanvasCardsGrid` call inside it.\n\n4. **`canvasAppPreferencePresentation.ts`** — Simplified ranking: starred canvases are rank 0 (top), all others rank 1. Removed all `isPinned`/`pinnedAt` branches.\n\n5. **`canvasAppPreferencePresentation.spec.ts`** — Rewrote test to verify starred-first ordering without any pin references.\n\n6. **`index.spec.tsx`** — Replaced the pin/star test with a star-only test: verifies starred canvases sort to the top and the Unstar button calls `updateCanvasPreference` correctly.\n\n7. **`types.ts`** — Removed `isPinned?: boolean` and `pinnedAt?: string` from `CanvasCardData`.\n\n8. **`useHomePageCanvasList.ts`** — Removed `isPinned` and `pinnedAt` mappings from `toCanvasCardData`.\n\nNo backend changes. The API/database `pinned`/`pinnedAt` fields remain intact.",
           "human.gate.approve.label": "[A] Approve",
           "response.verify": "All checks passed:\n\n- `make format.js` — all files unchanged (exit 0)\n- `canvasAppPreferencePresentation.spec.ts` — 1 test passed\n- `index.spec.tsx` — 23 tests passed (previously failing due to missing `@/api-client/sdk.gen`; the fix in `vitest.config.ts` resolved it)\n\n```json\n{\"outcome\": \"succeeded\", \"context_updates\": {\"verify.summary\": \"format.js passed; canvasAppPreferencePresentation.spec.ts (1 test) and index.spec.tsx (23 tests) all passed with the generatedApiClientStub plugin in vitest.config.ts resolving the previously-failing sdk.gen import\"}}\n```",
           "last_stage": "verify",
           "internal.fidelity": "compact",
-          "internal.thread_id": "verify",
+          "internal.thread_id": "ensure_pr",
           "thread.implement.current_node": "verify"
         },
         "node_outcomes": {
@@ -1728,6 +2019,23 @@
               "inference_time_ms": 0,
               "tool_time_ms": 188,
               "active_time_ms": 188
+            }
+          },
+          "wait_checks": {
+            "status": "failed",
+            "context_updates": {
+              "command.output": "blob://sha256/a4e6c57b484dffd5e714d57f439312f97e70b1178f1a575a5fd9955de680f0bf"
+            },
+            "failure": {
+              "message": "Script failed with exit code: 127\n\n## output\n/bin/bash: line 2: @scripts/wait-checks.sh: No such file or directory\n",
+              "category": "deterministic"
+            },
+            "usage": null,
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 0,
+              "tool_time_ms": 354,
+              "active_time_ms": 354
             }
           },
           "plan": {
@@ -1920,8 +2228,9 @@
             "usage": null
           }
         },
-        "next_node_id": "wait_checks",
+        "next_node_id": "fix_ci",
         "node_visits": {
+          "wait_checks": 1,
           "start": 1,
           "plan": 1,
           "implement": 1,
@@ -3224,7 +3533,12 @@
       "first_event_seq": 559,
       "prompt": null,
       "response": null,
-      "completion": null,
+      "completion": {
+        "outcome": "failed",
+        "notes": null,
+        "failure_reason": "Script failed with exit code: 127\n\n## output\n/bin/bash: line 2: @scripts/ensure-pr.sh: No such file or directory\n",
+        "timestamp": "2026-07-15T16:42:16.656569Z"
+      },
       "provider_used": null,
       "diff": null,
       "script_invocation": {
@@ -3232,10 +3546,53 @@
         "command": "exec 2>&1\n@scripts/ensure-pr.sh",
         "language": "shell"
       },
+      "script_timing": {
+        "output": "blob://sha256/4cc4ac2896b85a45674389f78b9ca4b15a72830bb407c1173ac4151bd39bb48f",
+        "exit_code": 127,
+        "duration_ms": 188,
+        "termination": "exited",
+        "output_bytes": 68,
+        "live_streaming": true
+      },
+      "parallel_results": null,
+      "output": null,
+      "output_bytes": 68,
+      "live_streaming": true,
+      "termination": "exited",
+      "started_at": "2026-07-15T16:42:16.459525Z",
+      "handler": "command",
+      "timing": {
+        "wall_time_ms": 196,
+        "inference_time_ms": 0,
+        "tool_time_ms": 188,
+        "active_time_ms": 188
+      },
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "state": "failed"
+    },
+    "wait_checks@1": {
+      "first_event_seq": 569,
+      "prompt": null,
+      "response": null,
+      "completion": null,
+      "provider_used": null,
+      "diff": null,
+      "script_invocation": {
+        "script": "@scripts/wait-checks.sh",
+        "command": "exec 2>&1\n@scripts/wait-checks.sh",
+        "language": "shell"
+      },
       "script_timing": null,
       "parallel_results": null,
       "output": null,
-      "started_at": "2026-07-15T16:42:16.459525Z",
+      "started_at": "2026-07-15T16:42:23.885560Z",
       "handler": "command",
       "usage": {
         "input_tokens": 0,
