@@ -38,6 +38,7 @@
 - For new components or triggers, see [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
 - For component design guidelines and quality standards, see [docs/contributing/component-design.md](docs/contributing/component-design.md)
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI with `make pb.gen`(requires a running `app` container from `make dev.up`)
+- After removing proto fields, renumber the remaining fields so message field numbers stay contiguous (no gaps), then run `make check.proto.field.numbers`. These protos are used for JSON conversion, not wire compatibility, so do not leave holes or `reserved` markers.
 
 ## Coding Style & Naming Conventions
 
