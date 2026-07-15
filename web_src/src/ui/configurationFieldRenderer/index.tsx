@@ -118,6 +118,7 @@ export const ConfigurationFieldRenderer = ({
   autocompleteExampleObj,
   allowExpressions = false,
   readOnly = false,
+  preserveEditLayout = false,
   expressionPreviewContext,
   expressionErrorMessage,
   expressionTemplateValue,
@@ -284,6 +285,7 @@ export const ConfigurationFieldRenderer = ({
     organizationId,
     allowExpressions: fieldAllowsExpressions,
     readOnly,
+    preserveEditLayout,
     excludedSuggestions: runTitlePresentation ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
     valuePreviewLabel: runTitlePresentation?.previewLabel,
     expressionPreviewContext,
@@ -291,7 +293,7 @@ export const ConfigurationFieldRenderer = ({
     expressionTemplateValue,
   };
 
-  if (readOnly && !shouldRenderFieldForReadOnly(field)) {
+  if (readOnly && !preserveEditLayout && !shouldRenderFieldForReadOnly(field)) {
     const expressionPreview = buildReadonlyExpressionPreview({
       field,
       value,
@@ -335,7 +337,7 @@ export const ConfigurationFieldRenderer = ({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
+          <Switch checked={isEnabled} onCheckedChange={handleToggleChange} disabled={readOnly} />
           <Label className="block text-left flex-1 min-w-0">
             {fieldLabel}
             {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
@@ -419,7 +421,7 @@ export const ConfigurationFieldRenderer = ({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
+        {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} disabled={readOnly} />}
         <Label className="block text-left flex-1 min-w-0">
           {fieldLabel}
           {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
