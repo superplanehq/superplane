@@ -660,17 +660,27 @@ func resolveFileAttachment(client *Client, httpCtx core.HTTPContext, entry FileA
 	if !strings.HasPrefix(fileURL, "http://") && !strings.HasPrefix(fileURL, "https://") {
 		return MessageFile{}, fmt.Errorf("files[%d]: URL %q must be an http(s) URL; to attach inline content, set the entry's source to content", index, fileURL)
 	}
+	return fetchURLAttachment(client, httpCtx, fileURL, entry.Filename, index)
+}
+
+// fetchURLAttachment downloads a URL entry and builds its attachment. Both the
+// structured and the legacy string form go through here so the same URL always
+// attaches identically, whichever config shape produced it.
+func fetchURLAttachment(client *Client, httpCtx core.HTTPContext, fileURL, preferredName string, index int) (MessageFile, error) {
 	content, err := client.FetchFile(httpCtx, fileURL)
 	if err != nil {
 		return MessageFile{}, fmt.Errorf("failed to fetch file %q: %w", fileURL, err)
 	}
 	contentType := resolveContentType(content, "")
-	name := entry.Filename
+	name := preferredName
 	if name == "" {
 		name = fileNameFromURL(fileURL, index)
 	}
-	name = attachmentName(name, contentType, index)
-	return MessageFile{Name: name, Content: content, ContentType: contentType}, nil
+	return MessageFile{
+		Name:        attachmentName(name, contentType, index),
+		Content:     content,
+		ContentType: contentType,
+	}, nil
 }
 
 // resolveLegacyFileEntry handles the original string entry form: an http(s)
@@ -693,11 +703,7 @@ func resolveLegacyFileEntry(client *Client, httpCtx core.HTTPContext, value stri
 		// an expression; a fetch would only fail with a cryptic error.
 		return MessageFile{}, fmt.Errorf("files[%d] is neither an http(s) URL nor a data: URI; to attach inline content, use a file entry with source set to content", index)
 	}
-	content, err := client.FetchFile(httpCtx, value)
-	if err != nil {
-		return MessageFile{}, fmt.Errorf("failed to fetch file %q: %w", value, err)
-	}
-	return MessageFile{Name: fileNameFromURL(value, index), Content: content}, nil
+	return fetchURLAttachment(client, httpCtx, value, "", index)
 }
 
 // fileNameFromURL derives an attachment filename from the URL path, falling

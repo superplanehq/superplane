@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -639,4 +640,34 @@ func Test__SendTextMessage__LegacyStringEntriesRemainSupported(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte("a,b"), file.Content)
 	})
+}
+
+func Test__SendTextMessage__URLEntriesAttachIdenticallyInBothShapes(t *testing.T) {
+	// A presigned-style URL with no extension in its path: the attachment name
+	// and type must come from the content, not the config shape.
+	pngBytes := []byte{
+		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+		0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+		0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89,
+	}
+	const artifactURL = "https://artifacts.example.com/agents/abc/download?sig=xyz"
+
+	fetchOnce := func() *contexts.HTTPContext {
+		return &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(pngBytes))},
+			},
+		}
+	}
+
+	legacy, err := resolveFileAttachment(&Client{BotToken: "t"}, fetchOnce(), FileAttachment{Raw: artifactURL}, 0)
+	require.NoError(t, err)
+
+	structured, err := resolveFileAttachment(&Client{BotToken: "t"}, fetchOnce(),
+		FileAttachment{Source: fileSourceURL, URL: artifactURL}, 0)
+	require.NoError(t, err)
+
+	assert.Equal(t, structured, legacy, "a legacy string URL must attach exactly like the structured form")
+	assert.Equal(t, "image/png", legacy.ContentType)
+	assert.Equal(t, "download.png", legacy.Name, "the extension must come from the sniffed content")
 }
