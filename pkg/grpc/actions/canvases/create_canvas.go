@@ -186,7 +186,7 @@ func CreateCanvasWithSeedFiles(
 		//
 		// Publish the draft version as the live version
 		//
-		publisher, err := changesets.NewCanvasPublisher(tx, updatedVersion, &emptyVersion, changesets.CanvasPublisherOptions{
+		publisher, err := changesets.NewCanvasPublisher(tx, &canvas, updatedVersion, &emptyVersion, changesets.CanvasPublisherOptions{
 			Registry:       registry,
 			OrgID:          organizationID,
 			Encryptor:      encryptor,
