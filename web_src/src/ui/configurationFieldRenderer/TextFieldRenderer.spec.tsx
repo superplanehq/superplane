@@ -7,15 +7,34 @@ import type { ConfigurationField } from "@/api-client";
 
 import { TextFieldRenderer } from "./TextFieldRenderer";
 
-vi.mock("@monaco-editor/react", () => ({
-  default: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
-    <textarea
-      aria-label="Monaco editor"
-      value={value ?? ""}
-      onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange?.(event.currentTarget.value)}
-    />
-  ),
-}));
+const monacoRenderValues = vi.hoisted((): string[] => []);
+
+vi.mock("@monaco-editor/react", async () => {
+  const { useState: useMockState } = await vi.importActual<{ useState: typeof useState }>("react");
+
+  return {
+    default: function MockMonacoEditor({
+      value,
+      onChange,
+    }: {
+      value?: string;
+      onChange?: (value: string | undefined) => void;
+    }) {
+      monacoRenderValues.push(value ?? "");
+      const [editorValue, setEditorValue] = useMockState(value ?? "");
+      return (
+        <textarea
+          aria-label="Monaco editor"
+          value={editorValue}
+          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
+            setEditorValue(event.currentTarget.value);
+            onChange?.(event.currentTarget.value);
+          }}
+        />
+      );
+    },
+  };
+});
 
 vi.mock("@/contexts/useTheme", () => ({
   useTheme: () => ({ preference: "light", resolvedTheme: "light", setPreference: () => undefined }),
@@ -130,6 +149,31 @@ describe("TextFieldRenderer expression-aware expansion", () => {
     expect(modalInput.value).toBe("{{ root().data.title }}");
     // The expression-aware editor exposes the preview toggle inside the modal.
     expect(screen.getAllByRole("button", { name: "Preview" }).length).toBeGreaterThan(0);
+  });
+
+  it("dismisses autocomplete suggestions with Escape without closing the dialog", async () => {
+    const onChange = vi.fn();
+    render(
+      <ControlledText
+        field={textField({ name: "message", label: "Message" })}
+        initialValue="{{ "
+        onChange={onChange}
+        allowExpressions
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /expand message editor/i }));
+    const modalInput = screen.getByTestId("text-field-message-modal-input") as HTMLTextAreaElement;
+    fireEvent.change(modalInput, { target: { value: "{{ root" } });
+
+    expect(await screen.findByTestId("autocomplete-suggestions")).toBeInTheDocument();
+    fireEvent.keyDown(modalInput, { key: "Escape" });
+
+    expect(screen.queryByTestId("autocomplete-suggestions")).not.toBeInTheDocument();
+    expect(screen.getByTestId("text-field-message-modal-input")).toHaveValue("{{ root");
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    expect(onChange).toHaveBeenLastCalledWith("{{ root");
   });
 });
 
@@ -253,4 +297,31 @@ describe("TextFieldRenderer code editor expansion", () => {
     const inlineEditor = screen.getByLabelText("Monaco editor") as HTMLTextAreaElement;
     expect(inlineEditor.value).toBe("echo hi");
   });
+
+  it("mounts Monaco with the latest value when the dialog is reopened", () => {
+    render(<ExternalCodeUpdater field={codeField} initialValue="echo original" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /expand script editor/i }));
+    const firstModalEditor = (screen.getAllByLabelText("Monaco editor") as HTMLTextAreaElement[])[1];
+    fireEvent.change(firstModalEditor, { target: { value: "echo discarded" } });
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+    fireEvent.click(screen.getByTestId("external-code-update"));
+    monacoRenderValues.length = 0;
+    fireEvent.click(screen.getByRole("button", { name: /expand script editor/i }));
+
+    expect(monacoRenderValues).not.toContain("echo discarded");
+    const reopenedModalEditor = (screen.getAllByLabelText("Monaco editor") as HTMLTextAreaElement[])[1];
+    expect(reopenedModalEditor.value).toBe("echo updated");
+  });
 });
+
+function ExternalCodeUpdater({ field, initialValue }: { field: ConfigurationField; initialValue: string }) {
+  const [value, setValue] = useState<unknown>(initialValue);
+  return (
+    <>
+      <TextFieldRenderer field={field} value={value} onChange={setValue} />
+      <button data-testid="external-code-update" onClick={() => setValue("echo updated")} />
+    </>
+  );
+}

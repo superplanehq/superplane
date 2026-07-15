@@ -1344,6 +1344,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           }
           break;
         case "Escape":
+          e.preventDefault();
+          e.stopPropagation();
           closeSuggestions();
           break;
       }

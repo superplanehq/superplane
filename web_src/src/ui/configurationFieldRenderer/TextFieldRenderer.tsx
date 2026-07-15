@@ -288,8 +288,15 @@ interface ExpandableEditorDialogProps {
   headerActions?: (props: { draft: string }) => React.ReactNode;
 }
 
-const ExpandableEditorDialog: React.FC<ExpandableEditorDialogProps> = ({
-  open,
+const ExpandableEditorDialog: React.FC<ExpandableEditorDialogProps> = ({ open, onOpenChange, ...sessionProps }) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    {open ? <ExpandableEditorDialogSession onOpenChange={onOpenChange} {...sessionProps} /> : null}
+  </Dialog>
+);
+
+type ExpandableEditorDialogSessionProps = Omit<ExpandableEditorDialogProps, "open">;
+
+const ExpandableEditorDialogSession: React.FC<ExpandableEditorDialogSessionProps> = ({
   onOpenChange,
   title,
   initialValue,
@@ -299,17 +306,7 @@ const ExpandableEditorDialog: React.FC<ExpandableEditorDialogProps> = ({
   headerActions,
 }) => {
   const [draft, setDraft] = React.useState(initialValue);
-  const wasOpenRef = React.useRef(open);
-
-  // Reset the draft only when the dialog transitions from closed to open so that
-  // Cancel/Escape/overlay-click reliably discards in-progress edits, and so that
-  // an unrelated parent-side value update while editing does not overwrite the draft.
-  React.useEffect(() => {
-    if (open && !wasOpenRef.current) {
-      setDraft(initialValue);
-    }
-    wasOpenRef.current = open;
-  }, [open, initialValue]);
+  const contentRef = React.useRef<HTMLDivElement>(null);
 
   const handleSave = () => {
     onSave(draft);
@@ -330,37 +327,44 @@ const ExpandableEditorDialog: React.FC<ExpandableEditorDialogProps> = ({
     }
   };
 
+  const handleEscapeKeyDown = (event: KeyboardEvent) => {
+    const autocompleteIsFocused = contentRef.current?.contains(document.activeElement);
+    if (autocompleteIsFocused && document.querySelector("[data-autocomplete-suggestions]")) {
+      event.preventDefault();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        size="90vw"
-        className="flex flex-col gap-0 overflow-hidden p-0"
-        onClick={(e) => e.stopPropagation()}
-        onPointerDownOutside={handleInteractOutside}
-        onFocusOutside={handleInteractOutside}
-        onInteractOutside={handleInteractOutside}
-        data-testid={testId}
-      >
-        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 pr-12 dark:border-gray-600">
-          <DialogTitle className="truncate">{title}</DialogTitle>
-          <DialogDescription className="sr-only">
-            Expanded editor for {title}. Save to apply your changes or cancel to discard them.
-          </DialogDescription>
-          {headerActions ? <div className="flex items-center gap-2">{headerActions({ draft })}</div> : null}
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3">
-          {children({ value: draft, onChange: setDraft })}
-        </div>
-        <DialogFooter className="shrink-0 border-t border-gray-200 px-4 py-3 dark:border-gray-600">
-          <Button type="button" variant="outline" onClick={handleCancel} data-testid="expandable-editor-cancel">
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSave} data-testid="expandable-editor-save">
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <DialogContent
+      ref={contentRef}
+      size="90vw"
+      className="flex flex-col gap-0 overflow-hidden p-0"
+      onClick={(e) => e.stopPropagation()}
+      onEscapeKeyDown={handleEscapeKeyDown}
+      onPointerDownOutside={handleInteractOutside}
+      onFocusOutside={handleInteractOutside}
+      onInteractOutside={handleInteractOutside}
+      data-testid={testId}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 pr-12 dark:border-gray-600">
+        <DialogTitle className="truncate">{title}</DialogTitle>
+        <DialogDescription className="sr-only">
+          Expanded editor for {title}. Save to apply your changes or cancel to discard them.
+        </DialogDescription>
+        {headerActions ? <div className="flex items-center gap-2">{headerActions({ draft })}</div> : null}
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3">
+        {children({ value: draft, onChange: setDraft })}
+      </div>
+      <DialogFooter className="shrink-0 border-t border-gray-200 px-4 py-3 dark:border-gray-600">
+        <Button type="button" variant="outline" onClick={handleCancel} data-testid="expandable-editor-cancel">
+          Cancel
+        </Button>
+        <Button type="button" onClick={handleSave} data-testid="expandable-editor-save">
+          Save
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 };
 
