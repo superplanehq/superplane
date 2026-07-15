@@ -30,6 +30,18 @@ describe("normalizeYamlForDiff", () => {
     expect(normalized.indexOf("id: a")).toBeLessThan(normalized.indexOf("id: b"));
   });
 
+  it("orders the edges section by source, target, and channel", () => {
+    const live =
+      "spec:\n  edges:\n    - sourceId: b\n      targetId: c\n      channel: default\n    - sourceId: a\n      targetId: b\n      channel: default\n";
+    const draft =
+      "spec:\n  edges:\n    - sourceId: a\n      targetId: b\n      channel: default\n    - sourceId: b\n      targetId: c\n      channel: default\n";
+
+    const normalized = normalizeYamlForDiff(live);
+
+    expect(normalized).toBe(normalizeYamlForDiff(draft));
+    expect(normalized.indexOf("sourceId: a")).toBeLessThan(normalized.indexOf("sourceId: b"));
+  });
+
   it("still reports a difference when values actually change", () => {
     const live = "name: old\nref: r\n";
     const draft = "ref: r\nname: new\n";
