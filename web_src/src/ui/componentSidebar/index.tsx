@@ -2,7 +2,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { cn, resolveIcon } from "@/lib/utils";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, Puzzle, Rabbit, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { useAvailableIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
@@ -13,6 +13,7 @@ import type { SidebarEvent } from "./types";
 import { DocsTab } from "./DocsTab";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
+import { SimpleTooltip } from "./SimpleTooltip";
 import { useSidebarLayoutStore, useSidebarLayoutViewport, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import type {
   AuthorizationDomainType,
@@ -27,6 +28,7 @@ import type { ReactNode } from "react";
 import { HistoryQueuePage, PageHeader } from "./pages";
 import { analytics } from "@/lib/analytics";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
+import type { LiveNodePreRunStatus } from "@/lib/liveNodePreRunStatus";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
 const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
@@ -153,6 +155,11 @@ interface ComponentSidebarProps {
 
   workflowNodes?: ComponentsNode[];
   readOnly?: boolean;
+  formDisabled?: boolean;
+  livePreRunStatus?: LiveNodePreRunStatus;
+  onContinueEditing?: () => void | Promise<void>;
+  continueEditingDisabled?: boolean;
+  continueEditingDisabledTooltip?: string;
   layout?: "sidebar" | "bottom";
   resolveRunId?: (event: SidebarEvent) => string | null;
   fetchRunId?: (event: SidebarEvent) => Promise<string | null>;
@@ -217,6 +224,11 @@ export const ComponentSidebar = ({
   componentDocumentationUrl,
   workflowNodes = [],
   readOnly = false,
+  formDisabled = false,
+  livePreRunStatus,
+  onContinueEditing,
+  continueEditingDisabled = false,
+  continueEditingDisabledTooltip,
   layout = "sidebar",
   resolveRunId,
   fetchRunId,
@@ -518,7 +530,7 @@ export const ComponentSidebar = ({
           className={
             isBottomLayout
               ? "flex h-9 shrink-0 items-stretch justify-between border-b border-slate-200 pl-3 dark:border-gray-800/70"
-              : "flex items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")
+              : "flex shrink-0 items-center justify-between gap-3 px-4 pt-3 relative" + (hideNodeId ? " pb-3" : " pb-8")
           }
         >
           {isBottomLayout ? (
@@ -568,6 +580,65 @@ export const ComponentSidebar = ({
                       </button>
                     </div>
                   )}
+                  {formDisabled && livePreRunStatus ? (
+                    <div
+                      className={cn(
+                        "mt-3 flex items-start gap-2 rounded-md px-2 pt-1.5 pb-3 text-sm",
+                        livePreRunStatus.purpose === "setup"
+                          ? "bg-orange-100 text-yellow-800 dark:bg-orange-950/30 dark:text-orange-300/70"
+                          : "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-300",
+                      )}
+                    >
+                      {livePreRunStatus.purpose === "setup" ? (
+                        <Puzzle size={14} className="mt-0.5 shrink-0" />
+                      ) : (
+                        <Rabbit size={14} className="mt-0.5 shrink-0" />
+                      )}
+                      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                        <span>{livePreRunStatus.title}</span>
+                        {livePreRunStatus.description ? (
+                          <>
+                            <div className="mb-1.5 rounded-md bg-white/50 px-2.5 py-1.5 dark:bg-gray-900/50">
+                              <span className="text-[13px] leading-snug">{livePreRunStatus.description}</span>
+                            </div>
+                            {livePreRunStatus.purpose === "setup" && onContinueEditing ? (
+                              continueEditingDisabled && continueEditingDisabledTooltip ? (
+                                <SimpleTooltip content={continueEditingDisabledTooltip} hideOnClick={false}>
+                                  <span className="inline-flex w-fit">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-fit shadow-none"
+                                      disabled={continueEditingDisabled}
+                                      onClick={() => {
+                                        void onContinueEditing();
+                                      }}
+                                    >
+                                      Continue Editing
+                                    </Button>
+                                  </span>
+                                </SimpleTooltip>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-fit shadow-none"
+                                  disabled={continueEditingDisabled}
+                                  onClick={() => {
+                                    void onContinueEditing();
+                                  }}
+                                >
+                                  Continue Editing
+                                </Button>
+                              )
+                            ) : null}
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
                 {null}
               </div>
@@ -582,14 +653,14 @@ export const ComponentSidebar = ({
         </div>
         <div className="relative flex-1 min-h-0 overflow-hidden">
           <div
-            className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out dark:bg-gray-900 ${
+            className={`absolute inset-0 flex min-h-0 flex-col bg-white transition-transform duration-300 ease-in-out dark:bg-gray-900 ${
               isDetailView ? "-translate-x-full" : "translate-x-0"
             } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
           >
             <Tabs
               value={activeTab}
               onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs")}
-              className={isBottomLayout ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "flex-1"}
+              className="flex min-h-0 flex-1 flex-col overflow-hidden"
             >
               {showSettingsTab &&
                 (isBottomLayout ? (
@@ -626,7 +697,7 @@ export const ComponentSidebar = ({
                     ) : null}
                   </div>
                 ) : (
-                  <div className="border-b border-slate-950/15 dark:border-gray-800/70">
+                  <div className="shrink-0 border-b border-slate-950/15 dark:border-gray-800/70">
                     <div className="flex px-4">
                       {shouldShowRunsTab && (
                         <button
@@ -704,10 +775,7 @@ export const ComponentSidebar = ({
               )}
 
               {showSettingsTab && (
-                <TabsContent
-                  value="settings"
-                  className={cn("mt-0", isBottomLayout && "min-h-0 flex-1 overflow-y-auto")}
-                >
+                <TabsContent value="settings" className="mt-0 h-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
                   <SettingsTab
                     mode={nodeConfigMode}
                     nodeId={nodeId}
@@ -724,6 +792,7 @@ export const ComponentSidebar = ({
                     integrationRef={integrationRef}
                     integrations={integrations}
                     readOnly={readOnly}
+                    formDisabled={formDisabled}
                     canReadIntegrations={canReadIntegrations}
                     canCreateIntegrations={canCreateIntegrations}
                     canUpdateIntegrations={canUpdateIntegrations}
@@ -736,11 +805,7 @@ export const ComponentSidebar = ({
               )}
 
               {showSettingsTab && !hideDocsTab && (
-                <TabsContent
-                  value="docs"
-                  className={cn("mt-0", isBottomLayout ? "min-h-0 flex-1 overflow-y-auto" : "overflow-y-auto")}
-                  style={!isBottomLayout ? { maxHeight: "calc(100vh - 160px)" } : undefined}
-                >
+                <TabsContent value="docs" className="mt-0 h-0 min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
                   <DocsTab
                     description={componentDescription}
                     examplePayload={componentExamplePayload}
@@ -754,7 +819,7 @@ export const ComponentSidebar = ({
           </div>
 
           <div
-            className={`absolute inset-0 flex flex-col bg-white transition-transform duration-300 ease-in-out dark:bg-gray-900 ${
+            className={`absolute inset-0 flex min-h-0 flex-col bg-white transition-transform duration-300 ease-in-out dark:bg-gray-900 ${
               isDetailView ? "translate-x-0" : "translate-x-full"
             } ${isDetailView ? "pointer-events-auto" : "pointer-events-none"}`}
           >
