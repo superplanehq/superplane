@@ -366,3 +366,42 @@ func Test__ValidateList__MaxItems(t *testing.T) {
 func ptrInt(v int) *int {
 	return &v
 }
+
+func Test__ValidateList__AllowStringItems(t *testing.T) {
+	objectItems := func(allowStrings bool) Field {
+		return Field{
+			Name: "files",
+			Type: FieldTypeList,
+			TypeOptions: &TypeOptions{
+				List: &ListTypeOptions{
+					AllowStringItems: allowStrings,
+					ItemDefinition: &ListItemDefinition{
+						Type: FieldTypeObject,
+						Schema: []Field{
+							{Name: "url", Type: FieldTypeString},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	t.Run("string items are rejected by default", func(t *testing.T) {
+		err := validateList(objectItems(false), []any{"https://example.com/a.png"})
+		assert.ErrorContains(t, err, "item at index 0 must be an object")
+	})
+
+	t.Run("string items are accepted when the field opts in", func(t *testing.T) {
+		// Configurations saved before the item schema existed stay valid.
+		assert.NoError(t, validateList(objectItems(true), []any{"https://example.com/a.png"}))
+	})
+
+	t.Run("object items are still validated when strings are allowed", func(t *testing.T) {
+		assert.NoError(t, validateList(objectItems(true), []any{map[string]any{"url": "https://example.com/a.png"}}))
+	})
+
+	t.Run("other item types are still rejected when strings are allowed", func(t *testing.T) {
+		err := validateList(objectItems(true), []any{123})
+		assert.ErrorContains(t, err, "item at index 0 must be an object")
+	})
+}

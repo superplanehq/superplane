@@ -7,12 +7,30 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const discordAPIBase = "https://discord.com/api/v10"
+
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+
+// createFormFile is like multipart.Writer.CreateFormFile but lets the caller
+// set the part's Content-Type. The stdlib helper hardcodes
+// application/octet-stream, which loses the real media type of the attachment.
+func createFormFile(w *multipart.Writer, field, filename, contentType string) (io.Writer, error) {
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+		quoteEscaper.Replace(field), quoteEscaper.Replace(filename)))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	h.Set("Content-Type", contentType)
+	return w.CreatePart(h)
+}
 
 type Client struct {
 	BotToken string
@@ -181,6 +199,9 @@ const (
 type MessageFile struct {
 	Name    string
 	Content []byte
+	// ContentType is the attachment's media type. When empty the multipart
+	// helper falls back to application/octet-stream.
+	ContentType string
 }
 
 // FetchFile downloads a file from a URL (e.g. a presigned artifact link from
@@ -232,7 +253,7 @@ func (c *Client) CreateMessageWithFiles(channelID string, req CreateMessageReque
 	}
 
 	for i, file := range files {
-		part, err := writer.CreateFormFile(fmt.Sprintf("files[%d]", i), file.Name)
+		part, err := createFormFile(writer, fmt.Sprintf("files[%d]", i), file.Name, file.ContentType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create file part: %w", err)
 		}
