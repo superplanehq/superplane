@@ -60,7 +60,8 @@ export function MarkdownVariablesPanel({
   setDraftVariables,
   previewVars,
   errors,
-  isLoading,
+  baseLoading,
+  searchingNames = [],
   onInsertSnippet,
   collapsed = false,
   onToggleCollapsed,
@@ -71,7 +72,13 @@ export function MarkdownVariablesPanel({
   setDraftVariables: (next: MarkdownVariable[]) => void;
   previewVars: Record<string, unknown>;
   errors: MarkdownVariableError[];
-  isLoading: boolean;
+  /** True while shared memory / run queries are still loading. */
+  baseLoading: boolean;
+  /**
+   * Run variable names still eagerly paging for a filter match. Only those
+   * rows show "Loading preview…" — settled siblings can surface errors.
+   */
+  searchingNames?: readonly string[];
   onInsertSnippet: (snippet: string) => void;
   /** When `true`, render the slim collapsed strip instead of the full rail. */
   collapsed?: boolean;
@@ -99,6 +106,8 @@ export function MarkdownVariablesPanel({
     }
     return map;
   }, [errors]);
+
+  const searchingNameSet = useMemo(() => new Set(searchingNames), [searchingNames]);
 
   // Names that appear more than once. On save `normalizeDraftVariables` keeps
   // only the first entry per name, so we flag duplicates here to warn the
@@ -170,7 +179,7 @@ export function MarkdownVariablesPanel({
               onChange={(next) => updateVariable(index, next)}
               onRemove={() => removeVariable(index)}
               onInsertSnippet={onInsertSnippet}
-              loading={isLoading}
+              loading={baseLoading || searchingNameSet.has(variable.name)}
             />
           ))
         )}
