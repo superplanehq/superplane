@@ -23,6 +23,7 @@ export function useAgentConversationHandlers({
   agentMode,
   chatId,
   canvasId,
+  isAutoLayoutOnUpdateEnabled,
   isBusy,
   outcomeMutation,
   interruptMutation,
@@ -35,6 +36,7 @@ export function useAgentConversationHandlers({
   agentMode: AgentMode;
   chatId: string;
   canvasId: string;
+  isAutoLayoutOnUpdateEnabled: boolean;
   isBusy: boolean;
   outcomeMutation: ReturnType<typeof useDefineAgentOutcome>;
   interruptMutation: ReturnType<typeof useInterruptAgentChat>;
@@ -84,12 +86,20 @@ export function useAgentConversationHandlers({
       setError(null);
       setNotice(null);
 
-      await send.mutateAsync({ chatId, content, mode: agentMode, images }).catch((error) => {
-        setError(error instanceof Error ? error.message : "failed to send message");
-        throw error;
-      });
+      await send
+        .mutateAsync({
+          chatId,
+          content,
+          mode: agentMode,
+          images,
+          autoLayoutOnUpdateEnabled: isAutoLayoutOnUpdateEnabled,
+        })
+        .catch((error) => {
+          setError(error instanceof Error ? error.message : "failed to send message");
+          throw error;
+        });
     },
-    [agentMode, chatId, canvasId, setError, setNotice, setOutcomeState],
+    [agentMode, chatId, canvasId, isAutoLayoutOnUpdateEnabled, setError, setNotice, setOutcomeState],
   );
 
   const handleStop = useCallback(() => {
@@ -101,12 +111,17 @@ export function useAgentConversationHandlers({
       const { sendMutation: send, resetMutation: reset } = mutationsRef.current;
       if (send.isPending || reset.isPending) return;
       try {
-        await send.mutateAsync({ chatId, content: action, mode: agentMode });
+        await send.mutateAsync({
+          chatId,
+          content: action,
+          mode: agentMode,
+          autoLayoutOnUpdateEnabled: isAutoLayoutOnUpdateEnabled,
+        });
       } catch {
         // Keep the current transcript unchanged when quick actions fail.
       }
     },
-    [agentMode, chatId],
+    [agentMode, chatId, isAutoLayoutOnUpdateEnabled],
   );
 
   const handleStartBuilding = useCallback(
@@ -119,12 +134,13 @@ export function useAgentConversationHandlers({
           chatId,
           content: "Specs approved. Start building.",
           mode: "builder",
+          autoLayoutOnUpdateEnabled: isAutoLayoutOnUpdateEnabled,
         });
       } catch {
         setError("Failed to start building. Please try again.");
       }
     },
-    [chatId, setError],
+    [chatId, isAutoLayoutOnUpdateEnabled, setError],
   );
 
   return useMemo(
