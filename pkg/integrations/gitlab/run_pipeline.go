@@ -168,6 +168,12 @@ func (r *RunPipeline) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("project is required")
 	}
 
+	// Run Pipeline tracks completion through a project webhook created at
+	// setup time, so the project cannot come from an expression.
+	if isExpression(spec.Project) {
+		return fmt.Errorf("project does not support expressions: Run Pipeline creates a project webhook, so it needs a concrete project")
+	}
+
 	if strings.TrimSpace(spec.Ref) == "" {
 		return fmt.Errorf("ref is required")
 	}

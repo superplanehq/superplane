@@ -15,6 +15,32 @@ export type InfiniteRunsPage = {
   lastTimestamp?: string;
 };
 
+/**
+ * Returns a cached infinite-runs page for `pageParam` when it is still valid
+ * against page 1's `totalCount`. Used during full refetches so tail pages are
+ * not re-fetched when the canvas total is unchanged.
+ */
+export function reuseCachedInfiniteRunsPage(
+  cached: InfiniteData<InfiniteRunsPage> | undefined,
+  pageParam: string,
+  authoritativeTotal: number | undefined,
+): InfiniteRunsPage | undefined {
+  if (!cached) return undefined;
+
+  const index = cached.pageParams.findIndex((p) => p === pageParam);
+  if (index < 0) return undefined;
+
+  const cachedPage = cached.pages[index];
+  if (cachedPage === undefined) return undefined;
+
+  if (authoritativeTotal !== undefined && cachedPage.totalCount !== authoritativeTotal) {
+    return undefined;
+  }
+
+  if (authoritativeTotal === undefined) return cachedPage;
+  return { ...cachedPage, totalCount: authoritativeTotal };
+}
+
 const RUN_STATE_ORDER: Record<CanvasesCanvasRunState, number> = {
   STATE_UNKNOWN: 0,
   STATE_STARTED: 1,
@@ -118,6 +144,7 @@ function mergeRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun
     state: incoming.state ?? existing.state,
     result: incoming.result ?? existing.result,
     executions: incoming.executions?.length ? incoming.executions : (existing.executions ?? incoming.executions),
+    queueItems: incoming.queueItems !== undefined ? incoming.queueItems : existing.queueItems,
     createdAt: incoming.createdAt ?? existing.createdAt,
     updatedAt: incoming.updatedAt ?? existing.updatedAt,
     finishedAt: incoming.finishedAt ?? existing.finishedAt,

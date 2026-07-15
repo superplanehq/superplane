@@ -95,10 +95,11 @@ func mapCanvasNameUniqueConstraintError(err error) error {
 func publishCanvasVersionInTransaction(
 	ctx context.Context,
 	tx *gorm.DB,
+	canvas *models.Canvas,
 	liveVersion *models.CanvasVersion,
 	nextVersion *models.CanvasVersion,
 	options changesets.CanvasPublisherOptions,
-) error {
+) (changesets.CanvasPublishResult, error) {
 	changeset, err := changesets.NewChangesetBuilder(
 		liveVersion.Nodes,
 		liveVersion.Edges,
@@ -106,19 +107,24 @@ func publishCanvasVersionInTransaction(
 		nextVersion.Edges,
 	).Build()
 	if err != nil {
-		return err
+		return changesets.CanvasPublishResult{}, err
 	}
 
 	if len(changeset.Changes) == 0 {
-		return mapCanvasNameUniqueConstraintError(
+		return changesets.CanvasPublishResult{}, mapCanvasNameUniqueConstraintError(
 			models.PromoteToLiveInTransaction(tx, nextVersion, nextVersion.Nodes, nextVersion.Edges),
 		)
 	}
 
-	publisher, err := changesets.NewCanvasPublisher(tx, nextVersion, liveVersion, options)
+	publisher, err := changesets.NewCanvasPublisher(tx, canvas, nextVersion, liveVersion, options)
 	if err != nil {
-		return err
+		return changesets.CanvasPublishResult{}, err
 	}
 
-	return mapCanvasNameUniqueConstraintError(publisher.Publish(ctx))
+	err = mapCanvasNameUniqueConstraintError(publisher.Publish(ctx))
+	if err != nil {
+		return changesets.CanvasPublishResult{}, err
+	}
+
+	return publisher.Result(), nil
 }

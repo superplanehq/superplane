@@ -15,10 +15,17 @@ export function ResizeHandle({
       aria-label="Resize run inspector"
       data-testid="run-inspector-resize-handle"
       onPointerDown={onPointerDown}
-      className={cn(
-        "absolute left-0 top-0 z-30 h-full w-1 -translate-x-1/2 cursor-ew-resize transition-colors hover:bg-blue-300/60",
-        isResizing && "bg-blue-400/70",
-      )}
-    />
+      className="group absolute top-0 bottom-0 left-0 z-30 w-4 cursor-col-resize bg-transparent"
+      style={{ marginLeft: "-8px" }}
+    >
+      <div
+        aria-hidden
+        data-testid="run-inspector-resize-line"
+        className={cn(
+          "pointer-events-none absolute top-0 bottom-0 left-[calc(50%-1px)] w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 dark:group-hover:bg-gray-500/50",
+          isResizing && "bg-slate-950/50 dark:bg-gray-500/50",
+        )}
+      />
+    </div>
   );
 }

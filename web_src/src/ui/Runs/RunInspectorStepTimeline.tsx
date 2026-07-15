@@ -3,7 +3,9 @@ import { getJsonViewStyle } from "@/lib/jsonViewTheme";
 import { Accordion } from "@/ui/accordion";
 import { useTheme } from "@/contexts/useTheme";
 import { RunNodeDetailDetailsView } from "./RunNodeDetailDetailsView";
+import { shouldShowRunnerLogs } from "./runnerLogsVisibility";
 import { InputChainMoreChip } from "./RunInspectorInputChainModal";
+import { RunnerLogsTimelineCard } from "./RunInspectorRunnerLogs";
 import { RuntimeTimelineCard } from "./RunInspectorRuntimeConfig";
 import {
   DetailBox,
@@ -53,7 +55,8 @@ export function RunInspectorStepTimeline({
 
   const hasDetails = !!section.tabData?.details && Object.keys(section.tabData.details).length > 0;
   const hasRuntimeConfig = hasObjectValue(section.tabData?.configuration);
-  const timelineItems = buildTimelineItems(section, hasRuntimeConfig);
+  const hasRunnerLogs = shouldShowRunnerLogs(section);
+  const timelineItems = buildTimelineItems(section, hasRuntimeConfig, hasRunnerLogs);
   const hasOutputTimelineItem = timelineItems.some((item) => item.value === "output");
 
   useEffect(() => {
@@ -90,6 +93,7 @@ export function RunInspectorStepTimeline({
     const next: InternalAccordionPreferences = {
       input: values.includes("input"),
       runtime: values.includes("runtime"),
+      logs: values.includes("logs"),
       output: values.includes("output"),
     };
     setPreferences(next);
@@ -97,7 +101,7 @@ export function RunInspectorStepTimeline({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-3">
       {hasDetails || section.badge || section.createdAt ? (
         <DetailBox title="Summary">
           <RunNodeDetailDetailsView
@@ -108,7 +112,12 @@ export function RunInspectorStepTimeline({
         </DetailBox>
       ) : null}
 
-      <Accordion type="multiple" value={openValues} onValueChange={handlePreferenceChange}>
+      <Accordion
+        type="multiple"
+        className="flex flex-col gap-3"
+        value={openValues}
+        onValueChange={handlePreferenceChange}
+      >
         {timelineItems.map((item, index) => (
           <TimelineRail
             key={item.value}
@@ -125,6 +134,8 @@ export function RunInspectorStepTimeline({
                 canShowExpressionTemplates={canShowExpressionTemplates}
                 onEditNode={onEditNode}
               />
+            ) : item.value === "logs" ? (
+              <RunnerLogsTimelineCard section={section} isOpen={preferences.logs} />
             ) : (
               <OutputTimelineCard section={section} jsonViewStyle={jsonViewStyle} />
             )}

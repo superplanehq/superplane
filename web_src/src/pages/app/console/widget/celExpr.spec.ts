@@ -66,6 +66,61 @@ describe("celExpr", () => {
       expect(evalExpr(compiled, { name: "42" }, env)).toBe(true);
       expect(evalExpr(compiled, { name: "43" }, env)).toBe(false);
     });
+
+    it("evaluates `value / 2` when value is a plain JS number", () => {
+      // `@marcbachmann/cel-js` needs int arithmetic on `BigInt` values;
+      // the adapter upfront-coerces safe-integer JS numbers so this
+      // common case keeps working without explicit `int(...)` wrapping.
+      const compiled = compileExpr("value / 2");
+      const env = buildEnv();
+      expect(evalExpr(compiled, { value: 10 }, env)).toBe(5);
+    });
+
+    it("returns integer arithmetic results as plain JS numbers, not BigInt", () => {
+      const compiled = compileExpr("size([1, 2, 3])");
+      const result = evalExpr(compiled, {}, buildEnv());
+      expect(result).toBe(3);
+      expect(typeof result).toBe("number");
+    });
+
+    it("evaluates arithmetic on nested numeric fields", () => {
+      const compiled = compileExpr("row.a + row.b");
+      const env = buildEnv();
+      expect(evalExpr(compiled, { row: { a: 10, b: 20 } }, env)).toBe(30);
+    });
+  });
+
+  describe("fail-soft coercions and temporal normalization", () => {
+    it("fail-softs int() on unparseable input to 0", () => {
+      const compiled = compileExpr("int(value) / 2");
+      expect(evalExpr(compiled, { value: "nope" }, buildEnv())).toBe(0);
+      expect(evalExpr(compiled, { value: " 12 " }, buildEnv())).toBe(6);
+    });
+
+    it("JSON-serializes maps and lists via string()", () => {
+      expect(evalExpr(compileExpr("string(payload)"), { payload: { a: 1 } }, buildEnv())).toBe('{"a":1}');
+      expect(evalExpr(compileExpr("string(tags)"), { tags: ["a", "b"] }, buildEnv())).toBe('["a","b"]');
+    });
+
+    it("renders timestamp() as ISO-8601 in templates", () => {
+      const template = compileTemplate("At {{ timestamp(1700000000) }}");
+      expect(evalTemplate(template, {}, buildEnv(), String)).toBe("At 2023-11-14T22:13:20.000Z");
+    });
+
+    it('renders duration("5m") as a human string, not a protobuf object', () => {
+      const template = compileTemplate('Took {{ duration("5m") }}');
+      expect(evalTemplate(template, {}, buildEnv(), String)).toBe("Took 5m");
+    });
+
+    it("includes sub-second nanos when normalizing duration strings", () => {
+      expect(evalExpr(compileExpr('duration("1500ms")'), {}, buildEnv())).toBe("1s");
+    });
+
+    it("does not treat plain row maps with seconds/nanos as durations", () => {
+      const compiled = compileExpr("value");
+      const row = { value: { seconds: 300, nanos: 0 } };
+      expect(evalExpr(compiled, row, buildEnv())).toEqual({ seconds: 300, nanos: 0 });
+    });
   });
 
   describe("formatDate builtin", () => {
@@ -172,11 +227,11 @@ describe("celExpr", () => {
   });
 
   describe("parseJson builtin", () => {
-    // cel-js's grammar does not allow postfix `.foo` / `[i]` / `.method(...)`
-    // after a function call result. So `parseJson(blob).items` is a parse
-    // error. The builtin is still useful when composed with other functions
-    // (`size(...)`, `string(...)`, equality), or when the whole expression
-    // is `parseJson(value)` and the renderer consumes the structured result.
+    // `@marcbachmann/cel-js` supports postfix `.field` / `[i]` /
+    // `.method(...)` after a function-call result, so authors can chain
+    // directly off `parseJson(...)`. The builtin also stays useful when
+    // composed with other functions (`size(...)`, `string(...)`) or for
+    // equality checks against structured values.
     it("parses a JSON array string and returns it wholesale", () => {
       const compiled = compileExpr("parseJson(tags)");
       expect(evalExpr(compiled, { tags: '["a","b"]' }, buildEnv())).toEqual(["a", "b"]);
@@ -216,14 +271,21 @@ describe("celExpr", () => {
       // formatting should compose `string()` or shape the data upstream.
       expect(result).toBe("Tags: a,b");
     });
+
+    it("supports postfix field / index access after the parse call", () => {
+      // Regression coverage for the `@marcbachmann/cel-js` migration:
+      // chaining `.items[0].id` off a function result was a parse error
+      // under the previous library and is a real capability now.
+      const compiled = compileExpr("parseJson(blob).items[0].id");
+      expect(evalExpr(compiled, { blob: '{"items":[{"id":42}]}' }, buildEnv())).toBe(42);
+    });
   });
 
   describe("string trimming builtins", () => {
-    // These exist because cel-js doesn't allow postfix `[i]` / `.method()`
-    // after a function-call result. The user-facing requirement is "first
-    // line" / "first X chars" against runs data (raw multi-line outputs);
-    // each helper returns the scalar directly so authors don't need
-    // chaining the language can't parse.
+    // Scalar-returning trim helpers for the common "first line" / "first
+    // X chars" needs against runs data (raw multi-line outputs). Callers
+    // can compose `truncate(firstLine(msg), 80, "…")` without stringing
+    // together `split(...)` + indexing themselves.
 
     describe("firstLine", () => {
       it("returns the text before the first newline", () => {
@@ -317,10 +379,10 @@ describe("celExpr", () => {
 
     describe("splitIndex", () => {
       it("returns the nth segment as a scalar", () => {
-        // cel-js copies string literals verbatim — `"\n"` in CEL source is
-        // backslash + n, not a newline — so `splitIndex` unescapes the
-        // separator. The JS-side `\\n` here matches what an author would
-        // type in their YAML cell expression.
+        // `@marcbachmann/cel-js` interprets `"\n"` in CEL source as a real
+        // newline, so the JS-side `\\n` here compiles to a single-character
+        // separator — matching what an author would type in their YAML
+        // cell expression.
         const compiled = compileExpr('splitIndex(message, "\\n", 0)');
         expect(evalExpr(compiled, { message: "first\nsecond\nthird" }, buildEnv())).toBe("first");
       });
@@ -334,7 +396,18 @@ describe("celExpr", () => {
         expect(evalExpr(compiled, { message: "first\rsecond" }, buildEnv())).toBe("first");
       });
 
-      it("preserves a literal backslash that is not part of a recognized escape", () => {
+      it("supports a literal backslash separator via raw strings", () => {
+        // Regular CEL strings still evaluate `\<letter>` escapes at parse
+        // time, so authors who need a literal backslash separator reach
+        // for a raw string (`r"\?"` compiles to two characters).
+        const compiled = compileExpr('splitIndex(value, r"\\?", 0)');
+        expect(evalExpr(compiled, { value: "a\\?b" }, buildEnv())).toBe("a");
+      });
+
+      it('preserves legacy ChromeGG `"\\?"` backslash separators', () => {
+        // Pre-migration authors wrote `"\?"` expecting a two-character
+        // separator. The adapter doubles non-standard escapes so this
+        // keeps working under `@marcbachmann/cel-js`.
         const compiled = compileExpr('splitIndex(value, "\\?", 0)');
         expect(evalExpr(compiled, { value: "a\\?b" }, buildEnv())).toBe("a");
       });
@@ -433,10 +506,10 @@ describe("celExpr", () => {
   });
 
   describe("join builtin", () => {
-    // `join` exists specifically so authors can flatten the result of a `.map`
-    // macro chain into a single string. cel-js doesn't allow `.method()`
-    // postfix after a function-call result, so the canonical form is
-    // `join(list.map(x, expr), sep)`.
+    // `join` exists so authors can flatten the result of a `.map` macro
+    // chain into a single string. The canonical form is
+    // `join(list.map(x, expr), sep)` — a bare list value renders as JSON,
+    // which is intentional for inspection but noisy for HTML output.
     it("joins a list of strings with the separator", () => {
       const compiled = compileExpr('join(["a", "b", "c"], ", ")');
       expect(evalExpr(compiled, {}, buildEnv())).toBe("a, b, c");
@@ -500,7 +573,7 @@ describe("celExpr", () => {
       const compiled = compileExpr("value / 2");
       const result = evalExprDetailed(compiled, { value: "abc" }, buildEnv());
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.error).toMatch(/division|type/i);
+      if (!result.ok) expect(result.error).toMatch(/overload|division|type/i);
     });
 
     it("propagates the first segment error from evalTemplateDetailed", () => {

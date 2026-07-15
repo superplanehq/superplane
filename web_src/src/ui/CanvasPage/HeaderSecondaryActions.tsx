@@ -1,6 +1,5 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import type { HeaderProps } from "./Header";
@@ -191,9 +190,6 @@ function CommitStagingButton({ onCommit, disabled }: { onCommit: () => void; dis
       type="button"
       variant="default"
       size="sm"
-      className={cn(
-        "bg-orange-500 text-white hover:bg-orange-600 hover:opacity-95 focus-visible:ring-orange-500/40 dark:bg-orange-300 dark:text-orange-950 dark:hover:bg-orange-400/90 dark:focus-visible:ring-orange-400/40",
-      )}
       onClick={onCommit}
       disabled={disabled}
       data-testid="canvas-commit-staging-button"
@@ -296,18 +292,19 @@ function ExitEditButton({
   disabledTooltip?: string;
 }) {
   const button = (
-    <UIButton
+    <button
       type="button"
-      variant="ghost"
-      size="icon"
       onClick={onClick}
       disabled={disabled}
       data-testid="canvas-exit-edit-button"
-      aria-label="Exit edit"
-      className="-mr-0.5 size-8 shrink-0 p-0 text-slate-950 hover:bg-transparent hover:text-slate-900 dark:text-gray-100 dark:hover:text-gray-100"
+      aria-label="Finish editing"
+      className="group flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <X className="size-5 stroke-[2] text-slate-950 opacity-65 dark:text-gray-100" aria-hidden />
-    </UIButton>
+      <span className="text-[13px] font-medium text-slate-600 dark:text-gray-400">Finish Editing</span>
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-950 transition-colors group-hover:bg-slate-950/5 dark:text-gray-100 dark:group-hover:bg-gray-800/50">
+        <X className="h-4 w-4" aria-hidden />
+      </span>
+    </button>
   );
 
   if (disabled && disabledTooltip) {
