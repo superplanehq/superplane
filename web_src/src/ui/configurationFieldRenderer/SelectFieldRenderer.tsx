@@ -30,7 +30,7 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       <SelectTrigger className="w-full" data-testid={testId}>
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
       </SelectTrigger>
-      <SelectContent className="max-h-60">
+      <SelectContent position="popper" className="max-h-60">
         {selectOptions.map((opt) => (
           <SelectItem key={opt.value} value={opt.value ?? ""} title={opt.description || undefined}>
             {opt.label}
