@@ -345,12 +345,12 @@ func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.A
 		Description:     description,
 		Rubric:          rubric,
 		MaxIterations:   maxIterations,
-		ContextPreamble: s.buildPreamble(session, ModeBuilder),
+		ContextPreamble: s.buildPreamble(session, ModeBuilder, false),
 	})
 	return contextReplayed, err
 }
 
-func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []MessageImage, mode ...string) (*models.AgentSessionMessage, error) {
+func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []MessageImage, options ...SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
 	if content == "" && len(images) == 0 {
 		return nil, fmt.Errorf("message content is required")
 	}
@@ -360,10 +360,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	agentMode := ModeOperator
-	if len(mode) > 0 {
-		agentMode = NormalizeMode(mode[0])
-	}
+	messageOptions := resolveSendMessageRequestOptions(options)
 
 	session, err = s.refreshStaleProviderSession(ctx, session)
 	if err != nil {
@@ -373,7 +370,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	contextReplayed, err := s.sendMessageToProvider(ctx, session, content, images, agentMode)
+	contextReplayed, err := s.sendMessageToProvider(ctx, session, content, images, messageOptions)
 	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return nil, s.handleBusySession(sessionID, organizationID, userID)
@@ -386,7 +383,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 				}
 				return nil, recoverErr
 			}
-			contextReplayed, err = s.sendMessageToProvider(ctx, recovered, content, images, agentMode)
+			contextReplayed, err = s.sendMessageToProvider(ctx, recovered, content, images, messageOptions)
 			if err != nil {
 				if errors.Is(err, ErrSessionBusy) {
 					return nil, s.handleBusySession(sessionID, organizationID, userID)
@@ -437,14 +434,24 @@ func toSessionImages(images []MessageImage) datatypes.JSONSlice[models.AgentSess
 	return out
 }
 
-func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, images []MessageImage, mode Mode) (bool, error) {
+func resolveSendMessageRequestOptions(options []SendMessageRequestOptions) SendMessageRequestOptions {
+	if len(options) == 0 {
+		return SendMessageRequestOptions{Mode: string(ModeOperator)}
+	}
+
+	resolved := options[0]
+	resolved.Mode = string(NormalizeMode(resolved.Mode))
+	return resolved
+}
+
+func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, images []MessageImage, options SendMessageRequestOptions) (bool, error) {
 	message, contextReplayed, err := s.messageWithRewind(session, content)
 	if err != nil {
 		return false, err
 	}
 
 	err = s.provider.SendMessage(ctx, session.ProviderSessionID, message, SendMessageOptions{
-		ContextPreamble: s.buildPreamble(session, mode),
+		ContextPreamble: s.buildPreamble(session, NormalizeMode(options.Mode), options.AutoLayoutOnUpdateEnabled),
 		Images:          images,
 	})
 	return contextReplayed, err
@@ -635,11 +642,12 @@ func (s *Service) archiveProviderSession(ctx context.Context, providerSessionID 
 	}
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, mode Mode) string {
+func (s *Service) buildPreamble(session *models.AgentSession, mode Mode, autoLayoutOnUpdateEnabled bool) string {
 	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
+		fmt.Sprintf("%t", autoLayoutOnUpdateEnabled),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)

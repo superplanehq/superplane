@@ -580,7 +580,7 @@ func TestToolSchemaRevision_ReturnsStableRevision(t *testing.T) {
 	second := p.ToolSchemaRevision()
 
 	assert.Equal(t, first, second)
-	assert.Contains(t, first, "agent-tools-v1.1.4:")
+	assert.Contains(t, first, "agent-tools-v1.2.0:")
 }
 
 func TestStreamEvents_MapsKnownTypes(t *testing.T) {

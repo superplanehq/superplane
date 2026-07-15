@@ -206,6 +206,22 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
+function useAutoLayoutOnUpdatePreference() {
+  const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
+    readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
+  );
+
+  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
+    const newValue = !isAutoLayoutOnUpdateEnabled;
+    setIsAutoLayoutOnUpdateEnabled(newValue);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
+    }
+  }, [isAutoLayoutOnUpdateEnabled]);
+
+  return { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled };
+}
+
 export function AppPage() {
   const { organizationId, appId } = useParams<{
     organizationId: string;
@@ -590,9 +606,7 @@ export function AppPage() {
 
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
-  const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
-    readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
-  );
+  const { handleToggleAutoLayoutOnUpdate, isAutoLayoutOnUpdateEnabled } = useAutoLayoutOnUpdatePreference();
 
   const lastSavedWorkflowSignatureRef = useRef("");
   const lastAppliedVersionSnapshotRef = useRef("");
@@ -1147,14 +1161,6 @@ export function AppPage() {
       hasQueuedFollowUp: false,
     });
   }, []);
-
-  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
-    const newValue = !isAutoLayoutOnUpdateEnabled;
-    setIsAutoLayoutOnUpdateEnabled(newValue);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY, JSON.stringify(newValue));
-    }
-  }, [isAutoLayoutOnUpdateEnabled]);
 
   const applyAutoLayoutOnAddedNode = useCallback(
     async (workflow: CanvasesCanvas, nodeID?: string): Promise<CanvasesCanvas> => {

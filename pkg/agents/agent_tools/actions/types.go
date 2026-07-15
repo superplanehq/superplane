@@ -33,10 +33,11 @@ type Input struct {
 
 // PatchOperation describes one small graph edit for patch_staging.
 type PatchOperation struct {
-	Op     string     `json:"op"`
-	NodeID string     `json:"node_id,omitempty"`
-	Node   *PatchNode `json:"node,omitempty"`
-	Edge   *PatchEdge `json:"edge,omitempty"`
+	Op       string         `json:"op"`
+	NodeID   string         `json:"node_id,omitempty"`
+	Node     *PatchNode     `json:"node,omitempty"`
+	Position *PatchPosition `json:"position,omitempty"`
+	Edge     *PatchEdge     `json:"edge,omitempty"`
 }
 
 type PatchNode struct {
@@ -62,6 +63,7 @@ type PatchPosition struct {
 
 // AutoLayoutInput configures optional backend auto-layout for draft updates.
 type AutoLayoutInput struct {
+	Enabled *bool    `json:"enabled,omitempty"`
 	Scope   string   `json:"scope,omitempty"`
 	NodeIDs []string `json:"node_ids,omitempty"`
 }

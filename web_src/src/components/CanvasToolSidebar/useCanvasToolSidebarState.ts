@@ -46,6 +46,7 @@ export type UseCanvasToolSidebarStateOptions = {
   liveCanvasVersionId?: string;
   headerMode?: CanvasPageHeaderMode;
   isRunInspectionMode?: boolean;
+  isAutoLayoutOnUpdateEnabled?: boolean;
   onAgentStagingReady?: AgentStagingReadyHandler;
   onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
   /** When true (e.g. template canvas picker), hides the tool sidebar toggle and clears open state. */
@@ -66,6 +67,7 @@ export function useCanvasToolSidebarState({
   liveCanvasVersionId,
   headerMode,
   isRunInspectionMode = false,
+  isAutoLayoutOnUpdateEnabled = false,
   onAgentStagingReady,
   onAgentStagingCommit,
   hideCanvasToolSidebar,
@@ -183,6 +185,7 @@ export function useCanvasToolSidebarState({
     liveCanvasVersionId,
     headerMode,
     isRunInspectionMode,
+    isAutoLayoutOnUpdateEnabled,
     onAgentStagingReady,
     onAgentStagingCommit,
     isEditing,
