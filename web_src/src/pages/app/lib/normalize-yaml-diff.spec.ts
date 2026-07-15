@@ -20,6 +20,16 @@ describe("normalizeYamlForDiff", () => {
     expect(normalized.indexOf("a: 1")).toBeLessThan(normalized.indexOf("b: 2"));
   });
 
+  it("orders the nodes section by node id", () => {
+    const live = "spec:\n  nodes:\n    - id: b\n      name: second\n    - id: a\n      name: first\n";
+    const draft = "spec:\n  nodes:\n    - id: a\n      name: first\n    - id: b\n      name: second\n";
+
+    const normalized = normalizeYamlForDiff(live);
+
+    expect(normalized).toBe(normalizeYamlForDiff(draft));
+    expect(normalized.indexOf("id: a")).toBeLessThan(normalized.indexOf("id: b"));
+  });
+
   it("still reports a difference when values actually change", () => {
     const live = "name: old\nref: r\n";
     const draft = "ref: r\nname: new\n";
