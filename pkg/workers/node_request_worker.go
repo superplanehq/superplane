@@ -306,6 +306,11 @@ func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, 
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
 	}
 
+	if execution.State == models.CanvasNodeExecutionStateFinished {
+		logger.Infof("Execution %s already finished - completing request", execution.ID)
+		return request.Complete(tx)
+	}
+
 	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents)
 }
 
@@ -381,6 +386,16 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	}
 
 	logger.Infof("Component execution hook completed")
+	finished, err := execution.IsFinishedInTransaction(tx)
+	if err != nil {
+		return err
+	}
+
+	if finished {
+		logger.Infof("Execution %s already finished after hook - completing request", execution.ID)
+		return request.Complete(tx)
+	}
+
 	err = tx.Save(&execution).Error
 	if err != nil {
 		return fmt.Errorf("error saving execution after action handler: %v", err)
