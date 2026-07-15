@@ -3,6 +3,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { shallow } from "zustand/shallow";
 import {
+  getPaddedViewportRendererRect,
   getVisibleEdgeIdsInPaddedViewport,
   getVisibleNodeIdsInPaddedViewport,
   includeCanvasNodesThatMustStayMounted,
@@ -39,7 +40,9 @@ export function useCanvasViewportCulling(nodes: Node[], edges: Edge[], enabled: 
       nodes,
     );
 
-    const visibleEdgeIds = getVisibleEdgeIdsInPaddedViewport(edges, visibleNodeIds);
+    const viewportRect =
+      width === 0 || height === 0 ? undefined : getPaddedViewportRendererRect(width, height, transform);
+    const visibleEdgeIds = getVisibleEdgeIdsInPaddedViewport(edges, visibleNodeIds, nodeLookup, viewportRect);
 
     return { visibleNodeIds, visibleEdgeIds };
   }, [enabled, nodeLookup, width, height, transform, nodes, edges]);
