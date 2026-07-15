@@ -52,6 +52,8 @@ export type ConsoleOverlayProps = {
   organizationId?: string;
   /** Canvas nodes used to resolve chip references by id or name. */
   canvasNodes?: SuperplaneComponentsNode[];
+  /** True while the canvas nodes are still being fetched. */
+  canvasNodesLoading?: boolean;
   /** Latest known node status per node id; powers the status chip. */
   nodeStatuses?: Record<string, ConsoleNodeStatus | undefined>;
   /** Callback invoked when a manual-run chip is clicked. */
@@ -81,6 +83,7 @@ export function ConsoleOverlay({
   canvasName,
   organizationId,
   canvasNodes,
+  canvasNodesLoading,
   nodeStatuses,
   onTriggerNode,
   showConsoleEditControls = false,
@@ -166,6 +169,7 @@ export function ConsoleOverlay({
       canvasId={canvasId}
       organizationId={organizationId}
       nodes={contextNodes}
+      nodesLoading={canvasNodesLoading}
       nodeStatuses={nodeStatuses}
       canRunNodes={canRunNodes}
       onTriggerNode={canRunNodes ? onTriggerNode : undefined}
