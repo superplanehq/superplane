@@ -26,7 +26,7 @@ const (
 	RetryStrategyFixed       = "fixed"
 	RetryStrategyExponential = "exponential"
 	DefaultTimeout           = time.Second * 30
-	MaxTimeout               = time.Second * 30
+	MaxTimeout               = time.Minute * 5
 	RetryMinInterval         = time.Second * 5
 	RetryMaxInterval         = time.Minute * 5
 	RetryMaxAttempts         = 30
@@ -196,6 +196,16 @@ func (e *HTTP) Setup(ctx core.SetupContext) error {
 
 	if err := validateAuthorizationSpec(spec.Authorization); err != nil {
 		return err
+	}
+
+	if spec.TimeoutSeconds != nil {
+		if *spec.TimeoutSeconds < 1 {
+			return fmt.Errorf("timeout seconds must be greater than or equal to 1")
+		}
+
+		if spec.Timeout() > MaxTimeout {
+			return fmt.Errorf("timeout seconds must be less than or equal to %d", int(MaxTimeout.Seconds()))
+		}
 	}
 
 	if spec.ContentType == nil {
