@@ -26,14 +26,8 @@ export type TriggerReferenceResolver = (reference: string) => string | undefined
  * permanently stale".
  */
 export interface TriggerFilterMatchOptions {
-  /**
-   * How many canvas nodes are available for id/name resolution. When `0`
-   * (the empty fallback while `canvas?.spec?.nodes` is still loading),
-   * unresolved trigger refs are treated as inconclusive rather than
-   * permanently unmatchable — otherwise widgets skip eager paging and
-   * markdown variables flash "No run matched…" for valid filters.
-   */
-  nodeCatalogSize?: number;
+  /** Whether the canvas node catalog is still being fetched. */
+  nodeCatalogLoading?: boolean;
 }
 
 /**
@@ -81,11 +75,11 @@ function runMatchesTriggerFilter(
   if (!triggerNodeId) return false;
   const canonicalIds = resolveTriggerFilterIds(triggers, resolveTriggerReference);
   if (canonicalIds.size === 0) {
-    // Empty set: every persisted ref failed to resolve. When the node catalog
-    // is still empty that is inconclusive (canvas may be loading) — fall back
-    // to raw-ref comparison so UUID filters still match. Once nodes are
-    // present, empty means permanently stale.
-    if (resolveTriggerReference && (options?.nodeCatalogSize ?? 0) === 0) {
+    // Empty set: every persisted ref failed to resolve. While the catalog is
+    // loading that is inconclusive, so raw UUID refs may still match. Once
+    // loading settles, an empty catalog is a real empty canvas and the refs
+    // are unmatchable.
+    if (resolveTriggerReference && options?.nodeCatalogLoading === true) {
       return triggers.some((reference) => reference.trim() === triggerNodeId);
     }
     return false;
@@ -121,10 +115,9 @@ export function resolveTriggerFilterIds(
  * no resolver is provided). Used to skip eager pagination that can never
  * find a match for fully-stale trigger YAML.
  *
- * When a resolver is provided but the node catalog is still empty
- * (`nodeCatalogSize === 0`), returns `true` — resolution is inconclusive
- * until nodes arrive, so callers must not treat the filter as permanently
- * stale.
+ * While the node catalog is loading, returns `true` because resolution is
+ * inconclusive. A settled empty catalog is not loading and unresolved refs
+ * are permanently unmatchable.
  */
 export function triggerFilterCanMatch(
   triggers: readonly string[] | undefined,
@@ -132,7 +125,7 @@ export function triggerFilterCanMatch(
   options?: TriggerFilterMatchOptions,
 ): boolean {
   if (!triggers || triggers.length === 0) return true;
-  if (resolveTriggerReference && (options?.nodeCatalogSize ?? 0) === 0) return true;
+  if (resolveTriggerReference && options?.nodeCatalogLoading === true) return true;
   return resolveTriggerFilterIds(triggers, resolveTriggerReference).size > 0;
 }
 

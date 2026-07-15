@@ -25,8 +25,10 @@ import { buildNodeNameMap, collectRunRows } from "./widgetRowCollection";
 export function useConsoleTriggerMatch(ctx: ConsoleContextValue | undefined) {
   const resolveTrigger = useCallback((reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id, [ctx]);
   const triggerMatchOptions = useMemo(
-    (): TriggerFilterMatchOptions => ({ nodeCatalogSize: ctx?.nodes?.length ?? 0 }),
-    [ctx?.nodes?.length],
+    (): TriggerFilterMatchOptions => ({
+      nodeCatalogLoading: ctx?.nodesLoading ?? false,
+    }),
+    [ctx?.nodesLoading],
   );
   return { resolveTrigger, triggerMatchOptions };
 }

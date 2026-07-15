@@ -146,16 +146,16 @@ describe("isRunQueryStillSearching", () => {
     );
   });
 
-  it("keeps searching for unresolved trigger names until the node catalog loads", () => {
+  it("distinguishes a loading trigger catalog from a settled empty canvas", () => {
     const unresolved = () => undefined;
     expect(
       isRunQueryStillSearching({ ...idleQuery, hasNextPage: false }, runSource({ triggers: ["deploy"] }), unresolved, {
-        nodeCatalogSize: 0,
+        nodeCatalogLoading: true,
       }),
     ).toBe(true);
     expect(
       isRunQueryStillSearching({ ...idleQuery, hasNextPage: false }, runSource({ triggers: ["deploy"] }), unresolved, {
-        nodeCatalogSize: 2,
+        nodeCatalogLoading: false,
       }),
     ).toBe(false);
   });

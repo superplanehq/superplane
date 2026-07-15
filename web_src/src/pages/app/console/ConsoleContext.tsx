@@ -28,6 +28,8 @@ export interface ConsoleContextValue {
   organizationId: string;
   /** All canvas nodes available for chip resolution. */
   nodes: SuperplaneComponentsNode[];
+  /** True while the canvas node catalog is still being fetched. */
+  nodesLoading?: boolean;
   /** Optional latest-status map keyed by node id. */
   nodeStatuses?: Record<string, ConsoleNodeStatus | undefined>;
   /**

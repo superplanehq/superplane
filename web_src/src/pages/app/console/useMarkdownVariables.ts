@@ -190,7 +190,9 @@ export function useMarkdownVariables(
     // same row that save persists.
     const seen = new Set<string>();
     const resolveTrigger = (reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id;
-    const triggerMatchOptions = { nodeCatalogSize: ctx?.nodes?.length ?? 0 };
+    const triggerMatchOptions = {
+      nodeCatalogLoading: ctx?.nodesLoading ?? false,
+    };
     for (const variable of list) {
       if (!variable?.name || !variable?.source) continue;
       if (seen.has(variable.name)) continue;
@@ -259,7 +261,9 @@ function collectRunVariableRootEventIds(args: {
   const ids: string[] = [];
   const seen = new Set<string>();
   const resolveTrigger = (reference: string) => resolveConsoleTrigger(args.ctx, reference)?.node.id;
-  const triggerMatchOptions = { nodeCatalogSize: args.ctx?.nodes?.length ?? 0 };
+  const triggerMatchOptions = {
+    nodeCatalogLoading: args.ctx?.nodesLoading ?? false,
+  };
   for (const variable of args.list) {
     const source = variable?.source;
     if (source?.kind !== "run") continue;
@@ -342,7 +346,9 @@ function useEagerFilterPagination(args: {
   const anyUnresolved = useMemo(() => {
     if (filteredVariables.length === 0) return false;
     const resolveTrigger = (reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id;
-    const triggerMatchOptions = { nodeCatalogSize: ctx?.nodes?.length ?? 0 };
+    const triggerMatchOptions = {
+      nodeCatalogLoading: ctx?.nodesLoading ?? false,
+    };
     return filteredVariables.some((variable) => {
       if (!runSelectStatusFilterCanMatch(variable.source.select, variable.source.statuses)) return false;
       if (!triggerFilterCanMatch(variable.source.triggers, resolveTrigger, triggerMatchOptions)) return false;
@@ -511,7 +517,7 @@ function isTriggerCatalogPending(
   resolveTrigger: ((reference: string) => string | undefined) | undefined,
   options: TriggerFilterMatchOptions | undefined,
 ): boolean {
-  return (triggers?.length ?? 0) > 0 && resolveTrigger !== undefined && options?.nodeCatalogSize === 0;
+  return (triggers?.length ?? 0) > 0 && resolveTrigger !== undefined && options?.nodeCatalogLoading === true;
 }
 
 function buildRunVariableValue(firstRun: RunRow, ctx: ResolveContext): Record<string, unknown> {
