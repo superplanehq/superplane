@@ -2,6 +2,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import type { ConfigurationField, ConfigurationSelectOption } from "@/api-client";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/ui/switch";
 import type { ReadonlyExpressionPreview } from "./expressionPreview";
 
 export function ReadonlyConfigurationField({
@@ -66,22 +67,7 @@ function ReadonlyBooleanField({ label, value, description }: { label?: string; v
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        <span
-          className={
-            value
-              ? "relative inline-flex h-5 w-9 rounded-full bg-blue-500"
-              : "relative inline-flex h-5 w-9 rounded-full bg-slate-200 dark:bg-gray-700"
-          }
-          aria-hidden="true"
-        >
-          <span
-            className={
-              value
-                ? "absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-white"
-                : "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white"
-            }
-          />
-        </span>
+        <Switch checked={value} disabled aria-readonly />
         <ReadonlyFieldLabel label={label} />
       </div>
       {description ? <p className="text-xs leading-normal text-gray-500 dark:text-gray-400">{description}</p> : null}
