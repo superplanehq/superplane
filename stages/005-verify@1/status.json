@@ -1,0 +1,6 @@
+{
+  "outcome": "failed",
+  "notes": null,
+  "failure_reason": "npx vitest run src/pages/home/index.spec.tsx exited non-zero: 'Failed to resolve import @/api-client/sdk.gen' — generated API client not present in this environment (pre-existing failure, identical on HEAD~1 before the implementation)",
+  "timestamp": "2026-07-15T16:27:33.535958Z"
+}
