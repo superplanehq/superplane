@@ -24,7 +24,7 @@ import { ZoomSlider } from "@/components/zoom-slider";
 import { getDraftDiffEdgeStyle } from "@/lib/draftDiff";
 import { DARK_BASE_BG_HEX } from "@/lib/darkThemeSurfaces";
 import { cn } from "@/lib/utils";
-import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Search, Trash2, CircleAlert } from "lucide-react";
+import { CircleX, Copy, LayoutGrid, Loader2, Search, Trash2, CircleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -847,6 +847,7 @@ function CanvasPage(props: CanvasPageProps) {
     liveCanvasVersionId: props.liveCanvasVersionId,
     headerMode: props.headerMode,
     isRunInspectionMode: props.isRunInspectionMode,
+    isAutoLayoutOnUpdateEnabled: props.isAutoLayoutOnUpdateEnabled ?? false,
     onAgentStagingReady: props.onAgentStagingReady,
     onAgentStagingCommit: props.onAgentStagingCommit,
   });
@@ -2597,19 +2598,6 @@ function CanvasContent({
     [reportZoom, viewportRef],
   );
 
-  const handleToggleAutoLayoutOnUpdate = useCallback(() => {
-    if (isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled) {
-      return;
-    }
-    onToggleAutoLayoutOnUpdate();
-  }, [isReadOnly, onToggleAutoLayoutOnUpdate, autoLayoutOnUpdateDisabled]);
-
-  const isAutoLayoutToggleDisabled = isReadOnly || !onToggleAutoLayoutOnUpdate || autoLayoutOnUpdateDisabled;
-  const autoLayoutTooltipMessage =
-    autoLayoutOnUpdateDisabledTooltip ||
-    (isAutoLayoutOnUpdateEnabled
-      ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
-      : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
   const suppressNextPaneClickRef = useRef(false);
   const suppressNextPaneClickTimeoutRef = useRef<number | null>(null);
   const handledFocusRequestKeyRef = useRef<string | null>(null);
@@ -3288,41 +3276,6 @@ function CanvasContent({
   const handleOpenCommandPalette = useCallback(() => {
     openGlobalCommandPalette();
   }, []);
-  const autoLayoutToggleControl = useMemo(() => {
-    if (!isEditMode) {
-      return null;
-    }
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 px-0 text-slate-600 hover:text-slate-900 dark:text-gray-400 dark:hover:text-gray-100"
-              onClick={handleToggleAutoLayoutOnUpdate}
-              disabled={isAutoLayoutToggleDisabled}
-              aria-pressed={isAutoLayoutOnUpdateEnabled}
-            >
-              {isAutoLayoutOnUpdateEnabled ? (
-                <LayoutGrid className="h-3 w-3" />
-              ) : (
-                <LayoutDashboard className="h-3 w-3" />
-              )}
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-      </Tooltip>
-    );
-  }, [
-    autoLayoutTooltipMessage,
-    handleToggleAutoLayoutOnUpdate,
-    isAutoLayoutOnUpdateEnabled,
-    isAutoLayoutToggleDisabled,
-    isEditMode,
-  ]);
   const commandPaletteSearchControl = useMemo(
     () => (
       <Tooltip>
@@ -3342,15 +3295,7 @@ function CanvasContent({
     ),
     [handleOpenCommandPalette],
   );
-  const zoomSliderContent = useMemo(
-    () => (
-      <>
-        {autoLayoutToggleControl}
-        {commandPaletteSearchControl}
-      </>
-    ),
-    [autoLayoutToggleControl, commandPaletteSearchControl],
-  );
+  const zoomSliderContent = useMemo(() => <>{commandPaletteSearchControl}</>, [commandPaletteSearchControl]);
   const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
   const handleSelectionStart = useCallback(() => {
     setIsSelecting(true);
@@ -3430,6 +3375,12 @@ function CanvasContent({
                   className="!static !m-0"
                   isSnapToGridEnabled={isEditMode ? isSnapToGridEnabled : undefined}
                   onSnapToGridToggle={isEditMode ? handleSnapToGridToggle : undefined}
+                  isAutoLayoutOnUpdateEnabled={isEditMode ? isAutoLayoutOnUpdateEnabled : undefined}
+                  onAutoLayoutOnUpdateToggle={isEditMode ? onToggleAutoLayoutOnUpdate : undefined}
+                  autoLayoutOnUpdateDisabled={isReadOnly || autoLayoutOnUpdateDisabled}
+                  autoLayoutOnUpdateDisabledTooltip={
+                    isReadOnly ? "You don't have permission to edit this canvas." : autoLayoutOnUpdateDisabledTooltip
+                  }
                 >
                   {zoomSliderContent}
                 </ZoomSlider>

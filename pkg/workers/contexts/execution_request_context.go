@@ -22,6 +22,15 @@ func (c *ExecutionRequestContext) ScheduleActionCall(actionName string, paramete
 		return fmt.Errorf("interval must be bigger than 1s")
 	}
 
+	finished, err := c.execution.IsFinished(c.tx)
+	if err != nil {
+		return err
+	}
+
+	if finished {
+		return nil
+	}
+
 	runAt := time.Now().Add(interval)
 	return c.execution.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{

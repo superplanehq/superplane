@@ -38,31 +38,33 @@ func (a *RunCodeAgent) poll(ctx core.ActionHookContext) error {
 	if meta.Session == nil || meta.Session.ID == "" {
 		// No session was recorded (anomalous): reclaim any stray resources and
 		// finish as an error instead of leaving the node running indefinitely.
+		// There is no session to keep here, so persist cannot apply.
 		ctx.Logger.Errorf("poll: execution metadata has no session id; finishing as error")
 		if client, err := runagent.NewClient(ctx.HTTP, ctx.Integration); err == nil {
-			a.teardown(client, meta, false, ctx.Logger.Warnf)
+			a.teardown(client, meta, false, false, ctx.Logger.Warnf)
 		}
 		out := buildOutput("error", "", meta.Branch, nil, meta.PrURL)
 		return ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out})
 	}
 	attempt, errs := parsePollParams(ctx)
+	persist := persistSession(ctx.Configuration, ctx.Logger)
 
 	client, err := runagent.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return a.handleClientError(ctx, meta, attempt, errs, err)
+		return a.handleClientError(ctx, meta, attempt, errs, persist, err)
 	}
 
 	sess, err := client.GetManagedSession(meta.Session.ID)
 	if err != nil {
-		return a.handlePollError(ctx, client, meta, attempt, errs)
+		return a.handlePollError(ctx, client, meta, attempt, errs, persist)
 	}
 
 	if sess != nil && isSessionTerminal(sess.Status) {
-		return a.handleTerminalSession(ctx, client, meta, sess, attempt, errs)
+		return a.handleTerminalSession(ctx, client, meta, sess, attempt, errs, persist)
 	}
 
 	if attempt > maxPollAttempts {
-		return a.finishTimeout(ctx, client, meta)
+		return a.finishTimeout(ctx, client, meta, persist)
 	}
 	return a.scheduleNextPoll(ctx, attempt+1, 0)
 }
@@ -81,35 +83,35 @@ func parsePollParams(ctx core.ActionHookContext) (int, int) {
 // emitFinal emits a terminal payload and, only after a successful emit, reclaims
 // the provisioned resources. On an emit failure it returns the error WITHOUT
 // tearing down, so the session survives for the hook to retry.
-func (a *RunCodeAgent) emitFinal(ctx core.ActionHookContext, client *runagent.Client, meta *ExecutionMetadata, out OutputPayload, interrupt bool) error {
+func (a *RunCodeAgent) emitFinal(ctx core.ActionHookContext, client *runagent.Client, meta *ExecutionMetadata, out OutputPayload, interrupt, persist bool) error {
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
 		ctx.Logger.Warnf("Failed to emit result for session %s: %v.", meta.Session.ID, err)
 		return err
 	}
-	a.teardown(client, meta, interrupt, ctx.Logger.Warnf)
+	a.teardown(client, meta, interrupt, persist, ctx.Logger.Warnf)
 	return nil
 }
 
 // finishTimeout reports a timeout and reclaims the still-running session.
-func (a *RunCodeAgent) finishTimeout(ctx core.ActionHookContext, client *runagent.Client, meta *ExecutionMetadata) error {
+func (a *RunCodeAgent) finishTimeout(ctx core.ActionHookContext, client *runagent.Client, meta *ExecutionMetadata, persist bool) error {
 	ctx.Logger.Errorf("Session %s exceeded max poll attempts", meta.Session.ID)
 	out := buildOutput("timeout", meta.Session.ID, meta.Branch, nil, meta.PrURL)
-	return a.emitFinal(ctx, client, meta, out, true)
+	return a.emitFinal(ctx, client, meta, out, true, persist)
 }
 
 // handlePollError retries a failed status read, then reports an error and reclaims.
-func (a *RunCodeAgent) handlePollError(ctx core.ActionHookContext, client *runagent.Client, meta *ExecutionMetadata, attempt, errs int) error {
+func (a *RunCodeAgent) handlePollError(ctx core.ActionHookContext, client *runagent.Client, meta *ExecutionMetadata, attempt, errs int, persist bool) error {
 	errs++
 	if errs < maxPollErrors {
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 	ctx.Logger.Errorf("Session %s: polling failed repeatedly", meta.Session.ID)
 	out := buildOutput("error", meta.Session.ID, meta.Branch, nil, meta.PrURL)
-	return a.emitFinal(ctx, client, meta, out, true)
+	return a.emitFinal(ctx, client, meta, out, true, persist)
 }
 
 // handleClientError surfaces client/config failures as errors (not timeouts).
-func (a *RunCodeAgent) handleClientError(ctx core.ActionHookContext, meta *ExecutionMetadata, attempt, errs int, cause error) error {
+func (a *RunCodeAgent) handleClientError(ctx core.ActionHookContext, meta *ExecutionMetadata, attempt, errs int, persist bool, cause error) error {
 	errs++
 	if errs < maxPollErrors {
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
@@ -121,14 +123,14 @@ func (a *RunCodeAgent) handleClientError(ctx core.ActionHookContext, meta *Execu
 	}
 	// Best-effort reclaim: retry building a client now that the run is finished.
 	if client, cErr := runagent.NewClient(ctx.HTTP, ctx.Integration); cErr == nil {
-		a.teardown(client, meta, true, ctx.Logger.Warnf)
+		a.teardown(client, meta, true, persist, ctx.Logger.Warnf)
 	} else {
 		ctx.Logger.Warnf("Cannot reclaim resources for session %s: client unavailable: %v", meta.Session.ID, cErr)
 	}
 	return nil
 }
 
-func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client *runagent.Client, meta *ExecutionMetadata, sess *runagent.ManagedSession, attempt, errs int) error {
+func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client *runagent.Client, meta *ExecutionMetadata, sess *runagent.ManagedSession, attempt, errs int, persist bool) error {
 	sm, err := client.GetSessionMessagesWithRetry(meta.Session.ID, finalMessageReads, finalMessageDelay)
 	if (err != nil || sm == nil || !sm.Complete) && attempt <= maxPollAttempts {
 		// Give the event stream a chance to finish writing so we can assemble the
@@ -140,6 +142,11 @@ func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client 
 	}
 
 	out := buildOutput(sess.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
+	// Past the poll budget the events may still be unavailable (sm == nil);
+	// emit what we have and only look for artifacts when events were read.
+	if sm != nil {
+		out.Artifacts = runagent.CollectSessionArtifacts(client, meta.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
+	}
 	if err := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); err != nil {
 		// Never tear down on an emit failure: the session still holds the agent
 		// output (PR URL, summary), so a transient emit failure must remain
@@ -154,7 +161,7 @@ func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client 
 
 	mergeSessionIntoMetadata(meta, sess)
 	_ = ctx.Metadata.Set(*meta)
-	a.teardown(client, meta, false, ctx.Logger.Warnf)
+	a.teardown(client, meta, false, persist, ctx.Logger.Warnf)
 	return nil
 }
 
@@ -166,6 +173,10 @@ func (a *RunCodeAgent) scheduleNextPoll(ctx core.ActionHookContext, nextAttempt,
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{"attempt": nextAttempt, "errors": errors}, interval)
 }
 
+// Cancel always reclaims, even with "Keep Session After Run" enabled: the run
+// never finished, and cancelling often accompanies deleting the node — which
+// drops the only record of these IDs, leaving a billable environment that
+// nothing could ever reclaim.
 func (a *RunCodeAgent) Cancel(ctx core.ExecutionContext) error {
 	meta := &ExecutionMetadata{}
 	if err := mapstructure.Decode(ctx.Metadata.Get(), meta); err != nil {
@@ -176,6 +187,6 @@ func (a *RunCodeAgent) Cancel(ctx core.ExecutionContext) error {
 		ctx.Logger.Warnf("Cancel: cannot build client to reclaim managed agent resources: %v", err)
 		return nil
 	}
-	a.teardown(client, meta, true, ctx.Logger.Warnf)
+	a.teardown(client, meta, true, false, ctx.Logger.Warnf)
 	return nil
 }
