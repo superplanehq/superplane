@@ -90,6 +90,22 @@ func TestSendAgentChatMessage_TranslatesBusySession(t *testing.T) {
 	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 }
 
+func TestSendAgentChatMessage_TranslatesInvalidRequest(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	svc := &stubService{
+		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, []agentservice.MessageImage, agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
+			return nil, agentservice.ErrInvalidRequest
+		},
+	}
+	_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
+		ChatId:  uuid.NewString(),
+		Content: "x",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+}
+
 func TestSendAgentChatMessage_MapsBuilderMode(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
