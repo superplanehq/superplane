@@ -791,6 +791,33 @@ func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing
 		"preamble must still be injected after the previous attempt failed at the provider")
 }
 
+func TestService_DefineOutcome_IncludesAutoLayoutPreferenceInPreamble(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	err = svc.DefineOutcome(
+		context.Background(),
+		r.Organization.ID,
+		r.User,
+		session.ID,
+		"Build the requested workflow",
+		"- Draft version created",
+		3,
+		agents.DefineOutcomeRequestOptions{
+			AutoLayoutOnUpdateEnabled: true,
+		},
+	)
+	require.NoError(t, err)
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "auto_layout_on_update_enabled: true")
+}
+
 func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
