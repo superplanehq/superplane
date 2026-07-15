@@ -480,10 +480,11 @@
     "base_sha": "6e5d54977d7229d41aa6a305af7b90a623fee7de"
   },
   "status": {
-    "kind": "running"
+    "kind": "blocked",
+    "blocked_reason": "human_input_required"
   },
-  "status_updated_at": "2026-07-15T16:16:43.422687Z",
-  "last_event_at": "2026-07-15T16:18:33.428857Z",
+  "status_updated_at": "2026-07-15T16:18:40.110712Z",
+  "last_event_at": "2026-07-15T16:18:40.110712Z",
   "pending_control": null,
   "checkpoints": [
     {
@@ -523,9 +524,9 @@
       "diff": {}
     },
     {
-      "seq": 0,
+      "seq": 107,
       "checkpoint": {
-        "timestamp": "2026-07-15T16:18:33.533439Z",
+        "timestamp": "2026-07-15T16:18:40.110207Z",
         "current_node": "plan",
         "completed_nodes": [
           "start",
@@ -533,22 +534,22 @@
         ],
         "node_retries": {},
         "context_values": {
-          "internal.run_id": "01KXK8XMFVPC78HV72MX5FR3B8",
-          "response.plan": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star button as-is.\n\n### Files changed (8 total — frontend only, no backend)\n\n| File | What changes |\n|---|---|\n| `CanvasCardsGrid.tsx` | Delete the Pin `CanvasPreferenceButton`, remove `onTogglePin` prop, remove `Pin` lucide import |\n| `index.tsx` | Delete the \"Pinned\" section rendering, remove `onTogglePin` wiring and `isPinned` filtering from `buildFolderedLayout`, remove `Pin` lucide import |\n| `CanvasFolderSection.tsx` | Remove `onTogglePin` prop that it threads through to `CanvasCardsGrid` |\n| `canvasAppPreferencePresentation.ts` | Remove `isPinned`/`pinnedAt` from the sort-rank logic; starred apps become rank 0 |\n| `canvasAppPreferencePresentation.spec.ts` | Update assertions to match new sort order |\n| `index.spec.tsx` | Remove pin button interaction from the preference test |\n| `types.ts` | Remove `isPinned`/`pinnedAt` dead fields from `CanvasCardData` |\n| `useHomePageCanvasList.ts` | Remove `isPinned`/`pinnedAt` from `toCanvasCardData` |\n\n### Key decisions\n\n- **No backend changes** — the API, protos, and DB schema for `pinned` are untouched. This keeps the change minimal and reversible.\n- The `CanvasPreferenceButton` component itself is preserved (still needed for Star).\n- Existing previously-pinned canvases silently fall back into the normal layout — no data loss.\n- Verification: `make check.build.ui` + `make format.js` + manual UI check of the home page.",
-          "failure_class": "",
-          "graph.rankdir": "LR",
-          "failure_signature": "",
+          "internal.work_dir": "/workspace/superplane",
           "last_response": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star bu",
+          "current_node": "plan",
+          "internal.run_id": "01KXK8XMFVPC78HV72MX5FR3B8",
+          "internal.fidelity": "compact",
+          "failure_class": "",
           "thread.start.current_node": "plan",
           "internal.retry_count.start": 0,
-          "graph.goal": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3",
-          "internal.retry_count.plan": 0,
-          "internal.work_dir": "/workspace/superplane",
-          "internal.node_visit_count": 1,
           "outcome": "succeeded",
-          "internal.fidelity": "compact",
           "internal.thread_id": "start",
-          "current_node": "plan",
+          "internal.retry_count.plan": 0,
+          "internal.node_visit_count": 1,
+          "graph.goal": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3",
+          "response.plan": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star button as-is.\n\n### Files changed (8 total — frontend only, no backend)\n\n| File | What changes |\n|---|---|\n| `CanvasCardsGrid.tsx` | Delete the Pin `CanvasPreferenceButton`, remove `onTogglePin` prop, remove `Pin` lucide import |\n| `index.tsx` | Delete the \"Pinned\" section rendering, remove `onTogglePin` wiring and `isPinned` filtering from `buildFolderedLayout`, remove `Pin` lucide import |\n| `CanvasFolderSection.tsx` | Remove `onTogglePin` prop that it threads through to `CanvasCardsGrid` |\n| `canvasAppPreferencePresentation.ts` | Remove `isPinned`/`pinnedAt` from the sort-rank logic; starred apps become rank 0 |\n| `canvasAppPreferencePresentation.spec.ts` | Update assertions to match new sort order |\n| `index.spec.tsx` | Remove pin button interaction from the preference test |\n| `types.ts` | Remove `isPinned`/`pinnedAt` dead fields from `CanvasCardData` |\n| `useHomePageCanvasList.ts` | Remove `isPinned`/`pinnedAt` from `toCanvasCardData` |\n\n### Key decisions\n\n- **No backend changes** — the API, protos, and DB schema for `pinned` are untouched. This keeps the change minimal and reversible.\n- The `CanvasPreferenceButton` component itself is preserved (still needed for Star).\n- Existing previously-pinned canvases silently fall back into the normal layout — no data loss.\n- Verification: `make check.build.ui` + `make format.js` + manual UI check of the home page.",
+          "failure_signature": "",
+          "graph.rankdir": "LR",
           "last_stage": "plan"
         },
         "node_outcomes": {
@@ -599,7 +600,124 @@
           }
         },
         "next_node_id": "approve",
+        "git_commit_sha": "26b413843fed8bcb39b3c7b6f6ea78a3845f1eb3",
         "node_visits": {
+          "start": 1,
+          "plan": 1
+        }
+      },
+      "diff": {
+        "patch": "diff --git a/plan.md b/plan.md\nnew file mode 100644\nindex 0000000..4cddbca\n--- /dev/null\n+++ b/plan.md\n@@ -0,0 +1,124 @@\n+# Plan: Remove \"Pin App\" from Homepage\n+\n+## 1. Summary\n+\n+The homepage currently shows two inline action buttons on each app card: **Pin** (push-pin icon) and **Star** (star icon). This change removes the Pin button from app cards and the \"Pinned\" section header that groups pinned apps at the top of the homepage. Only the Star functionality is retained.\n+\n+The backend API and data model retain `pinned` / `pinnedAt` support unchanged — this is purely a UI removal. Existing pinned canvases will no longer appear in a dedicated section and will no longer be pinnable from the UI.\n+\n+---\n+\n+## 2. Ordered Implementation Steps\n+\n+### Step 1 — Remove the Pin button from `CanvasCardsGrid.tsx`\n+\n+**File:** `web_src/src/pages/home/CanvasCardsGrid.tsx`\n+\n+- Remove the `CanvasPreferenceButton` block that renders the `Pin` icon (lines 116–124).\n+- Remove the `onTogglePin` prop from `CanvasCardsGridProps`, `CanvasCardsGrid`, and `CanvasCard` interfaces and function signatures.\n+- Remove the `Pin` import from `lucide-react` (line 6) — it is no longer referenced in this file.\n+\n+### Step 2 — Remove the \"Pinned\" section and `onTogglePin` from `index.tsx`\n+\n+**File:** `web_src/src/pages/home/index.tsx`\n+\n+- Remove the `onTogglePin` prop from the `Content` component's props interface and its call sites.\n+- Remove the `pinnedCanvases` computation and the `<section>` block that renders the \"Pinned\" heading and `CanvasCardsGrid` for pinned canvases (lines 140–182).\n+- Remove the `isPinned` check from `buildFolderedLayout` (line 252 — the early `continue` that skips pinned canvases from the \"unfiled\" list; pinned canvases should now fall through to the normal layout).\n+- Remove the `onTogglePin` handler passed from `HomePage` to `Content` (line 91).\n+- Remove the `Pin` import from `lucide-react` (line 5) — it is no longer used in this file.\n+\n+### Step 3 — Remove `onTogglePin` from `CanvasFolderSection.tsx`\n+\n+**File:** `web_src/src/pages/home/CanvasFolderSection.tsx`\n+\n+- Remove `onTogglePin` from `CanvasFolderSectionProps` interface.\n+- Remove the `onTogglePin` parameter from `CanvasFolderSection` function signature.\n+- Remove the `onTogglePin` prop passed to `CanvasCardsGrid` inside `CanvasFolderSection`.\n+\n+### Step 4 — Update tests in `index.spec.tsx`\n+\n+**File:** `web_src/src/pages/home/index.spec.tsx`\n+\n+- Remove or update the `\"orders preferred canvases and requests preference updates\"` test, which tests that clicking \"Unpin app Z Free Canvas\" calls `updateCanvasPreference` with `{ pinned: false }`. Since the Pin button no longer exists:\n+  - Remove the pin-related assertions and the `Unpin app Z Free Canvas` button interaction.\n+  - Keep (or simplify) the star-related assertions, since Star is preserved.\n+- Update the test's setup canvases if it relied on the \"Pinned\" section heading — the `Pinned` heading will no longer render.\n+\n+### Step 5 — Update `canvasAppPreferencePresentation.ts` and its spec\n+\n+**File:** `web_src/src/pages/home/canvasAppPreferencePresentation.ts`\n+\n+The ordering function currently ranks pinned canvases first (rank 0), starred second (rank 1), then all others (rank 2). With Pin removed from the UI:\n+- Remove the `isPinned` / `pinnedAt` branch from `canvasPreferenceRank` and `preferenceTime`, making starred canvases rank 0 and all others rank 1.\n+- Update `preferenceTime` to only consider `starredAt`.\n+\n+**File:** `web_src/src/pages/home/canvasAppPreferencePresentation.spec.ts`\n+\n+- Remove or update assertions that reference `isPinned: true` / `pinnedAt`. Starred canvases should now sort to the top; previously-pinned canvases are treated as regular canvases.\n+\n+### Step 6 — (Optional) Clean up `types.ts`\n+\n+**File:** `web_src/src/pages/home/types.ts`\n+\n+The `CanvasCardData` type still has `isPinned`, `pinnedAt` fields. These flow in from `useHomePageCanvasList.ts` → API data. Since the API still returns these fields and no code in other parts of the UI depends on them (they were only used in the homepage), they can be safely removed from `CanvasCardData` to avoid dead fields.\n+\n+- Remove `isPinned?: boolean` and `pinnedAt?: string` from `CanvasCardData`.\n+- Remove `isPinned` and `pinnedAt` mappings from `toCanvasCardData` in `useHomePageCanvasList.ts`.\n+\n+> **Note:** If removing from the type causes TypeScript errors elsewhere (e.g., the spec files that make canvases with `isPinned`), those call sites must be cleaned up too.\n+\n+---\n+\n+## 3. Files Changed and Why\n+\n+| File | Change | Reason |\n+|---|---|---|\n+| `web_src/src/pages/home/CanvasCardsGrid.tsx` | Remove Pin button, `onTogglePin` prop, `Pin` import | Pin UI element lives here |\n+| `web_src/src/pages/home/index.tsx` | Remove \"Pinned\" section, `onTogglePin` wiring, `Pin` import | Homepage layout and data flow |\n+| `web_src/src/pages/home/CanvasFolderSection.tsx` | Remove `onTogglePin` prop thread | Passes `onTogglePin` down to `CanvasCardsGrid` |\n+| `web_src/src/pages/home/canvasAppPreferencePresentation.ts` | Remove pinned-first rank, keep starred-first | Sorting now irrelevant to pin |\n+| `web_src/src/pages/home/canvasAppPreferencePresentation.spec.ts` | Update ordering assertions | Reflects new sort logic |\n+| `web_src/src/pages/home/index.spec.tsx` | Remove pin button interactions from test | Button no longer in DOM |\n+| `web_src/src/pages/home/types.ts` | Remove `isPinned`, `pinnedAt` from `CanvasCardData` | Clean up dead fields (optional but clean) |\n+| `web_src/src/pages/home/useHomePageCanvasList.ts` | Remove `isPinned`/`pinnedAt` from `toCanvasCardData` | Follows type cleanup above |\n+\n+**No backend changes required.** The API endpoint (`canvasesUpdateCanvasPreference`) and its `pinned` parameter remain intact. Existing data with `pinned: true` is ignored by the UI.\n+\n+---\n+\n+## 4. Verification\n+\n+### Automated checks\n+\n+```bash\n+# TypeScript build check — must pass with no errors\n+make check.build.ui\n+\n+# JavaScript formatting\n+make format.js\n+\n+# Unit tests (vitest, runs in the app container)\n+# Vitest picks up index.spec.tsx and canvasAppPreferencePresentation.spec.ts automatically\n+make check.build.ui   # also type-checks everything\n+```\n+\n+### Manual UI check\n+\n+1. Run `make dev.server` and open `http://localhost:8000`.\n+2. Navigate to the home page for an org that has apps.\n+3. Confirm no pin (push-pin) icon appears on any app card.\n+4. Confirm the Star button still appears and toggles correctly.\n+5. Confirm apps that were previously pinned now appear in the regular (unfiled or folder) section, not in a \"Pinned\" banner section.\n+6. Confirm previously-starred apps still float to the top of their section.\n+\n+---\n+\n+## 5. Risks / Out-of-Scope Notes\n+\n+- **No backend changes** — the API, database, and protobuf definitions for `pinned` / `pinnedAt` are left intact. This is intentional: removing the UI feature does not require a database migration, and future re-enablement is easy.\n+- **Existing pinned canvases** — users who previously pinned apps will see those apps fall back into the regular/folder layout. No data is lost.\n+- **`CanvasPreferenceButton` component** — this shared helper in `CanvasCardsGrid.tsx` is still used for the Star button. Do not delete it; only remove the Pin invocation.\n+- **`useUpdateCanvasPreference` hook** — still used for starring. Its `pinned` parameter type can be left in place since the hook signature is shared. The call site in `index.tsx` simply stops passing `onTogglePin`.\n+- **Out of scope:** Removing the `pinned` field from the API response, protobuf definitions, database schema, or backend models. That is a separate, larger change.\n+- **Out of scope:** Adding any alternative \"sort to top\" affordance using pin. The goal is removal only.\n",
+        "summary": {
+          "files_changed": 1,
+          "additions": 124,
+          "deletions": 0
+        }
+      }
+    },
+    {
+      "seq": 0,
+      "checkpoint": {
+        "timestamp": "2026-07-15T16:21:21.000781Z",
+        "current_node": "approve",
+        "completed_nodes": [
+          "start",
+          "plan",
+          "approve"
+        ],
+        "node_retries": {},
+        "context_values": {
+          "internal.run_id": "01KXK8XMFVPC78HV72MX5FR3B8",
+          "thread.plan.current_node": "approve",
+          "preferred_label": "[A] Approve",
+          "response.plan": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star button as-is.\n\n### Files changed (8 total — frontend only, no backend)\n\n| File | What changes |\n|---|---|\n| `CanvasCardsGrid.tsx` | Delete the Pin `CanvasPreferenceButton`, remove `onTogglePin` prop, remove `Pin` lucide import |\n| `index.tsx` | Delete the \"Pinned\" section rendering, remove `onTogglePin` wiring and `isPinned` filtering from `buildFolderedLayout`, remove `Pin` lucide import |\n| `CanvasFolderSection.tsx` | Remove `onTogglePin` prop that it threads through to `CanvasCardsGrid` |\n| `canvasAppPreferencePresentation.ts` | Remove `isPinned`/`pinnedAt` from the sort-rank logic; starred apps become rank 0 |\n| `canvasAppPreferencePresentation.spec.ts` | Update assertions to match new sort order |\n| `index.spec.tsx` | Remove pin button interaction from the preference test |\n| `types.ts` | Remove `isPinned`/`pinnedAt` dead fields from `CanvasCardData` |\n| `useHomePageCanvasList.ts` | Remove `isPinned`/`pinnedAt` from `toCanvasCardData` |\n\n### Key decisions\n\n- **No backend changes** — the API, protos, and DB schema for `pinned` are untouched. This keeps the change minimal and reversible.\n- The `CanvasPreferenceButton` component itself is preserved (still needed for Star).\n- Existing previously-pinned canvases silently fall back into the normal layout — no data loss.\n- Verification: `make check.build.ui` + `make format.js` + manual UI check of the home page.",
+          "internal.retry_count.approve": 0,
+          "failure_class": "",
+          "graph.rankdir": "LR",
+          "failure_signature": "",
+          "last_response": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star bu",
+          "thread.start.current_node": "plan",
+          "human.gate.approve.answer": "A",
+          "internal.retry_count.start": 0,
+          "graph.goal": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3",
+          "internal.retry_count.plan": 0,
+          "human.gate.approve.question": "Approve Plan",
+          "internal.work_dir": "/workspace/superplane",
+          "internal.node_visit_count": 1,
+          "human.gate.label": "[A] Approve",
+          "human.gate.selected": "A",
+          "human.gate.approve.label": "[A] Approve",
+          "outcome": "succeeded",
+          "internal.fidelity": "compact",
+          "internal.thread_id": "plan",
+          "current_node": "approve",
+          "last_stage": "plan"
+        },
+        "node_outcomes": {
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          },
+          "plan": {
+            "status": "succeeded",
+            "context_updates": {
+              "last_stage": "plan",
+              "last_response": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star bu",
+              "response.plan": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star button as-is.\n\n### Files changed (8 total — frontend only, no backend)\n\n| File | What changes |\n|---|---|\n| `CanvasCardsGrid.tsx` | Delete the Pin `CanvasPreferenceButton`, remove `onTogglePin` prop, remove `Pin` lucide import |\n| `index.tsx` | Delete the \"Pinned\" section rendering, remove `onTogglePin` wiring and `isPinned` filtering from `buildFolderedLayout`, remove `Pin` lucide import |\n| `CanvasFolderSection.tsx` | Remove `onTogglePin` prop that it threads through to `CanvasCardsGrid` |\n| `canvasAppPreferencePresentation.ts` | Remove `isPinned`/`pinnedAt` from the sort-rank logic; starred apps become rank 0 |\n| `canvasAppPreferencePresentation.spec.ts` | Update assertions to match new sort order |\n| `index.spec.tsx` | Remove pin button interaction from the preference test |\n| `types.ts` | Remove `isPinned`/`pinnedAt` dead fields from `CanvasCardData` |\n| `useHomePageCanvasList.ts` | Remove `isPinned`/`pinnedAt` from `toCanvasCardData` |\n\n### Key decisions\n\n- **No backend changes** — the API, protos, and DB schema for `pinned` are untouched. This keeps the change minimal and reversible.\n- The `CanvasPreferenceButton` component itself is preserved (still needed for Star).\n- Existing previously-pinned canvases silently fall back into the normal layout — no data loss.\n- Verification: `make check.build.ui` + `make format.js` + manual UI check of the home page."
+            },
+            "notes": "Stage completed: plan",
+            "usage": {
+              "input": {
+                "usage": {
+                  "model": {
+                    "provider": "anthropic",
+                    "model_id": "claude-sonnet-4-6"
+                  },
+                  "tokens": {
+                    "input_tokens": 52551,
+                    "output_tokens": 4866,
+                    "reasoning_tokens": 0,
+                    "cache_read_tokens": 428892,
+                    "cache_write_tokens": 93095
+                  }
+                },
+                "facts": {
+                  "algorithm": "anthropic",
+                  "cache_write_5m_tokens": 93095,
+                  "cache_write_1h_tokens": 0
+                }
+              },
+              "total_usd_micros": 708416
+            },
+            "files_touched": [
+              "/workspace/superplane/plan.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 102862,
+              "tool_time_ms": 2520,
+              "active_time_ms": 105382
+            }
+          },
+          "approve": {
+            "status": "succeeded",
+            "preferred_label": "[A] Approve",
+            "suggested_next_ids": [
+              "implement"
+            ],
+            "context_updates": {
+              "human.gate.approve.answer": "A",
+              "human.gate.label": "[A] Approve",
+              "human.gate.approve.label": "[A] Approve",
+              "human.gate.selected": "A",
+              "human.gate.approve.question": "Approve Plan"
+            },
+            "usage": null
+          }
+        },
+        "next_node_id": "implement",
+        "node_visits": {
+          "approve": 1,
           "start": 1,
           "plan": 1
         }
@@ -632,13 +750,40 @@
   },
   "pull_request": null,
   "superseded_by": null,
-  "pending_interviews": {},
+  "pending_interviews": {
+    "01KXK95EVEPS0TAS9852H5FX5G": {
+      "question": {
+        "id": "01KXK95EVEPS0TAS9852H5FX5G",
+        "text": "Approve Plan",
+        "stage": "approve",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "key": "A",
+            "label": "[A] Approve"
+          },
+          {
+            "key": "R",
+            "label": "[R] Revise"
+          }
+        ],
+        "allow_freeform": false,
+        "context_display": "The plan has been written to `plan.md`. Here's a summary of what it covers:\n\n## Plan Summary\n\n**Goal:** Remove the Pin button from homepage app cards and the \"Pinned\" grouped section. Keep the Star button as-is.\n\n### Files changed (8 total — frontend only, no backend)\n\n| File | What changes |\n|---|---|\n| `CanvasCardsGrid.tsx` | Delete the Pin `CanvasPreferenceButton`, remove `onTogglePin` prop, remove `Pin` lucide import |\n| `index.tsx` | Delete the \"Pinned\" section rendering, remove `onTogglePin` wiring and `isPinned` filtering from `buildFolderedLayout`, remove `Pin` lucide import |\n| `CanvasFolderSection.tsx` | Remove `onTogglePin` prop that it threads through to `CanvasCardsGrid` |\n| `canvasAppPreferencePresentation.ts` | Remove `isPinned`/`pinnedAt` from the sort-rank logic; starred apps become rank 0 |\n| `canvasAppPreferencePresentation.spec.ts` | Update assertions to match new sort order |\n| `index.spec.tsx` | Remove pin button interaction from the preference test |\n| `types.ts` | Remove `isPinned`/`pinnedAt` dead fields from `CanvasCardData` |\n| `useHomePageCanvasList.ts` | Remove `isPinned`/`pinnedAt` from `toCanvasCardData` |\n\n### Key decisions\n\n- **No backend changes** — the API, protos, and DB schema for `pinned` are untouched. This keeps the change minimal and reversible.\n- The `CanvasPreferenceButton` component itself is preserved (still needed for Star).\n- Existing previously-pinned canvases silently fall back into the normal layout — no data loss.\n- Verification: `make check.build.ui` + `make format.js` + manual UI check of the home page."
+      },
+      "started_at": "2026-07-15T16:18:40.110667Z"
+    }
+  },
   "stages": {
     "plan@1": {
       "first_event_seq": 29,
       "prompt": null,
       "response": null,
-      "completion": null,
+      "completion": {
+        "outcome": "succeeded",
+        "notes": "Stage completed: plan",
+        "failure_reason": null,
+        "timestamp": "2026-07-15T16:18:33.533306Z"
+      },
       "provider_used": {
         "mode": "agent",
         "provider": "anthropic",
@@ -652,6 +797,12 @@
       "output": null,
       "started_at": "2026-07-15T16:16:47.323372Z",
       "handler": "agent",
+      "timing": {
+        "wall_time_ms": 106208,
+        "inference_time_ms": 102862,
+        "tool_time_ms": 2520,
+        "active_time_ms": 105382
+      },
       "usage": {
         "input_tokens": 52551,
         "output_tokens": 4866,
@@ -859,6 +1010,29 @@
           }
         ],
         "warnings": []
+      },
+      "state": "succeeded"
+    },
+    "approve@1": {
+      "first_event_seq": 110,
+      "prompt": null,
+      "response": null,
+      "completion": null,
+      "provider_used": null,
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": null,
+      "parallel_results": null,
+      "output": null,
+      "started_at": "2026-07-15T16:18:40.110517Z",
+      "handler": "human",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
       },
       "state": "running"
     },
