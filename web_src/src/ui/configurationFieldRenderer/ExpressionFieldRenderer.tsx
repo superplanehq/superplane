@@ -10,6 +10,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   onChange,
   autocompleteExampleObj,
   allowExpressions = false,
+  readOnly = false,
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
 
@@ -21,6 +22,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
         onChange={(e) => onChange(e.target.value || undefined)}
         placeholder={field.placeholder || ""}
         className=""
+        disabled={readOnly}
         data-testid={toTestId(`expression-field-${field.name}`)}
       />
     );
@@ -34,6 +36,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
         onChange={(e) => onChange(e.target.value || undefined)}
         placeholder={field.placeholder || ""}
         className=""
+        disabled={readOnly}
         data-testid={toTestId(`expression-field-${field.name}`)}
       />
     );
@@ -50,6 +53,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
       showValuePreview
       quickTip="Tip: type `$` to browse node payloads."
       className=""
+      disabled={readOnly}
       data-testid={toTestId(`expression-field-${field.name}`)}
     />
   );

@@ -62,6 +62,7 @@ import {
 } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
+import { resolveLiveNodePreRunStatus } from "@/lib/liveNodePreRunStatus";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/app/lib/find-free-position-in-viewport";
 import {
@@ -80,6 +81,7 @@ import {
 import { Sentry } from "@/sentry";
 import { useTheme } from "@/contexts/useTheme";
 import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
+import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
@@ -281,7 +283,7 @@ export interface CanvasPageProps {
   ) => void;
   onAnnotationBlur?: () => void;
   getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
-  onNodeClick?: (nodeId: string) => void;
+  onNodeClick?: (nodeId: string, actions: { openConfigurationSidebar: () => void }) => void;
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
@@ -1290,6 +1292,23 @@ function CanvasPage(props: CanvasPageProps) {
     !!props.runNodeDetailCanvasId &&
     (!!props.runNodeDetailRun || !!props.runCanvasLoading);
 
+  const handleContinueEditing = useCallback(() => {
+    if (!state.componentSidebar.selectedNodeId || !props.onEnterEditMode) {
+      return;
+    }
+
+    setPendingRuntimeEditNodeId(state.componentSidebar.selectedNodeId);
+    void (async () => {
+      try {
+        await props.onEnterEditMode?.();
+      } catch {
+        setPendingRuntimeEditNodeId((currentNodeId) =>
+          currentNodeId === state.componentSidebar.selectedNodeId ? null : currentNodeId,
+        );
+      }
+    })();
+  }, [props.onEnterEditMode, state.componentSidebar.selectedNodeId]);
+
   const renderInspectorSidebar = useCallback(
     (layout: "sidebar" | "bottom") => (
       <Sidebar
@@ -1328,9 +1347,14 @@ function CanvasPage(props: CanvasPageProps) {
         components={props.components}
         triggers={props.triggers}
         readOnly={readOnly}
+        formDisabled={!props.isEditing}
+        isEditing={props.isEditing}
         canReadIntegrations={props.canReadIntegrations}
         canCreateIntegrations={props.canCreateIntegrations}
         canUpdateIntegrations={props.canUpdateIntegrations}
+        onContinueEditing={!props.isEditing && props.onEnterEditMode ? handleContinueEditing : undefined}
+        continueEditingDisabled={props.enterEditModeDisabled}
+        continueEditingDisabledTooltip={props.enterEditModeDisabledTooltip}
       />
     ),
     [
@@ -1343,6 +1367,8 @@ function CanvasPage(props: CanvasPageProps) {
       props.canCreateIntegrations,
       props.canReadIntegrations,
       props.canUpdateIntegrations,
+      props.enterEditModeDisabled,
+      props.enterEditModeDisabledTooltip,
       props.fetchRunIdForSidebarEvent,
       props.getAllHistoryEvents,
       props.getAllQueueEvents,
@@ -1360,6 +1386,7 @@ function CanvasPage(props: CanvasPageProps) {
       props.triggers,
       props.isEditing,
       props.loadSidebarData,
+      props.onEnterEditMode,
       props.onLoadMoreHistory,
       props.onLoadMoreQueue,
       props.onReEmit,
@@ -1369,6 +1396,7 @@ function CanvasPage(props: CanvasPageProps) {
       props.resolveRunIdForSidebarEvent,
       props.workflowNodes,
       readOnly,
+      handleContinueEditing,
       state,
     ],
   );
@@ -1573,7 +1601,9 @@ function CanvasPage(props: CanvasPageProps) {
                 />
               </ReactFlowProvider>
             )}
-            {isComponentSidebarVisibleMode(props.headerMode) && !props.isRunInspectionMode && props.isEditing
+            {isComponentSidebarVisibleMode(props.headerMode) &&
+            !props.isRunInspectionMode &&
+            (props.isEditing || state.componentSidebar.isOpen)
               ? renderInspectorSidebar("sidebar")
               : null}
           </div>
@@ -1676,9 +1706,14 @@ function Sidebar({
   components,
   triggers,
   readOnly,
+  formDisabled = false,
+  isEditing = false,
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  onContinueEditing,
+  continueEditingDisabled,
+  continueEditingDisabledTooltip,
   layout = "sidebar",
 }: {
   layout?: "sidebar" | "bottom";
@@ -1723,9 +1758,14 @@ function Sidebar({
   components?: ActionsAction[];
   triggers?: TriggersTrigger[];
   readOnly?: boolean;
+  formDisabled?: boolean;
+  isEditing?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  onContinueEditing?: () => void | Promise<void>;
+  continueEditingDisabled?: boolean;
+  continueEditingDisabledTooltip?: string;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -1744,7 +1784,31 @@ function Sidebar({
 
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
-  const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode;
+  const hideRunsTab = !isEditing || isAnnotationNode;
+  const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode && !hideRunsTab;
+  const nodeExecutionVersion = useNodeExecutionStore((store) => store.version);
+  const livePreRunStatus = useMemo(() => {
+    if (!formDisabled || !state.componentSidebar.selectedNodeId || !workflowNodes) {
+      return undefined;
+    }
+
+    const workflowNode = workflowNodes.find((node) => node.id === state.componentSidebar.selectedNodeId);
+    if (!workflowNode) {
+      return undefined;
+    }
+
+    const nodeData = useNodeExecutionStore.getState().getNodeData(state.componentSidebar.selectedNodeId);
+    void nodeExecutionVersion;
+    return resolveLiveNodePreRunStatus(workflowNode, nodeData, {
+      configurationFields: editingNodeData?.configurationFields,
+    });
+  }, [
+    editingNodeData?.configurationFields,
+    formDisabled,
+    nodeExecutionVersion,
+    state.componentSidebar.selectedNodeId,
+    workflowNodes,
+  ]);
 
   // Trigger data loading when sidebar opens for a node.
   useEffect(() => {
@@ -1882,10 +1946,15 @@ function Sidebar({
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
-      hideRunsTab={isAnnotationNode}
+      hideRunsTab={hideRunsTab}
       hideDocsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
       readOnly={readOnly}
+      formDisabled={formDisabled}
+      livePreRunStatus={livePreRunStatus}
+      onContinueEditing={onContinueEditing}
+      continueEditingDisabled={continueEditingDisabled}
+      continueEditingDisabledTooltip={continueEditingDisabledTooltip}
       resolveRunId={resolveRunId}
       fetchRunId={fetchRunId}
       onSelectRun={onSelectRun}
@@ -2209,7 +2278,7 @@ function CanvasContent({
   fitViewContentKey?: string;
   lastFittedContentKeyRef?: React.MutableRefObject<string | null>;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
-  onNodeClick?: (nodeId: string) => void;
+  onNodeClick?: (nodeId: string, actions: { openConfigurationSidebar: () => void }) => void;
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
@@ -2398,12 +2467,20 @@ function CanvasContent({
         return;
       }
 
-      if (isPendingConnection && onPendingConnectionNodeClick) {
+      if (onNodeClick) {
+        onNodeClick(nodeId, {
+          openConfigurationSidebar: () => {
+            const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
+            stateRef.current.componentSidebar.open(nodeId);
+
+            applySidebarTabOnNodeOpen(setCurrentTab, wasSidebarOpen, true);
+            onBuildingBlocksSidebarToggle?.(false);
+          },
+        });
+      } else if (isPendingConnection && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
-      } else if (onNodeClick) {
-        onNodeClick(nodeId);
       } else {
         const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
         stateRef.current.componentSidebar.open(nodeId);

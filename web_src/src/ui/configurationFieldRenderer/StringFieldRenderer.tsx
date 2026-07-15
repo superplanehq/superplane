@@ -12,6 +12,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   allowExpressions = false,
   excludedSuggestions,
   valuePreviewLabel,
+  readOnly = false,
 }) => {
   const hasInitialized = useRef(false);
   const shouldPreserveEmpty = field.togglable === true;
@@ -37,6 +38,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
         }}
         placeholder={field.placeholder || ""}
         className=""
+        disabled={readOnly}
         data-testid={toTestId(`string-field-${field.name}`)}
       />
     );
@@ -53,6 +55,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
         }}
         placeholder={field.placeholder || ""}
         className=""
+        disabled={readOnly}
         data-testid={toTestId(`string-field-${field.name}`)}
       />
     );
@@ -72,6 +75,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       valuePreviewLabel={valuePreviewLabel}
       quickTip="Tip: type `{{` to start an expression."
       className=""
+      disabled={readOnly}
       data-testid={toTestId(`string-field-${field.name}`)}
       excludedSuggestions={excludedSuggestions}
     />

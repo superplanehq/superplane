@@ -437,7 +437,7 @@ describe("CanvasPage connection drop", () => {
 
     await act(async () => {});
     expect(loadSidebarData).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("component-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
   });
 
   it("does not render a live bottom inspector", async () => {
@@ -480,7 +480,7 @@ describe("CanvasPage connection drop", () => {
     await act(async () => {});
 
     expect(screen.queryByTestId("live-node-detail-pane")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("component-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
   });
 
   it("renders edit inspector in right sidebar, not bottom pane", async () => {
@@ -526,7 +526,7 @@ describe("CanvasPage connection drop", () => {
     expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
   });
 
-  it("closes hidden live sidebar state from canvas pane click", async () => {
+  it("closes live configuration sidebar from canvas pane click", async () => {
     const onSidebarChange = vi.fn();
     const getSidebarData = vi.fn(() => ({
       latestEvents: [],
@@ -567,7 +567,7 @@ describe("CanvasPage connection drop", () => {
 
     await act(async () => {});
 
-    expect(screen.queryByTestId("component-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
 
     act(() => {
       reactFlowPropsRef.current?.onPaneClick?.();
