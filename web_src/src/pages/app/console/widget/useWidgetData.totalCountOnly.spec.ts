@@ -40,6 +40,11 @@ describe("runsRenderIsTotalCountOnly", () => {
     expect(runsRenderIsTotalCountOnly(runsSource, numberCountWithFilters)).toBe(false);
   });
 
+  it("returns false when the runs data source has status/trigger filters", () => {
+    expect(runsRenderIsTotalCountOnly({ ...runsSource, statuses: ["passed"] }, numberCount)).toBe(false);
+    expect(runsRenderIsTotalCountOnly({ ...runsSource, triggers: ["deploy"] }, numberCount)).toBe(false);
+  });
+
   it("returns false when the render needs a sparkline (rows still required)", () => {
     expect(runsRenderIsTotalCountOnly(runsSource, numberCountWithSparkline)).toBe(false);
   });
