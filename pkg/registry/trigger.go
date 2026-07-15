@@ -133,3 +133,21 @@ func (s *PanicableTrigger) OnIntegrationMessage(ctx core.IntegrationMessageConte
 
 	return integrationTrigger.OnIntegrationMessage(ctx)
 }
+
+func (s *PanicableTrigger) OnAppMessage(ctx core.AppMessageContext) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ctx.Logger.Errorf("Trigger %s panicked in OnAppMessage(): %v\nStack: %s",
+				s.underlying.Name(), r, debug.Stack())
+			err = fmt.Errorf("trigger %s panicked in OnAppMessage(): %v",
+				s.underlying.Name(), r)
+		}
+	}()
+
+	appTrigger, ok := s.underlying.(core.AppTrigger)
+	if !ok {
+		return fmt.Errorf("trigger %s is not an app trigger", s.underlying.Name())
+	}
+
+	return appTrigger.OnAppMessage(ctx)
+}

@@ -98,7 +98,7 @@ func Test__NewCanvasPublisher(t *testing.T) {
 
 	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 	require.NoError(t, err)
-	publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+	publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 
 	require.Nil(t, publisher)
 	require.ErrorContains(t, err, "no changes between live and draft version being applied")
@@ -138,7 +138,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -218,7 +218,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -273,7 +273,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -334,7 +334,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -379,7 +379,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -427,7 +427,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -479,7 +479,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -533,7 +533,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -588,7 +588,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -662,7 +662,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -726,7 +726,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -768,7 +768,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -824,7 +824,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err = models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -879,7 +879,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err = models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -926,7 +926,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -998,7 +998,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -1058,7 +1058,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
@@ -1132,7 +1132,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
 		require.NoError(t, err)
-		publisher, err := NewCanvasPublisher(database.Conn(), draft, liveVersion, canvasPublisherOptions(r))
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())

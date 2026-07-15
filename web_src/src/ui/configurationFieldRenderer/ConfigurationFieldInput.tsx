@@ -11,6 +11,7 @@ import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
+import { AppFieldRenderer } from "./AppFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
@@ -77,6 +78,18 @@ export function ConfigurationFieldInput({
         autocompleteExampleObj={autocompleteExampleObj}
         labelRightRef={allowExpressions ? labelRightRef : undefined}
         labelRightReady={allowExpressions ? labelRightReady : false}
+      />
+    );
+  }
+
+  if (field.type === "app") {
+    return (
+      <AppFieldRenderer
+        field={field}
+        value={value as string | undefined}
+        onChange={onChange}
+        organizationId={organizationId}
+        readOnly={commonProps.readOnly}
       />
     );
   }
