@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import {
+  resolveCachedNodeRunId,
+  resolveLiveCanvasNodeClickSyncAction,
+  resolveRunLookupEventForNodeActivity,
+} from "./runInspectionLiveNodeLookup";
 
 function execution(overrides: Partial<CanvasesCanvasNodeExecution>): CanvasesCanvasNodeExecution {
   return overrides as CanvasesCanvasNodeExecution;
@@ -94,5 +98,48 @@ describe("resolveRunLookupEventForNodeActivity", () => {
     const runId = resolveCachedNodeRunId("trigger-1", { id: "trigger-1", type: "TYPE_TRIGGER" }, () => null);
 
     expect(runId).toBe("run-from-trigger");
+  });
+});
+
+describe("resolveLiveCanvasNodeClickSyncAction", () => {
+  it("looks up a run from the server when the node has no cached activity", () => {
+    useNodeExecutionStore.getState().clear();
+
+    expect(
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "lookupRun" });
+  });
+
+  it("inspects the cached run when one is already resolved", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "action-1",
+      execution({
+        id: "latest-execution",
+        nodeId: "action-1",
+        runId: "run-from-execution",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "inspectRun", runId: "run-from-execution" });
+  });
+
+  it("looks up a run when activity exists but no cached run id is available", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "action-1",
+      execution({
+        id: "latest-execution",
+        nodeId: "action-1",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "lookupRun" });
   });
 });

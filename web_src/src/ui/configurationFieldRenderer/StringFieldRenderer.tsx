@@ -12,19 +12,29 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   allowExpressions = false,
   excludedSuggestions,
   valuePreviewLabel,
+  readOnly = false,
 }) => {
   const hasInitialized = useRef(false);
   const shouldPreserveEmpty = field.togglable === true;
 
   // Set initial value only on first mount if no value is present but there's a default
   useEffect(() => {
+    if (readOnly) {
+      return;
+    }
+
     if (!hasInitialized.current && (value === undefined || value === null) && field.defaultValue !== undefined) {
       hasInitialized.current = true;
       onChange(String(field.defaultValue));
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [readOnly, value, field.defaultValue, onChange]);
 
-  const currentValue = (value as string) ?? "";
+  const currentValue =
+    value === undefined || value === null
+      ? readOnly && field.defaultValue !== undefined
+        ? String(field.defaultValue)
+        : ""
+      : String(value);
 
   if (!allowExpressions) {
     return (
@@ -37,6 +47,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
         }}
         placeholder={field.placeholder || ""}
         className=""
+        disabled={readOnly}
         data-testid={toTestId(`string-field-${field.name}`)}
       />
     );
@@ -53,6 +64,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
         }}
         placeholder={field.placeholder || ""}
         className=""
+        disabled={readOnly}
         data-testid={toTestId(`string-field-${field.name}`)}
       />
     );
@@ -72,6 +84,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       valuePreviewLabel={valuePreviewLabel}
       quickTip="Tip: type `{{` to start an expression."
       className=""
+      disabled={readOnly}
       data-testid={toTestId(`string-field-${field.name}`)}
       excludedSuggestions={excludedSuggestions}
     />
