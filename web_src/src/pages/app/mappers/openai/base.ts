@@ -76,11 +76,13 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 type ResponseNodeMetadata = {
   model?: unknown;
   structuredOutput?: boolean;
+  codeInterpreter?: boolean;
 };
 
 type ResponseConfiguration = {
   model?: unknown;
   outputSchema?: string;
+  codeInterpreter?: boolean;
 };
 
 // metadataList surfaces the configured model and structured-output state on the
@@ -101,6 +103,11 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const structured = config ? hasSchema(config.outputSchema) : Boolean(meta?.structuredOutput);
   if (structured) {
     items.push({ icon: "braces", label: "Structured output" });
+  }
+
+  const codeInterpreter = config ? Boolean(config.codeInterpreter) : Boolean(meta?.codeInterpreter);
+  if (codeInterpreter) {
+    items.push({ icon: "terminal", label: "Code interpreter" });
   }
 
   return items;

@@ -76,11 +76,13 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 type TextPromptNodeMetadata = {
   model?: unknown;
   structuredOutput?: boolean;
+  codeExecution?: boolean;
 };
 
 type TextPromptConfiguration = {
   model?: unknown;
   outputSchema?: string;
+  codeExecution?: boolean;
 };
 
 // metadataList surfaces the configured model and structured-output state on the
@@ -101,6 +103,11 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const structured = config ? hasSchema(config.outputSchema) : Boolean(meta?.structuredOutput);
   if (structured) {
     items.push({ icon: "braces", label: "Structured output" });
+  }
+
+  const codeExecution = config ? Boolean(config.codeExecution) : Boolean(meta?.codeExecution);
+  if (codeExecution) {
+    items.push({ icon: "terminal", label: "Code execution" });
   }
 
   return items;

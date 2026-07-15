@@ -31,6 +31,9 @@ var exampleOutputMergePullRequestBytes []byte
 //go:embed payloads/add_pull_request_reviewers.json
 var exampleOutputAddPullRequestReviewersBytes []byte
 
+//go:embed payloads/mark_pull_request_ready_for_review.json
+var exampleOutputMarkPullRequestReadyForReviewBytes []byte
+
 var exampleOutputAddReactionOnce sync.Once
 var exampleOutputAddReaction map[string]any
 
@@ -45,6 +48,9 @@ var exampleOutputMergePullRequest map[string]any
 
 var exampleOutputAddPullRequestReviewersOnce sync.Once
 var exampleOutputAddPullRequestReviewers map[string]any
+
+var exampleOutputMarkPullRequestReadyForReviewOnce sync.Once
+var exampleOutputMarkPullRequestReadyForReview map[string]any
 
 var exampleDataOnPullRequestOnce sync.Once
 var exampleDataOnPullRequest map[string]any
@@ -108,5 +114,13 @@ func (c *AddPullRequestReviewers) ExampleOutput() map[string]any {
 		&exampleOutputAddPullRequestReviewersOnce,
 		exampleOutputAddPullRequestReviewersBytes,
 		&exampleOutputAddPullRequestReviewers,
+	)
+}
+
+func (c *MarkPullRequestReadyForReview) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputMarkPullRequestReadyForReviewOnce,
+		exampleOutputMarkPullRequestReadyForReviewBytes,
+		&exampleOutputMarkPullRequestReadyForReview,
 	)
 }

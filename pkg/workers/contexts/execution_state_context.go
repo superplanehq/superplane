@@ -130,11 +130,12 @@ func (s *ExecutionStateContext) EmitAndContinue(channel, payloadType string, pay
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {
-	if err := s.execution.FailInTransaction(s.tx, reason, message); err != nil {
+	failed, err := s.execution.FailInTransaction(s.tx, reason, message)
+	if err != nil {
 		return err
 	}
 
-	if reason == models.CanvasNodeExecutionResultReasonError {
+	if failed && reason == models.CanvasNodeExecutionResultReasonError {
 		DispatchOnError(s.tx, s.execution, s.onNewEvents)
 	}
 

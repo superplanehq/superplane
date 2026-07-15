@@ -10,39 +10,23 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { MetadataItem } from "@/ui/metadataList";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { integrationResourceDisplayLabel } from "@/lib/integrationResourceLabel";
 
-type RunCodeAgentNodeMetadata = {
-  repository?: unknown;
-  baseBranch?: string;
-  prUrl?: string;
-  model?: unknown;
-  sourceMode?: string;
-};
-
-type RunCodeAgentConfiguration = {
-  sourceMode?: string;
-  repository?: unknown;
-  baseBranch?: string;
-  prUrl?: string;
-  model?: unknown;
-};
-
-type RunCodeAgentArtifact = {
+type SessionArtifact = {
   fileId?: string;
   filename?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  downloadUrl?: string;
 };
 
-type RunCodeAgentPayloadData = {
+type RunAgentPayloadData = {
   status?: string;
   sessionId?: string;
-  prUrl?: string;
-  branch?: string;
   lastMessage?: string;
-  artifacts?: RunCodeAgentArtifact[];
+  messages?: unknown[];
+  artifacts?: SessionArtifact[];
 };
 
 function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
@@ -54,14 +38,14 @@ function addDetail(details: Record<string, string>, key: string, value: string |
 // formatArtifacts joins the names of the files the agent produced, falling
 // back to the file id when a name is missing. Returns undefined when the run
 // produced no artifacts so the entry is omitted.
-function formatArtifacts(artifacts?: RunCodeAgentArtifact[]): string | undefined {
+function formatArtifacts(artifacts?: SessionArtifact[]): string | undefined {
   const names = (artifacts ?? [])
     .map((artifact) => artifact.filename || artifact.fileId)
     .filter((name): name is string => Boolean(name));
   return names.length > 0 ? names.join(", ") : undefined;
 }
 
-export const runCodeAgentMapper: ComponentBaseMapper = {
+export const runAgentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "claude";
@@ -75,9 +59,8 @@ export const runCodeAgentMapper: ComponentBaseMapper = {
         context.node.name ||
         context.componentDefinition?.label ||
         context.componentDefinition?.name ||
-        "Run Code Agent",
-      eventSections: lastExecution ? runCodeAgentEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(context.node),
+        "Run Claude Agent",
+      eventSections: lastExecution ? runAgentEventSections(context.nodes, lastExecution, componentName) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -86,22 +69,17 @@ export const runCodeAgentMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
-    if (context.execution.createdAt) {
-      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+    const timestamp = context.execution.updatedAt || context.execution.createdAt;
+    if (timestamp) {
+      details["Executed At"] = new Date(timestamp).toLocaleString();
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const data = (outputs?.default?.[0]?.data ?? {}) as RunCodeAgentPayloadData;
+    const data = (outputs?.default?.[0]?.data ?? {}) as RunAgentPayloadData;
 
-    const entries: Array<[string, string | undefined]> = [
-      ["Status", data.status],
-      ["Pull Request", data.prUrl],
-      ["Branch", data.branch],
-      ["Artifacts", formatArtifacts(data.artifacts)],
-    ];
-    for (const [key, value] of entries) {
-      addDetail(details, key, value);
-    }
+    addDetail(details, "Status", data.status);
+    addDetail(details, "Session ID", data.sessionId);
+    addDetail(details, "Artifacts", formatArtifacts(data.artifacts));
 
     return details;
   },
@@ -112,39 +90,7 @@ export const runCodeAgentMapper: ComponentBaseMapper = {
   },
 };
 
-// metadataList shows the configured target on the component card, independent of
-// any execution (names resolved at Setup, with config as a fallback).
-function metadataList(node: NodeInfo): MetadataItem[] {
-  const items: MetadataItem[] = [];
-  const meta = (node.metadata ?? {}) as RunCodeAgentNodeMetadata;
-  const config = (node.configuration ?? {}) as RunCodeAgentConfiguration;
-
-  const isPR = (meta.sourceMode ?? config.sourceMode) === "pr";
-  if (isPR) {
-    const pr = meta.prUrl || config.prUrl;
-    if (pr) {
-      items.push({ icon: "git-pull-request", label: pr });
-    }
-  } else {
-    const repo = integrationResourceDisplayLabel(meta.repository) ?? integrationResourceDisplayLabel(config.repository);
-    if (repo) {
-      items.push({ icon: "git-branch", label: repo });
-    }
-    const baseBranch = meta.baseBranch || config.baseBranch;
-    if (baseBranch) {
-      items.push({ icon: "git-branch", label: baseBranch });
-    }
-  }
-
-  const model = integrationResourceDisplayLabel(meta.model) ?? integrationResourceDisplayLabel(config.model);
-  if (model) {
-    items.push({ icon: "bot", label: model });
-  }
-
-  return items;
-}
-
-function runCodeAgentEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function runAgentEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
