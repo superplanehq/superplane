@@ -78,6 +78,15 @@ func handleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType strin
 		return http.StatusNotFound, nil, nil
 	}
 
+	//
+	// Once the execution is finished, its metadata and finished timestamp are
+	// settled. Late or duplicate webhooks must not touch it again, otherwise the
+	// metadata write would move the execution's finished_at timestamp (issue #6126).
+	//
+	if executionCtx.ExecutionState.IsFinished() {
+		return http.StatusOK, nil, nil
+	}
+
 	sink := taskLogFromBrokerTask(task)
 	if sink == nil {
 		sink = taskLogFromRawWebhook(raw)
