@@ -3,6 +3,8 @@ import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import * as yaml from "js-yaml";
 
+import { normalizeYamlForDiff } from "./lib/normalize-yaml-diff";
+
 const CanvasYamlDiffModal = lazy(() =>
   import("./CanvasYamlDiffModal").then((module) => ({ default: module.CanvasYamlDiffModal })),
 );
@@ -120,8 +122,8 @@ function buildNodeYamlDiffPayload({
     return null;
   }
 
-  const liveYamlText = dumpNodeYaml(liveNode);
-  const draftYamlText = dumpNodeYaml(applyRenderedNodeState(draftNode, draftNodes));
+  const liveYamlText = normalizeYamlForDiff(dumpNodeYaml(liveNode));
+  const draftYamlText = normalizeYamlForDiff(dumpNodeYaml(applyRenderedNodeState(draftNode, draftNodes)));
   if (liveYamlText === draftYamlText) {
     return null;
   }
@@ -167,13 +169,19 @@ export function useCanvasYamlDiffModal({
           spec: draftCanvasVersion.spec,
         });
 
-    if (!livePayload || !draftPayload || livePayload.yamlText === draftPayload.yamlText) {
+    if (!livePayload || !draftPayload) {
+      return null;
+    }
+
+    const liveYamlText = normalizeYamlForDiff(livePayload.yamlText);
+    const draftYamlText = normalizeYamlForDiff(draftPayload.yamlText);
+    if (liveYamlText === draftYamlText) {
       return null;
     }
 
     return {
-      liveYamlText: livePayload.yamlText,
-      draftYamlText: draftPayload.yamlText,
+      liveYamlText,
+      draftYamlText,
       filename: draftPayload.filename || livePayload.filename,
     };
   }, [
