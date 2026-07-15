@@ -1,0 +1,114 @@
+diff --git a/plan.md b/plan.md
+new file mode 100644
+index 0000000..f5b325d
+--- /dev/null
++++ b/plan.md
+@@ -0,0 +1,108 @@
++# Plan: Remove "Pin App" from Homepage — Keep Only Star
++
++## 1. Summary
++
++The homepage (`/web_src/src/pages/home/`) currently shows two preference buttons on each app card: a **Pin** button (thumbtack icon) and a **Star** button. There is also a "Pinned" section at the top of the page that groups all pinned apps.
++
++The goal is to remove the Pin feature from the homepage UI entirely, leaving only the Star button. The backend API that supports pinning does not need to change; only the frontend presentation layer is affected.
++
++---
++
++## 2. Ordered Implementation Steps
++
++### Step 1 — Remove the Pin button from the card UI (`CanvasCardsGrid.tsx`)
++
++- Delete the `<CanvasPreferenceButton>` block that renders the `Pin` icon (lines 116–124).
++- Remove the `Pin` import from `lucide-react` (line 6).
++- Remove the `onTogglePin` prop from `CanvasCardsGridProps` and `CanvasCardProps` interfaces and from the destructured parameters of both `CanvasCardsGrid` and `CanvasCard`.
++
++### Step 2 — Remove `onTogglePin` from `CanvasFolderSection.tsx`
++
++- Remove `onTogglePin` from `CanvasFolderSectionProps`.
++- Remove it from the destructured parameters of `CanvasFolderSection`.
++- Remove it from the `<CanvasCardsGrid>` JSX props call inside `CanvasFolderSection`.
++
++### Step 3 — Remove the "Pinned" section and `onTogglePin` wiring from the homepage root (`index.tsx`)
++
++- Remove the `Pin` import from `lucide-react` (line 5).
++- Remove the `pinnedCanvases` variable and the entire "Pinned" `<section>` block (lines 140–182).
++- Remove the `onTogglePin` prop from the `Content` component's props interface and destructuring.
++- Remove all three `onTogglePin={onTogglePin}` prop passes to `<CanvasCardsGrid>` / `<CanvasFolderSection>` inside `Content`.
++- Remove the `onTogglePin` callback prop and its associated `updateCanvasPreference.mutate({ canvasId, pinned })` call from `HomePage` (lines 91–92).
++- The `buildFolderedLayout` function contains a guard `if (canvas.isPinned) continue;` that prevented pinned canvases from appearing in the free section. Remove that guard so that formerly-pinned canvases (which may still have `isPinned: true` from the backend) are displayed normally.
++
++### Step 4 — Update `canvasAppPreferencePresentation.ts` (optional simplification, but keeps correctness)
++
++- The `canvasPreferenceRank` and `preferenceTime` functions still reference `isPinned`. Since the "Pinned" section is removed, the ordering between pinned and starred canvases in the remaining sections no longer matters to users. However, leaving the logic in place is harmless and avoids a breaking behavioral change for starred ordering.
++- **Decision:** Leave `canvasAppPreferencePresentation.ts` unchanged for now. The star-based ordering still works correctly. If desired in a future pass, the pin-related branches can be removed from the ranking/time functions.
++
++### Step 5 — Update `types.ts` (optional cleanup)
++
++- `CanvasCardData.isPinned`, `pinnedAt` are used only by the UI layer being removed. They are still populated by `useHomePageCanvasList.ts` from the API response.
++- **Decision:** Leave `types.ts` unchanged for now. The fields are cheap to carry and removing them would require changes to `useHomePageCanvasList.ts` and the spec for `canvasAppPreferencePresentation`. A follow-up cleanup PR can handle this.
++
++### Step 6 — Update tests (`index.spec.tsx`)
++
++- The test `"orders preferred canvases and requests preference updates"` clicks `"Unpin app Z Free Canvas"` and asserts `mutationMocks.updateCanvasPreference` was called with `{ canvasId: "z-free", pinned: false }`. After removing the Pin button, this assertion is invalid.
++- Remove the pin-related click and assertion from that test, keeping the star-related assertion intact.
++- Remove any assertion that looks for a "Pinned" section heading.
++- The test setup data for `pinned: true` on canvas `z-free` can be simplified (or kept as-is since it only affects sorting, which is still exercised).
++
++### Step 7 — Run checks and formatting
++
++```bash
++make format.js
++make check.build.ui
++```
++
++---
++
++## 3. Files That Will Change
++
++| File | Why |
++|------|-----|
++| `web_src/src/pages/home/CanvasCardsGrid.tsx` | Remove Pin button, `onTogglePin` prop, `Pin` import |
++| `web_src/src/pages/home/CanvasFolderSection.tsx` | Remove `onTogglePin` prop pass-through |
++| `web_src/src/pages/home/index.tsx` | Remove Pin import, "Pinned" section, `onTogglePin` wiring, `isPinned` guard in `buildFolderedLayout` |
++| `web_src/src/pages/home/index.spec.tsx` | Update test that asserts Pin button click and "Pinned" section |
++
++**Files that do NOT need to change (out of scope):**
++
++| File | Reason untouched |
++|------|-----------------|
++| `web_src/src/pages/home/types.ts` | Fields kept for forward-compat; no visible behavior |
++| `web_src/src/pages/home/canvasAppPreferencePresentation.ts` | Pin-rank branch is a no-op once no pin section exists; star ordering unaffected |
++| `web_src/src/pages/home/canvasAppPreferencePresentation.spec.ts` | Pinned ordering test still passes (logic unchanged) |
++| `web_src/src/pages/home/useHomePageCanvasList.ts` | Still maps `pinned`/`pinnedAt` from API — harmless |
++| `web_src/src/hooks/useCanvasData.ts` | Backend preference API kept as-is |
++| Backend Go code | No backend changes needed |
++
++---
++
++## 4. How to Verify
++
++### Automated checks
++```bash
++# Format JS/TS code
++make format.js
++
++# Confirm TypeScript compiles and Vite bundle succeeds
++make check.build.ui
++```
++
++### Manual UI check
++1. Start the dev server (`make dev.server`).
++2. Navigate to the homepage (`/`).
++3. Confirm each app card shows only a **Star** button — no thumbtack/pin icon.
++4. Confirm there is no "Pinned" section above the folder/card grid.
++5. Click the Star button on a card and confirm it toggles correctly.
++6. Confirm apps that had `isPinned: true` in the API response are now displayed in the normal grid (not segregated).
++
++---
++
++## 5. Risks / Out-of-Scope Notes
++
++- **Backend data:** The API still stores and returns `pinned`/`pinnedAt` for canvases. Removing the UI button means users can no longer pin, but existing pinned state remains in the database silently. This is acceptable for a UI-only removal. A future backend cleanup task could clear the `pinned` field via migration or API change.
++- **`buildFolderedLayout` guard:** The guard `if (canvas.isPinned) continue` currently hides pinned canvases from the unfiled section (they appear only in the Pinned section). Removing the Pinned section without removing this guard would cause formerly-pinned canvases to disappear. The guard **must** be removed as part of Step 3.
++- **Out of scope:** Removing pin-related fields from the API, protobuf definitions, database models, or any backend logic is explicitly out of scope for this change.
++- **Out of scope:** The `canvasAppPreferencePresentation.ts` sorting logic (which still references `isPinned`) is intentionally left unchanged to avoid scope creep.

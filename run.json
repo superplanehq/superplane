@@ -337,10 +337,11 @@
     "base_sha": "392d25f4624d91dea9c941c6eef85381dd76a00b"
   },
   "status": {
-    "kind": "running"
+    "kind": "blocked",
+    "blocked_reason": "human_input_required"
   },
-  "status_updated_at": "2026-07-15T15:51:51.400044Z",
-  "last_event_at": "2026-07-15T15:53:24.895876Z",
+  "status_updated_at": "2026-07-15T15:53:30.397160Z",
+  "last_event_at": "2026-07-15T15:53:30.397160Z",
   "pending_control": null,
   "checkpoints": [
     {
@@ -380,9 +381,9 @@
       "diff": {}
     },
     {
-      "seq": 0,
+      "seq": 107,
       "checkpoint": {
-        "timestamp": "2026-07-15T15:53:24.932454Z",
+        "timestamp": "2026-07-15T15:53:30.396827Z",
         "current_node": "plan",
         "completed_nodes": [
           "start",
@@ -390,23 +391,23 @@
         ],
         "node_retries": {},
         "context_values": {
-          "internal.retry_count.plan": 0,
           "graph.goal": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3",
-          "internal.node_visit_count": 1,
-          "outcome": "succeeded",
-          "failure_class": "",
-          "failure_signature": "",
-          "response.plan": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/`:\n\n1. **`CanvasCardsGrid.tsx`** — renders the thumbtack `<Pin>` button on each card alongside the star button\n2. **`index.tsx`** — wires the `onTogglePin` callback, renders the **\"Pinned\" section** at the top of the page, and has a guard in `buildFolderedLayout` that hides pinned canvases from the main grid\n3. **`CanvasFolderSection.tsx`** — passes `onTogglePin` through to the grid\n4. **`index.spec.tsx`** — has a test that clicks \"Unpin app\" and asserts on the Pinned section\n\n---\n\n## Key Risks Called Out\n\n- The `buildFolderedLayout` function has an `if (canvas.isPinned) continue` guard that **must be removed** along with the Pinned section — otherwise previously-pinned canvases would vanish from the UI entirely.\n- The backend API still stores `pinned`/`pinnedAt`; this is intentionally out of scope.\n- `canvasAppPreferencePresentation.ts` sorting logic references `isPinned` but is left unchanged since it's harmless and keeps the scope minimal.",
-          "graph.rankdir": "LR",
+          "last_stage": "plan",
+          "internal.retry_count.plan": 0,
           "internal.run_id": "01KXK7JAFBA0CP8C2TC5PWW4K4",
-          "internal.thread_id": "start",
-          "internal.fidelity": "compact",
+          "outcome": "succeeded",
           "internal.work_dir": "/workspace/superplane",
-          "last_response": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/",
-          "current_node": "plan",
           "thread.start.current_node": "plan",
+          "failure_signature": "",
+          "internal.node_visit_count": 1,
           "internal.retry_count.start": 0,
-          "last_stage": "plan"
+          "response.plan": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/`:\n\n1. **`CanvasCardsGrid.tsx`** — renders the thumbtack `<Pin>` button on each card alongside the star button\n2. **`index.tsx`** — wires the `onTogglePin` callback, renders the **\"Pinned\" section** at the top of the page, and has a guard in `buildFolderedLayout` that hides pinned canvases from the main grid\n3. **`CanvasFolderSection.tsx`** — passes `onTogglePin` through to the grid\n4. **`index.spec.tsx`** — has a test that clicks \"Unpin app\" and asserts on the Pinned section\n\n---\n\n## Key Risks Called Out\n\n- The `buildFolderedLayout` function has an `if (canvas.isPinned) continue` guard that **must be removed** along with the Pinned section — otherwise previously-pinned canvases would vanish from the UI entirely.\n- The backend API still stores `pinned`/`pinnedAt`; this is intentionally out of scope.\n- `canvasAppPreferencePresentation.ts` sorting logic references `isPinned` but is left unchanged since it's harmless and keeps the scope minimal.",
+          "failure_class": "",
+          "graph.rankdir": "LR",
+          "internal.thread_id": "start",
+          "current_node": "plan",
+          "internal.fidelity": "compact",
+          "last_response": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/"
         },
         "node_outcomes": {
           "plan": {
@@ -456,9 +457,126 @@
           }
         },
         "next_node_id": "approve",
+        "git_commit_sha": "12b8d63015d60a979a4a749a6a2ce0ac8f57d40b",
         "node_visits": {
           "plan": 1,
           "start": 1
+        }
+      },
+      "diff": {
+        "patch": "diff --git a/plan.md b/plan.md\nnew file mode 100644\nindex 0000000..f5b325d\n--- /dev/null\n+++ b/plan.md\n@@ -0,0 +1,108 @@\n+# Plan: Remove \"Pin App\" from Homepage — Keep Only Star\n+\n+## 1. Summary\n+\n+The homepage (`/web_src/src/pages/home/`) currently shows two preference buttons on each app card: a **Pin** button (thumbtack icon) and a **Star** button. There is also a \"Pinned\" section at the top of the page that groups all pinned apps.\n+\n+The goal is to remove the Pin feature from the homepage UI entirely, leaving only the Star button. The backend API that supports pinning does not need to change; only the frontend presentation layer is affected.\n+\n+---\n+\n+## 2. Ordered Implementation Steps\n+\n+### Step 1 — Remove the Pin button from the card UI (`CanvasCardsGrid.tsx`)\n+\n+- Delete the `<CanvasPreferenceButton>` block that renders the `Pin` icon (lines 116–124).\n+- Remove the `Pin` import from `lucide-react` (line 6).\n+- Remove the `onTogglePin` prop from `CanvasCardsGridProps` and `CanvasCardProps` interfaces and from the destructured parameters of both `CanvasCardsGrid` and `CanvasCard`.\n+\n+### Step 2 — Remove `onTogglePin` from `CanvasFolderSection.tsx`\n+\n+- Remove `onTogglePin` from `CanvasFolderSectionProps`.\n+- Remove it from the destructured parameters of `CanvasFolderSection`.\n+- Remove it from the `<CanvasCardsGrid>` JSX props call inside `CanvasFolderSection`.\n+\n+### Step 3 — Remove the \"Pinned\" section and `onTogglePin` wiring from the homepage root (`index.tsx`)\n+\n+- Remove the `Pin` import from `lucide-react` (line 5).\n+- Remove the `pinnedCanvases` variable and the entire \"Pinned\" `<section>` block (lines 140–182).\n+- Remove the `onTogglePin` prop from the `Content` component's props interface and destructuring.\n+- Remove all three `onTogglePin={onTogglePin}` prop passes to `<CanvasCardsGrid>` / `<CanvasFolderSection>` inside `Content`.\n+- Remove the `onTogglePin` callback prop and its associated `updateCanvasPreference.mutate({ canvasId, pinned })` call from `HomePage` (lines 91–92).\n+- The `buildFolderedLayout` function contains a guard `if (canvas.isPinned) continue;` that prevented pinned canvases from appearing in the free section. Remove that guard so that formerly-pinned canvases (which may still have `isPinned: true` from the backend) are displayed normally.\n+\n+### Step 4 — Update `canvasAppPreferencePresentation.ts` (optional simplification, but keeps correctness)\n+\n+- The `canvasPreferenceRank` and `preferenceTime` functions still reference `isPinned`. Since the \"Pinned\" section is removed, the ordering between pinned and starred canvases in the remaining sections no longer matters to users. However, leaving the logic in place is harmless and avoids a breaking behavioral change for starred ordering.\n+- **Decision:** Leave `canvasAppPreferencePresentation.ts` unchanged for now. The star-based ordering still works correctly. If desired in a future pass, the pin-related branches can be removed from the ranking/time functions.\n+\n+### Step 5 — Update `types.ts` (optional cleanup)\n+\n+- `CanvasCardData.isPinned`, `pinnedAt` are used only by the UI layer being removed. They are still populated by `useHomePageCanvasList.ts` from the API response.\n+- **Decision:** Leave `types.ts` unchanged for now. The fields are cheap to carry and removing them would require changes to `useHomePageCanvasList.ts` and the spec for `canvasAppPreferencePresentation`. A follow-up cleanup PR can handle this.\n+\n+### Step 6 — Update tests (`index.spec.tsx`)\n+\n+- The test `\"orders preferred canvases and requests preference updates\"` clicks `\"Unpin app Z Free Canvas\"` and asserts `mutationMocks.updateCanvasPreference` was called with `{ canvasId: \"z-free\", pinned: false }`. After removing the Pin button, this assertion is invalid.\n+- Remove the pin-related click and assertion from that test, keeping the star-related assertion intact.\n+- Remove any assertion that looks for a \"Pinned\" section heading.\n+- The test setup data for `pinned: true` on canvas `z-free` can be simplified (or kept as-is since it only affects sorting, which is still exercised).\n+\n+### Step 7 — Run checks and formatting\n+\n+```bash\n+make format.js\n+make check.build.ui\n+```\n+\n+---\n+\n+## 3. Files That Will Change\n+\n+| File | Why |\n+|------|-----|\n+| `web_src/src/pages/home/CanvasCardsGrid.tsx` | Remove Pin button, `onTogglePin` prop, `Pin` import |\n+| `web_src/src/pages/home/CanvasFolderSection.tsx` | Remove `onTogglePin` prop pass-through |\n+| `web_src/src/pages/home/index.tsx` | Remove Pin import, \"Pinned\" section, `onTogglePin` wiring, `isPinned` guard in `buildFolderedLayout` |\n+| `web_src/src/pages/home/index.spec.tsx` | Update test that asserts Pin button click and \"Pinned\" section |\n+\n+**Files that do NOT need to change (out of scope):**\n+\n+| File | Reason untouched |\n+|------|-----------------|\n+| `web_src/src/pages/home/types.ts` | Fields kept for forward-compat; no visible behavior |\n+| `web_src/src/pages/home/canvasAppPreferencePresentation.ts` | Pin-rank branch is a no-op once no pin section exists; star ordering unaffected |\n+| `web_src/src/pages/home/canvasAppPreferencePresentation.spec.ts` | Pinned ordering test still passes (logic unchanged) |\n+| `web_src/src/pages/home/useHomePageCanvasList.ts` | Still maps `pinned`/`pinnedAt` from API — harmless |\n+| `web_src/src/hooks/useCanvasData.ts` | Backend preference API kept as-is |\n+| Backend Go code | No backend changes needed |\n+\n+---\n+\n+## 4. How to Verify\n+\n+### Automated checks\n+```bash\n+# Format JS/TS code\n+make format.js\n+\n+# Confirm TypeScript compiles and Vite bundle succeeds\n+make check.build.ui\n+```\n+\n+### Manual UI check\n+1. Start the dev server (`make dev.server`).\n+2. Navigate to the homepage (`/`).\n+3. Confirm each app card shows only a **Star** button — no thumbtack/pin icon.\n+4. Confirm there is no \"Pinned\" section above the folder/card grid.\n+5. Click the Star button on a card and confirm it toggles correctly.\n+6. Confirm apps that had `isPinned: true` in the API response are now displayed in the normal grid (not segregated).\n+\n+---\n+\n+## 5. Risks / Out-of-Scope Notes\n+\n+- **Backend data:** The API still stores and returns `pinned`/`pinnedAt` for canvases. Removing the UI button means users can no longer pin, but existing pinned state remains in the database silently. This is acceptable for a UI-only removal. A future backend cleanup task could clear the `pinned` field via migration or API change.\n+- **`buildFolderedLayout` guard:** The guard `if (canvas.isPinned) continue` currently hides pinned canvases from the unfiled section (they appear only in the Pinned section). Removing the Pinned section without removing this guard would cause formerly-pinned canvases to disappear. The guard **must** be removed as part of Step 3.\n+- **Out of scope:** Removing pin-related fields from the API, protobuf definitions, database models, or any backend logic is explicitly out of scope for this change.\n+- **Out of scope:** The `canvasAppPreferencePresentation.ts` sorting logic (which still references `isPinned`) is intentionally left unchanged to avoid scope creep.\n",
+        "summary": {
+          "files_changed": 1,
+          "additions": 108,
+          "deletions": 0
+        }
+      }
+    },
+    {
+      "seq": 0,
+      "checkpoint": {
+        "timestamp": "2026-07-15T15:54:18.004059Z",
+        "current_node": "approve",
+        "completed_nodes": [
+          "start",
+          "plan",
+          "approve"
+        ],
+        "node_retries": {},
+        "context_values": {
+          "internal.retry_count.plan": 0,
+          "graph.goal": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3",
+          "internal.node_visit_count": 1,
+          "outcome": "succeeded",
+          "failure_class": "",
+          "failure_signature": "",
+          "response.plan": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/`:\n\n1. **`CanvasCardsGrid.tsx`** — renders the thumbtack `<Pin>` button on each card alongside the star button\n2. **`index.tsx`** — wires the `onTogglePin` callback, renders the **\"Pinned\" section** at the top of the page, and has a guard in `buildFolderedLayout` that hides pinned canvases from the main grid\n3. **`CanvasFolderSection.tsx`** — passes `onTogglePin` through to the grid\n4. **`index.spec.tsx`** — has a test that clicks \"Unpin app\" and asserts on the Pinned section\n\n---\n\n## Key Risks Called Out\n\n- The `buildFolderedLayout` function has an `if (canvas.isPinned) continue` guard that **must be removed** along with the Pinned section — otherwise previously-pinned canvases would vanish from the UI entirely.\n- The backend API still stores `pinned`/`pinnedAt`; this is intentionally out of scope.\n- `canvasAppPreferencePresentation.ts` sorting logic references `isPinned` but is left unchanged since it's harmless and keeps the scope minimal.",
+          "human.gate.label": "[A] Approve",
+          "human.gate.approve.label": "[A] Approve",
+          "graph.rankdir": "LR",
+          "internal.run_id": "01KXK7JAFBA0CP8C2TC5PWW4K4",
+          "internal.thread_id": "plan",
+          "internal.fidelity": "compact",
+          "internal.work_dir": "/workspace/superplane",
+          "last_response": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/",
+          "thread.plan.current_node": "approve",
+          "human.gate.approve.answer": "A",
+          "preferred_label": "[A] Approve",
+          "human.gate.approve.question": "Approve Plan",
+          "current_node": "approve",
+          "thread.start.current_node": "plan",
+          "internal.retry_count.start": 0,
+          "last_stage": "plan",
+          "internal.retry_count.approve": 0,
+          "human.gate.selected": "A"
+        },
+        "node_outcomes": {
+          "approve": {
+            "status": "succeeded",
+            "preferred_label": "[A] Approve",
+            "suggested_next_ids": [
+              "implement"
+            ],
+            "context_updates": {
+              "human.gate.selected": "A",
+              "human.gate.approve.question": "Approve Plan",
+              "human.gate.label": "[A] Approve",
+              "human.gate.approve.label": "[A] Approve",
+              "human.gate.approve.answer": "A"
+            },
+            "usage": null
+          },
+          "plan": {
+            "status": "succeeded",
+            "context_updates": {
+              "response.plan": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/`:\n\n1. **`CanvasCardsGrid.tsx`** — renders the thumbtack `<Pin>` button on each card alongside the star button\n2. **`index.tsx`** — wires the `onTogglePin` callback, renders the **\"Pinned\" section** at the top of the page, and has a guard in `buildFolderedLayout` that hides pinned canvases from the main grid\n3. **`CanvasFolderSection.tsx`** — passes `onTogglePin` through to the grid\n4. **`index.spec.tsx`** — has a test that clicks \"Unpin app\" and asserts on the Pinned section\n\n---\n\n## Key Risks Called Out\n\n- The `buildFolderedLayout` function has an `if (canvas.isPinned) continue` guard that **must be removed** along with the Pinned section — otherwise previously-pinned canvases would vanish from the UI entirely.\n- The backend API still stores `pinned`/`pinnedAt`; this is intentionally out of scope.\n- `canvasAppPreferencePresentation.ts` sorting logic references `isPinned` but is left unchanged since it's harmless and keeps the scope minimal.",
+              "last_stage": "plan",
+              "last_response": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/"
+            },
+            "notes": "Stage completed: plan",
+            "usage": {
+              "input": {
+                "usage": {
+                  "model": {
+                    "provider": "anthropic",
+                    "model_id": "claude-sonnet-4-6"
+                  },
+                  "tokens": {
+                    "input_tokens": 41566,
+                    "output_tokens": 4322,
+                    "reasoning_tokens": 0,
+                    "cache_read_tokens": 255805,
+                    "cache_write_tokens": 72154
+                  }
+                },
+                "facts": {
+                  "algorithm": "anthropic",
+                  "cache_write_5m_tokens": 72154,
+                  "cache_write_1h_tokens": 0
+                }
+              },
+              "total_usd_micros": 536846
+            },
+            "files_touched": [
+              "/workspace/superplane/plan.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 87387,
+              "tool_time_ms": 1701,
+              "active_time_ms": 89088
+            }
+          },
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          }
+        },
+        "next_node_id": "implement",
+        "node_visits": {
+          "plan": 1,
+          "start": 1,
+          "approve": 1
         }
       },
       "diff": {}
@@ -489,7 +607,29 @@
   },
   "pull_request": null,
   "superseded_by": null,
-  "pending_interviews": {},
+  "pending_interviews": {
+    "01KXK7QCGXY7H3ZZH88TABMGR9": {
+      "question": {
+        "id": "01KXK7QCGXY7H3ZZH88TABMGR9",
+        "text": "Approve Plan",
+        "stage": "approve",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "key": "A",
+            "label": "[A] Approve"
+          },
+          {
+            "key": "R",
+            "label": "[R] Revise"
+          }
+        ],
+        "allow_freeform": false,
+        "context_display": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/`:\n\n1. **`CanvasCardsGrid.tsx`** — renders the thumbtack `<Pin>` button on each card alongside the star button\n2. **`index.tsx`** — wires the `onTogglePin` callback, renders the **\"Pinned\" section** at the top of the page, and has a guard in `buildFolderedLayout` that hides pinned canvases from the main grid\n3. **`CanvasFolderSection.tsx`** — passes `onTogglePin` through to the grid\n4. **`index.spec.tsx`** — has a test that clicks \"Unpin app\" and asserts on the Pinned section\n\n---\n\n## Key Risks Called Out\n\n- The `buildFolderedLayout` function has an `if (canvas.isPinned) continue` guard that **must be removed** along with the Pinned section — otherwise previously-pinned canvases would vanish from the UI entirely.\n- The backend API still stores `pinned`/`pinnedAt`; this is intentionally out of scope.\n- `canvasAppPreferencePresentation.ts` sorting logic references `isPinned` but is left unchanged since it's harmless and keeps the scope minimal."
+      },
+      "started_at": "2026-07-15T15:53:30.397115Z"
+    }
+  },
   "stages": {
     "start@1": {
       "first_event_seq": 23,
@@ -529,7 +669,12 @@
       "first_event_seq": 27,
       "prompt": null,
       "response": null,
-      "completion": null,
+      "completion": {
+        "outcome": "succeeded",
+        "notes": "Stage completed: plan",
+        "failure_reason": null,
+        "timestamp": "2026-07-15T15:53:24.932299Z"
+      },
       "provider_used": {
         "mode": "agent",
         "provider": "anthropic",
@@ -543,6 +688,12 @@
       "output": null,
       "started_at": "2026-07-15T15:51:55.037075Z",
       "handler": "agent",
+      "timing": {
+        "wall_time_ms": 89894,
+        "inference_time_ms": 87387,
+        "tool_time_ms": 1701,
+        "active_time_ms": 89088
+      },
       "usage": {
         "input_tokens": 41566,
         "output_tokens": 4322,
@@ -750,6 +901,29 @@
           }
         ],
         "warnings": []
+      },
+      "state": "succeeded"
+    },
+    "approve@1": {
+      "first_event_seq": 110,
+      "prompt": null,
+      "response": null,
+      "completion": null,
+      "provider_used": null,
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": null,
+      "parallel_results": null,
+      "output": null,
+      "started_at": "2026-07-15T15:53:30.397071Z",
+      "handler": "human",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
       },
       "state": "running"
     }
