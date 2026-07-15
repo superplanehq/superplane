@@ -2489,7 +2489,9 @@ function CanvasContent({
             const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
             stateRef.current.componentSidebar.open(nodeId);
 
-            applySidebarTabOnNodeOpen(setCurrentTab, wasSidebarOpen, true);
+            const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
+            const nodeHasActivity = nodeData.executions.length > 0 || nodeData.events.length > 0;
+            applySidebarTabOnNodeOpen(setCurrentTab, wasSidebarOpen, !nodeHasActivity);
             onBuildingBlocksSidebarToggle?.(false);
           },
         });

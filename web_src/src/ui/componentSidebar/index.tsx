@@ -597,29 +597,14 @@ export const ComponentSidebar = ({
                       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                         <span>{livePreRunStatus.title}</span>
                         {livePreRunStatus.description ? (
-                          <>
-                            <div className="mb-1.5 rounded-md bg-white/50 px-2.5 py-1.5 dark:bg-gray-900/50">
-                              <span className="text-[13px] leading-snug">{livePreRunStatus.description}</span>
-                            </div>
-                            {livePreRunStatus.purpose === "setup" && onContinueEditing ? (
-                              continueEditingDisabled && continueEditingDisabledTooltip ? (
-                                <SimpleTooltip content={continueEditingDisabledTooltip} hideOnClick={false}>
-                                  <span className="inline-flex w-fit">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="w-fit shadow-none"
-                                      disabled={continueEditingDisabled}
-                                      onClick={() => {
-                                        void onContinueEditing();
-                                      }}
-                                    >
-                                      Continue Editing
-                                    </Button>
-                                  </span>
-                                </SimpleTooltip>
-                              ) : (
+                          <div className="mb-1.5 rounded-md bg-white/50 px-2.5 py-1.5 dark:bg-gray-900/50">
+                            <span className="text-[13px] leading-snug">{livePreRunStatus.description}</span>
+                          </div>
+                        ) : null}
+                        {livePreRunStatus.purpose === "setup" && onContinueEditing ? (
+                          continueEditingDisabled && continueEditingDisabledTooltip ? (
+                            <SimpleTooltip content={continueEditingDisabledTooltip} hideOnClick={false}>
+                              <span className="inline-flex w-fit">
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -632,9 +617,22 @@ export const ComponentSidebar = ({
                                 >
                                   Continue Editing
                                 </Button>
-                              )
-                            ) : null}
-                          </>
+                              </span>
+                            </SimpleTooltip>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-fit shadow-none"
+                              disabled={continueEditingDisabled}
+                              onClick={() => {
+                                void onContinueEditing();
+                              }}
+                            >
+                              Continue Editing
+                            </Button>
+                          )
                         ) : null}
                       </div>
                     </div>
