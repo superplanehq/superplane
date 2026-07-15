@@ -146,13 +146,17 @@ describe("isRunQueryStillSearching", () => {
     );
   });
 
-  it("keeps searching while the node catalog is empty even if trigger refs do not resolve yet", () => {
+  it("keeps searching for unresolved trigger names until the node catalog loads", () => {
     const unresolved = () => undefined;
     expect(
-      isRunQueryStillSearching(idleQuery, runSource({ triggers: ["deploy"] }), unresolved, { nodeCatalogSize: 0 }),
+      isRunQueryStillSearching({ ...idleQuery, hasNextPage: false }, runSource({ triggers: ["deploy"] }), unresolved, {
+        nodeCatalogSize: 0,
+      }),
     ).toBe(true);
     expect(
-      isRunQueryStillSearching(idleQuery, runSource({ triggers: ["deploy"] }), unresolved, { nodeCatalogSize: 2 }),
+      isRunQueryStillSearching({ ...idleQuery, hasNextPage: false }, runSource({ triggers: ["deploy"] }), unresolved, {
+        nodeCatalogSize: 2,
+      }),
     ).toBe(false);
   });
 });

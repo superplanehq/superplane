@@ -501,8 +501,17 @@ export function isRunQueryStillSearching(
   if (!hasRunStatusTriggerFilters({ statuses: source.statuses, triggers: source.triggers })) return false;
   if (!runSelectStatusFilterCanMatch(source.select, source.statuses)) return false;
   if (!triggerFilterCanMatch(source.triggers, resolveTrigger, triggerMatchOptions)) return false;
+  if (isTriggerCatalogPending(source.triggers, resolveTrigger, triggerMatchOptions)) return true;
   const pageCount = query.data?.pages?.length ?? 0;
   return query.hasNextPage === true && pageCount < WIDGET_MAX_EAGER_PAGES;
+}
+
+function isTriggerCatalogPending(
+  triggers: readonly string[] | undefined,
+  resolveTrigger: ((reference: string) => string | undefined) | undefined,
+  options: TriggerFilterMatchOptions | undefined,
+): boolean {
+  return (triggers?.length ?? 0) > 0 && resolveTrigger !== undefined && options?.nodeCatalogSize === 0;
 }
 
 function buildRunVariableValue(firstRun: RunRow, ctx: ResolveContext): Record<string, unknown> {

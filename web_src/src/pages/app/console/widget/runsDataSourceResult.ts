@@ -102,19 +102,9 @@ export function useRunsDataSourceResult({
         executionsByRootEventId,
         runsFilters,
         triggerMatchOptions,
-        resultLimit: progressive ? undefined : displaySlice,
+        resultLimit: effectiveLimit,
       }),
-    [
-      dataSource,
-      pages,
-      ctx,
-      collectLimit,
-      executionsByRootEventId,
-      runsFilters,
-      triggerMatchOptions,
-      progressive,
-      displaySlice,
-    ],
+    [dataSource, pages, ctx, collectLimit, executionsByRootEventId, runsFilters, triggerMatchOptions, effectiveLimit],
   );
   const triggersMatchable = triggerFilterCanMatch(runsFilters?.triggers, resolveTrigger, triggerMatchOptions);
   const fillRowCount = filtersActive ? rows.length : loadedRowCount;
@@ -291,7 +281,7 @@ function useRunsExecutionSideload(args: {
   return { executionsByRootEventId, runExecutionsLoading };
 }
 
-function buildRunsDataSourceRows(args: {
+export function buildRunsDataSourceRows(args: {
   dataSource: WidgetDataSource;
   pages: Parameters<typeof collectRunRows>[0];
   ctx: ConsoleContextValue | undefined;
@@ -299,7 +289,7 @@ function buildRunsDataSourceRows(args: {
   executionsByRootEventId: Map<string, CanvasesCanvasNodeExecution[]>;
   runsFilters: ReturnType<typeof runsFiltersFromDataSource>;
   triggerMatchOptions?: TriggerFilterMatchOptions;
-  /** Cap applied after filtering for non-progressive panels (chart/number). */
+  /** Cap applied after filtering so the configured data-source limit wins over shared cache size. */
   resultLimit?: number;
 }): unknown[] {
   if (args.dataSource.kind !== "runs") return [];
