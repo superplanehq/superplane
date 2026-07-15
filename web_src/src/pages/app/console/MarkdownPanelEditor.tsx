@@ -37,13 +37,13 @@ function useMarkdownEditorPreview(
   draftVariables: MarkdownVariable[],
 ) {
   const textForSideload = useMemo(() => `${draftTitle}\n${draftBody}`, [draftTitle, draftBody]);
-  const { vars, errors, isLoading, baseLoading, sideloadLoading } = useMarkdownVariables(
+  const { vars, errors, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
     canvasId,
     draftVariables,
     textForSideload,
   );
-  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading);
-  return { previewVars: vars, errors, isLoading, previewLoading };
+  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
+  return { previewVars: vars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading };
 }
 
 interface MarkdownPanelEditorProps {
@@ -90,12 +90,8 @@ export function MarkdownPanelEditor({
     }
   };
 
-  const { previewVars, errors, isLoading, previewLoading } = useMarkdownEditorPreview(
-    canvasId,
-    draftTitle,
-    draftBody,
-    draftVariables,
-  );
+  const { previewVars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading } =
+    useMarkdownEditorPreview(canvasId, draftTitle, draftBody, draftVariables);
 
   // Preview is collapsible — when collapsed the textarea reclaims the freed
   // vertical space, useful on shorter panel cards.
@@ -159,7 +155,9 @@ export function MarkdownPanelEditor({
           setDraftVariables={setDraftVariables}
           previewVars={previewVars}
           errors={errors}
-          isLoading={isLoading}
+          baseLoading={baseLoading}
+          sideloadLoading={sideloadLoading}
+          searchingNames={searchingNames}
           onInsertSnippet={insertAtCursor}
           collapsed={variablesCollapsed}
           onToggleCollapsed={toggleVariablesCollapsed}
