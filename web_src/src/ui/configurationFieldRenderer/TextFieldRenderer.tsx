@@ -14,6 +14,13 @@ import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomple
 
 const PLAIN_TEXT_MIN_HEIGHT_PX = 120;
 
+interface FieldSizingStyle extends React.CSSProperties {
+  fieldSizing: "fixed";
+}
+
+// `fieldSizing` is supported by browsers and Tailwind but is not yet included in this project's CSS type definitions.
+const FIXED_FIELD_SIZING_STYLE: FieldSizingStyle = { fieldSizing: "fixed" };
+
 const CODE_EDITOR_OPTIONS = {
   minimap: { enabled: false },
   fontSize: 13,
@@ -144,9 +151,8 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
               value={draftValue}
               onChange={(e) => setDraftValue(e.target.value)}
               placeholder={field.placeholder || ""}
-              // `field-sizing-fixed` overrides the default `field-sizing-content` from the shadcn
-              // Textarea primitive so the control fills the dialog instead of tracking content height.
-              className="h-full min-h-0 flex-1 resize-none field-sizing-fixed"
+              style={FIXED_FIELD_SIZING_STYLE}
+              className="h-full min-h-0 flex-1 resize-none"
               data-testid={toTestId(`${testId}-modal-input`)}
             />
           )

@@ -263,7 +263,7 @@ describe("TextFieldRenderer plain modal textarea sizing", () => {
     fireEvent.click(screen.getByRole("button", { name: /expand prompt editor/i }));
 
     const modalInput = screen.getByTestId("text-field-prompt-modal-input") as HTMLTextAreaElement;
-    expect(modalInput.className).toContain("field-sizing-fixed");
+    expect(modalInput.style.getPropertyValue("field-sizing")).toBe("fixed");
     expect(modalInput.className).toContain("h-full");
     expect(modalInput.className).toContain("flex-1");
   });
