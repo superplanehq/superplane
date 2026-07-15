@@ -1,0 +1,22 @@
+digraph PlanImplement {
+    graph [goal="{{ goal }}"]
+    rankdir=LR
+
+    start [shape=Mdiamond, label="Start"]
+    exit  [shape=Msquare, label="Exit"]
+
+    plan      [label="Plan", max_visits=5, reasoning_effort="high", prompt="@prompts/plan.md"]
+    approve   [shape=hexagon, label="Approve Plan"]
+    implement [label="Implement", prompt="@prompts/implement.md"]
+    verify    [label="Verify", prompt="@prompts/verify.md", output_schema="routing"]
+    fix       [label="Fix Failures", max_visits=3, prompt="@prompts/fix.md"]
+
+    start -> plan -> approve
+    approve -> implement [label="[A] Approve"]
+    approve -> plan      [label="[R] Revise"]
+    implement -> verify
+    verify -> exit [label="Pass", condition="outcome=succeeded"]
+    verify -> fix  [label="Fix", condition="outcome=failed"]
+    verify -> fix  [label="Fix"]
+    fix -> verify
+}

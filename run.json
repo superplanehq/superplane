@@ -1,0 +1,369 @@
+{
+  "title": "Remove \"Pin App\" from homepage - keep only star",
+  "spec": {
+    "run_id": "01KXK7JAFBA0CP8C2TC5PWW4K4",
+    "settings": {
+      "project": {
+        "name": null,
+        "description": null,
+        "metadata": {}
+      },
+      "workflow": {
+        "name": null,
+        "description": null,
+        "graph": "workflow.fabro",
+        "metadata": {}
+      },
+      "run": {
+        "goal": {
+          "type": "inline",
+          "value": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3"
+        },
+        "working_dir": null,
+        "metadata": {},
+        "inputs": {},
+        "model": {
+          "provider": "anthropic",
+          "name": "claude-sonnet-4-6",
+          "fallbacks": [],
+          "controls": {
+            "reasoning_effort": null,
+            "speed": null
+          }
+        },
+        "git": {
+          "author": null
+        },
+        "prepare": {
+          "commands": [
+            "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs",
+            "node -v && npm -v"
+          ],
+          "timeout_ms": 300000
+        },
+        "execution": {
+          "mode": "normal",
+          "approval": "prompt"
+        },
+        "checkpoint": {
+          "exclude_globs": [],
+          "skip_git_hooks": false
+        },
+        "clone": {
+          "enabled": true
+        },
+        "run_branch": {
+          "enabled": true,
+          "push": true
+        },
+        "meta_branch": {
+          "enabled": true,
+          "push": true
+        },
+        "environment": {
+          "id": "docker",
+          "provider": "docker",
+          "image": {
+            "docker": "buildpack-deps:noble",
+            "dockerfile": null
+          },
+          "resources": {
+            "cpu": 4,
+            "memory": "8GB",
+            "disk": null
+          },
+          "network": {
+            "mode": "allow_all",
+            "allow": []
+          },
+          "lifecycle": {
+            "preserve": false,
+            "stop_on_terminal": true,
+            "auto_stop": null
+          },
+          "labels": {},
+          "volumes": [],
+          "env": {}
+        },
+        "notifications": {},
+        "interviews": {
+          "provider": null,
+          "slack": null
+        },
+        "agent": {
+          "fabro_tools": false,
+          "permissions": null,
+          "mcps": {}
+        },
+        "hooks": [],
+        "scm": {
+          "provider": null,
+          "owner": null,
+          "repository": null,
+          "github": null
+        },
+        "pull_request": {
+          "enabled": true,
+          "draft": true,
+          "auto_merge": false,
+          "merge_strategy": "squash"
+        },
+        "artifacts": {
+          "include": []
+        },
+        "integrations": {
+          "github": {
+            "permissions": {}
+          }
+        }
+      }
+    },
+    "graph": {
+      "name": "PlanImplement",
+      "nodes": {
+        "approve": {
+          "id": "approve",
+          "attrs": {
+            "shape": {
+              "String": "hexagon"
+            },
+            "label": {
+              "String": "Approve Plan"
+            }
+          }
+        },
+        "start": {
+          "id": "start",
+          "attrs": {
+            "shape": {
+              "String": "Mdiamond"
+            },
+            "label": {
+              "String": "Start"
+            }
+          }
+        },
+        "verify": {
+          "id": "verify",
+          "attrs": {
+            "prompt": {
+              "String": "Inspect the current git diff and `plan.md`. Run the **minimal** SuperPlane verification appropriate for the changed files.\n\nGuidance for choosing commands:\n\n- Prefer **targeted** checks on files/packages you changed (e.g. specific vitest files, `make test PKG_TEST_PACKAGES=./pkg/...`)\n- JS/TS/UI: `make format.js`, then targeted vitest for touched specs. Only run `make check.build.ui` when the change is broad enough that a full UI typecheck is justified\n- Go: `make format.go`, then targeted `make test PKG_TEST_PACKAGES=...` / package lint as needed. Use full `make lint` / `make check.build.app` only when justified by the diff\n- Do **not** expand into unrelated full-suite failures you did not need to run\n\nRules:\n\n- **Do not fix failures in this stage** — only run checks and report\n- If **any** command you ran exits non-zero, the stage **must fail** — including when you believe the failure is pre-existing\n- If all chosen commands pass, the stage succeeds\n- End your response with a routing JSON object (Fabro reads the last one). Examples:\n\nSuccess:\n```json\n{\"outcome\": \"succeeded\", \"context_updates\": {\"verify.summary\": \"all chosen checks passed\"}}\n```\n\nFailure:\n```json\n{\"outcome\": \"failed\", \"failure_reason\": \"<command> failed: <short reason>\", \"context_updates\": {\"verify.summary\": \"<what failed>\"}}\n```\n"
+            },
+            "output_schema": {
+              "String": "routing"
+            },
+            "label": {
+              "String": "Verify"
+            }
+          }
+        },
+        "exit": {
+          "id": "exit",
+          "attrs": {
+            "label": {
+              "String": "Exit"
+            },
+            "shape": {
+              "String": "Msquare"
+            }
+          }
+        },
+        "plan": {
+          "id": "plan",
+          "attrs": {
+            "prompt": {
+              "String": "Analyze the SuperPlane codebase and the workflow goal: Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3\n\nWrite a clear, step-by-step implementation plan to a Markdown file named `plan.md` at the repository root (or update it if revising).\n\nThe plan must include:\n\n1. A short summary of the intended change\n2. Ordered implementation steps\n3. Which files will change and why\n4. How to verify the change (relevant `make` targets, packages, or UI checks)\n5. Risks / out-of-scope notes\n\nDo not implement code in this stage — planning only. Prefer reading existing patterns in the repo over inventing new ones."
+            },
+            "label": {
+              "String": "Plan"
+            },
+            "max_visits": {
+              "Integer": 5
+            },
+            "reasoning_effort": {
+              "String": "high"
+            }
+          }
+        },
+        "implement": {
+          "id": "implement",
+          "attrs": {
+            "prompt": {
+              "String": "Read `plan.md` and implement every step for the workflow goal: Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3\n\nRequirements:\n\n- Make the code changes described in the plan\n- Follow existing SuperPlane conventions (see AGENTS.md / web_src/AGENTS.md where relevant)\n- Prefer small, focused edits; do not expand scope beyond the plan\n- Do not open a PR yourself; leave git state ready for the run's PR hooks if enabled\n- After edits, briefly summarize what changed"
+            },
+            "label": {
+              "String": "Implement"
+            }
+          }
+        },
+        "fix": {
+          "id": "fix",
+          "attrs": {
+            "max_visits": {
+              "Integer": 3
+            },
+            "label": {
+              "String": "Fix Failures"
+            },
+            "prompt": {
+              "String": "Fix the verification failures from the previous stage for the workflow goal: Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3\n\nRequirements:\n\n- Re-read the previous stage preamble, especially `failure_reason` / verify output\n- Correct the code (or tests) so the **same checks** can pass\n- Stay within the scope of `plan.md`; do not start unrelated refactors or fix unrelated base-branch breakage unless it blocks the chosen checks\n- Do not re-run the full verify matrix yourself beyond what you need to confirm a fix — the next stage will verify again"
+            }
+          }
+        }
+      },
+      "edges": [
+        {
+          "from": "start",
+          "to": "plan",
+          "attrs": {}
+        },
+        {
+          "from": "plan",
+          "to": "approve",
+          "attrs": {}
+        },
+        {
+          "from": "approve",
+          "to": "implement",
+          "attrs": {
+            "label": {
+              "String": "[A] Approve"
+            }
+          }
+        },
+        {
+          "from": "approve",
+          "to": "plan",
+          "attrs": {
+            "label": {
+              "String": "[R] Revise"
+            }
+          }
+        },
+        {
+          "from": "implement",
+          "to": "verify",
+          "attrs": {}
+        },
+        {
+          "from": "verify",
+          "to": "exit",
+          "attrs": {
+            "label": {
+              "String": "Pass"
+            },
+            "condition": {
+              "String": "outcome=succeeded"
+            }
+          }
+        },
+        {
+          "from": "verify",
+          "to": "fix",
+          "attrs": {
+            "condition": {
+              "String": "outcome=failed"
+            },
+            "label": {
+              "String": "Fix"
+            }
+          }
+        },
+        {
+          "from": "verify",
+          "to": "fix",
+          "attrs": {
+            "label": {
+              "String": "Fix"
+            }
+          }
+        },
+        {
+          "from": "fix",
+          "to": "verify",
+          "attrs": {}
+        }
+      ],
+      "attrs": {
+        "rankdir": {
+          "String": "LR"
+        },
+        "goal": {
+          "String": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3"
+        }
+      }
+    },
+    "graph_source": "digraph PlanImplement {\n    graph [goal=\"{{ goal }}\"]\n    rankdir=LR\n\n    start [shape=Mdiamond, label=\"Start\"]\n    exit  [shape=Msquare, label=\"Exit\"]\n\n    plan      [label=\"Plan\", max_visits=5, reasoning_effort=\"high\", prompt=\"@prompts/plan.md\"]\n    approve   [shape=hexagon, label=\"Approve Plan\"]\n    implement [label=\"Implement\", prompt=\"@prompts/implement.md\"]\n    verify    [label=\"Verify\", prompt=\"@prompts/verify.md\", output_schema=\"routing\"]\n    fix       [label=\"Fix Failures\", max_visits=3, prompt=\"@prompts/fix.md\"]\n\n    start -> plan -> approve\n    approve -> implement [label=\"[A] Approve\"]\n    approve -> plan      [label=\"[R] Revise\"]\n    implement -> verify\n    verify -> exit [label=\"Pass\", condition=\"outcome=succeeded\"]\n    verify -> fix  [label=\"Fix\", condition=\"outcome=failed\"]\n    verify -> fix  [label=\"Fix\"]\n    fix -> verify\n}\n",
+    "workflow_slug": "plan-implement",
+    "source_directory": "/Users/amitrovic/github/superplane",
+    "provenance": {
+      "server": {
+        "version": "0.254.0"
+      },
+      "client": {
+        "user_agent": "fabro-cli/0.254.0",
+        "name": "fabro-cli",
+        "version": "0.254.0"
+      },
+      "subject": {
+        "kind": "user",
+        "identity": {
+          "issuer": "fabro:dev",
+          "subject": "dev"
+        },
+        "login": "dev",
+        "auth_method": "dev_token"
+      }
+    },
+    "manifest_blob": "1b81996f5469069f8e85f0660d589052803bc1b5eb8d02d15c0d3ac1f174542f",
+    "definition_blob": "550e87f8bed6fd7e67e9185ce5ecf1b029d1e41b80fcc7e7e3a7b867fdcb9230",
+    "git": {
+      "origin_url": "https://github.com/superplanehq/superplane",
+      "branch": "main",
+      "sha": "44d8a1bb2cbac2e1786857b3755d6111779059de",
+      "dirty": "dirty",
+      "push_outcome": {
+        "type": "failed",
+        "remote": "origin",
+        "branch": "main",
+        "message": "Engine error: git push failed: To github.com:superplanehq/superplane.git\n ! [rejected]            main -> main (non-fast-forward)\nerror: failed to push some refs to 'github.com:superplanehq/superplane.git'\nhint: Updates were rejected because the tip of your current branch is behind\nhint: its remote counterpart. If you want to integrate the remote changes,\nhint: use 'git pull' before pushing again.\nhint: See the 'Note about fast-forwards' in 'git push --help' for details.\n"
+      }
+    }
+  },
+  "web_url": "http://127.0.0.1:32276/runs/01KXK7JAFBA0CP8C2TC5PWW4K4",
+  "start": null,
+  "status": {
+    "kind": "starting"
+  },
+  "status_updated_at": "2026-07-15T15:50:44.540889Z",
+  "last_event_at": "2026-07-15T15:51:51.366772Z",
+  "pending_control": null,
+  "checkpoints": [],
+  "conclusion": null,
+  "sandbox": {
+    "kind": "ready",
+    "plan": {
+      "provider": "docker",
+      "image": "buildpack-deps:noble"
+    },
+    "instance": {
+      "provider": "docker",
+      "image": "buildpack-deps:noble",
+      "runtime": {
+        "id": "2de97f9c3dd62035d91e2f679b9d36d0614afb7a2e350898bd373b1e0d177cbb",
+        "working_directory": "/workspace/superplane",
+        "repo_cloned": true,
+        "clone_origin_url": "https://github.com/superplanehq/superplane",
+        "clone_branch": "main",
+        "workspace_root": "/workspace",
+        "repos_root": "/repos",
+        "primary_repo_path": "/repos/superplanehq/superplane",
+        "primary_repo_link": "/workspace/superplane"
+      }
+    }
+  },
+  "pull_request": null,
+  "superseded_by": null,
+  "pending_interviews": {},
+  "stages": {}
+}
