@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -70,6 +71,10 @@ func (c *AppContext) Subscribe(id string) error {
 		return err
 	}
 
+	if sourceApp.ID == c.canvas.ID.String() {
+		return fmt.Errorf("cannot self-subscribe to messages")
+	}
+
 	err = models.DeleteCanvasSubscriptionsForNode(c.tx, c.canvas.ID, c.node.NodeID)
 	if err != nil {
 		return err
@@ -82,4 +87,8 @@ func (c *AppContext) Subscribe(id string) error {
 	}
 
 	return c.tx.Create(sub).Error
+}
+
+func (c *AppContext) Unsubscribe() error {
+	return models.DeleteCanvasSubscriptionsForNode(c.tx, c.canvas.ID, c.node.NodeID)
 }

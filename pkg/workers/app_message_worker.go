@@ -165,6 +165,10 @@ func (w *AppMessageWorker) deliverBroadcast(tx *gorm.DB, canvas *models.Canvas, 
 			continue
 		}
 
+		if node.State == models.CanvasNodeStateError {
+			continue
+		}
+
 		if err := w.sendMessageToNode(tx, canvas, sourceNode, node, payload, onNewEvents); err != nil {
 			w.logger.Errorf("send broadcast to node: %v", err)
 		}

@@ -91,6 +91,20 @@ func (c *OnBroadcast) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	metadata := OnBroadcastMetadata{}
+	err = mapstructure.Decode(ctx.Metadata.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	if metadata.App != nil {
+		return c.Update(ctx, config, metadata)
+	}
+
+	return c.Create(ctx, config)
+}
+
+func (c *OnBroadcast) Create(ctx core.TriggerContext, config OnBroadcastConfiguration) error {
 	if config.App == "" {
 		return fmt.Errorf("app is required")
 	}
@@ -100,8 +114,38 @@ func (c *OnBroadcast) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to get app: %w", err)
 	}
 
-	err = ctx.Apps.Subscribe(app.ID)
+	if err := ctx.Apps.Subscribe(config.App); err != nil {
+		return fmt.Errorf("failed to subscribe to app: %w", err)
+	}
+
+	return ctx.Metadata.Set(OnBroadcastMetadata{
+		App: &AppMetadata{
+			ID:   app.ID,
+			Name: app.Name,
+		},
+	})
+}
+
+func (c *OnBroadcast) Update(ctx core.TriggerContext, config OnBroadcastConfiguration, metadata OnBroadcastMetadata) error {
+	if metadata.App.ID == config.App || metadata.App.Name == config.App {
+		return nil
+	}
+
+	err := ctx.Apps.Unsubscribe()
 	if err != nil {
+		return fmt.Errorf("failed to unsubscribe from current app: %w", err)
+	}
+
+	if config.App == "" {
+		return fmt.Errorf("app is required")
+	}
+
+	app, err := ctx.Apps.Get(config.App)
+	if err != nil {
+		return fmt.Errorf("failed to get app: %w", err)
+	}
+
+	if err := ctx.Apps.Subscribe(config.App); err != nil {
 		return fmt.Errorf("failed to subscribe to app: %w", err)
 	}
 
@@ -130,5 +174,5 @@ func (c *OnBroadcast) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 }
 
 func (c *OnBroadcast) Cleanup(ctx core.TriggerContext) error {
-	return nil
+	return ctx.Apps.Unsubscribe()
 }

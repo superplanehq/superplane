@@ -115,6 +115,11 @@ func Test__AppContext__Subscribe(t *testing.T) {
 		assert.Equal(t, int64(1), count)
 	})
 
+	t.Run("returns error for self-subscribe", func(t *testing.T) {
+		err := ctx.Subscribe(listenerCanvas.ID.String())
+		require.ErrorContains(t, err, "cannot self-subscribe to messages")
+	})
+
 	t.Run("returns not found for missing source app", func(t *testing.T) {
 		err := ctx.Subscribe(uuid.New().String())
 		require.ErrorIs(t, err, core.ErrNotFound)
@@ -158,4 +163,42 @@ func Test__AppContext__Subscribe__replacesPreviousSourceApp(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, subs, 1)
 	assert.Equal(t, sourceCanvasB.ID, subs[0].SourceCanvasID)
+}
+
+func Test__AppContext__Unsubscribe(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	listenerCanvas, listenerNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "on-broadcast",
+				Name:   "On Broadcast",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"app": "",
+				}),
+			},
+		},
+		nil,
+	)
+
+	sourceCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	ctx := NewAppContext(database.Conn(), listenerCanvas, &listenerNodes[0])
+
+	require.NoError(t, ctx.Subscribe(sourceCanvas.ID.String()))
+	require.NoError(t, ctx.Unsubscribe())
+
+	var count int64
+	err := database.Conn().
+		Model(&models.CanvasSubscription{}).
+		Where("target_canvas_id = ? AND target_node_id = ?", listenerCanvas.ID, listenerNodes[0].NodeID).
+		Count(&count).
+		Error
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), count)
 }

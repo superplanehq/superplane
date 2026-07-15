@@ -229,6 +229,78 @@ func Test__AppMessageWorker_LockAndProcessMessage__skipsStaleSubscriptionAndDeli
 	assert.Equal(t, int64(0), staleSubs)
 }
 
+func Test__AppMessageWorker_LockAndProcessMessage__skipsTargetNodeInErrorState(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewAppMessageWorker(r.Registry)
+
+	sourceCanvas, sourceNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:        "broadcast-message",
+				Name:          "Broadcast Message",
+				Type:          models.NodeTypeComponent,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "broadcastMessage"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+			},
+		},
+		nil,
+	)
+
+	targetCanvas, targetNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "on-broadcast",
+				Name:   "On Broadcast",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"app": sourceCanvas.ID.String(),
+				}),
+			},
+		},
+		nil,
+	)
+
+	require.NoError(t, database.Conn().Create(&models.CanvasSubscription{
+		SourceCanvasID: sourceCanvas.ID,
+		TargetCanvasID: targetCanvas.ID,
+		TargetNodeID:   targetNodes[0].NodeID,
+	}).Error)
+
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ? AND node_id = ?", targetCanvas.ID, targetNodes[0].NodeID).
+		Update("state", models.CanvasNodeStateError).
+		Error)
+
+	require.NoError(t, models.CreateAppMessage(
+		database.Conn(),
+		sourceCanvas.ID,
+		sourceNodes[0].NodeID,
+		map[string]any{"message": "hello"},
+	))
+
+	messages, err := models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+
+	require.NoError(t, worker.LockAndProcessMessage(messages[0]))
+
+	var remaining int64
+	require.NoError(t, database.Conn().Model(&models.AppMessage{}).Count(&remaining).Error)
+	assert.Equal(t, int64(0), remaining)
+
+	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 0)
+}
+
 func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWhenSourceNodeDeleted(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

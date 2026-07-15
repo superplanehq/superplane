@@ -98,6 +98,7 @@ type TriggerContext struct {
 type AppContext interface {
 	Get(idOrName string) (*App, error)
 	Subscribe(id string) error
+	Unsubscribe() error
 }
 
 type App struct {
