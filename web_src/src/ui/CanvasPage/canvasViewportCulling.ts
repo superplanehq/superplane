@@ -19,6 +19,19 @@ export function getPaddedViewportScreenRect(
   };
 }
 
+/**
+ * Renderer-space rect (canvas coordinates) of the padded viewport for the current
+ * transform. Shared by node and edge culling so both use the same visible region.
+ */
+export function getPaddedViewportRendererRect(
+  width: number,
+  height: number,
+  transform: Transform,
+  paddingPx = CANVAS_VIEWPORT_CULL_PADDING_PX,
+): Rect {
+  return getRendererRect(getPaddedViewportScreenRect(width, height, paddingPx), transform);
+}
+
 export function getVisibleNodeIdsInPaddedViewport<NodeType extends Node = Node>(
   nodeLookup: ReadonlyMap<string, InternalNode<NodeType>>,
   width: number,
@@ -30,7 +43,7 @@ export function getVisibleNodeIdsInPaddedViewport<NodeType extends Node = Node>(
     return new Set(nodeLookup.keys());
   }
 
-  const viewportRect = getRendererRect(getPaddedViewportScreenRect(width, height, paddingPx), transform);
+  const viewportRect = getPaddedViewportRendererRect(width, height, transform, paddingPx);
   const visibleNodeIds = new Set<string>();
 
   for (const node of nodeLookup.values()) {
@@ -42,19 +55,58 @@ export function getVisibleNodeIdsInPaddedViewport<NodeType extends Node = Node>(
   return visibleNodeIds;
 }
 
-export function getVisibleEdgeIdsInPaddedViewport<EdgeType extends Edge = Edge>(
+export function getVisibleEdgeIdsInPaddedViewport<EdgeType extends Edge = Edge, NodeType extends Node = Node>(
   edges: EdgeType[],
   visibleNodeIds: Set<string>,
+  nodeLookup?: ReadonlyMap<string, InternalNode<NodeType>>,
+  viewportRect?: Rect,
 ): Set<string> {
   const visibleEdgeIds = new Set<string>();
 
   for (const edge of edges) {
     if (visibleNodeIds.has(edge.source) || visibleNodeIds.has(edge.target)) {
       visibleEdgeIds.add(edge.id);
+      continue;
+    }
+
+    // Both endpoints are off-screen, but the edge itself can still cross the
+    // visible viewport (a long connection between two distant nodes). Keep it
+    // mounted when the box spanning both endpoints overlaps the viewport so the
+    // edge does not disappear while panning/zooming.
+    if (nodeLookup && viewportRect && edgeSpanOverlapsRect(edge, nodeLookup, viewportRect)) {
+      visibleEdgeIds.add(edge.id);
     }
   }
 
   return visibleEdgeIds;
+}
+
+function edgeSpanOverlapsRect<EdgeType extends Edge, NodeType extends Node>(
+  edge: EdgeType,
+  nodeLookup: ReadonlyMap<string, InternalNode<NodeType>>,
+  viewportRect: Rect,
+): boolean {
+  const source = nodeLookup.get(edge.source);
+  const target = nodeLookup.get(edge.target);
+  if (!source || !target) {
+    return false;
+  }
+
+  return getOverlappingArea(viewportRect, getEdgeSpanRect(source, target)) > 0;
+}
+
+function getEdgeSpanRect(source: InternalNode<Node>, target: InternalNode<Node>): Rect {
+  const sourceRect = getNodeRect(source);
+  const targetRect = getNodeRect(target);
+  const x = Math.min(sourceRect.x, targetRect.x);
+  const y = Math.min(sourceRect.y, targetRect.y);
+
+  return {
+    x,
+    y,
+    width: Math.max(sourceRect.x + sourceRect.width, targetRect.x + targetRect.width) - x,
+    height: Math.max(sourceRect.y + sourceRect.height, targetRect.y + targetRect.height) - y,
+  };
 }
 
 export function includeCanvasNodesThatMustStayMounted<NodeType extends Node>(

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { InternalNode, Node } from "@xyflow/react";
 import {
   CANVAS_VIEWPORT_CULL_PADDING_PX,
+  getPaddedViewportRendererRect,
   getPaddedViewportScreenRect,
   getVisibleEdgeIdsInPaddedViewport,
   getVisibleNodeIdsInPaddedViewport,
@@ -116,6 +117,40 @@ describe("canvasViewportCulling", () => {
     expect(visibleEdgeIds.has("a-b")).toBe(true);
     expect(visibleEdgeIds.has("b-c")).toBe(true);
     expect(visibleEdgeIds.has("c-d")).toBe(false);
+  });
+
+  it("keeps edges visible when both endpoints are off-screen but the edge crosses the viewport", () => {
+    const nodeLookup = new Map([
+      ["left", internalNode("left", { x: -2000, y: 400 })],
+      ["right", internalNode("right", { x: 2000, y: 400 })],
+    ]);
+    const viewportRect = getPaddedViewportRendererRect(1000, 800, [0, 0, 1]);
+
+    const visibleEdgeIds = getVisibleEdgeIdsInPaddedViewport(
+      [{ id: "left-right", source: "left", target: "right" }],
+      new Set<string>(),
+      nodeLookup,
+      viewportRect,
+    );
+
+    expect(visibleEdgeIds.has("left-right")).toBe(true);
+  });
+
+  it("hides edges when both endpoints and their span are outside the viewport", () => {
+    const nodeLookup = new Map([
+      ["far-a", internalNode("far-a", { x: 5000, y: 5000 })],
+      ["far-b", internalNode("far-b", { x: 6000, y: 5000 })],
+    ]);
+    const viewportRect = getPaddedViewportRendererRect(1000, 800, [0, 0, 1]);
+
+    const visibleEdgeIds = getVisibleEdgeIdsInPaddedViewport(
+      [{ id: "far-a-far-b", source: "far-a", target: "far-b" }],
+      new Set<string>(),
+      nodeLookup,
+      viewportRect,
+    );
+
+    expect(visibleEdgeIds.has("far-a-far-b")).toBe(false);
   });
 
   it("always keeps interactive nodes visible", () => {
