@@ -7,6 +7,7 @@ import {
   getVisibleEdgeIdsInPaddedViewport,
   getVisibleNodeIdsInPaddedViewport,
   includeCanvasNodesThatMustStayMounted,
+  includeEndpointsOfVisibleEdges,
   shouldKeepCanvasNodeVisible,
 } from "./canvasViewportCulling";
 
@@ -44,7 +45,12 @@ export function useCanvasViewportCulling(nodes: Node[], edges: Edge[], enabled: 
       width === 0 || height === 0 ? undefined : getPaddedViewportRendererRect(width, height, transform);
     const visibleEdgeIds = getVisibleEdgeIdsInPaddedViewport(edges, visibleNodeIds, nodeLookup, viewportRect);
 
-    return { visibleNodeIds, visibleEdgeIds };
+    // Edges only render while both endpoint nodes are mounted, so keep the
+    // endpoints of every visible edge mounted even when they are off-screen.
+    return {
+      visibleNodeIds: includeEndpointsOfVisibleEdges(visibleNodeIds, edges, visibleEdgeIds),
+      visibleEdgeIds,
+    };
   }, [enabled, nodeLookup, width, height, transform, nodes, edges]);
 }
 

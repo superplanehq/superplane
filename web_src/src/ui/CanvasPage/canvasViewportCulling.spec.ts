@@ -7,6 +7,7 @@ import {
   getVisibleEdgeIdsInPaddedViewport,
   getVisibleNodeIdsInPaddedViewport,
   includeCanvasNodesThatMustStayMounted,
+  includeEndpointsOfVisibleEdges,
   shouldKeepCanvasNodeVisible,
 } from "./canvasViewportCulling";
 
@@ -151,6 +152,27 @@ describe("canvasViewportCulling", () => {
     );
 
     expect(visibleEdgeIds.has("far-a-far-b")).toBe(false);
+  });
+
+  it("keeps both endpoint nodes of a visible edge mounted even when they are off-screen", () => {
+    const visibleNodeIds = includeEndpointsOfVisibleEdges(
+      new Set(["on-screen"]),
+      [
+        { id: "on-screen-off-screen", source: "on-screen", target: "off-screen" },
+        { id: "crossing", source: "far-left", target: "far-right" },
+        { id: "hidden-edge", source: "hidden-a", target: "hidden-b" },
+      ],
+      new Set(["on-screen-off-screen", "crossing"]),
+    );
+
+    // Endpoint that shares an edge with an on-screen node must stay mounted.
+    expect(visibleNodeIds.has("off-screen")).toBe(true);
+    // Both endpoints of an edge that only crosses the viewport must stay mounted.
+    expect(visibleNodeIds.has("far-left")).toBe(true);
+    expect(visibleNodeIds.has("far-right")).toBe(true);
+    // Endpoints of hidden edges are not forced to stay mounted.
+    expect(visibleNodeIds.has("hidden-a")).toBe(false);
+    expect(visibleNodeIds.has("hidden-b")).toBe(false);
   });
 
   it("always keeps interactive nodes visible", () => {
