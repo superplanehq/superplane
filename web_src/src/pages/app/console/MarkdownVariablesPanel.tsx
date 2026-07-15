@@ -25,6 +25,29 @@ const SOURCE_OPTIONS: Array<{ value: SourceKind; label: string }> = [
   { value: "run", label: "Run" },
 ];
 
+interface MarkdownVariablesPanelProps {
+  canvasId: string;
+  draftBody: string;
+  draftVariables: MarkdownVariable[];
+  setDraftVariables: (next: MarkdownVariable[]) => void;
+  previewVars: Record<string, unknown>;
+  errors: MarkdownVariableError[];
+  /** True while shared memory / run queries are still loading. */
+  baseLoading: boolean;
+  /** True while run-node executions used to build `$` maps are loading. */
+  sideloadLoading: boolean;
+  /**
+   * Run variable names still eagerly paging for a filter match. Only those
+   * rows show "Loading preview…" — settled siblings can surface errors.
+   */
+  searchingNames?: readonly string[];
+  onInsertSnippet: (snippet: string) => void;
+  /** When `true`, render the slim collapsed strip instead of the full rail. */
+  collapsed?: boolean;
+  /** Toggle the collapsed state. Required when `collapsed` is used. */
+  onToggleCollapsed?: () => void;
+}
+
 /** Default source seeded when the author clicks "Add variable". */
 function defaultMemorySource(): MarkdownMemoryVariableSource {
   return { kind: "memory", namespace: "" };
@@ -60,24 +83,13 @@ export function MarkdownVariablesPanel({
   setDraftVariables,
   previewVars,
   errors,
-  isLoading,
+  baseLoading,
+  sideloadLoading,
+  searchingNames = [],
   onInsertSnippet,
   collapsed = false,
   onToggleCollapsed,
-}: {
-  canvasId: string;
-  draftBody: string;
-  draftVariables: MarkdownVariable[];
-  setDraftVariables: (next: MarkdownVariable[]) => void;
-  previewVars: Record<string, unknown>;
-  errors: MarkdownVariableError[];
-  isLoading: boolean;
-  onInsertSnippet: (snippet: string) => void;
-  /** When `true`, render the slim collapsed strip instead of the full rail. */
-  collapsed?: boolean;
-  /** Toggle the collapsed state. Required when `collapsed` is used. */
-  onToggleCollapsed?: () => void;
-}) {
+}: MarkdownVariablesPanelProps) {
   void _draftBody;
   const updateVariable = (index: number, next: MarkdownVariable) => {
     const out = draftVariables.slice();
@@ -100,6 +112,7 @@ export function MarkdownVariablesPanel({
     return map;
   }, [errors]);
 
+  const searchingNameSet = useMemo(() => new Set(searchingNames), [searchingNames]);
   // Names that appear more than once. On save `normalizeDraftVariables` keeps
   // only the first entry per name, so we flag duplicates here to warn the
   // author before they lose the shadowed rows' configuration.
@@ -115,6 +128,16 @@ export function MarkdownVariablesPanel({
       if (count > 1) dups.add(name);
     }
     return dups;
+  }, [draftVariables]);
+  const variableRowKeys = useMemo(() => {
+    const occurrences = new Map<string, number>();
+    return draftVariables.map((variable, index) => {
+      const name = variable.name.trim();
+      if (!name) return `unnamed-variable-${index}`;
+      const occurrence = occurrences.get(name) ?? 0;
+      occurrences.set(name, occurrence + 1);
+      return occurrence === 0 ? name : `${name}-${occurrence}`;
+    });
   }, [draftVariables]);
 
   if (collapsed) {
@@ -161,16 +184,20 @@ export function MarkdownVariablesPanel({
         ) : (
           draftVariables.map((variable, index) => (
             <VariableRow
-              key={index}
+              key={variableRowKeys[index]}
               canvasId={canvasId}
               variable={variable}
               error={errorByName.get(variable.name)}
               duplicate={duplicateNames.has(variable.name?.trim())}
-              previewValue={previewVars[variable.name]}
+              previewValue={sideloadLoading && variable.source?.kind === "run" ? null : previewVars[variable.name]}
               onChange={(next) => updateVariable(index, next)}
               onRemove={() => removeVariable(index)}
               onInsertSnippet={onInsertSnippet}
-              loading={isLoading}
+              loading={
+                baseLoading ||
+                (sideloadLoading && variable.source?.kind === "run") ||
+                searchingNameSet.has(variable.name)
+              }
             />
           ))
         )}
