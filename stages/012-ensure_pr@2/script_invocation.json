@@ -1,0 +1,5 @@
+{
+  "script": "@scripts/ensure-pr.sh",
+  "command": "exec 2>&1\n@scripts/ensure-pr.sh",
+  "language": "shell"
+}
