@@ -144,7 +144,9 @@ export function JsonPayload({
               <span aria-hidden className={props.className}>
                 &quot;
               </span>
-              <span {...props}>{escapeJsonStringValue(displayValue)}</span>
+              <span {...props} className={cn(props.className, "wrap-anywhere whitespace-pre-wrap")}>
+                {escapeJsonStringValue(displayValue)}
+              </span>
               <span aria-hidden className={props.className}>
                 &quot;
               </span>
