@@ -357,49 +357,31 @@ describe("HomePage canvas folders", () => {
     expect(within(deploymentsSection).getByLabelText("Folder actions")).toBeInTheDocument();
   });
 
-  it("orders preferred canvases and requests preference updates", async () => {
+  it("orders starred canvases first and requests star updates", async () => {
     const user = userEvent.setup();
     useCanvases.mockReturnValue({
       data: [
-        makeCanvas("z-free", "Z Free Canvas", undefined, {
-          folderId: "folder-1",
-          pinned: true,
-          pinnedAt: "2026-05-06T00:00:00Z",
-        }),
+        makeCanvas("a-free", "A Free Canvas"),
         makeCanvas("starred", "Starred Canvas", undefined, {
           starred: true,
           starredAt: "2026-05-06T00:00:00Z",
         }),
-        makeCanvas("a-free", "A Free Canvas"),
       ],
       isLoading: false,
       error: null,
     });
-    useCanvasFolders.mockReturnValue({
-      data: [makeFolder("folder-1", "Deployments", "blue", ["z-free"])],
-      isLoading: false,
-      error: null,
-    });
+    useCanvasFolders.mockReturnValue({ data: [], isLoading: false, error: null });
 
     renderHome();
 
-    const pinnedSection = screen.getByRole("heading", { name: "Pinned" }).closest("section")!;
-    const deploymentsSection = screen.getByText("Deployments").closest("section")!;
-    expect(pinnedSection).toHaveClass("dark:bg-white/5");
-    expect(within(pinnedSection).getByText("Z Free Canvas")).toBeInTheDocument();
-    expect(within(deploymentsSection).getByText("Z Free Canvas")).toBeInTheDocument();
-    expect(
-      within(pinnedSection).getByText("Z Free Canvas").compareDocumentPosition(screen.getByText("A Free Canvas")) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Pinned" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Pin app A Free Canvas")).not.toBeInTheDocument();
     expect(
       screen.getByText("Starred Canvas").compareDocumentPosition(screen.getByText("A Free Canvas")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
-    await user.click(within(pinnedSection).getByLabelText("Unpin app Z Free Canvas"));
     await user.click(screen.getByLabelText("Unstar app Starred Canvas"));
-    expect(mutationMocks.updateCanvasPreference).toHaveBeenCalledWith({ canvasId: "z-free", pinned: false });
     expect(mutationMocks.updateCanvasPreference).toHaveBeenCalledWith({ canvasId: "starred", starred: false });
   });
 
