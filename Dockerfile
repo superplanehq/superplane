@@ -21,9 +21,6 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOPATH="/go"
 ENV GOBIN="/go/bin"
 ENV PATH="${GOBIN}:${PATH}"
-# `|` (not `,`) so Go falls back to `direct` on ANY error (stream reset, 5xx,
-# GCS blips), not only HTTP 404/410. Combined with scripts/go-mod-download's
-# retry loop, this mitigates flaky module downloads in CI (see issue #6161).
 ENV GOPROXY="https://proxy.golang.org|direct"
 ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 
