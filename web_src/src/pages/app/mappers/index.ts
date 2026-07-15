@@ -260,6 +260,7 @@ import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
+import { invokeAppMapper, INVOKE_APP_STATE_REGISTRY } from "./invokeApp";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
@@ -301,6 +302,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   wait: waitMapper,
   approval: approvalMapper,
   merge: mergeMapper,
+  invokeApp: invokeAppMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
@@ -463,6 +465,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
   merge: MERGE_STATE_REGISTRY,
+  invokeApp: INVOKE_APP_STATE_REGISTRY,
 };
 
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {

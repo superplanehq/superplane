@@ -12,6 +12,7 @@ import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { AppFieldRenderer } from "./AppFieldRenderer";
+import { AppCanvasNodeFieldRenderer } from "./AppCanvasNodeFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
@@ -88,6 +89,19 @@ export function ConfigurationFieldInput({
         field={field}
         value={value as string | undefined}
         onChange={onChange}
+        organizationId={organizationId}
+        readOnly={commonProps.readOnly}
+      />
+    );
+  }
+
+  if (field.type === "app-canvas-node") {
+    return (
+      <AppCanvasNodeFieldRenderer
+        field={field}
+        value={value as string | undefined}
+        onChange={onChange}
+        allValues={allValues}
         organizationId={organizationId}
         readOnly={commonProps.readOnly}
       />

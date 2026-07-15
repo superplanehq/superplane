@@ -222,6 +222,7 @@ export const RoleField = createExampleStory("role");
 export const GroupField = createExampleStory("group");
 export const IntegrationResourceField = createExampleStory("integration-resource");
 export const AppField = createExampleStory("app");
+export const AppCanvasNodeField = createExampleStory("app-canvas-node");
 export const AnyPredicateListField = createExampleStory("any-predicate-list");
 export const GitRefField = createExampleStory("git-ref");
 export const SecretKeyField = createExampleStory("secret-key");

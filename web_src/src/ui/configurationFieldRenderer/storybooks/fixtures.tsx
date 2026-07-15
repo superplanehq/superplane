@@ -599,6 +599,33 @@ export const rendererExamples: RendererExample[] = [
     initialValue: "canvas_billing_alerts",
   },
   {
+    id: "app-canvas-node",
+    storyName: "AppCanvasNodeField",
+    category: "Context-Aware Inputs",
+    source: "Special field type",
+    goType: "FieldTypeAppCanvasNode",
+    docsDescription:
+      "Use `app-canvas-node` when a field must reference a node in another app, optionally filtered by node type and component.",
+    field: baseField({
+      name: "node",
+      label: "Invoke node",
+      type: "app-canvas-node",
+      description: "Select the On Invoke trigger in the target app.",
+      required: true,
+      typeOptions: {
+        appCanvasNode: {
+          nodeTypes: ["trigger"],
+          componentTypes: ["onInvoke"],
+          parameters: [{ name: "app", valueFrom: { field: "app" } }],
+        },
+      },
+    }),
+    allValues: {
+      app: "canvas_billing_alerts",
+    },
+    initialValue: "on-invoke",
+  },
+  {
     id: "any-predicate-list",
     storyName: "AnyPredicateListField",
     category: "Structured Content",
@@ -763,6 +790,19 @@ const mockGroups = [
   },
 ];
 
+const mockTargetAppCanvas = {
+  id: "canvas_billing_alerts",
+  name: "Billing Alerts",
+  organizationId: STORY_ORGANIZATION_ID,
+  spec: {
+    nodes: [
+      { id: "on-invoke", name: "On Invoke", type: "TYPE_TRIGGER", component: "onInvoke" },
+      { id: "on-broadcast", name: "On Broadcast", type: "TYPE_TRIGGER", component: "onBroadcast" },
+      { id: "send-email", name: "Send Email", type: "TYPE_ACTION", component: "sendEmail" },
+    ],
+  },
+};
+
 const mockCanvases = [
   {
     id: "canvas_billing_alerts",
@@ -865,6 +905,7 @@ export function seedConfigurationStoryQueryCache(queryClient: QueryClient) {
   queryClient.setQueryData(organizationKeys.roles(STORY_DOMAIN_ID), mockRoles);
   queryClient.setQueryData(organizationKeys.groups(STORY_DOMAIN_ID), mockGroups);
   queryClient.setQueryData(canvasKeys.list(STORY_ORGANIZATION_ID), mockCanvases);
+  queryClient.setQueryData(canvasKeys.detail(STORY_ORGANIZATION_ID, "canvas_billing_alerts"), mockTargetAppCanvas);
   queryClient.setQueryData(
     integrationKeys.resources(STORY_ORGANIZATION_ID, STORY_INTEGRATION_ID, "repository"),
     mockIntegrationResources,

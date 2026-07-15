@@ -35,6 +35,7 @@ const (
 	FieldTypeGitRef              = "git-ref"
 	FieldTypeSecretKey           = "secret-key"
 	FieldTypeApp                 = "app"
+	FieldTypeAppCanvasNode       = "app-canvas-node"
 )
 
 type Field struct {
@@ -103,6 +104,13 @@ type TypeOptions struct {
 	Time             *TimeTypeOptions             `json:"time,omitempty"`
 	Date             *DateTypeOptions             `json:"date,omitempty"`
 	DateTime         *DateTimeTypeOptions         `json:"dateTime,omitempty"`
+	AppCanvasNode    *AppCanvasNodeTypeOptions    `json:"appCanvasNode,omitempty"`
+}
+
+type AppCanvasNodeTypeOptions struct {
+	NodeTypes      []string       `json:"nodeTypes,omitempty"`
+	ComponentTypes []string       `json:"componentTypes,omitempty"`
+	Parameters     []ParameterRef `json:"parameters,omitempty"`
 }
 
 /*

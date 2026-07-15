@@ -356,7 +356,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 		Expressions: contexts.NewExpressionContext(builder),
 		OIDC:        w.oidcProvider,
-		Apps:        contexts.NewAppExecutionContext(tx, workflow, node),
+		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
 	}
 
 	if node.AppInstallationID != nil {

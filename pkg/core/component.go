@@ -51,6 +51,7 @@ type ExecutionContext struct {
 
 type AppExecutionContext interface {
 	Broadcast(payload any) error
+	Invoke(app string, node string, payload any) error
 }
 
 type ExpressionContext interface {

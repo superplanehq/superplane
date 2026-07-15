@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+
 	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
 	_ "net/http/pprof"
 	"os"
@@ -164,6 +165,12 @@ func startWorkers(
 		log.Println("Starting App Message Worker")
 
 		w := workers.NewAppMessageWorker(registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_APP_INVOCATION_WORKER") == "yes" {
+		log.Println("Starting App Invocation Worker")
+		w := workers.NewAppInvocationWorker(registry)
 		go w.Start(context.Background())
 	}
 

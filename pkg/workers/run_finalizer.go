@@ -2,6 +2,8 @@ package workers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -363,5 +365,55 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, "", err
 	}
 
+	if err := w.completeAppInvocation(tx, run.ID); err != nil {
+		return false, "", err
+	}
+
 	return true, "", nil
+}
+
+func (w *RunFinalizer) completeAppInvocation(tx *gorm.DB, runID uuid.UUID) error {
+	invocation, err := models.FindInvocationForRun(tx, runID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		w.logger.Infof("No invocation found for run %s", runID)
+		return nil
+	}
+
+	if err != nil {
+		w.logger.WithError(err).Errorf("Error finding invocation for run %s", runID)
+		return err
+	}
+
+	if invocation.State == models.AppInvocationStateCompleted {
+		w.logger.Infof("Invocation %s already completed for run %s", invocation.ID, runID)
+		return nil
+	}
+
+	if invocation.CallerExecutionID == nil {
+		w.logger.Infof("Invocation %s missing caller execution id for run %s", invocation.ID, runID)
+		return fmt.Errorf("invocation %s missing caller execution id", invocation.ID)
+	}
+
+	execution, err := models.FindNodeExecutionInTransaction(tx, invocation.CallerAppID, *invocation.CallerExecutionID)
+	if err != nil {
+		w.logger.WithError(err).Errorf("Error finding caller execution for invocation %s", invocation.ID)
+		return fmt.Errorf("find caller execution: %w", err)
+	}
+
+	//
+	// TODO: weird to have this hard coded here.
+	//
+	w.logger.Infof("Creating invocation callback request for execution %s", execution.ID)
+	now := time.Now()
+	err = execution.CreateRequest(tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
+		InvokeAction: &models.InvokeAction{
+			ActionName: "invocationPassed",
+		},
+	}, &now)
+
+	if err != nil {
+		return fmt.Errorf("schedule invocation callback: %w", err)
+	}
+
+	return invocation.Delete(tx)
 }
