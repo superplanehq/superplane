@@ -11,17 +11,17 @@ export type { CanvasBlockData } from "./types";
 const DRAFT_DIFF_BADGE = {
   added: {
     label: "ADDED",
-    className: "bg-green-500 text-white",
+    className: "bg-green-500 text-white dark:bg-green-400 dark:text-green-950",
     Icon: Plus,
   },
   updated: {
     label: "EDITED",
-    className: "bg-sky-500 text-white",
+    className: "bg-sky-500 text-white dark:bg-sky-400 dark:text-sky-950",
     Icon: Diff,
   },
   removed: {
     label: "REMOVED",
-    className: "bg-red-500 text-white",
+    className: "bg-red-500 text-white dark:bg-red-400 dark:text-red-950",
     Icon: Minus,
   },
 } as const;
