@@ -3,7 +3,7 @@ import type { ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "react-router-dom";
-import { Pin, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import type { ReactNode } from "react";
 import { appPath } from "@/lib/appPaths";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
@@ -27,7 +27,6 @@ interface CanvasCardsGridProps {
   canvasFolders: CanvasFolderData[];
   organizationId: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
-  onTogglePin: (canvasId: string, pinned: boolean) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
@@ -39,7 +38,6 @@ export function CanvasCardsGrid({
   canvasFolders,
   organizationId,
   onEditCanvas,
-  onTogglePin,
   onToggleStar,
   canUpdateCanvases,
   canDeleteCanvases,
@@ -54,7 +52,6 @@ export function CanvasCardsGrid({
           canvasFolders={canvasFolders}
           organizationId={organizationId}
           onEdit={onEditCanvas}
-          onTogglePin={onTogglePin}
           onToggleStar={onToggleStar}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
@@ -70,7 +67,6 @@ interface CanvasCardProps {
   canvasFolders: CanvasFolderData[];
   organizationId: string;
   onEdit: (canvas: CanvasCardData) => void;
-  onTogglePin: (canvasId: string, pinned: boolean) => void;
   onToggleStar: (canvasId: string, starred: boolean) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
@@ -82,7 +78,6 @@ function CanvasCard({
   canvasFolders,
   organizationId,
   onEdit,
-  onTogglePin,
   onToggleStar,
   canUpdateCanvases,
   canDeleteCanvases,
@@ -113,15 +108,6 @@ function CanvasCard({
               </Heading>
             </div>
             <div className="pointer-events-auto flex items-center gap-1">
-              <CanvasPreferenceButton
-                active={Boolean(canvas.isPinned)}
-                activeLabel={`Unpin app ${canvas.name}`}
-                inactiveLabel={`Pin app ${canvas.name}`}
-                activeTooltip="Unpin"
-                inactiveTooltip="Pin"
-                onClick={() => onTogglePin(canvas.id, !canvas.isPinned)}
-                icon={<Pin size={15} className={cn(canvas.isPinned && "fill-current")} aria-hidden />}
-              />
               <CanvasPreferenceButton
                 active={Boolean(canvas.isStarred)}
                 activeLabel={`Unstar app ${canvas.name}`}
