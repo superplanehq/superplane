@@ -42,7 +42,7 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 		memoryChanged = true
 	}
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		node, err := models.FindCanvasNode(tx, workflowID, execution.NodeID)
 
 		if err != nil {
