@@ -1,0 +1,6 @@
+{
+  "outcome": "failed",
+  "notes": null,
+  "failure_reason": "Script failed with exit code: 127\n\n## output\n/bin/bash: line 2: @scripts/wait-checks.sh: No such file or directory\n",
+  "timestamp": "2026-07-15T16:42:24.251361Z"
+}
