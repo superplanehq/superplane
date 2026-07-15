@@ -26,6 +26,9 @@ type Client struct {
 	APIKey  string
 	BaseURL string
 	http    core.HTTPContext
+	// sawSessionOutputs records whether an events page mentioned the session
+	// outputs directory; set while paging in GetSessionMessages.
+	sawSessionOutputs bool
 }
 
 type claudeErrorResponse struct {
@@ -235,14 +238,28 @@ func (c *Client) listManagedSessionEventsPage(sessionID, page string) ([]Managed
 	if err := json.Unmarshal(responseBody, &out); err != nil {
 		return nil, "", fmt.Errorf("failed to unmarshal session events: %w", err)
 	}
+
+	// The raw page is scanned for the session outputs directory: tool inputs
+	// (and messages) mention it whenever the agent wrote deliverables, and our
+	// event structs only decode text blocks.
+	if strings.Contains(string(responseBody), sessionOutputsDir) {
+		c.sawSessionOutputs = true
+	}
 	return out.Data, out.NextPage, nil
 }
+
+// sessionOutputsDir is where agents must save deliverables for them to be
+// captured by the Files API.
+const sessionOutputsDir = "/mnt/session/outputs"
 
 // SessionMessages holds all agent messages and completion status from a session's events.
 type SessionMessages struct {
 	Messages    []string // all agent.message texts in chronological order
 	LastMessage string   // the final agent.message text
 	Complete    bool     // true if session.status_idle or session.status_terminated is in the events
+	// ExpectsArtifacts is true when the session events mention the outputs
+	// directory, i.e. the agent (very likely) wrote deliverables.
+	ExpectsArtifacts bool
 }
 
 func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) {
@@ -251,6 +268,7 @@ func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) 
 	var allEvents []ManagedSessionEvent
 
 	// Fetch all events (desc order from API)
+	c.sawSessionOutputs = false
 	for {
 		events, nextPage, err := c.listManagedSessionEventsPage(sessionID, page)
 		if err != nil {
@@ -262,6 +280,7 @@ func (c *Client) GetSessionMessages(sessionID string) (*SessionMessages, error) 
 		}
 		page = nextPage
 	}
+	result.ExpectsArtifacts = c.sawSessionOutputs
 
 	// Check for terminal event (events are in desc order, so status_idle is first)
 	for _, e := range allEvents {
@@ -516,6 +535,113 @@ func (c *Client) DeleteManagedSession(sessionID string) error {
 	URL := c.BaseURL + "/sessions/" + url.PathEscape(sessionID)
 	_, err := c.execRequestWithBeta(http.MethodDelete, URL, nil, anthropicBetaManagedAgents)
 	return err
+}
+
+// SessionFile is a file surfaced by the Files API for a Managed Agents
+// session. Files the agent writes to /mnt/session/outputs/ are captured with
+// downloadable=true; input files mounted into the session are not downloadable.
+type SessionFile struct {
+	ID           string `json:"id"`
+	Filename     string `json:"filename"`
+	MimeType     string `json:"mime_type"`
+	SizeBytes    int64  `json:"size_bytes"`
+	CreatedAt    string `json:"created_at"`
+	Downloadable bool   `json:"downloadable"`
+}
+
+type listSessionFilesResponse struct {
+	Data    []SessionFile `json:"data"`
+	LastID  string        `json:"last_id"`
+	HasMore bool          `json:"has_more"`
+}
+
+// maxSessionFilePages caps forward pagination when listing session files so a
+// runaway has_more loop can never hang an execution.
+const maxSessionFilePages = 10
+
+// ListSessionFiles lists the files scoped to a session (GET /v1/files?scope_id=...),
+// paginating forward with after_id.
+func (c *Client) ListSessionFiles(sessionID string) ([]SessionFile, error) {
+	if sessionID == "" {
+		return nil, fmt.Errorf("session id is required")
+	}
+
+	var files []SessionFile
+	afterID := ""
+	for range maxSessionFilePages {
+		params := url.Values{}
+		params.Set("scope_id", sessionID)
+		params.Set("limit", "1000")
+		if afterID != "" {
+			params.Set("after_id", afterID)
+		}
+
+		responseBody, err := c.execRequestWithBeta(http.MethodGet, c.BaseURL+"/files?"+params.Encode(), nil, anthropicBetaManagedAgents)
+		if err != nil {
+			return nil, err
+		}
+
+		var response listSessionFilesResponse
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal session files: %w", err)
+		}
+
+		files = append(files, response.Data...)
+		if !response.HasMore || response.LastID == "" {
+			break
+		}
+		afterID = response.LastID
+	}
+	return files, nil
+}
+
+// ListSessionFilesWithRetry lists session files, retrying while the listing
+// has no downloadable entries — the agent's outputs can take a few seconds to
+// be indexed after the session goes idle, and mounted input copies (which are
+// never downloadable) may appear before them.
+func (c *Client) ListSessionFilesWithRetry(sessionID string, attempts int, delay time.Duration) ([]SessionFile, error) {
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var files []SessionFile
+	for i := 0; i < attempts; i++ {
+		var err error
+		files, err = c.ListSessionFiles(sessionID)
+		if err != nil {
+			return nil, err
+		}
+		if hasDownloadableFile(files) {
+			return files, nil
+		}
+		if i < attempts-1 {
+			time.Sleep(delay)
+		}
+	}
+	return files, nil
+}
+
+func hasDownloadableFile(files []SessionFile) bool {
+	for _, f := range files {
+		if f.Downloadable {
+			return true
+		}
+	}
+	return false
+}
+
+// FileContentURL returns the programmatic download link for a file. Requests
+// to it require the API key headers, including the beta header.
+func (c *Client) FileContentURL(fileID string) string {
+	return c.BaseURL + "/files/" + url.PathEscape(fileID) + "/content"
+}
+
+// DownloadFileContent fetches a file's raw content (GET /v1/files/{id}/content).
+func (c *Client) DownloadFileContent(fileID string) ([]byte, error) {
+	if fileID == "" {
+		return nil, fmt.Errorf("file id is required")
+	}
+	return c.execRequestWithBeta(http.MethodGet, c.FileContentURL(fileID), nil, anthropicBetaManagedAgents)
 }
 
 // DeleteFile removes an uploaded file (DELETE /v1/files/{id}).
