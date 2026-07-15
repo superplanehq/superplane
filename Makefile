@@ -167,6 +167,9 @@ dev.pr.clean.checkout:
 check.example.payloads:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_example_payloads.go"
 
+check.proto.field.numbers:
+	bash ./scripts/check_proto_field_numbers.sh
+
 check.configuration.fields:
 	$(COMPOSE) run --rm app bash -c "go run scripts/check_configuration_fields.go"
 
