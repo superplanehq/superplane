@@ -305,6 +305,7 @@ export function SettingsTab({
       "time",
       "cron",
       "git-ref",
+      "app",
     ].includes(fieldType);
   }, []);
 

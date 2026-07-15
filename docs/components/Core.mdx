@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="On Broadcast" href="#on-broadcast" description="Receive broadcast messages from another SuperPlane app" />
   <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
   <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
   <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
@@ -22,6 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
+  <LinkCard title="Broadcast Message" href="#broadcast-message" description="Broadcast a message to other SuperPlane apps" />
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Display" href="#display" description="Display a debug message from the latest execution" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
@@ -43,6 +45,36 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Upsert Memory" href="#upsert-memory" description="Update matching memory rows, or create one when no match exists" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
+
+<a id="on-broadcast"></a>
+
+## On Broadcast
+
+**Trigger key:** `onBroadcast`
+
+Receive broadcast messages from another SuperPlane app
+
+### Example Data
+
+```json
+{
+  "data": {
+    "app": {
+      "id": "123",
+      "name": "Another App"
+    },
+    "node": {
+      "id": "123",
+      "name": "Node Name"
+    },
+    "payload": {
+      "message": "Hello, World!"
+    }
+  },
+  "timestamp": "2024-01-01T09:00:00Z",
+  "type": "app.broadcast"
+}
+```
 
 <a id="on-error"></a>
 
@@ -424,6 +456,26 @@ The Approval component pauses workflow execution and waits for manual approval f
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "approval.finished"
+}
+```
+
+<a id="broadcast-message"></a>
+
+## Broadcast Message
+
+**Component key:** `broadcastMessage`
+
+Broadcast a message to other SuperPlane apps subscribed to this app
+
+### Example Output
+
+```json
+{
+  "data": {
+    "message": "broadcast message"
+  },
+  "timestamp": "2024-01-01T09:00:00Z",
+  "type": "app.broadcast"
 }
 ```
 

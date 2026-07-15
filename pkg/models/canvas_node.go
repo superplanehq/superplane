@@ -205,6 +205,11 @@ func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeR
 		return DeleteCanvasNodeResult{}, err
 	}
 
+	err = DeleteCanvasSubscriptionsForNode(tx, node.WorkflowID, node.NodeID)
+	if err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
+
 	if node.WebhookID == nil {
 		return result, nil
 	}
@@ -263,9 +268,14 @@ func FindUnscopedCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*Ca
 }
 
 func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]CanvasNode, error) {
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+
 	var nodes []CanvasNode
 	err := tx.
-		Where("workflow_id = ? AND node_id IN ?", canvasID, nodeIDs).
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id AND workflows.deleted_at IS NULL").
+		Where("workflow_nodes.workflow_id = ? AND workflow_nodes.node_id IN ?", canvasID, nodeIDs).
 		Find(&nodes).
 		Error
 
