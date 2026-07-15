@@ -135,8 +135,12 @@ func (t *AppAgentTool) InputSchema() agents.CustomToolInputSchema {
 			"patch_operations": patchOperationsSchema(),
 			"auto_layout": {
 				Type:        "object",
-				Description: "Optional patch_staging auto-layout settings. If omitted for graph patch operations, the backend applies horizontal connected-component layout seeded by affected nodes and edge endpoints. Pass scope full_canvas to re-layout the whole graph, or connected_component with node_ids to choose seeds. Passing auto_layout without patch_operations applies layout only.",
+				Description: "Optional patch_staging auto-layout settings. If omitted for graph patch operations, the backend applies horizontal connected-component layout seeded by affected nodes and edge endpoints. Pass enabled false to preserve existing positions, scope full_canvas to re-layout the whole graph, or connected_component with node_ids to choose seeds. Passing enabled true without patch_operations applies layout only.",
 				Properties: map[string]agents.CustomToolInputSchema{
+					"enabled": {
+						Type:        "boolean",
+						Description: "Set false to disable auto-layout for this patch and preserve explicit/current node positions.",
+					},
 					"scope": {
 						Type: "string",
 						Enum: []string{"full_canvas", "connected_component"},
@@ -209,9 +213,17 @@ func patchOperationsSchema() agents.CustomToolInputSchema {
 				},
 				"node_id": {
 					Type:        "string",
-					Description: "For delete_node, or as an ID fallback for update_node.",
+					Description: "For delete_node, or as an ID fallback for update_node and top-level position updates.",
 				},
 				"node": patchNodeSchema(),
+				"position": {
+					Type:        "object",
+					Description: "For add_node or update_node. Agent-friendly alias for node.position; node.position takes effect when this field is omitted.",
+					Properties: map[string]agents.CustomToolInputSchema{
+						"x": {Type: "integer"},
+						"y": {Type: "integer"},
+					},
+				},
 				"edge": patchEdgeSchema(),
 			},
 			Required: []string{"op"},

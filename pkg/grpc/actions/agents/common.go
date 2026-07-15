@@ -19,7 +19,7 @@ type AgentsService interface {
 	ResetSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error)
 	GetSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error)
 	ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error)
-	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []agentservice.MessageImage, mode ...string) (*models.AgentSessionMessage, error)
+	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []agentservice.MessageImage, options ...agentservice.SendMessageRequestOptions) (*models.AgentSessionMessage, error)
 	InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error
 	DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error
 }

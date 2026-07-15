@@ -133,6 +133,7 @@ message SendAgentChatMessageRequest {
   string content = 2;
   AgentMode mode = 3;
   repeated AgentChatImage images = 4;
+  bool auto_layout_on_update_enabled = 5;
 }
 
 enum AgentChatImageMediaType {

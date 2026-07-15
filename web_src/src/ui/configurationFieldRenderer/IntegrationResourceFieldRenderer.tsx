@@ -3,7 +3,7 @@ import { AutoCompleteSelect, type AutoCompleteOption } from "@/components/AutoCo
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SegmentedNav } from "@/ui/SegmentedNav";
 import type { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/lib/testID";
@@ -236,32 +236,29 @@ export const IntegrationResourceFieldRenderer = ({
     );
 
     if (allowExpressions) {
-      const tabsList = (
-        <TabsList className="h-7 rounded-md p-0.5">
-          <TabsTrigger value="fixed" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
-            Fixed
-          </TabsTrigger>
-          <TabsTrigger value="expression" className="text-xs px-2 py-1 data-[state=active]:shadow-sm">
-            Expression
-          </TabsTrigger>
-        </TabsList>
+      const modeToggle = (
+        <SegmentedNav
+          ariaLabel="Value mode"
+          value={useExpressionMode ? "expression" : "fixed"}
+          onValueChange={(nextValue) => {
+            // Preserve any previously entered value when switching modes so users
+            // don't lose their input just by toggling between Fixed and Expression.
+            setUseExpressionMode(nextValue === "expression");
+          }}
+          options={[
+            { value: "fixed", label: "Fixed" },
+            { value: "expression", label: "Expression" },
+          ]}
+          size="xs"
+        />
       );
-      const tabsInLabelRow =
-        labelRightReady && labelRightRef?.current ? createPortal(tabsList, labelRightRef.current) : null;
-
-      const handleTabChange = (v: string) => {
-        // Preserve any previously entered value when switching modes so users
-        // don't lose their input just by toggling between Fixed and Expression.
-        setUseExpressionMode(v === "expression");
-      };
+      const toggleInLabelRow =
+        labelRightReady && labelRightRef?.current ? createPortal(modeToggle, labelRightRef.current) : null;
 
       return (
         <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
-          <Tabs value={useExpressionMode ? "expression" : "fixed"} onValueChange={handleTabChange}>
-            {tabsInLabelRow ?? <div className="flex justify-end">{tabsList}</div>}
-            <TabsContent value="fixed">{picker}</TabsContent>
-            <TabsContent value="expression">{expressionInput}</TabsContent>
-          </Tabs>
+          {toggleInLabelRow ?? <div className="flex justify-end">{modeToggle}</div>}
+          {useExpressionMode ? expressionInput : picker}
         </div>
       );
     }

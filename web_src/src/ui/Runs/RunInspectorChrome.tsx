@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, ChevronsRight, Link as LinkIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, Link as LinkIcon, PanelRightClose } from "lucide-react";
 import type { ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -42,10 +42,10 @@ export function RunInspectorChrome({
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="flex h-7 w-7 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
               data-testid="run-panel-close"
             >
-              <ChevronsRight className="h-4 w-4" />
+              <PanelRightClose className="h-4 w-4" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Close</TooltipContent>
@@ -113,7 +113,7 @@ function RunNavigationButton({
 }
 
 const chromeIconButtonClassName = cn(
-  "flex h-7 w-7 items-center justify-center rounded text-gray-500 transition-colors",
+  "flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition-colors",
   "hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-40",
   "dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
 );
