@@ -3,6 +3,7 @@ package workers
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -869,4 +870,160 @@ func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *te
 	require.NoError(t, err)
 	assert.Zero(t, eventCount)
 	assert.False(t, executionConsumer.HasReceivedMessage())
+}
+
+func Test__NodeRequestWorker_SkipsHookForFinishedExecution(t *testing.T) {
+	//
+	// A poll-style hook can be requested after the execution is already finished
+	// (for example, a poll scheduled before an incoming webhook finished it).
+	// A finished execution is terminal, so the worker must not invoke the hook
+	// again - re-saving the execution would move its updated_at, which is the
+	// timestamp surfaced as the execution's finished_at (issue #6126). The
+	// request is completed regardless.
+	//
+	hookInvoked := false
+	componentName := "finished_poll_" + uuid.New().String()
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  componentName,
+		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			hookInvoked = true
+			return nil
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+
+	finishedAt := time.Now().Add(-10 * time.Minute)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": finishedAt,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "poll",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	assert.False(t, hookInvoked, "hook must not be invoked for an already finished execution")
+
+	var updatedRequest models.CanvasNodeRequest
+	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State,
+		"request must be completed even when the hook is skipped")
+
+	var updatedExecution models.CanvasNodeExecution
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	require.NotNil(t, updatedExecution.UpdatedAt)
+	assert.WithinDuration(t, finishedAt, *updatedExecution.UpdatedAt, time.Second,
+		"finished execution updated_at must not be overwritten by a skipped hook")
+}
+
+func Test__NodeRequestWorker_UpdatesUpdatedAtForRunningExecution(t *testing.T) {
+	//
+	// Counterpart to the guard above: updated_at is only preserved for executions
+	// that were ALREADY finished before the hook ran. A hook on a still-running
+	// execution must let updated_at advance as usual, so the timestamp keeps
+	// reflecting the last activity. This pins that boundary so the fix cannot be
+	// widened into omitting updated_at for every hook invocation.
+	//
+	componentName := "running_poll_" + uuid.New().String()
+	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
+		Name:  componentName,
+		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			return nil
+		},
+	}))
+
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, componentNode, "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, map[string]any{})
+
+	staleUpdatedAt := time.Now().Add(-10 * time.Minute)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateStarted,
+		"updated_at": staleUpdatedAt,
+	}).Error)
+
+	request := models.CanvasNodeRequest{
+		ID:          uuid.New(),
+		WorkflowID:  canvas.ID,
+		NodeID:      componentNode,
+		ExecutionID: &execution.ID,
+		Type:        models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "poll",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	err := worker.LockAndProcessRequest(request)
+	require.NoError(t, err)
+
+	var updatedExecution models.CanvasNodeExecution
+	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
+	require.NoError(t, err)
+	require.NotNil(t, updatedExecution.UpdatedAt)
+	assert.True(t, updatedExecution.UpdatedAt.After(staleUpdatedAt),
+		"running execution updated_at must advance when a hook runs")
 }

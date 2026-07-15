@@ -316,6 +316,19 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	execution *models.CanvasNodeExecution,
 	onNewEvents func([]models.CanvasEvent),
 ) error {
+	//
+	// A finished execution is terminal: its metadata and finished_at timestamp
+	// are already settled. Invoking the hook again is a no-op - for example, a
+	// runner poll scheduled before an incoming webhook finished the execution
+	// (issue #6126) - but re-saving the execution afterwards would move
+	// updated_at, which is surfaced as finished_at. Skip the hook entirely and
+	// just complete the request.
+	//
+	if execution.State == models.CanvasNodeExecutionStateFinished {
+		logger.Infof("Execution %s already finished - skipping hook and completing request", execution.ID)
+		return request.Complete(tx)
+	}
+
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return fmt.Errorf("failed to find node: %w", err)
@@ -381,6 +394,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	}
 
 	logger.Infof("Component execution hook completed")
+
 	err = tx.Save(&execution).Error
 	if err != nil {
 		return fmt.Errorf("error saving execution after action handler: %v", err)
