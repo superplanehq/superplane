@@ -1,0 +1,39 @@
+digraph PlanImplement {
+    graph [goal="{{ goal }}"]
+    rankdir=LR
+
+    start [shape=Mdiamond, label="Start"]
+    exit  [shape=Msquare, label="Exit"]
+
+    plan      [label="Plan", max_visits=5, reasoning_effort="high", prompt="@prompts/plan.md"]
+    approve   [shape=hexagon, label="Approve Plan"]
+    implement [label="Implement", prompt="@prompts/implement.md"]
+    verify    [label="Verify", prompt="@prompts/verify.md", output_schema="routing"]
+    fix       [label="Fix Failures", max_visits=3, prompt="@prompts/fix.md"]
+    ensure_pr [label="Open/Reuse PR", shape=parallelogram, script="@scripts/ensure-pr.sh"]
+    wait_checks [label="Wait for Checks", shape=parallelogram, script="@scripts/wait-checks.sh"]
+    fix_ci    [label="Fix CI Failures", max_visits=3, prompt="@prompts/fix-ci.md"]
+    review    [shape=hexagon, label="Review PR"]
+    revise    [label="Address Review", max_visits=3, prompt="@prompts/revise.md"]
+
+    start -> plan -> approve
+    approve -> implement [label="[A] Approve"]
+    approve -> plan      [label="[R] Revise"]
+
+    implement -> verify
+    verify -> ensure_pr [label="Pass", condition="outcome=succeeded"]
+    verify -> fix      [label="Fix", condition="outcome=failed"]
+    verify -> fix      [label="Fix"]
+    fix -> verify
+
+    ensure_pr -> wait_checks
+    wait_checks -> review [label="Pass", condition="outcome=succeeded"]
+    wait_checks -> fix_ci [label="Fix CI", condition="outcome=failed"]
+    wait_checks -> fix_ci [label="Fix CI"]
+    fix_ci -> verify
+
+    review -> exit   [label="[A] Approve"]
+    review -> revise [label="[R] Request changes"]
+    review -> revise [freeform=true]
+    revise -> verify
+}
