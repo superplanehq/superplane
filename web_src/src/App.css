@@ -384,8 +384,8 @@
 
   input:focus::selection,
   textarea:focus::selection {
-    background-color: revert;
-    color: revert;
+    background-color: Highlight;
+    color: HighlightText;
   }
 }
 
