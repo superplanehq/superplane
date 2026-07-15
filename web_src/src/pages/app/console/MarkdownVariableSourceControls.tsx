@@ -276,7 +276,8 @@ export function RunSourceControls({
 }) {
   const setStatuses = (statuses: RunStatusFilter[] | undefined) => {
     const next = { ...source };
-    if (statuses && statuses.length > 0) next.statuses = statuses;
+    const compatibleStatuses = statusesCompatibleWithRunSelect(source.select, statuses);
+    if (compatibleStatuses) next.statuses = compatibleStatuses;
     else delete next.statuses;
     onChange(next);
   };
