@@ -727,15 +727,44 @@ func validateFieldValue(field Field, value any) error {
 	return nil
 }
 
+// isRequiredByCondition reports whether a field's RequiredConditions are all
+// satisfied. Conditions combine with AND (every condition must match), which
+// lets a field express "required unless one of these alternatives is filled":
+// a condition matches an empty/absent target field when its Values contain the
+// empty string, so listing the alternatives as empty-matches makes the field
+// required only while every alternative is blank.
 func isRequiredByCondition(field Field, config map[string]any) bool {
 	for _, condition := range field.RequiredConditions {
-		conditionValue, exists := config[condition.Field]
-		if !exists {
-			continue
+		if !conditionMatches(condition, config) {
+			return false
 		}
-
-		return slices.Contains(condition.Values, fmt.Sprintf("%v", conditionValue))
 	}
 
-	return false
+	return true
+}
+
+func conditionMatches(condition RequiredCondition, config map[string]any) bool {
+	value, exists := config[condition.Field]
+	if !exists || isEmptyConfigValue(value) {
+		return slices.Contains(condition.Values, "")
+	}
+
+	return slices.Contains(condition.Values, fmt.Sprintf("%v", value))
+}
+
+// isEmptyConfigValue reports whether a configuration value carries no data, so
+// that empty strings, lists, and maps are all treated as "not provided".
+func isEmptyConfigValue(value any) bool {
+	switch v := value.(type) {
+	case nil:
+		return true
+	case string:
+		return v == ""
+	case []any:
+		return len(v) == 0
+	case map[string]any:
+		return len(v) == 0
+	default:
+		return false
+	}
 }
