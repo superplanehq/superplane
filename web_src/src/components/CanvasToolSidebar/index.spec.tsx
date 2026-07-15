@@ -235,6 +235,7 @@ describe("CanvasToolSidebar", () => {
       content: "retry",
       mode: "operator",
       images: [],
+      autoLayoutOnUpdateEnabled: false,
     });
   });
 
