@@ -101,26 +101,16 @@ export function resolveCachedNodeRunId(
   return lookupEvent?.runId || (lookupEvent ? resolveRunId(lookupEvent) : null);
 }
 
-export type LiveCanvasNodeClickSyncAction =
-  | { kind: "inspectRun"; runId: string }
-  | { kind: "openConfiguration" }
-  | { kind: "lookupRun" };
+export type LiveCanvasNodeClickSyncAction = { kind: "inspectRun"; runId: string } | { kind: "lookupRun" };
 
 export function resolveLiveCanvasNodeClickSyncAction(
   nodeId: string,
   workflowNode: ComponentsNode | undefined,
-  nodeData: NodeActivityData,
   resolveRunId: (event: SidebarEvent) => string | null,
 ): LiveCanvasNodeClickSyncAction {
   const cachedRunId = resolveCachedNodeRunId(nodeId, workflowNode, resolveRunId);
   if (cachedRunId) {
     return { kind: "inspectRun", runId: cachedRunId };
-  }
-
-  const nodeType = workflowNode?.type || "TYPE_ACTION";
-  const cachedLookupEvent = resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
-  if (!cachedLookupEvent) {
-    return { kind: "openConfiguration" };
   }
 
   return { kind: "lookupRun" };

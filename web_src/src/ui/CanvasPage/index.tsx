@@ -1797,6 +1797,7 @@ function Sidebar({
   }, [state.componentSidebar.selectedNodeId, nodeExecutionVersion]);
   const hideRunsTab = isAnnotationNode || (!isEditing && !selectedNodeHasActivity);
   const shouldShowRunsSidebar = canvasMode === "live" && !isAnnotationNode && !hideRunsTab;
+  const shouldLoadLiveSidebarData = canvasMode === "live" && !isAnnotationNode;
   const livePreRunStatus = useMemo(() => {
     if (!formDisabled || !state.componentSidebar.selectedNodeId || !workflowNodes) {
       return undefined;
@@ -1823,14 +1824,19 @@ function Sidebar({
   // Trigger data loading when sidebar opens for a node.
   useEffect(() => {
     if (
-      shouldShowRunsSidebar &&
+      shouldLoadLiveSidebarData &&
       state.componentSidebar.isOpen &&
       state.componentSidebar.selectedNodeId &&
       loadSidebarData
     ) {
       loadSidebarData(state.componentSidebar.selectedNodeId);
     }
-  }, [state.componentSidebar.isOpen, state.componentSidebar.selectedNodeId, loadSidebarData, shouldShowRunsSidebar]);
+  }, [
+    shouldLoadLiveSidebarData,
+    state.componentSidebar.isOpen,
+    state.componentSidebar.selectedNodeId,
+    loadSidebarData,
+  ]);
 
   useEffect(() => {
     if (sidebarData?.latestEvents) {

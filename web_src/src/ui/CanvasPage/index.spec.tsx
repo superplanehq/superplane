@@ -364,7 +364,7 @@ describe("CanvasPage connection drop", () => {
     expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
   });
 
-  it("does not load component sidebar run data in live mode", async () => {
+  it("loads component sidebar run data in live mode", async () => {
     const loadSidebarData = vi.fn();
     const getSidebarData = vi.fn(() => ({
       latestEvents: [],
@@ -436,7 +436,7 @@ describe("CanvasPage connection drop", () => {
     );
 
     await act(async () => {});
-    expect(loadSidebarData).not.toHaveBeenCalled();
+    expect(loadSidebarData).toHaveBeenCalledWith("node-1");
     expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
   });
 

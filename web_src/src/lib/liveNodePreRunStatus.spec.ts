@@ -55,7 +55,7 @@ describe("resolveLiveNodePreRunStatus", () => {
         events: [],
       }),
     ).toEqual({
-      title: "Waiting for the first run...",
+      title: "Inspect activity in Runs",
       purpose: "runtime",
     });
   });

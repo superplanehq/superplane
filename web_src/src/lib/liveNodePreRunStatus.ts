@@ -49,7 +49,7 @@ export function resolveLiveNodePreRunStatus(
     return { title: "Waiting for the first run...", purpose: "runtime" };
   }
 
-  return { title: "Waiting for the first run...", purpose: "runtime" };
+  return { title: "Inspect activity in Runs", purpose: "runtime" };
 }
 
 export function formatLiveNodeConfigurationIssue(

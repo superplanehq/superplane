@@ -3751,21 +3751,10 @@ export function AppPage() {
       liveCanvasNodeClickLookupRef.current = lookupId;
 
       const workflowNode = canvasNodesById.get(nodeId);
-      const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
-      const syncAction = resolveLiveCanvasNodeClickSyncAction(
-        nodeId,
-        workflowNode,
-        nodeData,
-        resolveRunIdForSidebarEvent,
-      );
+      const syncAction = resolveLiveCanvasNodeClickSyncAction(nodeId, workflowNode, resolveRunIdForSidebarEvent);
 
       if (syncAction.kind === "inspectRun") {
         handleSelectRunFromSidebarEvent(syncAction.runId, { nodeId });
-        return;
-      }
-
-      if (syncAction.kind === "openConfiguration") {
-        actions.openConfigurationSidebar();
         return;
       }
 

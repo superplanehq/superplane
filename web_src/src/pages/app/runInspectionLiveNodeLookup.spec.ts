@@ -102,17 +102,12 @@ describe("resolveRunLookupEventForNodeActivity", () => {
 });
 
 describe("resolveLiveCanvasNodeClickSyncAction", () => {
-  it("opens configuration when the node has no cached activity", () => {
+  it("looks up a run from the server when the node has no cached activity", () => {
     useNodeExecutionStore.getState().clear();
 
     expect(
-      resolveLiveCanvasNodeClickSyncAction(
-        "action-1",
-        { id: "action-1", type: "TYPE_ACTION" },
-        { executions: [], events: [] },
-        () => null,
-      ),
-    ).toEqual({ kind: "openConfiguration" });
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "lookupRun" });
   });
 
   it("inspects the cached run when one is already resolved", () => {
@@ -128,12 +123,7 @@ describe("resolveLiveCanvasNodeClickSyncAction", () => {
     );
 
     expect(
-      resolveLiveCanvasNodeClickSyncAction(
-        "action-1",
-        { id: "action-1", type: "TYPE_ACTION" },
-        useNodeExecutionStore.getState().getNodeData("action-1"),
-        () => null,
-      ),
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
     ).toEqual({ kind: "inspectRun", runId: "run-from-execution" });
   });
 
@@ -149,12 +139,7 @@ describe("resolveLiveCanvasNodeClickSyncAction", () => {
     );
 
     expect(
-      resolveLiveCanvasNodeClickSyncAction(
-        "action-1",
-        { id: "action-1", type: "TYPE_ACTION" },
-        useNodeExecutionStore.getState().getNodeData("action-1"),
-        () => null,
-      ),
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
     ).toEqual({ kind: "lookupRun" });
   });
 });
