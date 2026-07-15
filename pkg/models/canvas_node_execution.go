@@ -398,6 +398,15 @@ func (e *CanvasNodeExecution) Pass(outputs map[string][]any) ([]CanvasEvent, err
 }
 
 func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[string][]any) ([]CanvasEvent, error) {
+	finished, err := e.IsFinishedInTransaction(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	if finished {
+		return []CanvasEvent{}, nil
+	}
+
 	now := time.Now()
 
 	//
@@ -456,6 +465,10 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 		}).Error
 
 	if err != nil {
+		return nil, err
+	}
+
+	if err := CompletePendingRequestsForExecutionInTransaction(tx, e.ID); err != nil {
 		return nil, err
 	}
 
@@ -524,6 +537,15 @@ func (e *CanvasNodeExecution) Fail(reason, message string) error {
 }
 
 func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) error {
+	finished, err := e.IsFinishedInTransaction(tx)
+	if err != nil {
+		return err
+	}
+
+	if finished {
+		return nil
+	}
+
 	now := time.Now()
 
 	e.State = CanvasNodeExecutionStateFinished
@@ -532,7 +554,7 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 	e.ResultMessage = message
 	e.UpdatedAt = &now
 
-	err := tx.Model(e).
+	err = tx.Model(e).
 		Updates(map[string]interface{}{
 			"state":          CanvasNodeExecutionStateFinished,
 			"result":         CanvasNodeExecutionResultFailed,
@@ -560,7 +582,7 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 		}
 	}
 
-	return nil
+	return CompletePendingRequestsForExecutionInTransaction(tx, e.ID)
 }
 
 func (e *CanvasNodeExecution) Cancel(cancelledBy *uuid.UUID) error {
@@ -568,6 +590,15 @@ func (e *CanvasNodeExecution) Cancel(cancelledBy *uuid.UUID) error {
 }
 
 func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid.UUID) error {
+	finished, err := e.IsFinishedInTransaction(tx)
+	if err != nil {
+		return err
+	}
+
+	if finished {
+		return nil
+	}
+
 	now := time.Now()
 
 	e.State = CanvasNodeExecutionStateFinished
@@ -575,7 +606,7 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 	e.CancelledBy = cancelledBy
 	e.UpdatedAt = &now
 
-	err := tx.Model(e).
+	err = tx.Model(e).
 		Updates(map[string]interface{}{
 			"state":        CanvasNodeExecutionStateFinished,
 			"result":       CanvasNodeExecutionResultCancelled,
@@ -599,7 +630,7 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 		}
 	}
 
-	return nil
+	return CompletePendingRequestsForExecutionInTransaction(tx, e.ID)
 }
 
 func (e *CanvasNodeExecution) GetInput(tx *gorm.DB) (any, error) {
@@ -637,6 +668,20 @@ func (e *CanvasNodeExecution) GetOutputsInTransaction(tx *gorm.DB) ([]CanvasEven
 	}
 
 	return events, nil
+}
+
+func (e *CanvasNodeExecution) IsFinishedInTransaction(tx *gorm.DB) (bool, error) {
+	var execution CanvasNodeExecution
+	err := tx.
+		Select("state").
+		Where("id = ?", e.ID).
+		First(&execution).
+		Error
+	if err != nil {
+		return false, err
+	}
+
+	return execution.State == CanvasNodeExecutionStateFinished, nil
 }
 
 func ListCanvasEventsForExecutionsInTransaction(tx *gorm.DB, executionIDs []uuid.UUID) ([]CanvasEvent, error) {
