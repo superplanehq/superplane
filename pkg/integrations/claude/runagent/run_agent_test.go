@@ -180,6 +180,47 @@ func Test__RunAgent__poll__terminal(t *testing.T) {
 	assert.Equal(t, "# Report\n", out.Artifacts[0].Content)
 }
 
+func Test__RunAgent__poll__persistSessionKeepsSession(t *testing.T) {
+	a := &RunAgent{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"sess_1","status":"idle"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"type":"session.status_idle"},{"type":"agent.message","content":[{"type":"text","text":"Final"}]}]}`))},
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	metadataCtx := &contexts.MetadataContext{
+		Metadata: ExecutionMetadata{
+			Session: &SessionMetadata{ID: "sess_1", Status: "running"},
+		},
+	}
+	hookCtx := core.ActionHookContext{
+		Name:       "poll",
+		Parameters: map[string]any{"attempt": float64(1), "errors": float64(0)},
+		Configuration: map[string]any{
+			"agent":          "agent_1",
+			"environmentId":  "env_1",
+			"prompt":         "do it",
+			"persistSession": true,
+		},
+		HTTP:           httpContext,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       metadataCtx,
+		ExecutionState: executionState,
+		Logger:         logrus.NewEntry(logrus.New()),
+		Requests:       &contexts.RequestContext{},
+	}
+
+	require.NoError(t, a.HandleHook(hookCtx))
+	require.True(t, executionState.Finished)
+	assert.Equal(t, "idle", executionState.Payloads[0].(map[string]any)["data"].(OutputPayload).Status)
+
+	for _, r := range httpContext.Requests {
+		assert.False(t, r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/sessions/sess_1"),
+			"session must be kept when persistSession is enabled")
+	}
+}
+
 func Test__RunAgent__poll__timeout(t *testing.T) {
 	a := &RunAgent{}
 	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
