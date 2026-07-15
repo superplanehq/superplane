@@ -1,6 +1,6 @@
 import { canvasKeys } from "@/hooks/useCanvasData";
 
-import type { WidgetDataSource, WidgetRender } from "./types";
+import type { WidgetDataSource, WidgetRender, WidgetRunsDataSource } from "./types";
 
 /**
  * Stable string identifier for the shared `useInfiniteCanvasRuns` cache
@@ -37,6 +37,10 @@ export function runsRenderIsTotalCountOnly(dataSource: WidgetDataSource, render:
   if (render.aggregation !== "count") return false;
   if (render.filters && render.filters.length > 0) return false;
   if ("sparklineField" in render && render.sparklineField) return false;
-  if ((dataSource.statuses?.length ?? 0) > 0 || (dataSource.triggers?.length ?? 0) > 0) return false;
+  if (runsSourceUsesClientSideFilters(dataSource)) return false;
   return true;
+}
+
+function runsSourceUsesClientSideFilters(dataSource: WidgetRunsDataSource): boolean {
+  return (dataSource.statuses?.length ?? 0) > 0 || (dataSource.triggers?.length ?? 0) > 0;
 }
