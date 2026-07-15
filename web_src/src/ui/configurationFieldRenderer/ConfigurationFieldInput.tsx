@@ -82,6 +82,16 @@ export function ConfigurationFieldInput({
     );
   }
 
+  if (field.type === "git-ref") {
+    return (
+      <GitRefFieldRenderer
+        {...commonProps}
+        labelRightRef={allowExpressions ? labelRightRef : undefined}
+        labelRightReady={allowExpressions ? labelRightReady : false}
+      />
+    );
+  }
+
   if (field.type === "app") {
     return (
       <AppFieldRenderer
@@ -237,8 +247,6 @@ function renderDateTimeField(commonProps: FieldRendererProps) {
 
 function renderReferenceField(commonProps: FieldRendererProps) {
   switch (commonProps.field.type) {
-    case "git-ref":
-      return <GitRefFieldRenderer {...commonProps} />;
     case "repository-file":
       return <RepositoryFileFieldRenderer {...commonProps} />;
     case "timezone":

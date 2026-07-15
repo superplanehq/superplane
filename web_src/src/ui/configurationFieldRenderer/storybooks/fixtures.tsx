@@ -643,6 +643,7 @@ export const rendererExamples: RendererExample[] = [
       description: "Use when the stored value must be a normalized Git branch or tag reference.",
     }),
     initialValue: "refs/heads/main",
+    allowExpressions: true,
   },
   {
     id: "secret-key",
