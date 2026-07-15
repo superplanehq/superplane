@@ -872,23 +872,23 @@ func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *te
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
 
-func Test__NodeRequestWorker_PreservesUpdatedAtForFinishedExecution(t *testing.T) {
+func Test__NodeRequestWorker_SkipsHookForFinishedExecution(t *testing.T) {
 	//
-	// A poll-style hook can fire after the execution is already finished (for
-	// example, a poll scheduled before an incoming webhook finished it). Such a
-	// no-op invocation must not move the execution's updated_at, which is the
-	// timestamp surfaced as the execution's finished_at (issue #6126).
+	// A poll-style hook can be requested after the execution is already finished
+	// (for example, a poll scheduled before an incoming webhook finished it).
+	// A finished execution is terminal, so the worker must not invoke the hook
+	// again - re-saving the execution would move its updated_at, which is the
+	// timestamp surfaced as the execution's finished_at (issue #6126). The
+	// request is completed regardless.
 	//
+	hookInvoked := false
 	componentName := "finished_poll_" + uuid.New().String()
 	registry.RegisterAction(componentName, impl.NewDummyAction(impl.DummyActionOptions{
 		Name:  componentName,
 		Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
 		HandleHookFunc: func(ctx core.ActionHookContext) error {
-			// Mirror the runner poller: finished executions are terminal, do nothing.
-			if ctx.ExecutionState.IsFinished() {
-				return nil
-			}
-			return errors.New("hook should not run work for a finished execution")
+			hookInvoked = true
+			return nil
 		},
 	}))
 
@@ -940,12 +940,20 @@ func Test__NodeRequestWorker_PreservesUpdatedAtForFinishedExecution(t *testing.T
 	err := worker.LockAndProcessRequest(request)
 	require.NoError(t, err)
 
+	assert.False(t, hookInvoked, "hook must not be invoked for an already finished execution")
+
+	var updatedRequest models.CanvasNodeRequest
+	err = database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, updatedRequest.State,
+		"request must be completed even when the hook is skipped")
+
 	var updatedExecution models.CanvasNodeExecution
 	err = database.Conn().Where("id = ?", execution.ID).First(&updatedExecution).Error
 	require.NoError(t, err)
 	require.NotNil(t, updatedExecution.UpdatedAt)
 	assert.WithinDuration(t, finishedAt, *updatedExecution.UpdatedAt, time.Second,
-		"finished execution updated_at must not be overwritten by a no-op hook")
+		"finished execution updated_at must not be overwritten by a skipped hook")
 }
 
 func Test__NodeRequestWorker_UpdatesUpdatedAtForRunningExecution(t *testing.T) {

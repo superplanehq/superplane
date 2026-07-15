@@ -316,6 +316,19 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	execution *models.CanvasNodeExecution,
 	onNewEvents func([]models.CanvasEvent),
 ) error {
+	//
+	// A finished execution is terminal: its metadata and finished_at timestamp
+	// are already settled. Invoking the hook again is a no-op - for example, a
+	// runner poll scheduled before an incoming webhook finished the execution
+	// (issue #6126) - but re-saving the execution afterwards would move
+	// updated_at, which is surfaced as finished_at. Skip the hook entirely and
+	// just complete the request.
+	//
+	if execution.State == models.CanvasNodeExecutionStateFinished {
+		logger.Infof("Execution %s already finished - skipping hook and completing request", execution.ID)
+		return request.Complete(tx)
+	}
+
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return fmt.Errorf("failed to find node: %w", err)
@@ -374,17 +387,6 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 
 	logger.Infof("Invoking component execution hook")
 
-	//
-	// A finished execution records its completion time in updated_at, which is
-	// surfaced as the execution's finished_at. Hooks can still be invoked on a
-	// finished execution - for example, a runner poll scheduled before an
-	// incoming webhook finished it (issue #6126). Such hooks no-op, so persisting
-	// the execution again must not move updated_at. We capture the state before
-	// the hook runs so an invocation that legitimately finishes the execution
-	// still records its finished_at.
-	//
-	alreadyFinished := execution.State == models.CanvasNodeExecutionStateFinished
-
 	hookCtx.Logger = logger
 	err = hookProvider.HandleHook(hookCtx)
 	if err != nil {
@@ -393,12 +395,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 
 	logger.Infof("Component execution hook completed")
 
-	save := tx
-	if alreadyFinished {
-		save = tx.Omit("UpdatedAt")
-	}
-
-	err = save.Save(&execution).Error
+	err = tx.Save(&execution).Error
 	if err != nil {
 		return fmt.Errorf("error saving execution after action handler: %v", err)
 	}
