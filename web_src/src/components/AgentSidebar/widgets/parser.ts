@@ -276,6 +276,17 @@ function parseSurvey(raw: string): SurveySegment {
   let currentOptions: string[] = [];
   let hasInput = false;
 
+  const flushCurrentQuestion = () => {
+    if (!currentPrompt || (!currentOptions.length && !hasInput)) return;
+
+    if (shouldSplitOptionsIntoQuestions(currentPrompt, currentOptions, hasInput)) {
+      questions.push(...currentOptions.map((prompt) => ({ prompt, options: [], hasInput: true })));
+      return;
+    }
+
+    questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
+  };
+
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -289,20 +300,37 @@ function parseSurvey(raw: string): SurveySegment {
       }
     } else {
       // New question - flush previous
-      if (currentPrompt && (currentOptions.length || hasInput)) {
-        questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
-      }
+      flushCurrentQuestion();
       currentPrompt = trimmed;
       currentOptions = [];
       hasInput = false;
     }
   }
   // Flush last question
-  if (currentPrompt && (currentOptions.length || hasInput)) {
-    questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
-  }
+  flushCurrentQuestion();
 
   return { type: "survey", questions };
+}
+
+function shouldSplitOptionsIntoQuestions(prompt: string, options: string[], hasInput: boolean): boolean {
+  if (hasInput || options.length < 2) return false;
+
+  return isContextPrompt(prompt) && options.every(isQuestionOption);
+}
+
+function isContextPrompt(prompt: string): boolean {
+  const text = stripMarkdownEmphasis(prompt).trim();
+  if (!text.endsWith(":") || text.includes("?")) return false;
+
+  return !/^(choose|pick|select)\b/i.test(text);
+}
+
+function isQuestionOption(option: string): boolean {
+  return option.trim().endsWith("?");
+}
+
+function stripMarkdownEmphasis(value: string): string {
+  return value.replace(/[*_]+/g, "");
 }
 
 function parseRubric(meta: string, raw: string): RubricSegment {

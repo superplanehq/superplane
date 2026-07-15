@@ -139,6 +139,85 @@ Oops!
     expect(segments[1].type).toBe("error");
   });
 
+  it("keeps normal multiple-choice survey options together", () => {
+    const segments = parseAgentContent(`:::survey
+Which environment should we deploy to?
+- Staging
+- Production
+- [input]
+:::`);
+
+    expect(segments).toEqual([
+      {
+        type: "survey",
+        questions: [
+          {
+            prompt: "Which environment should we deploy to?",
+            options: ["Staging", "Production"],
+            hasInput: true,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps multiple-choice survey question options together", () => {
+    const segments = parseAgentContent(`:::survey
+Choose the question to ask next:
+- Did the agent finish analyzing the PR?
+- Was a report generated for the run?
+- Is the download command being run on the same PR?
+:::`);
+
+    expect(segments).toEqual([
+      {
+        type: "survey",
+        questions: [
+          {
+            prompt: "Choose the question to ask next:",
+            options: [
+              "Did the agent finish analyzing the PR?",
+              "Was a report generated for the run?",
+              "Is the download command being run on the same PR?",
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("treats question-like survey bullet items as separate free-text questions", () => {
+    const segments = parseAgentContent(`:::survey
+**When you tested \`/download-report\`:**
+- Did you first create a PR to trigger the agent and let it finish analyzing?
+- Are you trying to use \`/download-report\` on a PR that never had an agent run on it?
+- Did you wait for the agent to complete before commenting \`/download-report\`?
+:::`);
+
+    expect(segments).toEqual([
+      {
+        type: "survey",
+        questions: [
+          {
+            prompt: "Did you first create a PR to trigger the agent and let it finish analyzing?",
+            options: [],
+            hasInput: true,
+          },
+          {
+            prompt: "Are you trying to use `/download-report` on a PR that never had an agent run on it?",
+            options: [],
+            hasInput: true,
+          },
+          {
+            prompt: "Did you wait for the agent to complete before commenting `/download-report`?",
+            options: [],
+            hasInput: true,
+          },
+        ],
+      },
+    ]);
+  });
+
   it("preserves full markdown bodies inside categorized rubric sections", () => {
     const content = `:::rubric HTTP Monitor Spec
 ## Flow
