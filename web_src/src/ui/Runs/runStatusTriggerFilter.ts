@@ -21,6 +21,22 @@ export interface RunStatusTriggerFilters {
 export type TriggerReferenceResolver = (reference: string) => string | undefined;
 
 /**
+ * Options for trigger-filter matchability / row matching when a resolver
+ * is in play. Distinguishes "canvas nodes not loaded yet" from "refs are
+ * permanently stale".
+ */
+export interface TriggerFilterMatchOptions {
+  /**
+   * How many canvas nodes are available for id/name resolution. When `0`
+   * (the empty fallback while `canvas?.spec?.nodes` is still loading),
+   * unresolved trigger refs are treated as inconclusive rather than
+   * permanently unmatchable — otherwise widgets skip eager paging and
+   * markdown variables flash "No run matched…" for valid filters.
+   */
+  nodeCatalogSize?: number;
+}
+
+/**
  * Return true when the run passes the (optional) status and trigger
  * filters. Both filter dimensions are ORed within a dimension and ANDed
  * across dimensions: "any of the selected statuses AND any of the
@@ -33,6 +49,7 @@ export function runMatchesStatusTriggerFilters(
   run: CanvasesCanvasRun,
   filters: RunStatusTriggerFilters | undefined,
   resolveTriggerReference?: TriggerReferenceResolver,
+  options?: TriggerFilterMatchOptions,
 ): boolean {
   if (!filters) return true;
 
@@ -44,17 +61,36 @@ export function runMatchesStatusTriggerFilters(
 
   const triggers = filters.triggers;
   if (triggers && triggers.length > 0) {
-    const triggerNodeId = run.rootEvent?.nodeId;
-    if (!triggerNodeId) return false;
-    const canonicalIds = resolveTriggerFilterIds(triggers, resolveTriggerReference);
-    // Empty set means every persisted ref failed to resolve (stale/deleted
-    // node) — no run can match, so stop rather than comparing raw strings
-    // that will never equal a live node id.
-    if (canonicalIds.size === 0) return false;
-    if (!canonicalIds.has(triggerNodeId)) return false;
+    if (!runMatchesTriggerFilter(run.rootEvent?.nodeId, triggers, resolveTriggerReference, options)) return false;
   }
 
   return true;
+}
+
+/**
+ * Match a run's root-event node id against a trigger-filter list.
+ * Extracted from {@link runMatchesStatusTriggerFilters} to keep complexity
+ * under the lint budget and to isolate the empty-catalog fallback.
+ */
+function runMatchesTriggerFilter(
+  triggerNodeId: string | undefined,
+  triggers: readonly string[],
+  resolveTriggerReference?: TriggerReferenceResolver,
+  options?: TriggerFilterMatchOptions,
+): boolean {
+  if (!triggerNodeId) return false;
+  const canonicalIds = resolveTriggerFilterIds(triggers, resolveTriggerReference);
+  if (canonicalIds.size === 0) {
+    // Empty set: every persisted ref failed to resolve. When the node catalog
+    // is still empty that is inconclusive (canvas may be loading) — fall back
+    // to raw-ref comparison so UUID filters still match. Once nodes are
+    // present, empty means permanently stale.
+    if (resolveTriggerReference && (options?.nodeCatalogSize ?? 0) === 0) {
+      return triggers.some((reference) => reference.trim() === triggerNodeId);
+    }
+    return false;
+  }
+  return canonicalIds.has(triggerNodeId);
 }
 
 /**
@@ -84,12 +120,19 @@ export function resolveTriggerFilterIds(
  * there is no trigger filter, or when at least one reference resolves (or
  * no resolver is provided). Used to skip eager pagination that can never
  * find a match for fully-stale trigger YAML.
+ *
+ * When a resolver is provided but the node catalog is still empty
+ * (`nodeCatalogSize === 0`), returns `true` — resolution is inconclusive
+ * until nodes arrive, so callers must not treat the filter as permanently
+ * stale.
  */
 export function triggerFilterCanMatch(
   triggers: readonly string[] | undefined,
   resolveTriggerReference?: TriggerReferenceResolver,
+  options?: TriggerFilterMatchOptions,
 ): boolean {
   if (!triggers || triggers.length === 0) return true;
+  if (resolveTriggerReference && (options?.nodeCatalogSize ?? 0) === 0) return true;
   return resolveTriggerFilterIds(triggers, resolveTriggerReference).size > 0;
 }
 

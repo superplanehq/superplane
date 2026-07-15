@@ -1,36 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun } from "@/api-client";
-import { useCanvasMemoryEntries, useEventExecutionsBatch, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
-import {
-  hasRunStatusTriggerFilters,
-  runMatchesStatusTriggerFilters,
-  triggerFilterCanMatch,
-  type RunStatusTriggerFilters,
-  type TriggerReferenceResolver,
-} from "@/ui/Runs/runStatusTriggerFilter";
+import { useCanvasMemoryEntries, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 
-import {
-  resolveConsoleNode,
-  resolveConsoleTrigger,
-  useConsoleContext,
-  type ConsoleContextValue,
-} from "../ConsoleContext";
+import { resolveConsoleNode, useConsoleContext, type ConsoleContextValue } from "../ConsoleContext";
 import { flattenMemoryEntries } from "./memoryRow";
+import { collectRunRootEventIdsFromPages, useRunsDataSourceResult } from "./runsDataSourceResult";
 import { makeRunsFlightKey } from "./runsWidgetQuery";
-import type { WidgetDataSource, WidgetRender } from "./types";
+import type { WidgetDataResult, WidgetDataSource, WidgetRender } from "./types";
+
+export type { WidgetDataResult };
 import {
   LOAD_MORE_STEP,
   computeDisplaySlice,
   computeEffectiveLimit,
   computeInitialDisplayCount,
-  computeRunsDataSourceLoading,
   computeTrendCollectLimit,
   computeWidgetHasMore,
   isWidgetQueryLoading,
   useEagerInfinitePagination,
 } from "./widgetPagination";
-import { buildNodeNameMap, collectExecutionRows, collectRunRows } from "./widgetRowCollection";
+import { buildNodeNameMap, collectExecutionRows } from "./widgetRowCollection";
 
 // Re-export the row-collection and pagination helpers from this module so the
 // existing spec imports (and any external callers) keep working after the
@@ -58,37 +47,6 @@ export {
   collectRunRows,
   lastOutputData,
 } from "./widgetRowCollection";
-
-export interface WidgetDataResult {
-  rows: unknown[];
-  isLoading: boolean;
-  error?: string;
-  /** Server-reported total for sources that expose one (currently `runs`). */
-  totalCount?: number;
-  /**
-   * Whether more rows can be revealed by calling `loadMore()`. Only meaningful
-   * for progressive callers (the table widget). `false` for chart/number
-   * panels that always render against the full configured limit.
-   */
-  hasMore?: boolean;
-  /**
-   * `true` while a `loadMore()`-triggered (or scroll-triggered) fetch is in
-   * flight, distinct from the initial fill which is reported via `isLoading`.
-   */
-  isFetchingMore?: boolean;
-  /**
-   * Grow the per-widget display window by `LOAD_MORE_STEP` rows (capped at
-   * the configured limit, if any). No-op for non-progressive callers.
-   */
-  loadMore?: () => void;
-  /**
-   * Progressive display window size. When set, `rows` is the full loaded set
-   * (so filter/sort see every already-fetched row) and the table renders only
-   * the first `displayCount` rows after filter+sort. Trend neighbors can then
-   * resolve against loaded-but-not-yet-shown rows.
-   */
-  displayCount?: number;
-}
 
 /**
  * Reactively fetch the dataset for a widget based on its declared data source.
@@ -376,261 +334,8 @@ function useExecutionsDataSourceResult({
   return { rows, isLoading, error: errorMessage(query.error), ...paginationFields };
 }
 
-function useRunsDataSourceResult({
-  canvasId,
-  dataSource,
-  ctx,
-  needsNodeOutputs,
-  progressive,
-  displayCount,
-  displaySlice,
-  effectiveLimit,
-  initialFillTarget,
-  loadMore,
-  skipEagerFill,
-}: {
-  canvasId: string;
-  dataSource: WidgetDataSource;
-  ctx: ConsoleContextValue | undefined;
-  needsNodeOutputs: boolean;
-  progressive: boolean;
-  displayCount: number;
-  displaySlice: number;
-  effectiveLimit: number;
-  initialFillTarget: number;
-  loadMore: () => void;
-  skipEagerFill: boolean;
-}): WidgetDataResult {
-  const enabled = dataSource.kind === "runs";
-  const query = useInfiniteCanvasRuns(canvasId, {}, enabled);
-  const pages = useMemo(() => query.data?.pages ?? [], [query.data]);
-  const pageCount = pages.length;
-
-  const loadedRowCount = useMemo(() => countLoadedRuns(pages, enabled), [enabled, pages]);
-  const runsFilters = useMemo(() => runsFiltersFromDataSource(dataSource), [dataSource]);
-  const filtersActive = hasRunStatusTriggerFilters(runsFilters);
-  const resolveTrigger = useCallback((reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id, [ctx]);
-  const collectLimit = computeRunsCollectLimit({
-    filtersActive,
-    progressive,
-    displaySlice,
-    loadedRowCount,
-    effectiveLimit,
-  });
-  // Side-load only needs executions for rows that survive filtering (and the
-  // display / trend window). Reusing `collectLimit` when filters are active
-  // would issue ListEventExecutions for every unfiltered loaded run.
-  const sideloadLimit = computeRunsSideloadLimit({
-    filtersActive,
-    progressive,
-    displaySlice,
-    collectLimit,
-  });
-
-  const { executionsByRootEventId, runExecutionsLoading } = useRunsExecutionSideload({
-    canvasId,
-    enabled: dataSource.kind === "runs" && needsNodeOutputs,
-    pages,
-    collectLimit: sideloadLimit,
-    filters: runsFilters,
-    resolveTrigger,
-  });
-
-  const rows = useMemo(
-    () =>
-      buildRunsDataSourceRows({
-        dataSource,
-        pages,
-        ctx,
-        collectLimit,
-        executionsByRootEventId,
-        runsFilters,
-        // Non-progressive panels cap at `limit` after filtering. Progressive
-        // tables keep the full filtered set so displayCount can slice.
-        resultLimit: progressive ? undefined : displaySlice,
-      }),
-    [dataSource, pages, ctx, collectLimit, executionsByRootEventId, runsFilters, progressive, displaySlice],
-  );
-  const triggersMatchable = triggerFilterCanMatch(runsFilters?.triggers, resolveTrigger);
-  // With filters, `limit` is the desired matching-row count — keep paging
-  // until we have that many matches (or hit the shared page cap).
-  const fillRowCount = filtersActive ? rows.length : loadedRowCount;
-  // Skip eager fill for totalCount-only KPIs; also require matchable triggers.
-  const eagerEnabled = enabled && triggersMatchable && !skipEagerFill;
-
-  const runsFlightKey = useMemo(() => makeRunsFlightKey(canvasId, {}), [canvasId]);
-  useEagerInfinitePagination({
-    enabled: eagerEnabled,
-    fillTarget: displaySlice,
-    loadedRowCount: fillRowCount,
-    pageCount,
-    hasNextPage: query.hasNextPage,
-    isFetchingNextPage: query.isFetchingNextPage,
-    isFetching: query.isFetching,
-    isError: query.isError,
-    isFetchNextPageError: query.isFetchNextPageError,
-    fetchNextPage: query.fetchNextPage,
-    flightKey: runsFlightKey,
-  });
-
-  const isLoading = computeRunsDataSourceLoading({
-    query,
-    enabled: eagerEnabled,
-    fillRowCount,
-    initialFillTarget,
-    pageCount,
-    filtersActive,
-    triggersMatchable,
-    progressive,
-    runExecutionsLoading,
-  });
-
-  // Stale / fully-unresolved trigger filters can never match further pages —
-  // hide Load more even when the server still has a next page.
-  const hasMore = computeWidgetHasMore({
-    progressive,
-    displayCount,
-    effectiveLimit,
-    loadedRowCount: fillRowCount,
-    hasNextPage: triggersMatchable ? query.hasNextPage : false,
-    pageCount,
-  });
-  const isFetchingMore = enabled && query.isFetchingNextPage && !isLoading && hasMore;
-  const paginationFields = progressive ? { hasMore, isFetchingMore, loadMore, displayCount: displaySlice } : {};
-  const totalCount = filtersActive ? undefined : query.data?.pages?.[0]?.totalCount;
-  return { rows, isLoading, error: errorMessage(query.error), totalCount, ...paginationFields };
-}
-
-function countLoadedRuns(pages: { runs?: unknown[] }[], enabled: boolean): number {
-  if (!enabled) return 0;
-  let count = 0;
-  for (const page of pages) count += page?.runs?.length ?? 0;
-  return count;
-}
-
-function runsFiltersFromDataSource(dataSource: WidgetDataSource) {
-  if (dataSource.kind !== "runs") return undefined;
-  return { statuses: dataSource.statuses, triggers: dataSource.triggers };
-}
-
-function computeRunsCollectLimit(args: {
-  filtersActive: boolean;
-  progressive: boolean;
-  displaySlice: number;
-  loadedRowCount: number;
-  effectiveLimit: number;
-}): number {
-  // Filters: materialize every loaded run so matches aren't dropped pre-filter.
-  if (args.filtersActive) return args.loadedRowCount;
-  if (args.progressive) {
-    return computeTrendCollectLimit(args.displaySlice, args.loadedRowCount, args.effectiveLimit);
-  }
-  return args.displaySlice;
-}
-
-/**
- * Cap for execution side-load queries. When status/trigger filters are active
- * on a non-progressive panel, only the post-filter display window needs `$`
- * data — not every already-loaded (and soon-to-be-dropped) run.
- */
-function computeRunsSideloadLimit(args: {
-  filtersActive: boolean;
-  progressive: boolean;
-  displaySlice: number;
-  collectLimit: number;
-}): number {
-  if (args.filtersActive && !args.progressive) return args.displaySlice;
-  return args.collectLimit;
-}
-
-function useRunsExecutionSideload(args: {
-  canvasId: string;
-  enabled: boolean;
-  pages: { runs?: CanvasesCanvasRun[] }[];
-  collectLimit: number;
-  filters?: RunStatusTriggerFilters;
-  resolveTrigger?: TriggerReferenceResolver;
-}) {
-  const runRootEventIds = useMemo(() => {
-    if (!args.enabled) return [] as string[];
-    return collectRunRootEventIdsFromPages(args.pages, args.collectLimit, args.filters, args.resolveTrigger);
-  }, [args.enabled, args.pages, args.collectLimit, args.filters, args.resolveTrigger]);
-
-  const { queries: runExecutionQueries, isLoading: runExecutionsLoading } = useEventExecutionsBatch(
-    args.canvasId,
-    runRootEventIds,
-  );
-
-  const executionsByRootEventId = useMemo(() => {
-    const map = new Map<string, CanvasesCanvasNodeExecution[]>();
-    runRootEventIds.forEach((eventId, index) => {
-      const data = runExecutionQueries[index]?.data;
-      if (!data?.executions) return;
-      map.set(eventId, data.executions as CanvasesCanvasNodeExecution[]);
-    });
-    return map;
-  }, [runRootEventIds, runExecutionQueries]);
-
-  return { executionsByRootEventId, runExecutionsLoading };
-}
-
-function buildRunsDataSourceRows(args: {
-  dataSource: WidgetDataSource;
-  pages: Parameters<typeof collectRunRows>[0];
-  ctx: ConsoleContextValue | undefined;
-  collectLimit: number;
-  executionsByRootEventId: Map<string, CanvasesCanvasNodeExecution[]>;
-  runsFilters: ReturnType<typeof runsFiltersFromDataSource>;
-  /** Cap applied after filtering for non-progressive panels (chart/number). */
-  resultLimit?: number;
-}): unknown[] {
-  if (args.dataSource.kind !== "runs") return [];
-  const nodeNameById = buildNodeNameMap(args.ctx?.nodes);
-  const collected = collectRunRows(args.pages, nodeNameById, args.collectLimit, args.executionsByRootEventId);
-  const filtered = hasRunStatusTriggerFilters(args.runsFilters)
-    ? collected.filter((row) =>
-        runMatchesStatusTriggerFilters(
-          row as CanvasesCanvasRun,
-          args.runsFilters,
-          (reference) => resolveConsoleTrigger(args.ctx, reference)?.node.id,
-        ),
-      )
-    : collected;
-  if (args.resultLimit != null && Number.isFinite(args.resultLimit) && filtered.length > args.resultLimit) {
-    return filtered.slice(0, args.resultLimit);
-  }
-  return filtered;
-}
-
-/**
- * Collect root-event ids for execution side-load. When filters are provided,
- * only matching runs count toward `collectLimit` so tight status/trigger
- * filters do not fan out ListEventExecutions across the unfiltered page set.
- */
-export function collectRunRootEventIdsFromPages(
-  pages: { runs?: CanvasesCanvasRun[] }[],
-  collectLimit: number,
-  filters?: RunStatusTriggerFilters,
-  resolveTrigger?: TriggerReferenceResolver,
-): string[] {
-  const filterActive = hasRunStatusTriggerFilters(filters);
-  const seen = new Set<string>();
-  const ids: string[] = [];
-  let count = 0;
-  for (const page of pages) {
-    for (const run of page?.runs ?? []) {
-      if (filterActive && !runMatchesStatusTriggerFilters(run, filters, resolveTrigger)) continue;
-      if (count >= collectLimit) return ids;
-      count += 1;
-      const id = run.rootEvent?.id;
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        ids.push(id);
-      }
-    }
-  }
-  return ids;
-}
+// Specs import this from `./useWidgetData`; keep the re-export stable.
+export { collectRunRootEventIdsFromPages };
 
 function errorMessage(error: unknown): string | undefined {
   return error ? String(error) : undefined;

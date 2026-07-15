@@ -37,6 +37,41 @@ export interface WidgetRunsDataSource {
 
 export type WidgetDataSource = WidgetMemoryDataSource | WidgetExecutionsDataSource | WidgetRunsDataSource;
 
+/**
+ * Uniform result from {@link useWidgetData} so renderers don't care which
+ * underlying query produced the rows.
+ */
+export interface WidgetDataResult {
+  rows: unknown[];
+  isLoading: boolean;
+  error?: string;
+  /** Server-reported total for sources that expose one (currently `runs`). */
+  totalCount?: number;
+  /**
+   * Whether more rows can be revealed by calling `loadMore()`. Only meaningful
+   * for progressive callers (the table widget). `false` for chart/number
+   * panels that always render against the full configured limit.
+   */
+  hasMore?: boolean;
+  /**
+   * `true` while a `loadMore()`-triggered (or scroll-triggered) fetch is in
+   * flight, distinct from the initial fill which is reported via `isLoading`.
+   */
+  isFetchingMore?: boolean;
+  /**
+   * Grow the per-widget display window by `LOAD_MORE_STEP` rows (capped at
+   * the configured limit, if any). No-op for non-progressive callers.
+   */
+  loadMore?: () => void;
+  /**
+   * Progressive display window size. When set, `rows` is the full loaded set
+   * (so filter/sort see every already-fetched row) and the table renders only
+   * the first `displayCount` rows after filter+sort. Trend neighbors can then
+   * resolve against loaded-but-not-yet-shown rows.
+   */
+  displayCount?: number;
+}
+
 export type WidgetColumnFormat =
   | "text"
   | "number"

@@ -102,12 +102,40 @@ describe("triggerFilterCanMatch", () => {
   });
 
   it("returns false when every reference fails to resolve", () => {
-    expect(triggerFilterCanMatch(["gone"], () => undefined)).toBe(false);
+    expect(triggerFilterCanMatch(["gone"], () => undefined, { nodeCatalogSize: 2 })).toBe(false);
   });
 
   it("returns true when at least one reference resolves", () => {
     const resolver = (reference: string) => (reference === "deploy" ? "id-1" : undefined);
     expect(triggerFilterCanMatch(["gone", "deploy"], resolver)).toBe(true);
+  });
+
+  it("stays optimistic while the node catalog is still empty", () => {
+    // Regression: empty canvasNodes fallback made every ref look stale, so
+    // widgets skipped eager paging and markdown flashed "No run matched…".
+    const resolver = () => undefined;
+    expect(triggerFilterCanMatch(["deploy"], resolver, { nodeCatalogSize: 0 })).toBe(true);
+    expect(triggerFilterCanMatch(["deploy"], resolver, { nodeCatalogSize: 3 })).toBe(false);
+  });
+});
+
+describe("runMatchesStatusTriggerFilters with empty node catalog", () => {
+  it("falls back to raw id comparison while the catalog is empty", () => {
+    const resolver = () => undefined;
+    const matched = run({ rootEvent: { nodeId: "trigger-1" } });
+    expect(runMatchesStatusTriggerFilters(matched, { triggers: ["trigger-1"] }, resolver, { nodeCatalogSize: 0 })).toBe(
+      true,
+    );
+    expect(runMatchesStatusTriggerFilters(matched, { triggers: ["deploy"] }, resolver, { nodeCatalogSize: 0 })).toBe(
+      false,
+    );
+  });
+
+  it("treats fully unresolved refs as stale once the catalog is present", () => {
+    const resolver = () => undefined;
+    expect(runMatchesStatusTriggerFilters(run(), { triggers: ["trigger-1"] }, resolver, { nodeCatalogSize: 2 })).toBe(
+      false,
+    );
   });
 });
 

@@ -12,6 +12,7 @@ import {
   runMatchesStatusTriggerFilters,
   runSelectStatusFilterCanMatch,
   triggerFilterCanMatch,
+  type TriggerFilterMatchOptions,
 } from "@/ui/Runs/runStatusTriggerFilter";
 
 import { resolveConsoleTrigger, useConsoleContext } from "./ConsoleContext";
@@ -189,6 +190,7 @@ export function useMarkdownVariables(
     // same row that save persists.
     const seen = new Set<string>();
     const resolveTrigger = (reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id;
+    const triggerMatchOptions = { nodeCatalogSize: ctx?.nodes?.length ?? 0 };
     for (const variable of list) {
       if (!variable?.name || !variable?.source) continue;
       if (seen.has(variable.name)) continue;
@@ -202,6 +204,7 @@ export function useMarkdownVariables(
         executionsByRootEventId,
         nodeNameById,
         resolveTrigger,
+        triggerMatchOptions,
       });
       out[variable.name] = resolved.value;
       if (resolved.error) errs.push({ name: variable.name, message: resolved.error });
@@ -256,6 +259,7 @@ function collectRunVariableRootEventIds(args: {
   const ids: string[] = [];
   const seen = new Set<string>();
   const resolveTrigger = (reference: string) => resolveConsoleTrigger(args.ctx, reference)?.node.id;
+  const triggerMatchOptions = { nodeCatalogSize: args.ctx?.nodes?.length ?? 0 };
   for (const variable of args.list) {
     const source = variable?.source;
     if (source?.kind !== "run") continue;
@@ -265,7 +269,7 @@ function collectRunVariableRootEventIds(args: {
       passedRunsData: args.passedRunsData,
       failedRunsData: args.failedRunsData,
     });
-    const run = firstMatchingRun(data, source, resolveTrigger);
+    const run = firstMatchingRun(data, source, resolveTrigger, triggerMatchOptions);
     const id = run?.rootEvent?.id;
     if (id && !seen.has(id)) {
       seen.add(id);
@@ -338,10 +342,11 @@ function useEagerFilterPagination(args: {
   const anyUnresolved = useMemo(() => {
     if (filteredVariables.length === 0) return false;
     const resolveTrigger = (reference: string) => resolveConsoleTrigger(ctx, reference)?.node.id;
+    const triggerMatchOptions = { nodeCatalogSize: ctx?.nodes?.length ?? 0 };
     return filteredVariables.some((variable) => {
       if (!runSelectStatusFilterCanMatch(variable.source.select, variable.source.statuses)) return false;
-      if (!triggerFilterCanMatch(variable.source.triggers, resolveTrigger)) return false;
-      return firstMatchingRun(data, variable.source, resolveTrigger) === undefined;
+      if (!triggerFilterCanMatch(variable.source.triggers, resolveTrigger, triggerMatchOptions)) return false;
+      return firstMatchingRun(data, variable.source, resolveTrigger, triggerMatchOptions) === undefined;
     });
   }, [filteredVariables, data, ctx]);
 
@@ -382,6 +387,7 @@ function firstMatchingRun(
   data: RunsQueryData | undefined,
   source: MarkdownRunVariableSource,
   resolveTrigger: (reference: string) => string | undefined,
+  triggerMatchOptions?: TriggerFilterMatchOptions,
 ): RunRow | undefined {
   const pages = data?.pages ?? [];
   const filters = { statuses: source.statuses, triggers: source.triggers };
@@ -389,7 +395,9 @@ function firstMatchingRun(
   for (const page of pages) {
     for (const run of page?.runs ?? []) {
       if (!active) return run;
-      if (runMatchesStatusTriggerFilters(run as CanvasesCanvasRun, filters, resolveTrigger)) return run;
+      if (runMatchesStatusTriggerFilters(run as CanvasesCanvasRun, filters, resolveTrigger, triggerMatchOptions)) {
+        return run;
+      }
     }
   }
   return undefined;
@@ -404,6 +412,7 @@ interface ResolveContext {
   executionsByRootEventId: Map<string, CanvasesCanvasNodeExecution[]>;
   nodeNameById: Map<string, string>;
   resolveTrigger: (reference: string) => string | undefined;
+  triggerMatchOptions?: TriggerFilterMatchOptions;
 }
 
 interface RunQuerySnapshot {
@@ -446,7 +455,7 @@ function resolveRunVariable(
   ctx: ResolveContext,
 ): { value: unknown; error?: string; searching?: boolean } {
   const query = pickRunQuery(source.select, ctx);
-  const firstRun = firstMatchingRun(query.data, source, ctx.resolveTrigger);
+  const firstRun = firstMatchingRun(query.data, source, ctx.resolveTrigger, ctx.triggerMatchOptions);
   if (firstRun) {
     return { value: buildRunVariableValue(firstRun, ctx) };
   }
@@ -457,7 +466,7 @@ function resolveRunVariable(
   }
   // Stay quiet while the initial page or eager filter pagination is still
   // searching — otherwise the preview flashes "No run matched…" between pages.
-  if (isRunQueryStillSearching(query, source, ctx.resolveTrigger)) {
+  if (isRunQueryStillSearching(query, source, ctx.resolveTrigger, ctx.triggerMatchOptions)) {
     return { value: null, searching: true };
   }
   return { value: null, error: noRunFoundMessage(source) };
@@ -485,12 +494,13 @@ export function isRunQueryStillSearching(
   query: RunQuerySnapshot,
   source: MarkdownRunVariableSource,
   resolveTrigger?: (reference: string) => string | undefined,
+  triggerMatchOptions?: TriggerFilterMatchOptions,
 ): boolean {
   if (isRunsQueryFailed(query)) return false;
   if (query.isLoading || query.isFetchingNextPage) return true;
   if (!hasRunStatusTriggerFilters({ statuses: source.statuses, triggers: source.triggers })) return false;
   if (!runSelectStatusFilterCanMatch(source.select, source.statuses)) return false;
-  if (!triggerFilterCanMatch(source.triggers, resolveTrigger)) return false;
+  if (!triggerFilterCanMatch(source.triggers, resolveTrigger, triggerMatchOptions)) return false;
   const pageCount = query.data?.pages?.length ?? 0;
   return query.hasNextPage === true && pageCount < WIDGET_MAX_EAGER_PAGES;
 }
