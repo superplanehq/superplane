@@ -98,7 +98,7 @@ import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
-import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { resolveInitFitDecision, stampFittedContentKey } from "./fitView";
 import { RightSideControls } from "./RightSideControls";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
@@ -2662,22 +2662,17 @@ function CanvasContent({
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
     (reactFlowInstance: { setViewport: (viewport: Viewport) => void }) => {
-      const isFirstFit = !hasFitToViewRef.current;
-
-      // While the viewport is locked, a remount (mode switch, version change) must
-      // not re-frame the canvas — restore what the user was looking at instead. The
-      // very first fit still runs so there's a sensible initial framing to lock onto.
-      const lockSuppressesRefit = isViewportLockedRef.current && !isFirstFit && !!viewportRef.current;
-
       // Switching to a different canvas/version must re-fit the whole graph instead of
-      // reusing the previous content's viewport, matching the first-load behavior.
-      const needsInitialFit =
-        !lockSuppressesRefit &&
-        shouldRefitOnInit({
-          hasFittedBefore: hasFitToViewRef.current,
-          fitViewContentKey,
-          lastFittedContentKey: lastFittedContentKeyRef?.current ?? null,
-        });
+      // reusing the previous content's viewport, matching the first-load behavior. While
+      // the viewport is locked, a remount must not re-frame the canvas — the very first
+      // fit still runs so there's a sensible initial framing to lock onto.
+      const { isFirstFit, needsInitialFit, lockSuppressedRefit } = resolveInitFitDecision({
+        hasFittedBefore: hasFitToViewRef.current,
+        fitViewContentKey,
+        lastFittedContentKey: lastFittedContentKeyRef?.current ?? null,
+        isViewportLocked: isViewportLockedRef.current,
+        hasStoredViewport: !!viewportRef.current,
+      });
 
       if (needsInitialFit) {
         const hasNodes = (stateRef.current.nodes?.length ?? 0) > 0;
@@ -2722,7 +2717,7 @@ function CanvasContent({
         // When the lock suppressed the re-fit, mark this content as handled so the
         // content-change effect doesn't fit it later; unlocking then only affects
         // future navigation rather than snapping the current view.
-        if (lockSuppressesRefit) {
+        if (lockSuppressedRefit) {
           stampFittedContentKey(lastFittedContentKeyRef, fitViewContentKey);
         }
         setIsInitialized(true);
