@@ -101,9 +101,6 @@ message ListTypeOptions {
   optional int32 max_items = 3;
   optional bool accordion = 4;
   optional bool reorderable = 5;
-  // When true, items saved as plain strings before the item schema existed
-  // remain valid alongside object items.
-  optional bool allow_string_items = 6;
 }
 
 message ObjectTypeOptions {

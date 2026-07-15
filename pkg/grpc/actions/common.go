@@ -196,11 +196,6 @@ func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListT
 		pbOpts.Reorderable = &reorderable
 	}
 
-	if opts.AllowStringItems {
-		allowStringItems := true
-		pbOpts.AllowStringItems = &allowStringItems
-	}
-
 	if opts.MaxItems != nil {
 		maxItems := int32(*opts.MaxItems)
 		pbOpts.MaxItems = &maxItems
@@ -534,10 +529,9 @@ func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.Lis
 	}
 
 	opts := &configuration.ListTypeOptions{
-		ItemLabel:        pbOpts.GetItemLabel(),
-		Accordion:        pbOpts.GetAccordion(),
-		Reorderable:      pbOpts.GetReorderable(),
-		AllowStringItems: pbOpts.GetAllowStringItems(),
+		ItemLabel:   pbOpts.GetItemLabel(),
+		Accordion:   pbOpts.GetAccordion(),
+		Reorderable: pbOpts.GetReorderable(),
 		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},

@@ -49,11 +49,10 @@ type FileAttachment struct {
 	Encoding string `json:"encoding" mapstructure:"encoding"`
 	MimeType string `json:"mimeType" mapstructure:"mimeType"`
 	Filename string `json:"filename" mapstructure:"filename"`
-	Raw      string `json:"-" mapstructure:"-"`
 }
 
 func (f FileAttachment) isEmpty() bool {
-	return f.Raw == "" && f.URL == "" && f.Content == ""
+	return f.URL == "" && f.Content == ""
 }
 
 // decodeFileAttachments accepts both entry shapes: structured objects and
@@ -69,18 +68,15 @@ func decodeFileAttachments(raw any) ([]FileAttachment, error) {
 
 	entries := make([]FileAttachment, 0, len(items))
 	for i, item := range items {
-		switch v := item.(type) {
-		case string:
-			entries = append(entries, FileAttachment{Raw: strings.TrimSpace(v)})
-		case map[string]any:
-			var entry FileAttachment
-			if err := mapstructure.Decode(v, &entry); err != nil {
-				return nil, fmt.Errorf("files[%d]: %v", i, err)
-			}
-			entries = append(entries, entry)
-		default:
+		obj, ok := item.(map[string]any)
+		if !ok {
 			return nil, fmt.Errorf("files[%d] must be a file entry", i)
 		}
+		var entry FileAttachment
+		if err := mapstructure.Decode(obj, &entry); err != nil {
+			return nil, fmt.Errorf("files[%d]: %v", i, err)
+		}
+		entries = append(entries, entry)
 	}
 	return entries, nil
 }
@@ -143,7 +139,7 @@ func (c *SendTextMessage) Documentation() string {
   - **URL** — a public http(s) link; the file is downloaded and attached.
   - **Inline content** — the file content itself, e.g. an AI component artifact: set **Content** to ` + "`{{ $['Text Prompt'].data.artifacts[0].content }}`" + `, pick the **MIME Type**, and set **Encoding** to match the artifact's ` + "`encoding`" + ` field (text for plain text, base64 for binary files like images).
 
-  An optional **Filename** names the attachment; legacy plain-string entries (URL or ` + "`data:`" + ` URI) keep working.
+  An optional **Filename** names the attachment; when omitted it is derived from the URL or the file's detected type.
 
 ## Output
 
@@ -227,9 +223,6 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "File",
-					// Entries saved before this schema existed are plain URL or
-					// data: URI strings; they stay valid and are still attached.
-					AllowStringItems: true,
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
@@ -469,13 +462,6 @@ func validateFiles(files []FileAttachment) error {
 	}
 
 	for i, file := range files {
-		if file.Raw != "" {
-			if err := validateLegacyFileEntry(file.Raw); err != nil {
-				return err
-			}
-			continue
-		}
-
 		switch file.Source {
 		case "", fileSourceURL:
 			if file.URL == "" || isExpressionValue(file.URL) {
@@ -497,61 +483,6 @@ func validateFiles(files []FileAttachment) error {
 	}
 
 	return nil
-}
-
-func validateLegacyFileEntry(value string) error {
-	if isExpressionValue(value) {
-		return nil
-	}
-	if strings.HasPrefix(value, "data:") {
-		if _, _, err := parseDataURI(value); err != nil {
-			return fmt.Errorf("invalid data URI: %v", err)
-		}
-		return nil
-	}
-	parsed, err := url.Parse(value)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return fmt.Errorf("invalid file URL %q: must be an http(s) URL or a data: URI", value)
-	}
-	return nil
-}
-
-// parseDataURI decodes a data: URI (data:[<mediatype>][;base64],<data>) into
-// its media type and content bytes. It lets inline payload data — like the
-// artifacts AI components emit — be attached without a publicly fetchable URL.
-func parseDataURI(uri string) (string, []byte, error) {
-	rest, ok := strings.CutPrefix(uri, "data:")
-	if !ok {
-		return "", nil, fmt.Errorf("missing data: prefix")
-	}
-	meta, data, ok := strings.Cut(rest, ",")
-	if !ok {
-		return "", nil, fmt.Errorf("missing comma separator")
-	}
-
-	mediaType := meta
-	isBase64 := false
-	if encoded, found := strings.CutSuffix(meta, ";base64"); found {
-		mediaType = encoded
-		isBase64 = true
-	}
-
-	if isBase64 {
-		// Tolerate whitespace around the payload, e.g. "base64, {{ expr }}".
-		content, err := base64.StdEncoding.DecodeString(strings.TrimSpace(data))
-		if err != nil {
-			return "", nil, fmt.Errorf("invalid base64 content: %v", err)
-		}
-		return mediaType, content, nil
-	}
-
-	// Plain data is percent-decoded per the data: URI scheme, but expression
-	// values paste raw content in, so undecodable data is kept as-is rather
-	// than rejected (e.g. a CSV containing a literal "%").
-	if content, err := url.PathUnescape(data); err == nil {
-		return mediaType, []byte(content), nil
-	}
-	return mediaType, []byte(data), nil
 }
 
 // canonicalExtensions maps common media types to the extension clients (e.g.
@@ -631,10 +562,6 @@ func hasAttachableFile(files []FileAttachment) bool {
 // entries are downloaded, content entries are decoded inline, and legacy
 // string entries keep their URL/data: URI behavior.
 func resolveFileAttachment(client *Client, httpCtx core.HTTPContext, entry FileAttachment, index int) (MessageFile, error) {
-	if entry.Raw != "" {
-		return resolveLegacyFileEntry(client, httpCtx, entry.Raw, index)
-	}
-
 	if entry.Source == fileSourceContent {
 		// Expression values often carry stray whitespace around the content.
 		data := strings.TrimSpace(entry.Content)
@@ -683,31 +610,6 @@ func fetchURLAttachment(client *Client, httpCtx core.HTTPContext, fileURL, prefe
 	}, nil
 }
 
-// resolveLegacyFileEntry handles the original string entry form: an http(s)
-// URL to download or a data: URI carrying the content inline.
-func resolveLegacyFileEntry(client *Client, httpCtx core.HTTPContext, value string, index int) (MessageFile, error) {
-	if strings.HasPrefix(value, "data:") {
-		mediaType, content, err := parseDataURI(value)
-		if err != nil {
-			return MessageFile{}, fmt.Errorf("invalid data URI in files[%d]: %v", index, err)
-		}
-		contentType := resolveContentType(content, mediaType)
-		return MessageFile{
-			Name:        attachmentName("", contentType, index),
-			Content:     content,
-			ContentType: contentType,
-		}, nil
-	}
-	if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
-		// A schemeless entry is almost always raw file content pasted via
-		// an expression; a fetch would only fail with a cryptic error.
-		return MessageFile{}, fmt.Errorf("files[%d] is neither an http(s) URL nor a data: URI; to attach inline content, use a file entry with source set to content", index)
-	}
-	return fetchURLAttachment(client, httpCtx, value, "", index)
-}
-
-// fileNameFromURL derives an attachment filename from the URL path, falling
-// back to a positional name for URLs without one (e.g. bare presigned links).
 func fileNameFromURL(fileURL string, index int) string {
 	fallback := fmt.Sprintf("file-%d", index+1)
 	parsed, err := url.Parse(fileURL)

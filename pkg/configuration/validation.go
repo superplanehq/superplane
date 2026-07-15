@@ -339,12 +339,6 @@ func validateList(field Field, value any) error {
 	itemDef := listOptions.ItemDefinition
 	for i, item := range list {
 		if itemDef.Type == FieldTypeObject && len(itemDef.Schema) > 0 {
-			// Entries saved before the item schema was introduced are plain
-			// strings; opted-in fields keep accepting them.
-			if _, isString := item.(string); isString && listOptions.AllowStringItems {
-				continue
-			}
-
 			itemMap, ok := item.(map[string]any)
 			if !ok {
 				return fmt.Errorf("item at index %d must be an object", i)

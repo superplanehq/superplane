@@ -60,7 +60,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 				Configuration: map[string]any{"botToken": "test-token"},
 			},
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"channel": "123456789", "files": []any{"", ""}},
+			Configuration: map[string]any{"channel": "123456789", "files": []any{map[string]any{"source": "url", "url": ""}, map[string]any{"source": "url", "url": ""}}},
 		})
 
 		require.ErrorContains(t, err, "either content, embed (title/description), or files is required")
@@ -69,7 +69,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 	t.Run("too many files -> error", func(t *testing.T) {
 		files := make([]any, 11)
 		for i := range files {
-			files[i] = fmt.Sprintf("https://example.com/file-%d.png", i)
+			files[i] = map[string]any{"source": "url", "url": fmt.Sprintf("https://example.com/file-%d.png", i)}
 		}
 
 		err := component.Setup(core.SetupContext{
@@ -89,7 +89,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 				Configuration: map[string]any{"botToken": "test-token"},
 			},
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"channel": "123456789", "files": []any{"ftp://example.com/file.png"}},
+			Configuration: map[string]any{"channel": "123456789", "files": []any{map[string]any{"source": "url", "url": "ftp://example.com/file.png"}}},
 		})
 
 		require.ErrorContains(t, err, "must be an http(s) URL")
@@ -105,7 +105,7 @@ func Test__SendTextMessage__Setup(t *testing.T) {
 				Configuration: map[string]any{"botToken": "test-token"},
 			},
 			Metadata:      &contexts.MetadataContext{},
-			Configuration: map[string]any{"channel": "123456789", "files": []any{"{{ nodes.download.outputs.url }}"}},
+			Configuration: map[string]any{"channel": "123456789", "files": []any{map[string]any{"source": "url", "url": "{{ nodes.download.outputs.url }}"}}},
 		})
 
 		require.NoError(t, err)
@@ -293,7 +293,7 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 			Configuration: map[string]any{
 				"channel": "123456789",
 				"content": "Here is the artifact",
-				"files":   []any{"https://artifacts.example.com/agents/abc/artifacts/screenshot.png?sig=xyz"},
+				"files":   []any{map[string]any{"source": "url", "url": "https://artifacts.example.com/agents/abc/artifacts/screenshot.png?sig=xyz"}},
 			},
 		})
 
@@ -324,7 +324,7 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 			HTTP:           httpContext,
 			Configuration: map[string]any{
 				"channel": "123456789",
-				"files":   []any{"https://artifacts.example.com/missing.png"},
+				"files":   []any{map[string]any{"source": "url", "url": "https://artifacts.example.com/missing.png"}},
 			},
 		})
 
@@ -343,7 +343,7 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 			HTTP:           &contexts.HTTPContext{},
 			Configuration: map[string]any{
 				"channel": "123456789",
-				"files":   []any{""},
+				"files":   []any{map[string]any{"source": "url", "url": ""}},
 			},
 		})
 
@@ -433,51 +433,6 @@ func Test__SendTextMessage__Execute(t *testing.T) {
 	})
 }
 
-func Test__SendTextMessage__DataURIFiles(t *testing.T) {
-	t.Run("validateFiles accepts data URIs", func(t *testing.T) {
-		require.NoError(t, validateFiles([]FileAttachment{{Raw: "data:text/csv;base64,YSxiCjEsMgo="}}))
-		require.NoError(t, validateFiles([]FileAttachment{{Raw: "data:text/plain,hello%20world"}}))
-	})
-
-	t.Run("validateFiles rejects malformed data URIs", func(t *testing.T) {
-		require.ErrorContains(t, validateFiles([]FileAttachment{{Raw: "data:text/csv;base64"}}), "invalid data URI")
-		require.ErrorContains(t, validateFiles([]FileAttachment{{Raw: "data:text/csv;base64,%%%"}}), "invalid data URI")
-	})
-
-	t.Run("parseDataURI keeps undecodable plain data as-is", func(t *testing.T) {
-		mediaType, content, err := parseDataURI("data:text/csv,discount\n50% off")
-		require.NoError(t, err)
-		require.Equal(t, "text/csv", mediaType)
-		require.Equal(t, []byte("discount\n50% off"), content)
-	})
-
-	t.Run("parseDataURI decodes base64 and plain content", func(t *testing.T) {
-		mediaType, content, err := parseDataURI("data:image/png;base64,aGVsbG8=")
-		require.NoError(t, err)
-		require.Equal(t, "image/png", mediaType)
-		require.Equal(t, []byte("hello"), content)
-
-		mediaType, content, err = parseDataURI("data:text/plain,hello%20world")
-		require.NoError(t, err)
-		require.Equal(t, "text/plain", mediaType)
-		require.Equal(t, []byte("hello world"), content)
-	})
-
-	t.Run("attachmentName appends the content-type extension when missing", func(t *testing.T) {
-		require.Equal(t, "file-1.png", attachmentName("", "image/png", 0))
-		require.Equal(t, "chart.png", attachmentName("chart", "image/png", 0))
-		// A user-provided name that already carries an extension is kept.
-		require.Equal(t, "report.pdf", attachmentName("report.pdf", "image/png", 0))
-	})
-
-	t.Run("extensionForType avoids the obscure jpeg alias", func(t *testing.T) {
-		// mime.ExtensionsByType would return ".jfif" first for image/jpeg,
-		// which Discord will not preview; the canonical map returns ".jpg".
-		require.Equal(t, ".jpg", extensionForType("image/jpeg"))
-		require.Equal(t, ".png", extensionForType("image/png"))
-	})
-}
-
 func Test__SendTextMessage__InlineImageIsRenderable(t *testing.T) {
 	// A minimal but valid PNG (1x1 transparent pixel).
 	pngBytes := []byte{
@@ -512,36 +467,22 @@ func Test__SendTextMessage__InlineImageIsRenderable(t *testing.T) {
 	})
 }
 
-func Test__SendTextMessage__SchemelessFileEntry(t *testing.T) {
-	t.Run("raw content without a scheme fails with guidance", func(t *testing.T) {
-		client := &Client{BotToken: "t"}
-		_, err := sendMessage(client, &contexts.HTTPContext{}, SendTextMessageConfiguration{
-			Channel: "chan",
-			Content: "hi",
-			Files:   []FileAttachment{{Raw: "iVBORw0KGgoAAAANSUhEUg=="}},
-		}, CreateMessageRequest{Content: "hi"})
-		require.ErrorContains(t, err, "neither an http(s) URL nor a data: URI")
-	})
-
-	t.Run("data URI with whitespace-padded base64 decodes", func(t *testing.T) {
-		mediaType, content, err := parseDataURI("data:image/png;base64, aGVsbG8= ")
-		require.NoError(t, err)
-		require.Equal(t, "image/png", mediaType)
-		require.Equal(t, []byte("hello"), content)
-	})
-}
-
 func Test__SendTextMessage__StructuredFileEntries(t *testing.T) {
-	t.Run("decode accepts strings and objects", func(t *testing.T) {
+	t.Run("decode reads object entries", func(t *testing.T) {
 		entries, err := decodeFileAttachments([]any{
-			"https://example.com/report.pdf",
+			map[string]any{"source": "url", "url": "https://example.com/report.pdf"},
 			map[string]any{"source": "content", "content": "a,b\n1,2\n", "encoding": "text", "mimeType": "text/csv"},
 		})
 		require.NoError(t, err)
 		require.Len(t, entries, 2)
-		require.Equal(t, "https://example.com/report.pdf", entries[0].Raw)
+		require.Equal(t, "https://example.com/report.pdf", entries[0].URL)
 		require.Equal(t, "content", entries[1].Source)
 		require.Equal(t, "text/csv", entries[1].MimeType)
+	})
+
+	t.Run("decode rejects a non-object entry", func(t *testing.T) {
+		_, err := decodeFileAttachments([]any{"https://example.com/report.pdf"})
+		require.ErrorContains(t, err, "must be a file entry")
 	})
 
 	t.Run("content entry with base64 encoding decodes bytes", func(t *testing.T) {
@@ -602,72 +543,47 @@ func Test__SendTextMessage__InlineFileSizeLimit(t *testing.T) {
 	require.ErrorContains(t, err, "per-file limit")
 }
 
-func Test__SendTextMessage__LegacyStringEntriesRemainSupported(t *testing.T) {
-	// Nodes saved before the structured file entry existed store plain strings.
-	// They must keep validating and attaching, alongside the object form.
-	component := &SendTextMessage{}
-
-	t.Run("legacy string entries pass configuration validation", func(t *testing.T) {
-		legacy := map[string]any{
-			"channel": "123456789",
-			"content": "artifacts",
-			"files": []any{
-				`{{ $["Launch Cursor Agent"].data.artifacts[0].url }}`,
-				"https://example.com/report.pdf",
-			},
-		}
-		require.NoError(t, configuration.ValidateConfiguration(component.Configuration(), legacy))
-	})
-
-	t.Run("structured entries pass configuration validation", func(t *testing.T) {
-		structured := map[string]any{
-			"channel": "123456789",
-			"files": []any{
-				map[string]any{"source": "content", "content": "aGk=", "encoding": "base64", "mimeType": "image/png"},
-			},
-		}
-		require.NoError(t, configuration.ValidateConfiguration(component.Configuration(), structured))
-	})
-
-	t.Run("non-string, non-object items are still rejected", func(t *testing.T) {
-		bad := map[string]any{"channel": "123456789", "files": []any{123}}
-		require.ErrorContains(t, configuration.ValidateConfiguration(component.Configuration(), bad), "must be an object")
-	})
-
-	t.Run("a legacy data URI string still attaches its content", func(t *testing.T) {
-		file, err := resolveFileAttachment(&Client{BotToken: "t"}, &contexts.HTTPContext{},
-			FileAttachment{Raw: "data:text/csv,a%2Cb"}, 0)
-		require.NoError(t, err)
-		require.Equal(t, []byte("a,b"), file.Content)
-	})
-}
-
-func Test__SendTextMessage__URLEntriesAttachIdenticallyInBothShapes(t *testing.T) {
+func Test__SendTextMessage__URLEntryIsNamedFromContent(t *testing.T) {
 	// A presigned-style URL with no extension in its path: the attachment name
-	// and type must come from the content, not the config shape.
+	// and type must come from the content, otherwise Discord shows a generic
+	// download instead of the image.
 	pngBytes := []byte{
 		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
 		0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
 		0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89,
 	}
-	const artifactURL = "https://artifacts.example.com/agents/abc/download?sig=xyz"
-
-	fetchOnce := func() *contexts.HTTPContext {
-		return &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(pngBytes))},
-			},
-		}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(pngBytes))},
+		},
 	}
 
-	legacy, err := resolveFileAttachment(&Client{BotToken: "t"}, fetchOnce(), FileAttachment{Raw: artifactURL}, 0)
+	file, err := resolveFileAttachment(&Client{BotToken: "t"}, httpCtx,
+		FileAttachment{Source: fileSourceURL, URL: "https://artifacts.example.com/agents/abc/download?sig=xyz"}, 0)
 	require.NoError(t, err)
+	assert.Equal(t, "download.png", file.Name)
+	assert.Equal(t, "image/png", file.ContentType)
+	assert.Equal(t, pngBytes, file.Content)
+}
 
-	structured, err := resolveFileAttachment(&Client{BotToken: "t"}, fetchOnce(),
-		FileAttachment{Source: fileSourceURL, URL: artifactURL}, 0)
-	require.NoError(t, err)
+func Test__SendTextMessage__ConfigurationContract(t *testing.T) {
+	component := &SendTextMessage{}
 
-	assert.Equal(t, structured, legacy, "a legacy string URL must attach exactly like the structured form")
-	assert.Equal(t, "image/png", legacy.ContentType)
-	assert.Equal(t, "download.png", legacy.Name, "the extension must come from the sniffed content")
+	t.Run("structured entries are valid", func(t *testing.T) {
+		require.NoError(t, configuration.ValidateConfiguration(component.Configuration(), map[string]any{
+			"channel": "123456789",
+			"files": []any{
+				map[string]any{"source": "url", "url": "https://example.com/a.png"},
+				map[string]any{"source": "content", "content": "aGk=", "encoding": "base64", "mimeType": "image/png"},
+			},
+		}))
+	})
+
+	t.Run("non-object entries are rejected", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(component.Configuration(), map[string]any{
+			"channel": "123456789",
+			"files":   []any{"https://example.com/a.png"},
+		})
+		require.ErrorContains(t, err, "must be an object")
+	})
 }

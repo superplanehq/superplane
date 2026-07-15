@@ -214,11 +214,6 @@ type ListTypeOptions struct {
 
 	// When true, list items can be reordered with move up/down controls.
 	Reorderable bool `json:"reorderable,omitempty"`
-
-	// AllowStringItems keeps a list whose ItemDefinition is an object valid for
-	// configurations saved as plain strings before the item schema existed.
-	// Components that set it must still decode both shapes at execution.
-	AllowStringItems bool `json:"allowStringItems,omitempty"`
 }
 
 /*
