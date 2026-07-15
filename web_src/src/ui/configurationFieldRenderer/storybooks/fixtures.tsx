@@ -7,6 +7,7 @@ import type {
   OrganizationsIntegration,
 } from "@/api-client";
 import { integrationKeys } from "@/hooks/useIntegrations";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 import { secretKeys } from "@/hooks/useSecrets";
 
@@ -581,6 +582,23 @@ export const rendererExamples: RendererExample[] = [
     allowExpressions: true,
   },
   {
+    id: "app",
+    storyName: "AppField",
+    category: "Context-Aware Inputs",
+    source: "Special field type",
+    goType: "FieldTypeApp",
+    docsDescription:
+      "Use `app` when a trigger or component needs to reference another app in the same organization, such as subscribing to its events.",
+    field: baseField({
+      name: "app",
+      label: "Source app",
+      type: "app",
+      description: "Select another app in this organization to listen for events.",
+      required: true,
+    }),
+    initialValue: "canvas_billing_alerts",
+  },
+  {
     id: "any-predicate-list",
     storyName: "AnyPredicateListField",
     category: "Structured Content",
@@ -617,12 +635,12 @@ export const rendererExamples: RendererExample[] = [
     source: "Special field type",
     goType: "FieldTypeGitRef",
     docsDescription:
-      "Use `git-ref` when downstream integrations need a normalized Git reference in `refs/heads/*`, `refs/tags/*`, or `refs/pull/*` form.",
+      "Use `git-ref` when downstream integrations need a normalized Git reference in `refs/heads/*` or `refs/tags/*` form.",
     field: baseField({
       name: "deployRef",
       label: "Deploy ref",
       type: "git-ref",
-      description: "Use when the stored value must be a normalized Git branch, tag, or pull request reference.",
+      description: "Use when the stored value must be a normalized Git branch or tag reference.",
     }),
     initialValue: "refs/heads/main",
   },
@@ -745,6 +763,24 @@ const mockGroups = [
   },
 ];
 
+const mockCanvases = [
+  {
+    id: "canvas_billing_alerts",
+    name: "Billing Alerts",
+    organizationId: STORY_ORGANIZATION_ID,
+  },
+  {
+    id: "canvas_customer_onboarding",
+    name: "Customer Onboarding",
+    organizationId: STORY_ORGANIZATION_ID,
+  },
+  {
+    id: "canvas_storybook_current",
+    name: "Storybook Current App",
+    organizationId: STORY_ORGANIZATION_ID,
+  },
+];
+
 const mockIntegrationResources = [
   {
     id: "repo_1",
@@ -828,6 +864,7 @@ export function seedConfigurationStoryQueryCache(queryClient: QueryClient) {
   queryClient.setQueryData(organizationKeys.users(STORY_DOMAIN_ID), mockUsers);
   queryClient.setQueryData(organizationKeys.roles(STORY_DOMAIN_ID), mockRoles);
   queryClient.setQueryData(organizationKeys.groups(STORY_DOMAIN_ID), mockGroups);
+  queryClient.setQueryData(canvasKeys.list(STORY_ORGANIZATION_ID), mockCanvases);
   queryClient.setQueryData(
     integrationKeys.resources(STORY_ORGANIZATION_ID, STORY_INTEGRATION_ID, "repository"),
     mockIntegrationResources,
