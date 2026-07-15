@@ -232,7 +232,7 @@ export function buildChartData(
     return buildPivotedChartData(rows, xResolver, seriesFieldKey, seriesFields[0], env);
   }
   const seriesResolvers = seriesFields.map((series) => ({
-    key: series.key,
+    key: sanitizeChartSeriesKey(series.key),
     hasField: Boolean(series.field),
     resolver: series.field ? compileFieldResolver(series.field, env) : null,
   }));
@@ -263,8 +263,47 @@ export function buildChartData(
 /** Object key used in pivoted chart rows when `seriesField` resolves empty. */
 export const EMPTY_PIVOTED_SERIES_KEY = "(empty)";
 
+/**
+ * Prefix applied to series keys that would collide with React/DOM props or the
+ * chart row's reserved `x` category field when used as Recharts `dataKey`s.
+ */
+export const RESERVED_CHART_SERIES_KEY_PREFIX = "__sp_";
+
+/**
+ * Series names that break Recharts/React when used as object keys / `dataKey`
+ * values (e.g. React error #62 when `style` is a string/number on an SVG node),
+ * plus `x` which is reserved for the category axis on chart data rows.
+ */
+const RESERVED_CHART_SERIES_KEYS = new Set([
+  "x",
+  "style",
+  "class",
+  "className",
+  "id",
+  "key",
+  "ref",
+  "children",
+  "dangerouslySetInnerHTML",
+]);
+
+/**
+ * Rewrite series keys that would collide with React/DOM props or the chart's
+ * reserved `x` category field. Ordinary keys are returned unchanged; applying
+ * again to an already-prefixed key is a no-op.
+ */
+export function sanitizeChartSeriesKey(key: string): string {
+  if (!RESERVED_CHART_SERIES_KEYS.has(key)) return key;
+  return `${RESERVED_CHART_SERIES_KEY_PREFIX}${key}`;
+}
+
+/** Safe dataKey plus human-readable label for a raw series name (empty → "(empty)"). */
+export function resolveChartSeriesIdentity(raw: string): { key: string; label: string } {
+  const label = raw === "" ? EMPTY_PIVOTED_SERIES_KEY : raw;
+  return { key: sanitizeChartSeriesKey(label), label };
+}
+
 function pivotedSeriesDataKey(raw: string): string {
-  return raw === "" ? EMPTY_PIVOTED_SERIES_KEY : raw;
+  return resolveChartSeriesIdentity(raw).key;
 }
 
 function buildPivotedChartData(
@@ -311,21 +350,29 @@ function buildPivotedChartData(
 }
 
 /**
+ * Distinct pivoted series identities (safe `dataKey` + display label) in
+ * first-seen order. Reserved names keep their original label for legends.
+ */
+export function distinctChartSeries(rows: unknown[], seriesField: string): Array<{ key: string; label: string }> {
+  const env = buildEnv();
+  const resolver = compileFieldResolver(seriesField, env);
+  const ordered: Array<{ key: string; label: string }> = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const identity = resolveChartSeriesIdentity(String(resolver.resolve(row) ?? ""));
+    if (!seen.has(identity.key)) {
+      seen.add(identity.key);
+      ordered.push(identity);
+    }
+  }
+  return ordered;
+}
+
+/**
  * Distinct series keys discovered when pivoting `rows` by `seriesField`. Used
  * by chart renderers to emit one chart layer per pivoted series. Order
  * matches the first occurrence in the input rows.
  */
 export function distinctSeriesKeys(rows: unknown[], seriesField: string): string[] {
-  const env = buildEnv();
-  const resolver = compileFieldResolver(seriesField, env);
-  const ordered: string[] = [];
-  const seen = new Set<string>();
-  for (const row of rows) {
-    const key = pivotedSeriesDataKey(String(resolver.resolve(row) ?? ""));
-    if (!seen.has(key)) {
-      seen.add(key);
-      ordered.push(key);
-    }
-  }
-  return ordered;
+  return distinctChartSeries(rows, seriesField).map((series) => series.key);
 }

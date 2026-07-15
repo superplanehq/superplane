@@ -231,6 +231,48 @@ describe("WidgetChart bar variants", () => {
     );
     expect(container.querySelectorAll(".recharts-bar").length).toBe(2);
   });
+
+  it("renders when a configured series label is a reserved DOM prop name", () => {
+    const rows = [
+      { day: "Mon", style: 10 },
+      { day: "Tue", style: 20 },
+    ];
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "bar",
+        xField: "day",
+        series: [{ field: "style", label: "style" }],
+        legend: "show",
+      },
+      { rows },
+    );
+    expect(screen.getByTestId("widget-chart")).toBeInTheDocument();
+    expect(container.querySelectorAll(".recharts-bar").length).toBe(1);
+    expect(screen.getByText("style")).toBeInTheDocument();
+  });
+
+  it("renders pivoted series whose seriesField values are reserved DOM prop names", () => {
+    const rows = [
+      { day: "Mon", kind: "style", count: 10 },
+      { day: "Mon", kind: "class", count: 5 },
+      { day: "Tue", kind: "style", count: 7 },
+    ];
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "stacked-bar",
+        xField: "day",
+        seriesField: "kind",
+        series: [{ field: "count", label: "Count" }],
+      },
+      { rows },
+    );
+    expect(screen.getByTestId("widget-chart")).toBeInTheDocument();
+    expect(container.querySelectorAll(".recharts-bar").length).toBe(2);
+    expect(screen.getByText("style")).toBeInTheDocument();
+    expect(screen.getByText("class")).toBeInTheDocument();
+  });
 });
 
 describe("WidgetChart legend visibility", () => {
