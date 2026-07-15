@@ -6,7 +6,8 @@ import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
-import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
+import { type RunStatusKey } from "@/ui/Runs/runPresentation";
+import { RunStatusBadge } from "@/ui/Runs/RunStatusBadge";
 import { Link as LinkIcon } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -65,7 +66,7 @@ export function RunRow({
       className={cn(
         RUNS_SIDEBAR_RUN_ROW_CLASS,
         "group relative w-full transition-colors",
-        isSelected ? "bg-sky-100 dark:bg-gray-800" : "hover:bg-slate-50 dark:hover:bg-gray-800",
+        isSelected ? "bg-sky-100 dark:bg-indigo-950" : "hover:bg-slate-50 dark:hover:bg-gray-800",
       )}
     >
       <Link
@@ -109,9 +110,7 @@ function RunRowTitleLine({
       <span
         className={cn(
           "min-w-0 flex-1 truncate text-[13px] leading-5",
-          isSelected
-            ? "font-semibold text-sky-950 dark:text-gray-50"
-            : "font-semibold text-gray-900 dark:text-gray-100",
+          isSelected ? "font-medium text-sky-950 dark:text-gray-50" : "font-medium text-gray-900 dark:text-gray-100",
         )}
         title={title}
       >
@@ -147,25 +146,6 @@ async function copyRunLink(runHref: string) {
   } catch {
     toast.error("Failed to copy run link");
   }
-}
-
-function RunStatusBadge({ status }: { status: RunStatusKey }) {
-  const statusMeta = RUN_STATUS_META[status];
-  const StatusIcon = statusMeta.icon;
-
-  return (
-    <span
-      aria-label={statusMeta.label}
-      title={statusMeta.label}
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[12px] font-medium leading-4 ring-1",
-        statusMeta.badgeClassName,
-      )}
-    >
-      <StatusIcon className="size-3.5" aria-hidden />
-      <span>{statusMeta.label}</span>
-    </span>
-  );
 }
 
 function RunRowMetadataLine({

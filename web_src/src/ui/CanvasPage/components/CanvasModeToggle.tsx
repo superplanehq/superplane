@@ -1,5 +1,6 @@
 import { appPath } from "@/lib/appPaths";
 import { isNormalClick } from "@/lib/linkHelpers";
+import { segmentedNavTabClassName } from "@/lib/segmentedNav";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
 
@@ -27,12 +28,6 @@ const CONSOLE_TAB = "console";
 const MEMORY_TAB = "memory";
 const FILES_TAB = "files";
 
-const BASE_TAB_CLASSES =
-  "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-2.5 py-1 text-[13px] font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50";
-
-const ACTIVE_CLASSES = "bg-white text-slate-900 shadow-sm dark:bg-gray-400 dark:text-gray-950 dark:shadow-none";
-const INACTIVE_CLASSES = "text-slate-500 hover:text-foreground dark:text-gray-400 dark:hover:text-gray-100";
-
 const MODE_TO_TAB: Record<string, string> = {
   console: CONSOLE_TAB,
   memory: MEMORY_TAB,
@@ -51,31 +46,31 @@ function modeToTab(mode: string): string {
   return MODE_TO_TAB[mode] ?? CANVAS_TAB;
 }
 
-/** Edit-mode nav background tinted to match the draft status badges. */
+/** Edit-mode nav background tinted to match edit-session chrome. */
 function editingNavClassName(): string {
-  return "bg-orange-200 dark:bg-orange-900/55";
+  return "bg-orange-200";
 }
 
-/** Edit-mode inactive tab text — light tints match draft badges; dark mode keeps orange cues. */
+/** Edit-mode inactive tab text on the orange nav track. */
 function editingInactiveClassName(): string {
-  return "bg-transparent text-orange-800/80 hover:text-orange-900 transition-none dark:text-orange-300/80 dark:hover:text-orange-200";
+  return "bg-transparent text-orange-950/80 hover:text-orange-950 transition-none";
 }
 
-/** Active edit tab — lighter orange pill on the orange nav track. */
+/** Active edit tab — white pill on the orange nav track in light mode. */
 function editingActiveClassName(): string {
-  return "rounded-full bg-orange-100 text-orange-950 dark:bg-orange-700/60 dark:text-orange-50 dark:shadow-none";
+  return "rounded-full bg-white text-gray-800 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:shadow-none";
 }
 
 function tabClasses(selected: string, value: string, editing: boolean) {
   const isActive = selected === value;
-  const stateClass = isActive
-    ? editing
-      ? editingActiveClassName()
-      : ACTIVE_CLASSES
-    : editing
-      ? editingInactiveClassName()
-      : INACTIVE_CLASSES;
-  return cn(BASE_TAB_CLASSES, stateClass, isActive && "font-bold");
+  if (!editing) {
+    return segmentedNavTabClassName(isActive);
+  }
+
+  return segmentedNavTabClassName(isActive, {
+    activeClasses: editingActiveClassName(),
+    inactiveClasses: editingInactiveClassName(),
+  });
 }
 
 export function CanvasModeToggle({

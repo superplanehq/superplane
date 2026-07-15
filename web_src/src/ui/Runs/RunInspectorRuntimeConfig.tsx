@@ -1,8 +1,8 @@
 import { Pencil } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SEGMENTED_NAV_CLASSES, segmentedNavTabClassName } from "@/lib/segmentedNav";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { cn } from "@/lib/utils";
 import { EmptySectionText, JsonPayload, TimelineAccordionCard } from "./RunInspectorTimelineCard";
@@ -78,29 +78,23 @@ function RuntimeHeaderActions({
 
 function RuntimeViewToggle({ mode, onChange }: { mode: "form" | "json"; onChange: (mode: "form" | "json") => void }) {
   return (
-    <span className="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white p-0.5 text-xs font-medium dark:border-gray-700 dark:bg-gray-950">
+    <nav aria-label="Runtime config view" className={SEGMENTED_NAV_CLASSES}>
       {(["form", "json"] as const).map((item) => (
-        <Button
+        <button
           key={item}
           type="button"
-          variant="ghost"
           aria-label={item === "form" ? "Form" : "JSON"}
           aria-pressed={mode === item}
-          className={cn(
-            "h-6 rounded px-2 text-xs",
-            mode === item
-              ? "bg-slate-100 text-slate-900 shadow-sm hover:bg-slate-100 dark:bg-gray-800 dark:text-gray-50 dark:hover:bg-gray-800"
-              : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-100",
-          )}
+          className={cn(segmentedNavTabClassName(mode === item), "text-xs")}
           onClick={(event) => {
             event.stopPropagation();
             onChange(item);
           }}
         >
           {item === "form" ? "Form" : "JSON"}
-        </Button>
+        </button>
       ))}
-    </span>
+    </nav>
   );
 }
 

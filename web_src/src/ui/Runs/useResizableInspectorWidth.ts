@@ -46,7 +46,7 @@ export function useResizableInspectorWidth() {
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", finishResize);
     window.addEventListener("pointercancel", finishResize);
-    document.body.style.cursor = "ew-resize";
+    document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
 
     return () => {

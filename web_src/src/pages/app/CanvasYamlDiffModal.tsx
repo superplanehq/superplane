@@ -114,7 +114,7 @@ function CanvasYamlDiffBody({
         <div className="flex min-w-0 items-center gap-3">
           <h2 className="truncate text-sm font-medium text-slate-900 dark:text-gray-100">{title}</h2>
         </div>
-        <DialogClose className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded leading-none hover:bg-slate-950/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none dark:hover:bg-white/10">
+        <DialogClose className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full leading-none hover:bg-slate-950/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none dark:hover:bg-white/10">
           <XIcon className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </DialogClose>
