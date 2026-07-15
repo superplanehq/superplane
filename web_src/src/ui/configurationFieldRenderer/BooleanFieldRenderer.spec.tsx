@@ -49,4 +49,10 @@ describe("BooleanFieldRenderer", () => {
     expect(handleChange).toHaveBeenCalledTimes(1);
     expect(handleChange).toHaveBeenCalledWith(true);
   });
+
+  it("renders a disabled switch when readOnly", () => {
+    render(<BooleanFieldRenderer field={createBooleanField()} value={true} onChange={vi.fn()} readOnly />);
+
+    expect(screen.getByRole("switch")).toBeDisabled();
+  });
 });
