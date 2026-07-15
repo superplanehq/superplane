@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/chart";
 import { useTheme } from "@/contexts/useTheme";
 
-import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
+import { applyFilters, applySort, buildChartData, distinctChartSeries, sanitizeChartSeriesKey } from "./widgetData";
 import { resolveChartColor } from "./chartColors";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
 import { WidgetEmptyState } from "../WidgetEmptyState";
@@ -103,23 +103,24 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   const configuredSeries = useMemo<ChartSeries[]>(
     () =>
       render.series.map((s, idx) => {
-        const key = s.label ?? s.field ?? `series-${idx}`;
+        const label = s.label ?? s.field ?? `series-${idx}`;
+        const key = sanitizeChartSeriesKey(label);
         return {
           ...s,
           key,
-          color: resolveChartColor(key, idx, isDark),
+          label: s.label ?? label,
+          color: resolveChartColor(label, idx, isDark),
         };
       }),
     [render.series, isDark],
   );
   const pivotedSeries = useMemo<ChartSeries[]>(() => {
     if (!seriesField) return [];
-    const distinct = distinctSeriesKeys(sorted, seriesField);
-    return distinct.map((key, idx) => ({
+    return distinctChartSeries(sorted, seriesField).map(({ key, label }, idx) => ({
       ...valueSeries,
       key,
-      label: key,
-      color: resolveChartColor(key, idx, isDark),
+      label,
+      color: resolveChartColor(label, idx, isDark),
     }));
   }, [seriesField, sorted, valueSeries, isDark]);
   const series = seriesField ? pivotedSeries : configuredSeries;
