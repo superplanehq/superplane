@@ -27,6 +27,11 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   excludedSuggestions?: string[];
   /** Minimum height in pixels. Overrides the default derived from `inputSize` (useful for multi-line fields). */
   minHeight?: number;
+  /**
+   * When true, the input stretches to fill the height of its parent instead of auto-resizing to fit its content.
+   * Use this inside modals or panels that provide their own scroll container.
+   */
+  fullHeight?: boolean;
 }
 
 const suggestionSortPriority = {
@@ -122,6 +127,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       expressionMode = "wrapped",
       excludedSuggestions,
       minHeight,
+      fullHeight = false,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -180,11 +186,17 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const suppressSuggestionsRef = useRef(false);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
 
-    // Auto-resize textarea based on content (and backdrop in preview mode)
+    // Auto-resize textarea based on content (and backdrop in preview mode).
+    // In fullHeight mode the parent controls the height, so we skip the auto-resize
+    // and clear any inline height that a previous non-fullHeight render might have set.
     const adjustTextareaHeight = useCallback(() => {
       const textarea = inputRef.current;
       const backdrop = backdropRef.current;
       if (!textarea) return;
+      if (fullHeight) {
+        textarea.style.height = "";
+        return;
+      }
       textarea.style.height = "auto";
       // In preview mode, backdrop content may be longer than textarea content
       // Use the larger of the two heights
@@ -193,7 +205,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       const resolvedMinHeight = minHeight ?? INPUT_SIZE_MIN_HEIGHT[inputSize];
       const finalHeight = Math.max(textareaHeight, backdropHeight, resolvedMinHeight);
       textarea.style.height = `${finalHeight}px`;
-    }, [inputSize, minHeight]);
+    }, [fullHeight, inputSize, minHeight]);
 
     // Tokenize expression content for syntax highlighting
     const tokenizeExpression = (expr: string): React.ReactNode[] => {
@@ -1332,6 +1344,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           }
           break;
         case "Escape":
+          e.preventDefault();
+          e.stopPropagation();
           closeSuggestions();
           break;
       }
@@ -1350,7 +1364,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const showBottomBar = showPreviewToggle || (isFocused && !!quickTip);
 
     return (
-      <div ref={containerRef} className="relative w-full">
+      <div ref={containerRef} className={twMerge(["relative w-full", fullHeight && "flex h-full flex-col"])}>
         {/* Hidden mirror element for measuring cursor position */}
         <div
           ref={mirrorRef}
@@ -1371,6 +1385,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             "relative block w-full rounded-md bg-white dark:bg-gray-800",
             "focus-within:ring-ring/50",
             "has-data-disabled:opacity-50",
+            fullHeight && "flex min-h-0 flex-1",
             className,
           ])}
         >
@@ -1431,6 +1446,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
               "text-transparent caret-gray-950 dark:caret-white",
               INPUT_SIZE_TYPOGRAPHY[inputSize],
               INPUT_SIZE_HEIGHT[inputSize],
+              fullHeight && "h-full min-h-0 flex-1 overflow-y-auto",
             ])}
             {...rest}
           />
@@ -1496,6 +1512,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             <div
               ref={suggestionsRef}
               data-testid="autocomplete-suggestions"
+              data-autocomplete-suggestions=""
               className="fixed z-[9999] bg-transparent"
               style={{
                 top: `${dropdownPosition.top}px`,
