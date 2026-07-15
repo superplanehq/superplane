@@ -129,6 +129,40 @@ func Test__DescribeIntegration(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("integration app no longer registered -> internal error", func(t *testing.T) {
+		//
+		// Register a test integration and create an integration with it.
+		//
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				ctx.Integration.Ready()
+				return nil
+			},
+		})
+
+		name := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"key": "value"})
+		require.NoError(t, err)
+
+		createResponse, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
+		require.NoError(t, err)
+		integrationID := createResponse.Integration.Metadata.Id
+
+		//
+		// Unregister the app to simulate an integration whose app was removed.
+		// Serialization now fails, but the error must be classified as Internal
+		// instead of leaking an unhandled HTTP 500.
+		//
+		delete(r.Registry.Integrations, "dummy")
+
+		_, err = DescribeIntegration(ctx, r.Registry, r.Organization.ID.String(), integrationID)
+		require.Error(t, err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.Internal, code)
+		assert.Contains(t, msg, "failed to serialize integration")
+	})
+
 	t.Run("describe integration with configuration -> configuration returned", func(t *testing.T) {
 		//
 		// Register a test application
