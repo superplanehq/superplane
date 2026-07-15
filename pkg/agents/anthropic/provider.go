@@ -131,6 +131,9 @@ func (p *Provider) SendMessage(ctx context.Context, providerSessionID, message s
 		if isProviderSessionUnavailable(err) {
 			return fmt.Errorf("%w: %w", agents.ErrProviderSessionUnavailable, err)
 		}
+		if isClientPayloadError(err) {
+			return fmt.Errorf("%w: %w", agents.ErrInvalidRequest, err)
+		}
 		return fmt.Errorf("anthropic: send message: %w", err)
 	}
 	return nil
@@ -282,6 +285,26 @@ func isProviderSessionUnavailable(err error) bool {
 		strings.Contains(message, "session was deleted") ||
 		strings.Contains(message, "session has been archived") ||
 		strings.Contains(message, "session was archived")
+}
+
+func isClientPayloadError(err error) bool {
+	var apiErr *apiError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	if apiErr.StatusCode == http.StatusRequestEntityTooLarge {
+		return true
+	}
+	if apiErr.StatusCode != http.StatusBadRequest {
+		return false
+	}
+
+	message := strings.ToLower(apiErr.Message)
+	return strings.Contains(message, "image") ||
+		strings.Contains(message, "payload") ||
+		strings.Contains(message, "too large") ||
+		strings.Contains(message, "request body") ||
+		strings.Contains(message, "body size")
 }
 
 func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, onEvent func(agents.ProviderEvent) error) error {
