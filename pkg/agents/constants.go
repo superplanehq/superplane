@@ -29,6 +29,7 @@ func AgentTokenScopes(canvasID string) []string {
 const preambleTemplate = "[SuperPlane session context — refreshed every turn; always use the latest values]\n" +
 	"canvas_id: %s\n" +
 	"organization_id: %s\n" +
+	"auto_layout_on_update_enabled: %s\n" +
 	"\n" +
 	"All SuperPlane access goes through the agent tools. Use the\n" +
 	"`superplane_app` custom tool for app reads, runtime reads, connected\n" +
@@ -94,11 +95,12 @@ Rules:
   The message field is the commit message: describe what changed in the app. Do not prefix it with "Staging ready" or similar status text.
 
 - You can add, remove, or modify nodes and edges with 'patch_staging' patch_operations. Graph patches auto-layout affected connected components by default.
+- If auto_layout_on_update_enabled is false in the session context, pass auto_layout.enabled=false with graph patch_staging calls unless the user explicitly asks you to arrange or auto-layout nodes.
 - Do not change an existing node's implementation with update_node. update_node may rename a node, update configuration, move it, or collapse/expand it. The only implementation exception is a placeholder node that has no component/trigger/widget yet; assigning its first implementation is allowed. All other component/trigger/widget/integration replacements must be delete_node plus add_node followed by reconnecting the required edges.
 - You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Read it with 'superplane_app' include_console and save it with action 'patch_staging' using console_yaml.
 - You can configure integration references and set up expressions. Secrets are managed by the user; reference them in YAML and ask the user to create any that do not exist.
 - For direct app edits, prefer the shortest reliable path: use 'superplane_app' action 'read' to read the effective staged app once, list integrations only if integration IDs are needed, stage the update, then report the result.
-- Use the 'superplane_app' custom tool for canvas reads, runtime reads, staging updates, and connected integration lists. Use action 'read_runtime' for memory, runs, event executions, node executions, node queue items, node events, and runner logs. patch_staging auto-layouts affected connected components by default. Pass auto_layout only when you need full_canvas, custom connected_component node_ids, or a layout-only update.
+- Use the 'superplane_app' custom tool for canvas reads, runtime reads, staging updates, and connected integration lists. Use action 'read_runtime' for memory, runs, event executions, node executions, node queue items, node events, and runner logs. patch_staging auto-layouts affected connected components by default. Pass auto_layout when you need full_canvas, custom connected_component node_ids, layout-only updates, or enabled=false to preserve current positions.
 - When reading an app for build work, read it once with 'superplane_app' action 'read' and work from the returned YAML. Re-read only after you stage an update.
 - When editing the Console, work from the Console YAML already returned by 'superplane_app' (include_console). Read ref/docs/prd/console-and-widgets.md only if the task needs widget details you do not already know.
 - The tools return everything you need in one call; do not fan out repeated discovery commands. Read once, then work from the returned data.

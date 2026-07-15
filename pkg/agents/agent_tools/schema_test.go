@@ -86,7 +86,12 @@ func TestAppAgentToolSchemaUsesPatchStagingForStagingUpdates(t *testing.T) {
 	assert.NotContains(t, schema.Properties, "canvas_yaml")
 	assert.Contains(t, schema.Properties, "console_yaml")
 	assert.Contains(t, schema.Properties["console_yaml"].Description, "For patch_staging")
-	assert.Contains(t, schema.Properties["auto_layout"].Description, "applies layout only")
+	assert.Contains(t, schema.Properties["auto_layout"].Description, "enabled false")
+	assert.Contains(t, schema.Properties["auto_layout"].Properties, "enabled")
+
+	operationSchema := schema.Properties["patch_operations"].Items
+	require.NotNil(t, operationSchema)
+	assert.Contains(t, operationSchema.Properties, "position")
 }
 
 func TestAppAgentToolSchemaIncludesOptionalVersionID(t *testing.T) {
