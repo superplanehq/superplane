@@ -44,13 +44,13 @@ function useHtmlEditorPreview(
   draftVariables: MarkdownVariable[],
 ) {
   const textForSideload = useMemo(() => `${draftTitle}\n${draftBody}`, [draftTitle, draftBody]);
-  const { vars, errors, isLoading, baseLoading, sideloadLoading } = useMarkdownVariables(
+  const { vars, errors, baseLoading, sideloadLoading, searchingNames } = useMarkdownVariables(
     canvasId,
     draftVariables,
     textForSideload,
   );
-  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading);
-  return { previewVars: vars, errors, isLoading, previewLoading };
+  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
+  return { previewVars: vars, errors, baseLoading, searchingNames, previewLoading };
 }
 
 interface HtmlPanelEditorProps {
@@ -97,7 +97,7 @@ export function HtmlPanelEditor({
     }
   };
 
-  const { previewVars, errors, isLoading, previewLoading } = useHtmlEditorPreview(
+  const { previewVars, errors, baseLoading, searchingNames, previewLoading } = useHtmlEditorPreview(
     canvasId,
     draftTitle,
     draftBody,
@@ -159,7 +159,8 @@ export function HtmlPanelEditor({
           setDraftVariables={setDraftVariables}
           previewVars={previewVars}
           errors={errors}
-          isLoading={isLoading}
+          baseLoading={baseLoading}
+          searchingNames={searchingNames}
           onInsertSnippet={(snippet) => codeEditorRef.current?.insertAtCursor(snippet)}
           collapsed={variablesCollapsed}
           onToggleCollapsed={toggleVariablesCollapsed}
