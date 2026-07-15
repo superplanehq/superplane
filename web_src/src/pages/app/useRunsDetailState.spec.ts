@@ -316,7 +316,7 @@ describe("useRunsDetailState", () => {
     expect(result.current.detailDismissedForRunId).toBeNull();
   });
 
-  it("persists closed run detail and keeps run row selection closed", () => {
+  it("reopens run detail when a run row is selected after dismissal", () => {
     const { result } = renderHook(() =>
       useRunsDetailState(makeSearchParams({ run: "run-1" }), true, "run-1", undefined, { canvasId: "canvas-1" }),
     );
@@ -328,11 +328,12 @@ describe("useRunsDetailState", () => {
     expect(window.localStorage.getItem(runInspectorAutoOpenStorageKey("canvas-1"))).toBe("false");
 
     act(() => {
-      result.current.maybeOpenRunDetailForRun("run-2");
+      result.current.clearDismissedRunDetail({ persistAutoOpen: true });
     });
 
-    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-1")).toBe(true);
-    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-2")).toBe(true);
+    expect(window.localStorage.getItem(runInspectorAutoOpenStorageKey("canvas-1"))).toBe("true");
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-1")).toBe(false);
+    expect(isRunDetailDismissed(result.current.detailDismissedForRunId, "run-2")).toBe(false);
   });
 
   it("persists auto-open again when a node opens run detail", () => {

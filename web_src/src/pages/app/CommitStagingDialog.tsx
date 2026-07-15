@@ -29,7 +29,7 @@ export function CommitStagingDialog({ open, pending, onOpenChange, onCommit }: C
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="border-0 dark:border-0">
         <DialogHeader>
           <DialogTitle>Commit changes</DialogTitle>
           <DialogDescription>Describe what changed in this commit.</DialogDescription>

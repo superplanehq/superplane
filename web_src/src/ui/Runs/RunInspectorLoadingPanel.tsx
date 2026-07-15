@@ -11,7 +11,7 @@ export function RunInspectorLoadingPanel({ onClose }: { onClose: () => void }) {
   return (
     <aside
       className={cn(
-        "relative z-20 flex h-full shrink-0 flex-col border-l border-slate-950/10 bg-white text-gray-900 shadow-xl dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100",
+        "relative z-20 flex h-full shrink-0 flex-col border-l border-slate-950/10 bg-white text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100",
         appDarkModeClasses,
       )}
       style={{ width: inspectorWidth.width }}
