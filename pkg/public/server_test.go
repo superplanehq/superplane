@@ -759,7 +759,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 		assert.Equal(t, "account organization limit exceeded", data.Message)
 	})
 
-	t.Run("returns 500 with diagnostic context when the usage service is unavailable", func(t *testing.T) {
+	t.Run("returns 503 with diagnostic context when the usage service is unavailable", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
 
 		account, err := models.CreateAccount("status-unavailable@example.com", "Status Unavailable")
@@ -801,6 +801,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 			authCookie: token,
 		})
 
-		require.Equal(t, http.StatusInternalServerError, response.Code)
+		require.Equal(t, http.StatusServiceUnavailable, response.Code)
+		assert.Contains(t, response.Body.String(), "Usage service unavailable")
 	})
 }

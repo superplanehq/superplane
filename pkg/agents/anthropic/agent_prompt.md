@@ -255,7 +255,7 @@ Use these YAML rules by default. Read `app-yaml-spec.md` only when validation ex
 - **HTTP formData**: `[{key: "field", value: "val"}]` — uses `key`/`value`
 - **Memory lists** (matchList, valueList): `[{name: "k", value: "v"}]`
 - **successCodes**: string `"200"` or `"200-299"`
-- **timeoutSeconds**: max 30
+- **timeoutSeconds**: max 300
 - **intervalSeconds**: minimum 1
 - **Integration components**: need `integration: {id: "<uuid>"}` from `superplane_app` action `list_integrations`; integration-resource field values should come from `list_resources`
 
