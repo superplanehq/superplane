@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nextPersistedTriggerRefs } from "./runDataSourceTriggerRefs";
+import { nextPersistedTriggerRefs, resolveSelectedTriggerIds } from "./runDataSourceTriggerRefs";
 
 const nodes = [
   { id: "trigger-1", name: "deploy", type: "TYPE_TRIGGER" as const, component: "webhook" },
@@ -8,6 +8,12 @@ const nodes = [
   { id: "trigger-3", type: "TYPE_TRIGGER" as const, component: "manual" },
 ];
 const ctx = { nodes };
+
+describe("resolveSelectedTriggerIds", () => {
+  it("preserves persisted refs while the trigger catalog is loading", () => {
+    expect(resolveSelectedTriggerIds(["trigger-1", "deploy"], { nodes: [] })).toEqual(["trigger-1", "deploy"]);
+  });
+});
 
 describe("nextPersistedTriggerRefs", () => {
   it("keeps friendly names when unchecking one of several named triggers", () => {
@@ -64,5 +70,27 @@ describe("nextPersistedTriggerRefs", () => {
         ctx,
       }),
     ).toBeUndefined();
+  });
+
+  it("removes an id ref while the trigger catalog is loading", () => {
+    expect(
+      nextPersistedTriggerRefs({
+        triggers: ["trigger-1"],
+        triggerId: "trigger-1",
+        selected: true,
+        ctx: { nodes: [] },
+      }),
+    ).toBeUndefined();
+  });
+
+  it("does not duplicate an id ref while the trigger catalog is loading", () => {
+    expect(
+      nextPersistedTriggerRefs({
+        triggers: ["trigger-1"],
+        triggerId: "trigger-1",
+        selected: false,
+        ctx: { nodes: [] },
+      }),
+    ).toEqual(["trigger-1"]);
   });
 });

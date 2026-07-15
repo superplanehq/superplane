@@ -4,9 +4,9 @@ import { resolveConsoleTrigger } from "./ConsoleContext";
 /**
  * Resolve every persisted trigger reference (id-or-name) to its concrete
  * node id so the shared checkbox list can drive selection state off of
- * ids while YAML keeps the friendly name authors typed. Entries that no
- * longer match a canvas node are dropped so stale references quietly
- * fall out of the UI.
+ * ids while YAML keeps the friendly name authors typed. Until the canvas
+ * node catalog loads, unresolved entries stay represented by their raw
+ * references so id-based selections remain toggleable without duplicates.
  */
 export function resolveSelectedTriggerIds(
   triggers: readonly string[] | undefined,
@@ -16,10 +16,10 @@ export function resolveSelectedTriggerIds(
   const out: string[] = [];
   const seen = new Set<string>();
   for (const reference of triggers) {
-    const resolved = resolveConsoleTrigger(ctx, reference)?.node.id;
-    if (!resolved || seen.has(resolved)) continue;
-    seen.add(resolved);
-    out.push(resolved);
+    const selectedId = resolveConsoleTrigger(ctx, reference)?.node.id ?? reference.trim();
+    if (!selectedId || seen.has(selectedId)) continue;
+    seen.add(selectedId);
+    out.push(selectedId);
   }
   return out;
 }
@@ -41,13 +41,15 @@ export function nextPersistedTriggerRefs(args: {
 }): string[] | undefined {
   const { triggers, triggerId, selected, ctx } = args;
   const current = triggers ?? [];
+  const referencesTrigger = (reference: string) =>
+    reference.trim() === triggerId || resolveConsoleTrigger(ctx, reference)?.node.id === triggerId;
 
   if (selected) {
-    const remaining = current.filter((reference) => resolveConsoleTrigger(ctx, reference)?.node.id !== triggerId);
+    const remaining = current.filter((reference) => !referencesTrigger(reference));
     return remaining.length > 0 ? remaining : undefined;
   }
 
-  if (current.some((reference) => resolveConsoleTrigger(ctx, reference)?.node.id === triggerId)) {
+  if (current.some(referencesTrigger)) {
     return current.length > 0 ? [...current] : undefined;
   }
 

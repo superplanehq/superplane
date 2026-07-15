@@ -50,7 +50,7 @@ function useHtmlEditorPreview(
     textForSideload,
   );
   const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
-  return { previewVars: vars, errors, baseLoading, searchingNames, previewLoading };
+  return { previewVars: vars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading };
 }
 
 interface HtmlPanelEditorProps {
@@ -97,7 +97,7 @@ export function HtmlPanelEditor({
     }
   };
 
-  const { previewVars, errors, baseLoading, searchingNames, previewLoading } = useHtmlEditorPreview(
+  const { previewVars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading } = useHtmlEditorPreview(
     canvasId,
     draftTitle,
     draftBody,
@@ -160,6 +160,7 @@ export function HtmlPanelEditor({
           previewVars={previewVars}
           errors={errors}
           baseLoading={baseLoading}
+          sideloadLoading={sideloadLoading}
           searchingNames={searchingNames}
           onInsertSnippet={(snippet) => codeEditorRef.current?.insertAtCursor(snippet)}
           collapsed={variablesCollapsed}

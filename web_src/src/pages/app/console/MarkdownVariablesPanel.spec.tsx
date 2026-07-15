@@ -25,6 +25,7 @@ describe("MarkdownVariablesPanel per-variable loading", () => {
         previewVars={{ deploy: null, memory: null }}
         errors={[{ name: "memory", message: 'No memory rows in namespace "ns".' }]}
         baseLoading={false}
+        sideloadLoading={false}
         searchingNames={["deploy"]}
         onInsertSnippet={() => {}}
       />,
@@ -47,6 +48,7 @@ describe("MarkdownVariablesPanel per-variable loading", () => {
           { name: "memory", message: 'No memory rows in namespace "ns".' },
         ]}
         baseLoading={false}
+        sideloadLoading={false}
         searchingNames={[]}
         onInsertSnippet={() => {}}
       />,
@@ -54,5 +56,25 @@ describe("MarkdownVariablesPanel per-variable loading", () => {
 
     expect(screen.queryByText("Loading preview…")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("markdown-variable-preview-error")).toHaveLength(2);
+  });
+
+  it("keeps previews loading while run executions are side-loading", () => {
+    render(
+      <MarkdownVariablesPanel
+        canvasId="canvas-1"
+        draftBody=""
+        draftVariables={VARIABLES}
+        setDraftVariables={() => {}}
+        previewVars={{ deploy: { $: {} }, memory: null }}
+        errors={[]}
+        baseLoading={false}
+        sideloadLoading
+        searchingNames={[]}
+        onInsertSnippet={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Loading preview…")).toBeInTheDocument();
+    expect(screen.getByText("No data resolved yet.")).toBeInTheDocument();
   });
 });

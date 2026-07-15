@@ -43,7 +43,7 @@ function useMarkdownEditorPreview(
     textForSideload,
   );
   const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
-  return { previewVars: vars, errors, baseLoading, searchingNames, previewLoading };
+  return { previewVars: vars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading };
 }
 
 interface MarkdownPanelEditorProps {
@@ -90,12 +90,8 @@ export function MarkdownPanelEditor({
     }
   };
 
-  const { previewVars, errors, baseLoading, searchingNames, previewLoading } = useMarkdownEditorPreview(
-    canvasId,
-    draftTitle,
-    draftBody,
-    draftVariables,
-  );
+  const { previewVars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading } =
+    useMarkdownEditorPreview(canvasId, draftTitle, draftBody, draftVariables);
 
   // Preview is collapsible — when collapsed the textarea reclaims the freed
   // vertical space, useful on shorter panel cards.
@@ -160,6 +156,7 @@ export function MarkdownPanelEditor({
           previewVars={previewVars}
           errors={errors}
           baseLoading={baseLoading}
+          sideloadLoading={sideloadLoading}
           searchingNames={searchingNames}
           onInsertSnippet={insertAtCursor}
           collapsed={variablesCollapsed}
