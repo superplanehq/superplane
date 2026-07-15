@@ -550,7 +550,6 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
 
 type UpdateCanvasPreferenceInput = {
   canvasId: string;
-  pinned?: boolean;
   starred?: boolean;
 };
 
@@ -558,12 +557,11 @@ export const useUpdateCanvasPreference = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ canvasId, pinned, starred }: UpdateCanvasPreferenceInput) => {
+    mutationFn: async ({ canvasId, starred }: UpdateCanvasPreferenceInput) => {
       return await canvasesUpdateCanvasPreference(
         withOrganizationHeader({
           path: { canvasId },
           body: {
-            pinned,
             starred,
           },
         }),
@@ -602,12 +600,6 @@ function applyCanvasPreferenceToSummary(
 
   return {
     ...canvas,
-    ...(preference.pinned === undefined
-      ? {}
-      : {
-          pinned: preference.pinned,
-          pinnedAt: preference.pinned ? timestamp : undefined,
-        }),
     ...(preference.starred === undefined
       ? {}
       : {
