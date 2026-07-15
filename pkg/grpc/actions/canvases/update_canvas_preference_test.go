@@ -19,14 +19,11 @@ func Test__UpdateCanvasPreference__StoresAndClearsPreferences(t *testing.T) {
 
 	response, err := UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
 		CanvasId: canvas.ID.String(),
-		Pinned:   proto.Bool(true),
 		Starred:  proto.Bool(true),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, response.Preference)
-	assert.True(t, response.Preference.Pinned)
 	assert.True(t, response.Preference.Starred)
-	assert.NotNil(t, response.Preference.PinnedAt)
 	assert.NotNil(t, response.Preference.StarredAt)
 
 	var count int64
@@ -41,14 +38,11 @@ func Test__UpdateCanvasPreference__StoresAndClearsPreferences(t *testing.T) {
 
 	response, err = UpdateCanvasPreference(context.Background(), r.Organization.ID.String(), r.User.String(), &pb.UpdateCanvasPreferenceRequest{
 		CanvasId: canvas.ID.String(),
-		Pinned:   proto.Bool(false),
 		Starred:  proto.Bool(false),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, response.Preference)
-	assert.False(t, response.Preference.Pinned)
 	assert.False(t, response.Preference.Starred)
-	assert.Nil(t, response.Preference.PinnedAt)
 	assert.Nil(t, response.Preference.StarredAt)
 
 	err = database.DB(context.Background()).Model(&models.UserCanvasPreference{}).
