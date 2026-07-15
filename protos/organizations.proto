@@ -403,7 +403,7 @@ message DescribeIntegrationResponse {
 message ListIntegrationResourcesRequest {
   string id = 1;
   string integration_id = 2;
-  map<string, string> parameters = 4;
+  map<string, string> parameters = 3;
 }
 
 message ListIntegrationResourcesResponse {
