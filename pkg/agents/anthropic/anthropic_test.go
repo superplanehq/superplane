@@ -429,6 +429,50 @@ func TestSendMessage_MapsDeletedSessionBadRequestToUnavailableSession(t *testing
 	assert.ErrorIs(t, err, agents.ErrProviderSessionUnavailable)
 }
 
+func TestSendMessage_MapsPayloadTooLargeToInvalidRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"request payload is too large"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrInvalidRequest)
+}
+
+func TestSendMessage_MapsImageSizeLimitErrorToInvalidRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"image content exceeds the model limit"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{
+		Images: []agents.MessageImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agents.ErrInvalidRequest)
+}
+
+func TestSendMessage_DoesNotMapUnrelatedImageErrorToInvalidRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"image service temporarily unavailable"}}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.SendMessage(context.Background(), "sesn_live", "hi", agents.SendMessageOptions{
+		Images: []agents.MessageImage{{MediaType: "image/png", Data: "aGVsbG8="}},
+	})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, agents.ErrInvalidRequest)
+	assert.Contains(t, err.Error(), "anthropic: send message")
+}
+
 func TestSendMessage_DoesNotTreatBadRequestNotFoundMessageAsUnavailableSession(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
