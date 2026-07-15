@@ -276,6 +276,17 @@ function parseSurvey(raw: string): SurveySegment {
   let currentOptions: string[] = [];
   let hasInput = false;
 
+  const flushCurrentQuestion = () => {
+    if (!currentPrompt || (!currentOptions.length && !hasInput)) return;
+
+    if (!hasInput && currentOptions.length > 1 && currentOptions.every(isQuestionOption)) {
+      questions.push(...currentOptions.map((prompt) => ({ prompt, options: [], hasInput: true })));
+      return;
+    }
+
+    questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
+  };
+
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -289,20 +300,20 @@ function parseSurvey(raw: string): SurveySegment {
       }
     } else {
       // New question - flush previous
-      if (currentPrompt && (currentOptions.length || hasInput)) {
-        questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
-      }
+      flushCurrentQuestion();
       currentPrompt = trimmed;
       currentOptions = [];
       hasInput = false;
     }
   }
   // Flush last question
-  if (currentPrompt && (currentOptions.length || hasInput)) {
-    questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
-  }
+  flushCurrentQuestion();
 
   return { type: "survey", questions };
+}
+
+function isQuestionOption(option: string): boolean {
+  return option.trim().endsWith("?");
 }
 
 function parseRubric(meta: string, raw: string): RubricSegment {
