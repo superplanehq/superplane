@@ -27,6 +27,18 @@ func TestApplyLayout_RejectsUnsupportedAlgorithm(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported layout algorithm")
 }
 
+func TestApplyLayout_RejectsUnspecifiedAlgorithm(t *testing.T) {
+	nodes := []N{{ID: "node-1", Position: Position{X: 0, Y: 0}}}
+
+	_, _, err := ApplyLayout(nodes, nil, &AutoLayout{Algorithm: "ALGORITHM_UNSPECIFIED"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "layout algorithm is required")
+
+	_, _, err = ApplyLayout(nodes, nil, &AutoLayout{Algorithm: "UNSPECIFIED"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "layout algorithm is required")
+}
+
 func TestApplyLayout_AcceptsHorizontalAlias(t *testing.T) {
 	nodes := []N{
 		{ID: "source", Position: Position{X: 0, Y: 0}},
@@ -38,6 +50,133 @@ func TestApplyLayout_AcceptsHorizontalAlias(t *testing.T) {
 	updatedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)
 	require.NoError(t, err)
 	require.Len(t, updatedNodes, 2)
+}
+
+func TestApplyLayout_DefaultsEmptyAlgorithmToHorizontal(t *testing.T) {
+	nodes := []N{{ID: "node-1", Position: Position{X: 10, Y: 20}}}
+	autoLayout := &AutoLayout{Algorithm: "", Scope: ScopeFullCanvas}
+
+	updatedNodes, _, err := ApplyLayout(nodes, nil, autoLayout)
+	require.NoError(t, err)
+	require.Len(t, updatedNodes, 1)
+	assert.Equal(t, Position{X: 10, Y: 20}, updatedNodes[0].Position)
+}
+
+func TestApplyLayout_ScopeAliases(t *testing.T) {
+	nodes := []N{
+		{ID: "a-1", Position: Position{X: 0, Y: 0}},
+		{ID: "a-2", Position: Position{X: 300, Y: 0}},
+		{ID: "b-1", Position: Position{X: 0, Y: 900}},
+	}
+	edges := []E{{SourceID: "a-1", TargetID: "a-2", Channel: "default"}}
+
+	for _, scope := range []string{"FULL_CANVAS", "FULL"} {
+		updatedNodes, _, err := ApplyLayout(nodes, edges, &AutoLayout{
+			Algorithm: AlgorithmHorizontal,
+			Scope:     scope,
+		})
+		require.NoError(t, err, scope)
+		assert.NotEqual(t, Position{X: 0, Y: 900}, mapLayoutNodesByID(updatedNodes)["b-1"].Position, scope)
+	}
+
+	for _, scope := range []string{"CONNECTED_COMPONENT", "CONNECTED", "", "SCOPE_UNSPECIFIED"} {
+		updatedNodes, _, err := ApplyLayout(nodes, edges, &AutoLayout{
+			Algorithm: AlgorithmHorizontal,
+			Scope:     scope,
+			NodeIDs:   []string{"a-1"},
+		})
+		require.NoError(t, err, scope)
+		nodesByID := mapLayoutNodesByID(updatedNodes)
+		assert.Equal(t, Position{X: 0, Y: 900}, nodesByID["b-1"].Position, scope)
+		assert.NotEqual(t, Position{X: 300, Y: 0}, nodesByID["a-2"].Position, scope)
+	}
+}
+
+func TestApplyLayout_DeduplicatesSeedNodeIDs(t *testing.T) {
+	nodes := []N{
+		{ID: "a-1", Position: Position{X: 0, Y: 0}},
+		{ID: "a-2", Position: Position{X: 300, Y: 0}},
+		{ID: "b-1", Position: Position{X: 0, Y: 900}},
+	}
+	edges := []E{{SourceID: "a-1", TargetID: "a-2", Channel: "default"}}
+	autoLayout := &AutoLayout{
+		Algorithm: AlgorithmHorizontal,
+		Scope:     ScopeConnectedComponent,
+		NodeIDs:   []string{"a-1", "a-1"},
+	}
+
+	updatedNodes, _, err := ApplyLayout(nodes, edges, autoLayout)
+	require.NoError(t, err)
+	assert.Equal(t, Position{X: 0, Y: 900}, mapLayoutNodesByID(updatedNodes)["b-1"].Position)
+}
+
+func TestApplyLayout_AllNodesWithoutIDsIsNoOp(t *testing.T) {
+	nodes := []N{
+		{ID: "", Position: Position{X: 1, Y: 2}},
+		{ID: "", Position: Position{X: 3, Y: 4}},
+	}
+	autoLayout := &AutoLayout{Algorithm: AlgorithmHorizontal, Scope: ScopeFullCanvas}
+
+	updatedNodes, _, err := ApplyLayout(nodes, nil, autoLayout)
+	require.NoError(t, err)
+	assert.Equal(t, nodes, updatedNodes)
+}
+
+func TestApplyLayout_IgnoresEdgesOutsideFlowNodes(t *testing.T) {
+	nodes := []N{
+		{ID: "source", Position: Position{X: 0, Y: 0}},
+		{ID: "target", Position: Position{X: 500, Y: 0}},
+	}
+	edges := []E{
+		{SourceID: "source", TargetID: "target", Channel: "default"},
+		{SourceID: "missing", TargetID: "target", Channel: "default"},
+		{SourceID: "source", TargetID: "missing", Channel: "default"},
+	}
+	autoLayout := &AutoLayout{Algorithm: AlgorithmHorizontal, Scope: ScopeFullCanvas}
+
+	updatedNodes, updatedEdges, err := ApplyLayout(nodes, edges, autoLayout)
+	require.NoError(t, err)
+	assert.Equal(t, edges, updatedEdges)
+	require.Len(t, updatedNodes, 2)
+}
+
+func TestApplyLayout_SortsDisconnectedComponentsByXWhenYEqual(t *testing.T) {
+	nodes := []N{
+		{ID: "right-1", Position: Position{X: 400, Y: 0}},
+		{ID: "left-1", Position: Position{X: 0, Y: 0}},
+	}
+	autoLayout := &AutoLayout{Algorithm: AlgorithmHorizontal, Scope: ScopeFullCanvas}
+
+	updatedNodes, _, err := ApplyLayout(nodes, nil, autoLayout)
+	require.NoError(t, err)
+
+	nodesByID := mapLayoutNodesByID(updatedNodes)
+	assert.Less(t, nodesByID["left-1"].Position.Y, nodesByID["right-1"].Position.Y)
+}
+
+func TestComputeAutogPositions_MultipleDisconnectedNodes(t *testing.T) {
+	positions := computeAutogPositions(
+		[]N{
+			{ID: "b", Position: Position{X: 10, Y: 200}},
+			{ID: "a", Position: Position{X: 0, Y: 100}},
+			{ID: "c", Position: Position{X: 5, Y: 100}},
+		},
+		nil,
+	)
+
+	require.Len(t, positions.byNodeID, 3)
+	assert.Equal(t, Position{X: 0, Y: 0}, positions.byNodeID["a"])
+	assert.Equal(t, Position{X: 0, Y: int(autoLayoutNodeHeight + autoLayoutNodeGap)}, positions.byNodeID["c"])
+	assert.Equal(t, Position{X: 0, Y: 2 * int(autoLayoutNodeHeight+autoLayoutNodeGap)}, positions.byNodeID["b"])
+}
+
+func TestComputeAutogPositions_EmptyNodes(t *testing.T) {
+	positions := computeAutogPositions(nil, nil)
+	assert.Empty(t, positions.byNodeID)
+}
+
+func TestResolveMinPositionFromLayout_Empty(t *testing.T) {
+	assert.Equal(t, Position{}, resolveMinPositionFromLayout(newLayoutPositions(0)))
 }
 
 func TestApplyLayout_RejectsUnknownSeedNode(t *testing.T) {
