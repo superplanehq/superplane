@@ -19,22 +19,14 @@ function compareCanvasPreferenceOrder(left: CanvasCardData, right: CanvasCardDat
 }
 
 function canvasPreferenceRank(canvas: CanvasCardData): number {
-  if (canvas.isPinned) {
+  if (canvas.isStarred) {
     return 0;
   }
 
-  if (canvas.isStarred) {
-    return 1;
-  }
-
-  return 2;
+  return 1;
 }
 
 function preferenceTime(canvas: CanvasCardData): number {
-  if (canvas.isPinned) {
-    return timestampValue(canvas.pinnedAt);
-  }
-
   if (canvas.isStarred) {
     return timestampValue(canvas.starredAt);
   }

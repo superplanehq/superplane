@@ -498,7 +498,6 @@ CREATE TABLE public.user_canvas_preferences (
     organization_id uuid NOT NULL,
     user_id uuid NOT NULL,
     canvas_id uuid NOT NULL,
-    pinned_at timestamp without time zone,
     starred_at timestamp without time zone,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
@@ -1430,13 +1429,6 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 
 
 --
--- Name: idx_user_canvas_preferences_user_pinned; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_user_canvas_preferences_user_pinned ON public.user_canvas_preferences USING btree (organization_id, user_id, pinned_at DESC) WHERE (pinned_at IS NOT NULL);
-
-
---
 -- Name: idx_user_canvas_preferences_user_starred; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2210,7 +2202,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260714192922	f
+20260715185442	f
 \.
 
 
