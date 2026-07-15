@@ -1,0 +1,249 @@
+diff --git a/web_src/src/pages/home/CanvasCardsGrid.tsx b/web_src/src/pages/home/CanvasCardsGrid.tsx
+index 9739ec8..3953e81 100644
+--- a/web_src/src/pages/home/CanvasCardsGrid.tsx
++++ b/web_src/src/pages/home/CanvasCardsGrid.tsx
+@@ -3,7 +3,7 @@ import type { ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
+ import { Button } from "@/components/ui/button";
+ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+ import { Link } from "react-router-dom";
+-import { Pin, Star } from "lucide-react";
++import { Star } from "lucide-react";
+ import type { ReactNode } from "react";
+ import { appPath } from "@/lib/appPaths";
+ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+@@ -27,7 +27,6 @@ interface CanvasCardsGridProps {
+   canvasFolders: CanvasFolderData[];
+   organizationId: string;
+   onEditCanvas: (canvas: CanvasCardData) => void;
+-  onTogglePin: (canvasId: string, pinned: boolean) => void;
+   onToggleStar: (canvasId: string, starred: boolean) => void;
+   canUpdateCanvases: boolean;
+   canDeleteCanvases: boolean;
+@@ -39,7 +38,6 @@ export function CanvasCardsGrid({
+   canvasFolders,
+   organizationId,
+   onEditCanvas,
+-  onTogglePin,
+   onToggleStar,
+   canUpdateCanvases,
+   canDeleteCanvases,
+@@ -54,7 +52,6 @@ export function CanvasCardsGrid({
+           canvasFolders={canvasFolders}
+           organizationId={organizationId}
+           onEdit={onEditCanvas}
+-          onTogglePin={onTogglePin}
+           onToggleStar={onToggleStar}
+           canUpdateCanvases={canUpdateCanvases}
+           canDeleteCanvases={canDeleteCanvases}
+@@ -70,7 +67,6 @@ interface CanvasCardProps {
+   canvasFolders: CanvasFolderData[];
+   organizationId: string;
+   onEdit: (canvas: CanvasCardData) => void;
+-  onTogglePin: (canvasId: string, pinned: boolean) => void;
+   onToggleStar: (canvasId: string, starred: boolean) => void;
+   canUpdateCanvases: boolean;
+   canDeleteCanvases: boolean;
+@@ -82,7 +78,6 @@ function CanvasCard({
+   canvasFolders,
+   organizationId,
+   onEdit,
+-  onTogglePin,
+   onToggleStar,
+   canUpdateCanvases,
+   canDeleteCanvases,
+@@ -113,15 +108,6 @@ function CanvasCard({
+               </Heading>
+             </div>
+             <div className="pointer-events-auto flex items-center gap-1">
+-              <CanvasPreferenceButton
+-                active={Boolean(canvas.isPinned)}
+-                activeLabel={`Unpin app ${canvas.name}`}
+-                inactiveLabel={`Pin app ${canvas.name}`}
+-                activeTooltip="Unpin"
+-                inactiveTooltip="Pin"
+-                onClick={() => onTogglePin(canvas.id, !canvas.isPinned)}
+-                icon={<Pin size={15} className={cn(canvas.isPinned && "fill-current")} aria-hidden />}
+-              />
+               <CanvasPreferenceButton
+                 active={Boolean(canvas.isStarred)}
+                 activeLabel={`Unstar app ${canvas.name}`}
+diff --git a/web_src/src/pages/home/CanvasFolderSection.tsx b/web_src/src/pages/home/CanvasFolderSection.tsx
+index b574be5..92c65cd 100644
+--- a/web_src/src/pages/home/CanvasFolderSection.tsx
++++ b/web_src/src/pages/home/CanvasFolderSection.tsx
+@@ -28,7 +28,6 @@ interface CanvasFolderSectionProps {
+   canvasFolders: CanvasFolderData[];
+   organizationId: string;
+   onEditCanvas: (canvas: CanvasCardData) => void;
+-  onTogglePin: (canvasId: string, pinned: boolean) => void;
+   onToggleStar: (canvasId: string, starred: boolean) => void;
+   canCreateCanvases: boolean;
+   canUpdateCanvases: boolean;
+@@ -183,7 +182,6 @@ export function CanvasFolderSection({
+   canvasFolders,
+   organizationId,
+   onEditCanvas,
+-  onTogglePin,
+   onToggleStar,
+   canCreateCanvases,
+   canUpdateCanvases,
+@@ -283,7 +281,6 @@ export function CanvasFolderSection({
+           canvasFolders={canvasFolders}
+           organizationId={organizationId}
+           onEditCanvas={onEditCanvas}
+-          onTogglePin={onTogglePin}
+           onToggleStar={onToggleStar}
+           canUpdateCanvases={canUpdateCanvases}
+           canDeleteCanvases={canDeleteCanvases}
+diff --git a/web_src/src/pages/home/index.spec.tsx b/web_src/src/pages/home/index.spec.tsx
+index 941e94d..13fe7a3 100644
+--- a/web_src/src/pages/home/index.spec.tsx
++++ b/web_src/src/pages/home/index.spec.tsx
+@@ -361,11 +361,7 @@ describe("HomePage canvas folders", () => {
+     const user = userEvent.setup();
+     useCanvases.mockReturnValue({
+       data: [
+-        makeCanvas("z-free", "Z Free Canvas", undefined, {
+-          folderId: "folder-1",
+-          pinned: true,
+-          pinnedAt: "2026-05-06T00:00:00Z",
+-        }),
++        makeCanvas("z-free", "Z Free Canvas", "folder-1"),
+         makeCanvas("starred", "Starred Canvas", undefined, {
+           starred: true,
+           starredAt: "2026-05-06T00:00:00Z",
+@@ -383,23 +379,14 @@ describe("HomePage canvas folders", () => {
+ 
+     renderHome();
+ 
+-    const pinnedSection = screen.getByRole("heading", { name: "Pinned" }).closest("section")!;
+     const deploymentsSection = screen.getByText("Deployments").closest("section")!;
+-    expect(pinnedSection).toHaveClass("dark:bg-white/5");
+-    expect(within(pinnedSection).getByText("Z Free Canvas")).toBeInTheDocument();
+     expect(within(deploymentsSection).getByText("Z Free Canvas")).toBeInTheDocument();
+-    expect(
+-      within(pinnedSection).getByText("Z Free Canvas").compareDocumentPosition(screen.getByText("A Free Canvas")) &
+-        Node.DOCUMENT_POSITION_FOLLOWING,
+-    ).toBeTruthy();
+     expect(
+       screen.getByText("Starred Canvas").compareDocumentPosition(screen.getByText("A Free Canvas")) &
+         Node.DOCUMENT_POSITION_FOLLOWING,
+     ).toBeTruthy();
+ 
+-    await user.click(within(pinnedSection).getByLabelText("Unpin app Z Free Canvas"));
+     await user.click(screen.getByLabelText("Unstar app Starred Canvas"));
+-    expect(mutationMocks.updateCanvasPreference).toHaveBeenCalledWith({ canvasId: "z-free", pinned: false });
+     expect(mutationMocks.updateCanvasPreference).toHaveBeenCalledWith({ canvasId: "starred", starred: false });
+   });
+ 
+diff --git a/web_src/src/pages/home/index.tsx b/web_src/src/pages/home/index.tsx
+index 081c60c..de8d0b7 100644
+--- a/web_src/src/pages/home/index.tsx
++++ b/web_src/src/pages/home/index.tsx
+@@ -2,7 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
+ import { useUpdateCanvasPreference } from "@/hooks/useCanvasData";
+ import { usePageTitle } from "@/hooks/usePageTitle";
+ import { useReportPageReady } from "@/hooks/useReportPageReady";
+-import { Palette, Pin } from "lucide-react";
++import { Palette } from "lucide-react";
+ import { useState } from "react";
+ import { Navigate, useParams } from "react-router-dom";
+ import { Heading } from "../../components/Heading/heading";
+@@ -88,7 +88,6 @@ export function HomePage() {
+             organizationId={organizationId}
+             searchQuery={searchQuery}
+             onEditCanvas={openEdit}
+-            onTogglePin={(canvasId, pinned) => updateCanvasPreference.mutate({ canvasId, pinned })}
+             onToggleStar={(canvasId, starred) => updateCanvasPreference.mutate({ canvasId, starred })}
+             canCreateCanvases={canCreateCanvases}
+             canUpdateCanvases={canUpdateCanvases}
+@@ -117,7 +116,6 @@ function Content({
+   organizationId,
+   searchQuery,
+   onEditCanvas,
+-  onTogglePin,
+   onToggleStar,
+   canCreateCanvases,
+   canUpdateCanvases,
+@@ -130,14 +128,12 @@ function Content({
+   organizationId: string;
+   searchQuery: string;
+   onEditCanvas: (canvas: CanvasCardData) => void;
+-  onTogglePin: (canvasId: string, pinned: boolean) => void;
+   onToggleStar: (canvasId: string, starred: boolean) => void;
+   canCreateCanvases: boolean;
+   canUpdateCanvases: boolean;
+   canDeleteCanvases: boolean;
+   permissionsLoading: boolean;
+ }) {
+-  const pinnedCanvases = preferredFilteredCanvases.filter((canvas) => canvas.isPinned);
+   const folderedLayout = buildFolderedLayout(
+     preferredFilteredCanvases,
+     preferredFilteredCanvases,
+@@ -149,38 +145,12 @@ function Content({
+     return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
+   }
+ 
+-  if (
+-    pinnedCanvases.length === 0 &&
+-    folderedLayout.visibleFolders.length === 0 &&
+-    folderedLayout.unfiledCanvases.length === 0
+-  ) {
++  if (folderedLayout.visibleFolders.length === 0 && folderedLayout.unfiledCanvases.length === 0) {
+     return searchQuery ? <CanvasesSearchEmptyState /> : <CanvasesEmptyState />;
+   }
+ 
+   return (
+     <div className="space-y-6">
+-      {pinnedCanvases.length > 0 ? (
+-        <section className={cn(CANVAS_FOLDER_SECTION_SHELL_CLASS, "bg-white dark:bg-white/5")}>
+-          <div className="mb-4 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+-            <Pin size={16} className="text-blue-600 dark:text-blue-400" aria-hidden />
+-            <Heading level={3} className="mb-0 !text-base font-medium">
+-              Pinned
+-            </Heading>
+-          </div>
+-          <CanvasCardsGrid
+-            canvases={pinnedCanvases}
+-            canvasFolders={canvasFolders}
+-            organizationId={organizationId}
+-            onEditCanvas={onEditCanvas}
+-            onTogglePin={onTogglePin}
+-            onToggleStar={onToggleStar}
+-            canUpdateCanvases={canUpdateCanvases}
+-            canDeleteCanvases={canDeleteCanvases}
+-            permissionsLoading={permissionsLoading}
+-          />
+-        </section>
+-      ) : null}
+-
+       {folderedLayout.visibleFolders.map((folder) => (
+         <CanvasFolderSection
+           key={folder.id}
+@@ -189,7 +159,6 @@ function Content({
+           canvasFolders={canvasFolders}
+           organizationId={organizationId}
+           onEditCanvas={onEditCanvas}
+-          onTogglePin={onTogglePin}
+           onToggleStar={onToggleStar}
+           canCreateCanvases={canCreateCanvases}
+           canUpdateCanvases={canUpdateCanvases}
+@@ -209,7 +178,6 @@ function Content({
+             canvasFolders={canvasFolders}
+             organizationId={organizationId}
+             onEditCanvas={onEditCanvas}
+-            onTogglePin={onTogglePin}
+             onToggleStar={onToggleStar}
+             canUpdateCanvases={canUpdateCanvases}
+             canDeleteCanvases={canDeleteCanvases}
+@@ -249,10 +217,6 @@ function buildFolderedLayout(
+       continue;
+     }
+ 
+-    if (canvas.isPinned) {
+-      continue;
+-    }
+-
+     unfiledCanvases.push(canvas);
+   }
+ 
