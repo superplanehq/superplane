@@ -131,7 +131,14 @@ func (c *OnBroadcast) Update(ctx core.TriggerContext, config OnBroadcastConfigur
 		return nil
 	}
 
-	err := ctx.Apps.Unsubscribe()
+	// Clear the metadata
+	err := ctx.Metadata.Set(OnBroadcastMetadata{})
+	if err != nil {
+		return fmt.Errorf("failed to clear metadata: %w", err)
+	}
+
+	// Unsubscribe from the current app
+	err = ctx.Apps.Unsubscribe()
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from current app: %w", err)
 	}
