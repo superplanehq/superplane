@@ -132,7 +132,7 @@ func TestRunPythonProcessTaskStatusIncludesResult(t *testing.T) {
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"ok":true}`),
 	}
-	require.NoError(t, processBrokerTaskStatus(state, task, RunPythonFinishedEventType))
+	require.NoError(t, processBrokerTaskStatus(state, task, TaskOutcome{FinishedEventType: RunPythonFinishedEventType}))
 	require.Equal(t, PassedOutputChannel, state.Channel)
 
 	wrapped := state.Payloads[0].(map[string]any)

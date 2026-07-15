@@ -1,7 +1,7 @@
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import type { RunInspectorNodeSection } from "./runNodeDetailModel";
 
-const RUNNER_COMPONENTS = new Set(["runner", "runnerBash", "runnerJS", "runnerPython"]);
+const RUNNER_COMPONENTS = new Set(["runner", "runnerBash", "runnerJS", "runnerPython", "ssh"]);
 const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";
 
 export function shouldShowRunnerLogs(section: RunInspectorNodeSection): boolean {

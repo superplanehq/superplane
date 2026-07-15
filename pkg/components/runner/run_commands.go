@@ -17,8 +17,12 @@ const (
 	FailedOutputChannel     = "failed"
 	RunnerFinishedEventType = "runner.finished"
 
-	pollInterval   = 2 * time.Minute
-	hookActionPoll = "poll"
+	pollInterval = 2 * time.Minute
+
+	// HookActionPoll is the internal hook name used to poll broker task status.
+	// Components that offload compute to a runner register a hook with this name
+	// and forward it to PollTask.
+	HookActionPoll = "poll"
 )
 
 func init() {
@@ -318,28 +322,36 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return afterRunnerTaskCreated(ctx, taskID)
+	return AfterTaskCreated(ctx, taskID)
 }
 
 func (c *Runner) Hooks() []core.Hook {
-	return []core.Hook{{Name: hookActionPoll, Type: core.HookTypeInternal}}
+	return []core.Hook{{Name: HookActionPoll, Type: core.HookTypeInternal}}
 }
 
 func (c *Runner) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
-	case hookActionPoll:
-		return pollBrokerTask(ctx, RunnerFinishedEventType)
+	case HookActionPoll:
+		return PollTask(ctx, c.taskOutcome())
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
 func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return handleBrokerWebhook(ctx, RunnerFinishedEventType)
+	return HandleTaskWebhook(ctx, c.taskOutcome())
+}
+
+func (c *Runner) taskOutcome() TaskOutcome {
+	return TaskOutcome{
+		FinishedEventType: RunnerFinishedEventType,
+		PassedChannel:     PassedOutputChannel,
+		FailedChannel:     FailedOutputChannel,
+	}
 }
 
 func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task) error {
-	return processBrokerTaskStatus(state, task, RunnerFinishedEventType)
+	return processBrokerTaskStatus(state, task, c.taskOutcome())
 }
 
 func brokerResultAsAny(raw json.RawMessage) any {
@@ -355,7 +367,7 @@ func brokerResultAsAny(raw json.RawMessage) any {
 }
 
 func (c *Runner) Cancel(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+	return CancelBrokerTask(ctx)
 }
 
 func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }

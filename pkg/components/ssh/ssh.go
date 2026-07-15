@@ -1,16 +1,15 @@
 package ssh
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
@@ -20,6 +19,8 @@ import (
 const (
 	channelSuccess = "success"
 	channelFailed  = "failed"
+
+	FinishedEventType = "ssh.command.executed"
 )
 
 const (
@@ -61,6 +62,7 @@ type EnvironmentVariable struct {
 }
 
 type Spec struct {
+	MachineType      string                `json:"machineType" mapstructure:"machineType"`
 	Host             string                `json:"host" mapstructure:"host"`
 	Port             int                   `json:"port" mapstructure:"port"`
 	User             string                `json:"username" mapstructure:"username"`
@@ -92,39 +94,17 @@ func (s Spec) commandSourceOrDefault() string {
 	return s.CommandSource
 }
 
-type ExecutionMetadata struct {
-	Result           *CommandResult        `json:"result" mapstructure:"result"`
-	Host             string                `json:"host" mapstructure:"host"`
-	Port             int                   `json:"port" mapstructure:"port"`
-	User             string                `json:"user" mapstructure:"user"`
-	CommandSource    string                `json:"commandSource" mapstructure:"commandSource"`
-	Commands         string                `json:"commands" mapstructure:"commands"`
-	CommandFile      string                `json:"commandFile" mapstructure:"commandFile"`
-	WorkingDirectory string                `json:"workingDirectory" mapstructure:"workingDirectory"`
-	Environment      []EnvironmentVariable `json:"environment" mapstructure:"environment"`
-	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
-	ConnectionRetry  *ConnectionRetrySpec  `json:"connectionRetry" mapstructure:"connectionRetry"`
-	ExecutionRetry   *ExecutionRetrySpec   `json:"executionRetry" mapstructure:"executionRetry"`
-	Attempt          int                   `json:"attempt" mapstructure:"attempt"`
-	ExecutionAttempt int                   `json:"executionAttempt" mapstructure:"executionAttempt"`
-	MaxRetries       int                   `json:"maxRetries" mapstructure:"maxRetries"`
-	IntervalSeconds  int                   `json:"intervalSeconds" mapstructure:"intervalSeconds"`
-	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
-}
-
-type ConnectionRetryState struct {
-	Attempt         int `json:"attempt" mapstructure:"attempt"`                 // retries done so far (1 = first retry)
-	MaxRetries      int `json:"maxRetries" mapstructure:"maxRetries"`           // max retries from config
-	IntervalSeconds int `json:"intervalSeconds" mapstructure:"intervalSeconds"` // seconds between attempts
-}
-
 func (c *SSHCommand) Name() string  { return "ssh" }
 func (c *SSHCommand) Label() string { return "SSH Command" }
 func (c *SSHCommand) Description() string {
-	return "Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)."
+	return "Run one or more commands on a remote host via SSH, executed on a fleet runner. Authenticate using an organization Secret (SSH key or password)."
 }
 func (c *SSHCommand) Documentation() string {
 	return `Run one or more commands on a remote host via SSH.
+
+The connection and commands run on a fleet **runner** rather than in the control
+plane, so command output streams to **View logs** and long-running scripts are
+not bound by a control-plane time limit.
 
 ## Authentication
 
@@ -135,17 +115,18 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 
 ## Configuration
 
+- **Machine type**: Runner fleet that opens the SSH connection (required). Its host must provide the ` + "`ssh`" + ` client (and ` + "`sshpass`" + ` for password or passphrase auth).
 - **Host**, **Port** (default 22), **Username**: Connection details.
 - **Command source**: Choose **Inline** to type commands directly, or **From file** to load them from a file in the app's repository (e.g. scripts/deploy.sh).
-- **Commands** (inline mode): One or more commands to run, one per line (supports expressions). Each non-empty line becomes a command joined with &&. The output payload is based on the last command.
+- **Commands** (inline mode): One or more commands to run, one per line (supports expressions). They run with ` + "`set -e`" + ` so a failing command aborts the run.
 - **Command file** (file mode): Path to a file in the app's repository (e.g. ` + "`scripts/deploy.sh`" + `).
-- **Working directory**: Optional; Changes to this directory before running the command.
-- **Environment variables**: Optional list of key/value pairs available during command execution.
-- **Timeout (seconds)**: How long the command may run (default 60).
-- **Connection retry** (optional): Enable to retry connecting when the host is not reachable yet (e.g. server still booting). Set number of retries and interval between attempts.
-- **Execution retry** (optional): Enable to retry running the command when the exit status is not 0. Set number of retries and interval between attempts.
+- **Working directory**: Optional; changes to this directory before running the command.
+- **Environment variables**: Optional list of key/value pairs exported on the remote host during command execution.
+- **Execution timeout (seconds)**: Wall-clock limit for the whole runner task (default 3600, max 86400).
+- **Connection retry** (optional): Retry connecting when the host is not reachable yet (e.g. server still booting).
+- **Execution retry** (optional): Retry running the command when the exit status is not 0.
 
-## Output
+## Output channels
 
 - **success**: Exit code 0
 - **failed**: Non-zero exit code
@@ -161,11 +142,34 @@ func (c *SSHCommand) OutputChannels(configuration any) []core.OutputChannel {
 	}
 }
 
+func (c *SSHCommand) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type":      FinishedEventType,
+		"timestamp": "2026-01-19T12:00:00Z",
+		"data": []any{map[string]any{
+			"status":    "succeeded",
+			"exit_code": 0,
+		}},
+	}
+}
+
 func (c *SSHCommand) Configuration() []configuration.Field {
 	sshKeyOnly := []configuration.VisibilityCondition{{Field: "authMethod", Values: []string{AuthMethodSSHKey}}}
 	passwordOnly := []configuration.VisibilityCondition{{Field: "authMethod", Values: []string{AuthMethodPassword}}}
 
 	return []configuration.Field{
+		{
+			Name:        "machineType",
+			Label:       "Machine type",
+			Type:        configuration.FieldTypeSelect,
+			Description: "Runner fleet that opens the SSH connection",
+			Required:    true,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: runner.MachineTypeSelectOptions(),
+				},
+			},
+		},
 		{
 			Name:        "host",
 			Label:       "Host",
@@ -335,11 +339,17 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "timeout",
-			Label:       "Timeout (seconds)",
+			Label:       "Execution timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
-			Required:    true,
-			Default:     60,
-			Description: "Limit how long the command may run (seconds).",
+			Required:    false,
+			Default:     defaultTimeoutSeconds,
+			Description: "Wall-clock limit for the whole runner task. Defaults to 3600 seconds (1 hour); max 86400.",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: intPtr(0),
+					Max: intPtr(maxTimeoutSeconds),
+				},
+			},
 		},
 		{
 			Name:        "connectionRetry",
@@ -430,38 +440,51 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 	}
 }
 
+const (
+	defaultTimeoutSeconds = 3600
+	maxTimeoutSeconds     = 86400
+)
+
+func intPtr(v int) *int { return &v }
+
 func (c *SSHCommand) Setup(ctx core.SetupContext) error {
-	var spec Spec
-	config, ok := ctx.Configuration.(map[string]any)
-	if !ok || config == nil {
-		return fmt.Errorf("decode configuration: invalid configuration type")
-	}
-	if err := mapstructure.Decode(config, &spec); err != nil {
-		return fmt.Errorf("decode configuration: %w", err)
+	spec, err := decodeSpec(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
+	if err := validateSpec(spec); err != nil {
+		return err
+	}
+	if err := validateCommandSource(ctx, spec); err != nil {
+		return err
+	}
+
+	_, err = ctx.Webhook.Setup()
+	return err
+}
+
+// validateSpec checks the configuration values that do not require repository
+// access. Command-source validation (which reads repo files) is handled
+// separately by validateCommandSource.
+func validateSpec(spec Spec) error {
 	if spec.Host == "" {
 		return errors.New("host is required")
 	}
 	if spec.User == "" {
 		return errors.New("username is required")
 	}
-	if err := validateCommandSource(ctx, spec); err != nil {
-		return err
+	if strings.TrimSpace(spec.MachineType) == "" {
+		return errors.New("machine type is required")
 	}
 	if spec.Port != 0 && (spec.Port < 1 || spec.Port > 65535) {
 		return fmt.Errorf("invalid port: %d", spec.Port)
 	}
-	if spec.Timeout < 1 {
-		return errors.New("timeout is required and must be at least 1 second")
+	if spec.Timeout != 0 && (spec.Timeout < 1 || spec.Timeout > maxTimeoutSeconds) {
+		return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", maxTimeoutSeconds, defaultTimeoutSeconds)
 	}
-	for _, variable := range spec.Environment {
-		if variable.Name == "" {
-			return errors.New("environment variable name is required")
-		}
-		if !environmentVariableNameRegex.MatchString(variable.Name) {
-			return fmt.Errorf("invalid environment variable name: %s", variable.Name)
-		}
+	if err := validateEnvironment(spec.Environment); err != nil {
+		return err
 	}
 
 	switch spec.Authentication.Method {
@@ -476,48 +499,15 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	default:
 		return fmt.Errorf("invalid auth method: %s", spec.Authentication.Method)
 	}
-	if spec.ConnectionRetry != nil && spec.ConnectionRetry.Enabled {
-		if spec.ConnectionRetry.Retries < 0 {
-			return errors.New("connection retry: retries must be 0 or greater")
-		}
-		if spec.ConnectionRetry.IntervalSeconds < 1 {
-			return errors.New("connection retry: interval must be at least 1 second")
-		}
-	}
-	if spec.ExecutionRetry != nil && spec.ExecutionRetry.Enabled {
-		if spec.ExecutionRetry.Retries < 0 {
-			return errors.New("execution retry: retries must be 0 or greater")
-		}
-		if spec.ExecutionRetry.IntervalSeconds < 1 {
-			return errors.New("execution retry: interval must be at least 1 second")
-		}
-	}
 
-	return nil
-}
-
-func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
-	spec := Spec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
-	if err != nil {
+	if err := validateRetry("connection retry", spec.ConnectionRetry); err != nil {
 		return err
 	}
+	return validateRetry("execution retry", spec.ExecutionRetry)
+}
 
-	source := spec.commandSourceOrDefault()
-
-	// Inline mode: the (already template-resolved) commands are stored in
-	// metadata so retries don't have to re-evaluate expressions. File mode:
-	// metadata only carries the path; the file is re-read from the repo on
-	// every attempt so the script content never lives in the database.
-	resolvedCommands := ""
-	if source == CommandSourceInline {
-		if strings.TrimSpace(spec.Commands) == "" {
-			return errors.New("commands is required")
-		}
-		resolvedCommands = spec.Commands
-	}
-
-	for _, variable := range spec.Environment {
+func validateEnvironment(environment []EnvironmentVariable) error {
+	for _, variable := range environment {
 		if variable.Name == "" {
 			return errors.New("environment variable name is required")
 		}
@@ -525,57 +515,130 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("invalid environment variable name: %s", variable.Name)
 		}
 	}
+	return nil
+}
 
-	metadata := ExecutionMetadata{
-		Host:             spec.Host,
-		Port:             spec.Port,
-		User:             spec.User,
-		CommandSource:    source,
-		Commands:         resolvedCommands,
-		CommandFile:      spec.CommandFile,
-		WorkingDirectory: spec.WorkingDirectory,
-		Environment:      spec.Environment,
-		Timeout:          spec.Timeout,
-		ConnectionRetry:  spec.ConnectionRetry,
-		ExecutionRetry:   spec.ExecutionRetry,
-		Attempt:          0,
-		ExecutionAttempt: 0,
-		MaxRetries:       0,
-		IntervalSeconds:  0,
-		Authentication:   spec.Authentication,
+func validateRetry(label string, spec *RetrySpec) error {
+	if spec == nil || !spec.Enabled {
+		return nil
 	}
-	if spec.ConnectionRetry != nil {
-		metadata.MaxRetries = spec.ConnectionRetry.Retries
-		metadata.IntervalSeconds = spec.ConnectionRetry.IntervalSeconds
+	if spec.Retries < 0 {
+		return fmt.Errorf("%s: retries must be 0 or greater", label)
+	}
+	if spec.IntervalSeconds < 1 {
+		return fmt.Errorf("%s: interval must be at least 1 second", label)
+	}
+	return nil
+}
+
+func decodeSpec(raw any) (Spec, error) {
+	config, ok := raw.(map[string]any)
+	if !ok || config == nil {
+		return Spec{}, fmt.Errorf("decode configuration: invalid configuration type")
+	}
+	var spec Spec
+	if err := mapstructure.Decode(config, &spec); err != nil {
+		return Spec{}, fmt.Errorf("decode configuration: %w", err)
+	}
+	return spec, nil
+}
+
+func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
+	spec, err := decodeSpec(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+	if err := validateSpec(spec); err != nil {
+		return err
 	}
 
-	err = ctx.Metadata.Set(metadata)
+	body, err := c.commandBody(ctx.Files, spec)
 	if err != nil {
 		return err
 	}
 
-	// File mode: load the script body now so file errors surface before
-	// we try to open an SSH session. This re-checks the same size and
-	// empty-file guards Setup ran at publish time, in case the file
-	// changed in the repo between publish and run.
-	scriptBody := ""
-	if source == CommandSourceFile {
-		scriptBody, err = loadCommandFile(ctx.Files, spec.CommandFile)
+	environment, err := c.authEnvironment(ctx.Secrets, spec)
+	if err != nil {
+		return err
+	}
+
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		return fmt.Errorf("webhook setup: %w", err)
+	}
+
+	broker, err := runner.NewBrokerClient(ctx.HTTP)
+	if err != nil {
+		return fmt.Errorf("new broker client: %w", err)
+	}
+
+	remoteScript := buildRemoteScript(spec.Environment, spec.WorkingDirectory, body)
+	taskID, err := broker.CreateTask(runner.CreateTaskParams{
+		MachineType:    spec.MachineType,
+		RunMode:        runner.RunModeBash,
+		Script:         buildRunnerScript(spec, remoteScript),
+		WebhookURL:     webhookURL,
+		Environment:    environment,
+		ExecutionMode:  runner.ExecutionModeHost,
+		TimeoutSeconds: spec.Timeout,
+	})
+	if err != nil {
+		return fmt.Errorf("create task: %w", err)
+	}
+
+	return runner.AfterTaskCreated(ctx, taskID)
+}
+
+// commandBody resolves the commands to run on the remote host. Inline mode uses
+// the (already template-resolved) commands verbatim; file mode reads the script
+// from the app repository on every attempt so the script never lives in the
+// database.
+func (c *SSHCommand) commandBody(files core.RepositoryFilesContext, spec Spec) (string, error) {
+	if spec.commandSourceOrDefault() == CommandSourceFile {
+		return loadCommandFile(files, spec.CommandFile)
+	}
+	if strings.TrimSpace(spec.Commands) == "" {
+		return "", errors.New("commands is required")
+	}
+	return spec.Commands, nil
+}
+
+// authEnvironment resolves the SSH credentials from secrets and returns them as
+// broker task environment variables. Passing them this way keeps the secrets out
+// of persisted execution metadata; the generated runner script consumes them.
+func (c *SSHCommand) authEnvironment(secrets core.SecretsContext, spec Spec) ([]runner.BrokerEnvironmentVariable, error) {
+	if secrets == nil {
+		return nil, errors.New("secrets context is unavailable")
+	}
+
+	switch spec.Authentication.Method {
+	case AuthMethodSSHKey:
+		privateKey, err := secrets.GetKey(spec.Authentication.PrivateKey.Secret, spec.Authentication.PrivateKey.Key)
 		if err != nil {
-			return err
+			return nil, fmt.Errorf("cannot get private key: %w", err)
 		}
-	}
+		env := []runner.BrokerEnvironmentVariable{
+			{Name: envPrivateKey, Value: string(normalizePrivateKey(privateKey))},
+		}
+		if spec.Authentication.Passphrase.IsSet() {
+			passphrase, err := secrets.GetKey(spec.Authentication.Passphrase.Secret, spec.Authentication.Passphrase.Key)
+			if err != nil {
+				return nil, fmt.Errorf("cannot get passphrase: %w", err)
+			}
+			env = append(env, runner.BrokerEnvironmentVariable{Name: envPassphrase, Value: string(passphrase)})
+		}
+		return env, nil
 
-	execCtx := ExecuteSSHContext{
-		secretsCtx:   ctx.Secrets,
-		requestsCtx:  ctx.Requests,
-		stateCtx:     ctx.ExecutionState,
-		metadataCtx:  ctx.Metadata,
-		execMetadata: metadata,
-		scriptBody:   scriptBody,
-	}
+	case AuthMethodPassword:
+		password, err := secrets.GetKey(spec.Authentication.Password.Secret, spec.Authentication.Password.Key)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get password: %w", err)
+		}
+		return []runner.BrokerEnvironmentVariable{{Name: envPassword, Value: string(password)}}, nil
 
-	return c.executeSSH(execCtx)
+	default:
+		return nil, fmt.Errorf("unsupported authentication method: %s", spec.Authentication.Method)
+	}
 }
 
 // loadCommandFile reads, size-limits, and validates the command file referenced
@@ -611,313 +674,6 @@ func loadCommandFile(files core.RepositoryFilesContext, rawPath string) (string,
 		return "", fmt.Errorf("command file %q is empty", path)
 	}
 	return normalizeScriptLineEndings(string(data)), nil
-}
-
-func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
-	switch ctx.Name {
-	case "connectionRetry", "executionRetry":
-		if ctx.ExecutionState.IsFinished() {
-			return nil
-		}
-
-		metadata := ExecutionMetadata{}
-		err := mapstructure.Decode(ctx.Metadata.Get(), &metadata)
-		if err != nil {
-			return err
-		}
-
-		// Re-read the command file on every retry so the script body
-		// never lives in stored metadata. Same guards Execute applies on
-		// the initial attempt: a missing file or empty content fails
-		// fast before we try to open an SSH session.
-		scriptBody := ""
-		if metadata.CommandSource == CommandSourceFile {
-			scriptBody, err = loadCommandFile(ctx.Files, metadata.CommandFile)
-			if err != nil {
-				return err
-			}
-		}
-
-		execCtx := ExecuteSSHContext{
-			secretsCtx:   ctx.Secrets,
-			requestsCtx:  ctx.Requests,
-			stateCtx:     ctx.ExecutionState,
-			metadataCtx:  ctx.Metadata,
-			execMetadata: metadata,
-			scriptBody:   scriptBody,
-		}
-
-		return c.executeSSH(execCtx)
-	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
-	}
-}
-
-type ExecuteSSHContext struct {
-	secretsCtx  core.SecretsContext
-	requestsCtx core.RequestContext
-	stateCtx    core.ExecutionStateContext
-	metadataCtx core.MetadataWriter
-
-	execMetadata ExecutionMetadata
-
-	// File-mode script body to stream as stdin. Loaded by the caller so
-	// file-system errors surface before the SSH client is created. Empty
-	// for inline mode.
-	scriptBody string
-}
-
-func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
-	client, err := c.createClient(ctx.secretsCtx, ctx.execMetadata)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	command, stdin, err := c.buildExecutionCommand(ctx.execMetadata, ctx.scriptBody)
-	if err != nil {
-		return err
-	}
-	result, err := client.ExecuteScript(command, stdin, time.Duration(ctx.execMetadata.Timeout)*time.Second)
-	if c.isConnectError(err) {
-		if c.shouldRetry(ctx.execMetadata.ConnectionRetry, c.getRetryAttempt(ctx.metadataCtx)) {
-			err = c.incrementRetryCount(ctx.metadataCtx)
-			if err != nil {
-				return err
-			}
-
-			return ctx.requestsCtx.ScheduleActionCall("connectionRetry", map[string]any{}, time.Duration(ctx.execMetadata.ConnectionRetry.IntervalSeconds)*time.Second)
-		}
-
-		// Retries exhausted — emit on the failed channel with the connection error.
-		attempt := c.getRetryAttempt(ctx.metadataCtx)
-		failResult := &CommandResult{
-			Stdout:   "",
-			Stderr:   fmt.Sprintf("connection failed after %d retries: %s", attempt, err.Error()),
-			ExitCode: -1,
-		}
-
-		err = c.setResultMetadata(ctx.metadataCtx, failResult)
-		if err != nil {
-			return err
-		}
-
-		return ctx.stateCtx.Emit(channelFailed, "ssh.connection.failed", []any{failResult})
-	}
-
-	if err != nil {
-		return err
-	}
-
-	if result.ExitCode != 0 {
-		if c.shouldRetry(ctx.execMetadata.ExecutionRetry, c.getExecutionAttempt(ctx.metadataCtx)) {
-			err = c.incrementExecutionRetryCount(ctx.metadataCtx)
-			if err != nil {
-				return err
-			}
-
-			return ctx.requestsCtx.ScheduleActionCall(
-				"executionRetry",
-				map[string]any{},
-				time.Duration(ctx.execMetadata.ExecutionRetry.IntervalSeconds)*time.Second,
-			)
-		}
-	}
-
-	err = c.setResultMetadata(ctx.metadataCtx, result)
-	if err != nil {
-		return err
-	}
-
-	channel := channelFailed
-	if result.ExitCode == 0 {
-		channel = channelSuccess
-	}
-
-	return ctx.stateCtx.Emit(channel, "ssh.command.executed", []any{result})
-}
-
-func (c *SSHCommand) shouldRetry(retrySpec *RetrySpec, attempt int) bool {
-	if retrySpec == nil || !retrySpec.Enabled {
-		return false
-	}
-
-	return attempt < retrySpec.Retries
-}
-
-func (c *SSHCommand) incrementRetryCount(metadata core.MetadataWriter) error {
-	current := c.getMetadataMap(metadata)
-	current["attempt"] = c.getRetryAttempt(metadata) + 1
-
-	return metadata.Set(current)
-}
-
-func (c *SSHCommand) incrementExecutionRetryCount(metadata core.MetadataWriter) error {
-	current := c.getMetadataMap(metadata)
-	current["executionAttempt"] = c.getExecutionAttempt(metadata) + 1
-
-	return metadata.Set(current)
-}
-
-func (c *SSHCommand) getExecutionAttempt(metadata core.MetadataWriter) int {
-	return c.getMetadataInt(metadata, "executionAttempt")
-}
-
-func (c *SSHCommand) getRetryAttempt(metadata core.MetadataWriter) int {
-	return c.getMetadataInt(metadata, "attempt")
-}
-
-func (c *SSHCommand) getMetadataInt(metadata core.MetadataWriter, key string) int {
-	meta := c.getMetadataMap(metadata)
-
-	value, ok := meta[key]
-	if !ok {
-		return 0
-	}
-
-	// JSON numbers deserialize as float64
-	switch v := value.(type) {
-	case float64:
-		return int(v)
-	case int:
-		return v
-	default:
-		return 0
-	}
-}
-
-func (c *SSHCommand) getMetadataMap(metadata core.MetadataWriter) map[string]any {
-	current := metadata.Get()
-	if current == nil {
-		return map[string]any{}
-	}
-
-	if metadataMap, ok := current.(map[string]any); ok {
-		return metadataMap
-	}
-
-	data, err := json.Marshal(current)
-	if err != nil {
-		return map[string]any{}
-	}
-
-	metadataMap := map[string]any{}
-	if err := json.Unmarshal(data, &metadataMap); err != nil {
-		return map[string]any{}
-	}
-
-	return metadataMap
-}
-
-func (c *SSHCommand) setResultMetadata(metadata core.MetadataWriter, result *CommandResult) error {
-	current := c.getMetadataMap(metadata)
-	current["result"] = map[string]any{
-		"exitCode": result.ExitCode,
-		"stdout":   result.Stdout,
-		"stderr":   result.Stderr,
-	}
-
-	return metadata.Set(current)
-}
-
-func (c *SSHCommand) isConnectError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	s := strings.ToLower(err.Error())
-
-	return strings.Contains(s, "dial") ||
-		strings.Contains(s, "timeout") ||
-		strings.Contains(s, "connection refused") ||
-		strings.Contains(s, "i/o timeout") ||
-		strings.Contains(s, "connection reset") ||
-		strings.Contains(s, "no route to host")
-}
-
-func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []EnvironmentVariable, command string) string {
-	finalCommand := command
-
-	if workingDirectory != "" {
-		finalCommand = fmt.Sprintf("cd %s && %s", shellQuote(workingDirectory), finalCommand)
-	}
-
-	if len(environment) == 0 {
-		return finalCommand
-	}
-
-	envAssignments := make([]string, 0, len(environment))
-	for _, variable := range environment {
-		envAssignments = append(envAssignments, fmt.Sprintf("%s=%s", variable.Name, shellQuote(variable.Value)))
-	}
-
-	return fmt.Sprintf("env %s sh -lc %s", strings.Join(envAssignments, " "), shellQuote(finalCommand))
-}
-
-// buildExecutionCommand assembles the final command sent to the remote host
-// and returns a stdin payload when the command should be streamed as a script.
-//
-// Inline mode keeps one-line commands on the command line, preserving the
-// long-standing behavior for simple invocations. Multi-line inline scripts are
-// streamed to `bash -s` so shell syntax that depends on real newlines (shebangs,
-// comments, conditionals, here-docs) is not flattened into invalid `&&` chains.
-//
-// File mode pipes the (already-loaded) script body to `bash -s` over stdin.
-// This avoids embedding the whole script in the command line — argv has size
-// limits and nested quoting is fragile — while preserving multi-line
-// constructs, comments, and bash-only features (pipefail, declare -A, here-docs,
-// process substitution) except for normalizing CRLF/CR line endings to LF. The
-// stream is always interpreted by bash, so any leading `#!` line is just a
-// comment: non-bash shebangs are not honored.
-func (c *SSHCommand) buildExecutionCommand(metadata ExecutionMetadata, scriptBody string) (string, io.Reader, error) {
-	if metadata.CommandSource == CommandSourceFile {
-		if scriptBody == "" {
-			return "", nil, errors.New("command file body is required")
-		}
-		command, payload := c.buildScriptCommand(metadata.WorkingDirectory, metadata.Environment, scriptBody)
-		return command, strings.NewReader(payload), nil
-	}
-
-	if isMultilineInlineScript(metadata.Commands) {
-		command, payload := c.buildInlineScriptCommand(metadata.WorkingDirectory, metadata.Environment, metadata.Commands)
-		return command, strings.NewReader(payload), nil
-	}
-
-	combined := buildCombinedCommands(metadata.Commands)
-	if combined == "" {
-		return "", nil, errors.New("commands is required")
-	}
-	return c.buildRemoteCommand(metadata.WorkingDirectory, metadata.Environment, combined), nil, nil
-}
-
-// buildScriptCommand returns the remote command (`env VAR=v ... bash -s`) and
-// the script body to stream over stdin. The working-directory change is
-// prepended on its own line (followed by `|| exit 1`) so a leading shebang or
-// comment in the script cannot swallow the `cd` via `#`-to-end-of-line.
-func (c *SSHCommand) buildScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
-	return c.buildScriptCommandWithShell("bash -s", workingDirectory, environment, script)
-}
-
-func (c *SSHCommand) buildInlineScriptCommand(workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
-	return c.buildScriptCommandWithShell("bash -e -s", workingDirectory, environment, script)
-}
-
-func (c *SSHCommand) buildScriptCommandWithShell(shellCommand string, workingDirectory string, environment []EnvironmentVariable, script string) (string, string) {
-	payload := normalizeScriptLineEndings(script)
-	if workingDirectory != "" {
-		payload = fmt.Sprintf("cd %s || exit 1\n%s", shellQuote(workingDirectory), payload)
-	}
-
-	command := shellCommand
-	if len(environment) > 0 {
-		envAssignments := make([]string, 0, len(environment))
-		for _, variable := range environment {
-			envAssignments = append(envAssignments, fmt.Sprintf("%s=%s", variable.Name, shellQuote(variable.Value)))
-		}
-		command = fmt.Sprintf("env %s %s", strings.Join(envAssignments, " "), command)
-	}
-
-	return command, payload
 }
 
 // validateCommandSource enforces the configured command-source variant.
@@ -971,100 +727,39 @@ func validateCommandSource(ctx core.SetupContext, spec Spec) error {
 	}
 }
 
-func buildCombinedCommands(commands string) string {
-	lines := strings.Split(normalizeScriptLineEndings(commands), "\n")
-	parts := make([]string, 0, len(lines))
-	for _, line := range lines {
-		l := strings.TrimSpace(line)
-		if l == "" {
-			continue
-		}
-		parts = append(parts, l)
+func (c *SSHCommand) taskOutcome() runner.TaskOutcome {
+	return runner.TaskOutcome{
+		FinishedEventType: FinishedEventType,
+		PassedChannel:     channelSuccess,
+		FailedChannel:     channelFailed,
 	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.Join(parts, " && ")
 }
 
-func isMultilineInlineScript(commands string) bool {
-	lines := strings.Split(normalizeScriptLineEndings(commands), "\n")
-	nonEmptyLines := 0
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		nonEmptyLines++
-		if nonEmptyLines > 1 {
-			return true
-		}
+func (c *SSHCommand) Hooks() []core.Hook {
+	return []core.Hook{{Name: runner.HookActionPoll, Type: core.HookTypeInternal}}
+}
+
+func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
+	switch ctx.Name {
+	case runner.HookActionPoll:
+		return runner.PollTask(ctx, c.taskOutcome())
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
-
-	return false
 }
 
-func normalizeScriptLineEndings(script string) string {
-	script = strings.ReplaceAll(script, "\r\n", "\n")
-	return strings.ReplaceAll(script, "\r", "\n")
-}
-
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
+func (c *SSHCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return runner.HandleTaskWebhook(ctx, c.taskOutcome())
 }
 
 func (c *SSHCommand) Cancel(ctx core.ExecutionContext) error {
-	return nil
+	return runner.CancelBrokerTask(ctx)
 }
 
 func (c *SSHCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *SSHCommand) Hooks() []core.Hook {
-	return []core.Hook{
-		{
-			Name: "connectionRetry",
-			Type: core.HookTypeInternal,
-		},
-		{
-			Name: "executionRetry",
-			Type: core.HookTypeInternal,
-		},
-	}
-}
-
-func (c *SSHCommand) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return 404, nil, fmt.Errorf("SSH component does not handle webhooks")
-}
-
 func (c *SSHCommand) Cleanup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (c *SSHCommand) createClient(secrets core.SecretsContext, metadata ExecutionMetadata) (*Client, error) {
-	switch metadata.Authentication.Method {
-	case AuthMethodSSHKey:
-		return c.createClientSSHKey(secrets, metadata)
-	case AuthMethodPassword:
-		return c.createClientForPassword(secrets, metadata)
-	default:
-		return nil, fmt.Errorf("unsupported authentication method: %s", metadata.Authentication.Method)
-	}
-}
-
-func (c *SSHCommand) createClientForPassword(secrets core.SecretsContext, metadata ExecutionMetadata) (*Client, error) {
-	password, err := secrets.GetKey(metadata.Authentication.Password.Secret, metadata.Authentication.Password.Key)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get password: %w", err)
-	}
-	return NewClientPassword(metadata.Host, metadata.Port, metadata.User, password), nil
-}
-
-func (c *SSHCommand) createClientSSHKey(secrets core.SecretsContext, metadata ExecutionMetadata) (*Client, error) {
-	privateKey, err := secrets.GetKey(metadata.Authentication.PrivateKey.Secret, metadata.Authentication.PrivateKey.Key)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get private key: %w", err)
-	}
-
-	return NewClientKey(metadata.Host, metadata.Port, metadata.User, privateKey, nil), nil
 }

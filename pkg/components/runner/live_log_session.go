@@ -47,9 +47,14 @@ type LiveLogAccessContext struct {
 	BrokerTaskID string
 }
 
+// SSHComponentName is the registry key of the SSH component. It offloads its
+// script execution to a runner broker task, so it shares the runner live-log
+// pipeline even though it lives in its own package.
+const SSHComponentName = "ssh"
+
 func IsRunnerComponent(name string) bool {
 	switch strings.TrimSpace(name) {
-	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName:
+	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName, SSHComponentName:
 		return true
 	default:
 		return false

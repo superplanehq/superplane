@@ -11,9 +11,10 @@ import type {
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getColorClass } from "@/lib/colors";
-import type React from "react";
+import React from "react";
 import { getTriggerRenderer } from ".";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 
 const SSH_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
@@ -24,8 +25,12 @@ type SSHResultPayload = {
   stderr?: string;
   Stdout?: string;
   Stderr?: string;
+  // Legacy in-process shape.
   exitCode?: number | string;
   ExitCode?: number | string;
+  // Runner-backed shape ({ status, exit_code }).
+  status?: string;
+  exit_code?: number | string;
 };
 
 function extractSSHResultFromPayload(payload: unknown): SSHResultPayload | undefined {
@@ -55,7 +60,7 @@ function getSSHResult(execution: ExecutionInfo): SSHResultPayload | undefined {
 
 function getSSHExitCode(execution: ExecutionInfo): number | undefined {
   const result = getSSHResult(execution);
-  const code = result?.exitCode ?? result?.ExitCode;
+  const code = result?.exit_code ?? result?.exitCode ?? result?.ExitCode;
   if (typeof code === "number") {
     return Number.isFinite(code) ? code : undefined;
   }
@@ -123,35 +128,50 @@ type SSHConfiguration = {
 
 export const sshMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions[0];
+    const canvasMode = context.canvasMode ?? "live";
+    const title =
+      context.node.name ||
+      context.componentDefinition.label ||
+      context.componentDefinition.name ||
+      "Unnamed component";
+
     return {
       iconSlug: context.componentDefinition.icon || "terminal",
       iconColor: getColorClass("black"),
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title:
-        context.node.name ||
-        context.componentDefinition.label ||
-        context.componentDefinition.name ||
-        "Unnamed component",
-      eventSections: context.lastExecutions[0]
-        ? getSSHEventSections(context.nodes, context.lastExecutions[0], sshStateFunction)
+      title,
+      eventSections: lastExecution
+        ? getSSHEventSections(context.nodes, lastExecution, sshStateFunction)
         : undefined,
-      includeEmptyState: !context.lastExecutions[0],
+      includeEmptyState: !lastExecution,
       metadata: getSSHMetadataList(context.node),
       eventStateMap: SSH_STATE_MAP,
+      // Command output now streams from the fleet runner, so surface the same
+      // "View logs" affordance the Runner components use.
+      customField: <RunnerLiveLogDialog title={title} canvasMode={canvasMode} execution={lastExecution ?? null} />,
+      customFieldPosition: "after",
     };
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as Record<string, unknown> | undefined;
+    const config = context.node.configuration as SSHConfiguration | undefined;
     const result = getSSHResult(context.execution);
-    const host = metadata?.host as string | undefined;
-    const port = metadata?.port as number | undefined;
-    const username = metadata?.user as string | undefined;
+    // The runner-backed component keeps connection details in the node
+    // configuration; older in-process executions stored them in metadata.
+    const host = (config?.host ?? (metadata?.host as string | undefined)) || undefined;
+    const port = config?.port ?? (metadata?.port as number | undefined);
+    const username = config?.username ?? (metadata?.user as string | undefined);
     if (host) {
       const portSuffix = port && port !== 22 ? `:${port}` : "";
       details["Host"] = `${username || "user"}@${host}${portSuffix}`;
+    }
+    const status = result?.status;
+    if (typeof status === "string" && status !== "") {
+      details["Status"] = status;
     }
 
     if (context.execution.createdAt) {
