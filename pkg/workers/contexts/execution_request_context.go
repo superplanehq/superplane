@@ -22,6 +22,10 @@ func (c *ExecutionRequestContext) ScheduleActionCall(actionName string, paramete
 		return fmt.Errorf("interval must be bigger than 1s")
 	}
 
+	if c.execution.State == models.CanvasNodeExecutionStateFinished {
+		return nil
+	}
+
 	runAt := time.Now().Add(interval)
 	return c.execution.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{
