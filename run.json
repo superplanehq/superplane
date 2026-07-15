@@ -331,14 +331,139 @@
     }
   },
   "web_url": "http://127.0.0.1:32276/runs/01KXK7JAFBA0CP8C2TC5PWW4K4",
-  "start": null,
-  "status": {
-    "kind": "starting"
+  "start": {
+    "start_time": "2026-07-15T15:51:51.400016Z",
+    "run_branch": "fabro/run/01KXK7JAFBA0CP8C2TC5PWW4K4",
+    "base_sha": "392d25f4624d91dea9c941c6eef85381dd76a00b"
   },
-  "status_updated_at": "2026-07-15T15:50:44.540889Z",
-  "last_event_at": "2026-07-15T15:51:51.366772Z",
+  "status": {
+    "kind": "running"
+  },
+  "status_updated_at": "2026-07-15T15:51:51.400044Z",
+  "last_event_at": "2026-07-15T15:53:24.895876Z",
   "pending_control": null,
-  "checkpoints": [],
+  "checkpoints": [
+    {
+      "seq": 26,
+      "checkpoint": {
+        "timestamp": "2026-07-15T15:51:55.036966Z",
+        "current_node": "start",
+        "completed_nodes": [
+          "start"
+        ],
+        "node_retries": {},
+        "context_values": {
+          "outcome": "succeeded",
+          "internal.work_dir": "/workspace/superplane",
+          "internal.fidelity": "compact",
+          "failure_signature": "",
+          "graph.rankdir": "LR",
+          "internal.thread_id": null,
+          "internal.retry_count.start": 0,
+          "internal.run_id": "01KXK7JAFBA0CP8C2TC5PWW4K4",
+          "failure_class": "",
+          "graph.goal": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3",
+          "internal.node_visit_count": 1,
+          "current_node": "start"
+        },
+        "node_outcomes": {
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          }
+        },
+        "next_node_id": "plan",
+        "node_visits": {
+          "start": 1
+        }
+      },
+      "diff": {}
+    },
+    {
+      "seq": 0,
+      "checkpoint": {
+        "timestamp": "2026-07-15T15:53:24.932454Z",
+        "current_node": "plan",
+        "completed_nodes": [
+          "start",
+          "plan"
+        ],
+        "node_retries": {},
+        "context_values": {
+          "internal.retry_count.plan": 0,
+          "graph.goal": "Remove \"Pin App\" from homepage - keep only star\n\n## Change\n\nRemove the \"Pin App\" action from the homepage. Keep only the star functionality.\n\n## Priority\n\nP3",
+          "internal.node_visit_count": 1,
+          "outcome": "succeeded",
+          "failure_class": "",
+          "failure_signature": "",
+          "response.plan": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/`:\n\n1. **`CanvasCardsGrid.tsx`** — renders the thumbtack `<Pin>` button on each card alongside the star button\n2. **`index.tsx`** — wires the `onTogglePin` callback, renders the **\"Pinned\" section** at the top of the page, and has a guard in `buildFolderedLayout` that hides pinned canvases from the main grid\n3. **`CanvasFolderSection.tsx`** — passes `onTogglePin` through to the grid\n4. **`index.spec.tsx`** — has a test that clicks \"Unpin app\" and asserts on the Pinned section\n\n---\n\n## Key Risks Called Out\n\n- The `buildFolderedLayout` function has an `if (canvas.isPinned) continue` guard that **must be removed** along with the Pinned section — otherwise previously-pinned canvases would vanish from the UI entirely.\n- The backend API still stores `pinned`/`pinnedAt`; this is intentionally out of scope.\n- `canvasAppPreferencePresentation.ts` sorting logic references `isPinned` but is left unchanged since it's harmless and keeps the scope minimal.",
+          "graph.rankdir": "LR",
+          "internal.run_id": "01KXK7JAFBA0CP8C2TC5PWW4K4",
+          "internal.thread_id": "start",
+          "internal.fidelity": "compact",
+          "internal.work_dir": "/workspace/superplane",
+          "last_response": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/",
+          "current_node": "plan",
+          "thread.start.current_node": "plan",
+          "internal.retry_count.start": 0,
+          "last_stage": "plan"
+        },
+        "node_outcomes": {
+          "plan": {
+            "status": "succeeded",
+            "context_updates": {
+              "response.plan": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/`:\n\n1. **`CanvasCardsGrid.tsx`** — renders the thumbtack `<Pin>` button on each card alongside the star button\n2. **`index.tsx`** — wires the `onTogglePin` callback, renders the **\"Pinned\" section** at the top of the page, and has a guard in `buildFolderedLayout` that hides pinned canvases from the main grid\n3. **`CanvasFolderSection.tsx`** — passes `onTogglePin` through to the grid\n4. **`index.spec.tsx`** — has a test that clicks \"Unpin app\" and asserts on the Pinned section\n\n---\n\n## Key Risks Called Out\n\n- The `buildFolderedLayout` function has an `if (canvas.isPinned) continue` guard that **must be removed** along with the Pinned section — otherwise previously-pinned canvases would vanish from the UI entirely.\n- The backend API still stores `pinned`/`pinnedAt`; this is intentionally out of scope.\n- `canvasAppPreferencePresentation.ts` sorting logic references `isPinned` but is left unchanged since it's harmless and keeps the scope minimal.",
+              "last_stage": "plan",
+              "last_response": "The plan has been written to `/workspace/superplane/plan.md`. Here's a summary of what I found and documented:\n\n---\n\n## What I Found\n\nThe \"Pin App\" feature spans four files in `web_src/src/pages/home/"
+            },
+            "notes": "Stage completed: plan",
+            "usage": {
+              "input": {
+                "usage": {
+                  "model": {
+                    "provider": "anthropic",
+                    "model_id": "claude-sonnet-4-6"
+                  },
+                  "tokens": {
+                    "input_tokens": 41566,
+                    "output_tokens": 4322,
+                    "reasoning_tokens": 0,
+                    "cache_read_tokens": 255805,
+                    "cache_write_tokens": 72154
+                  }
+                },
+                "facts": {
+                  "algorithm": "anthropic",
+                  "cache_write_5m_tokens": 72154,
+                  "cache_write_1h_tokens": 0
+                }
+              },
+              "total_usd_micros": 536846
+            },
+            "files_touched": [
+              "/workspace/superplane/plan.md"
+            ],
+            "timing": {
+              "wall_time_ms": 0,
+              "inference_time_ms": 87387,
+              "tool_time_ms": 1701,
+              "active_time_ms": 89088
+            }
+          },
+          "start": {
+            "status": "succeeded",
+            "usage": null
+          }
+        },
+        "next_node_id": "approve",
+        "node_visits": {
+          "plan": 1,
+          "start": 1
+        }
+      },
+      "diff": {}
+    }
+  ],
   "conclusion": null,
   "sandbox": {
     "kind": "ready",
@@ -365,5 +490,268 @@
   "pull_request": null,
   "superseded_by": null,
   "pending_interviews": {},
-  "stages": {}
+  "stages": {
+    "start@1": {
+      "first_event_seq": 23,
+      "prompt": null,
+      "response": null,
+      "completion": {
+        "outcome": "succeeded",
+        "notes": null,
+        "failure_reason": null,
+        "timestamp": "2026-07-15T15:51:55.036812Z"
+      },
+      "provider_used": null,
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": null,
+      "parallel_results": null,
+      "output": null,
+      "started_at": "2026-07-15T15:51:55.036568Z",
+      "handler": "start",
+      "timing": {
+        "wall_time_ms": 0,
+        "inference_time_ms": 0,
+        "tool_time_ms": 0,
+        "active_time_ms": 0
+      },
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "state": "succeeded"
+    },
+    "plan@1": {
+      "first_event_seq": 27,
+      "prompt": null,
+      "response": null,
+      "completion": null,
+      "provider_used": {
+        "mode": "agent",
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "reasoning_effort": "high"
+      },
+      "diff": null,
+      "script_invocation": null,
+      "script_timing": null,
+      "parallel_results": null,
+      "output": null,
+      "started_at": "2026-07-15T15:51:55.037075Z",
+      "handler": "agent",
+      "usage": {
+        "input_tokens": 41566,
+        "output_tokens": 4322,
+        "total_tokens": 373847,
+        "reasoning_tokens": 0,
+        "cache_read_tokens": 255805,
+        "cache_write_tokens": 72154,
+        "total_usd_micros": 536846
+      },
+      "model": {
+        "provider": "anthropic",
+        "model_id": "claude-sonnet-4-6"
+      },
+      "permission_level": "full",
+      "agent_tools": [
+        {
+          "name": "AskUserQuestion",
+          "description": "Ask the human one or more questions and wait for their answers before continuing this stage.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "other",
+          "invoked": false
+        },
+        {
+          "name": "TaskCreate",
+          "description": "Create pending tasks in the current session. Use concise subjects, descriptions, optional activeForm text, and metadata. Check TaskList first to avoid duplicate tasks.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "other",
+          "invoked": false
+        },
+        {
+          "name": "TaskGet",
+          "description": "Get one task by taskId, including subject, status, description, owner, blockedBy, and blocks.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "other",
+          "invoked": false
+        },
+        {
+          "name": "TaskList",
+          "description": "List tasks for the current session, including status, owner, and blocking dependencies. Use TaskGet with a taskId for full description and dependency details.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "other",
+          "invoked": false
+        },
+        {
+          "name": "TaskUpdate",
+          "description": "Update an existing task's status, text, owner, metadata, or dependencies. Valid statuses are pending, in_progress, completed, and deleted. After completing a task, call TaskList to find newly unblocked work.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "other",
+          "invoked": false
+        },
+        {
+          "name": "close_agent",
+          "description": "Close a running subagent that is no longer needed.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "subagent",
+          "invoked": false
+        },
+        {
+          "name": "edit_file",
+          "description": "Edit a file by replacing an exact string. The old_string must be an exact match and unique unless replace_all is true; include surrounding context when needed. Read the file first and preserve existing indentation.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "write",
+          "invoked": false
+        },
+        {
+          "name": "glob",
+          "description": "Find files by file names using a glob pattern. Use path to choose the search root. Prefer this over shell find or ls when locating repository files.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "read",
+          "invoked": true
+        },
+        {
+          "name": "grep",
+          "description": "Search file contents with a regex pattern. Use path to choose the search root, glob_filter to limit matching files, case_insensitive for case folding, and max_results to cap output.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "read",
+          "invoked": true
+        },
+        {
+          "name": "read_file",
+          "description": "Read files before editing them. Returns line-numbered text and supports offset/limit for large files. Use this instead of shell cat, head, tail, or sed when inspecting repository files.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "read",
+          "invoked": true
+        },
+        {
+          "name": "send_input",
+          "description": "Send a follow-up message to a running subagent when new information or corrected instructions are needed.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "subagent",
+          "invoked": false
+        },
+        {
+          "name": "shell",
+          "description": "Execute shell commands for terminal operations, package managers, tests and builds. Use dedicated tools for file reads, file edits, filename searches, and content searches. Provide timeout_ms for long-running commands.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "shell",
+          "invoked": true
+        },
+        {
+          "name": "spawn_agent",
+          "description": "Spawn a subagent for independent work or context isolation. Use it for tasks that can proceed separately, and avoid duplicating the same work in the parent session.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "subagent",
+          "invoked": false
+        },
+        {
+          "name": "wait",
+          "description": "Wait for a subagent to complete, then use the result to synthesize the outcome for the user.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "subagent",
+          "invoked": false
+        },
+        {
+          "name": "web_fetch",
+          "description": "Fetch content from a URL that starts with http:// or https://. Pass a prompt to extract specific information or summarize the page; omit prompt to return the page content.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "other",
+          "invoked": false
+        },
+        {
+          "name": "web_search",
+          "description": "Search the web using Brave Search when current external information is needed. Returns result titles, URLs, and descriptions; use web_fetch for a specific URL.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "other",
+          "invoked": false
+        },
+        {
+          "name": "write_file",
+          "description": "Create new files, or overwrite an existing file only when replacement is explicitly intended. Prefer edit_file for targeted changes to existing files because write_file overwrites the full file content.",
+          "source": {
+            "kind": "native"
+          },
+          "category": "write",
+          "invoked": true
+        }
+      ],
+      "context_window": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "context_window_tokens": 200000,
+        "input_tokens": 48290,
+        "usage_percent": 24.145,
+        "count_method": "response_usage_scaled_breakdown",
+        "staleness": "live",
+        "generated_at": "2026-07-15T15:53:24.889402Z",
+        "event_seq": 100,
+        "breakdown": [
+          {
+            "category": "system_prompt",
+            "tokens": 2172,
+            "usage_percent": 1.086
+          },
+          {
+            "category": "tools",
+            "tokens": 2492,
+            "usage_percent": 1.246
+          },
+          {
+            "category": "memory",
+            "tokens": 3015,
+            "usage_percent": 1.5075
+          },
+          {
+            "category": "conversation",
+            "tokens": 40602,
+            "usage_percent": 20.301
+          },
+          {
+            "category": "other",
+            "tokens": 9,
+            "usage_percent": 0.0045
+          }
+        ],
+        "warnings": []
+      },
+      "state": "running"
+    }
+  }
 }
