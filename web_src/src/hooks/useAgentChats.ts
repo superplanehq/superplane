@@ -101,11 +101,13 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
       content,
       mode,
       images,
+      autoLayoutOnUpdateEnabled,
     }: {
       chatId: string;
       content: string;
       mode?: AgentMode;
       images?: AgentOutgoingImage[];
+      autoLayoutOnUpdateEnabled?: boolean;
     }) => {
       const response = await agentsSendAgentChatMessage(
         withOrganizationHeader({
@@ -114,6 +116,7 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
           body: {
             content,
             mode: mode ? agentModeToApiMode[mode] : undefined,
+            autoLayoutOnUpdateEnabled,
             images: images && images.length > 0 ? images : undefined,
           },
         }),

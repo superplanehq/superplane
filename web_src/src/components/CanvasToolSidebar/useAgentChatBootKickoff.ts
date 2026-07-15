@@ -15,12 +15,14 @@ export function useAgentChatBootKickoff({
   chatId,
   canvasId,
   agentMode,
+  isAutoLayoutOnUpdateEnabled,
 }: {
   messagesQuery: ReturnType<typeof useAgentChatMessages>;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   chatId: string;
   canvasId: string;
   agentMode: AgentMode;
+  isAutoLayoutOnUpdateEnabled: boolean;
 }) {
   const [bootReadinessSignal, setBootReadinessSignal] = useState(0);
   const bootState = useRef<"idle" | "sending" | "sent">("idle");
@@ -57,6 +59,7 @@ export function useAgentChatBootKickoff({
         chatId,
         content: createSystemMessage(bootMessage),
         mode: agentMode,
+        autoLayoutOnUpdateEnabled: isAutoLayoutOnUpdateEnabled,
       })
       .then(() => {
         bootState.current = "sent";
@@ -65,5 +68,14 @@ export function useAgentChatBootKickoff({
       .catch(() => {
         bootState.current = "idle";
       });
-  }, [messagesQuery.data, messagesQuery.isLoading, bootReadinessSignal, chatId, canvasId, agentMode, sendMutation]);
+  }, [
+    messagesQuery.data,
+    messagesQuery.isLoading,
+    bootReadinessSignal,
+    chatId,
+    canvasId,
+    agentMode,
+    isAutoLayoutOnUpdateEnabled,
+    sendMutation,
+  ]);
 }
