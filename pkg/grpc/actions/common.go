@@ -186,6 +186,16 @@ func appCanvasNodeTypeOptionsToProto(opts *configuration.AppCanvasNodeTypeOption
 	}
 }
 
+func appTypeOptionsToProto(opts *configuration.AppTypeOptions) *configpb.AppTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	return &configpb.AppTypeOptions{
+		AllowSelf: opts.AllowSelf,
+	}
+}
+
 func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListTypeOptions {
 	if opts == nil || opts.ItemDefinition == nil {
 		return nil
@@ -312,6 +322,7 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 		Date:             dateTypeOptionsToProto(opts.Date),
 		Datetime:         dateTimeTypeOptionsToProto(opts.DateTime),
 		AppCanvasNode:    appCanvasNodeTypeOptionsToProto(opts.AppCanvasNode),
+		App:              appTypeOptionsToProto(opts.App),
 	}
 }
 
@@ -498,6 +509,16 @@ func protoToAppCanvasNodeTypeOptions(pbOpts *configpb.AppCanvasNodeTypeOptions) 
 	}
 }
 
+func protoToAppTypeOptions(pbOpts *configpb.AppTypeOptions) *configuration.AppTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	return &configuration.AppTypeOptions{
+		AllowSelf: pbOpts.AllowSelf,
+	}
+}
+
 func parameterRefsToProto(params []configuration.ParameterRef) []*configpb.ParameterRef {
 	if len(params) == 0 {
 		return nil
@@ -666,6 +687,7 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 		Date:             protoToDateTypeOptions(pbOpts.Date),
 		DateTime:         protoToDateTimeTypeOptions(pbOpts.Datetime),
 		AppCanvasNode:    protoToAppCanvasNodeTypeOptions(pbOpts.AppCanvasNode),
+		App:              protoToAppTypeOptions(pbOpts.App),
 	}
 }
 

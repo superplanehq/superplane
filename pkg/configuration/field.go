@@ -104,7 +104,12 @@ type TypeOptions struct {
 	Time             *TimeTypeOptions             `json:"time,omitempty"`
 	Date             *DateTypeOptions             `json:"date,omitempty"`
 	DateTime         *DateTimeTypeOptions         `json:"dateTime,omitempty"`
+	App              *AppTypeOptions              `json:"app,omitempty"`
 	AppCanvasNode    *AppCanvasNodeTypeOptions    `json:"appCanvasNode,omitempty"`
+}
+
+type AppTypeOptions struct {
+	AllowSelf bool `json:"allowSelf,omitempty"`
 }
 
 type AppCanvasNodeTypeOptions struct {

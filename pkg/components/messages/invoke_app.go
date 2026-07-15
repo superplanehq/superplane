@@ -93,6 +93,11 @@ func (c *InvokeApp) Configuration() []configuration.Field {
 			Description: "The SuperPlane app to invoke",
 			Type:        configuration.FieldTypeApp,
 			Required:    true,
+			TypeOptions: &configuration.TypeOptions{
+				App: &configuration.AppTypeOptions{
+					AllowSelf: true,
+				},
+			},
 		},
 		{
 			Name:        "node",

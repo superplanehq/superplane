@@ -24,17 +24,17 @@ type InvokeAppExecutionMetadata = {
 type InvokeAppMetadata = {
   app?: AppMetadata;
   node?: NodeMetadata;
-}
+};
 
 type NodeMetadata = {
   id?: string;
   name?: string;
-}
+};
 
 type AppMetadata = {
   id?: string;
   name?: string;
-}
+};
 
 export const INVOKE_APP_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,

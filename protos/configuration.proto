@@ -34,6 +34,11 @@ message TypeOptions {
   optional ExpressionTypeOptions expression = 12;
   optional TextTypeOptions text = 13;
   optional AppCanvasNodeTypeOptions app_canvas_node = 14;
+  optional AppTypeOptions app = 15;
+}
+
+message AppTypeOptions {
+  bool allow_self = 1;
 }
 
 message AppCanvasNodeTypeOptions {
