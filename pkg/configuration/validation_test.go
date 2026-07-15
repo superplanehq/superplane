@@ -101,6 +101,117 @@ func Test__ValidateConfiguration__RequiredConditions(t *testing.T) {
 	}
 }
 
+func Test__ValidateConfiguration__RequiredConditions_AllMustMatch(t *testing.T) {
+	fields := []Field{
+		{Name: "type", Type: FieldTypeString},
+		{Name: "crawlType", Type: FieldTypeString},
+		{
+			Name: "seedUrl",
+			Type: FieldTypeString,
+			RequiredConditions: []RequiredCondition{
+				{Field: "type", Values: []string{"web"}},
+				{Field: "crawlType", Values: []string{"seed"}},
+			},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		config      map[string]any
+		expectError bool
+	}{
+		{
+			name:        "not required when only one condition matches",
+			config:      map[string]any{"type": "web", "crawlType": "other"},
+			expectError: false,
+		},
+		{
+			name:        "required only when all conditions match",
+			config:      map[string]any{"type": "web", "crawlType": "seed"},
+			expectError: true,
+		},
+		{
+			name:        "satisfied when required value is present",
+			config:      map[string]any{"type": "web", "crawlType": "seed", "seedUrl": "https://x"},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConfiguration(fields, tt.config)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func Test__ValidateConfiguration__RequiredUnlessAlternativeFilled(t *testing.T) {
+	// "content" is required only while every alternative is empty, mirroring the
+	// Discord send-text-message rule (content, embed, or files is required).
+	fields := []Field{
+		{Name: "embedTitle", Type: FieldTypeString},
+		{Name: "embedDescription", Type: FieldTypeText},
+		{Name: "files", Type: FieldTypeList},
+		{
+			Name: "content",
+			Type: FieldTypeText,
+			RequiredConditions: []RequiredCondition{
+				{Field: "embedTitle", Values: []string{""}},
+				{Field: "embedDescription", Values: []string{""}},
+				{Field: "files", Values: []string{""}},
+			},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		config      map[string]any
+		expectError bool
+	}{
+		{
+			name:        "required when everything is blank",
+			config:      map[string]any{},
+			expectError: true,
+		},
+		{
+			name:        "required when alternatives are explicitly empty",
+			config:      map[string]any{"embedTitle": "", "embedDescription": "", "files": []any{}},
+			expectError: true,
+		},
+		{
+			name:        "not required when content is provided",
+			config:      map[string]any{"content": "hello"},
+			expectError: false,
+		},
+		{
+			name:        "not required when an embed title is provided",
+			config:      map[string]any{"embedTitle": "Release"},
+			expectError: false,
+		},
+		{
+			name:        "not required when a file is attached",
+			config:      map[string]any{"files": []any{map[string]any{"url": "https://x/f.pdf"}}},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConfiguration(fields, tt.config)
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "field 'content' is required")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func Test__ValidateConfiguration__DaysOfWeek(t *testing.T) {
 	fields := []Field{
 		{

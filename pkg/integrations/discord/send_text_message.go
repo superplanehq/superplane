@@ -185,6 +185,14 @@ func (c *SendTextMessage) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeText,
 			Required:    false,
 			Description: "Plain text message content (max 2000 characters)",
+			// A message needs content, an embed, or a file. Flag Content as
+			// required only while every alternative is still empty, so the panel
+			// prompts for input instead of silently allowing a blank message.
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "embedTitle", Values: []string{""}},
+				{Field: "embedDescription", Values: []string{""}},
+				{Field: "files", Values: []string{""}},
+			},
 		},
 		{
 			Name:        "embedTitle",

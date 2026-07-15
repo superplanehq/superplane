@@ -165,8 +165,10 @@ export function isFieldRequired(field: ConfigurationField, allValues: Record<str
     return false;
   }
 
-  // Check if any required condition is satisfied (OR logic)
-  return field.requiredConditions.some((condition) => {
+  // All required conditions must be satisfied (AND logic). An empty string in a
+  // condition's values matches when the referenced field is empty/unset, which
+  // lets a field be "required unless one of these alternatives is filled".
+  return field.requiredConditions.every((condition) => {
     if (!condition.field || !condition.values) {
       return false;
     }
@@ -174,11 +176,30 @@ export function isFieldRequired(field: ConfigurationField, allValues: Record<str
     const fieldValue = allValues[condition.field];
     const fieldValueStr = fieldValue !== undefined && fieldValue !== null ? String(fieldValue) : "";
 
-    // Check if the field value matches any of the expected values
     return condition.values.some((expectedValue) => {
+      if (expectedValue === "") {
+        return isValueEmpty(fieldValue);
+      }
       return fieldValueStr === expectedValue;
     });
   });
+}
+
+/**
+ * Reports whether a configuration value carries no data (empty string, empty
+ * list, or empty object all count as "not provided").
+ */
+function isValueEmpty(value: unknown): boolean {
+  if (value === undefined || value === null || value === "") {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+  if (typeof value === "object") {
+    return Object.keys(value).length === 0;
+  }
+  return false;
 }
 
 /**

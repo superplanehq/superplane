@@ -114,6 +114,36 @@ describe("components visibility helpers", () => {
     expect(isFieldRequired(conditionallyRequired, { provider: "github" })).toBe(true);
     expect(isFieldRequired(conditionallyRequired, { provider: "slack" })).toBe(false);
   });
+
+  it("requires a field only when all conditions match (AND logic)", () => {
+    const field = buildField({
+      requiredConditions: [
+        { field: "type", values: ["web"] },
+        { field: "crawlType", values: ["seed"] },
+      ],
+    });
+
+    expect(isFieldRequired(field, { type: "web", crawlType: "seed" })).toBe(true);
+    expect(isFieldRequired(field, { type: "web", crawlType: "other" })).toBe(false);
+    expect(isFieldRequired(field, { type: "web" })).toBe(false);
+  });
+
+  it("requires a field only while every empty-matched alternative is blank", () => {
+    // Mirrors the Discord send-text-message rule: Content is required unless an
+    // embed or file is supplied.
+    const content = buildField({
+      requiredConditions: [
+        { field: "embedTitle", values: [""] },
+        { field: "embedDescription", values: [""] },
+        { field: "files", values: [""] },
+      ],
+    });
+
+    expect(isFieldRequired(content, {})).toBe(true);
+    expect(isFieldRequired(content, { embedTitle: "", embedDescription: "", files: [] })).toBe(true);
+    expect(isFieldRequired(content, { embedTitle: "Release" })).toBe(false);
+    expect(isFieldRequired(content, { files: [{ url: "https://x/f.pdf" }] })).toBe(false);
+  });
 });
 
 describe("components value parsing and validation", () => {
