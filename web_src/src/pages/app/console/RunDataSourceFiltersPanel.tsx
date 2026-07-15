@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ListFilter } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -56,6 +56,11 @@ export function RunDataSourceFiltersPanel({
   const hasPersistedTriggerFilter = activeTriggerCount > 0;
 
   const [open, setOpen] = useState<boolean>(hasActiveFilters);
+  const activeFiltersSignature = JSON.stringify([statuses ?? [], triggers ?? []]);
+
+  useEffect(() => {
+    if (hasActiveFilters) setOpen(true);
+  }, [activeFiltersSignature, hasActiveFilters]);
 
   const toggleStatus = (status: RunStatusFilter) => {
     const next = new Set(selectedStatuses);

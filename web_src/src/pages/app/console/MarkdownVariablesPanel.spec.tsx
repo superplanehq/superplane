@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
@@ -6,7 +7,17 @@ import type { MarkdownVariable } from "./panelTypes";
 
 vi.mock("./MarkdownVariableSourceControls", () => ({
   MemorySourceControls: () => <div data-testid="memory-controls" />,
-  RunSourceControls: () => <div data-testid="run-controls" />,
+  RunSourceControls: ({ source }: { source: { statuses?: readonly string[]; triggers?: readonly string[] } }) => {
+    const [open, setOpen] = useState(Boolean(source.statuses?.length || source.triggers?.length));
+    return (
+      <div data-testid="run-controls">
+        <button type="button" onClick={() => setOpen((value) => !value)}>
+          Toggle mocked run filters
+        </button>
+        {open ? <div data-testid="mock-run-filter-content" /> : null}
+      </div>
+    );
+  },
 }));
 
 const VARIABLES: MarkdownVariable[] = [
@@ -15,6 +26,28 @@ const VARIABLES: MarkdownVariable[] = [
 ];
 
 describe("MarkdownVariablesPanel per-variable loading", () => {
+  it("does not reuse collapsed filter state after deleting a preceding variable", () => {
+    const unfiltered: MarkdownVariable = { name: "first", source: { kind: "run", select: "latest" } };
+    const filtered = VARIABLES[0];
+    const props = {
+      canvasId: "canvas-1",
+      draftBody: "",
+      setDraftVariables: () => {},
+      previewVars: {},
+      errors: [],
+      baseLoading: false,
+      sideloadLoading: false,
+      onInsertSnippet: () => {},
+    };
+    const { rerender } = render(<MarkdownVariablesPanel {...props} draftVariables={[unfiltered, filtered]} />);
+
+    expect(screen.getAllByTestId("mock-run-filter-content")).toHaveLength(1);
+
+    rerender(<MarkdownVariablesPanel {...props} draftVariables={[filtered]} />);
+
+    expect(screen.getByTestId("mock-run-filter-content")).toBeInTheDocument();
+  });
+
   it("shows Loading only for variables still searching, and surfaces sibling errors", () => {
     render(
       <MarkdownVariablesPanel

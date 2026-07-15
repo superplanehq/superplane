@@ -129,6 +129,16 @@ export function MarkdownVariablesPanel({
     }
     return dups;
   }, [draftVariables]);
+  const variableRowKeys = useMemo(() => {
+    const occurrences = new Map<string, number>();
+    return draftVariables.map((variable, index) => {
+      const name = variable.name.trim();
+      if (!name) return `unnamed-variable-${index}`;
+      const occurrence = occurrences.get(name) ?? 0;
+      occurrences.set(name, occurrence + 1);
+      return occurrence === 0 ? name : `${name}-${occurrence}`;
+    });
+  }, [draftVariables]);
 
   if (collapsed) {
     return <CollapsedVariablesStrip count={draftVariables.length} onToggleCollapsed={onToggleCollapsed} />;
@@ -174,7 +184,7 @@ export function MarkdownVariablesPanel({
         ) : (
           draftVariables.map((variable, index) => (
             <VariableRow
-              key={index}
+              key={variableRowKeys[index]}
               canvasId={canvasId}
               variable={variable}
               error={errorByName.get(variable.name)}
