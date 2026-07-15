@@ -160,6 +160,11 @@ type MessageImage struct {
 	Data      string
 }
 
+type SendMessageRequestOptions struct {
+	Mode                      string
+	AutoLayoutOnUpdateEnabled bool
+}
+
 // SendMessageOptions.ContextPreamble is prepended to the user's message so
 // providers that need caller context inline (e.g. the canvas/session
 // identifiers) receive it without a separate system message.

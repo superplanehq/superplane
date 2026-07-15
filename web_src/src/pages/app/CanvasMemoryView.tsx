@@ -158,6 +158,7 @@ function CanvasMemoryViewBody({
         <div className="flex items-center justify-end gap-2 border-b border-slate-950/10 bg-white px-4 py-2 dark:border-gray-700/70 dark:bg-gray-900">
           <Button
             type="button"
+            variant="outline"
             size="sm"
             onClick={handleCreateNamespaceClick}
             data-testid="memory-create-namespace-button"
@@ -295,7 +296,13 @@ function ZeroState({ canCreate, onCreate }: { canCreate: boolean; onCreate: () =
         canvas memory, entries will show up here.
       </p>
       {canCreate ? (
-        <Button type="button" size="sm" onClick={onCreate} data-testid="memory-create-namespace-empty-button">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onCreate}
+          data-testid="memory-create-namespace-empty-button"
+        >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Create memory namespace
         </Button>

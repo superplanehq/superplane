@@ -1,6 +1,6 @@
 import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
 import { cn } from "@/lib/utils";
+import { EventStatusBadge } from "@/ui/EventStatusBadge";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { eventBadgeForExecution, eventBadgeForTriggeredTrigger } from "@/ui/Runs/runNodeDetailModel";
@@ -13,19 +13,6 @@ interface RunExecutionNodeRowProps {
   isTrigger: boolean;
   isSelected: boolean;
   onSelect: (nodeId: string) => void;
-}
-
-function EventSectionStatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded px-[5px] py-[1.5px] text-[10px] font-semibold uppercase tracking-wide text-white",
-        withEventStatusBadgeClasses(badgeColor),
-      )}
-    >
-      {label}
-    </span>
-  );
 }
 
 export function RunExecutionNodeRow({
@@ -60,7 +47,7 @@ export function RunExecutionNodeRow({
       }}
       className={cn(
         "flex w-full cursor-pointer items-center gap-2 border-b border-b-slate-950/10 px-3 py-2 text-left transition-colors dark:border-gray-800/70",
-        isSelected ? "bg-sky-100 dark:bg-gray-800" : "hover:bg-gray-50 dark:hover:bg-gray-800",
+        isSelected ? "bg-sky-100 dark:bg-indigo-950" : "hover:bg-gray-50 dark:hover:bg-gray-800",
       )}
     >
       <RunNodeIcon
@@ -76,7 +63,7 @@ export function RunExecutionNodeRow({
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800 dark:text-gray-100">
         {nodeName}
       </span>
-      {badge ? <EventSectionStatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}
+      {badge ? <EventStatusBadge badgeColor={badge.badgeColor} label={badge.label} /> : null}
     </div>
   );
 }

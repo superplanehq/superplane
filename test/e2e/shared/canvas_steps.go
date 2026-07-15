@@ -71,7 +71,7 @@ func (s *CanvasSteps) AssertEditModeTabChrome() {
 		if err != nil || class == "" {
 			return false
 		}
-		return strings.Contains(class, "bg-orange-200") || strings.Contains(class, "dark:bg-orange-900/55")
+		return strings.Contains(class, "bg-orange-200")
 	}, 15*time.Second, 200*time.Millisecond, "edit-mode tab bar should use orange styling")
 
 	activeTab := q.Locator(`nav[aria-label="Canvas view"] [aria-current="page"]`).Run(s.session)
@@ -80,9 +80,11 @@ func (s *CanvasSteps) AssertEditModeTabChrome() {
 		if err != nil || class == "" {
 			return false
 		}
-		return strings.Contains(class, "font-bold") &&
-			(strings.Contains(class, "bg-orange-100") || strings.Contains(class, "dark:bg-orange-700/60"))
-	}, 15*time.Second, 200*time.Millisecond, "active edit-mode tab should be bold with orange styling")
+		return strings.Contains(class, "bg-white") &&
+			strings.Contains(class, "shadow-sm") &&
+			strings.Contains(class, "font-medium") &&
+			!strings.Contains(class, "font-bold")
+	}, 15*time.Second, 200*time.Millisecond, "active edit-mode tab should use white pill styling")
 }
 
 // AssertStagingActionsVisibleAndDisabled verifies commit/reset stay visible but disabled with no staged changes.

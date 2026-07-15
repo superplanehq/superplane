@@ -42,7 +42,22 @@ describe("useSendAgentChatMessage", () => {
       wrapper: wrapper(queryClient),
     });
 
-    const sendPromise = result.current.mutateAsync({ chatId: "chat-1", content: "Build this", mode: "builder" });
+    const sendPromise = result.current.mutateAsync({
+      chatId: "chat-1",
+      content: "Build this",
+      mode: "builder",
+      autoLayoutOnUpdateEnabled: false,
+    });
+
+    await waitFor(() => {
+      expect(agentsSendAgentChatMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            autoLayoutOnUpdateEnabled: false,
+          }),
+        }),
+      );
+    });
 
     await waitFor(() => {
       const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"));

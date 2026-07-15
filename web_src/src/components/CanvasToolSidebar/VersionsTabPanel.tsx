@@ -67,7 +67,7 @@ export function VersionsTabPanel({
         <VersionsNotices canEditCanvasVersion={canEditCanvasVersion} canvasDeletedRemotely={canvasDeletedRemotely} />
 
         <section>
-          <VersionsSectionHeader label="History" />
+          <VersionsSectionHeader label="Version History" />
           {hasNoVersions ? (
             <p className="px-3 py-2 text-xs text-slate-600 dark:text-gray-400">No commit history yet.</p>
           ) : (
