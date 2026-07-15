@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import * as yaml from "js-yaml";
+
+import { normalizeYamlForDiff } from "./normalize-yaml-diff";
+
+describe("normalizeYamlForDiff", () => {
+  it("produces identical output for documents that differ only in key ordering", () => {
+    const live = "name: deploy\ntype: TYPE_ACTION\nref: r\n";
+    const draft = "ref: r\ntype: TYPE_ACTION\nname: deploy\n";
+
+    expect(normalizeYamlForDiff(live)).toBe(normalizeYamlForDiff(draft));
+  });
+
+  it("sorts nested mapping keys recursively", () => {
+    const input = "spec:\n  nodes:\n    - name: n\n      configuration:\n        b: 2\n        a: 1\n";
+
+    const normalized = normalizeYamlForDiff(input);
+
+    expect(normalized).toBe(yaml.dump(yaml.load(input), { sortKeys: true, lineWidth: -1, noRefs: true }));
+    expect(normalized.indexOf("a: 1")).toBeLessThan(normalized.indexOf("b: 2"));
+  });
+
+  it("still reports a difference when values actually change", () => {
+    const live = "name: old\nref: r\n";
+    const draft = "ref: r\nname: new\n";
+
+    expect(normalizeYamlForDiff(live)).not.toBe(normalizeYamlForDiff(draft));
+  });
+
+  it("returns the original text for empty input", () => {
+    expect(normalizeYamlForDiff("")).toBe("");
+    expect(normalizeYamlForDiff("   \n")).toBe("   \n");
+  });
+
+  it("returns the original text when the input cannot be parsed as YAML", () => {
+    const invalid = "name: : :\n  - broken";
+    expect(normalizeYamlForDiff(invalid)).toBe(invalid);
+  });
+
+  it("returns the original text for scalar (non-object) documents", () => {
+    expect(normalizeYamlForDiff("just a string")).toBe("just a string");
+    expect(normalizeYamlForDiff("42")).toBe("42");
+  });
+});
