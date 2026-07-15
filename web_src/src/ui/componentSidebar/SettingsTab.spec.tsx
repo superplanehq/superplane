@@ -46,5 +46,6 @@ describe("SettingsTab", () => {
     expect(screen.getByRole("switch")).toBeDisabled();
     expect(screen.getByTestId("settings-tab-form")).toHaveClass("cursor-not-allowed");
     expect(screen.getByTestId("settings-tab-form")).not.toHaveClass("opacity-70");
+    expect(screen.getByTestId("settings-tab-form").querySelector("[inert]")).toBeInTheDocument();
   });
 });

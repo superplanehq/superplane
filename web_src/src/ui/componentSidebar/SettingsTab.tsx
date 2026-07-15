@@ -482,6 +482,10 @@ export function SettingsTab({
       className={cn("p-4 pb-24 overflow-x-hidden", isFormDisabled && FORM_DISABLED_CURSOR_CLASS)}
       data-testid="settings-tab-form"
       onBlurCapture={(event) => {
+        if (isFormDisabled) {
+          return;
+        }
+
         const target = event.target as HTMLElement | null;
         if (!target) {
           return;
@@ -492,7 +496,10 @@ export function SettingsTab({
         }
       }}
     >
-      <div className={cn("space-y-6", isFormDisabled && FORM_DISABLED_SURFACE_CLASS)}>
+      <div
+        className={cn("space-y-6", isFormDisabled && FORM_DISABLED_SURFACE_CLASS)}
+        {...(isFormDisabled ? { inert: true } : {})}
+      >
         {/* Node identification section — always visible */}
         <div className="flex flex-col gap-2">
           <Label className="min-w-[100px] text-left">

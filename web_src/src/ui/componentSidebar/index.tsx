@@ -40,6 +40,41 @@ const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
   }
 > = {};
 
+function LivePreRunContinueEditingButton({
+  disabled,
+  disabledTooltip,
+  onContinueEditing,
+}: {
+  disabled?: boolean;
+  disabledTooltip?: string;
+  onContinueEditing: () => void | Promise<void>;
+}) {
+  const button = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="w-fit shadow-none"
+      disabled={disabled}
+      onClick={() => {
+        void onContinueEditing();
+      }}
+    >
+      Continue Editing
+    </Button>
+  );
+
+  if (disabled && disabledTooltip) {
+    return (
+      <SimpleTooltip content={disabledTooltip} hideOnClick={false}>
+        <span className="inline-flex w-fit">{button}</span>
+      </SimpleTooltip>
+    );
+  }
+
+  return button;
+}
+
 function BottomInspectorTabButton({
   active,
   icon,
@@ -602,37 +637,11 @@ export const ComponentSidebar = ({
                           </div>
                         ) : null}
                         {livePreRunStatus.purpose === "setup" && onContinueEditing ? (
-                          continueEditingDisabled && continueEditingDisabledTooltip ? (
-                            <SimpleTooltip content={continueEditingDisabledTooltip} hideOnClick={false}>
-                              <span className="inline-flex w-fit">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-fit shadow-none"
-                                  disabled={continueEditingDisabled}
-                                  onClick={() => {
-                                    void onContinueEditing();
-                                  }}
-                                >
-                                  Continue Editing
-                                </Button>
-                              </span>
-                            </SimpleTooltip>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="w-fit shadow-none"
-                              disabled={continueEditingDisabled}
-                              onClick={() => {
-                                void onContinueEditing();
-                              }}
-                            >
-                              Continue Editing
-                            </Button>
-                          )
+                          <LivePreRunContinueEditingButton
+                            disabled={continueEditingDisabled}
+                            disabledTooltip={continueEditingDisabledTooltip}
+                            onContinueEditing={onContinueEditing}
+                          />
                         ) : null}
                       </div>
                     </div>

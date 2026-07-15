@@ -17,7 +17,7 @@ function node(overrides: Partial<ComponentsNode>): ComponentsNode {
 describe("resolveLiveNodePreRunStatus", () => {
   it("returns setup status for placeholder nodes", () => {
     expect(resolveLiveNodePreRunStatus(node({ component: undefined, name: "New Component" }), emptyActivity)).toEqual({
-      title: "Select a component from the sidebar",
+      title: "Continue editing to choose a component",
       purpose: "setup",
     });
   });

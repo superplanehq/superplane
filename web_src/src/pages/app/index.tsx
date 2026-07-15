@@ -3758,6 +3758,8 @@ export function AppPage() {
         return;
       }
 
+      actions.openConfigurationSidebar();
+
       void (async () => {
         try {
           const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);

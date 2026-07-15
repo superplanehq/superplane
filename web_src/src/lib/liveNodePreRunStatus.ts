@@ -25,7 +25,7 @@ export function resolveLiveNodePreRunStatus(
   const { configurationFields } = options;
   const isPlaceholder = !workflowNode.component && workflowNode.name === "New Component";
   if (isPlaceholder) {
-    return { title: "Select a component from the sidebar", purpose: "setup" };
+    return { title: "Continue editing to choose a component", purpose: "setup" };
   }
 
   if (workflowNode.errorMessage) {
