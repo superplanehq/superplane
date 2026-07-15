@@ -94,6 +94,14 @@ Create an [Admin API key](https://platform.openai.com/settings/organization/admi
 - Only **Organization Owners** can create admin keys.
 - Admin keys can read organization usage and costs but cannot call model endpoints.
 
+## Restricted API keys
+
+Unrestricted project keys work by default. If you use a restricted key, grant it:
+
+- **Model capabilities** → **Request** — required for Text Prompt.
+- **Responses API** → **Write** — required for Text Prompt.
+- **Files** → **Write** — required when you attach files to Text Prompt.
+
 > **Note:** Both keys are shown only once — store them somewhere safe before continuing.`
 }
 

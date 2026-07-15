@@ -510,7 +510,7 @@ func createNewCanvasVersionFromLive(
 		case ConsoleYAMLRepositoryPath:
 			console, err := yaml.ConsoleFromYML([]byte(content))
 			if err != nil {
-				return nil, err
+				return nil, grpcerrors.InvalidArgument(err, "invalid console yaml")
 			}
 
 			newVersion.ConsolePanels = datatypes.NewJSONType(slices.Clone(console.Panels()))
