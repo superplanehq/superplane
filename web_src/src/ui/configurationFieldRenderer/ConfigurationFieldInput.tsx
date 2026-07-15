@@ -13,6 +13,7 @@ import { GroupFieldRenderer } from "./GroupFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { AppFieldRenderer } from "./AppFieldRenderer";
 import { AppCanvasNodeFieldRenderer } from "./AppCanvasNodeFieldRenderer";
+import { InvocationParametersFieldRenderer } from "./InvocationParametersFieldRenderer";
 import { ListFieldRenderer } from "./ListFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
@@ -104,6 +105,21 @@ export function ConfigurationFieldInput({
         allValues={allValues}
         organizationId={organizationId}
         readOnly={commonProps.readOnly}
+      />
+    );
+  }
+
+  if (field.type === "invocation-parameters") {
+    return (
+      <InvocationParametersFieldRenderer
+        {...commonProps}
+        domainId={domainId}
+        domainType={domainType}
+        organizationId={organizationId}
+        allowExpressions={allowExpressions}
+        autocompleteExampleObj={autocompleteExampleObj}
+        validationErrors={validationErrors}
+        fieldPath={fieldPath}
       />
     );
   }

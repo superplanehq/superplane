@@ -151,8 +151,8 @@ func (w *AppInvocationWorker) invokeApp(tx *gorm.DB, callerApp *models.Canvas, i
 	// Call OnAppMessage() on the target node.
 	//
 	err = w.sendMessageToNode(tx, callerApp, targetNode, payload, onNewEvents)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		execution, hookErr := w.failAppInvocation(tx, invocation, onNewEvents, "target app does not have an onInvocation trigger")
+	if err != nil {
+		execution, hookErr := w.failAppInvocation(tx, invocation, onNewEvents, err.Error())
 		if hookErr != nil {
 			return nil, nil, hookErr
 		}

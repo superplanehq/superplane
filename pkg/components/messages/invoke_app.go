@@ -18,9 +18,9 @@ func init() {
 }
 
 type InvokeAppConfiguration struct {
-	App     string `json:"app" mapstructure:"app"`
-	Node    string `json:"node" mapstructure:"node"`
-	Payload any    `json:"payload" mapstructure:"payload"`
+	App        string         `json:"app" mapstructure:"app"`
+	Node       string         `json:"node" mapstructure:"node"`
+	Parameters map[string]any `json:"parameters" mapstructure:"parameters"`
 }
 
 type InvokeAppMetadata struct {
@@ -121,9 +121,10 @@ func (c *InvokeApp) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "payload",
-			Description: "The payload to send to the invoked app",
-			Type:        configuration.FieldTypeObject,
+			Name:        "parameters",
+			Label:       "Parameters",
+			Description: "The invocation parameters to use",
+			Type:        configuration.FieldTypeInvocationParameters,
 			Required:    true,
 		},
 	}
@@ -190,7 +191,7 @@ func (c *InvokeApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invoke app: metadata is required")
 	}
 
-	return ctx.Apps.Invoke(nodeMetadata.App.ID, nodeMetadata.Node.ID, config.Payload)
+	return ctx.Apps.Invoke(nodeMetadata.App.ID, nodeMetadata.Node.ID, config.Parameters)
 }
 
 func (c *InvokeApp) Hooks() []core.Hook {

@@ -265,6 +265,7 @@ import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
+import { onInvokeTriggerRenderer } from "./messages/on_invoke";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
 
@@ -277,6 +278,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
   webhook: webhookTriggerRenderer,
   start: startTriggerRenderer,
   onBroadcast: onBroadcastTriggerRenderer,
+  onInvoke: onInvokeTriggerRenderer,
 };
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
