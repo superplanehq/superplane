@@ -51,6 +51,12 @@ export interface GetSuggestionsOptions {
   includeTopLevelGlobals?: boolean;
   limit?: number;
   allowInStrings?: boolean;
+  /**
+   * Key in `globals` that backs the `$` / `$["…"]` selector. Defaults to the
+   * globals root (expr-lang behaviour). Widget CEL points this at
+   * `__runNodes__` so `$` completes run-node names instead of row fields.
+   */
+  envKeySource?: string;
 }
 
 type ExprFunction = {
@@ -590,16 +596,18 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     includeTopLevelGlobals = false,
     limit = 30,
     allowInStrings = false,
+    envKeySource,
   } = options;
+  const envRecord = resolveEnvRecord(globals, envKeySource);
   const left = text.slice(0, cursor);
   // 0) Env key trigger: after "$" or "$[" suggest keys immediately
   const envTrigger = detectEnvKeyTrigger(left);
   if (envTrigger) {
-    const keys = listGlobalKeys(globals);
+    const keys = listGlobalKeys(envRecord);
     return keys.slice(0, limit).map((k) => {
-      const v = (globals as Record<string, unknown>)[k];
+      const v = envRecord[k];
       const tailDot = isExpandableValue(v) ? "." : "";
-      const metadata = getNodeMetadata(globals, k, v);
+      const metadata = getNodeMetadata(envRecord, k, v);
       const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
       return {
         label: `["${k}"]`,
@@ -619,13 +627,13 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   const bracketCtx = detectBracketKeyContext(left);
   if (bracketCtx) {
     const prefix = (bracketCtx.partialKey ?? "").toLowerCase();
-    const keys = listGlobalKeys(globals);
+    const keys = listGlobalKeys(envRecord);
     return keys
       .filter((k) => k.toLowerCase().startsWith(prefix))
       .slice(0, limit)
       .map((k) => {
-        const v = (globals as Record<string, unknown>)[k];
-        const metadata = getNodeMetadata(globals, k, v);
+        const v = envRecord[k];
+        const metadata = getNodeMetadata(envRecord, k, v);
         const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
         return {
           label: `["${k}"]`,
@@ -684,7 +692,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     }
 
     const resolvableBase = isFunctionCall ? baseExpr : extractTailPathExpression(baseExpr);
-    const target = resolveExprToValue(resolvableBase, globals);
+    const target = resolveExprToValue(resolvableBase, globals, envKeySource);
 
     const keys = listKeys(target);
 
@@ -724,12 +732,12 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
 
   if (includeGlobals) {
     if (!prefix || "$".startsWith(prefix)) {
-      const nodeCount = listGlobalKeys(globals).length;
+      const nodeCount = listGlobalKeys(envRecord).length;
       out.push({
         label: "$",
         kind: "variable",
         insertText: "$",
-        detail: getValueTypeLabel(globals),
+        detail: getValueTypeLabel(envRecord),
         description:
           'Access event data emitted by connected components in a run, keyed by component name (e.g. $["Component Name"]).',
         nodeCount,
@@ -891,6 +899,12 @@ function detectEnvKeyTrigger(left: string): EnvKeyTrigger | null {
   if (/\$\s*$/.test(left)) return { quote: '"' };
   if (/\$\s*\[\s*$/.test(left)) return { quote: '"' };
   return null;
+}
+
+function resolveEnvRecord(globals: Record<string, unknown>, envKeySource: string | undefined): Record<string, unknown> {
+  if (!envKeySource) return globals;
+  const nested = globals[envKeySource];
+  return isRecord(nested) ? (nested as Record<string, unknown>) : {};
 }
 
 function listGlobalKeys(globals: Record<string, unknown>): string[] {
@@ -1323,7 +1337,11 @@ function extractSpecialFunctionCall(expr: string): string {
   return matchValue;
 }
 
-function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: string, globals: TGlobals): unknown {
+function resolveExprToValue<TGlobals extends Record<string, unknown>>(
+  baseExpr: string,
+  globals: TGlobals,
+  envKeySource?: string,
+): unknown {
   const stripWhitespaceOutsideStrings = (input: string) => {
     let out = "";
     let inSingle = false;
@@ -1405,7 +1423,7 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
   const first = (tokens[pos] as { t: "ident"; v: string }).v;
   pos++;
 
-  if (first === "$") cur = globals;
+  if (first === "$") cur = resolveEnvRecord(globals as Record<string, unknown>, envKeySource);
   else cur = globals ? (globals as Record<string, unknown>)[first] : undefined;
 
   while (pos < tokens.length) {

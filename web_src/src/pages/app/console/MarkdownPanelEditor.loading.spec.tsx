@@ -42,7 +42,7 @@ function renderEditor(draftBody: string) {
             setDraftBody={() => {}}
             draftVariables={[{ name: "run", source: { kind: "run", select: "latest" } }]}
             setDraftVariables={() => {}}
-            titleInputRef={createRef<HTMLInputElement>()}
+            titleInputRef={createRef<HTMLTextAreaElement>()}
             textareaRef={createRef<HTMLTextAreaElement>()}
             onCancel={() => {}}
             onCommit={() => {}}

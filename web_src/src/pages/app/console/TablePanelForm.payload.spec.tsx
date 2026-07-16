@@ -168,7 +168,9 @@ describe("TablePanelForm payload editor", () => {
     expect(getPathInputs()[0]!.value).toBe("foo");
 
     const filledRow = getPayloadRow(0);
-    const removeButton = Array.from(filledRow.querySelectorAll<HTMLButtonElement>("button")).find((b) => !b.disabled)!;
+    const removeButton = Array.from(filledRow.querySelectorAll<HTMLButtonElement>("button")).find(
+      (b) => b.title === "Remove field",
+    )!;
     fireEvent.click(removeButton);
 
     const state = JSON.parse(screen.getByTestId("harness-state").textContent ?? "null");
