@@ -10,6 +10,7 @@ import { DataSourceForm } from "./DataSourceForm";
 import { useConsoleContext } from "./ConsoleContext";
 import { NUMBER_PANEL_AGGREGATIONS, NUMBER_PANEL_FORMATS } from "./numberPanelFormConstants";
 import type { ScorecardPanelContent } from "./panelTypes";
+import { numericTargetCelAdapter } from "./widget/celAdapter";
 import type {
   WidgetColumnFormat,
   WidgetNumberAggregation,
@@ -328,6 +329,7 @@ function TargetFields({
         <Label className="text-xs font-medium text-slate-600 dark:text-gray-300">Target (optional)</Label>
         <ExpressionEditor
           dialect="cel"
+          expressionAdapter={numericTargetCelAdapter}
           syntaxProfile="pathOrRaw"
           value={render.target ?? ""}
           onChange={(next) => onChange({ target: next || undefined })}

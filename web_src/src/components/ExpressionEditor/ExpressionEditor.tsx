@@ -66,16 +66,18 @@ export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditor
     const resolvedIncludeFunctions = includeFunctions ?? dialect !== "cel";
     // Widget CEL's `$` selector maps to the internal `__runNodes__` map on the
     // row, so route env-key completion (`$` / `$["…"]`) to node names when the
-    // caller's `exampleObj` actually carries that map (widget forms). Markdown
-    // and HTML editors reuse the CEL dialect but pass a variable dictionary
-    // instead, so we leave `envKeySource` unset and let `$` fall back to the
-    // top-level globals in those cases.
-    const envKeySource = dialect === "cel" && hasRunNodesMap(rest.exampleObj) ? "__runNodes__" : undefined;
+    // caller's `exampleObj` actually carries that map (widget forms).
+    const hasRunNodes = hasRunNodesMap(rest.exampleObj);
+    const envKeySource = dialect === "cel" && hasRunNodes ? "__runNodes__" : undefined;
     const resolvedExcludedSuggestions = useMemo(() => {
       if (dialect !== "cel") return excludedSuggestions;
       const base = excludedSuggestions ?? [];
-      return base.includes("memory") ? base : [...base, "memory"];
-    }, [dialect, excludedSuggestions]);
+      const celOnlySuggestions = hasRunNodes ? ["memory"] : ["memory", "$"];
+      return celOnlySuggestions.reduce(
+        (excluded, suggestion) => (excluded.includes(suggestion) ? excluded : [...excluded, suggestion]),
+        base,
+      );
+    }, [dialect, excludedSuggestions, hasRunNodes]);
 
     return (
       <AutoCompleteInput

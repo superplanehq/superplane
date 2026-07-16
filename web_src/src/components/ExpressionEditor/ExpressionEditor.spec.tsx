@@ -69,6 +69,25 @@ describe("ExpressionEditor", () => {
     expect(screen.getByText(/browse node payloads/i)).toBeInTheDocument();
   });
 
+  it("hides root dollar suggestions when CEL context has no run-node map", async () => {
+    render(
+      <ExpressionEditor
+        aria-label="Markdown body"
+        dialect="cel"
+        exampleObj={{ run: { status: "passed" } }}
+        value=""
+        onChange={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Markdown body" });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "{{ ", selectionStart: 3 } });
+
+    expect(await screen.findByText("run")).toBeInTheDocument();
+    expect(screen.queryByText("$")).not.toBeInTheDocument();
+  });
+
   it("registerExpressionDialect wires a new default adapter", () => {
     const previousAdapter = getExpressionDialectAdapter("cel");
     const adapter: ExpressionAdapter = {

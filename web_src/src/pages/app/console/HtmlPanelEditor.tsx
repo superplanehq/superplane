@@ -16,7 +16,7 @@ import { MarkdownVariablesPanel } from "./MarkdownVariablesPanel";
 import { useMarkdownVariables } from "./useMarkdownVariables";
 import type { MarkdownVariable } from "./panelTypes";
 
-const MONACO_CEL_EXCLUDED_SUGGESTIONS = ["memory"];
+const MONACO_CEL_EXCLUDED_SUGGESTIONS = ["$", "memory"];
 
 /**
  * Imperative handle exposed by the body code editor to its parent. We don't
@@ -301,10 +301,9 @@ const HtmlCodeEditor = forwardRef<HtmlCodeEditorHandle, HtmlCodeEditorProps>(fun
     languageId: "html",
     // HTML bodies use widget CEL templates (`{{ … }}`), not expr-lang, so hide
     // the expr-lang function catalog + `memory` namespace and surface the
-    // caller-declared variables as top-level suggestions inside braces. The
-    // panel's `exampleObj` is a variable dictionary (no `__runNodes__` at the
-    // root), so `$` completion falls back to the top-level globals, matching
-    // how ExpressionEditor treats markdown/HTML fields.
+    // caller-declared variables as top-level suggestions inside braces. Root
+    // `$` is widget-row syntax and is invalid for this variable dictionary;
+    // nested run-node paths remain available through `run.$["Node"]`.
     includeTopLevelGlobals: true,
     includeFunctions: false,
     excludedSuggestions: MONACO_CEL_EXCLUDED_SUGGESTIONS,

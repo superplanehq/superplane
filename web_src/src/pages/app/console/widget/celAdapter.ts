@@ -89,7 +89,7 @@ export function evaluateCelPathLiteral(
   }
 }
 
-function evaluateProgressTargetPathLiteral(
+function evaluateNumericTargetPathLiteral(
   target: string,
   globals: Record<string, unknown> | null | undefined,
 ): ExpressionEvaluationOutcome {
@@ -100,7 +100,7 @@ function evaluateProgressTargetPathLiteral(
       return { ok: true, value: literal, formattedValue: stringifyCelValue(literal) };
     }
   }
-  return evaluateCelPathLiteral(target, globals);
+  return evaluateCelPathLiteral(trimmed, globals);
 }
 
 export const widgetCelAdapter: ExpressionAdapter = {
@@ -111,7 +111,7 @@ export const widgetCelAdapter: ExpressionAdapter = {
   evaluatePathLiteral: evaluateCelPathLiteral,
 };
 
-export const progressTargetCelAdapter: ExpressionAdapter = {
+export const numericTargetCelAdapter: ExpressionAdapter = {
   ...widgetCelAdapter,
-  evaluatePathLiteral: evaluateProgressTargetPathLiteral,
+  evaluatePathLiteral: evaluateNumericTargetPathLiteral,
 };

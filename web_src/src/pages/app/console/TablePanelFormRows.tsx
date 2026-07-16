@@ -25,7 +25,7 @@ import {
   type WidgetTrendDisplay,
 } from "./widget/types";
 import { suggestColumnFormat } from "./widget/useMemoryCatalog";
-import { progressTargetCelAdapter } from "./widget/celAdapter";
+import { numericTargetCelAdapter } from "./widget/celAdapter";
 
 const COLUMN_FORMATS: WidgetColumnFormat[] = [
   "text",
@@ -91,7 +91,7 @@ function ProgressFormatFields({
       <div className="col-span-8">
         <ExpressionEditor
           dialect="cel"
-          expressionAdapter={progressTargetCelAdapter}
+          expressionAdapter={numericTargetCelAdapter}
           syntaxProfile="pathOrRaw"
           exampleObj={sampleRow}
           value={col.progressTarget ?? ""}

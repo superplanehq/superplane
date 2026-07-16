@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateCel, progressTargetCelAdapter, resolveCelSuggestionValue, widgetCelAdapter } from "./celAdapter";
+import { evaluateCel, numericTargetCelAdapter, resolveCelSuggestionValue, widgetCelAdapter } from "./celAdapter";
 import { DOLLAR_REWRITE_IDENTIFIER } from "./celExpr";
 
 describe("evaluateCel", () => {
@@ -96,11 +96,19 @@ describe("widgetCelAdapter", () => {
     expect(widgetCelAdapter.formatResult("hello")).toBe("hello");
   });
 
-  it("previews numeric progress targets as literals", () => {
-    expect(progressTargetCelAdapter.evaluatePathLiteral?.(" 100.5 ", {})).toEqual({
+  it("previews numeric targets as literals", () => {
+    expect(numericTargetCelAdapter.evaluatePathLiteral?.(" 100.5 ", {})).toEqual({
       ok: true,
       value: 100.5,
       formattedValue: "100.5",
+    });
+  });
+
+  it("trims non-numeric targets before resolving their path", () => {
+    expect(numericTargetCelAdapter.evaluatePathLiteral?.(" total ", { total: 100 })).toEqual({
+      ok: true,
+      value: 100,
+      formattedValue: "100",
     });
   });
 });
