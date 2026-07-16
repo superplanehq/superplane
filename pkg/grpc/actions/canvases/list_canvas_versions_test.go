@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -72,5 +73,25 @@ func Test__ListCanvasVersionsPaginated(t *testing.T) {
 		assert.Equal(t, secondCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[0].GetMetadata().GetId())
 		assert.Equal(t, firstCommit.GetVersion().GetMetadata().GetId(), response.GetVersions()[1].GetMetadata().GetId())
 		assert.GreaterOrEqual(t, response.GetTotalCount(), uint32(2))
+	})
+
+	// Regression guard for #5851: the versions endpoint must never return
+	// codes.Internal (HTTP 500) because a canvas holds a stale reference to a
+	// version row that no longer exists. History listing does not depend on
+	// LiveVersionID, so a dangling pointer must not break the response.
+	t.Run("stale live version reference -> no internal error", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		orgID := r.Organization.ID.String()
+
+		staleVersionID := uuid.New()
+		err := database.Conn().
+			Model(&models.Canvas{}).
+			Where("id = ?", canvas.ID).
+			Update("live_version_id", staleVersionID).
+			Error
+		require.NoError(t, err)
+
+		_, err = ListCanvasVersionsPaginated(ctx, orgID, canvas.ID.String(), 0, nil)
+		require.NoError(t, err)
 	})
 }
