@@ -1,5 +1,4 @@
 import { act, renderHook } from "@testing-library/react";
-import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { usePendingState } from "./usePendingState";
@@ -14,18 +13,14 @@ function renderPendingState(overrides: Partial<Parameters<typeof usePendingState
   const options = {
     generatedPathSet: new Set<string>(["canvas.yaml"]),
     generatedPaths: ["canvas.yaml"],
-    finalRepositoryPathsRef: createRef<string[]>(),
-    allPathsRef: createRef<string[]>(),
-    loadedContentByPathRef: createRef<Record<string, string>>(),
-    committedContentByPathRef: createRef<Record<string, string>>(),
+    finalRepositoryPathsRef: { current: ["docs/readme.md"] },
+    allPathsRef: { current: ["canvas.yaml", "docs/readme.md"] },
+    loadedContentByPathRef: { current: {} as Record<string, string> },
+    committedContentByPathRef: { current: {} as Record<string, string> },
     openFile,
     closeFile,
     ...overrides,
   };
-  options.finalRepositoryPathsRef.current = ["docs/readme.md"];
-  options.allPathsRef.current = ["canvas.yaml", "docs/readme.md"];
-  options.loadedContentByPathRef.current = {};
-  options.committedContentByPathRef.current = {};
 
   const view = renderHook(() => usePendingState(options));
   return { ...view, openFile, closeFile };
