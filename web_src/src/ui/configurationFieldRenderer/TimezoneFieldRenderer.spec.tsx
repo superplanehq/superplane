@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolveTimezoneDisplayValue, TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
+import { resolveTimezoneDisplayValue } from "./timezoneDisplayValue";
+import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 
 describe("resolveTimezoneDisplayValue", () => {
   afterEach(() => {

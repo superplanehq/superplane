@@ -86,11 +86,7 @@ import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
-import {
-  resolveLiveCanvasNodeClickSyncAction,
-  resolveRunLookupEventForNodeActivity,
-  shouldDeferRunInspectionForLiveNodeClick,
-} from "./runInspectionLiveNodeLookup";
+import { resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -116,16 +112,13 @@ import { useDraftStagingActions } from "./useDraftStagingActions";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { buildDuplicatedEdges, buildDuplicatedNodes } from "./lib/duplicate-nodes";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
-import {
-  hasSidebarMapperCustomField,
-  resolveSidebarMapperCustomField,
-} from "./lib/resolve-sidebar-mapper-custom-field";
-import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { buildCanvasYamlExportPayload, materializeCanvasSpec } from "./lib/workflow-spec-files";
-import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
+import { getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { useCanvasSidebarCustomField } from "./useCanvasSidebarCustomField";
+import { useLiveCanvasNodeClick } from "./useLiveCanvasNodeClick";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
@@ -630,7 +623,6 @@ export function AppPage() {
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const consoleMutationGenerationRef = useRef(0);
-  const liveCanvasNodeClickLookupRef = useRef(0);
   const handleRemoteStagingUpdatedRef = useRef<() => Promise<void>>(async () => {});
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const { registerIgnoredCanvasUpdatedEcho, consumeIgnoredCanvasUpdatedEcho, resetLifecycleEchoGuards } =
@@ -3743,83 +3735,16 @@ export function AppPage() {
     [canvasId, canvasNodesById, refetchNodeDataMethod, queryClient],
   );
 
-  const cancelLiveNodeClickLookup = useCallback(() => {
-    liveCanvasNodeClickLookupRef.current += 1;
-  }, []);
-
-  const handleLiveCanvasNodeClick = useCallback(
-    (
-      nodeId: string,
-      actions: {
-        openConfigurationSidebar: (options?: { preferSettingsTab?: boolean }) => void;
-      },
-    ) => {
-      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
-
-      const lookupId = liveCanvasNodeClickLookupRef.current + 1;
-      liveCanvasNodeClickLookupRef.current = lookupId;
-
-      const workflowNode = canvasNodesById.get(nodeId);
-      const nodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
-      if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, nodeActivity)) {
-        actions.openConfigurationSidebar({ preferSettingsTab: true });
-        return;
-      }
-
-      const syncAction = resolveLiveCanvasNodeClickSyncAction(nodeId, workflowNode, resolveRunIdForSidebarEvent);
-
-      if (syncAction.kind === "inspectRun") {
-        handleSelectRunFromSidebarEvent(syncAction.runId, { nodeId });
-        return;
-      }
-
-      void (async () => {
-        try {
-          const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
-          if (liveCanvasNodeClickLookupRef.current !== lookupId) return;
-
-          const refreshedNodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
-          if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, refreshedNodeActivity)) {
-            actions.openConfigurationSidebar({ preferSettingsTab: true });
-            return;
-          }
-
-          if (!lookupEvent) {
-            actions.openConfigurationSidebar();
-            return;
-          }
-
-          const runId = await fetchRunIdForSidebarEvent(lookupEvent, { maxPages: 1 });
-          if (liveCanvasNodeClickLookupRef.current !== lookupId) return;
-
-          if (!runId) {
-            actions.openConfigurationSidebar();
-            return;
-          }
-
-          handleSelectRunFromSidebarEvent(runId, { nodeId });
-        } catch (error) {
-          console.error("Failed to inspect latest node run", error);
-          if (liveCanvasNodeClickLookupRef.current !== lookupId) return;
-          actions.openConfigurationSidebar();
-        }
-      })();
-    },
-    [
-      canvasNodesById,
-      fetchRunIdForSidebarEvent,
-      handleSelectRunFromSidebarEvent,
-      isEditing,
-      isRunInspectionMode,
-      liveSidebarRunLookupEnabled,
-      resolveLatestNodeRunLookupEvent,
-      resolveRunIdForSidebarEvent,
-    ],
-  );
-
-  useEffect(() => {
-    liveCanvasNodeClickLookupRef.current += 1;
-  }, [isEditing, isRunInspectionMode, liveSidebarRunLookupEnabled]);
+  const { cancelLiveNodeClickLookup, handleLiveCanvasNodeClick } = useLiveCanvasNodeClick({
+    canvasNodesById,
+    fetchRunIdForSidebarEvent,
+    handleSelectRunFromSidebarEvent,
+    isEditing,
+    isRunInspectionMode,
+    liveSidebarRunLookupEnabled,
+    resolveLatestNodeRunLookupEvent,
+    resolveRunIdForSidebarEvent,
+  });
 
   const handleCanvasNodeClick = useMemo(() => {
     if (runInspectionChromeActive) {
@@ -3913,72 +3838,17 @@ export function AppPage() {
     [canvasNodesById],
   );
 
-  const getCustomField = useCallback(
-    (nodeId: string, integration?: OrganizationsIntegration) => {
-      const node = canvasNodesById.get(nodeId);
-      if (!node) return null;
-
-      let componentName = "";
-      if (node.type === "TYPE_TRIGGER" && node.component) {
-        componentName = node.component;
-      } else if (node.type === "TYPE_ACTION" && node.component) {
-        componentName = node.component;
-      }
-
-      const renderer = getCustomFieldRenderer(componentName);
-      if (renderer) {
-        const context: {
-          integration?: OrganizationsIntegration;
-        } = {};
-        if (integration) {
-          context.integration = integration;
-        }
-
-        return (configuration?: Record<string, unknown>) => {
-          return renderCanvasNodeCustomField({
-            renderer,
-            node,
-            configuration,
-            context: Object.keys(context).length > 0 ? context : undefined,
-          });
-        };
-      }
-
-      if (node.type === "TYPE_ACTION" && node.component && canvasId && hasSidebarMapperCustomField(node.component)) {
-        const componentDef = allComponentsByName.get(node.component);
-        if (!componentDef) {
-          return null;
-        }
-
-        return () => {
-          const nodeData = getNodeData(nodeId);
-          return resolveSidebarMapperCustomField({
-            node,
-            canvasNodes,
-            executions: nodeData.executions,
-            componentDef,
-            canvasMode: isEditing ? "edit" : "live",
-            canvasId,
-            queryClient,
-            me,
-          });
-        };
-      }
-
-      return null;
-    },
-    [
-      allComponentsByName,
-      canvasId,
-      canvasNodes,
-      canvasNodesById,
-      getNodeData,
-      isEditing,
-      me,
-      queryClient,
-      storeVersion,
-    ],
-  );
+  const getCustomField = useCanvasSidebarCustomField({
+    allComponentsByName,
+    canvasId,
+    canvasNodes,
+    canvasNodesById,
+    getNodeData,
+    isEditing,
+    me,
+    queryClient,
+    storeVersion,
+  });
 
   const appFiles = useMemo(
     () =>

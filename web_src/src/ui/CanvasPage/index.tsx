@@ -1205,6 +1205,8 @@ function CanvasPage(props: CanvasPageProps) {
 
   const onCancelQueueItemHandler = props.onCancelQueueItem;
   const onCancelExecutionHandler = props.onCancelExecution;
+  const onLiveNodeClickLookupCancel = props.onLiveNodeClickLookupCancel;
+  const canvasStateMode = props.canvasStateMode || "default";
 
   const handleCancelQueueItem = useCallback(
     (queueId: string) => {
@@ -1227,7 +1229,7 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleSidebarClose = useCallback(() => {
-    props.onLiveNodeClickLookupCancel?.();
+    onLiveNodeClickLookupCancel?.();
 
     const selectedNodeId = state.componentSidebar.selectedNodeId;
     // Check if the currently open node is a pending connection
@@ -1236,7 +1238,7 @@ function CanvasPage(props: CanvasPageProps) {
 
     state.componentSidebar.close();
     // Reset to latest tab when sidebar closes
-    setCurrentTab(props.canvasStateMode === "editing" ? "settings" : "latest");
+    setCurrentTab(canvasStateMode === "editing" ? "settings" : "latest");
 
     // Only remove the node if it's a pending connection node (not yet configured)
     if (isPendingConnection && selectedNodeId) {
@@ -1257,7 +1259,7 @@ function CanvasPage(props: CanvasPageProps) {
         selected: false,
       })),
     );
-  }, [props.canvasStateMode, props.onLiveNodeClickLookupCancel, state, templateNodeId]);
+  }, [canvasStateMode, onLiveNodeClickLookupCancel, state, templateNodeId]);
 
   const openPendingEditNode = useCallback(
     (nodeId: string) => {
@@ -1295,7 +1297,6 @@ function CanvasPage(props: CanvasPageProps) {
     }
   }, [props.isRunInspectionMode, state.componentSidebar.isOpen, handleSidebarClose]);
 
-  const canvasStateMode = props.canvasStateMode || "default";
   const showRunInspectionFloatingBar =
     props.isRunInspectionMode && !props.isEditSessionActive && !props.isEditing && !!props.onBackToLiveCanvas;
   const showPreviewFloatingBar =
