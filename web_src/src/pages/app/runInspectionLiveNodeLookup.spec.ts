@@ -5,6 +5,7 @@ import {
   resolveCachedNodeRunId,
   resolveLiveCanvasNodeClickSyncAction,
   resolveRunLookupEventForNodeActivity,
+  shouldDeferRunInspectionForLiveNodeClick,
 } from "./runInspectionLiveNodeLookup";
 
 function execution(overrides: Partial<CanvasesCanvasNodeExecution>): CanvasesCanvasNodeExecution {
@@ -141,5 +142,67 @@ describe("resolveLiveCanvasNodeClickSyncAction", () => {
     expect(
       resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
     ).toEqual({ kind: "lookupRun" });
+  });
+});
+
+describe("shouldDeferRunInspectionForLiveNodeClick", () => {
+  it("defers run inspection for approval nodes waiting on input", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "approval-1",
+      execution({
+        id: "approval-execution",
+        nodeId: "approval-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "approval-1", type: "TYPE_ACTION", component: "approval" },
+        useNodeExecutionStore.getState().getNodeData("approval-1"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not defer run inspection for finished approval executions", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "approval-1",
+      execution({
+        id: "approval-execution",
+        nodeId: "approval-1",
+        state: "STATE_FINISHED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "approval-1", type: "TYPE_ACTION", component: "approval" },
+        useNodeExecutionStore.getState().getNodeData("approval-1"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not defer run inspection for unrelated components", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "noop-1",
+      execution({
+        id: "noop-execution",
+        nodeId: "noop-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "noop-1", type: "TYPE_ACTION", component: "noop" },
+        useNodeExecutionStore.getState().getNodeData("noop-1"),
+      ),
+    ).toBe(false);
   });
 });

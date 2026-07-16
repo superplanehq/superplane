@@ -115,3 +115,24 @@ export function resolveLiveCanvasNodeClickSyncAction(
 
   return { kind: "lookupRun" };
 }
+
+const LIVE_RUNTIME_INTERACTIVE_COMPONENTS = new Set(["approval", "wait", "timeGate"]);
+
+const ACTIVE_LIVE_RUNTIME_EXECUTION_STATES = new Set(["STATE_STARTED", "STATE_PENDING"]);
+
+export function shouldDeferRunInspectionForLiveNodeClick(
+  workflowNode: ComponentsNode | undefined,
+  nodeData: NodeActivityData,
+): boolean {
+  const component = workflowNode?.component;
+  if (!component || !LIVE_RUNTIME_INTERACTIVE_COMPONENTS.has(component)) {
+    return false;
+  }
+
+  const latestExecution = newestByTimestamp(nodeData.executions, executionTimestamp);
+  if (!latestExecution?.state) {
+    return false;
+  }
+
+  return ACTIVE_LIVE_RUNTIME_EXECUTION_STATES.has(latestExecution.state);
+}

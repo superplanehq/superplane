@@ -89,6 +89,7 @@ import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlClean
 import {
   resolveLiveCanvasNodeClickSyncAction,
   resolveRunLookupEventForNodeActivity,
+  shouldDeferRunInspectionForLiveNodeClick,
 } from "./runInspectionLiveNodeLookup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -3755,6 +3756,11 @@ export function AppPage() {
       liveCanvasNodeClickLookupRef.current = lookupId;
 
       const workflowNode = canvasNodesById.get(nodeId);
+      const nodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
+      if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, nodeActivity)) {
+        return;
+      }
+
       const syncAction = resolveLiveCanvasNodeClickSyncAction(nodeId, workflowNode, resolveRunIdForSidebarEvent);
 
       if (syncAction.kind === "inspectRun") {
@@ -3766,6 +3772,11 @@ export function AppPage() {
         try {
           const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
           if (liveCanvasNodeClickLookupRef.current !== lookupId) return;
+
+          const refreshedNodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
+          if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, refreshedNodeActivity)) {
+            return;
+          }
 
           if (!lookupEvent) {
             actions.openConfigurationSidebar();
