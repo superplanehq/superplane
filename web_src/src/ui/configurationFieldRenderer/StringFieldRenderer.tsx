@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
+import { useSkipDefaultsAfterReadOnly } from "./useSkipDefaultsAfterReadOnly";
 
 function resolveStringFieldDisplayValue(value: unknown, readOnly: boolean, defaultValue: unknown): string {
   if (value !== undefined && value !== null) {
@@ -27,11 +28,12 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   readOnly = false,
 }) => {
   const hasInitialized = useRef(false);
+  const skipDefaultsAfterReadOnly = useSkipDefaultsAfterReadOnly(readOnly);
   const shouldPreserveEmpty = field.togglable === true;
 
   // Set initial value only on first mount if no value is present but there's a default
   useEffect(() => {
-    if (readOnly) {
+    if (readOnly || skipDefaultsAfterReadOnly) {
       return;
     }
 
@@ -39,7 +41,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       hasInitialized.current = true;
       onChange(String(field.defaultValue));
     }
-  }, [readOnly, value, field.defaultValue, onChange]);
+  }, [readOnly, skipDefaultsAfterReadOnly, value, field.defaultValue, onChange]);
 
   const currentValue = resolveStringFieldDisplayValue(value, readOnly, field.defaultValue);
 

@@ -5,7 +5,7 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { runLiveCanvasNodeClickLookup } from "./liveCanvasNodeClickLookup";
 import {
   resolveLiveCanvasNodeClickSyncAction,
-  shouldDeferRunInspectionForLiveNodeClick,
+  shouldOpenConfigurationSidebarForLiveNodeClick,
 } from "./runInspectionLiveNodeLookup";
 
 type UseLiveCanvasNodeClickOptions = {
@@ -49,7 +49,7 @@ export function useLiveCanvasNodeClick({
 
       const workflowNode = canvasNodesById.get(nodeId);
       const nodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
-      if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, nodeActivity)) {
+      if (shouldOpenConfigurationSidebarForLiveNodeClick(workflowNode, nodeActivity)) {
         actions.openConfigurationSidebar({ preferSettingsTab: true });
         return;
       }

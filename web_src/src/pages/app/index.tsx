@@ -119,6 +119,7 @@ import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasSidebarCustomField } from "./useCanvasSidebarCustomField";
 import { useLiveCanvasNodeClick } from "./useLiveCanvasNodeClick";
+import { resolveNodeComponentMetadata } from "./resolveNodeComponentMetadata";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
@@ -1959,14 +1960,7 @@ export function AppPage() {
       let blockName: string | undefined;
 
       if (node.type === "TYPE_ACTION" || node.type === "TYPE_TRIGGER") {
-        const metadata =
-          node.type === "TYPE_ACTION"
-            ? node.component
-              ? allComponentsByName.get(node.component)
-              : undefined
-            : node.component
-              ? allTriggersByName.get(node.component)
-              : undefined;
+        const metadata = resolveNodeComponentMetadata(node, allComponentsByName, allTriggersByName);
         configurationFields = metadata?.configuration || [];
         displayLabel = metadata?.label || displayLabel;
         blockName = node.component;

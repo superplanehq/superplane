@@ -40,4 +40,28 @@ describe("TimezoneFieldRenderer", () => {
 
     expect(screen.getByText("GMT-5 (New York, Toronto)")).toBeInTheDocument();
   });
+
+  it("does not apply defaults after switching from read-only to editable", () => {
+    vi.spyOn(Date.prototype, "getTimezoneOffset").mockReturnValue(300);
+    const handleChange = vi.fn();
+    const { rerender } = render(
+      <TimezoneFieldRenderer
+        field={{ name: "timezone", label: "Timezone", type: "timezone" }}
+        value={undefined}
+        onChange={handleChange}
+        readOnly
+      />,
+    );
+
+    rerender(
+      <TimezoneFieldRenderer
+        field={{ name: "timezone", label: "Timezone", type: "timezone" }}
+        value={undefined}
+        onChange={handleChange}
+        readOnly={false}
+      />,
+    );
+
+    expect(handleChange).not.toHaveBeenCalled();
+  });
 });

@@ -51,12 +51,27 @@ describe("resolveLiveNodePreRunStatus", () => {
   it("returns approval-specific runtime status for active approval executions", () => {
     expect(
       resolveLiveNodePreRunStatus(node({ type: "TYPE_ACTION", component: "approval" }), {
-        executions: [{ id: "exec-1", state: "STATE_STARTED" }],
+        executions: [{ id: "exec-1", state: "STATE_STARTED", createdAt: "2026-07-07T10:00:00Z" }],
         events: [],
       }),
     ).toEqual({
       title: "Action required",
       description: "Use the controls below to continue.",
+      purpose: "runtime",
+    });
+  });
+
+  it("uses the latest approval execution when deciding action required status", () => {
+    expect(
+      resolveLiveNodePreRunStatus(node({ type: "TYPE_ACTION", component: "approval" }), {
+        executions: [
+          { id: "exec-older", state: "STATE_STARTED", createdAt: "2026-07-07T10:00:00Z" },
+          { id: "exec-latest", state: "STATE_FINISHED", createdAt: "2026-07-07T10:05:00Z" },
+        ],
+        events: [],
+      }),
+    ).toEqual({
+      title: "Inspect activity in Runs",
       purpose: "runtime",
     });
   });

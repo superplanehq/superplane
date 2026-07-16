@@ -1,7 +1,7 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import { shouldDeferRunInspectionForLiveNodeClick } from "./runInspectionLiveNodeLookup";
+import { shouldOpenConfigurationSidebarForLiveNodeClick } from "./runInspectionLiveNodeLookup";
 
 type LiveCanvasNodeClickActions = {
   openConfigurationSidebar: (options?: { preferSettingsTab?: boolean }) => void;
@@ -31,7 +31,7 @@ export async function runLiveCanvasNodeClickLookup({
     if (isLookupStale()) return;
 
     const refreshedNodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
-    if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, refreshedNodeActivity)) {
+    if (shouldOpenConfigurationSidebarForLiveNodeClick(workflowNode, refreshedNodeActivity)) {
       openConfigurationSidebar({ preferSettingsTab: true });
       return;
     }

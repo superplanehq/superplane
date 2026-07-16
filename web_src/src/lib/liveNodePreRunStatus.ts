@@ -1,4 +1,12 @@
-import type { ConfigurationField, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import type {
+  CanvasesCanvasNodeExecution,
+  ConfigurationField,
+  SuperplaneComponentsNode as ComponentsNode,
+} from "@/api-client";
+import {
+  hasActiveLiveRuntimeExecutionOnLatest,
+  LIVE_INTERACTIVE_SIDEBAR_COMPONENTS,
+} from "@/lib/liveInteractiveRuntime";
 
 export type LiveNodePreRunStatusPurpose = "setup" | "runtime";
 
@@ -9,19 +17,9 @@ export type LiveNodePreRunStatus = {
 };
 
 type NodeActivityData = {
-  executions: unknown[];
+  executions: CanvasesCanvasNodeExecution[];
   events: unknown[];
 };
-
-const ACTIVE_LIVE_RUNTIME_EXECUTION_STATES = new Set(["STATE_STARTED", "STATE_PENDING"]);
-const LIVE_INTERACTIVE_SIDEBAR_COMPONENTS = new Set(["approval"]);
-
-function hasActiveLiveRuntimeExecution(executions: unknown[]): boolean {
-  return executions.some((execution) => {
-    const state = (execution as { state?: string }).state;
-    return Boolean(state && ACTIVE_LIVE_RUNTIME_EXECUTION_STATES.has(state));
-  });
-}
 
 type ResolveLiveNodePreRunStatusOptions = {
   configurationFields?: ConfigurationField[];
@@ -62,7 +60,7 @@ export function resolveLiveNodePreRunStatus(
   if (
     workflowNode.component &&
     LIVE_INTERACTIVE_SIDEBAR_COMPONENTS.has(workflowNode.component) &&
-    hasActiveLiveRuntimeExecution(nodeData.executions)
+    hasActiveLiveRuntimeExecutionOnLatest(nodeData.executions)
   ) {
     return {
       title: "Action required",

@@ -3,15 +3,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 import { resolveDefaultTimezoneValue, resolveTimezoneDisplayValue, timezoneOptions } from "./timezoneDisplayValue";
+import { useSkipDefaultsAfterReadOnly } from "./useSkipDefaultsAfterReadOnly";
 
 export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, readOnly = false }) => {
   const hasSetDefault = useRef(false);
+  const skipDefaultsAfterReadOnly = useSkipDefaultsAfterReadOnly(readOnly);
   const testId = field.name ? toTestId(`field-${field.name}-select`) : undefined;
 
   // Set user's current timezone as default on first render if no value is present
   // or if the value is "current" (which signals to use user's timezone)
   useEffect(() => {
-    if (readOnly) {
+    if (readOnly || skipDefaultsAfterReadOnly) {
       return;
     }
 
@@ -19,7 +21,7 @@ export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
       onChange(resolveDefaultTimezoneValue());
       hasSetDefault.current = true;
     }
-  }, [readOnly, value, field.defaultValue, onChange]);
+  }, [readOnly, skipDefaultsAfterReadOnly, value, field.defaultValue, onChange]);
 
   // Get the display value - unset and "current" both resolve to the user's timezone
   const displayValue = resolveTimezoneDisplayValue(value);

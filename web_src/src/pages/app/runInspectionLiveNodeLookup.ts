@@ -3,6 +3,11 @@ import type {
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
+import {
+  hasActiveLiveRuntimeExecutionOnLatest,
+  isLiveNodeSetupState,
+  LIVE_INTERACTIVE_SIDEBAR_COMPONENTS,
+} from "@/lib/liveInteractiveRuntime";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
@@ -116,23 +121,25 @@ export function resolveLiveCanvasNodeClickSyncAction(
   return { kind: "lookupRun" };
 }
 
-const LIVE_RUNTIME_INTERACTIVE_COMPONENTS = new Set(["approval"]);
-
-const ACTIVE_LIVE_RUNTIME_EXECUTION_STATES = new Set(["STATE_STARTED", "STATE_PENDING"]);
-
 export function shouldDeferRunInspectionForLiveNodeClick(
   workflowNode: ComponentsNode | undefined,
   nodeData: NodeActivityData,
 ): boolean {
   const component = workflowNode?.component;
-  if (!component || !LIVE_RUNTIME_INTERACTIVE_COMPONENTS.has(component)) {
+  if (!component || !LIVE_INTERACTIVE_SIDEBAR_COMPONENTS.has(component)) {
     return false;
   }
 
-  const latestExecution = newestByTimestamp(nodeData.executions, executionTimestamp);
-  if (!latestExecution?.state) {
-    return false;
+  return hasActiveLiveRuntimeExecutionOnLatest(nodeData.executions);
+}
+
+export function shouldOpenConfigurationSidebarForLiveNodeClick(
+  workflowNode: ComponentsNode | undefined,
+  nodeData: NodeActivityData,
+): boolean {
+  if (isLiveNodeSetupState(workflowNode)) {
+    return true;
   }
 
-  return ACTIVE_LIVE_RUNTIME_EXECUTION_STATES.has(latestExecution.state);
+  return shouldDeferRunInspectionForLiveNodeClick(workflowNode, nodeData);
 }
