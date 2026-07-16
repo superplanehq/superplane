@@ -56,7 +56,7 @@
     "pkg/grpc/actions/messages": 0,
     "pkg/grpc/actions/organizations": 67.4,
     "pkg/grpc/actions/secrets": 65.1,
-    "pkg/grpc/actions/serviceaccounts": 5.3,
+    "pkg/grpc/actions/apikeys": 5.3,
     "pkg/grpc/actions/triggers": 84.6,
     "pkg/grpc/actions/widgets": 0,
     "pkg/grpc/errors": 60.5,
