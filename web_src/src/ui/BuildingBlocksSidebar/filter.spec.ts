@@ -42,6 +42,45 @@ describe("filterBlocksInCategory", () => {
     expect(result).toHaveLength(coreCategory.blocks.length);
   });
 
+  it("matches a query that spans the category subheader and the block text", () => {
+    const githubCategory: BuildingBlockCategory = {
+      name: "GitHub",
+      blocks: [
+        block({ name: "github.on_status", label: "On Status", type: "trigger" }),
+        block({ name: "github.on_push", label: "On Push", type: "trigger" }),
+      ],
+    };
+
+    const result = filterBlocksInCategory(githubCategory, "github status", "all");
+
+    expect(result.map((b) => b.label)).toEqual(["On Status"]);
+  });
+
+  it("matches tokens regardless of their order in the query", () => {
+    const githubCategory: BuildingBlockCategory = {
+      name: "GitHub",
+      blocks: [block({ name: "github.on_status", label: "On Status", type: "trigger" })],
+    };
+
+    const result = filterBlocksInCategory(githubCategory, "status github", "all");
+
+    expect(result.map((b) => b.label)).toEqual(["On Status"]);
+  });
+
+  it("matches blocks by description text", () => {
+    const category: BuildingBlockCategory = {
+      name: "Core",
+      blocks: [
+        block({ name: "approval", label: "Approval", description: "Wait for manual sign-off", type: "component" }),
+        block({ name: "filter", label: "Filter", type: "component" }),
+      ],
+    };
+
+    const result = filterBlocksInCategory(category, "sign-off", "all");
+
+    expect(result.map((b) => b.label)).toEqual(["Approval"]);
+  });
+
   it("narrows by type filter", () => {
     const result = filterBlocksInCategory(coreCategory, "", "trigger");
 
