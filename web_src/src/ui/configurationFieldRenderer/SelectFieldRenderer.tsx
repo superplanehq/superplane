@@ -2,13 +2,15 @@ import React, { useEffect, useRef } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
+import { useSkipDefaultsAfterReadOnly } from "./useSkipDefaultsAfterReadOnly";
 
 export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, readOnly = false }) => {
   const selectOptions = field.typeOptions?.select?.options ?? [];
   const hasSetDefault = useRef(false);
+  const skipDefaultsAfterReadOnly = useSkipDefaultsAfterReadOnly(readOnly);
 
   useEffect(() => {
-    if (readOnly) return;
+    if (readOnly || skipDefaultsAfterReadOnly) return;
 
     if (!hasSetDefault.current && (value === undefined || value === null) && field.defaultValue !== undefined) {
       const defaultVal = field.defaultValue as string;
@@ -17,7 +19,7 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
         hasSetDefault.current = true;
       }
     }
-  }, [readOnly, value, field.defaultValue, onChange]);
+  }, [readOnly, skipDefaultsAfterReadOnly, value, field.defaultValue, onChange]);
 
   const testId = field.name ? toTestId(`field-${field.name}-select`) : undefined;
 
