@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import type {
   ActionsAction,
   CanvasesCanvasNodeExecution,
@@ -17,6 +18,18 @@ const SIDEBAR_MAPPER_CUSTOM_FIELD_COMPONENTS = new Set(["approval"]);
 
 export function hasSidebarMapperCustomField(componentName: string | undefined | null): boolean {
   return Boolean(componentName && SIDEBAR_MAPPER_CUSTOM_FIELD_COMPONENTS.has(componentName));
+}
+
+function resolveMapperCustomFieldContent(customField: ReactNode | (() => ReactNode) | undefined): ReactNode | null {
+  if (customField == null) {
+    return null;
+  }
+
+  if (typeof customField === "function") {
+    return customField();
+  }
+
+  return customField;
 }
 
 export function resolveSidebarMapperCustomField({
@@ -39,7 +52,7 @@ export function resolveSidebarMapperCustomField({
   me?: SuperplaneMeUser | null;
 }) {
   const componentName = node.component;
-  if (!hasSidebarMapperCustomField(componentName) || !node.id) {
+  if (!componentName || !hasSidebarMapperCustomField(componentName) || !node.id) {
     return null;
   }
 
@@ -76,5 +89,5 @@ export function resolveSidebarMapperCustomField({
     canvasMode,
   });
 
-  return props.customField ?? null;
+  return resolveMapperCustomFieldContent(props.customField);
 }
