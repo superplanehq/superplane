@@ -131,7 +131,7 @@ function DefaultView(props: CommandPalettePageProps) {
 
         <CommandItem value="new-service-account" onSelect={props.onNewServiceAccount} className="cursor-pointer">
           <UserPlus className="mr-2 size-4 shrink-0" />
-          <span>New Service Account</span>
+          <span>New API Key</span>
         </CommandItem>
 
         <CommandItem value="new-secret" onSelect={props.onNewSecret} className="cursor-pointer">

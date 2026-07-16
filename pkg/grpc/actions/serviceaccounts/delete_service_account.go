@@ -28,11 +28,11 @@ func DeleteServiceAccount(ctx context.Context, req *pb.DeleteServiceAccountReque
 
 	user, err := models.FindActiveUserByID(orgID, req.Id)
 	if err != nil {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	if !user.IsServiceAccount() {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	// Remove all RBAC roles before deleting
@@ -50,7 +50,7 @@ func DeleteServiceAccount(ctx context.Context, req *pb.DeleteServiceAccountReque
 
 	err = user.Delete()
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to delete service account")
+		return nil, grpcerrors.Internal(err, "failed to delete API key")
 	}
 
 	return &pb.DeleteServiceAccountResponse{}, nil

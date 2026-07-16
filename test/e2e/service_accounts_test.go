@@ -359,6 +359,8 @@ func (s *serviceAccountSteps) givenServiceAccountExists(name, description string
 		name,
 		&desc,
 		user.ID,
+		nil,
+		nil,
 	)
 	require.NoError(s.t, err)
 	require.NotNil(s.t, sa)
