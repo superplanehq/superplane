@@ -2,7 +2,6 @@ package harness
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -12,17 +11,13 @@ var exampleOutputRunPipelineBytes []byte
 
 //go:embed example_data_on_pipeline_completed.json
 var exampleDataOnPipelineCompletedBytes []byte
-
-var exampleOutputOnce sync.Once
-var exampleOutput map[string]any
-
-var exampleDataOnce sync.Once
-var exampleData map[string]any
+var exampleOutput = utils.NewEmbeddedJSON(exampleOutputRunPipelineBytes)
+var exampleData = utils.NewEmbeddedJSON(exampleDataOnPipelineCompletedBytes)
 
 func (r *RunPipeline) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputOnce, exampleOutputRunPipelineBytes, &exampleOutput)
+	return exampleOutput.Value()
 }
 
 func (t *OnPipelineCompleted) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnce, exampleDataOnPipelineCompletedBytes, &exampleData)
+	return exampleData.Value()
 }

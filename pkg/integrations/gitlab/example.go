@@ -2,7 +2,6 @@ package gitlab
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -30,59 +29,43 @@ var exampleDataOnTagBytes []byte
 
 //go:embed example_data_on_vulnerability.json
 var exampleDataOnVulnerabilityBytes []byte
-
-var exampleDataOnIssueOnce sync.Once
-var exampleDataOnIssue map[string]any
-
-var exampleDataOnMergeCommentOnce sync.Once
-var exampleDataOnMergeComment map[string]any
-
-var exampleDataOnMergeRequestOnce sync.Once
-var exampleDataOnMergeRequest map[string]any
-
-var exampleDataOnMilestoneOnce sync.Once
-var exampleDataOnMilestone map[string]any
-
-var exampleDataOnPipelineOnce sync.Once
-var exampleDataOnPipeline map[string]any
-
-var exampleDataOnReleaseOnce sync.Once
-var exampleDataOnRelease map[string]any
-
-var exampleDataOnTagOnce sync.Once
-var exampleDataOnTag map[string]any
-
-var exampleDataOnVulnerabilityOnce sync.Once
-var exampleDataOnVulnerability map[string]any
+var exampleDataOnIssue = utils.NewEmbeddedJSON(exampleDataOnIssueBytes)
+var exampleDataOnMergeComment = utils.NewEmbeddedJSON(exampleDataOnMergeCommentBytes)
+var exampleDataOnMergeRequest = utils.NewEmbeddedJSON(exampleDataOnMergeRequestBytes)
+var exampleDataOnMilestone = utils.NewEmbeddedJSON(exampleDataOnMilestoneBytes)
+var exampleDataOnPipeline = utils.NewEmbeddedJSON(exampleDataOnPipelineBytes)
+var exampleDataOnRelease = utils.NewEmbeddedJSON(exampleDataOnReleaseBytes)
+var exampleDataOnTag = utils.NewEmbeddedJSON(exampleDataOnTagBytes)
+var exampleDataOnVulnerability = utils.NewEmbeddedJSON(exampleDataOnVulnerabilityBytes)
 
 func (i *OnIssue) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
+	return exampleDataOnIssue.Value()
 }
 
 func (m *OnMergeComment) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnMergeCommentOnce, exampleDataOnMergeCommentBytes, &exampleDataOnMergeComment)
+	return exampleDataOnMergeComment.Value()
 }
 
 func (m *OnMergeRequest) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnMergeRequestOnce, exampleDataOnMergeRequestBytes, &exampleDataOnMergeRequest)
+	return exampleDataOnMergeRequest.Value()
 }
 
 func (m *OnMilestone) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnMilestoneOnce, exampleDataOnMilestoneBytes, &exampleDataOnMilestone)
+	return exampleDataOnMilestone.Value()
 }
 
 func (p *OnPipeline) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPipelineOnce, exampleDataOnPipelineBytes, &exampleDataOnPipeline)
+	return exampleDataOnPipeline.Value()
 }
 
 func (r *OnRelease) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnReleaseOnce, exampleDataOnReleaseBytes, &exampleDataOnRelease)
+	return exampleDataOnRelease.Value()
 }
 
 func (t *OnTag) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnTagOnce, exampleDataOnTagBytes, &exampleDataOnTag)
+	return exampleDataOnTag.Value()
 }
 
 func (v *OnVulnerability) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnVulnerabilityOnce, exampleDataOnVulnerabilityBytes, &exampleDataOnVulnerability)
+	return exampleDataOnVulnerability.Value()
 }

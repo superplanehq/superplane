@@ -2,7 +2,6 @@ package statuses
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -15,36 +14,18 @@ var exampleOutputGetCombinedCommitStatusBytes []byte
 
 //go:embed payloads/on_commit_status.json
 var exampleDataOnCommitStatusBytes []byte
-
-var exampleOutputPublishCommitStatusOnce sync.Once
-var exampleOutputPublishCommitStatus map[string]any
-
-var exampleOutputGetCombinedCommitStatusOnce sync.Once
-var exampleOutputGetCombinedCommitStatus map[string]any
-
-var exampleDataOnCommitStatusOnce sync.Once
-var exampleDataOnCommitStatus map[string]any
+var exampleOutputPublishCommitStatus = utils.NewEmbeddedJSON(exampleOutputPublishCommitStatusBytes)
+var exampleOutputGetCombinedCommitStatus = utils.NewEmbeddedJSON(exampleOutputGetCombinedCommitStatusBytes)
+var exampleDataOnCommitStatus = utils.NewEmbeddedJSON(exampleDataOnCommitStatusBytes)
 
 func (c *PublishCommitStatus) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputPublishCommitStatusOnce,
-		exampleOutputPublishCommitStatusBytes,
-		&exampleOutputPublishCommitStatus,
-	)
+	return exampleOutputPublishCommitStatus.Value()
 }
 
 func (c *GetCombinedCommitStatus) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetCombinedCommitStatusOnce,
-		exampleOutputGetCombinedCommitStatusBytes,
-		&exampleOutputGetCombinedCommitStatus,
-	)
+	return exampleOutputGetCombinedCommitStatus.Value()
 }
 
 func (t *OnCommitStatus) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnCommitStatusOnce,
-		exampleDataOnCommitStatusBytes,
-		&exampleDataOnCommitStatus,
-	)
+	return exampleDataOnCommitStatus.Value()
 }

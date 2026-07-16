@@ -2,97 +2,78 @@ package elastic
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 //go:embed example_output_index_document.json
 var exampleOutputIndexDocumentBytes []byte
-
-var exampleOutputIndexDocumentOnce sync.Once
-var exampleOutputIndexDocument map[string]any
+var exampleOutputIndexDocument = utils.NewEmbeddedJSON(exampleOutputIndexDocumentBytes)
 
 func (c *IndexDocument) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputIndexDocumentOnce, exampleOutputIndexDocumentBytes, &exampleOutputIndexDocument)
+	return exampleOutputIndexDocument.Value()
 }
 
 //go:embed example_output_create_case.json
 var exampleOutputCreateCaseBytes []byte
-
-var exampleOutputCreateCaseOnce sync.Once
-var exampleOutputCreateCase map[string]any
+var exampleOutputCreateCase = utils.NewEmbeddedJSON(exampleOutputCreateCaseBytes)
 
 func (c *CreateCase) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateCaseOnce, exampleOutputCreateCaseBytes, &exampleOutputCreateCase)
+	return exampleOutputCreateCase.Value()
 }
 
 //go:embed example_output_get_case.json
 var exampleOutputGetCaseBytes []byte
-
-var exampleOutputGetCaseOnce sync.Once
-var exampleOutputGetCase map[string]any
+var exampleOutputGetCase = utils.NewEmbeddedJSON(exampleOutputGetCaseBytes)
 
 func (c *GetCase) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetCaseOnce, exampleOutputGetCaseBytes, &exampleOutputGetCase)
+	return exampleOutputGetCase.Value()
 }
 
 //go:embed example_output_update_case.json
 var exampleOutputUpdateCaseBytes []byte
-
-var exampleOutputUpdateCaseOnce sync.Once
-var exampleOutputUpdateCase map[string]any
+var exampleOutputUpdateCase = utils.NewEmbeddedJSON(exampleOutputUpdateCaseBytes)
 
 func (c *UpdateCase) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateCaseOnce, exampleOutputUpdateCaseBytes, &exampleOutputUpdateCase)
+	return exampleOutputUpdateCase.Value()
 }
 
 //go:embed example_output_get_document.json
 var exampleOutputGetDocumentBytes []byte
-
-var exampleOutputGetDocumentOnce sync.Once
-var exampleOutputGetDocument map[string]any
+var exampleOutputGetDocument = utils.NewEmbeddedJSON(exampleOutputGetDocumentBytes)
 
 func (c *GetDocument) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDocumentOnce, exampleOutputGetDocumentBytes, &exampleOutputGetDocument)
+	return exampleOutputGetDocument.Value()
 }
 
 //go:embed example_output_update_document.json
 var exampleOutputUpdateDocumentBytes []byte
-
-var exampleOutputUpdateDocumentOnce sync.Once
-var exampleOutputUpdateDocument map[string]any
+var exampleOutputUpdateDocument = utils.NewEmbeddedJSON(exampleOutputUpdateDocumentBytes)
 
 func (c *UpdateDocument) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateDocumentOnce, exampleOutputUpdateDocumentBytes, &exampleOutputUpdateDocument)
+	return exampleOutputUpdateDocument.Value()
 }
 
 //go:embed example_data_on_alert.json
 var exampleDataOnAlertBytes []byte
-
-var exampleDataOnAlertOnce sync.Once
-var exampleDataOnAlert map[string]any
+var exampleDataOnAlert = utils.NewEmbeddedJSON(exampleDataOnAlertBytes)
 
 func (t *OnAlertFires) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertOnce, exampleDataOnAlertBytes, &exampleDataOnAlert)
+	return exampleDataOnAlert.Value()
 }
 
 //go:embed example_data_on_case_status_change.json
 var exampleDataOnCaseStatusChangeBytes []byte
-
-var exampleDataOnCaseStatusChangeOnce sync.Once
-var exampleDataOnCaseStatusChange map[string]any
+var exampleDataOnCaseStatusChange = utils.NewEmbeddedJSON(exampleDataOnCaseStatusChangeBytes)
 
 func (t *OnCaseStatusChange) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnCaseStatusChangeOnce, exampleDataOnCaseStatusChangeBytes, &exampleDataOnCaseStatusChange)
+	return exampleDataOnCaseStatusChange.Value()
 }
 
 //go:embed example_data_on_document_indexed.json
 var exampleDataOnDocumentIndexedBytes []byte
-
-var exampleDataOnDocumentIndexedOnce sync.Once
-var exampleDataOnDocumentIndexed map[string]any
+var exampleDataOnDocumentIndexed = utils.NewEmbeddedJSON(exampleDataOnDocumentIndexedBytes)
 
 func (t *OnDocumentIndexed) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnDocumentIndexedOnce, exampleDataOnDocumentIndexedBytes, &exampleDataOnDocumentIndexed)
+	return exampleDataOnDocumentIndexed.Value()
 }

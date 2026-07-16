@@ -2,7 +2,6 @@ package daytona
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -24,49 +23,33 @@ var exampleOutputGetPreviewURLBytes []byte
 
 //go:embed example_output_delete_sandbox.json
 var exampleOutputDeleteSandboxBytes []byte
-
-var exampleOutputCreateSandboxOnce sync.Once
-var exampleOutputCreateSandbox map[string]any
-
-var exampleOutputCreateRepositorySandboxOnce sync.Once
-var exampleOutputCreateRepositorySandbox map[string]any
-
-var exampleOutputExecuteCodeOnce sync.Once
-var exampleOutputExecuteCode map[string]any
-
-var exampleOutputExecuteCommandOnce sync.Once
-var exampleOutputExecuteCommand map[string]any
-
-var exampleOutputGetPreviewURLOnce sync.Once
-var exampleOutputGetPreviewURL map[string]any
-
-var exampleOutputDeleteSandboxOnce sync.Once
-var exampleOutputDeleteSandbox map[string]any
+var exampleOutputCreateSandbox = utils.NewEmbeddedJSON(exampleOutputCreateSandboxBytes)
+var exampleOutputCreateRepositorySandbox = utils.NewEmbeddedJSON(exampleOutputCreateRepositorySandboxBytes)
+var exampleOutputExecuteCode = utils.NewEmbeddedJSON(exampleOutputExecuteCodeBytes)
+var exampleOutputExecuteCommand = utils.NewEmbeddedJSON(exampleOutputExecuteCommandBytes)
+var exampleOutputGetPreviewURL = utils.NewEmbeddedJSON(exampleOutputGetPreviewURLBytes)
+var exampleOutputDeleteSandbox = utils.NewEmbeddedJSON(exampleOutputDeleteSandboxBytes)
 
 func (c *CreateSandbox) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSandboxOnce, exampleOutputCreateSandboxBytes, &exampleOutputCreateSandbox)
+	return exampleOutputCreateSandbox.Value()
 }
 
 func (c *CreateRepositorySandbox) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateRepositorySandboxOnce,
-		exampleOutputCreateRepositorySandboxBytes,
-		&exampleOutputCreateRepositorySandbox,
-	)
+	return exampleOutputCreateRepositorySandbox.Value()
 }
 
 func (e *ExecuteCode) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputExecuteCodeOnce, exampleOutputExecuteCodeBytes, &exampleOutputExecuteCode)
+	return exampleOutputExecuteCode.Value()
 }
 
 func (e *ExecuteCommand) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputExecuteCommandOnce, exampleOutputExecuteCommandBytes, &exampleOutputExecuteCommand)
+	return exampleOutputExecuteCommand.Value()
 }
 
 func (p *GetPreviewURLComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetPreviewURLOnce, exampleOutputGetPreviewURLBytes, &exampleOutputGetPreviewURL)
+	return exampleOutputGetPreviewURL.Value()
 }
 
 func (d *DeleteSandbox) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteSandboxOnce, exampleOutputDeleteSandboxBytes, &exampleOutputDeleteSandbox)
+	return exampleOutputDeleteSandbox.Value()
 }

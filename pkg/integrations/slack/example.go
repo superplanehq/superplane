@@ -2,7 +2,6 @@ package slack
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -15,24 +14,18 @@ var exampleOutputWaitForButtonClickBytes []byte
 
 //go:embed example_data_on_app_mention.json
 var exampleDataOnAppMentionBytes []byte
-
-var exampleOutputSendTextMessageOnce sync.Once
-var exampleOutputSendTextMessage map[string]any
-
-var exampleOutputWaitForButtonClickOnce sync.Once
-var exampleOutputWaitForButtonClick map[string]any
-
-var exampleDataOnce sync.Once
-var exampleData map[string]any
+var exampleOutputSendTextMessage = utils.NewEmbeddedJSON(exampleOutputSendTextMessageBytes)
+var exampleOutputWaitForButtonClick = utils.NewEmbeddedJSON(exampleOutputWaitForButtonClickBytes)
+var exampleData = utils.NewEmbeddedJSON(exampleDataOnAppMentionBytes)
 
 func (c *SendTextMessage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputSendTextMessageOnce, exampleOutputSendTextMessageBytes, &exampleOutputSendTextMessage)
+	return exampleOutputSendTextMessage.Value()
 }
 
 func (c *WaitForButtonClick) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputWaitForButtonClickOnce, exampleOutputWaitForButtonClickBytes, &exampleOutputWaitForButtonClick)
+	return exampleOutputWaitForButtonClick.Value()
 }
 
 func (t *OnAppMention) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnce, exampleDataOnAppMentionBytes, &exampleData)
+	return exampleData.Value()
 }

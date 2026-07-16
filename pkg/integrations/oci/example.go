@@ -2,7 +2,6 @@ package oci
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -21,144 +20,116 @@ var exampleOutputUpdateImageBytes []byte
 
 //go:embed example_output_delete_image.json
 var exampleOutputDeleteImageBytes []byte
-
-var exampleOutputCreateComputeInstanceOnce sync.Once
-var exampleOutputCreateComputeInstanceCache map[string]any
-var exampleOutputCreateImageOnce sync.Once
-var exampleOutputCreateImageCache map[string]any
-var exampleOutputGetImageOnce sync.Once
-var exampleOutputGetImageCache map[string]any
-var exampleOutputUpdateImageOnce sync.Once
-var exampleOutputUpdateImageCache map[string]any
-var exampleOutputDeleteImageOnce sync.Once
-var exampleOutputDeleteImageCache map[string]any
+var exampleOutputCreateComputeInstanceCache = utils.NewEmbeddedJSON(exampleOutputCreateComputeInstanceBytes)
+var exampleOutputCreateImageCache = utils.NewEmbeddedJSON(exampleOutputCreateImageBytes)
+var exampleOutputGetImageCache = utils.NewEmbeddedJSON(exampleOutputGetImageBytes)
+var exampleOutputUpdateImageCache = utils.NewEmbeddedJSON(exampleOutputUpdateImageBytes)
+var exampleOutputDeleteImageCache = utils.NewEmbeddedJSON(exampleOutputDeleteImageBytes)
 
 func exampleOutputCreateComputeInstance() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateComputeInstanceOnce, exampleOutputCreateComputeInstanceBytes, &exampleOutputCreateComputeInstanceCache)
+	return exampleOutputCreateComputeInstanceCache.Value()
 }
 
 func exampleOutputCreateImage() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateImageOnce, exampleOutputCreateImageBytes, &exampleOutputCreateImageCache)
+	return exampleOutputCreateImageCache.Value()
 }
 
 func exampleOutputGetImage() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetImageOnce, exampleOutputGetImageBytes, &exampleOutputGetImageCache)
+	return exampleOutputGetImageCache.Value()
 }
 
 func exampleOutputUpdateImage() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateImageOnce, exampleOutputUpdateImageBytes, &exampleOutputUpdateImageCache)
+	return exampleOutputUpdateImageCache.Value()
 }
 
 func exampleOutputDeleteImage() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteImageOnce, exampleOutputDeleteImageBytes, &exampleOutputDeleteImageCache)
+	return exampleOutputDeleteImageCache.Value()
 }
 
 //go:embed example_data_on_compute_instance_created.json
 var exampleDataOnComputeInstanceCreatedBytes []byte
-
-var exampleDataOnComputeInstanceCreatedOnce sync.Once
-var exampleDataOnComputeInstanceCreatedCache map[string]any
+var exampleDataOnComputeInstanceCreatedCache = utils.NewEmbeddedJSON(exampleDataOnComputeInstanceCreatedBytes)
 
 func exampleDataOnComputeInstanceCreated() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnComputeInstanceCreatedOnce, exampleDataOnComputeInstanceCreatedBytes, &exampleDataOnComputeInstanceCreatedCache)
+	return exampleDataOnComputeInstanceCreatedCache.Value()
 }
 
 //go:embed example_output_create_application.json
 var exampleOutputCreateApplicationBytes []byte
-
-var exampleOutputCreateApplicationOnce sync.Once
-var exampleOutputCreateApplicationCache map[string]any
+var exampleOutputCreateApplicationCache = utils.NewEmbeddedJSON(exampleOutputCreateApplicationBytes)
 
 func exampleOutputCreateApplication() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateApplicationOnce, exampleOutputCreateApplicationBytes, &exampleOutputCreateApplicationCache)
+	return exampleOutputCreateApplicationCache.Value()
 }
 
 //go:embed example_output_create_function.json
 var exampleOutputCreateFunctionBytes []byte
-
-var exampleOutputCreateFunctionOnce sync.Once
-var exampleOutputCreateFunctionCache map[string]any
+var exampleOutputCreateFunctionCache = utils.NewEmbeddedJSON(exampleOutputCreateFunctionBytes)
 
 func exampleOutputCreateFunction() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateFunctionOnce, exampleOutputCreateFunctionBytes, &exampleOutputCreateFunctionCache)
+	return exampleOutputCreateFunctionCache.Value()
 }
 
 //go:embed example_output_invoke_function.json
 var exampleOutputInvokeFunctionBytes []byte
-
-var exampleOutputInvokeFunctionOnce sync.Once
-var exampleOutputInvokeFunctionCache map[string]any
+var exampleOutputInvokeFunctionCache = utils.NewEmbeddedJSON(exampleOutputInvokeFunctionBytes)
 
 func exampleOutputInvokeFunction() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputInvokeFunctionOnce, exampleOutputInvokeFunctionBytes, &exampleOutputInvokeFunctionCache)
+	return exampleOutputInvokeFunctionCache.Value()
 }
 
 //go:embed example_output_delete_application.json
 var exampleOutputDeleteApplicationBytes []byte
-
-var exampleOutputDeleteApplicationOnce sync.Once
-var exampleOutputDeleteApplicationCache map[string]any
+var exampleOutputDeleteApplicationCache = utils.NewEmbeddedJSON(exampleOutputDeleteApplicationBytes)
 
 func exampleOutputDeleteApplication() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteApplicationOnce, exampleOutputDeleteApplicationBytes, &exampleOutputDeleteApplicationCache)
+	return exampleOutputDeleteApplicationCache.Value()
 }
 
 //go:embed example_output_delete_function.json
 var exampleOutputDeleteFunctionBytes []byte
-
-var exampleOutputDeleteFunctionOnce sync.Once
-var exampleOutputDeleteFunctionCache map[string]any
+var exampleOutputDeleteFunctionCache = utils.NewEmbeddedJSON(exampleOutputDeleteFunctionBytes)
 
 func exampleOutputDeleteFunction() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteFunctionOnce, exampleOutputDeleteFunctionBytes, &exampleOutputDeleteFunctionCache)
+	return exampleOutputDeleteFunctionCache.Value()
 }
 
 //go:embed example_output_get_instance.json
 var exampleOutputGetInstanceBytes []byte
-
-var exampleOutputGetInstanceOnce sync.Once
-var exampleOutputGetInstanceCache map[string]any
+var exampleOutputGetInstanceCache = utils.NewEmbeddedJSON(exampleOutputGetInstanceBytes)
 
 func exampleOutputGetInstance() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetInstanceOnce, exampleOutputGetInstanceBytes, &exampleOutputGetInstanceCache)
+	return exampleOutputGetInstanceCache.Value()
 }
 
 //go:embed example_output_update_instance.json
 var exampleOutputUpdateInstanceBytes []byte
-
-var exampleOutputUpdateInstanceOnce sync.Once
-var exampleOutputUpdateInstanceCache map[string]any
+var exampleOutputUpdateInstanceCache = utils.NewEmbeddedJSON(exampleOutputUpdateInstanceBytes)
 
 func exampleOutputUpdateInstance() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateInstanceOnce, exampleOutputUpdateInstanceBytes, &exampleOutputUpdateInstanceCache)
+	return exampleOutputUpdateInstanceCache.Value()
 }
 
 //go:embed example_output_manage_instance_power.json
 var exampleOutputManageInstancePowerBytes []byte
-
-var exampleOutputManageInstancePowerOnce sync.Once
-var exampleOutputManageInstancePowerCache map[string]any
+var exampleOutputManageInstancePowerCache = utils.NewEmbeddedJSON(exampleOutputManageInstancePowerBytes)
 
 func exampleOutputManageInstancePower() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputManageInstancePowerOnce, exampleOutputManageInstancePowerBytes, &exampleOutputManageInstancePowerCache)
+	return exampleOutputManageInstancePowerCache.Value()
 }
 
 //go:embed example_output_delete_instance.json
 var exampleOutputDeleteInstanceBytes []byte
-
-var exampleOutputDeleteInstanceOnce sync.Once
-var exampleOutputDeleteInstanceCache map[string]any
+var exampleOutputDeleteInstanceCache = utils.NewEmbeddedJSON(exampleOutputDeleteInstanceBytes)
 
 func exampleOutputDeleteInstance() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteInstanceOnce, exampleOutputDeleteInstanceBytes, &exampleOutputDeleteInstanceCache)
+	return exampleOutputDeleteInstanceCache.Value()
 }
 
 //go:embed example_data_on_instance_state_change.json
 var exampleDataOnInstanceStateChangeBytes []byte
-
-var exampleDataOnInstanceStateChangeOnce sync.Once
-var exampleDataOnInstanceStateChangeCache map[string]any
+var exampleDataOnInstanceStateChangeCache = utils.NewEmbeddedJSON(exampleDataOnInstanceStateChangeBytes)
 
 func exampleDataOnInstanceStateChange() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnInstanceStateChangeOnce, exampleDataOnInstanceStateChangeBytes, &exampleDataOnInstanceStateChangeCache)
+	return exampleDataOnInstanceStateChangeCache.Value()
 }

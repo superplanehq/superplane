@@ -2,7 +2,6 @@ package storage
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -17,24 +16,19 @@ var exampleOutputGetBucketBytes []byte
 var exampleOutputDeleteBucketBytes []byte
 
 var (
-	exampleOutputCreateBucketOnce sync.Once
-	exampleOutputCreateBucket     map[string]any
-
-	exampleOutputGetBucketOnce sync.Once
-	exampleOutputGetBucket     map[string]any
-
-	exampleOutputDeleteBucketOnce sync.Once
-	exampleOutputDeleteBucket     map[string]any
+	exampleOutputCreateBucket = utils.NewEmbeddedJSON(exampleOutputCreateBucketBytes)
+	exampleOutputGetBucket    = utils.NewEmbeddedJSON(exampleOutputGetBucketBytes)
+	exampleOutputDeleteBucket = utils.NewEmbeddedJSON(exampleOutputDeleteBucketBytes)
 )
 
 func (c *CreateBucket) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateBucketOnce, exampleOutputCreateBucketBytes, &exampleOutputCreateBucket)
+	return exampleOutputCreateBucket.Value()
 }
 
 func (g *GetBucket) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetBucketOnce, exampleOutputGetBucketBytes, &exampleOutputGetBucket)
+	return exampleOutputGetBucket.Value()
 }
 
 func (d *DeleteBucket) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteBucketOnce, exampleOutputDeleteBucketBytes, &exampleOutputDeleteBucket)
+	return exampleOutputDeleteBucket.Value()
 }

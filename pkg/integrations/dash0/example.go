@@ -2,137 +2,110 @@ package dash0
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 //go:embed example_output_query_prometheus.json
 var exampleOutputQueryPrometheusBytes []byte
-
-var exampleOutputQueryPrometheusOnce sync.Once
-var exampleOutputQueryPrometheus map[string]any
+var exampleOutputQueryPrometheus = utils.NewEmbeddedJSON(exampleOutputQueryPrometheusBytes)
 
 //go:embed example_output_list_issues.json
 var exampleOutputListIssuesBytes []byte
-
-var exampleOutputListIssuesOnce sync.Once
-var exampleOutputListIssues map[string]any
+var exampleOutputListIssues = utils.NewEmbeddedJSON(exampleOutputListIssuesBytes)
 
 //go:embed example_output_create_http_synthetic_check.json
 var exampleOutputCreateHTTPSyntheticCheckBytes []byte
-
-var exampleOutputCreateHTTPSyntheticCheckOnce sync.Once
-var exampleOutputCreateHTTPSyntheticCheck map[string]any
+var exampleOutputCreateHTTPSyntheticCheck = utils.NewEmbeddedJSON(exampleOutputCreateHTTPSyntheticCheckBytes)
 
 //go:embed example_output_update_http_synthetic_check.json
 var exampleOutputUpdateHTTPSyntheticCheckBytes []byte
-
-var exampleOutputUpdateHTTPSyntheticCheckOnce sync.Once
-var exampleOutputUpdateHTTPSyntheticCheck map[string]any
+var exampleOutputUpdateHTTPSyntheticCheck = utils.NewEmbeddedJSON(exampleOutputUpdateHTTPSyntheticCheckBytes)
 
 //go:embed example_output_delete_http_synthetic_check.json
 var exampleOutputDeleteHTTPSyntheticCheckBytes []byte
-
-var exampleOutputDeleteHTTPSyntheticCheckOnce sync.Once
-var exampleOutputDeleteHTTPSyntheticCheck map[string]any
+var exampleOutputDeleteHTTPSyntheticCheck = utils.NewEmbeddedJSON(exampleOutputDeleteHTTPSyntheticCheckBytes)
 
 //go:embed example_output_send_log_event.json
 var exampleOutputSendLogEventBytes []byte
-
-var exampleOutputSendLogEventOnce sync.Once
-var exampleOutputSendLogEvent map[string]any
+var exampleOutputSendLogEvent = utils.NewEmbeddedJSON(exampleOutputSendLogEventBytes)
 
 //go:embed example_data_on_alert_notification.json
 var exampleDataOnAlertNotificationBytes []byte
 
 //go:embed example_output_get_http_synthetic_check.json
 var exampleOutputGetHTTPSyntheticCheckBytes []byte
-
-var exampleOutputGetHTTPSyntheticCheckOnce sync.Once
-var exampleOutputGetHTTPSyntheticCheck map[string]any
-
-var exampleDataOnAlertNotificationOnce sync.Once
-var exampleDataOnAlertNotification map[string]any
+var exampleOutputGetHTTPSyntheticCheck = utils.NewEmbeddedJSON(exampleOutputGetHTTPSyntheticCheckBytes)
+var exampleDataOnAlertNotification = utils.NewEmbeddedJSON(exampleDataOnAlertNotificationBytes)
 
 //go:embed example_data_on_synthetic_check_notification.json
 var exampleDataOnSyntheticCheckNotificationBytes []byte
-
-var exampleDataOnSyntheticCheckNotificationOnce sync.Once
-var exampleDataOnSyntheticCheckNotification map[string]any
+var exampleDataOnSyntheticCheckNotification = utils.NewEmbeddedJSON(exampleDataOnSyntheticCheckNotificationBytes)
 
 //go:embed example_output_create_check_rule.json
 var exampleOutputCreateCheckRuleBytes []byte
-
-var exampleOutputCreateCheckRuleOnce sync.Once
-var exampleOutputCreateCheckRule map[string]any
+var exampleOutputCreateCheckRule = utils.NewEmbeddedJSON(exampleOutputCreateCheckRuleBytes)
 
 //go:embed example_output_get_check_rule.json
 var exampleOutputGetCheckRuleBytes []byte
-
-var exampleOutputGetCheckRuleOnce sync.Once
-var exampleOutputGetCheckRule map[string]any
+var exampleOutputGetCheckRule = utils.NewEmbeddedJSON(exampleOutputGetCheckRuleBytes)
 
 //go:embed example_output_update_check_rule.json
 var exampleOutputUpdateCheckRuleBytes []byte
-
-var exampleOutputUpdateCheckRuleOnce sync.Once
-var exampleOutputUpdateCheckRule map[string]any
+var exampleOutputUpdateCheckRule = utils.NewEmbeddedJSON(exampleOutputUpdateCheckRuleBytes)
 
 //go:embed example_output_delete_check_rule.json
 var exampleOutputDeleteCheckRuleBytes []byte
-
-var exampleOutputDeleteCheckRuleOnce sync.Once
-var exampleOutputDeleteCheckRule map[string]any
+var exampleOutputDeleteCheckRule = utils.NewEmbeddedJSON(exampleOutputDeleteCheckRuleBytes)
 
 func (c *QueryPrometheus) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryPrometheusOnce, exampleOutputQueryPrometheusBytes, &exampleOutputQueryPrometheus)
+	return exampleOutputQueryPrometheus.Value()
 }
 
 func (c *ListIssues) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputListIssuesOnce, exampleOutputListIssuesBytes, &exampleOutputListIssues)
+	return exampleOutputListIssues.Value()
 }
 
 func (c *CreateHTTPSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateHTTPSyntheticCheckOnce, exampleOutputCreateHTTPSyntheticCheckBytes, &exampleOutputCreateHTTPSyntheticCheck)
+	return exampleOutputCreateHTTPSyntheticCheck.Value()
 }
 
 func (c *UpdateHTTPSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateHTTPSyntheticCheckOnce, exampleOutputUpdateHTTPSyntheticCheckBytes, &exampleOutputUpdateHTTPSyntheticCheck)
+	return exampleOutputUpdateHTTPSyntheticCheck.Value()
 }
 
 func (c *DeleteHTTPSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteHTTPSyntheticCheckOnce, exampleOutputDeleteHTTPSyntheticCheckBytes, &exampleOutputDeleteHTTPSyntheticCheck)
+	return exampleOutputDeleteHTTPSyntheticCheck.Value()
 }
 
 func (c *SendLogEvent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputSendLogEventOnce, exampleOutputSendLogEventBytes, &exampleOutputSendLogEvent)
+	return exampleOutputSendLogEvent.Value()
 }
 
 func (c *GetHTTPSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetHTTPSyntheticCheckOnce, exampleOutputGetHTTPSyntheticCheckBytes, &exampleOutputGetHTTPSyntheticCheck)
+	return exampleOutputGetHTTPSyntheticCheck.Value()
 }
 
 func onAlertNotificationExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertNotificationOnce, exampleDataOnAlertNotificationBytes, &exampleDataOnAlertNotification)
+	return exampleDataOnAlertNotification.Value()
 }
 
 func onSyntheticCheckNotificationExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnSyntheticCheckNotificationOnce, exampleDataOnSyntheticCheckNotificationBytes, &exampleDataOnSyntheticCheckNotification)
+	return exampleDataOnSyntheticCheckNotification.Value()
 }
 
 func (c *CreateCheckRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateCheckRuleOnce, exampleOutputCreateCheckRuleBytes, &exampleOutputCreateCheckRule)
+	return exampleOutputCreateCheckRule.Value()
 }
 
 func (c *GetCheckRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetCheckRuleOnce, exampleOutputGetCheckRuleBytes, &exampleOutputGetCheckRule)
+	return exampleOutputGetCheckRule.Value()
 }
 
 func (c *UpdateCheckRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateCheckRuleOnce, exampleOutputUpdateCheckRuleBytes, &exampleOutputUpdateCheckRule)
+	return exampleOutputUpdateCheckRule.Value()
 }
 
 func (c *DeleteCheckRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteCheckRuleOnce, exampleOutputDeleteCheckRuleBytes, &exampleOutputDeleteCheckRule)
+	return exampleOutputDeleteCheckRule.Value()
 }

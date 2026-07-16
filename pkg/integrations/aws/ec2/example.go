@@ -2,7 +2,6 @@ package ec2
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -81,250 +80,128 @@ var exampleOutputUpdateAlarmBytes []byte
 
 //go:embed example_output_delete_alarm.json
 var exampleOutputDeleteAlarmBytes []byte
-
-var exampleDataOnImageOnce sync.Once
-var exampleDataOnImage map[string]any
-
-var exampleDataOnAlarmOnce sync.Once
-var exampleDataOnAlarm map[string]any
-
-var exampleOutputCreateImageOnce sync.Once
-var exampleOutputCreateImage map[string]any
-
-var exampleOutputGetImageOnce sync.Once
-var exampleOutputGetImage map[string]any
-
-var exampleOutputCopyImageOnce sync.Once
-var exampleOutputCopyImage map[string]any
-
-var exampleOutputDeregisterImageOnce sync.Once
-var exampleOutputDeregisterImage map[string]any
-
-var exampleOutputEnableImageOnce sync.Once
-var exampleOutputEnableImage map[string]any
-
-var exampleOutputDisableImageOnce sync.Once
-var exampleOutputDisableImage map[string]any
-
-var exampleOutputEnableImageDeprecationOnce sync.Once
-var exampleOutputEnableImageDeprecation map[string]any
-
-var exampleOutputDisableImageDeprecationOnce sync.Once
-var exampleOutputDisableImageDeprecation map[string]any
-
-var exampleOutputCreateInstanceOnce sync.Once
-var exampleOutputCreateInstance map[string]any
-
-var exampleOutputDeleteInstanceOnce sync.Once
-var exampleOutputDeleteInstance map[string]any
-
-var exampleOutputGetInstanceOnce sync.Once
-var exampleOutputGetInstance map[string]any
-
-var exampleOutputManageInstancePowerOnce sync.Once
-var exampleOutputManageInstancePower map[string]any
-
-var exampleOutputGetInstanceMetricsOnce sync.Once
-var exampleOutputGetInstanceMetrics map[string]any
-
-var exampleOutputUpdateInstanceOnce sync.Once
-var exampleOutputUpdateInstance map[string]any
-
-var exampleOutputCreateAlarmOnce sync.Once
-var exampleOutputCreateAlarm map[string]any
-
-var exampleOutputGetAlarmOnce sync.Once
-var exampleOutputGetAlarm map[string]any
-
-var exampleOutputAllocateElasticIPOnce sync.Once
-var exampleOutputAllocateElasticIP map[string]any
-
-var exampleOutputReleaseElasticIPOnce sync.Once
-var exampleOutputReleaseElasticIP map[string]any
-
-var exampleOutputManageElasticIPOnce sync.Once
-var exampleOutputManageElasticIP map[string]any
-
-var exampleOutputCreateLoadBalancerOnce sync.Once
-var exampleOutputCreateLoadBalancer map[string]any
-
-var exampleOutputDeleteLoadBalancerOnce sync.Once
-var exampleOutputDeleteLoadBalancer map[string]any
-
-var exampleOutputUpdateAlarmOnce sync.Once
-var exampleOutputUpdateAlarm map[string]any
-
-var exampleOutputDeleteAlarmOnce sync.Once
-var exampleOutputDeleteAlarm map[string]any
+var exampleDataOnImage = utils.NewEmbeddedJSON(exampleDataOnImageBytes)
+var exampleDataOnAlarm = utils.NewEmbeddedJSON(exampleDataOnAlarmBytes)
+var exampleOutputCreateImage = utils.NewEmbeddedJSON(exampleOutputCreateImageBytes)
+var exampleOutputGetImage = utils.NewEmbeddedJSON(exampleOutputGetImageBytes)
+var exampleOutputCopyImage = utils.NewEmbeddedJSON(exampleOutputCopyImageBytes)
+var exampleOutputDeregisterImage = utils.NewEmbeddedJSON(exampleOutputDeregisterImageBytes)
+var exampleOutputEnableImage = utils.NewEmbeddedJSON(exampleOutputEnableImageBytes)
+var exampleOutputDisableImage = utils.NewEmbeddedJSON(exampleOutputDisableImageBytes)
+var exampleOutputEnableImageDeprecation = utils.NewEmbeddedJSON(exampleOutputEnableImageDeprecationBytes)
+var exampleOutputDisableImageDeprecation = utils.NewEmbeddedJSON(exampleOutputDisableImageDeprecationBytes)
+var exampleOutputCreateInstance = utils.NewEmbeddedJSON(exampleOutputCreateInstanceBytes)
+var exampleOutputDeleteInstance = utils.NewEmbeddedJSON(exampleOutputDeleteInstanceBytes)
+var exampleOutputGetInstance = utils.NewEmbeddedJSON(exampleOutputGetInstanceBytes)
+var exampleOutputManageInstancePower = utils.NewEmbeddedJSON(exampleOutputManageInstancePowerBytes)
+var exampleOutputGetInstanceMetrics = utils.NewEmbeddedJSON(exampleOutputGetInstanceMetricsBytes)
+var exampleOutputUpdateInstance = utils.NewEmbeddedJSON(exampleOutputUpdateInstanceBytes)
+var exampleOutputCreateAlarm = utils.NewEmbeddedJSON(exampleOutputCreateAlarmBytes)
+var exampleOutputGetAlarm = utils.NewEmbeddedJSON(exampleOutputGetAlarmBytes)
+var exampleOutputAllocateElasticIP = utils.NewEmbeddedJSON(exampleOutputAllocateElasticIPBytes)
+var exampleOutputReleaseElasticIP = utils.NewEmbeddedJSON(exampleOutputReleaseElasticIPBytes)
+var exampleOutputManageElasticIP = utils.NewEmbeddedJSON(exampleOutputManageElasticIPBytes)
+var exampleOutputCreateLoadBalancer = utils.NewEmbeddedJSON(exampleOutputCreateLoadBalancerBytes)
+var exampleOutputDeleteLoadBalancer = utils.NewEmbeddedJSON(exampleOutputDeleteLoadBalancerBytes)
+var exampleOutputUpdateAlarm = utils.NewEmbeddedJSON(exampleOutputUpdateAlarmBytes)
+var exampleOutputDeleteAlarm = utils.NewEmbeddedJSON(exampleOutputDeleteAlarmBytes)
 
 func (t *OnImage) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
+	return exampleDataOnImage.Value()
 }
 
 func (t *OnAlarm) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlarmOnce, exampleDataOnAlarmBytes, &exampleDataOnAlarm)
+	return exampleDataOnAlarm.Value()
 }
 
 func (c *CreateImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateImageOnce, exampleOutputCreateImageBytes, &exampleOutputCreateImage)
+	return exampleOutputCreateImage.Value()
 }
 
 func (c *GetImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetImageOnce, exampleOutputGetImageBytes, &exampleOutputGetImage)
+	return exampleOutputGetImage.Value()
 }
 
 func (c *CopyImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCopyImageOnce, exampleOutputCopyImageBytes, &exampleOutputCopyImage)
+	return exampleOutputCopyImage.Value()
 }
 
 func (c *DeregisterImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeregisterImageOnce,
-		exampleOutputDeregisterImageBytes,
-		&exampleOutputDeregisterImage,
-	)
+	return exampleOutputDeregisterImage.Value()
 }
 
 func (c *EnableImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputEnableImageOnce, exampleOutputEnableImageBytes, &exampleOutputEnableImage)
+	return exampleOutputEnableImage.Value()
 }
 
 func (c *DisableImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDisableImageOnce, exampleOutputDisableImageBytes, &exampleOutputDisableImage)
+	return exampleOutputDisableImage.Value()
 }
 
 func (c *EnableImageDeprecation) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputEnableImageDeprecationOnce,
-		exampleOutputEnableImageDeprecationBytes,
-		&exampleOutputEnableImageDeprecation,
-	)
+	return exampleOutputEnableImageDeprecation.Value()
 }
 
 func (c *DisableImageDeprecation) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDisableImageDeprecationOnce,
-		exampleOutputDisableImageDeprecationBytes,
-		&exampleOutputDisableImageDeprecation,
-	)
+	return exampleOutputDisableImageDeprecation.Value()
 }
 
 func (c *CreateInstance) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateInstanceOnce,
-		exampleOutputCreateInstanceBytes,
-		&exampleOutputCreateInstance,
-	)
+	return exampleOutputCreateInstance.Value()
 }
 
 func (c *DeleteInstance) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeleteInstanceOnce,
-		exampleOutputDeleteInstanceBytes,
-		&exampleOutputDeleteInstance,
-	)
+	return exampleOutputDeleteInstance.Value()
 }
 
 func (c *GetInstance) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetInstanceOnce,
-		exampleOutputGetInstanceBytes,
-		&exampleOutputGetInstance,
-	)
+	return exampleOutputGetInstance.Value()
 }
 
 func (c *ManageInstancePower) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputManageInstancePowerOnce,
-		exampleOutputManageInstancePowerBytes,
-		&exampleOutputManageInstancePower,
-	)
+	return exampleOutputManageInstancePower.Value()
 }
 
 func (c *GetInstanceMetrics) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetInstanceMetricsOnce,
-		exampleOutputGetInstanceMetricsBytes,
-		&exampleOutputGetInstanceMetrics,
-	)
+	return exampleOutputGetInstanceMetrics.Value()
 }
 
 func (c *UpdateInstance) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdateInstanceOnce,
-		exampleOutputUpdateInstanceBytes,
-		&exampleOutputUpdateInstance,
-	)
+	return exampleOutputUpdateInstance.Value()
 }
 
 func (c *CreateAlarm) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateAlarmOnce,
-		exampleOutputCreateAlarmBytes,
-		&exampleOutputCreateAlarm,
-	)
+	return exampleOutputCreateAlarm.Value()
 }
 
 func (c *GetAlarm) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetAlarmOnce,
-		exampleOutputGetAlarmBytes,
-		&exampleOutputGetAlarm,
-	)
+	return exampleOutputGetAlarm.Value()
 }
 
 func (c *AllocateElasticIP) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputAllocateElasticIPOnce,
-		exampleOutputAllocateElasticIPBytes,
-		&exampleOutputAllocateElasticIP,
-	)
+	return exampleOutputAllocateElasticIP.Value()
 }
 
 func (c *ReleaseElasticIP) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputReleaseElasticIPOnce,
-		exampleOutputReleaseElasticIPBytes,
-		&exampleOutputReleaseElasticIP,
-	)
+	return exampleOutputReleaseElasticIP.Value()
 }
 
 func (c *ManageElasticIP) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputManageElasticIPOnce,
-		exampleOutputManageElasticIPBytes,
-		&exampleOutputManageElasticIP,
-	)
+	return exampleOutputManageElasticIP.Value()
 }
 
 func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateLoadBalancerOnce,
-		exampleOutputCreateLoadBalancerBytes,
-		&exampleOutputCreateLoadBalancer,
-	)
+	return exampleOutputCreateLoadBalancer.Value()
 }
 
 func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeleteLoadBalancerOnce,
-		exampleOutputDeleteLoadBalancerBytes,
-		&exampleOutputDeleteLoadBalancer,
-	)
+	return exampleOutputDeleteLoadBalancer.Value()
 }
 
 func (c *UpdateAlarm) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdateAlarmOnce,
-		exampleOutputUpdateAlarmBytes,
-		&exampleOutputUpdateAlarm,
-	)
+	return exampleOutputUpdateAlarm.Value()
 }
 
 func (c *DeleteAlarm) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeleteAlarmOnce,
-		exampleOutputDeleteAlarmBytes,
-		&exampleOutputDeleteAlarm,
-	)
+	return exampleOutputDeleteAlarm.Value()
 }

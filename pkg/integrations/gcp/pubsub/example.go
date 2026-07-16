@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -26,45 +25,34 @@ var exampleOutputCreateSubscriptionBytes []byte
 var exampleOutputDeleteSubscriptionBytes []byte
 
 var (
-	exampleDataOnMessageOnce sync.Once
-	exampleDataOnMessage     map[string]any
-
-	exampleOutputPublishMessageOnce sync.Once
-	exampleOutputPublishMessage     map[string]any
-
-	exampleOutputCreateTopicOnce sync.Once
-	exampleOutputCreateTopic     map[string]any
-
-	exampleOutputDeleteTopicOnce sync.Once
-	exampleOutputDeleteTopic     map[string]any
-
-	exampleOutputCreateSubscriptionOnce sync.Once
-	exampleOutputCreateSubscription     map[string]any
-
-	exampleOutputDeleteSubscriptionOnce sync.Once
-	exampleOutputDeleteSubscription     map[string]any
+	exampleDataOnMessage            = utils.NewEmbeddedJSON(exampleDataOnMessageBytes)
+	exampleOutputPublishMessage     = utils.NewEmbeddedJSON(exampleOutputPublishMessageBytes)
+	exampleOutputCreateTopic        = utils.NewEmbeddedJSON(exampleOutputCreateTopicBytes)
+	exampleOutputDeleteTopic        = utils.NewEmbeddedJSON(exampleOutputDeleteTopicBytes)
+	exampleOutputCreateSubscription = utils.NewEmbeddedJSON(exampleOutputCreateSubscriptionBytes)
+	exampleOutputDeleteSubscription = utils.NewEmbeddedJSON(exampleOutputDeleteSubscriptionBytes)
 )
 
 func (t *OnMessage) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnMessageOnce, exampleDataOnMessageBytes, &exampleDataOnMessage)
+	return exampleDataOnMessage.Value()
 }
 
 func (c *PublishMessage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputPublishMessageOnce, exampleOutputPublishMessageBytes, &exampleOutputPublishMessage)
+	return exampleOutputPublishMessage.Value()
 }
 
 func (c *CreateTopicComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateTopicOnce, exampleOutputCreateTopicBytes, &exampleOutputCreateTopic)
+	return exampleOutputCreateTopic.Value()
 }
 
 func (c *DeleteTopicComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteTopicOnce, exampleOutputDeleteTopicBytes, &exampleOutputDeleteTopic)
+	return exampleOutputDeleteTopic.Value()
 }
 
 func (c *CreateSubscriptionComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSubscriptionOnce, exampleOutputCreateSubscriptionBytes, &exampleOutputCreateSubscription)
+	return exampleOutputCreateSubscription.Value()
 }
 
 func (c *DeleteSubscriptionComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteSubscriptionOnce, exampleOutputDeleteSubscriptionBytes, &exampleOutputDeleteSubscription)
+	return exampleOutputDeleteSubscription.Value()
 }

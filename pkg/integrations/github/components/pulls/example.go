@@ -2,7 +2,6 @@ package pulls
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -33,94 +32,48 @@ var exampleOutputAddPullRequestReviewersBytes []byte
 
 //go:embed payloads/mark_pull_request_ready_for_review.json
 var exampleOutputMarkPullRequestReadyForReviewBytes []byte
-
-var exampleOutputAddReactionOnce sync.Once
-var exampleOutputAddReaction map[string]any
-
-var exampleOutputCreateReviewOnce sync.Once
-var exampleOutputCreateReview map[string]any
-
-var exampleOutputCreatePullRequestOnce sync.Once
-var exampleOutputCreatePullRequest map[string]any
-
-var exampleOutputMergePullRequestOnce sync.Once
-var exampleOutputMergePullRequest map[string]any
-
-var exampleOutputAddPullRequestReviewersOnce sync.Once
-var exampleOutputAddPullRequestReviewers map[string]any
-
-var exampleOutputMarkPullRequestReadyForReviewOnce sync.Once
-var exampleOutputMarkPullRequestReadyForReview map[string]any
-
-var exampleDataOnPullRequestOnce sync.Once
-var exampleDataOnPullRequest map[string]any
-
-var exampleDataOnPRCommentOnce sync.Once
-var exampleDataOnPRComment map[string]any
-
-var exampleDataOnPRReviewCommentOnce sync.Once
-var exampleDataOnPRReviewComment map[string]any
+var exampleOutputAddReaction = utils.NewEmbeddedJSON(exampleOutputAddReactionBytes)
+var exampleOutputCreateReview = utils.NewEmbeddedJSON(exampleOutputCreateReviewBytes)
+var exampleOutputCreatePullRequest = utils.NewEmbeddedJSON(exampleOutputCreatePullRequestBytes)
+var exampleOutputMergePullRequest = utils.NewEmbeddedJSON(exampleOutputMergePullRequestBytes)
+var exampleOutputAddPullRequestReviewers = utils.NewEmbeddedJSON(exampleOutputAddPullRequestReviewersBytes)
+var exampleOutputMarkPullRequestReadyForReview = utils.NewEmbeddedJSON(exampleOutputMarkPullRequestReadyForReviewBytes)
+var exampleDataOnPullRequest = utils.NewEmbeddedJSON(exampleDataOnPullRequestBytes)
+var exampleDataOnPRComment = utils.NewEmbeddedJSON(exampleDataOnPRCommentBytes)
+var exampleDataOnPRReviewComment = utils.NewEmbeddedJSON(exampleDataOnPRReviewCommentBytes)
 
 func (c *AddReaction) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddReactionOnce, exampleOutputAddReactionBytes, &exampleOutputAddReaction)
+	return exampleOutputAddReaction.Value()
 }
 
 func (t *OnPullRequest) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPullRequestOnce, exampleDataOnPullRequestBytes, &exampleDataOnPullRequest)
+	return exampleDataOnPullRequest.Value()
 }
 
 func (t *OnPRComment) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnPRCommentOnce,
-		exampleDataOnPRCommentBytes,
-		&exampleDataOnPRComment,
-	)
+	return exampleDataOnPRComment.Value()
 }
 
 func (t *OnPRReviewComment) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnPRReviewCommentOnce,
-		exampleDataOnPRReviewCommentBytes,
-		&exampleDataOnPRReviewComment,
-	)
+	return exampleDataOnPRReviewComment.Value()
 }
 
 func (c *CreateReview) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateReviewOnce,
-		exampleOutputCreateReviewBytes,
-		&exampleOutputCreateReview,
-	)
+	return exampleOutputCreateReview.Value()
 }
 
 func (c *CreatePullRequest) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreatePullRequestOnce,
-		exampleOutputCreatePullRequestBytes,
-		&exampleOutputCreatePullRequest,
-	)
+	return exampleOutputCreatePullRequest.Value()
 }
 
 func (c *MergePullRequest) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputMergePullRequestOnce,
-		exampleOutputMergePullRequestBytes,
-		&exampleOutputMergePullRequest,
-	)
+	return exampleOutputMergePullRequest.Value()
 }
 
 func (c *AddPullRequestReviewers) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputAddPullRequestReviewersOnce,
-		exampleOutputAddPullRequestReviewersBytes,
-		&exampleOutputAddPullRequestReviewers,
-	)
+	return exampleOutputAddPullRequestReviewers.Value()
 }
 
 func (c *MarkPullRequestReadyForReview) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputMarkPullRequestReadyForReviewOnce,
-		exampleOutputMarkPullRequestReadyForReviewBytes,
-		&exampleOutputMarkPullRequestReadyForReview,
-	)
+	return exampleOutputMarkPullRequestReadyForReview.Value()
 }

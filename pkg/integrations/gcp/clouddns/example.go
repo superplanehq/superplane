@@ -2,7 +2,6 @@ package clouddns
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -17,24 +16,19 @@ var exampleOutputDeleteRecordBytes []byte
 var exampleOutputUpdateRecordBytes []byte
 
 var (
-	exampleOutputCreateRecordOnce sync.Once
-	exampleOutputCreateRecord     map[string]any
-
-	exampleOutputDeleteRecordOnce sync.Once
-	exampleOutputDeleteRecord     map[string]any
-
-	exampleOutputUpdateRecordOnce sync.Once
-	exampleOutputUpdateRecord     map[string]any
+	exampleOutputCreateRecord = utils.NewEmbeddedJSON(exampleOutputCreateRecordBytes)
+	exampleOutputDeleteRecord = utils.NewEmbeddedJSON(exampleOutputDeleteRecordBytes)
+	exampleOutputUpdateRecord = utils.NewEmbeddedJSON(exampleOutputUpdateRecordBytes)
 )
 
 func (c *CreateRecord) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateRecordOnce, exampleOutputCreateRecordBytes, &exampleOutputCreateRecord)
+	return exampleOutputCreateRecord.Value()
 }
 
 func (c *DeleteRecord) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteRecordOnce, exampleOutputDeleteRecordBytes, &exampleOutputDeleteRecord)
+	return exampleOutputDeleteRecord.Value()
 }
 
 func (c *UpdateRecord) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateRecordOnce, exampleOutputUpdateRecordBytes, &exampleOutputUpdateRecord)
+	return exampleOutputUpdateRecord.Value()
 }

@@ -2,7 +2,6 @@ package teams
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -15,24 +14,18 @@ var exampleDataOnMentionBytes []byte
 
 //go:embed example_data_on_message.json
 var exampleDataOnMessageBytes []byte
-
-var exampleOutputOnce sync.Once
-var exampleOutput map[string]any
-
-var exampleDataOnMentionOnce sync.Once
-var exampleDataOnMention map[string]any
-
-var exampleDataOnMessageOnce sync.Once
-var exampleDataOnMessage map[string]any
+var exampleOutput = utils.NewEmbeddedJSON(exampleOutputSendTextMessageBytes)
+var exampleDataOnMention = utils.NewEmbeddedJSON(exampleDataOnMentionBytes)
+var exampleDataOnMessage = utils.NewEmbeddedJSON(exampleDataOnMessageBytes)
 
 func (c *SendTextMessage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputOnce, exampleOutputSendTextMessageBytes, &exampleOutput)
+	return exampleOutput.Value()
 }
 
 func (t *OnMention) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnMentionOnce, exampleDataOnMentionBytes, &exampleDataOnMention)
+	return exampleDataOnMention.Value()
 }
 
 func (t *OnMessage) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnMessageOnce, exampleDataOnMessageBytes, &exampleDataOnMessage)
+	return exampleDataOnMessage.Value()
 }

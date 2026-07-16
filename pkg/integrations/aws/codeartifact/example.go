@@ -2,7 +2,6 @@ package codeartifact
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -30,87 +29,43 @@ var exampleOutputDeletePackageVersionsBytes []byte
 
 //go:embed example_output_dispose_package_versions.json
 var exampleOutputDisposePackageVersionsBytes []byte
-
-var exampleDataOnPackageVersionOnce sync.Once
-var exampleDataOnPackageVersion map[string]any
-
-var exampleOutputGetPackageVersionOnce sync.Once
-var exampleOutputGetPackageVersion map[string]any
-
-var exampleOutputCreateRepositoryOnce sync.Once
-var exampleOutputCreateRepository map[string]any
-
-var exampleOutputDeleteRepositoryOnce sync.Once
-var exampleOutputDeleteRepository map[string]any
-
-var exampleOutputUpdatePackageVersionsStatusOnce sync.Once
-var exampleOutputUpdatePackageVersionsStatus map[string]any
-
-var exampleOutputCopyPackageVersionsOnce sync.Once
-var exampleOutputCopyPackageVersions map[string]any
-
-var exampleOutputDeletePackageVersionsOnce sync.Once
-var exampleOutputDeletePackageVersions map[string]any
-
-var exampleOutputDisposePackageVersionsOnce sync.Once
-var exampleOutputDisposePackageVersions map[string]any
+var exampleDataOnPackageVersion = utils.NewEmbeddedJSON(exampleDataOnPackageVersionBytes)
+var exampleOutputGetPackageVersion = utils.NewEmbeddedJSON(exampleOutputGetPackageVersionBytes)
+var exampleOutputCreateRepository = utils.NewEmbeddedJSON(exampleOutputCreateRepositoryBytes)
+var exampleOutputDeleteRepository = utils.NewEmbeddedJSON(exampleOutputDeleteRepositoryBytes)
+var exampleOutputUpdatePackageVersionsStatus = utils.NewEmbeddedJSON(exampleOutputUpdatePackageVersionsStatusBytes)
+var exampleOutputCopyPackageVersions = utils.NewEmbeddedJSON(exampleOutputCopyPackageVersionsBytes)
+var exampleOutputDeletePackageVersions = utils.NewEmbeddedJSON(exampleOutputDeletePackageVersionsBytes)
+var exampleOutputDisposePackageVersions = utils.NewEmbeddedJSON(exampleOutputDisposePackageVersionsBytes)
 
 func (t *OnPackageVersion) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPackageVersionOnce, exampleDataOnPackageVersionBytes, &exampleDataOnPackageVersion)
+	return exampleDataOnPackageVersion.Value()
 }
 
 func (c *GetPackageVersion) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetPackageVersionOnce,
-		exampleOutputGetPackageVersionBytes,
-		&exampleOutputGetPackageVersion,
-	)
+	return exampleOutputGetPackageVersion.Value()
 }
 
 func (c *CreateRepository) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateRepositoryOnce,
-		exampleOutputCreateRepositoryBytes,
-		&exampleOutputCreateRepository,
-	)
+	return exampleOutputCreateRepository.Value()
 }
 
 func (c *DeleteRepository) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeleteRepositoryOnce,
-		exampleOutputDeleteRepositoryBytes,
-		&exampleOutputDeleteRepository,
-	)
+	return exampleOutputDeleteRepository.Value()
 }
 
 func (c *UpdatePackageVersionsStatus) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdatePackageVersionsStatusOnce,
-		exampleOutputUpdatePackageVersionsStatusBytes,
-		&exampleOutputUpdatePackageVersionsStatus,
-	)
+	return exampleOutputUpdatePackageVersionsStatus.Value()
 }
 
 func (c *CopyPackageVersions) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCopyPackageVersionsOnce,
-		exampleOutputCopyPackageVersionsBytes,
-		&exampleOutputCopyPackageVersions,
-	)
+	return exampleOutputCopyPackageVersions.Value()
 }
 
 func (c *DeletePackageVersions) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeletePackageVersionsOnce,
-		exampleOutputDeletePackageVersionsBytes,
-		&exampleOutputDeletePackageVersions,
-	)
+	return exampleOutputDeletePackageVersions.Value()
 }
 
 func (c *DisposePackageVersions) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDisposePackageVersionsOnce,
-		exampleOutputDisposePackageVersionsBytes,
-		&exampleOutputDisposePackageVersions,
-	)
+	return exampleOutputDisposePackageVersions.Value()
 }

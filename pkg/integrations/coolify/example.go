@@ -2,7 +2,6 @@ package coolify
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -23,38 +22,29 @@ var exampleOutputControlServiceBytes []byte
 var exampleOutputDeployApplicationBytes []byte
 
 var (
-	exampleOutputListApplicationsOnce sync.Once
-	exampleOutputListApplications     map[string]any
-
-	exampleOutputListServicesOnce sync.Once
-	exampleOutputListServices     map[string]any
-
-	exampleOutputControlApplicationOnce sync.Once
-	exampleOutputControlApplication     map[string]any
-
-	exampleOutputControlServiceOnce sync.Once
-	exampleOutputControlService     map[string]any
-
-	exampleOutputDeployApplicationOnce sync.Once
-	exampleOutputDeployApplication     map[string]any
+	exampleOutputListApplications   = utils.NewEmbeddedJSON(exampleOutputListApplicationsBytes)
+	exampleOutputListServices       = utils.NewEmbeddedJSON(exampleOutputListServicesBytes)
+	exampleOutputControlApplication = utils.NewEmbeddedJSON(exampleOutputControlApplicationBytes)
+	exampleOutputControlService     = utils.NewEmbeddedJSON(exampleOutputControlServiceBytes)
+	exampleOutputDeployApplication  = utils.NewEmbeddedJSON(exampleOutputDeployApplicationBytes)
 )
 
 func (c *ListApplications) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputListApplicationsOnce, exampleOutputListApplicationsBytes, &exampleOutputListApplications)
+	return exampleOutputListApplications.Value()
 }
 
 func (c *ListServices) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputListServicesOnce, exampleOutputListServicesBytes, &exampleOutputListServices)
+	return exampleOutputListServices.Value()
 }
 
 func (c *ControlApplication) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputControlApplicationOnce, exampleOutputControlApplicationBytes, &exampleOutputControlApplication)
+	return exampleOutputControlApplication.Value()
 }
 
 func (c *ControlService) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputControlServiceOnce, exampleOutputControlServiceBytes, &exampleOutputControlService)
+	return exampleOutputControlService.Value()
 }
 
 func (c *DeployApplication) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeployApplicationOnce, exampleOutputDeployApplicationBytes, &exampleOutputDeployApplication)
+	return exampleOutputDeployApplication.Value()
 }

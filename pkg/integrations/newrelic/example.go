@@ -2,7 +2,6 @@ package newrelic
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -15,24 +14,18 @@ var exampleOutputRunNRQLQueryBytes []byte
 
 //go:embed example_data_on_issue.json
 var exampleDataOnIssueBytes []byte
-
-var exampleOutputReportMetricOnce sync.Once
-var exampleOutputReportMetric map[string]any
-
-var exampleOutputRunNRQLQueryOnce sync.Once
-var exampleOutputRunNRQLQuery map[string]any
-
-var exampleDataOnIssueOnce sync.Once
-var exampleDataOnIssue map[string]any
+var exampleOutputReportMetric = utils.NewEmbeddedJSON(exampleOutputReportMetricBytes)
+var exampleOutputRunNRQLQuery = utils.NewEmbeddedJSON(exampleOutputRunNRQLQueryBytes)
+var exampleDataOnIssue = utils.NewEmbeddedJSON(exampleDataOnIssueBytes)
 
 func (c *ReportMetric) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputReportMetricOnce, exampleOutputReportMetricBytes, &exampleOutputReportMetric)
+	return exampleOutputReportMetric.Value()
 }
 
 func (c *RunNRQLQuery) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputRunNRQLQueryOnce, exampleOutputRunNRQLQueryBytes, &exampleOutputRunNRQLQuery)
+	return exampleOutputRunNRQLQuery.Value()
 }
 
 func (t *OnIssue) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
+	return exampleDataOnIssue.Value()
 }

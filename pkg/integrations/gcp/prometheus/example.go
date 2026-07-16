@@ -2,7 +2,6 @@ package prometheus
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -14,17 +13,14 @@ var exampleOutputQueryBytes []byte
 var exampleOutputQueryRangeBytes []byte
 
 var (
-	exampleOutputQueryOnce sync.Once
-	exampleOutputQuery     map[string]any
-
-	exampleOutputQueryRangeOnce sync.Once
-	exampleOutputQueryRange     map[string]any
+	exampleOutputQuery      = utils.NewEmbeddedJSON(exampleOutputQueryBytes)
+	exampleOutputQueryRange = utils.NewEmbeddedJSON(exampleOutputQueryRangeBytes)
 )
 
 func (q *Query) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryOnce, exampleOutputQueryBytes, &exampleOutputQuery)
+	return exampleOutputQuery.Value()
 }
 
 func (q *QueryRange) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryRangeOnce, exampleOutputQueryRangeBytes, &exampleOutputQueryRange)
+	return exampleOutputQueryRange.Value()
 }

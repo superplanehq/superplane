@@ -2,7 +2,6 @@ package azure
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -53,108 +52,79 @@ var exampleDataOnVMDeallocatedBytes []byte
 var exampleDataOnVMDeletedBytes []byte
 
 var (
-	exampleOutputCreateVMOnce sync.Once
-	exampleOutputCreateVM     map[string]any
-
-	exampleOutputStartVMOnce sync.Once
-	exampleOutputStartVM     map[string]any
-
-	exampleOutputStopVMOnce sync.Once
-	exampleOutputStopVM     map[string]any
-
-	exampleOutputRestartVMOnce sync.Once
-	exampleOutputRestartVM     map[string]any
-
-	exampleOutputDeallocateVMOnce sync.Once
-	exampleOutputDeallocateVM     map[string]any
-
-	exampleOutputDeleteVMOnce sync.Once
-	exampleOutputDeleteVM     map[string]any
-
-	exampleDataOnBlobCreatedOnce sync.Once
-	exampleDataOnBlobCreated     map[string]any
-
-	exampleDataOnBlobDeletedOnce sync.Once
-	exampleDataOnBlobDeleted     map[string]any
-
-	exampleDataOnImagePushedOnce sync.Once
-	exampleDataOnImagePushed     map[string]any
-
-	exampleDataOnImageDeletedOnce sync.Once
-	exampleDataOnImageDeleted     map[string]any
-
-	exampleDataOnVMStartedOnce sync.Once
-	exampleDataOnVMStarted     map[string]any
-
-	exampleDataOnVMStoppedOnce sync.Once
-	exampleDataOnVMStopped     map[string]any
-
-	exampleDataOnVMRestartedOnce sync.Once
-	exampleDataOnVMRestarted     map[string]any
-
-	exampleDataOnVMDeallocatedOnce sync.Once
-	exampleDataOnVMDeallocated     map[string]any
-
-	exampleDataOnVMDeletedOnce sync.Once
-	exampleDataOnVMDeleted     map[string]any
+	exampleOutputCreateVM      = utils.NewEmbeddedJSON(exampleOutputCreateVMBytes)
+	exampleOutputStartVM       = utils.NewEmbeddedJSON(exampleOutputStartVMBytes)
+	exampleOutputStopVM        = utils.NewEmbeddedJSON(exampleOutputStopVMBytes)
+	exampleOutputRestartVM     = utils.NewEmbeddedJSON(exampleOutputRestartVMBytes)
+	exampleOutputDeallocateVM  = utils.NewEmbeddedJSON(exampleOutputDeallocateVMBytes)
+	exampleOutputDeleteVM      = utils.NewEmbeddedJSON(exampleOutputDeleteVMBytes)
+	exampleDataOnBlobCreated   = utils.NewEmbeddedJSON(exampleDataOnBlobCreatedBytes)
+	exampleDataOnBlobDeleted   = utils.NewEmbeddedJSON(exampleDataOnBlobDeletedBytes)
+	exampleDataOnImagePushed   = utils.NewEmbeddedJSON(exampleDataOnImagePushedBytes)
+	exampleDataOnImageDeleted  = utils.NewEmbeddedJSON(exampleDataOnImageDeletedBytes)
+	exampleDataOnVMStarted     = utils.NewEmbeddedJSON(exampleDataOnVMStartedBytes)
+	exampleDataOnVMStopped     = utils.NewEmbeddedJSON(exampleDataOnVMStoppedBytes)
+	exampleDataOnVMRestarted   = utils.NewEmbeddedJSON(exampleDataOnVMRestartedBytes)
+	exampleDataOnVMDeallocated = utils.NewEmbeddedJSON(exampleDataOnVMDeallocatedBytes)
+	exampleDataOnVMDeleted     = utils.NewEmbeddedJSON(exampleDataOnVMDeletedBytes)
 )
 
 func (c *CreateVMComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateVMOnce, exampleOutputCreateVMBytes, &exampleOutputCreateVM)
+	return exampleOutputCreateVM.Value()
 }
 
 func (c *StartVMComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputStartVMOnce, exampleOutputStartVMBytes, &exampleOutputStartVM)
+	return exampleOutputStartVM.Value()
 }
 
 func (c *StopVMComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputStopVMOnce, exampleOutputStopVMBytes, &exampleOutputStopVM)
+	return exampleOutputStopVM.Value()
 }
 
 func (c *RestartVMComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputRestartVMOnce, exampleOutputRestartVMBytes, &exampleOutputRestartVM)
+	return exampleOutputRestartVM.Value()
 }
 
 func (c *DeallocateVMComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeallocateVMOnce, exampleOutputDeallocateVMBytes, &exampleOutputDeallocateVM)
+	return exampleOutputDeallocateVM.Value()
 }
 
 func (c *DeleteVMComponent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteVMOnce, exampleOutputDeleteVMBytes, &exampleOutputDeleteVM)
+	return exampleOutputDeleteVM.Value()
 }
 
 func (t *OnBlobCreated) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnBlobCreatedOnce, exampleDataOnBlobCreatedBytes, &exampleDataOnBlobCreated)
+	return exampleDataOnBlobCreated.Value()
 }
 
 func (t *OnBlobDeleted) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnBlobDeletedOnce, exampleDataOnBlobDeletedBytes, &exampleDataOnBlobDeleted)
+	return exampleDataOnBlobDeleted.Value()
 }
 
 func (t *OnImagePushed) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImagePushedOnce, exampleDataOnImagePushedBytes, &exampleDataOnImagePushed)
+	return exampleDataOnImagePushed.Value()
 }
 
 func (t *OnImageDeleted) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageDeletedOnce, exampleDataOnImageDeletedBytes, &exampleDataOnImageDeleted)
+	return exampleDataOnImageDeleted.Value()
 }
 
 func (t *OnVMStarted) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnVMStartedOnce, exampleDataOnVMStartedBytes, &exampleDataOnVMStarted)
+	return exampleDataOnVMStarted.Value()
 }
 
 func (t *OnVMStopped) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnVMStoppedOnce, exampleDataOnVMStoppedBytes, &exampleDataOnVMStopped)
+	return exampleDataOnVMStopped.Value()
 }
 
 func (t *OnVMRestarted) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnVMRestartedOnce, exampleDataOnVMRestartedBytes, &exampleDataOnVMRestarted)
+	return exampleDataOnVMRestarted.Value()
 }
 
 func (t *OnVMDeallocated) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnVMDeallocatedOnce, exampleDataOnVMDeallocatedBytes, &exampleDataOnVMDeallocated)
+	return exampleDataOnVMDeallocated.Value()
 }
 
 func (t *OnVMDeleted) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnVMDeletedOnce, exampleDataOnVMDeletedBytes, &exampleDataOnVMDeleted)
+	return exampleDataOnVMDeleted.Value()
 }

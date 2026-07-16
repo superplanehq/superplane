@@ -2,7 +2,6 @@ package cloudbuild
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -18,31 +17,23 @@ var exampleDataOnBuildCompleteBytes []byte
 
 //go:embed example_output_run_trigger.json
 var exampleOutputRunTriggerBytes []byte
-
-var exampleOutputCreateBuildOnce sync.Once
-var exampleOutputCreateBuild map[string]any
-
-var exampleOutputGetBuildOnce sync.Once
-var exampleOutputGetBuild map[string]any
-
-var exampleDataOnBuildCompleteOnce sync.Once
-var exampleDataOnBuildComplete map[string]any
-
-var exampleOutputRunTriggerOnce sync.Once
-var exampleOutputRunTrigger map[string]any
+var exampleOutputCreateBuild = utils.NewEmbeddedJSON(exampleOutputCreateBuildBytes)
+var exampleOutputGetBuild = utils.NewEmbeddedJSON(exampleOutputGetBuildBytes)
+var exampleDataOnBuildComplete = utils.NewEmbeddedJSON(exampleDataOnBuildCompleteBytes)
+var exampleOutputRunTrigger = utils.NewEmbeddedJSON(exampleOutputRunTriggerBytes)
 
 func (c *CreateBuild) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateBuildOnce, exampleOutputCreateBuildBytes, &exampleOutputCreateBuild)
+	return exampleOutputCreateBuild.Value()
 }
 
 func (c *GetBuild) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetBuildOnce, exampleOutputGetBuildBytes, &exampleOutputGetBuild)
+	return exampleOutputGetBuild.Value()
 }
 
 func (t *OnBuildComplete) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnBuildCompleteOnce, exampleDataOnBuildCompleteBytes, &exampleDataOnBuildComplete)
+	return exampleDataOnBuildComplete.Value()
 }
 
 func (c *RunTrigger) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputRunTriggerOnce, exampleOutputRunTriggerBytes, &exampleOutputRunTrigger)
+	return exampleOutputRunTrigger.Value()
 }

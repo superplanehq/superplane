@@ -2,7 +2,6 @@ package sns
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -24,51 +23,39 @@ var exampleOutputDeleteTopicBytes []byte
 
 //go:embed example_output_publish_message.json
 var exampleOutputPublishMessageBytes []byte
-
-var exampleDataOnTopicMessageOnce sync.Once
-var exampleDataOnTopicMessage map[string]any
-
-var exampleOutputGetTopicOnce sync.Once
-var exampleOutputGetTopic map[string]any
-
-var exampleOutputGetSubscriptionOnce sync.Once
-var exampleOutputGetSubscription map[string]any
-
-var exampleOutputCreateTopicOnce sync.Once
-var exampleOutputCreateTopic map[string]any
-
-var exampleOutputDeleteTopicOnce sync.Once
-var exampleOutputDeleteTopic map[string]any
-
-var exampleOutputPublishMessageOnce sync.Once
-var exampleOutputPublishMessage map[string]any
+var exampleDataOnTopicMessage = utils.NewEmbeddedJSON(exampleDataOnTopicMessageBytes)
+var exampleOutputGetTopic = utils.NewEmbeddedJSON(exampleOutputGetTopicBytes)
+var exampleOutputGetSubscription = utils.NewEmbeddedJSON(exampleOutputGetSubscriptionBytes)
+var exampleOutputCreateTopic = utils.NewEmbeddedJSON(exampleOutputCreateTopicBytes)
+var exampleOutputDeleteTopic = utils.NewEmbeddedJSON(exampleOutputDeleteTopicBytes)
+var exampleOutputPublishMessage = utils.NewEmbeddedJSON(exampleOutputPublishMessageBytes)
 
 // ExampleData returns an example payload for OnTopicMessage events.
 func (t *OnTopicMessage) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnTopicMessageOnce, exampleDataOnTopicMessageBytes, &exampleDataOnTopicMessage)
+	return exampleDataOnTopicMessage.Value()
 }
 
 // ExampleOutput returns an example payload for GetTopic.
 func (c *GetTopic) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetTopicOnce, exampleOutputGetTopicBytes, &exampleOutputGetTopic)
+	return exampleOutputGetTopic.Value()
 }
 
 // ExampleOutput returns an example payload for GetSubscription.
 func (c *GetSubscription) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetSubscriptionOnce, exampleOutputGetSubscriptionBytes, &exampleOutputGetSubscription)
+	return exampleOutputGetSubscription.Value()
 }
 
 // ExampleOutput returns an example payload for CreateTopic.
 func (c *CreateTopic) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateTopicOnce, exampleOutputCreateTopicBytes, &exampleOutputCreateTopic)
+	return exampleOutputCreateTopic.Value()
 }
 
 // ExampleOutput returns an example payload for DeleteTopic.
 func (c *DeleteTopic) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteTopicOnce, exampleOutputDeleteTopicBytes, &exampleOutputDeleteTopic)
+	return exampleOutputDeleteTopic.Value()
 }
 
 // ExampleOutput returns an example payload for PublishMessage.
 func (c *PublishMessage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputPublishMessageOnce, exampleOutputPublishMessageBytes, &exampleOutputPublishMessage)
+	return exampleOutputPublishMessage.Value()
 }
