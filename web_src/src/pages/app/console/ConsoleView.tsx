@@ -21,13 +21,7 @@ import { Label } from "@/components/ui/label";
 import type { ConsolePanel, ConsoleLayoutItem } from "@/hooks/useCanvasData";
 import type { DraftConsoleDiffItem, DraftConsoleDiffSummary } from "../draftConsoleDiff";
 
-import { registerExpressionDialect } from "@/components/ExpressionEditor";
-import { widgetCelAdapter } from "./widget/celAdapter";
 import { ConsoleGrid } from "./ConsoleGrid";
-
-// Wire the widget CEL adapter at module load so every ExpressionEditor
-// inside the console renders CEL semantics automatically.
-registerExpressionDialect("cel", widgetCelAdapter);
 import { CONSOLE_PANEL_SHELL_SURFACE } from "./consolePanelStyles";
 import { useConsolePanelState } from "./useConsolePanelState";
 import { CREATABLE_PANEL_TYPES, PANEL_TYPE_META, type PanelType } from "./panelTypes";

@@ -1,12 +1,12 @@
 import { useId } from "react";
 
-import { ExpressionEditor } from "@/components/ExpressionEditor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { DataSourceForm } from "./DataSourceForm";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import { useConsoleContext } from "./ConsoleContext";
 import { NUMBER_PANEL_AGGREGATIONS, NUMBER_PANEL_FORMATS } from "./numberPanelFormConstants";
 import type { ScorecardPanelContent } from "./panelTypes";
@@ -327,8 +327,7 @@ function TargetFields({
     <div className="space-y-2 rounded-lg bg-slate-100 p-3 dark:bg-gray-800">
       <div className="space-y-1.5">
         <Label className="text-xs font-medium text-slate-600 dark:text-gray-300">Target (optional)</Label>
-        <ExpressionEditor
-          dialect="cel"
+        <ConsoleExpressionEditor
           expressionAdapter={numericTargetCelAdapter}
           syntaxProfile="pathOrRaw"
           value={render.target ?? ""}

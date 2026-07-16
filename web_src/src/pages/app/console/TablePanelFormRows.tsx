@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/ui/checkbox";
-import { ExpressionEditor } from "@/components/ExpressionEditor";
 
 import { ROW_STYLE_CLASS, ROW_STYLE_LABEL } from "./widget/rowStyles";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import {
   WIDGET_FILTER_OPS,
   WIDGET_ROW_STYLE_TONES,
@@ -89,8 +89,7 @@ function ProgressFormatFields({
   return (
     <>
       <div className="col-span-8">
-        <ExpressionEditor
-          dialect="cel"
+        <ConsoleExpressionEditor
           expressionAdapter={numericTargetCelAdapter}
           syntaxProfile="pathOrRaw"
           exampleObj={sampleRow}
@@ -209,8 +208,7 @@ export function ColumnRow({
       <div className="grid min-w-0 flex-1 grid-cols-12 items-start gap-2">
         {/* Give the field editor a full row so its preview/quick tip fit. */}
         <div className="col-span-12">
-          <ExpressionEditor
-            dialect="cel"
+          <ConsoleExpressionEditor
             syntaxProfile="pathOrRaw"
             exampleObj={sampleRow}
             value={col.field}
@@ -255,8 +253,7 @@ export function ColumnRow({
         </Select>
         {col.format === "link" ? (
           <div className="col-span-12">
-            <ExpressionEditor
-              dialect="cel"
+            <ConsoleExpressionEditor
               syntaxProfile="wrapped"
               exampleObj={sampleRow}
               value={col.href ?? ""}
@@ -310,8 +307,7 @@ export function FilterRow({
   return (
     <div className="grid grid-cols-12 items-start gap-2 rounded border border-slate-200 p-2 dark:border-gray-600">
       <div className="col-span-12">
-        <ExpressionEditor
-          dialect="cel"
+        <ConsoleExpressionEditor
           syntaxProfile="pathOrRaw"
           exampleObj={sampleRow}
           value={filter.field}
@@ -335,8 +331,7 @@ export function FilterRow({
       </Select>
       {needsValue ? (
         <div className="col-span-8">
-          <ExpressionEditor
-            dialect="cel"
+          <ConsoleExpressionEditor
             syntaxProfile="singleWrapped"
             exampleObj={sampleRow}
             value={filter.value ?? ""}
@@ -371,8 +366,7 @@ export function RowStyleRow({
   return (
     <div className="grid grid-cols-12 items-start gap-2 rounded border border-slate-200 p-2 dark:border-gray-600">
       <div className="col-span-12">
-        <ExpressionEditor
-          dialect="cel"
+        <ConsoleExpressionEditor
           syntaxProfile="pathOrRaw"
           exampleObj={sampleRow}
           value={rule.field}
@@ -397,8 +391,7 @@ export function RowStyleRow({
       </Select>
       {needsValue ? (
         <div className="col-span-5">
-          <ExpressionEditor
-            dialect="cel"
+          <ConsoleExpressionEditor
             syntaxProfile="singleWrapped"
             exampleObj={sampleRow}
             value={rule.value ?? ""}

@@ -3,9 +3,9 @@ import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ExpressionEditor } from "@/components/ExpressionEditor";
 
 import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import { buildEnv, compileTemplate, evalTemplateDetailed } from "./widget/celExpr";
 
 export type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
@@ -98,8 +98,7 @@ function PayloadEntry({
           list={datalistId}
         />
         <div className="col-span-6">
-          <ExpressionEditor
-            dialect="cel"
+          <ConsoleExpressionEditor
             exampleObj={sampleRow}
             value={entry.template}
             onChange={(next) => onChange({ template: next })}

@@ -3,7 +3,6 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
 
-import { ExpressionEditor } from "@/components/ExpressionEditor";
 import { Button } from "@/components/ui/button";
 import { useResponsiveRailCollapse } from "@/hooks/useResponsiveRailCollapse";
 import { cn } from "@/lib/utils";
@@ -11,6 +10,7 @@ import { useTheme } from "@/contexts/useTheme";
 import { useMonacoExpressionAutocomplete } from "@/ui/configurationFieldRenderer/useMonacoExpressionAutocomplete";
 
 import { HtmlBody, HtmlBodyLoading } from "./HtmlBody";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import { interpolateMarkdownTemplate, markdownTextIsLoading } from "./markdownInterpolation";
 import { MarkdownVariablesPanel } from "./MarkdownVariablesPanel";
 import { useMarkdownVariables } from "./useMarkdownVariables";
@@ -137,9 +137,8 @@ export function HtmlPanelEditor({
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
       <div className="flex items-center gap-2 rounded-t-lg px-2 py-1" onKeyDown={handleTitleKeyDown}>
-        <ExpressionEditor
+        <ConsoleExpressionEditor
           ref={titleInputRef}
-          dialect="cel"
           syntaxProfile="wrapped"
           value={draftTitle}
           onChange={setDraftTitle}

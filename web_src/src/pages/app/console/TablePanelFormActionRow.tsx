@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExpressionEditor } from "@/components/ExpressionEditor";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
 import { getTriggerTemplates } from "./consoleTriggerParameters";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import { PayloadEditor } from "./TablePanelPayloadEditor";
 import { WIDGET_ROW_ACTION_ICONS, WIDGET_ROW_ACTION_VARIANTS, type WidgetRowAction } from "./widget/types";
 
@@ -241,8 +241,7 @@ function ActionConditions({
 }) {
   return (
     <div className="grid grid-cols-2 items-start gap-2">
-      <ExpressionEditor
-        dialect="cel"
+      <ConsoleExpressionEditor
         // Runtime for the row-action "show" field routes bare input through
         // the legacy `evaluateShow` parser (not CEL), so keep preview scoped
         // to `{{ … }}` expressions where semantics match.
@@ -251,11 +250,11 @@ function ActionConditions({
         value={action.show ?? ""}
         onChange={(next) => onChange({ show: next || undefined })}
         placeholder='Show when (status == "running" or {{ expr }})'
+        quickTip="Tip: bare conditions run at render time; use one full `{{ … }}` CEL expression for preview."
         inputSize="md"
         showValuePreview
       />
-      <ExpressionEditor
-        dialect="cel"
+      <ConsoleExpressionEditor
         syntaxProfile="wrapped"
         exampleObj={sampleRow}
         value={action.confirm ?? ""}

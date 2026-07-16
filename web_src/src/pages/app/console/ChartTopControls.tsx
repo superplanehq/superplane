@@ -1,6 +1,6 @@
-import { ExpressionEditor } from "@/components/ExpressionEditor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import {
@@ -69,8 +69,7 @@ export function ChartTopControls({
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">X-axis field</Label>
-          <ExpressionEditor
-            dialect="cel"
+          <ConsoleExpressionEditor
             syntaxProfile="pathOrRaw"
             value={value.render.xField}
             onChange={(next) => onChange({ ...value, render: { ...value.render, xField: next } })}
@@ -249,8 +248,7 @@ function ChartSortRow({
     <div className="grid grid-cols-3 gap-3">
       <div className="space-y-1.5 col-span-2">
         <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Sort by (optional)</Label>
-        <ExpressionEditor
-          dialect="cel"
+        <ConsoleExpressionEditor
           syntaxProfile="pathOrRaw"
           value={sortField}
           onChange={(next) => updateField(next)}

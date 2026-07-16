@@ -1,12 +1,12 @@
 import { useMemo, useState, type RefObject } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
-import { ExpressionEditor } from "@/components/ExpressionEditor";
 import { Button } from "@/components/ui/button";
 import { useResponsiveRailCollapse } from "@/hooks/useResponsiveRailCollapse";
 import { cn } from "@/lib/utils";
 
 import { interpolateMarkdownTemplate } from "./markdownInterpolation";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
 import { markdownTextIsLoading } from "./markdownInterpolation";
 import { MarkdownVariablesPanel } from "./MarkdownVariablesPanel";
@@ -136,9 +136,8 @@ export function MarkdownPanelEditor({
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
       <div className="flex items-center gap-2 rounded-t-lg px-2 py-1" onKeyDown={handleTitleKeyDown}>
-        <ExpressionEditor
+        <ConsoleExpressionEditor
           ref={titleInputRef}
-          dialect="cel"
           syntaxProfile="wrapped"
           value={draftTitle}
           onChange={setDraftTitle}
@@ -160,9 +159,8 @@ export function MarkdownPanelEditor({
       >
         <div className="flex min-h-0 min-w-0 flex-col border-r border-slate-950/10 dark:border-gray-800">
           <div className="flex min-h-[120px] flex-1 flex-col" onKeyDown={handleShortcutKeys}>
-            <ExpressionEditor
+            <ConsoleExpressionEditor
               ref={textareaRef}
-              dialect="cel"
               syntaxProfile="wrapped"
               value={draftBody}
               onChange={setDraftBody}

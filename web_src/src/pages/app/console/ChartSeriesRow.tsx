@@ -1,11 +1,11 @@
 import { Trash2 } from "lucide-react";
 
-import { ExpressionEditor } from "@/components/ExpressionEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { CHART_SERIES_FORMATS } from "./chartPanelFormConstants";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import type { WidgetChartSeries, WidgetColumnFormat } from "./widget/types";
 
 export function ChartSeriesRow({
@@ -25,8 +25,7 @@ export function ChartSeriesRow({
     <div className="flex gap-2 rounded-lg bg-slate-100 p-2">
       <div className="min-w-0 flex-1 space-y-2">
         <div className="grid grid-cols-2 gap-2">
-          <ExpressionEditor
-            dialect="cel"
+          <ConsoleExpressionEditor
             syntaxProfile="pathOrRaw"
             className="h-8"
             value={series.field ?? ""}

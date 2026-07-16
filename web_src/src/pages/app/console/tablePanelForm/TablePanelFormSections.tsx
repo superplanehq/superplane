@@ -3,12 +3,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SuperplaneComponentsNode } from "@/api-client";
-import { ExpressionEditor } from "@/components/ExpressionEditor";
 
 import { MemoryDiscoveryPanel } from "../MemoryDiscoveryPanel";
 import type { TablePanelContent } from "../panelTypes";
 import { ActionRow } from "../TablePanelFormActionRow";
 import { ColumnRow, FilterRow, RowStyleRow } from "../TablePanelFormRows";
+import { ConsoleExpressionEditor } from "../ConsoleExpressionEditor";
 import { WIDGET_SORT_ORDERS, type WidgetSortOrder } from "../widget/types";
 import type { TablePanelFormActions } from "./useTablePanelFormActions";
 import type { TablePanelPayloadDrafts } from "./useTablePanelPayloadDrafts";
@@ -236,8 +236,7 @@ export function TablePanelSortSection({
       <Label className="text-xs font-medium text-slate-600 dark:text-gray-400">Sort by (optional)</Label>
       <div className="grid grid-cols-3 items-start gap-2">
         <div className="col-span-2">
-          <ExpressionEditor
-            dialect="cel"
+          <ConsoleExpressionEditor
             syntaxProfile="pathOrRaw"
             exampleObj={sampleRow}
             value={sortField}
