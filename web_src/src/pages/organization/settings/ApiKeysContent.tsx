@@ -30,6 +30,16 @@ function formatDateTime(value?: string) {
   return new Date(value).toLocaleString();
 }
 
+function isExpired(value?: string) {
+  return !!value && new Date(value).getTime() <= Date.now();
+}
+
+function tokenStatus(serviceAccount: ServiceAccountsServiceAccount) {
+  if (!serviceAccount.hasToken) return "None";
+  if (isExpired(serviceAccount.expiresAt)) return "Expired";
+  return "Active";
+}
+
 export function ApiKeysContent({
   sorted,
   canCreate,
@@ -106,7 +116,7 @@ export function ApiKeysContent({
               </span>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{sa.hasToken ? "Active" : "None"}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">{tokenStatus(sa)}</span>
             </TableCell>
             <TableCell>
               <div className="flex justify-end">
