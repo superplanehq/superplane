@@ -42,7 +42,12 @@ export function useLiveCanvasNodeClick({
         openConfigurationSidebar: (options?: { preferSettingsTab?: boolean }) => void;
       },
     ) => {
-      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
+      if (isRunInspectionMode || isEditing) return;
+
+      if (!liveSidebarRunLookupEnabled) {
+        actions.openConfigurationSidebar();
+        return;
+      }
 
       const lookupId = liveCanvasNodeClickLookupRef.current + 1;
       liveCanvasNodeClickLookupRef.current = lookupId;

@@ -7,7 +7,8 @@ import { SegmentedNav } from "@/ui/SegmentedNav";
 import type { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/lib/testID";
-import { type RefObject, useEffect, useMemo, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { useSkipDefaultsAfterReadOnly } from "./useSkipDefaultsAfterReadOnly";
 
 interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
@@ -63,6 +64,8 @@ export const IntegrationResourceFieldRenderer = ({
   // Fixed vs Expression mode for single-select when expressions are allowed
   const initialIsExpression = allowExpressions && !isMulti && isExpressionValue(value);
   const [useExpressionMode, setUseExpressionMode] = useState(initialIsExpression);
+  const hasAppliedDefault = useRef(false);
+  const skipDefaultsAfterReadOnly = useSkipDefaultsAfterReadOnly(readOnly);
 
   const additionalQueryParameters = useMemo(() => {
     const resourceParameters = field.typeOptions?.resource?.parameters ?? [];
@@ -148,7 +151,7 @@ export const IntegrationResourceFieldRenderer = ({
 
   // Set initial value on first render if no value is present but there's a default (only for multi-select)
   useEffect(() => {
-    if (readOnly) {
+    if (readOnly || skipDefaultsAfterReadOnly || hasAppliedDefault.current) {
       return;
     }
 
@@ -159,10 +162,11 @@ export const IntegrationResourceFieldRenderer = ({
           ? JSON.parse(field.defaultValue as string)
           : [];
       if (Array.isArray(defaultVal) && defaultVal.length > 0) {
+        hasAppliedDefault.current = true;
         onChange(defaultVal);
       }
     }
-  }, [readOnly, isMulti, value, field.defaultValue, onChange]);
+  }, [readOnly, skipDefaultsAfterReadOnly, isMulti, value, field.defaultValue, onChange]);
 
   const resourcesUnavailable = !organizationId || !integrationId || isLoadingResources || !!resourcesError;
   const hasResources = Boolean(resources && resources.length > 0);

@@ -9,15 +9,22 @@ function executionTimestamp(execution: CanvasesCanvasNodeExecution): number {
 }
 
 export function newestExecution(executions: CanvasesCanvasNodeExecution[]): CanvasesCanvasNodeExecution | null {
+  if (executions.length === 0) {
+    return null;
+  }
+
   let newest: CanvasesCanvasNodeExecution | null = null;
   let newestTimestamp = Number.NEGATIVE_INFINITY;
+  let newestIndex = -1;
 
-  for (const execution of executions) {
+  for (let index = 0; index < executions.length; index++) {
+    const execution = executions[index];
     const candidateTimestamp = executionTimestamp(execution);
     const safeTimestamp = Number.isFinite(candidateTimestamp) ? candidateTimestamp : Number.NEGATIVE_INFINITY;
-    if (safeTimestamp > newestTimestamp) {
+    if (safeTimestamp > newestTimestamp || (safeTimestamp === newestTimestamp && index > newestIndex)) {
       newest = execution;
       newestTimestamp = safeTimestamp;
+      newestIndex = index;
     }
   }
 
