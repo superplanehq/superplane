@@ -529,5 +529,5 @@ func FindSecret(ctx core.IntegrationContext, secretName string) (string, error) 
 		}
 	}
 
-	return "", fmt.Errorf("secret %s not found", secretName)
+	return "", fmt.Errorf("secret %s %w", secretName, core.ErrSecretNotFound)
 }

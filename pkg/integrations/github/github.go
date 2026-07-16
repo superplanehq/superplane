@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -235,6 +236,18 @@ func (g *GitHub) findWebhookSecret(ctx core.HTTPRequestContext) (string, error) 
 func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext) {
 	webhookSecret, err := g.findWebhookSecret(ctx)
 	if err != nil {
+		//
+		// A missing webhook secret means the integration setup never completed
+		// (e.g. afterAppCreation failed before the secret was stored). This is a
+		// configuration problem, not a server bug, so respond with 404 and log at
+		// Warn to avoid tripping the 5xx Sentry capture in the logging middleware.
+		//
+		if errors.Is(err, core.ErrSecretNotFound) {
+			ctx.Logger.Warnf("Webhook secret not configured, integration setup incomplete: %v", err)
+			http.Error(ctx.Response, "integration setup incomplete", http.StatusNotFound)
+			return
+		}
+
 		ctx.Logger.Errorf("Error finding webhook secret: %v", err)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return

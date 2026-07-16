@@ -1,10 +1,17 @@
 package core
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
+
+// ErrSecretNotFound is returned by secret lookups when the requested secret
+// does not exist. Callers can use errors.Is to distinguish a missing secret
+// (e.g. an incomplete integration setup) from an unexpected store failure.
+var ErrSecretNotFound = errors.New("not found")
 
 /*
  * IntegrationSetupProvider is the contract for an integration to provide its setup flow.
