@@ -231,8 +231,8 @@ const OwnerSetup: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4 py-8">
-      <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-lg outline outline-gray-950/10 shadow-sm p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-400 px-4 py-8 dark:bg-gray-950">
+      <div className="max-w-md w-full rounded-lg bg-white p-8 shadow-sm outline outline-gray-950/10 dark:bg-gray-900 dark:outline-gray-700/70">
         {step === "owner" && (
           <OwnerStep
             email={email}
