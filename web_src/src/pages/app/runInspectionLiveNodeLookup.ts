@@ -100,3 +100,39 @@ export function resolveCachedNodeRunId(
   const lookupEvent = resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
   return lookupEvent?.runId || (lookupEvent ? resolveRunId(lookupEvent) : null);
 }
+
+export type LiveCanvasNodeClickSyncAction = { kind: "inspectRun"; runId: string } | { kind: "lookupRun" };
+
+export function resolveLiveCanvasNodeClickSyncAction(
+  nodeId: string,
+  workflowNode: ComponentsNode | undefined,
+  resolveRunId: (event: SidebarEvent) => string | null,
+): LiveCanvasNodeClickSyncAction {
+  const cachedRunId = resolveCachedNodeRunId(nodeId, workflowNode, resolveRunId);
+  if (cachedRunId) {
+    return { kind: "inspectRun", runId: cachedRunId };
+  }
+
+  return { kind: "lookupRun" };
+}
+
+const LIVE_RUNTIME_INTERACTIVE_COMPONENTS = new Set(["approval"]);
+
+const ACTIVE_LIVE_RUNTIME_EXECUTION_STATES = new Set(["STATE_STARTED", "STATE_PENDING"]);
+
+export function shouldDeferRunInspectionForLiveNodeClick(
+  workflowNode: ComponentsNode | undefined,
+  nodeData: NodeActivityData,
+): boolean {
+  const component = workflowNode?.component;
+  if (!component || !LIVE_RUNTIME_INTERACTIVE_COMPONENTS.has(component)) {
+    return false;
+  }
+
+  const latestExecution = newestByTimestamp(nodeData.executions, executionTimestamp);
+  if (!latestExecution?.state) {
+    return false;
+  }
+
+  return ACTIVE_LIVE_RUNTIME_EXECUTION_STATES.has(latestExecution.state);
+}

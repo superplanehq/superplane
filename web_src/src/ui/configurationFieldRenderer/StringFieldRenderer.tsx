@@ -4,6 +4,18 @@ import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteIn
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
+function resolveStringFieldDisplayValue(value: unknown, readOnly: boolean, defaultValue: unknown): string {
+  if (value !== undefined && value !== null) {
+    return String(value);
+  }
+
+  if (readOnly && defaultValue !== undefined) {
+    return String(defaultValue);
+  }
+
+  return "";
+}
+
 export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
@@ -12,19 +24,24 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   allowExpressions = false,
   excludedSuggestions,
   valuePreviewLabel,
+  readOnly = false,
 }) => {
   const hasInitialized = useRef(false);
   const shouldPreserveEmpty = field.togglable === true;
 
   // Set initial value only on first mount if no value is present but there's a default
   useEffect(() => {
+    if (readOnly) {
+      return;
+    }
+
     if (!hasInitialized.current && (value === undefined || value === null) && field.defaultValue !== undefined) {
       hasInitialized.current = true;
       onChange(String(field.defaultValue));
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [readOnly, value, field.defaultValue, onChange]);
 
-  const currentValue = (value as string) ?? "";
+  const currentValue = resolveStringFieldDisplayValue(value, readOnly, field.defaultValue);
 
   if (!allowExpressions) {
     return (
@@ -37,6 +54,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
         }}
         placeholder={field.placeholder || ""}
         className=""
+        disabled={readOnly}
         data-testid={toTestId(`string-field-${field.name}`)}
       />
     );
@@ -53,6 +71,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
         }}
         placeholder={field.placeholder || ""}
         className=""
+        disabled={readOnly}
         data-testid={toTestId(`string-field-${field.name}`)}
       />
     );
@@ -72,6 +91,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       valuePreviewLabel={valuePreviewLabel}
       quickTip="Tip: type `{{` to start an expression."
       className=""
+      disabled={readOnly}
       data-testid={toTestId(`string-field-${field.name}`)}
       excludedSuggestions={excludedSuggestions}
     />

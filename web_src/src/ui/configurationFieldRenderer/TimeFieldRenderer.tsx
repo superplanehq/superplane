@@ -3,15 +3,25 @@ import { Input } from "@/components/ui/input";
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
-export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, allValues = {} }) => {
+export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  allValues = {},
+  readOnly = false,
+}) => {
   useEffect(() => {
+    if (readOnly) {
+      return;
+    }
+
     if ((value === undefined || value === null) && field.defaultValue !== undefined) {
       const defaultVal = field.defaultValue as string;
       if (defaultVal && defaultVal !== "") {
         onChange(defaultVal);
       }
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [readOnly, value, field.defaultValue, onChange]);
 
   // Calculate min/max based on other fields for time gates
   const getTimeConstraints = React.useMemo(() => {
@@ -37,6 +47,7 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
       className=""
       min={getTimeConstraints.min}
       max={getTimeConstraints.max}
+      disabled={readOnly}
       data-testid={toTestId(`time-field-${field.name}`)}
     />
   );
