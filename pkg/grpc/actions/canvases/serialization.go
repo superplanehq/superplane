@@ -26,14 +26,22 @@ func SerializeCanvas(
 		canvasFolderID = canvas.CanvasFolderID.String()
 	}
 
+	var createdAt, updatedAt *timestamppb.Timestamp
+	if canvas.CreatedAt != nil {
+		createdAt = timestamppb.New(*canvas.CreatedAt)
+	}
+	if canvas.UpdatedAt != nil {
+		updatedAt = timestamppb.New(*canvas.UpdatedAt)
+	}
+
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
 			Id:             canvas.ID.String(),
 			OrganizationId: canvas.OrganizationID.String(),
 			Name:           canvas.Name,
 			Description:    canvas.Description,
-			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
+			CreatedAt:      createdAt,
+			UpdatedAt:      updatedAt,
 			CreatedBy:      createdBy,
 			FolderId:       canvasFolderID,
 		},
