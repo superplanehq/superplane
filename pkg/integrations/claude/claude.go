@@ -134,7 +134,7 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 	case "environment":
 		return i.listEnvironmentResources(client)
 	case "agentVersion":
-		return i.listAgentVersionResources(client, ctx.Parameters["agent"])
+		return i.listAgentVersionResources(ctx, ctx.Parameters["agent"])
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -221,12 +221,19 @@ func (i *Claude) listEnvironmentResources(client *Client) ([]core.IntegrationRes
 // unset/latest state after a specific version was pinned, and gives a newly
 // created agent a usable option. The value stays the bare version number (or
 // "latest"). An empty agent (nothing selected yet) yields no options.
-func (i *Claude) listAgentVersionResources(client *Client, agentID string) ([]core.IntegrationResource, error) {
+func (i *Claude) listAgentVersionResources(ctx core.ListResourcesContext, agentID string) ([]core.IntegrationResource, error) {
 	if strings.TrimSpace(agentID) == "" {
 		return []core.IntegrationResource{}, nil
 	}
 
-	versions, err := client.ListManagedAgentVersions(agentID)
+	// Reuse the runagent client's version listing so the /agents/{id}/versions
+	// call has a single implementation shared with the run-time version check.
+	client, err := runagent.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	versions, err := client.ListAgentVersionNumbers(agentID)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +245,7 @@ func (i *Claude) listAgentVersionResources(client *Client, agentID string) ([]co
 		ID:   "latest",
 	})
 	for _, version := range versions {
-		value := strconv.Itoa(version.Version)
+		value := strconv.Itoa(version)
 		resources = append(resources, core.IntegrationResource{
 			Type: "agentVersion",
 			Name: value,

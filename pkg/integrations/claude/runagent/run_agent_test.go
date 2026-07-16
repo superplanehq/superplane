@@ -107,6 +107,21 @@ func Test__validateSpec__rejectsBadVersion(t *testing.T) {
 	assert.Contains(t, err.Error(), "version")
 }
 
+func Test__ListAgentVersionNumbers(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"version":1},{"version":3},{"version":2}]}`))},
+	}}
+	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
+
+	versions, err := client.ListAgentVersionNumbers("agent_1")
+	require.NoError(t, err)
+	assert.Equal(t, []int{3, 2, 1}, versions, "versions must be returned newest first")
+	assert.Contains(t, httpCtx.Requests[0].URL.Path, "/agents/agent_1/versions")
+
+	_, err = client.ListAgentVersionNumbers("")
+	require.Error(t, err)
+}
+
 // Nodes saved before this component used resource fields stored the environment
 // under "environmentId" and the version as a number. They must keep decoding
 // and validating without being re-saved.

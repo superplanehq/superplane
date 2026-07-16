@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -239,6 +240,10 @@ func (c *Client) ListAgentVersionNumbers(agentID string) ([]int, error) {
 		}
 		page = resp.NextPage
 	}
+
+	// Newest first, so callers (e.g. the version picker) can present the latest
+	// version at the top and treat index 0 as the current version.
+	sort.Slice(versions, func(i, j int) bool { return versions[i] > versions[j] })
 	return versions, nil
 }
 

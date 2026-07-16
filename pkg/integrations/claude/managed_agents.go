@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sort"
 )
 
 // anthropicManagedAgentsBeta is the beta header required by the Managed Agents
@@ -30,12 +29,6 @@ type ManagedEnvironment struct {
 	Name string `json:"name"`
 }
 
-// ManagedAgentVersion is a single historical version of an agent, returned by
-// GET /v1/agents/{id}/versions.
-type ManagedAgentVersion struct {
-	Version int `json:"version"`
-}
-
 type managedAgentsResponse struct {
 	Data     []ManagedAgent `json:"data"`
 	NextPage string         `json:"next_page"`
@@ -44,11 +37,6 @@ type managedAgentsResponse struct {
 type managedEnvironmentsResponse struct {
 	Data     []ManagedEnvironment `json:"data"`
 	NextPage string               `json:"next_page"`
-}
-
-type managedAgentVersionsResponse struct {
-	Data     []ManagedAgentVersion `json:"data"`
-	NextPage string                `json:"next_page"`
 }
 
 // ListManagedAgents lists the Managed Agents in the workspace, following
@@ -111,44 +99,4 @@ func (c *Client) ListManagedEnvironments() ([]ManagedEnvironment, error) {
 		page = response.NextPage
 	}
 	return environments, nil
-}
-
-// ListManagedAgentVersions lists an agent's versions, newest first.
-func (c *Client) ListManagedAgentVersions(agentID string) ([]ManagedAgentVersion, error) {
-	if agentID == "" {
-		return nil, fmt.Errorf("agent id is required")
-	}
-
-	var versions []ManagedAgentVersion
-	page := ""
-	for range maxManagedAgentsPages {
-		params := url.Values{}
-		params.Set("limit", "100")
-		if page != "" {
-			params.Set("page", page)
-		}
-
-		body, err := c.execRequestWithBeta(http.MethodGet, c.BaseURL+"/agents/"+url.PathEscape(agentID)+"/versions?"+params.Encode(), nil, anthropicManagedAgentsBeta)
-		if err != nil {
-			return nil, err
-		}
-
-		var response managedAgentVersionsResponse
-		if err := json.Unmarshal(body, &response); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal agent versions response: %v", err)
-		}
-
-		versions = append(versions, response.Data...)
-		if response.NextPage == "" {
-			break
-		}
-		page = response.NextPage
-	}
-
-	// The API documents newest-first ordering, but sort defensively so the
-	// caller can always treat index 0 as the latest version.
-	sort.Slice(versions, func(i, j int) bool {
-		return versions[i].Version > versions[j].Version
-	})
-	return versions, nil
 }
