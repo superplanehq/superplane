@@ -245,7 +245,9 @@ describe("invalidateStagedCanvasCaches", () => {
 
     expect(invalidateSpy).toHaveBeenCalled();
     for (const call of invalidateSpy.mock.calls) {
-      expect(call[0]).toMatchObject({ cancelRefetch: false });
+      // cancelRefetch lives in the InvalidateOptions (second) argument, not in
+      // the query filters — passing it in the filters object fails type-check.
+      expect(call[1]).toMatchObject({ cancelRefetch: false });
     }
   });
 

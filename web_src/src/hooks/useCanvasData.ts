@@ -206,17 +206,19 @@ export function invalidateStagedCanvasCaches(queryClient: QueryClient, canvasId:
   //   2. Promise.allSettled — absorb any other rejection here instead of
   //      letting it surface via window.onunhandledrejection.
   void Promise.allSettled([
-    queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId), cancelRefetch: false }),
-    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId), cancelRefetch: false }),
-    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId), cancelRefetch: false }),
-    queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId), cancelRefetch: false }),
-    queryClient.invalidateQueries({
-      cancelRefetch: false,
-      predicate: (query) => {
-        const key = query.queryKey;
-        return Array.isArray(key) && key.includes(canvasId) && key[key.length - 1] === "staged";
+    queryClient.invalidateQueries({ queryKey: canvasKeys.canvasStaging(canvasId) }, { cancelRefetch: false }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedCanvasSpec(canvasId) }, { cancelRefetch: false }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.stagedConsole(canvasId) }, { cancelRefetch: false }),
+    queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) }, { cancelRefetch: false }),
+    queryClient.invalidateQueries(
+      {
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && key.includes(canvasId) && key[key.length - 1] === "staged";
+        },
       },
-    }),
+      { cancelRefetch: false }
+    ),
   ]);
 }
 
