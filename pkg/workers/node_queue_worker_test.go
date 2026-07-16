@@ -627,3 +627,73 @@ func Test__NodeQueueWorker_ProcessesNextQueueItemOnExecutionFinished(t *testing.
 	require.NoError(t, err)
 	assert.Empty(t, queueItems)
 }
+
+func Test__NodeQueueWorker_DiscardsQueueItemForFinishedRun(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, r.GitProvider, amqpURL)
+	logger := log.NewEntry(log.New())
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+
+	//
+	// Create the run for the root event and finalize it as cancelled, simulating a
+	// queue item that was created just before the run was cancelled.
+	//
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), rootEvent)
+	require.NoError(t, err)
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":        models.CanvasRunStateFinished,
+		"result":       models.CanvasRunResultCancelled,
+		"cancelled_at": &now,
+		"finished_at":  &now,
+		"updated_at":   &now,
+	}).Error)
+
+	queueItem := support.CreateQueueItem(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
+	queueItem.RunID = run.ID
+	require.NoError(t, database.Conn().Save(queueItem).Error)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+
+	require.NoError(t, worker.LockAndProcessNode(logger, *node, time.Now()))
+
+	//
+	// No execution should be created, and the stale queue item should be discarded.
+	//
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, executions)
+
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
+}

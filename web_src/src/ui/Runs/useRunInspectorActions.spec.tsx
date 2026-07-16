@@ -3,23 +3,18 @@ import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasRun } from "@/api-client";
-import type { RunInspectorNodeSection } from "./runNodeDetailModel";
 import { useRunInspectorActions } from "./useRunInspectorActions";
 
-const run: CanvasesCanvasRun = {
+const startedRun: CanvasesCanvasRun = {
+  id: "run-1",
+  state: "STATE_STARTED",
   rootEvent: {
     id: "root-event-1",
     nodeId: "trigger-1",
   },
 };
 
-function renderActions(
-  sections: RunInspectorNodeSection[],
-  {
-    executionsLoading = false,
-    runOverride = run,
-  }: { executionsLoading?: boolean; runOverride?: CanvasesCanvasRun } = {},
-) {
+function renderActions(run: CanvasesCanvasRun) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -31,9 +26,7 @@ function renderActions(
     () =>
       useRunInspectorActions({
         canvasId: "canvas-1",
-        run: runOverride,
-        sections,
-        executionsLoading,
+        run,
       }),
     {
       wrapper: ({ children }: { children: ReactNode }) => (
@@ -43,66 +36,22 @@ function renderActions(
   );
 }
 
-function actionSection(overrides: Partial<RunInspectorNodeSection> = {}): RunInspectorNodeSection {
-  return {
-    sectionValue: "action-1",
-    nodeId: "action-1",
-    nodeName: "Action 1",
-    isTrigger: false,
-    isQueued: false,
-    badge: null,
-    tabData: null,
-    upstreamSections: [],
-    outputSections: [],
-    actions: {
-      canStop: false,
-      canPushThrough: false,
-      approvalRecords: [],
-    },
-    configurationFields: [],
-    ...overrides,
-  };
-}
-
 describe("useRunInspectorActions", () => {
-  it("allows Stop when action sections only have lightweight running execution refs", () => {
-    const { result } = renderActions([
-      actionSection({
-        executionRef: {
-          id: "execution-ref-1",
-          nodeId: "action-1",
-          state: "STATE_STARTED",
-        },
-      }),
-    ]);
+  it("enables Stop while the run is started", () => {
+    const { result } = renderActions(startedRun);
 
     expect(result.current.stopDisabled).toBe(false);
   });
 
-  it("allows Stop for loaded action execution details so queued steps can be cancelled", () => {
-    const { result } = renderActions([
-      actionSection({
-        execution: {
-          id: "execution-1",
-          nodeId: "action-1",
-          state: "STATE_FINISHED",
-          result: "RESULT_PASSED",
-        },
-      }),
-    ]);
+  it("disables Stop once the run has finished", () => {
+    const { result } = renderActions({ ...startedRun, state: "STATE_FINISHED" });
 
-    expect(result.current.stopDisabled).toBe(false);
+    expect(result.current.stopDisabled).toBe(true);
   });
 
-  it("allows Stop for queued items while executions are loading", () => {
-    const { result } = renderActions([], {
-      executionsLoading: true,
-      runOverride: {
-        ...run,
-        queueItems: [{ id: "queue-1", nodeId: "action-1" }],
-      },
-    });
+  it("disables Stop when the run has no id", () => {
+    const { result } = renderActions({ ...startedRun, id: undefined });
 
-    expect(result.current.stopDisabled).toBe(false);
+    expect(result.current.stopDisabled).toBe(true);
   });
 });

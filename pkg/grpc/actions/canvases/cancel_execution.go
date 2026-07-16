@@ -76,55 +76,8 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 }
 
 func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authorization, encryptor crypto.Encryptor, organizationID string, registry *registry.Registry, execution *models.CanvasNodeExecution, node *models.CanvasNode, user *models.User, onMemoryChanged func()) error {
-	if node.Type != models.NodeTypeComponent {
-		return nil
-	}
-
-	ref := node.Ref.Data()
-	if ref.Component != nil {
-		action, err := registry.GetAction(ref.Component.Name)
-		if err != nil {
-			log.Errorf("action %s not found: %v", ref.Component.Name, err)
-			return err
-		}
-
-		logger := logging.ForExecution(execution)
-		orgUUID := uuid.MustParse(organizationID)
-		canvasName := ""
-		if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
-			canvasName = workflow.Name
-		}
-		ctx := core.ExecutionContext{
-			ID:             execution.ID,
-			WorkflowID:     execution.WorkflowID.String(),
-			OrganizationID: organizationID,
-			CanvasName:     canvasName,
-			NodeID:         execution.NodeID,
-			NodeName:       node.Name,
-			Configuration:  execution.Configuration.Data(),
-			HTTP:           registry.HTTPContextInTransaction(tx),
-			Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-			ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
-			Requests:       contexts.NewExecutionRequestContext(tx, execution),
-			Auth:           contexts.NewAuthReader(tx, orgUUID, authService, user),
-			CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).WithChangeCallback(onMemoryChanged),
-		}
-
-		if node.AppInstallationID != nil {
-			integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
-			if err != nil {
-				logger.Errorf("error finding app installation: %v", err)
-				return grpcerrors.Internal(err, "error building context")
-			}
-
-			logger = logging.WithIntegration(logger, *integration)
-			ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, nil)
-		}
-
-		ctx.Logger = logger
-		if err := action.Cancel(ctx); err != nil {
-			log.Errorf("failed to cancel component execution %s: %v", execution.ID.String(), err)
-		}
+	if err := invokeExecutionCancelHook(tx, authService, encryptor, organizationID, registry, execution, node, user, onMemoryChanged); err != nil {
+		return err
 	}
 
 	var cancelledBy *uuid.UUID
@@ -133,4 +86,65 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 	}
 
 	return execution.CancelInTransaction(tx, cancelledBy)
+}
+
+// invokeExecutionCancelHook runs a component's best-effort external Cancel action
+// (e.g. cancelling a remote CI job). It does NOT change the execution's stored
+// state — callers are responsible for marking the execution cancelled. This is
+// shared by single-execution cancellation and whole-run cancellation.
+func invokeExecutionCancelHook(tx *gorm.DB, authService authorization.Authorization, encryptor crypto.Encryptor, organizationID string, registry *registry.Registry, execution *models.CanvasNodeExecution, node *models.CanvasNode, user *models.User, onMemoryChanged func()) error {
+	if node.Type != models.NodeTypeComponent {
+		return nil
+	}
+
+	ref := node.Ref.Data()
+	if ref.Component == nil {
+		return nil
+	}
+
+	action, err := registry.GetAction(ref.Component.Name)
+	if err != nil {
+		log.Errorf("action %s not found: %v", ref.Component.Name, err)
+		return err
+	}
+
+	logger := logging.ForExecution(execution)
+	orgUUID := uuid.MustParse(organizationID)
+	canvasName := ""
+	if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
+		canvasName = workflow.Name
+	}
+	ctx := core.ExecutionContext{
+		ID:             execution.ID,
+		WorkflowID:     execution.WorkflowID.String(),
+		OrganizationID: organizationID,
+		CanvasName:     canvasName,
+		NodeID:         execution.NodeID,
+		NodeName:       node.Name,
+		Configuration:  execution.Configuration.Data(),
+		HTTP:           registry.HTTPContextInTransaction(tx),
+		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+		ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
+		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Auth:           contexts.NewAuthReader(tx, orgUUID, authService, user),
+		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).WithChangeCallback(onMemoryChanged),
+	}
+
+	if node.AppInstallationID != nil {
+		integration, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
+		if err != nil {
+			logger.Errorf("error finding app installation: %v", err)
+			return grpcerrors.Internal(err, "error building context")
+		}
+
+		logger = logging.WithIntegration(logger, *integration)
+		ctx.Integration = contexts.NewIntegrationContext(tx, node, integration, encryptor, registry, nil)
+	}
+
+	ctx.Logger = logger
+	if err := action.Cancel(ctx); err != nil {
+		log.Errorf("failed to cancel component execution %s: %v", execution.ID.String(), err)
+	}
+
+	return nil
 }

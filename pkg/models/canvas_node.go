@@ -575,6 +575,23 @@ func deleteQueueItemsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (
 	return deletedQueueItems, nil
 }
 
+// deleteQueueItemsForRun bulk-deletes every pending queue item belonging to a run,
+// returning the deleted rows so callers can publish deletion messages.
+func deleteQueueItemsForRun(tx *gorm.DB, workflowID, runID uuid.UUID) ([]CanvasNodeQueueItem, error) {
+	var deletedQueueItems []CanvasNodeQueueItem
+	err := tx.
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}, {Name: "node_id"}, {Name: "run_id"}}}).
+		Where("workflow_id = ?", workflowID).
+		Where("run_id = ?", runID).
+		Delete(&deletedQueueItems).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return deletedQueueItems, nil
+}
+
 func nodeExecutionIDs(executions []CanvasNodeExecution) []uuid.UUID {
 	executionIDs := make([]uuid.UUID, 0, len(executions))
 	for _, execution := range executions {

@@ -24,6 +24,7 @@ vi.mock("@uiw/react-json-view", () => ({
 
 const reemitTriggerEventMock = vi.fn();
 const cancelExecutionMock = vi.fn();
+const cancelRunMock = vi.fn();
 const invokeExecutionHookMock = vi.fn();
 const describeRunMock = vi.fn();
 const listNodeQueueItemsMock = vi.fn();
@@ -35,6 +36,7 @@ vi.mock("@/api-client", async (importOriginal) => {
     ...actual,
     canvasesReemitTriggerEvent: (...args: unknown[]) => reemitTriggerEventMock(...args),
     canvasesCancelExecution: (...args: unknown[]) => cancelExecutionMock(...args),
+    canvasesCancelRun: (...args: unknown[]) => cancelRunMock(...args),
     canvasesInvokeNodeExecutionHook: (...args: unknown[]) => invokeExecutionHookMock(...args),
     canvasesDescribeRun: (...args: unknown[]) => describeRunMock(...args),
     canvasesListNodeQueueItems: (...args: unknown[]) => listNodeQueueItemsMock(...args),
@@ -88,6 +90,7 @@ beforeEach(() => {
   mockedMe = null;
   reemitTriggerEventMock.mockResolvedValue({});
   cancelExecutionMock.mockResolvedValue({});
+  cancelRunMock.mockResolvedValue({});
   invokeExecutionHookMock.mockResolvedValue({});
   describeRunMock.mockResolvedValue({ data: { run: { queueItems: [] } } });
   listNodeQueueItemsMock.mockResolvedValue({ data: { items: [] } });
@@ -519,32 +522,40 @@ describe("RunInspectorPanel", () => {
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
-  it("keeps the stop action disabled while executions are loading", () => {
+  it("cancels the run in a single request while executions are still loading", async () => {
     mockedExecutions = [];
     mockedExecutionsLoading = true;
 
     renderInspector({ run: runningRun });
 
     const stopButton = screen.getByRole("button", { name: "Stop" });
-    expect(stopButton).toBeDisabled();
+    expect(stopButton).toBeEnabled();
 
     fireEvent.click(stopButton);
 
+    await waitFor(() => {
+      expect(cancelRunMock).toHaveBeenCalledTimes(1);
+    });
+    // The server decides which work to cancel, so the client no longer
+    // reconciles executions or queue items itself.
     expect(cancelExecutionMock).not.toHaveBeenCalled();
     expect(listNodeQueueItemsMock).not.toHaveBeenCalled();
   });
 
-  it("keeps the stop action disabled when no action steps are loaded", () => {
+  it("cancels the run in a single request when no action steps are loaded", async () => {
     mockedExecutions = [];
     mockedExecutionsLoading = false;
 
     renderInspector({ run: runningRun });
 
     const stopButton = screen.getByRole("button", { name: "Stop" });
-    expect(stopButton).toBeDisabled();
+    expect(stopButton).toBeEnabled();
 
     fireEvent.click(stopButton);
 
+    await waitFor(() => {
+      expect(cancelRunMock).toHaveBeenCalledTimes(1);
+    });
     expect(cancelExecutionMock).not.toHaveBeenCalled();
     expect(listNodeQueueItemsMock).not.toHaveBeenCalled();
   });

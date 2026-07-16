@@ -163,6 +163,111 @@ func Test__ListCanvasRuns__StatesAndResultsAreOredWithinWorkflow(t *testing.T) {
 	assert.Len(t, runs, 2, "expected only running+passed runs from canvas A")
 }
 
+func Test__CalculateCanvasRunResultInTransaction__CancelledMarkerOverridesFailed(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultFailed,
+		"updated_at": time.Now(),
+	}).Error)
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(run).Update("cancelled_at", &now).Error)
+
+	result := calculateCanvasRunResult(t, run.ID)
+	assert.Equal(t, models.CanvasRunResultCancelled, result)
+}
+
+func Test__CancelRun__CancelsActiveWorkAndFinalizes(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	require.NoError(t, database.Conn().Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+
+	queueItem := support.CreateQueueItem(t, run.WorkflowID, "node-2", execution.RootEventID, execution.RootEventID)
+	queueItem.RunID = run.ID
+	require.NoError(t, database.Conn().Save(queueItem).Error)
+
+	userID := uuid.New()
+	result := cancelRun(t, run.WorkflowID, run.ID, &userID)
+	require.NotNil(t, result)
+	assert.False(t, result.AlreadyFinished)
+	require.Len(t, result.CancelledExecutions, 1)
+	assert.Equal(t, execution.ID, result.CancelledExecutions[0].ID)
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
+	require.NotNil(t, updatedRun.CancelledAt)
+	require.NotNil(t, updatedRun.FinishedAt)
+	require.NotNil(t, updatedRun.CancelledBy)
+	assert.Equal(t, userID, *updatedRun.CancelledBy)
+
+	updatedExecution, err := models.FindNodeExecution(run.WorkflowID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
+	assert.Equal(t, models.CanvasNodeExecutionResultCancelled, updatedExecution.Result)
+
+	openWork := findOpenCanvasRunWork(t, run.ID)
+	assert.False(t, openWork.HasActiveExecutions)
+	assert.False(t, openWork.HasQueueItems)
+}
+
+func Test__CancelRun__IdempotentOnFinishedRun(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": time.Now(),
+	}).Error)
+
+	now := time.Now()
+	require.NoError(t, database.Conn().Model(run).Updates(map[string]any{
+		"state":       models.CanvasRunStateFinished,
+		"result":      models.CanvasRunResultPassed,
+		"finished_at": &now,
+		"updated_at":  &now,
+	}).Error)
+
+	result := cancelRun(t, run.WorkflowID, run.ID, nil)
+	require.NotNil(t, result)
+	assert.True(t, result.AlreadyFinished)
+
+	updatedRun, err := models.FindCanvasRunInTransaction(database.Conn(), run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
+	assert.Nil(t, updatedRun.CancelledAt)
+}
+
+func Test__CancelRun__LeavesOtherRunsUntouched(t *testing.T) {
+	run, _ := setupRunWithExecution(t)
+
+	otherRootEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, "trigger", "default", nil)
+	otherRun := createRunForRootEvent(t, otherRootEvent)
+	otherExecution := createExecutionForRun(t, otherRun, otherRootEvent.ID, "node-1")
+
+	cancelRun(t, run.WorkflowID, run.ID, nil)
+
+	updatedOther, err := models.FindNodeExecution(otherRun.WorkflowID, otherExecution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, updatedOther.State)
+
+	otherRunReloaded, err := models.FindCanvasRunInTransaction(database.Conn(), otherRun.WorkflowID, otherRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, otherRunReloaded.State)
+	assert.Nil(t, otherRunReloaded.CancelledAt)
+}
+
+func cancelRun(t *testing.T, workflowID, runID uuid.UUID, cancelledBy *uuid.UUID) *models.CancelRunResult {
+	var result *models.CancelRunResult
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		result, err = models.CancelRun(tx, workflowID, runID, cancelledBy)
+		return err
+	}))
+
+	return result
+}
+
 func createRunWithState(t *testing.T, workflowID uuid.UUID, state, result string) *models.CanvasRun {
 	now := time.Now()
 	liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), workflowID)
