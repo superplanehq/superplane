@@ -130,7 +130,9 @@ func InvokeNodeTriggerHook(
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			logger.Errorf("failed to publish canvas event created RabbitMQ message: %v", err)
+		}
 	}
 
 	// Convert result to protobuf struct

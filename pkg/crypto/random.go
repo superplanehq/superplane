@@ -17,7 +17,11 @@ func Base64String(size int) (string, error) {
 }
 
 func NewRandomKey(ctx context.Context, encryptor Encryptor, name string) (string, []byte, error) {
-	plainKey, _ := Base64String(32)
+	plainKey, err := Base64String(32)
+	if err != nil {
+		return "", nil, err
+	}
+
 	encrypted, err := encryptor.Encrypt(ctx, []byte(plainKey), []byte(name))
 	if err != nil {
 		return "", nil, err

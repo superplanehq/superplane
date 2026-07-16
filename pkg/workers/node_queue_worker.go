@@ -303,15 +303,20 @@ func (w *NodeQueueWorker) LockAndProcessNode(logger *log.Entry, node models.Canv
 		}
 
 		if queueItem != nil {
-			messages.NewCanvasQueueItemMessage(
+			err := messages.NewCanvasQueueItemMessage(
 				queueItem.WorkflowID.String(),
 				queueItem.ID.String(),
 				queueItem.NodeID,
 			).Publish(true)
+			if err != nil {
+				logger.Errorf("failed to publish canvas queue item RabbitMQ message: %v", err)
+			}
 		}
 
 		for _, event := range newEvents {
-			messages.PublishCanvasEventCreatedMessage(&event)
+			if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+				logger.Errorf("failed to publish canvas event created RabbitMQ message: %v", err)
+			}
 		}
 	}
 

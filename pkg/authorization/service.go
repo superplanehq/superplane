@@ -516,7 +516,10 @@ func (a *AuthService) assignRoleWithEnforcer(enforcer casbin.IEnforcer, userID, 
 
 	// If not a default role, check if it's a custom role that exists
 	if !isValidDefaultRole {
-		policies, _ := enforcer.GetFilteredPolicy(0, prefixedRole, domain)
+		policies, err := enforcer.GetFilteredPolicy(0, prefixedRole, domain)
+		if err != nil {
+			return fmt.Errorf("failed to get policies for role %s: %w", role, err)
+		}
 		if len(policies) == 0 {
 			return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
 		}
@@ -722,8 +725,14 @@ func (a *AuthService) getRoleDefinition(enforcer casbin.IEnforcer, roleName stri
 	// For custom roles, check if role exists by looking for policies
 	if !a.IsDefaultRole(roleName, domainType) {
 		// For custom roles, check if role exists by looking for policies
-		policies, _ := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-		groupingPolicies, _ := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+		policies, err := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get policies for role %s: %w", roleName, err)
+		}
+		groupingPolicies, err := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get grouping policies for role %s: %w", roleName, err)
+		}
 		if len(policies) == 0 && len(groupingPolicies) == 0 {
 			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
 		}
@@ -792,8 +801,14 @@ func (a *AuthService) GetRolePermissions(ctx context.Context, roleName string, d
 	var permissions []*Permission
 	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		if !a.IsDefaultRole(roleName, domainType) {
-			policies, _ := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-			groupingPolicies, _ := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+			policies, err := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+			if err != nil {
+				return fmt.Errorf("failed to get policies for role %s: %w", roleName, err)
+			}
+			groupingPolicies, err := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+			if err != nil {
+				return fmt.Errorf("failed to get grouping policies for role %s: %w", roleName, err)
+			}
 			if len(policies) == 0 && len(groupingPolicies) == 0 {
 				return fmt.Errorf("role %s not found in domain %s", roleName, domain)
 			}
@@ -820,8 +835,14 @@ func (a *AuthService) GetRoleHierarchy(ctx context.Context, roleName string, dom
 	var hierarchy []string
 	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
 		if !a.IsDefaultRole(roleName, domainType) {
-			policies, _ := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-			groupingPolicies, _ := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+			policies, err := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+			if err != nil {
+				return fmt.Errorf("failed to get policies for role %s: %w", roleName, err)
+			}
+			groupingPolicies, err := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+			if err != nil {
+				return fmt.Errorf("failed to get grouping policies for role %s: %w", roleName, err)
+			}
 			if len(policies) == 0 && len(groupingPolicies) == 0 {
 				return fmt.Errorf("role %s not found in domain %s", roleName, domain)
 			}
@@ -859,7 +880,10 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 	if roleDefinition.InheritsFrom != nil {
 		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
 			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
-			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
+			policies, err := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
+			if err != nil {
+				return fmt.Errorf("failed to get policies for inherited role %s: %w", roleDefinition.InheritsFrom.Name, err)
+			}
 			if len(policies) == 0 {
 				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
 			}
@@ -909,7 +933,10 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 	domain := prefixDomain(roleDefinition.DomainType, domainID)
 	prefixedRoleName := prefixRoleName(roleDefinition.Name)
 
-	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+	existingPolicies, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+	if err != nil {
+		return fmt.Errorf("failed to get policies for role %s: %w", roleDefinition.Name, err)
+	}
 	if len(existingPolicies) == 0 {
 		return fmt.Errorf("role %s not found in domain %s", roleDefinition.Name, domain)
 	}
@@ -917,7 +944,10 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 	if roleDefinition.InheritsFrom != nil {
 		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
 			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
-			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
+			policies, err := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
+			if err != nil {
+				return fmt.Errorf("failed to get policies for inherited role %s: %w", roleDefinition.InheritsFrom.Name, err)
+			}
 			if len(policies) == 0 {
 				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
 			}
@@ -925,7 +955,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 	}
 
 	tx := database.Conn().Begin()
-	err := models.UpsertRoleMetadataInTransaction(tx, roleDefinition.Name, roleDefinition.DomainType, domainID, roleDefinition.DisplayName, roleDefinition.Description)
+	err = models.UpsertRoleMetadataInTransaction(tx, roleDefinition.Name, roleDefinition.DomainType, domainID, roleDefinition.DisplayName, roleDefinition.Description)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to upsert role metadata for role %s: %w", roleDefinition.Name, err)
@@ -977,13 +1007,16 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 	domain := prefixDomain(domainType, domainID)
 	prefixedRoleName := prefixRoleName(roleName)
 
-	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+	existingPolicies, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+	if err != nil {
+		return fmt.Errorf("failed to get policies for role %s: %w", roleName, err)
+	}
 	if len(existingPolicies) == 0 {
 		return fmt.Errorf("role %s not found in domain %s", roleName, domain)
 	}
 
 	tx := database.Conn().Begin()
-	err := models.DeleteRoleMetadataInTransaction(tx, roleName, domainType, domainID)
+	err = models.DeleteRoleMetadataInTransaction(tx, roleName, domainType, domainID)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete role metadata for role %s: %w", roleName, err)
