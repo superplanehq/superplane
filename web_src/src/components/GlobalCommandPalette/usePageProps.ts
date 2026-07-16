@@ -1,6 +1,6 @@
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useOrganizationInviteLink } from "@/hooks/useOrganizationData";
-import { useServiceAccounts } from "@/hooks/useServiceAccounts";
+import { useAPIKeys } from "@/hooks/useApiKeys";
 import { appPath } from "@/lib/appPaths";
 import { Key, Palette, Plug } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -24,7 +24,7 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
     enabled: !!organizationId,
   });
   const { data: inviteLink } = useOrganizationInviteLink(organizationId, !!organizationId && model.canManageInviteLink);
-  const { data: serviceAccounts = [] } = useServiceAccounts(organizationId);
+  const { data: apiKeys = [] } = useAPIKeys(organizationId);
   const inviteLinkToken = inviteLink?.enabled ? inviteLink.token : undefined;
 
   const integrations = useMemo<IntegrationItem[]>(
@@ -45,8 +45,8 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   }, [model]);
 
   const searchResults = useMemo(
-    () => buildSearchResults(model, integrations, serviceAccounts, organizationId, goTo),
-    [model, integrations, serviceAccounts, organizationId, goTo],
+    () => buildSearchResults(model, integrations, apiKeys, organizationId, goTo),
+    [model, integrations, apiKeys, organizationId, goTo],
   );
 
   const handleCopyInviteLink = useCallback(() => {
@@ -89,8 +89,8 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
       closePalette();
       window.open(DOCS_URL, "_blank", "noopener,noreferrer");
     },
-    onNewServiceAccount: () => {
-      goTo(`/${organizationId}/settings/service-accounts`);
+    onNewAPIKey: () => {
+      goTo(`/${organizationId}/settings/api-keys`);
     },
     onNewSecret: () => {
       goTo(`/${organizationId}/settings/secrets`);
@@ -121,7 +121,7 @@ export function useCommandPalettePageProps(model: CommandPaletteModel): CommandP
   };
 }
 
-type ServiceAccountSearchItem = {
+type APIKeySearchItem = {
   id?: string;
   name?: string;
 };
@@ -135,7 +135,7 @@ function integrationStatusFrom(state: string | undefined): IntegrationStatus {
 function buildSearchResults(
   model: CommandPaletteModel,
   integrations: IntegrationItem[],
-  serviceAccounts: ServiceAccountSearchItem[],
+  apiKeys: APIKeySearchItem[],
   organizationId: string,
   goTo: (href: string) => void,
 ): PaletteAction[] {
@@ -176,16 +176,16 @@ function buildSearchResults(
     }
   }
 
-  for (const sa of serviceAccounts) {
-    const name = sa.name ?? "";
-    if (matchesSearch(query, name, sa.id)) {
+  for (const apiKey of apiKeys) {
+    const name = apiKey.name ?? "";
+    if (matchesSearch(query, name, apiKey.id)) {
       results.push({
-        id: `sa-${sa.id}`,
+        id: `api-key-${apiKey.id}`,
         label: name,
         description: "API Key",
         icon: Key,
-        onSelect: () => goTo(`/${organizationId}/settings/service-accounts/${sa.id}`),
-        keywords: [name, sa.id ?? ""],
+        onSelect: () => goTo(`/${organizationId}/settings/api-keys/${apiKey.id}`),
+        keywords: [name, apiKey.id ?? ""],
       });
     }
   }

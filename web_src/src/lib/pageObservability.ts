@@ -155,14 +155,14 @@ function resolveSettingsPageObservability(organizationId: string, segments: stri
         };
       }
       return { pageKey: "settingsSecrets", attributes: organizationAttributes };
-    case "service-accounts":
+    case "api-keys":
       if (rest[0]) {
         return {
-          pageKey: "settingsServiceAccountDetail",
-          attributes: { ...organizationAttributes, service_account_id: rest[0] },
+          pageKey: "settingsAPIKeyDetail",
+          attributes: { ...organizationAttributes, api_key_id: rest[0] },
         };
       }
-      return { pageKey: "settingsServiceAccounts", attributes: organizationAttributes };
+      return { pageKey: "settingsAPIKeys", attributes: organizationAttributes };
     case "profile":
       return { pageKey: "settingsProfile", attributes: organizationAttributes };
     case "billing":

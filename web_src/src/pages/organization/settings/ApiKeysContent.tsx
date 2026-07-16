@@ -1,4 +1,4 @@
-import type { ServiceAccountsServiceAccount } from "@/api-client/types.gen";
+import type { ApiKeysApiKey } from "@/api-client/types.gen";
 import { Icon } from "@/components/Icon";
 import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -14,7 +14,7 @@ import {
 } from "./settingsPageStyles";
 
 interface ApiKeysContentProps {
-  sorted: ServiceAccountsServiceAccount[];
+  sorted: ApiKeysApiKey[];
   canCreate: boolean;
   canDelete: boolean;
   permissionsLoading: boolean;
@@ -34,9 +34,9 @@ function isExpired(value?: string) {
   return !!value && new Date(value).getTime() <= Date.now();
 }
 
-function tokenStatus(serviceAccount: ServiceAccountsServiceAccount) {
-  if (!serviceAccount.hasToken) return "None";
-  if (isExpired(serviceAccount.expiresAt)) return "Expired";
+function tokenStatus(apiKey: ApiKeysApiKey) {
+  if (!apiKey.hasToken) return "None";
+  if (isExpired(apiKey.expiresAt)) return "Expired";
   return "Active";
 }
 
@@ -67,7 +67,7 @@ export function ApiKeysContent({
             className="mt-4 flex items-center"
             onClick={onCreateClick}
             disabled={!canCreate}
-            data-testid="sa-create-btn"
+            data-testid="api-key-create-btn"
           >
             <Icon name="plus" />
             Create API Key
@@ -91,32 +91,36 @@ export function ApiKeysContent({
         </TableRow>
       </TableHead>
       <TableBody>
-        {sorted.map((sa) => (
-          <TableRow key={sa.id} className="last:[&>td]:border-b-0">
+        {sorted.map((apiKey) => (
+          <TableRow key={apiKey.id} className="last:[&>td]:border-b-0">
             <TableCell>
               <div className="flex items-center gap-2">
                 <KeyRound size={16} className="text-gray-500 dark:text-gray-400" />
-                <Link href={getDetailPath(sa.id || "")} className={settingsTableLinkClassName} data-testid="sa-link">
-                  {sa.name || "Unnamed"}
+                <Link
+                  href={getDetailPath(apiKey.id || "")}
+                  className={settingsTableLinkClassName}
+                  data-testid="api-key-link"
+                >
+                  {apiKey.name || "Unnamed"}
                 </Link>
               </div>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{sa.description || "-"}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">{apiKey.description || "-"}</span>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{scopeLabel(sa.canvasIds)}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">{scopeLabel(apiKey.canvasIds)}</span>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{formatDateTime(sa.expiresAt)}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">{formatDateTime(apiKey.expiresAt)}</span>
             </TableCell>
             <TableCell>
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                {sa.createdByName ? sa.createdByName?.trim() : "-"}
+                {apiKey.createdByName ? apiKey.createdByName?.trim() : "-"}
               </span>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{tokenStatus(sa)}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">{tokenStatus(apiKey)}</span>
             </TableCell>
             <TableCell>
               <div className="flex justify-end">
@@ -127,10 +131,10 @@ export function ApiKeysContent({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onDelete(sa.id || "", sa.name || "")}
+                    onClick={() => onDelete(apiKey.id || "", apiKey.name || "")}
                     disabled={!canDelete || deletePending}
                     className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                    data-testid="sa-delete-btn"
+                    data-testid="api-key-delete-btn"
                   >
                     <Icon name="trash-2" size="sm" />
                   </Button>

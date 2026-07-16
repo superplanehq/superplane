@@ -1,4 +1,4 @@
-package serviceaccounts
+package apikeys
 
 import (
 	"context"
@@ -9,11 +9,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	"gorm.io/datatypes"
 )
 
-func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountRequest) (*pb.UpdateServiceAccountResponse, error) {
+func UpdateAPIKey(ctx context.Context, req *pb.UpdateAPIKeyRequest) (*pb.UpdateAPIKeyResponse, error) {
 	_, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -33,7 +33,7 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
-	if !user.IsServiceAccount() {
+	if !user.IsAPIKey() {
 		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
@@ -51,21 +51,21 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 
 	db := database.DB(ctx)
 	if req.CanvasIds != nil {
-		canvasIDs, err := validateServiceAccountCanvasIDs(db, orgID, req.CanvasIds)
+		canvasIDs, err := validateAPIKeyCanvasIDs(db, orgID, req.CanvasIds)
 		if err != nil {
 			return nil, err
 		}
-		user.ServiceAccountCanvasIDs = datatypes.NewJSONSlice(canvasIDs)
+		user.APIKeyCanvasIDs = datatypes.NewJSONSlice(canvasIDs)
 	}
 
 	if req.ClearExpiresAt {
-		user.ServiceAccountExpiresAt = nil
+		user.APIKeyExpiresAt = nil
 	} else if req.ExpiresAt != nil {
 		expiresAt := req.ExpiresAt.AsTime()
 		if !expiresAt.After(time.Now()) {
 			return nil, grpcerrors.InvalidArgument(nil, "expiration must be in the future")
 		}
-		user.ServiceAccountExpiresAt = &expiresAt
+		user.APIKeyExpiresAt = &expiresAt
 	}
 
 	user.UpdatedAt = time.Now()
@@ -74,12 +74,12 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 		return nil, grpcerrors.Internal(err, "failed to update API key")
 	}
 
-	creator, err := creatorUserForServiceAccount(db, orgID, user)
+	creator, err := creatorUserForAPIKey(db, orgID, user)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to update API key")
 	}
 
-	return &pb.UpdateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(user, creator),
+	return &pb.UpdateAPIKeyResponse{
+		ApiKey: serializeAPIKey(user, creator),
 	}, nil
 }
