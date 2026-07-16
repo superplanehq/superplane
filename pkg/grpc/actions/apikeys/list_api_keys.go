@@ -1,4 +1,4 @@
-package serviceaccounts
+package apikeys
 
 import (
 	"context"
@@ -7,10 +7,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 )
 
-func ListServiceAccounts(ctx context.Context) (*pb.ListServiceAccountsResponse, error) {
+func ListAPIKeys(ctx context.Context) (*pb.ListAPIKeysResponse, error) {
 	_, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -22,26 +22,26 @@ func ListServiceAccounts(ctx context.Context) (*pb.ListServiceAccountsResponse, 
 	}
 
 	db := database.DB(ctx)
-	users, err := models.FindServiceAccountsByOrganization(db, orgID)
+	users, err := models.FindAPIKeysByOrganization(db, orgID)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list service accounts")
+		return nil, grpcerrors.Internal(err, "failed to list API keys")
 	}
 
-	creatorsByID, err := creatorsByIDForServiceAccounts(db, orgID, users)
+	creatorsByID, err := creatorsByIDForAPIKeys(db, orgID, users)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list service accounts")
+		return nil, grpcerrors.Internal(err, "failed to list API keys")
 	}
 
-	serviceAccounts := make([]*pb.ServiceAccount, len(users))
+	apiKeys := make([]*pb.APIKey, len(users))
 	for i := range users {
 		var creator *models.User
 		if users[i].CreatedBy != nil {
 			creator = creatorsByID[users[i].CreatedBy.String()]
 		}
-		serviceAccounts[i] = serializeServiceAccount(&users[i], creator)
+		apiKeys[i] = serializeAPIKey(&users[i], creator)
 	}
 
-	return &pb.ListServiceAccountsResponse{
-		ServiceAccounts: serviceAccounts,
+	return &pb.ListAPIKeysResponse{
+		ApiKeys: apiKeys,
 	}, nil
 }
