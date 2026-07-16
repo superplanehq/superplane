@@ -70,8 +70,7 @@ export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditor
     // and HTML editors reuse the CEL dialect but pass a variable dictionary
     // instead, so we leave `envKeySource` unset and let `$` fall back to the
     // top-level globals in those cases.
-    const envKeySource =
-      dialect === "cel" && hasRunNodesMap(rest.exampleObj) ? "__runNodes__" : undefined;
+    const envKeySource = dialect === "cel" && hasRunNodesMap(rest.exampleObj) ? "__runNodes__" : undefined;
     const resolvedExcludedSuggestions = useMemo(() => {
       if (dialect !== "cel") return excludedSuggestions;
       const base = excludedSuggestions ?? [];

@@ -901,10 +901,7 @@ function detectEnvKeyTrigger(left: string): EnvKeyTrigger | null {
   return null;
 }
 
-function resolveEnvRecord(
-  globals: Record<string, unknown>,
-  envKeySource: string | undefined,
-): Record<string, unknown> {
+function resolveEnvRecord(globals: Record<string, unknown>, envKeySource: string | undefined): Record<string, unknown> {
   if (!envKeySource) return globals;
   const nested = globals[envKeySource];
   return isRecord(nested) ? (nested as Record<string, unknown>) : {};

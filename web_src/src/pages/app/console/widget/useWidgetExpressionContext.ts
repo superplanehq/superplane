@@ -74,10 +74,7 @@ export function useWidgetExpressionContext(args: {
 const CATALOG_STUB_NODE_KEY = "example-node";
 const CATALOG_STUB_NODE_SHAPE = { outputs: {}, data: {} };
 
-function withCatalogRunNodesStub(
-  row: Record<string, unknown>,
-  fields: MemoryFieldSummary[],
-): Record<string, unknown> {
+function withCatalogRunNodesStub(row: Record<string, unknown>, fields: MemoryFieldSummary[]): Record<string, unknown> {
   const hasDollar = fields.some((f) => f.field === "$");
   if (!hasDollar) return row;
   const stub = { [CATALOG_STUB_NODE_KEY]: CATALOG_STUB_NODE_SHAPE };
