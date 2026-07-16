@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import {
+  resolveCachedNodeRunId,
+  resolveLiveCanvasNodeClickSyncAction,
+  resolveRunLookupEventForNodeActivity,
+  shouldDeferRunInspectionForLiveNodeClick,
+  shouldOpenConfigurationSidebarForLiveNodeClick,
+} from "./runInspectionLiveNodeLookup";
 
 function execution(overrides: Partial<CanvasesCanvasNodeExecution>): CanvasesCanvasNodeExecution {
   return overrides as CanvasesCanvasNodeExecution;
@@ -94,5 +100,190 @@ describe("resolveRunLookupEventForNodeActivity", () => {
     const runId = resolveCachedNodeRunId("trigger-1", { id: "trigger-1", type: "TYPE_TRIGGER" }, () => null);
 
     expect(runId).toBe("run-from-trigger");
+  });
+});
+
+describe("resolveLiveCanvasNodeClickSyncAction", () => {
+  it("looks up a run from the server when the node has no cached activity", () => {
+    useNodeExecutionStore.getState().clear();
+
+    expect(
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "lookupRun" });
+  });
+
+  it("inspects the cached run when one is already resolved", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "action-1",
+      execution({
+        id: "latest-execution",
+        nodeId: "action-1",
+        runId: "run-from-execution",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "inspectRun", runId: "run-from-execution" });
+  });
+
+  it("looks up a run when activity exists but no cached run id is available", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "action-1",
+      execution({
+        id: "latest-execution",
+        nodeId: "action-1",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "lookupRun" });
+  });
+});
+
+describe("shouldDeferRunInspectionForLiveNodeClick", () => {
+  it("defers run inspection for approval nodes waiting on input", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "approval-1",
+      execution({
+        id: "approval-execution",
+        nodeId: "approval-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "approval-1", type: "TYPE_ACTION", component: "approval" },
+        useNodeExecutionStore.getState().getNodeData("approval-1"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not defer run inspection for finished approval executions", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "approval-1",
+      execution({
+        id: "approval-execution",
+        nodeId: "approval-1",
+        state: "STATE_FINISHED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "approval-1", type: "TYPE_ACTION", component: "approval" },
+        useNodeExecutionStore.getState().getNodeData("approval-1"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not defer run inspection for wait nodes with active executions", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "wait-1",
+      execution({
+        id: "wait-execution",
+        nodeId: "wait-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "wait-1", type: "TYPE_ACTION", component: "wait" },
+        useNodeExecutionStore.getState().getNodeData("wait-1"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not defer run inspection for unrelated components", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "noop-1",
+      execution({
+        id: "noop-execution",
+        nodeId: "noop-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "noop-1", type: "TYPE_ACTION", component: "noop" },
+        useNodeExecutionStore.getState().getNodeData("noop-1"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not defer when the latest approval execution is finished even if an older one is active", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "approval-1",
+      execution({
+        id: "older-approval-execution",
+        nodeId: "approval-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:10:00Z",
+      }),
+    );
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "approval-1",
+      execution({
+        id: "latest-approval-execution",
+        nodeId: "approval-1",
+        state: "STATE_FINISHED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "approval-1", type: "TYPE_ACTION", component: "approval" },
+        useNodeExecutionStore.getState().getNodeData("approval-1"),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("shouldOpenConfigurationSidebarForLiveNodeClick", () => {
+  it("opens the configuration sidebar for setup nodes with configuration errors", () => {
+    expect(
+      shouldOpenConfigurationSidebarForLiveNodeClick(
+        { id: "action-1", type: "TYPE_ACTION", component: "noop", errorMessage: "field 'repository' is required" },
+        { executions: [], events: [] },
+      ),
+    ).toBe(true);
+  });
+
+  it("opens the configuration sidebar for active approval executions", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "approval-1",
+      execution({
+        id: "approval-execution",
+        nodeId: "approval-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldOpenConfigurationSidebarForLiveNodeClick(
+        { id: "approval-1", type: "TYPE_ACTION", component: "approval" },
+        useNodeExecutionStore.getState().getNodeData("approval-1"),
+      ),
+    ).toBe(true);
   });
 });
