@@ -100,7 +100,9 @@ func (c *Query) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to execute query: %w", err)
 	}
 
-	ctx.Metadata.Set(QueryNodeMetadata{Query: config.Query})
+	if err := ctx.Metadata.Set(QueryNodeMetadata{Query: config.Query}); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
 
 	payload := map[string]any{
 		"resultType": data["resultType"],

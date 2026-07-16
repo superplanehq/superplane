@@ -484,8 +484,7 @@ func (c *CreateRepositorySandbox) startClone(ctx core.ActionHookContext, client 
 		}
 
 		ctx.Logger.Errorf("repository clone failed: %v", err)
-		ctx.ExecutionState.Fail("error", fmt.Sprintf("repository clone failed: %v", err))
-		return nil
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("repository clone failed: %v", err))
 	}
 
 	metadata.Clone = &CloneMetadata{
@@ -627,8 +626,7 @@ func (c *CreateRepositorySandbox) pollBootstrapping(ctx core.ActionHookContext, 
 		}
 
 		ctx.Logger.Errorf("bootstrap script failed with exit code %d: %s", result.ExitCode, result.ShortResult())
-		ctx.ExecutionState.Fail("error", fmt.Sprintf("bootstrap script failed with exit code %d: %s", result.ExitCode, result.ShortResult()))
-		return nil
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("bootstrap script failed with exit code %d: %s", result.ExitCode, result.ShortResult()))
 	}
 
 	return c.finish(ctx, metadata)

@@ -119,7 +119,9 @@ func (w *AppMessageWorker) LockAndProcessMessage(message models.AppMessage) erro
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			w.logger.Errorf("failed to publish canvas event created RabbitMQ message: %v", err)
+		}
 	}
 
 	return nil

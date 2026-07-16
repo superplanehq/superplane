@@ -104,7 +104,9 @@ func (c *ExpireSilence) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to expire silence: %w", err)
 	}
 
-	ctx.Metadata.Set(ExpireSilenceNodeMetadata{SilenceID: config.Silence})
+	if err := ctx.Metadata.Set(ExpireSilenceNodeMetadata{SilenceID: config.Silence}); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
 
 	payload := map[string]any{
 		"silenceID": config.Silence,
