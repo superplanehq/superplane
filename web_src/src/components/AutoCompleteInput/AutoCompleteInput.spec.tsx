@@ -250,6 +250,32 @@ describe("AutoCompleteInput suggestions", () => {
     });
   });
 
+  it("accepts the first suggestion with Enter when value preview is disabled", async () => {
+    render(
+      <AutoCompleteInput
+        aria-label="Panel title"
+        exampleObj={{ __root: { data: { name: "DCO" } } }}
+        value=""
+        onChange={vi.fn()}
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "Panel title" });
+    const value = "{{ ro";
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value, selectionStart: value.length } });
+    expect(await screen.findAllByText("root()")).not.toHaveLength(0);
+
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(input).toHaveValue("{{ root().");
+    });
+  });
+
   it("keeps follow-up suggestions visible after the keyboard cursor sync frame", async () => {
     renderRunTitleInput();
     const input = screen.getByRole("textbox", { name: "Run title" });

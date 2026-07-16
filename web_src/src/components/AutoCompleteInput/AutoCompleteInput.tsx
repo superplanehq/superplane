@@ -961,7 +961,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
       const nextHighlightedIndex = canPreserveHighlightedIndex
         ? highlightedIndexRef.current
-        : showValuePreview && newSuggestions.length > 0
+        : newSuggestions.length > 0
           ? 0
           : -1;
       highlightedIndexRef.current = nextHighlightedIndex;
@@ -982,7 +982,6 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       startWord,
       suffix,
       onChange,
-      showValuePreview,
       exampleObj,
       excludedSuggestions,
       computeHighlightedValue,
@@ -1081,7 +1080,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         setSuggestions(nextSuggestions);
         setIsOpen(true);
 
-        const nextHighlightedIndex = showValuePreview ? 0 : -1;
+        const nextHighlightedIndex = nextSuggestions.length > 0 ? 0 : -1;
         highlightedIndexRef.current = nextHighlightedIndex;
         setHighlightedIndex(nextHighlightedIndex);
 
@@ -1094,7 +1093,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           setHighlightedValue(undefined);
         }
       },
-      [computeHighlightedValue, showValuePreview],
+      [computeHighlightedValue],
     );
 
     const closeSuggestions = useCallback(() => {
