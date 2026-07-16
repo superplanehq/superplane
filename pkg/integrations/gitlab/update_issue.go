@@ -103,7 +103,7 @@ func (c *UpdateIssue) Documentation() string {
 - **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
 - **Milestone** (toggle): Milestone to associate with the issue
 
-Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Enabling a field with an empty value clears it - e.g. toggling on Labels or Assignees with nothing selected removes all of them, and toggling on Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
 
 ## Output
 
@@ -253,8 +253,13 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 	}
 
 	raw, _ := ctx.Configuration.(map[string]any)
-	if !newUpdateIssueToggles(raw).hasUpdates() {
+	toggles := newUpdateIssueToggles(raw)
+	if !toggles.hasUpdates() {
 		return errors.New("at least one field must be enabled to update")
+	}
+
+	if toggles.Title && config.Title == "" {
+		return errors.New("title cannot be empty")
 	}
 
 	return ensureProjectInMetadata(
@@ -278,6 +283,10 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	toggles := newUpdateIssueToggles(raw)
 	if !toggles.hasUpdates() {
 		return errors.New("at least one field must be enabled to update")
+	}
+
+	if toggles.Title && config.Title == "" {
+		return errors.New("title cannot be empty")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
