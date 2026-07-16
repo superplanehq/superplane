@@ -16,16 +16,11 @@ import { CopyButton } from "@/ui/CopyButton";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  useServiceAccount,
-  useUpdateServiceAccount,
-  useDeleteServiceAccount,
-  useRegenerateServiceAccountToken,
-} from "@/hooks/useServiceAccounts";
+import { useAPIKey, useUpdateAPIKey, useDeleteAPIKey, useRegenerateAPIKeyToken } from "@/hooks/useApiKeys";
 import { useCanvases } from "@/hooks/useCanvasData";
-import type { ServiceAccountsServiceAccount } from "@/api-client/types.gen";
+import type { ApiKeysApiKey } from "@/api-client/types.gen";
 
-interface ServiceAccountDetailProps {
+interface APIKeyDetailProps {
   organizationId: string;
 }
 
@@ -49,12 +44,12 @@ function formatDateTime(value?: string) {
 }
 
 function useApiKeyEditForm(
-  serviceAccount: ServiceAccountsServiceAccount | null | undefined,
+  apiKey: ApiKeysApiKey | null | undefined,
   id: string | undefined,
   organizationId: string,
   canUpdate: boolean,
 ) {
-  const updateMutation = useUpdateServiceAccount(organizationId);
+  const updateMutation = useUpdateAPIKey(organizationId);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -63,11 +58,11 @@ function useApiKeyEditForm(
   const [editCanvasIds, setEditCanvasIds] = useState<string[]>([]);
 
   const handleEditStart = () => {
-    setEditName(serviceAccount?.name || "");
-    setEditDescription(serviceAccount?.description || "");
-    setEditExpiresAt(toLocalDateTimeInput(serviceAccount?.expiresAt));
-    setEditAccessMode(serviceAccount?.canvasIds?.length ? "canvas" : "organization");
-    setEditCanvasIds(serviceAccount?.canvasIds || []);
+    setEditName(apiKey?.name || "");
+    setEditDescription(apiKey?.description || "");
+    setEditExpiresAt(toLocalDateTimeInput(apiKey?.expiresAt));
+    setEditAccessMode(apiKey?.canvasIds?.length ? "canvas" : "organization");
+    setEditCanvasIds(apiKey?.canvasIds || []);
     setIsEditing(true);
   };
 
@@ -92,7 +87,7 @@ function useApiKeyEditForm(
       return;
     }
 
-    const originalExpiresAt = toLocalDateTimeInput(serviceAccount?.expiresAt);
+    const originalExpiresAt = toLocalDateTimeInput(apiKey?.expiresAt);
     const expiresAtChanged = editExpiresAt !== originalExpiresAt;
 
     try {
@@ -131,24 +126,24 @@ function useApiKeyEditForm(
 }
 
 function useApiKeyTokenActions(
-  serviceAccount: ServiceAccountsServiceAccount | null | undefined,
+  apiKey: ApiKeysApiKey | null | undefined,
   id: string | undefined,
   organizationId: string,
   canDelete: boolean,
   canUpdate: boolean,
 ) {
   const navigate = useNavigate();
-  const deleteMutation = useDeleteServiceAccount(organizationId);
-  const regenerateTokenMutation = useRegenerateServiceAccountToken(organizationId);
+  const deleteMutation = useDeleteAPIKey(organizationId);
+  const regenerateTokenMutation = useRegenerateAPIKeyToken(organizationId);
   const [newToken, setNewToken] = useState<string | null>(null);
 
   const handleDelete = async () => {
     if (!canDelete || !id) return;
-    if (!confirm(`Are you sure you want to delete API key "${serviceAccount?.name}"? This cannot be undone.`)) return;
+    if (!confirm(`Are you sure you want to delete API key "${apiKey?.name}"? This cannot be undone.`)) return;
     try {
       await deleteMutation.mutateAsync(id);
       showSuccessToast("API key deleted");
-      navigate(`/${organizationId}/settings/service-accounts`);
+      navigate(`/${organizationId}/settings/api-keys`);
     } catch (error) {
       showErrorToast(`Failed to delete: ${getApiErrorMessage(error)}`);
     }
@@ -178,17 +173,17 @@ function useApiKeyTokenActions(
   };
 }
 
-export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailProps) {
+export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
   const { id } = useParams<{ id: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
-  const { data: serviceAccount, isLoading } = useServiceAccount(organizationId, id || "");
+  const { data: apiKey, isLoading } = useAPIKey(organizationId, id || "");
   const { data: canvases = [] } = useCanvases(organizationId);
-  usePageTitle(["API Keys", serviceAccount?.name]);
-  const canUpdate = canAct("service_accounts", "update");
-  const canDelete = canAct("service_accounts", "delete");
-  const editForm = useApiKeyEditForm(serviceAccount, id, organizationId, canUpdate);
-  const tokenActions = useApiKeyTokenActions(serviceAccount, id, organizationId, canDelete, canUpdate);
+  usePageTitle(["API Keys", apiKey?.name]);
+  const canUpdate = canAct("api_keys", "update");
+  const canDelete = canAct("api_keys", "delete");
+  const editForm = useApiKeyEditForm(apiKey, id, organizationId, canUpdate);
+  const tokenActions = useApiKeyTokenActions(apiKey, id, organizationId, canDelete, canUpdate);
 
   useReportPageReady(!isLoading && !permissionsLoading && !!id);
 
@@ -204,7 +199,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
     );
   }
 
-  if (!serviceAccount) {
+  if (!apiKey) {
     return (
       <div className="space-y-6 pt-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 overflow-hidden">
@@ -216,19 +211,19 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
     );
   }
 
-  const createdAt = serviceAccount.createdAt ? new Date(serviceAccount.createdAt).toLocaleDateString() : "—";
-  const createdByLabel = serviceAccount.createdByName ? serviceAccount.createdByName.trim() : "—";
-  const serviceAccountsHref = `/${organizationId}/settings/service-accounts`;
+  const createdAt = apiKey.createdAt ? new Date(apiKey.createdAt).toLocaleDateString() : "—";
+  const createdByLabel = apiKey.createdByName ? apiKey.createdByName.trim() : "—";
+  const apiKeysHref = `/${organizationId}/settings/api-keys`;
   const canvasNamesById = new Map(canvases.map((canvas) => [canvas.id, canvas.name || "Unnamed"]));
-  const scopeLabel = serviceAccount.canvasIds?.length
-    ? serviceAccount.canvasIds.map((canvasId) => canvasNamesById.get(canvasId) || canvasId).join(", ")
+  const scopeLabel = apiKey.canvasIds?.length
+    ? apiKey.canvasIds.map((canvasId) => canvasNamesById.get(canvasId) || canvasId).join(", ")
     : "Organization-wide";
 
   return (
     <div className="space-y-6 pt-6">
       {/* Back button */}
       <Link
-        to={serviceAccountsHref}
+        to={apiKeysHref}
         className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition"
         aria-label="Back to API keys"
       >
@@ -242,7 +237,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <KeyRound size={20} className="text-gray-500" />
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{serviceAccount.name}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{apiKey.name}</h2>
             </div>
             <div className="flex gap-2">
               {!editForm.isEditing && (
@@ -255,7 +250,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                     size="sm"
                     onClick={editForm.handleEditStart}
                     disabled={!canUpdate}
-                    data-testid="sa-detail-edit"
+                    data-testid="api-key-detail-edit"
                   >
                     <Icon name="pencil" size="sm" />
                     Edit
@@ -272,7 +267,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                   onClick={tokenActions.handleDelete}
                   disabled={!canDelete || tokenActions.deleteMutation.isPending}
                   className="text-red-600 hover:text-red-700"
-                  data-testid="sa-detail-delete"
+                  data-testid="api-key-detail-delete"
                 >
                   <Icon name="trash-2" size="sm" />
                   Delete
@@ -298,7 +293,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                   value={editForm.editName}
                   onChange={(e) => editForm.setEditName(e.target.value)}
                   required
-                  data-testid="sa-detail-edit-name"
+                  data-testid="api-key-detail-edit-name"
                 />
               </div>
               <div>
@@ -307,7 +302,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                   value={editForm.editDescription}
                   onChange={(e) => editForm.setEditDescription(e.target.value)}
                   rows={3}
-                  data-testid="sa-detail-edit-description"
+                  data-testid="api-key-detail-edit-description"
                 />
               </div>
               <div>
@@ -316,7 +311,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                   value={editForm.editAccessMode}
                   onValueChange={(value) => editForm.setEditAccessMode(value as AccessMode)}
                 >
-                  <SelectTrigger className="w-full" data-testid="sa-detail-edit-access-mode">
+                  <SelectTrigger className="w-full" data-testid="api-key-detail-edit-access-mode">
                     <SelectValue placeholder="Select access" />
                   </SelectTrigger>
                   <SelectContent>
@@ -341,7 +336,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                           <Checkbox
                             checked={editForm.editCanvasIds.includes(canvasId)}
                             onChange={() => editForm.toggleEditCanvas(canvasId)}
-                            data-testid="sa-detail-edit-canvas"
+                            data-testid="api-key-detail-edit-canvas"
                           />
                           <span className="text-gray-800 dark:text-gray-100">{canvas.name || "Unnamed"}</span>
                         </label>
@@ -356,7 +351,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                   type="datetime-local"
                   value={editForm.editExpiresAt}
                   onChange={(e) => editForm.setEditExpiresAt(e.target.value)}
-                  data-testid="sa-detail-edit-expires-at"
+                  data-testid="api-key-detail-edit-expires-at"
                 />
               </div>
               <div className="flex gap-2">
@@ -382,17 +377,17 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
           ) : (
             <dl className="grid grid-cols-2 gap-y-4 text-sm">
               <dt className="text-gray-500 dark:text-gray-400">Description</dt>
-              <dd className="text-gray-800 dark:text-white">{serviceAccount.description || "—"}</dd>
+              <dd className="text-gray-800 dark:text-white">{apiKey.description || "—"}</dd>
               <dt className="text-gray-500 dark:text-gray-400">Access</dt>
               <dd className="text-gray-800 dark:text-white">{scopeLabel}</dd>
               <dt className="text-gray-500 dark:text-gray-400">Expires</dt>
-              <dd className="text-gray-800 dark:text-white">{formatDateTime(serviceAccount.expiresAt)}</dd>
+              <dd className="text-gray-800 dark:text-white">{formatDateTime(apiKey.expiresAt)}</dd>
               <dt className="text-gray-500 dark:text-gray-400">Created by</dt>
               <dd className="text-gray-800 dark:text-white">{createdByLabel}</dd>
               <dt className="text-gray-500 dark:text-gray-400">Created at</dt>
               <dd className="text-gray-800 dark:text-white">{createdAt}</dd>
               <dt className="text-gray-500 dark:text-gray-400">ID</dt>
-              <dd className="text-gray-800 dark:text-white font-mono text-xs">{serviceAccount.id}</dd>
+              <dd className="text-gray-800 dark:text-white font-mono text-xs">{apiKey.id}</dd>
             </dl>
           )}
         </div>
@@ -403,7 +398,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
         <div className="px-6 py-6">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-white mb-2">API Token</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            {serviceAccount.hasToken
+            {apiKey.hasToken
               ? "This API key has an active token. Regenerating will invalidate the current one."
               : "No token is currently active for this API key."}
           </p>
@@ -417,7 +412,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
               disabled={!canUpdate}
               loading={tokenActions.regenerateTokenMutation.isPending}
               loadingText="Regenerating..."
-              data-testid="sa-detail-regenerate-token"
+              data-testid="api-key-detail-regenerate-token"
             >
               <Icon name="refresh-cw" size="sm" />
               Regenerate Token
@@ -447,12 +442,12 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
                   readOnly
                   value={tokenActions.newToken}
                   className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-800"
-                  data-testid="sa-token-display"
+                  data-testid="api-key-token-display"
                 />
                 <CopyButton
                   variant="button"
                   text={tokenActions.newToken}
-                  data-testid="sa-token-copy"
+                  data-testid="api-key-token-copy"
                   onCopyError={() => showErrorToast("Failed to copy token")}
                 >
                   Copy
@@ -460,7 +455,7 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
               </div>
 
               <div className="flex justify-start mt-6">
-                <Button onClick={() => tokenActions.setNewToken(null)} data-testid="sa-token-done">
+                <Button onClick={() => tokenActions.setNewToken(null)} data-testid="api-key-token-done">
                   Done
                 </Button>
               </div>

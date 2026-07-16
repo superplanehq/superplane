@@ -24,7 +24,7 @@ export type CommandPalettePageProps = {
   onExpandIntegrations: () => void;
   onCollapse: () => void;
   onGoToDocs: () => void;
-  onNewServiceAccount: () => void;
+  onNewAPIKey: () => void;
   onNewSecret: () => void;
   onSignOut: () => void;
   onConnectIntegration: () => void;
@@ -129,7 +129,7 @@ function DefaultView(props: CommandPalettePageProps) {
           <span>Go to Docs</span>
         </CommandItem>
 
-        <CommandItem value="new-service-account" onSelect={props.onNewServiceAccount} className="cursor-pointer">
+        <CommandItem value="new-api-key" onSelect={props.onNewAPIKey} className="cursor-pointer">
           <UserPlus className="mr-2 size-4 shrink-0" />
           <span>New API Key</span>
         </CommandItem>
