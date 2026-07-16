@@ -693,6 +693,7 @@ message CanvasNodeExecution {
     STATE_PENDING = 1;
     STATE_STARTED = 2;
     STATE_FINISHED = 3;
+    STATE_CANCELLING = 4;
   }
 
   enum Result {
@@ -724,6 +725,7 @@ message CanvasNodeExecution {
   CanvasEvent root_event = 14;
   UserRef cancelled_by = 15;
   string run_id = 16;
+  google.protobuf.Timestamp cancelled_at = 17;
 }
 
 message CanvasNodeQueueItem {
