@@ -63,6 +63,7 @@ export function useEditor({
   const allPathsRef = useRef(bootstrapPaths.allPaths);
   const finalRepositoryPathsRef = useRef(bootstrapPaths.finalRepositoryPaths);
   const openFileRef = useRef<(path: string) => void>(() => {});
+  const closeFileRef = useRef<(path: string) => void>(() => {});
   const pending = usePendingState({
     generatedPathSet: catalog.generatedPathSet,
     generatedPaths: catalog.generatedPaths,
@@ -71,6 +72,7 @@ export function useEditor({
     loadedContentByPathRef,
     committedContentByPathRef,
     openFile: (path) => openFileRef.current(path),
+    closeFile: (path) => closeFileRef.current(path),
     versionId,
     onSpecFileChange,
   });
@@ -93,6 +95,7 @@ export function useEditor({
 
   const tabs = useFilesTabState(pathLists.allPaths, catalog.generatedPaths, catalog.filesQuery.isLoading);
   openFileRef.current = tabs.openFile;
+  closeFileRef.current = tabs.closeTab;
 
   const selection = useRepositorySelectedFileQuery({
     canvasId,
