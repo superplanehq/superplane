@@ -31,6 +31,12 @@ const (
 	PipelineStatusBlocked   = "blocked"
 )
 
+// zeroSHA is the all-zero commit SHA GitLab sends in push events to signal a
+// ref that did not exist before the push (branch creation, where "before" is
+// zeroed) or no longer exists after it (branch deletion, where "after" is
+// zeroed).
+const zeroSHA = "0000000000000000000000000000000000000000"
+
 type WebhookConfiguration struct {
 	EventType string `json:"eventType" mapstructure:"eventType"`
 	ProjectID string `json:"projectId" mapstructure:"projectId"`

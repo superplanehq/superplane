@@ -22,6 +22,12 @@ var exampleDataOnMilestoneBytes []byte
 //go:embed example_data_on_pipeline.json
 var exampleDataOnPipelineBytes []byte
 
+//go:embed example_data_on_push.json
+var exampleDataOnPushBytes []byte
+
+//go:embed example_data_on_branch_created.json
+var exampleDataOnBranchCreatedBytes []byte
+
 //go:embed example_data_on_release.json
 var exampleDataOnReleaseBytes []byte
 
@@ -45,6 +51,12 @@ var exampleDataOnMilestone map[string]any
 
 var exampleDataOnPipelineOnce sync.Once
 var exampleDataOnPipeline map[string]any
+
+var exampleDataOnPushOnce sync.Once
+var exampleDataOnPush map[string]any
+
+var exampleDataOnBranchCreatedOnce sync.Once
+var exampleDataOnBranchCreated map[string]any
 
 var exampleDataOnReleaseOnce sync.Once
 var exampleDataOnRelease map[string]any
@@ -73,6 +85,14 @@ func (m *OnMilestone) ExampleData() map[string]any {
 
 func (p *OnPipeline) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPipelineOnce, exampleDataOnPipelineBytes, &exampleDataOnPipeline)
+}
+
+func (p *OnPush) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPushOnce, exampleDataOnPushBytes, &exampleDataOnPush)
+}
+
+func (t *OnBranchCreated) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnBranchCreatedOnce, exampleDataOnBranchCreatedBytes, &exampleDataOnBranchCreated)
 }
 
 func (r *OnRelease) ExampleData() map[string]any {
