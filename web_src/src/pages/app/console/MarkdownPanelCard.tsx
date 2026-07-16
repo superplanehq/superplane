@@ -124,7 +124,7 @@ export function MarkdownPanelCard({ panel, readOnly, onDelete, onChange, onEditi
   const [draftBody, setDraftBody] = useState(body);
   const [draftTitle, setDraftTitle] = useState(persistedTitle);
   const [draftVariables, setDraftVariables] = useState<MarkdownVariable[]>(variables);
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Surfaced when an in-card save is blocked by the shared variable validator
