@@ -14,6 +14,7 @@ type UsePendingStateOptions = {
   loadedContentByPathRef: RefObject<Record<string, string>>;
   committedContentByPathRef: RefObject<Record<string, string>>;
   openFile: (path: string) => void;
+  closeFile: (path: string) => void;
   versionId?: string;
   onSpecFileChange?: (path: string, content: string) => void;
 };
@@ -26,6 +27,7 @@ export function usePendingState({
   loadedContentByPathRef,
   committedContentByPathRef,
   openFile,
+  closeFile,
   versionId,
   onSpecFileChange,
 }: UsePendingStateOptions) {
@@ -101,8 +103,12 @@ export function usePendingState({
     (path: string) => {
       if (generatedPathSet.has(path)) return;
       setPendingChangesByPath((current) => applyPendingDelete(current, path));
+      // Close the tab so a deleted file does not linger in the tab bar (it is
+      // also removed from the file list). The staged deletion is still tracked
+      // in pendingChangesByPath and surfaced in the Diff dialog.
+      closeFile(path);
     },
-    [generatedPathSet],
+    [closeFile, generatedPathSet],
   );
 
   const discardAllChanges = useCallback(() => {
