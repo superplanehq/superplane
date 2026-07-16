@@ -2,7 +2,6 @@ package route53
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -15,36 +14,18 @@ var exampleOutputUpsertRecordBytes []byte
 
 //go:embed example_output_delete_record.json
 var exampleOutputDeleteRecordBytes []byte
-
-var exampleOutputCreateRecordOnce sync.Once
-var exampleOutputCreateRecord map[string]any
-
-var exampleOutputUpsertRecordOnce sync.Once
-var exampleOutputUpsertRecord map[string]any
-
-var exampleOutputDeleteRecordOnce sync.Once
-var exampleOutputDeleteRecord map[string]any
+var exampleOutputCreateRecord = utils.NewEmbeddedJSON(exampleOutputCreateRecordBytes)
+var exampleOutputUpsertRecord = utils.NewEmbeddedJSON(exampleOutputUpsertRecordBytes)
+var exampleOutputDeleteRecord = utils.NewEmbeddedJSON(exampleOutputDeleteRecordBytes)
 
 func (c *CreateRecord) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateRecordOnce,
-		exampleOutputCreateRecordBytes,
-		&exampleOutputCreateRecord,
-	)
+	return exampleOutputCreateRecord.Value()
 }
 
 func (c *UpsertRecord) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpsertRecordOnce,
-		exampleOutputUpsertRecordBytes,
-		&exampleOutputUpsertRecord,
-	)
+	return exampleOutputUpsertRecord.Value()
 }
 
 func (c *DeleteRecord) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeleteRecordOnce,
-		exampleOutputDeleteRecordBytes,
-		&exampleOutputDeleteRecord,
-	)
+	return exampleOutputDeleteRecord.Value()
 }

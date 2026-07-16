@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -19,9 +18,7 @@ type CreateOriginRule struct{}
 
 //go:embed example_output_create_origin_rule.json
 var exampleOutputCreateOriginRuleBytes []byte
-
-var exampleOutputCreateOriginRuleOnce sync.Once
-var exampleOutputCreateOriginRule map[string]any
+var exampleOutputCreateOriginRule = utils.NewEmbeddedJSON(exampleOutputCreateOriginRuleBytes)
 
 type CreateOriginRuleSpec struct {
 	Zone        string                `json:"zone" mapstructure:"zone"`
@@ -80,7 +77,7 @@ func (c *CreateOriginRule) OutputChannels(configuration any) []core.OutputChanne
 }
 
 func (c *CreateOriginRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateOriginRuleOnce, exampleOutputCreateOriginRuleBytes, &exampleOutputCreateOriginRule)
+	return exampleOutputCreateOriginRule.Value()
 }
 
 func (c *CreateOriginRule) Configuration() []configuration.Field {

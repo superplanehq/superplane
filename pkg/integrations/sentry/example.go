@@ -2,145 +2,94 @@ package sentry
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 //go:embed example_data_on_issue.json
 var exampleDataOnIssueBytes []byte
-
-var exampleDataOnIssueOnce sync.Once
-var exampleDataOnIssue map[string]any
+var exampleDataOnIssue = utils.NewEmbeddedJSON(exampleDataOnIssueBytes)
 
 //go:embed example_output_update_issue.json
 var exampleOutputUpdateIssueBytes []byte
-
-var exampleOutputUpdateIssueOnce sync.Once
-var exampleOutputUpdateIssue map[string]any
+var exampleOutputUpdateIssue = utils.NewEmbeddedJSON(exampleOutputUpdateIssueBytes)
 
 //go:embed example_output_get_issue.json
 var exampleOutputGetIssueBytes []byte
-
-var exampleOutputGetIssueOnce sync.Once
-var exampleOutputGetIssue map[string]any
+var exampleOutputGetIssue = utils.NewEmbeddedJSON(exampleOutputGetIssueBytes)
 
 //go:embed example_output_create_alert.json
 var exampleOutputCreateAlertBytes []byte
-
-var exampleOutputCreateAlertOnce sync.Once
-var exampleOutputCreateAlert map[string]any
+var exampleOutputCreateAlert = utils.NewEmbeddedJSON(exampleOutputCreateAlertBytes)
 
 //go:embed example_output_delete_alert.json
 var exampleOutputDeleteAlertBytes []byte
-
-var exampleOutputDeleteAlertOnce sync.Once
-var exampleOutputDeleteAlert map[string]any
+var exampleOutputDeleteAlert = utils.NewEmbeddedJSON(exampleOutputDeleteAlertBytes)
 
 //go:embed example_output_update_alert.json
 var exampleOutputUpdateAlertBytes []byte
-
-var exampleOutputUpdateAlertOnce sync.Once
-var exampleOutputUpdateAlert map[string]any
+var exampleOutputUpdateAlert = utils.NewEmbeddedJSON(exampleOutputUpdateAlertBytes)
 
 //go:embed example_output_list_alerts.json
 var exampleOutputListAlertsBytes []byte
-
-var exampleOutputListAlertsOnce sync.Once
-var exampleOutputListAlerts map[string]any
+var exampleOutputListAlerts = utils.NewEmbeddedJSON(exampleOutputListAlertsBytes)
 
 //go:embed example_output_get_alert.json
 var exampleOutputGetAlertBytes []byte
-
-var exampleOutputGetAlertOnce sync.Once
-var exampleOutputGetAlert map[string]any
+var exampleOutputGetAlert = utils.NewEmbeddedJSON(exampleOutputGetAlertBytes)
 
 //go:embed example_output_create_release.json
 var exampleOutputCreateReleaseBytes []byte
-
-var exampleOutputCreateReleaseOnce sync.Once
-var exampleOutputCreateRelease map[string]any
+var exampleOutputCreateRelease = utils.NewEmbeddedJSON(exampleOutputCreateReleaseBytes)
 
 //go:embed example_output_create_deploy.json
 var exampleOutputCreateDeployBytes []byte
-
-var exampleOutputCreateDeployOnce sync.Once
-var exampleOutputCreateDeploy map[string]any
+var exampleOutputCreateDeploy = utils.NewEmbeddedJSON(exampleOutputCreateDeployBytes)
 
 //go:embed example_output_link_github_issue.json
 var exampleOutputLinkGitHubIssueBytes []byte
-
-var exampleOutputLinkGitHubIssueOnce sync.Once
-var exampleOutputLinkGitHubIssue map[string]any
+var exampleOutputLinkGitHubIssue = utils.NewEmbeddedJSON(exampleOutputLinkGitHubIssueBytes)
 
 func (t *OnIssue) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
+	return exampleDataOnIssue.Value()
 }
 
 func (c *UpdateIssue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueOnce, exampleOutputUpdateIssueBytes, &exampleOutputUpdateIssue)
+	return exampleOutputUpdateIssue.Value()
 }
 
 func (c *CreateAlert) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateAlertOnce,
-		exampleOutputCreateAlertBytes,
-		&exampleOutputCreateAlert,
-	)
+	return exampleOutputCreateAlert.Value()
 }
 
 func (c *UpdateAlert) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdateAlertOnce,
-		exampleOutputUpdateAlertBytes,
-		&exampleOutputUpdateAlert,
-	)
+	return exampleOutputUpdateAlert.Value()
 }
 
 func (c *DeleteAlert) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeleteAlertOnce,
-		exampleOutputDeleteAlertBytes,
-		&exampleOutputDeleteAlert,
-	)
+	return exampleOutputDeleteAlert.Value()
 }
 
 func (c *ListAlerts) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputListAlertsOnce,
-		exampleOutputListAlertsBytes,
-		&exampleOutputListAlerts,
-	)
+	return exampleOutputListAlerts.Value()
 }
 
 func (c *GetAlert) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAlertOnce, exampleOutputGetAlertBytes, &exampleOutputGetAlert)
+	return exampleOutputGetAlert.Value()
 }
 
 func (c *GetIssue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIssueOnce, exampleOutputGetIssueBytes, &exampleOutputGetIssue)
+	return exampleOutputGetIssue.Value()
 }
 
 func (c *CreateRelease) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateReleaseOnce,
-		exampleOutputCreateReleaseBytes,
-		&exampleOutputCreateRelease,
-	)
+	return exampleOutputCreateRelease.Value()
 }
 
 func (c *CreateDeploy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateDeployOnce,
-		exampleOutputCreateDeployBytes,
-		&exampleOutputCreateDeploy,
-	)
+	return exampleOutputCreateDeploy.Value()
 }
 
 func (c *LinkGitHubIssue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputLinkGitHubIssueOnce,
-		exampleOutputLinkGitHubIssueBytes,
-		&exampleOutputLinkGitHubIssue,
-	)
+	return exampleOutputLinkGitHubIssue.Value()
 }

@@ -2,27 +2,22 @@ package claude
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 //go:embed example_output_text_prompt.json
 var exampleOutputTextPromptBytes []byte
-
-var exampleOutputTextPromptOnce sync.Once
-var exampleOutputTextPrompt map[string]any
+var exampleOutputTextPrompt = utils.NewEmbeddedJSON(exampleOutputTextPromptBytes)
 
 func (c *TextPrompt) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputTextPromptOnce, exampleOutputTextPromptBytes, &exampleOutputTextPrompt)
+	return exampleOutputTextPrompt.Value()
 }
 
 //go:embed example_output_create_batch_message.json
 var exampleOutputCreateBatchMessageBytes []byte
-
-var exampleOutputCreateBatchMessageOnce sync.Once
-var exampleOutputCreateBatchMessage map[string]any
+var exampleOutputCreateBatchMessage = utils.NewEmbeddedJSON(exampleOutputCreateBatchMessageBytes)
 
 func (c *CreateBatchMessage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateBatchMessageOnce, exampleOutputCreateBatchMessageBytes, &exampleOutputCreateBatchMessage)
+	return exampleOutputCreateBatchMessage.Value()
 }

@@ -2,7 +2,6 @@ package prometheus
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -27,52 +26,38 @@ var exampleOutputQueryBytes []byte
 
 //go:embed example_output_query_range.json
 var exampleOutputQueryRangeBytes []byte
-
-var exampleDataOnAlertOnce sync.Once
-var exampleDataOnAlert map[string]any
-
-var exampleOutputGetAlertOnce sync.Once
-var exampleOutputGetAlert map[string]any
-
-var exampleOutputCreateSilenceOnce sync.Once
-var exampleOutputCreateSilence map[string]any
-
-var exampleOutputExpireSilenceOnce sync.Once
-var exampleOutputExpireSilence map[string]any
-
-var exampleOutputGetSilenceOnce sync.Once
-var exampleOutputGetSilence map[string]any
-
-var exampleOutputQueryOnce sync.Once
-var exampleOutputQuery map[string]any
-
-var exampleOutputQueryRangeOnce sync.Once
-var exampleOutputQueryRange map[string]any
+var exampleDataOnAlert = utils.NewEmbeddedJSON(exampleDataOnAlertBytes)
+var exampleOutputGetAlert = utils.NewEmbeddedJSON(exampleOutputGetAlertBytes)
+var exampleOutputCreateSilence = utils.NewEmbeddedJSON(exampleOutputCreateSilenceBytes)
+var exampleOutputExpireSilence = utils.NewEmbeddedJSON(exampleOutputExpireSilenceBytes)
+var exampleOutputGetSilence = utils.NewEmbeddedJSON(exampleOutputGetSilenceBytes)
+var exampleOutputQuery = utils.NewEmbeddedJSON(exampleOutputQueryBytes)
+var exampleOutputQueryRange = utils.NewEmbeddedJSON(exampleOutputQueryRangeBytes)
 
 func (t *OnAlert) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertOnce, exampleDataOnAlertBytes, &exampleDataOnAlert)
+	return exampleDataOnAlert.Value()
 }
 
 func (c *GetAlert) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAlertOnce, exampleOutputGetAlertBytes, &exampleOutputGetAlert)
+	return exampleOutputGetAlert.Value()
 }
 
 func (c *CreateSilence) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSilenceOnce, exampleOutputCreateSilenceBytes, &exampleOutputCreateSilence)
+	return exampleOutputCreateSilence.Value()
 }
 
 func (c *ExpireSilence) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputExpireSilenceOnce, exampleOutputExpireSilenceBytes, &exampleOutputExpireSilence)
+	return exampleOutputExpireSilence.Value()
 }
 
 func (c *GetSilence) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetSilenceOnce, exampleOutputGetSilenceBytes, &exampleOutputGetSilence)
+	return exampleOutputGetSilence.Value()
 }
 
 func (c *Query) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryOnce, exampleOutputQueryBytes, &exampleOutputQuery)
+	return exampleOutputQuery.Value()
 }
 
 func (c *QueryRange) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryRangeOnce, exampleOutputQueryRangeBytes, &exampleOutputQueryRange)
+	return exampleOutputQueryRange.Value()
 }

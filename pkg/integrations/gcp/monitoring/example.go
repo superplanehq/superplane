@@ -2,7 +2,6 @@ package monitoring
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -32,59 +31,44 @@ var exampleOutputExpireSnoozeBytes []byte
 var exampleDataOnAlertBytes []byte
 
 var (
-	exampleOutputCreateAlertingPolicyOnce sync.Once
-	exampleOutputCreateAlertingPolicy     map[string]any
-
-	exampleOutputGetAlertingPolicyOnce sync.Once
-	exampleOutputGetAlertingPolicy     map[string]any
-
-	exampleOutputDeleteAlertingPolicyOnce sync.Once
-	exampleOutputDeleteAlertingPolicy     map[string]any
-
-	exampleOutputUpdateAlertingPolicyOnce sync.Once
-	exampleOutputUpdateAlertingPolicy     map[string]any
-
-	exampleOutputCreateSnoozeOnce sync.Once
-	exampleOutputCreateSnooze     map[string]any
-
-	exampleOutputGetSnoozeOnce sync.Once
-	exampleOutputGetSnooze     map[string]any
-
-	exampleOutputExpireSnoozeOnce sync.Once
-	exampleOutputExpireSnooze     map[string]any
-
-	exampleDataOnAlertOnce sync.Once
-	exampleDataOnAlert     map[string]any
+	exampleOutputCreateAlertingPolicy = utils.NewEmbeddedJSON(exampleOutputCreateAlertingPolicyBytes)
+	exampleOutputGetAlertingPolicy    = utils.NewEmbeddedJSON(exampleOutputGetAlertingPolicyBytes)
+	exampleOutputDeleteAlertingPolicy = utils.NewEmbeddedJSON(exampleOutputDeleteAlertingPolicyBytes)
+	exampleOutputUpdateAlertingPolicy = utils.NewEmbeddedJSON(exampleOutputUpdateAlertingPolicyBytes)
+	exampleOutputCreateSnooze         = utils.NewEmbeddedJSON(exampleOutputCreateSnoozeBytes)
+	exampleOutputGetSnooze            = utils.NewEmbeddedJSON(exampleOutputGetSnoozeBytes)
+	exampleOutputExpireSnooze         = utils.NewEmbeddedJSON(exampleOutputExpireSnoozeBytes)
+	exampleDataOnAlert                = utils.NewEmbeddedJSON(exampleDataOnAlertBytes)
 )
 
 func (c *CreateSnooze) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSnoozeOnce, exampleOutputCreateSnoozeBytes, &exampleOutputCreateSnooze)
+	return exampleOutputCreateSnooze.Value()
 }
 
 func (g *GetSnooze) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetSnoozeOnce, exampleOutputGetSnoozeBytes, &exampleOutputGetSnooze)
+	return exampleOutputGetSnooze.Value()
 }
 
 func (e *ExpireSnooze) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputExpireSnoozeOnce, exampleOutputExpireSnoozeBytes, &exampleOutputExpireSnooze)
+	return exampleOutputExpireSnooze.Value()
 }
 
 func onAlertExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertOnce, exampleDataOnAlertBytes, &exampleDataOnAlert)
+	return exampleDataOnAlert.Value()
 }
 
 func (c *CreateAlertingPolicy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAlertingPolicyOnce, exampleOutputCreateAlertingPolicyBytes, &exampleOutputCreateAlertingPolicy)
+	return exampleOutputCreateAlertingPolicy.Value()
 }
 
 func (g *GetAlertingPolicy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAlertingPolicyOnce, exampleOutputGetAlertingPolicyBytes, &exampleOutputGetAlertingPolicy)
+	return exampleOutputGetAlertingPolicy.Value()
 }
 
 func (d *DeleteAlertingPolicy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAlertingPolicyOnce, exampleOutputDeleteAlertingPolicyBytes, &exampleOutputDeleteAlertingPolicy)
+	return exampleOutputDeleteAlertingPolicy.Value()
 }
 
 func (u *UpdateAlertingPolicy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAlertingPolicyOnce, exampleOutputUpdateAlertingPolicyBytes, &exampleOutputUpdateAlertingPolicy)
+	return exampleOutputUpdateAlertingPolicy.Value()
 }

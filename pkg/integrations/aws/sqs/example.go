@@ -2,57 +2,46 @@ package sqs
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 //go:embed example_output_create_queue.json
 var exampleOutputCreateQueueBytes []byte
-
-var exampleOutputCreateQueueOnce sync.Once
-var exampleOutputCreateQueue map[string]any
+var exampleOutputCreateQueue = utils.NewEmbeddedJSON(exampleOutputCreateQueueBytes)
 
 //go:embed example_output_delete_queue.json
 var exampleOutputDeleteQueueBytes []byte
-
-var exampleOutputDeleteQueueOnce sync.Once
-var exampleOutputDeleteQueue map[string]any
+var exampleOutputDeleteQueue = utils.NewEmbeddedJSON(exampleOutputDeleteQueueBytes)
 
 //go:embed example_output_purge_queue.json
 var exampleOutputPurgeQueueBytes []byte
-
-var exampleOutputPurgeQueueOnce sync.Once
-var exampleOutputPurgeQueue map[string]any
+var exampleOutputPurgeQueue = utils.NewEmbeddedJSON(exampleOutputPurgeQueueBytes)
 
 //go:embed example_output_get_queue.json
 var exampleOutputGetQueueBytes []byte
-
-var exampleOutputGetQueueOnce sync.Once
-var exampleOutputGetQueue map[string]any
+var exampleOutputGetQueue = utils.NewEmbeddedJSON(exampleOutputGetQueueBytes)
 
 //go:embed example_output_send_message.json
 var exampleOutputSendMessageBytes []byte
-
-var exampleOutputSendMessageOnce sync.Once
-var exampleOutputSendMessage map[string]any
+var exampleOutputSendMessage = utils.NewEmbeddedJSON(exampleOutputSendMessageBytes)
 
 func (c *CreateQueue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateQueueOnce, exampleOutputCreateQueueBytes, &exampleOutputCreateQueue)
+	return exampleOutputCreateQueue.Value()
 }
 
 func (c *DeleteQueue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteQueueOnce, exampleOutputDeleteQueueBytes, &exampleOutputDeleteQueue)
+	return exampleOutputDeleteQueue.Value()
 }
 
 func (c *PurgeQueue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputPurgeQueueOnce, exampleOutputPurgeQueueBytes, &exampleOutputPurgeQueue)
+	return exampleOutputPurgeQueue.Value()
 }
 
 func (c *GetQueue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetQueueOnce, exampleOutputGetQueueBytes, &exampleOutputGetQueue)
+	return exampleOutputGetQueue.Value()
 }
 
 func (c *SendMessage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputSendMessageOnce, exampleOutputSendMessageBytes, &exampleOutputSendMessage)
+	return exampleOutputSendMessage.Value()
 }

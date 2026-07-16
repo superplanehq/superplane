@@ -2,7 +2,6 @@ package grafana
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -90,263 +89,143 @@ var exampleOutputUpdateHTTPSyntheticCheckBytes []byte
 
 //go:embed example_output_delete_http_synthetic_check.json
 var exampleOutputDeleteHTTPSyntheticCheckBytes []byte
-
-var exampleOutputQueryDataSourceOnce sync.Once
-var exampleOutputQueryDataSource map[string]any
-
-var exampleOutputCreateAlertRuleOnce sync.Once
-var exampleOutputCreateAlertRule map[string]any
-
-var exampleOutputGetAlertRuleOnce sync.Once
-var exampleOutputGetAlertRule map[string]any
-
-var exampleOutputUpdateAlertRuleOnce sync.Once
-var exampleOutputUpdateAlertRule map[string]any
-
-var exampleOutputDeleteAlertRuleOnce sync.Once
-var exampleOutputDeleteAlertRule map[string]any
-
-var exampleOutputListAlertRulesOnce sync.Once
-var exampleOutputListAlertRules map[string]any
-
-var exampleDataOnAlertFiringOnce sync.Once
-var exampleDataOnAlertFiring map[string]any
-
-var exampleOutputQueryLogsOnce sync.Once
-var exampleOutputQueryLogs map[string]any
-
-var exampleOutputQueryTracesOnce sync.Once
-var exampleOutputQueryTraces map[string]any
-
-var exampleOutputGetDashboardOnce sync.Once
-var exampleOutputGetDashboard map[string]any
-
-var exampleOutputRenderPanelOnce sync.Once
-var exampleOutputRenderPanel map[string]any
-
-var exampleOutputListSilencesOnce sync.Once
-var exampleOutputListSilences map[string]any
-
-var exampleOutputGetSilenceOnce sync.Once
-var exampleOutputGetSilence map[string]any
-
-var exampleOutputCreateSilenceOnce sync.Once
-var exampleOutputCreateSilence map[string]any
-
-var exampleOutputDeleteSilenceOnce sync.Once
-var exampleOutputDeleteSilence map[string]any
-
-var exampleOutputCreateAnnotationOnce sync.Once
-var exampleOutputCreateAnnotation map[string]any
-
-var exampleOutputListAnnotationsOnce sync.Once
-var exampleOutputListAnnotations map[string]any
-
-var exampleOutputDeleteAnnotationOnce sync.Once
-var exampleOutputDeleteAnnotation map[string]any
-
-var exampleOutputDeclareIncidentOnce sync.Once
-var exampleOutputDeclareIncident map[string]any
-
-var exampleOutputDeclareDrillOnce sync.Once
-var exampleOutputDeclareDrill map[string]any
-
-var exampleOutputGetIncidentOnce sync.Once
-var exampleOutputGetIncident map[string]any
-
-var exampleOutputUpdateIncidentOnce sync.Once
-var exampleOutputUpdateIncident map[string]any
-
-var exampleOutputResolveIncidentOnce sync.Once
-var exampleOutputResolveIncident map[string]any
-
-var exampleOutputAddIncidentActivityOnce sync.Once
-var exampleOutputAddIncidentActivity map[string]any
-
-var exampleOutputCreateHTTPSyntheticCheckOnce sync.Once
-var exampleOutputCreateHTTPSyntheticCheck map[string]any
-
-var exampleOutputGetHTTPSyntheticCheckOnce sync.Once
-var exampleOutputGetHTTPSyntheticCheck map[string]any
-
-var exampleOutputUpdateHTTPSyntheticCheckOnce sync.Once
-var exampleOutputUpdateHTTPSyntheticCheck map[string]any
-
-var exampleOutputDeleteHTTPSyntheticCheckOnce sync.Once
-var exampleOutputDeleteHTTPSyntheticCheck map[string]any
+var exampleOutputQueryDataSource = utils.NewEmbeddedJSON(exampleOutputQueryDataSourceBytes)
+var exampleOutputCreateAlertRule = utils.NewEmbeddedJSON(exampleOutputCreateAlertRuleBytes)
+var exampleOutputGetAlertRule = utils.NewEmbeddedJSON(exampleOutputGetAlertRuleBytes)
+var exampleOutputUpdateAlertRule = utils.NewEmbeddedJSON(exampleOutputUpdateAlertRuleBytes)
+var exampleOutputDeleteAlertRule = utils.NewEmbeddedJSON(exampleOutputDeleteAlertRuleBytes)
+var exampleOutputListAlertRules = utils.NewEmbeddedJSON(exampleOutputListAlertRulesBytes)
+var exampleDataOnAlertFiring = utils.NewEmbeddedJSON(exampleDataOnAlertFiringBytes)
+var exampleOutputQueryLogs = utils.NewEmbeddedJSON(exampleOutputQueryLogsBytes)
+var exampleOutputQueryTraces = utils.NewEmbeddedJSON(exampleOutputQueryTracesBytes)
+var exampleOutputGetDashboard = utils.NewEmbeddedJSON(exampleOutputGetDashboardBytes)
+var exampleOutputRenderPanel = utils.NewEmbeddedJSON(exampleOutputRenderPanelBytes)
+var exampleOutputListSilences = utils.NewEmbeddedJSON(exampleOutputListSilencesBytes)
+var exampleOutputGetSilence = utils.NewEmbeddedJSON(exampleOutputGetSilenceBytes)
+var exampleOutputCreateSilence = utils.NewEmbeddedJSON(exampleOutputCreateSilenceBytes)
+var exampleOutputDeleteSilence = utils.NewEmbeddedJSON(exampleOutputDeleteSilenceBytes)
+var exampleOutputCreateAnnotation = utils.NewEmbeddedJSON(exampleOutputCreateAnnotationBytes)
+var exampleOutputListAnnotations = utils.NewEmbeddedJSON(exampleOutputListAnnotationsBytes)
+var exampleOutputDeleteAnnotation = utils.NewEmbeddedJSON(exampleOutputDeleteAnnotationBytes)
+var exampleOutputDeclareIncident = utils.NewEmbeddedJSON(exampleOutputDeclareIncidentBytes)
+var exampleOutputDeclareDrill = utils.NewEmbeddedJSON(exampleOutputDeclareDrillBytes)
+var exampleOutputGetIncident = utils.NewEmbeddedJSON(exampleOutputGetIncidentBytes)
+var exampleOutputUpdateIncident = utils.NewEmbeddedJSON(exampleOutputUpdateIncidentBytes)
+var exampleOutputResolveIncident = utils.NewEmbeddedJSON(exampleOutputResolveIncidentBytes)
+var exampleOutputAddIncidentActivity = utils.NewEmbeddedJSON(exampleOutputAddIncidentActivityBytes)
+var exampleOutputCreateHTTPSyntheticCheck = utils.NewEmbeddedJSON(exampleOutputCreateHTTPSyntheticCheckBytes)
+var exampleOutputGetHTTPSyntheticCheck = utils.NewEmbeddedJSON(exampleOutputGetHTTPSyntheticCheckBytes)
+var exampleOutputUpdateHTTPSyntheticCheck = utils.NewEmbeddedJSON(exampleOutputUpdateHTTPSyntheticCheckBytes)
+var exampleOutputDeleteHTTPSyntheticCheck = utils.NewEmbeddedJSON(exampleOutputDeleteHTTPSyntheticCheckBytes)
 
 func (q *QueryDataSource) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryDataSourceOnce, exampleOutputQueryDataSourceBytes, &exampleOutputQueryDataSource)
+	return exampleOutputQueryDataSource.Value()
 }
 
 func (c *CreateAlertRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateAlertRuleOnce,
-		exampleOutputCreateAlertRuleBytes,
-		&exampleOutputCreateAlertRule,
-	)
+	return exampleOutputCreateAlertRule.Value()
 }
 
 func (c *GetAlertRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetAlertRuleOnce,
-		exampleOutputGetAlertRuleBytes,
-		&exampleOutputGetAlertRule,
-	)
+	return exampleOutputGetAlertRule.Value()
 }
 
 func (c *UpdateAlertRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdateAlertRuleOnce,
-		exampleOutputUpdateAlertRuleBytes,
-		&exampleOutputUpdateAlertRule,
-	)
+	return exampleOutputUpdateAlertRule.Value()
 }
 
 func (c *DeleteAlertRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeleteAlertRuleOnce,
-		exampleOutputDeleteAlertRuleBytes,
-		&exampleOutputDeleteAlertRule,
-	)
+	return exampleOutputDeleteAlertRule.Value()
 }
 
 func (c *ListAlertRules) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputListAlertRulesOnce,
-		exampleOutputListAlertRulesBytes,
-		&exampleOutputListAlertRules,
-	)
+	return exampleOutputListAlertRules.Value()
 }
 
 func (t *OnAlertFiring) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlertFiringOnce, exampleDataOnAlertFiringBytes, &exampleDataOnAlertFiring)
+	return exampleDataOnAlertFiring.Value()
 }
 
 func (q *QueryLogs) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryLogsOnce, exampleOutputQueryLogsBytes, &exampleOutputQueryLogs)
+	return exampleOutputQueryLogs.Value()
 }
 
 func (q *QueryTraces) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputQueryTracesOnce, exampleOutputQueryTracesBytes, &exampleOutputQueryTraces)
+	return exampleOutputQueryTraces.Value()
 }
 
 func (c *GetDashboard) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetDashboardOnce,
-		exampleOutputGetDashboardBytes,
-		&exampleOutputGetDashboard,
-	)
+	return exampleOutputGetDashboard.Value()
 }
 
 func (c *RenderPanel) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputRenderPanelOnce,
-		exampleOutputRenderPanelBytes,
-		&exampleOutputRenderPanel,
-	)
+	return exampleOutputRenderPanel.Value()
 }
 
 func (l *ListSilences) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputListSilencesOnce, exampleOutputListSilencesBytes, &exampleOutputListSilences)
+	return exampleOutputListSilences.Value()
 }
 
 func (g *GetSilence) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetSilenceOnce, exampleOutputGetSilenceBytes, &exampleOutputGetSilence)
+	return exampleOutputGetSilence.Value()
 }
 
 func (c *CreateSilence) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSilenceOnce, exampleOutputCreateSilenceBytes, &exampleOutputCreateSilence)
+	return exampleOutputCreateSilence.Value()
 }
 
 func (d *DeleteSilence) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteSilenceOnce, exampleOutputDeleteSilenceBytes, &exampleOutputDeleteSilence)
+	return exampleOutputDeleteSilence.Value()
 }
 
 func (c *CreateAnnotation) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAnnotationOnce, exampleOutputCreateAnnotationBytes, &exampleOutputCreateAnnotation)
+	return exampleOutputCreateAnnotation.Value()
 }
 
 func (l *ListAnnotations) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputListAnnotationsOnce, exampleOutputListAnnotationsBytes, &exampleOutputListAnnotations)
+	return exampleOutputListAnnotations.Value()
 }
 
 func (d *DeleteAnnotation) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAnnotationOnce, exampleOutputDeleteAnnotationBytes, &exampleOutputDeleteAnnotation)
+	return exampleOutputDeleteAnnotation.Value()
 }
 
 func (d *DeclareIncident) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeclareIncidentOnce,
-		exampleOutputDeclareIncidentBytes,
-		&exampleOutputDeclareIncident,
-	)
+	return exampleOutputDeclareIncident.Value()
 }
 
 func (d *DeclareDrill) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeclareDrillOnce,
-		exampleOutputDeclareDrillBytes,
-		&exampleOutputDeclareDrill,
-	)
+	return exampleOutputDeclareDrill.Value()
 }
 
 func (g *GetIncident) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIncidentOnce, exampleOutputGetIncidentBytes, &exampleOutputGetIncident)
+	return exampleOutputGetIncident.Value()
 }
 
 func (u *UpdateIncident) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdateIncidentOnce,
-		exampleOutputUpdateIncidentBytes,
-		&exampleOutputUpdateIncident,
-	)
+	return exampleOutputUpdateIncident.Value()
 }
 
 func (r *ResolveIncident) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputResolveIncidentOnce,
-		exampleOutputResolveIncidentBytes,
-		&exampleOutputResolveIncident,
-	)
+	return exampleOutputResolveIncident.Value()
 }
 
 func (a *AddIncidentActivity) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputAddIncidentActivityOnce,
-		exampleOutputAddIncidentActivityBytes,
-		&exampleOutputAddIncidentActivity,
-	)
+	return exampleOutputAddIncidentActivity.Value()
 }
 
 func (c *CreateHTTPSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateHTTPSyntheticCheckOnce,
-		exampleOutputCreateHTTPSyntheticCheckBytes,
-		&exampleOutputCreateHTTPSyntheticCheck,
-	)
+	return exampleOutputCreateHTTPSyntheticCheck.Value()
 }
 
 func (g *GetHTTPSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetHTTPSyntheticCheckOnce,
-		exampleOutputGetHTTPSyntheticCheckBytes,
-		&exampleOutputGetHTTPSyntheticCheck,
-	)
+	return exampleOutputGetHTTPSyntheticCheck.Value()
 }
 
 func (c *UpdateHTTPSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdateHTTPSyntheticCheckOnce,
-		exampleOutputUpdateHTTPSyntheticCheckBytes,
-		&exampleOutputUpdateHTTPSyntheticCheck,
-	)
+	return exampleOutputUpdateHTTPSyntheticCheck.Value()
 }
 
 func (d *DeleteHTTPSyntheticCheck) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeleteHTTPSyntheticCheckOnce,
-		exampleOutputDeleteHTTPSyntheticCheckBytes,
-		&exampleOutputDeleteHTTPSyntheticCheck,
-	)
+	return exampleOutputDeleteHTTPSyntheticCheck.Value()
 }

@@ -2,7 +2,6 @@ package honeycomb
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -14,27 +13,16 @@ var exampleDataOnAlertFiredBytes []byte
 var exampleOutputCreateEventBytes []byte
 
 var (
-	exampleDataOnAlertFiredOnce sync.Once
-	exampleDataOnAlertFired     map[string]any
-
-	exampleOutputCreateEventOnce sync.Once
-	exampleOutputCreateEvent     map[string]any
+	exampleDataOnAlertFired  = utils.NewEmbeddedJSON(exampleDataOnAlertFiredBytes)
+	exampleOutputCreateEvent = utils.NewEmbeddedJSON(exampleOutputCreateEventBytes)
 )
 
 func embeddedExampleDataOnAlertFired() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnAlertFiredOnce,
-		exampleDataOnAlertFiredBytes,
-		&exampleDataOnAlertFired,
-	)
+	return exampleDataOnAlertFired.Value()
 }
 
 func embeddedExampleOutputCreateEvent() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateEventOnce,
-		exampleOutputCreateEventBytes,
-		&exampleOutputCreateEvent,
-	)
+	return exampleOutputCreateEvent.Value()
 }
 
 func (t *OnAlertFired) ExampleData() map[string]any {

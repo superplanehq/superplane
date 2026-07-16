@@ -2,7 +2,6 @@ package cloudsmith
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -36,114 +35,93 @@ var exampleDataOnSecurityScanCompletedBytes []byte
 
 //go:embed example_data_on_package_created.json
 var exampleDataOnPackageCreatedBytes []byte
-
-var exampleOutputGetRepositoryOnce sync.Once
-var exampleOutputGetRepository map[string]any
-var exampleOutputGetPackageOnce sync.Once
-var exampleOutputGetPackage map[string]any
-var exampleOutputResyncPackageOnce sync.Once
-var exampleOutputResyncPackage map[string]any
-var exampleOutputTagPackageOnce sync.Once
-var exampleOutputTagPackage map[string]any
-var exampleOutputDeletePackageOnce sync.Once
-var exampleOutputDeletePackage map[string]any
-var exampleOutputScanPackageOnce sync.Once
-var exampleOutputScanPackage map[string]any
-var exampleOutputQuarantinePackageOnce sync.Once
-var exampleOutputQuarantinePackage map[string]any
-var exampleOutputGetPackageVulnerabilitiesOnce sync.Once
-var exampleOutputGetPackageVulnerabilities map[string]any
-var exampleDataOnSecurityScanCompletedOnce sync.Once
-var exampleDataOnSecurityScanCompleted map[string]any
-var exampleDataOnPackageCreatedOnce sync.Once
-var exampleDataOnPackageCreated map[string]any
+var exampleOutputGetRepository = utils.NewEmbeddedJSON(exampleOutputGetRepositoryBytes)
+var exampleOutputGetPackage = utils.NewEmbeddedJSON(exampleOutputGetPackageBytes)
+var exampleOutputResyncPackage = utils.NewEmbeddedJSON(exampleOutputResyncPackageBytes)
+var exampleOutputTagPackage = utils.NewEmbeddedJSON(exampleOutputTagPackageBytes)
+var exampleOutputDeletePackage = utils.NewEmbeddedJSON(exampleOutputDeletePackageBytes)
+var exampleOutputScanPackage = utils.NewEmbeddedJSON(exampleOutputScanPackageBytes)
+var exampleOutputQuarantinePackage = utils.NewEmbeddedJSON(exampleOutputQuarantinePackageBytes)
+var exampleOutputGetPackageVulnerabilities = utils.NewEmbeddedJSON(exampleOutputGetPackageVulnerabilitiesBytes)
+var exampleDataOnSecurityScanCompleted = utils.NewEmbeddedJSON(exampleDataOnSecurityScanCompletedBytes)
+var exampleDataOnPackageCreated = utils.NewEmbeddedJSON(exampleDataOnPackageCreatedBytes)
 
 func (g *GetRepository) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetRepositoryOnce, exampleOutputGetRepositoryBytes, &exampleOutputGetRepository)
+	return exampleOutputGetRepository.Value()
 }
 
 func (g *GetPackage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetPackageOnce, exampleOutputGetPackageBytes, &exampleOutputGetPackage)
+	return exampleOutputGetPackage.Value()
 }
 
 func (r *ResyncPackage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputResyncPackageOnce, exampleOutputResyncPackageBytes, &exampleOutputResyncPackage)
+	return exampleOutputResyncPackage.Value()
 }
 
 //go:embed example_output_list_packages.json
 var exampleOutputListPackagesBytes []byte
-
-var exampleOutputListPackagesOnce sync.Once
-var exampleOutputListPackages map[string]any
+var exampleOutputListPackages = utils.NewEmbeddedJSON(exampleOutputListPackagesBytes)
 
 func (l *ListPackages) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputListPackagesOnce, exampleOutputListPackagesBytes, &exampleOutputListPackages)
+	return exampleOutputListPackages.Value()
 }
 
 //go:embed example_output_promote_package.json
 var exampleOutputPromotePackageBytes []byte
-
-var exampleOutputPromotePackageOnce sync.Once
-var exampleOutputPromotePackage map[string]any
+var exampleOutputPromotePackage = utils.NewEmbeddedJSON(exampleOutputPromotePackageBytes)
 
 func (p *PromotePackage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputPromotePackageOnce, exampleOutputPromotePackageBytes, &exampleOutputPromotePackage)
+	return exampleOutputPromotePackage.Value()
 }
 
 func (t *TagPackage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputTagPackageOnce, exampleOutputTagPackageBytes, &exampleOutputTagPackage)
+	return exampleOutputTagPackage.Value()
 }
 
 func (d *DeletePackage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeletePackageOnce, exampleOutputDeletePackageBytes, &exampleOutputDeletePackage)
+	return exampleOutputDeletePackage.Value()
 }
 
 func (s *ScanPackage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputScanPackageOnce, exampleOutputScanPackageBytes, &exampleOutputScanPackage)
+	return exampleOutputScanPackage.Value()
 }
 
 func (q *QuarantinePackage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputQuarantinePackageOnce, exampleOutputQuarantinePackageBytes, &exampleOutputQuarantinePackage)
+	return exampleOutputQuarantinePackage.Value()
 }
 
 func (g *GetPackageVulnerabilities) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetPackageVulnerabilitiesOnce, exampleOutputGetPackageVulnerabilitiesBytes, &exampleOutputGetPackageVulnerabilities)
+	return exampleOutputGetPackageVulnerabilities.Value()
 }
 
 func onSecurityScanCompletedExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnSecurityScanCompletedOnce, exampleDataOnSecurityScanCompletedBytes, &exampleDataOnSecurityScanCompleted)
+	return exampleDataOnSecurityScanCompleted.Value()
 }
 
 func onPackageCreatedExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPackageCreatedOnce, exampleDataOnPackageCreatedBytes, &exampleDataOnPackageCreated)
+	return exampleDataOnPackageCreated.Value()
 }
 
 //go:embed example_output_create_vulnerability_policy.json
 var exampleOutputCreateVulnerabilityPolicyBytes []byte
-
-var exampleOutputCreateVulnerabilityPolicyOnce sync.Once
-var exampleOutputCreateVulnerabilityPolicy map[string]any
+var exampleOutputCreateVulnerabilityPolicy = utils.NewEmbeddedJSON(exampleOutputCreateVulnerabilityPolicyBytes)
 
 func (c *CreateVulnerabilityPolicy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateVulnerabilityPolicyOnce, exampleOutputCreateVulnerabilityPolicyBytes, &exampleOutputCreateVulnerabilityPolicy)
+	return exampleOutputCreateVulnerabilityPolicy.Value()
 }
 
 //go:embed example_output_get_vulnerability_policy.json
 var exampleOutputGetVulnerabilityPolicyBytes []byte
-
-var exampleOutputGetVulnerabilityPolicyOnce sync.Once
-var exampleOutputGetVulnerabilityPolicy map[string]any
+var exampleOutputGetVulnerabilityPolicy = utils.NewEmbeddedJSON(exampleOutputGetVulnerabilityPolicyBytes)
 
 func (g *GetVulnerabilityPolicy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetVulnerabilityPolicyOnce, exampleOutputGetVulnerabilityPolicyBytes, &exampleOutputGetVulnerabilityPolicy)
+	return exampleOutputGetVulnerabilityPolicy.Value()
 }
 
 //go:embed example_output_delete_vulnerability_policy.json
 var exampleOutputDeleteVulnerabilityPolicyBytes []byte
-
-var exampleOutputDeleteVulnerabilityPolicyOnce sync.Once
-var exampleOutputDeleteVulnerabilityPolicy map[string]any
+var exampleOutputDeleteVulnerabilityPolicy = utils.NewEmbeddedJSON(exampleOutputDeleteVulnerabilityPolicyBytes)
 
 func (d *DeleteVulnerabilityPolicy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteVulnerabilityPolicyOnce, exampleOutputDeleteVulnerabilityPolicyBytes, &exampleOutputDeleteVulnerabilityPolicy)
+	return exampleOutputDeleteVulnerabilityPolicy.Value()
 }

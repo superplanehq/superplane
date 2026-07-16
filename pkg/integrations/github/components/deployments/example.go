@@ -2,35 +2,22 @@ package deployments
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 //go:embed payloads/create_deployment.json
 var exampleCreateDeploymentBytes []byte
-
-var exampleCreateDeploymentOnce sync.Once
-var exampleCreateDeployment map[string]any
+var exampleCreateDeployment = utils.NewEmbeddedJSON(exampleCreateDeploymentBytes)
 
 func (c *CreateDeployment) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleCreateDeploymentOnce,
-		exampleCreateDeploymentBytes,
-		&exampleCreateDeployment,
-	)
+	return exampleCreateDeployment.Value()
 }
 
 //go:embed payloads/create_deployment_status.json
 var exampleCreateDeploymentStatusBytes []byte
-
-var exampleCreateDeploymentStatusOnce sync.Once
-var exampleCreateDeploymentStatus map[string]any
+var exampleCreateDeploymentStatus = utils.NewEmbeddedJSON(exampleCreateDeploymentStatusBytes)
 
 func (c *CreateDeploymentStatus) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleCreateDeploymentStatusOnce,
-		exampleCreateDeploymentStatusBytes,
-		&exampleCreateDeploymentStatus,
-	)
+	return exampleCreateDeploymentStatus.Value()
 }

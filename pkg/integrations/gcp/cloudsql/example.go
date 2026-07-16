@@ -2,7 +2,6 @@ package cloudsql
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -26,45 +25,34 @@ var exampleOutputGetInstanceBytes []byte
 var exampleOutputDeleteInstanceBytes []byte
 
 var (
-	exampleOutputCreateDatabaseOnce sync.Once
-	exampleOutputCreateDatabase     map[string]any
-
-	exampleOutputGetDatabaseOnce sync.Once
-	exampleOutputGetDatabase     map[string]any
-
-	exampleOutputDeleteDatabaseOnce sync.Once
-	exampleOutputDeleteDatabase     map[string]any
-
-	exampleOutputCreateInstanceOnce sync.Once
-	exampleOutputCreateInstance     map[string]any
-
-	exampleOutputGetInstanceOnce sync.Once
-	exampleOutputGetInstance     map[string]any
-
-	exampleOutputDeleteInstanceOnce sync.Once
-	exampleOutputDeleteInstance     map[string]any
+	exampleOutputCreateDatabase = utils.NewEmbeddedJSON(exampleOutputCreateDatabaseBytes)
+	exampleOutputGetDatabase    = utils.NewEmbeddedJSON(exampleOutputGetDatabaseBytes)
+	exampleOutputDeleteDatabase = utils.NewEmbeddedJSON(exampleOutputDeleteDatabaseBytes)
+	exampleOutputCreateInstance = utils.NewEmbeddedJSON(exampleOutputCreateInstanceBytes)
+	exampleOutputGetInstance    = utils.NewEmbeddedJSON(exampleOutputGetInstanceBytes)
+	exampleOutputDeleteInstance = utils.NewEmbeddedJSON(exampleOutputDeleteInstanceBytes)
 )
 
 func (c *CreateDatabase) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateDatabaseOnce, exampleOutputCreateDatabaseBytes, &exampleOutputCreateDatabase)
+	return exampleOutputCreateDatabase.Value()
 }
 
 func (g *GetDatabase) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDatabaseOnce, exampleOutputGetDatabaseBytes, &exampleOutputGetDatabase)
+	return exampleOutputGetDatabase.Value()
 }
 
 func (d *DeleteDatabase) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteDatabaseOnce, exampleOutputDeleteDatabaseBytes, &exampleOutputDeleteDatabase)
+	return exampleOutputDeleteDatabase.Value()
 }
 
 func (c *CreateInstance) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateInstanceOnce, exampleOutputCreateInstanceBytes, &exampleOutputCreateInstance)
+	return exampleOutputCreateInstance.Value()
 }
 
 func (g *GetInstance) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetInstanceOnce, exampleOutputGetInstanceBytes, &exampleOutputGetInstance)
+	return exampleOutputGetInstance.Value()
 }
 
 func (d *DeleteInstance) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteInstanceOnce, exampleOutputDeleteInstanceBytes, &exampleOutputDeleteInstance)
+	return exampleOutputDeleteInstance.Value()
 }

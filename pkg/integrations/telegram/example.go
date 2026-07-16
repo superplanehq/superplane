@@ -2,7 +2,6 @@ package telegram
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -15,24 +14,18 @@ var exampleDataOnMentionBytes []byte
 
 //go:embed example_output_wait_for_button_click.json
 var exampleOutputWaitForButtonClickBytes []byte
-
-var exampleOutputOnce sync.Once
-var exampleOutput map[string]any
-
-var exampleDataOnce sync.Once
-var exampleData map[string]any
-
-var exampleOutputWaitForButtonClickOnce sync.Once
-var exampleOutputWaitForButtonClick map[string]any
+var exampleOutput = utils.NewEmbeddedJSON(exampleOutputSendMessageBytes)
+var exampleData = utils.NewEmbeddedJSON(exampleDataOnMentionBytes)
+var exampleOutputWaitForButtonClick = utils.NewEmbeddedJSON(exampleOutputWaitForButtonClickBytes)
 
 func (c *SendMessage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputOnce, exampleOutputSendMessageBytes, &exampleOutput)
+	return exampleOutput.Value()
 }
 
 func (t *OnMention) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnce, exampleDataOnMentionBytes, &exampleData)
+	return exampleData.Value()
 }
 
 func (c *WaitForButtonClick) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputWaitForButtonClickOnce, exampleOutputWaitForButtonClickBytes, &exampleOutputWaitForButtonClick)
+	return exampleOutputWaitForButtonClick.Value()
 }

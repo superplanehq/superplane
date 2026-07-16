@@ -2,91 +2,54 @@ package prometheus
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 //go:embed example_output_create_workspace.json
 var exampleOutputCreateWorkspaceBytes []byte
-
-var exampleOutputCreateWorkspaceOnce sync.Once
-var exampleOutputCreateWorkspace map[string]any
+var exampleOutputCreateWorkspace = utils.NewEmbeddedJSON(exampleOutputCreateWorkspaceBytes)
 
 //go:embed example_output_get_workspace.json
 var exampleOutputGetWorkspaceBytes []byte
-
-var exampleOutputGetWorkspaceOnce sync.Once
-var exampleOutputGetWorkspace map[string]any
+var exampleOutputGetWorkspace = utils.NewEmbeddedJSON(exampleOutputGetWorkspaceBytes)
 
 //go:embed example_output_update_workspace.json
 var exampleOutputUpdateWorkspaceBytes []byte
-
-var exampleOutputUpdateWorkspaceOnce sync.Once
-var exampleOutputUpdateWorkspace map[string]any
+var exampleOutputUpdateWorkspace = utils.NewEmbeddedJSON(exampleOutputUpdateWorkspaceBytes)
 
 //go:embed example_output_delete_workspace.json
 var exampleOutputDeleteWorkspaceBytes []byte
-
-var exampleOutputDeleteWorkspaceOnce sync.Once
-var exampleOutputDeleteWorkspace map[string]any
+var exampleOutputDeleteWorkspace = utils.NewEmbeddedJSON(exampleOutputDeleteWorkspaceBytes)
 
 //go:embed example_output_query.json
 var exampleOutputQueryBytes []byte
-
-var exampleOutputQueryOnce sync.Once
-var exampleOutputQuery map[string]any
+var exampleOutputQuery = utils.NewEmbeddedJSON(exampleOutputQueryBytes)
 
 //go:embed example_output_query_range.json
 var exampleOutputQueryRangeBytes []byte
-
-var exampleOutputQueryRangeOnce sync.Once
-var exampleOutputQueryRange map[string]any
+var exampleOutputQueryRange = utils.NewEmbeddedJSON(exampleOutputQueryRangeBytes)
 
 func (c *CreateWorkspace) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateWorkspaceOnce,
-		exampleOutputCreateWorkspaceBytes,
-		&exampleOutputCreateWorkspace,
-	)
+	return exampleOutputCreateWorkspace.Value()
 }
 
 func (c *GetWorkspace) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetWorkspaceOnce,
-		exampleOutputGetWorkspaceBytes,
-		&exampleOutputGetWorkspace,
-	)
+	return exampleOutputGetWorkspace.Value()
 }
 
 func (c *UpdateWorkspace) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdateWorkspaceOnce,
-		exampleOutputUpdateWorkspaceBytes,
-		&exampleOutputUpdateWorkspace,
-	)
+	return exampleOutputUpdateWorkspace.Value()
 }
 
 func (c *DeleteWorkspace) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeleteWorkspaceOnce,
-		exampleOutputDeleteWorkspaceBytes,
-		&exampleOutputDeleteWorkspace,
-	)
+	return exampleOutputDeleteWorkspace.Value()
 }
 
 func (c *Query) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputQueryOnce,
-		exampleOutputQueryBytes,
-		&exampleOutputQuery,
-	)
+	return exampleOutputQuery.Value()
 }
 
 func (c *QueryRange) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputQueryRangeOnce,
-		exampleOutputQueryRangeBytes,
-		&exampleOutputQueryRange,
-	)
+	return exampleOutputQueryRange.Value()
 }

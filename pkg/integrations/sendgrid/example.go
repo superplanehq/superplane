@@ -2,7 +2,6 @@ package sendgrid
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -15,28 +14,18 @@ var exampleOutputCreateOrUpdateContactBytes []byte
 
 //go:embed example_data_on_email_event.json
 var exampleDataOnEmailEventBytes []byte
-
-var exampleOutputSendEmailOnce sync.Once
-var exampleOutputSendEmail map[string]any
-
-var exampleOutputCreateOrUpdateContactOnce sync.Once
-var exampleOutputCreateOrUpdateContact map[string]any
-
-var exampleDataOnEmailEventOnce sync.Once
-var exampleDataOnEmailEvent map[string]any
+var exampleOutputSendEmail = utils.NewEmbeddedJSON(exampleOutputSendEmailBytes)
+var exampleOutputCreateOrUpdateContact = utils.NewEmbeddedJSON(exampleOutputCreateOrUpdateContactBytes)
+var exampleDataOnEmailEvent = utils.NewEmbeddedJSON(exampleDataOnEmailEventBytes)
 
 func (c *SendEmail) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputSendEmailOnce, exampleOutputSendEmailBytes, &exampleOutputSendEmail)
+	return exampleOutputSendEmail.Value()
 }
 
 func (c *CreateOrUpdateContact) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCreateOrUpdateContactOnce,
-		exampleOutputCreateOrUpdateContactBytes,
-		&exampleOutputCreateOrUpdateContact,
-	)
+	return exampleOutputCreateOrUpdateContact.Value()
 }
 
 func (t *OnEmailEvent) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnEmailEventOnce, exampleDataOnEmailEventBytes, &exampleDataOnEmailEvent)
+	return exampleDataOnEmailEvent.Value()
 }

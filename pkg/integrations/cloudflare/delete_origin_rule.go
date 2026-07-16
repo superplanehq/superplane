@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -19,9 +18,7 @@ type DeleteOriginRule struct{}
 
 //go:embed example_output_delete_origin_rule.json
 var exampleOutputDeleteOriginRuleBytes []byte
-
-var exampleOutputDeleteOriginRuleOnce sync.Once
-var exampleOutputDeleteOriginRule map[string]any
+var exampleOutputDeleteOriginRule = utils.NewEmbeddedJSON(exampleOutputDeleteOriginRuleBytes)
 
 type DeleteOriginRuleSpec struct {
 	Rule string `json:"rule"`
@@ -64,7 +61,7 @@ func (c *DeleteOriginRule) OutputChannels(configuration any) []core.OutputChanne
 }
 
 func (c *DeleteOriginRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteOriginRuleOnce, exampleOutputDeleteOriginRuleBytes, &exampleOutputDeleteOriginRule)
+	return exampleOutputDeleteOriginRule.Value()
 }
 
 func (c *DeleteOriginRule) Configuration() []configuration.Field {

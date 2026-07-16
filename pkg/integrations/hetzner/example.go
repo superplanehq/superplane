@@ -2,7 +2,6 @@ package hetzner
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -44,87 +43,64 @@ var exampleOutputListObjectsBytes []byte
 var exampleOutputPresignedURLBytes []byte
 
 var (
-	exampleOutputCreateServerOnce sync.Once
-	exampleOutputCreateServer     map[string]any
-
-	exampleOutputCreateSnapshotOnce sync.Once
-	exampleOutputCreateSnapshot     map[string]any
-
-	exampleOutputCreateLoadBalancerOnce sync.Once
-	exampleOutputCreateLoadBalancer     map[string]any
-
-	exampleOutputDeleteServerOnce sync.Once
-	exampleOutputDeleteServer     map[string]any
-
-	exampleOutputDeleteSnapshotOnce sync.Once
-	exampleOutputDeleteSnapshot     map[string]any
-
-	exampleOutputDeleteLoadBalancerOnce sync.Once
-	exampleOutputDeleteLoadBalancer     map[string]any
-
-	exampleOutputCreateBucketOnce sync.Once
-	exampleOutputCreateBucketData map[string]any
-
-	exampleOutputDeleteBucketOnce sync.Once
-	exampleOutputDeleteBucketData map[string]any
-
-	exampleOutputUploadObjectOnce sync.Once
-	exampleOutputUploadObjectData map[string]any
-
-	exampleOutputDeleteObjectOnce sync.Once
-	exampleOutputDeleteObjectData map[string]any
-
-	exampleOutputListObjectsOnce sync.Once
-	exampleOutputListObjectsData map[string]any
-
-	exampleOutputPresignedURLOnce sync.Once
-	exampleOutputPresignedURLData map[string]any
+	exampleOutputCreateServer       = utils.NewEmbeddedJSON(exampleOutputCreateServerBytes)
+	exampleOutputCreateSnapshot     = utils.NewEmbeddedJSON(exampleOutputCreateSnapshotBytes)
+	exampleOutputCreateLoadBalancer = utils.NewEmbeddedJSON(exampleOutputCreateLoadBalancerBytes)
+	exampleOutputDeleteServer       = utils.NewEmbeddedJSON(exampleOutputDeleteServerBytes)
+	exampleOutputDeleteSnapshot     = utils.NewEmbeddedJSON(exampleOutputDeleteSnapshotBytes)
+	exampleOutputDeleteLoadBalancer = utils.NewEmbeddedJSON(exampleOutputDeleteLoadBalancerBytes)
+	exampleOutputCreateBucketData   = utils.NewEmbeddedJSON(exampleOutputCreateBucketBytes)
+	exampleOutputDeleteBucketData   = utils.NewEmbeddedJSON(exampleOutputDeleteBucketBytes)
+	exampleOutputUploadObjectData   = utils.NewEmbeddedJSON(exampleOutputUploadObjectBytes)
+	exampleOutputDeleteObjectData   = utils.NewEmbeddedJSON(exampleOutputDeleteObjectBytes)
+	exampleOutputListObjectsData    = utils.NewEmbeddedJSON(exampleOutputListObjectsBytes)
+	exampleOutputPresignedURLData   = utils.NewEmbeddedJSON(exampleOutputPresignedURLBytes)
 )
 
 func (c *CreateServer) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateServerOnce, exampleOutputCreateServerBytes, &exampleOutputCreateServer)
+	return exampleOutputCreateServer.Value()
 }
 
 func (c *CreateSnapshot) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateSnapshotOnce, exampleOutputCreateSnapshotBytes, &exampleOutputCreateSnapshot)
+	return exampleOutputCreateSnapshot.Value()
 }
 
 func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateLoadBalancerOnce, exampleOutputCreateLoadBalancerBytes, &exampleOutputCreateLoadBalancer)
+	return exampleOutputCreateLoadBalancer.Value()
 }
 
 func (c *DeleteServer) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteServerOnce, exampleOutputDeleteServerBytes, &exampleOutputDeleteServer)
+	return exampleOutputDeleteServer.Value()
 }
 
 func (c *DeleteSnapshot) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteSnapshotOnce, exampleOutputDeleteSnapshotBytes, &exampleOutputDeleteSnapshot)
+	return exampleOutputDeleteSnapshot.Value()
 }
 
 func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteLoadBalancerOnce, exampleOutputDeleteLoadBalancerBytes, &exampleOutputDeleteLoadBalancer)
+	return exampleOutputDeleteLoadBalancer.Value()
 }
 
 func exampleOutputCreateBucket() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateBucketOnce, exampleOutputCreateBucketBytes, &exampleOutputCreateBucketData)
+	return exampleOutputCreateBucketData.Value()
 }
 
 func exampleOutputDeleteBucket() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteBucketOnce, exampleOutputDeleteBucketBytes, &exampleOutputDeleteBucketData)
+	return exampleOutputDeleteBucketData.Value()
 }
 
 func exampleOutputUploadObject() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUploadObjectOnce, exampleOutputUploadObjectBytes, &exampleOutputUploadObjectData)
+	return exampleOutputUploadObjectData.Value()
 }
 
 func exampleOutputDeleteObject() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteObjectOnce, exampleOutputDeleteObjectBytes, &exampleOutputDeleteObjectData)
+	return exampleOutputDeleteObjectData.Value()
 }
 
 func exampleOutputListObjects() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputListObjectsOnce, exampleOutputListObjectsBytes, &exampleOutputListObjectsData)
+	return exampleOutputListObjectsData.Value()
 }
 
 func exampleOutputPresignedURL() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputPresignedURLOnce, exampleOutputPresignedURLBytes, &exampleOutputPresignedURLData)
+	return exampleOutputPresignedURLData.Value()
 }

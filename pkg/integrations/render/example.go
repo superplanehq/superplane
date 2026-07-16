@@ -2,7 +2,6 @@ package render
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -39,124 +38,58 @@ var exampleOutputAddCustomDomainBytes []byte
 
 //go:embed example_output_remove_custom_domain.json
 var exampleOutputRemoveCustomDomainBytes []byte
-
-var exampleDataOnDeployOnce sync.Once
-var exampleDataOnDeploy map[string]any
-
-var exampleDataOnBuildOnce sync.Once
-var exampleDataOnBuild map[string]any
-
-var exampleOutputDeployOnce sync.Once
-var exampleOutputDeploy map[string]any
-
-var exampleOutputGetServiceOnce sync.Once
-var exampleOutputGetService map[string]any
-
-var exampleOutputGetDeployOnce sync.Once
-var exampleOutputGetDeploy map[string]any
-
-var exampleOutputCancelDeployOnce sync.Once
-var exampleOutputCancelDeploy map[string]any
-
-var exampleOutputRollbackDeployOnce sync.Once
-var exampleOutputRollbackDeploy map[string]any
-
-var exampleOutputPurgeCacheOnce sync.Once
-var exampleOutputPurgeCache map[string]any
-
-var exampleOutputUpdateEnvVarOnce sync.Once
-var exampleOutputUpdateEnvVar map[string]any
-
-var exampleOutputAddCustomDomainOnce sync.Once
-var exampleOutputAddCustomDomain map[string]any
-
-var exampleOutputRemoveCustomDomainOnce sync.Once
-var exampleOutputRemoveCustomDomain map[string]any
+var exampleDataOnDeploy = utils.NewEmbeddedJSON(exampleDataOnDeployBytes)
+var exampleDataOnBuild = utils.NewEmbeddedJSON(exampleDataOnBuildBytes)
+var exampleOutputDeploy = utils.NewEmbeddedJSON(exampleOutputDeployBytes)
+var exampleOutputGetService = utils.NewEmbeddedJSON(exampleOutputGetServiceBytes)
+var exampleOutputGetDeploy = utils.NewEmbeddedJSON(exampleOutputGetDeployBytes)
+var exampleOutputCancelDeploy = utils.NewEmbeddedJSON(exampleOutputCancelDeployBytes)
+var exampleOutputRollbackDeploy = utils.NewEmbeddedJSON(exampleOutputRollbackDeployBytes)
+var exampleOutputPurgeCache = utils.NewEmbeddedJSON(exampleOutputPurgeCacheBytes)
+var exampleOutputUpdateEnvVar = utils.NewEmbeddedJSON(exampleOutputUpdateEnvVarBytes)
+var exampleOutputAddCustomDomain = utils.NewEmbeddedJSON(exampleOutputAddCustomDomainBytes)
+var exampleOutputRemoveCustomDomain = utils.NewEmbeddedJSON(exampleOutputRemoveCustomDomainBytes)
 
 func (t *OnDeploy) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnDeployOnce,
-		exampleDataOnDeployBytes,
-		&exampleDataOnDeploy,
-	)
+	return exampleDataOnDeploy.Value()
 }
 
 func (t *OnBuild) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnBuildOnce,
-		exampleDataOnBuildBytes,
-		&exampleDataOnBuild,
-	)
+	return exampleDataOnBuild.Value()
 }
 
 func (c *Deploy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputDeployOnce,
-		exampleOutputDeployBytes,
-		&exampleOutputDeploy,
-	)
+	return exampleOutputDeploy.Value()
 }
 
 func (c *GetService) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetServiceOnce,
-		exampleOutputGetServiceBytes,
-		&exampleOutputGetService,
-	)
+	return exampleOutputGetService.Value()
 }
 
 func (c *GetDeploy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputGetDeployOnce,
-		exampleOutputGetDeployBytes,
-		&exampleOutputGetDeploy,
-	)
+	return exampleOutputGetDeploy.Value()
 }
 
 func (c *CancelDeploy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputCancelDeployOnce,
-		exampleOutputCancelDeployBytes,
-		&exampleOutputCancelDeploy,
-	)
+	return exampleOutputCancelDeploy.Value()
 }
 
 func (c *RollbackDeploy) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputRollbackDeployOnce,
-		exampleOutputRollbackDeployBytes,
-		&exampleOutputRollbackDeploy,
-	)
+	return exampleOutputRollbackDeploy.Value()
 }
 
 func (c *PurgeCache) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputPurgeCacheOnce,
-		exampleOutputPurgeCacheBytes,
-		&exampleOutputPurgeCache,
-	)
+	return exampleOutputPurgeCache.Value()
 }
 
 func (c *UpdateEnvVar) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputUpdateEnvVarOnce,
-		exampleOutputUpdateEnvVarBytes,
-		&exampleOutputUpdateEnvVar,
-	)
+	return exampleOutputUpdateEnvVar.Value()
 }
 
 func (c *AddCustomDomain) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputAddCustomDomainOnce,
-		exampleOutputAddCustomDomainBytes,
-		&exampleOutputAddCustomDomain,
-	)
+	return exampleOutputAddCustomDomain.Value()
 }
 
 func (c *RemoveCustomDomain) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputRemoveCustomDomainOnce,
-		exampleOutputRemoveCustomDomainBytes,
-		&exampleOutputRemoveCustomDomain,
-	)
+	return exampleOutputRemoveCustomDomain.Value()
 }

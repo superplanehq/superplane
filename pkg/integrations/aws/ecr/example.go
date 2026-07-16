@@ -2,7 +2,6 @@ package ecr
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -21,38 +20,28 @@ var exampleOutputGetImageScanFindingsBytes []byte
 
 //go:embed example_output_scan_image.json
 var exampleOutputScanImageBytes []byte
-
-var exampleDataOnImagePushOnce sync.Once
-var exampleDataOnImagePush map[string]any
-
-var exampleDataOnImageScanOnce sync.Once
-var exampleDataOnImageScan map[string]any
-
-var exampleOutputGetImageOnce sync.Once
-var exampleOutputGetImage map[string]any
-
-var exampleOutputGetImageScanFindingsOnce sync.Once
-var exampleOutputGetImageScanFindings map[string]any
-
-var exampleOutputScanImageOnce sync.Once
-var exampleOutputScanImage map[string]any
+var exampleDataOnImagePush = utils.NewEmbeddedJSON(exampleDataOnImagePushBytes)
+var exampleDataOnImageScan = utils.NewEmbeddedJSON(exampleDataOnImageScanBytes)
+var exampleOutputGetImage = utils.NewEmbeddedJSON(exampleOutputGetImageBytes)
+var exampleOutputGetImageScanFindings = utils.NewEmbeddedJSON(exampleOutputGetImageScanFindingsBytes)
+var exampleOutputScanImage = utils.NewEmbeddedJSON(exampleOutputScanImageBytes)
 
 func (t *OnImagePush) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImagePushOnce, exampleDataOnImagePushBytes, &exampleDataOnImagePush)
+	return exampleDataOnImagePush.Value()
 }
 
 func (t *OnImageScan) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageScanOnce, exampleDataOnImageScanBytes, &exampleDataOnImageScan)
+	return exampleDataOnImageScan.Value()
 }
 
 func (c *GetImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetImageOnce, exampleOutputGetImageBytes, &exampleOutputGetImage)
+	return exampleOutputGetImage.Value()
 }
 
 func (c *GetImageScanFindings) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetImageScanFindingsOnce, exampleOutputGetImageScanFindingsBytes, &exampleOutputGetImageScanFindings)
+	return exampleOutputGetImageScanFindings.Value()
 }
 
 func (c *ScanImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputScanImageOnce, exampleOutputScanImageBytes, &exampleOutputScanImage)
+	return exampleOutputScanImage.Value()
 }

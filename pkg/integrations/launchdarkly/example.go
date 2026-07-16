@@ -2,37 +2,30 @@ package launchdarkly
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
 //go:embed example_output_get_feature_flag.json
 var exampleOutputGetFeatureFlagBytes []byte
-
-var exampleOutputGetFeatureFlagOnce sync.Once
-var exampleOutputGetFeatureFlag map[string]any
+var exampleOutputGetFeatureFlag = utils.NewEmbeddedJSON(exampleOutputGetFeatureFlagBytes)
 
 //go:embed example_output_delete_feature_flag.json
 var exampleOutputDeleteFeatureFlagBytes []byte
-
-var exampleOutputDeleteFeatureFlagOnce sync.Once
-var exampleOutputDeleteFeatureFlag map[string]any
+var exampleOutputDeleteFeatureFlag = utils.NewEmbeddedJSON(exampleOutputDeleteFeatureFlagBytes)
 
 //go:embed example_data_on_feature_flag_change.json
 var exampleDataOnFeatureFlagChangeBytes []byte
-
-var exampleDataOnFeatureFlagChangeOnce sync.Once
-var exampleDataOnFeatureFlagChange map[string]any
+var exampleDataOnFeatureFlagChange = utils.NewEmbeddedJSON(exampleDataOnFeatureFlagChangeBytes)
 
 func (c *GetFeatureFlag) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetFeatureFlagOnce, exampleOutputGetFeatureFlagBytes, &exampleOutputGetFeatureFlag)
+	return exampleOutputGetFeatureFlag.Value()
 }
 
 func (c *DeleteFeatureFlag) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteFeatureFlagOnce, exampleOutputDeleteFeatureFlagBytes, &exampleOutputDeleteFeatureFlag)
+	return exampleOutputDeleteFeatureFlag.Value()
 }
 
 func (t *OnFeatureFlagChange) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnFeatureFlagChangeOnce, exampleDataOnFeatureFlagChangeBytes, &exampleDataOnFeatureFlagChange)
+	return exampleDataOnFeatureFlagChange.Value()
 }

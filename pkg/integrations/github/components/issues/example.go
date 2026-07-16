@@ -2,7 +2,6 @@ package issues
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -39,80 +38,58 @@ var exampleOutputAddIssueAssigneeBytes []byte
 
 //go:embed payloads/remove_issue_assignee.json
 var exampleOutputRemoveIssueAssigneeBytes []byte
-
-var exampleOutputCreateIssueOnce sync.Once
-var exampleOutputCreateIssue map[string]any
-
-var exampleOutputCreateIssueCommentOnce sync.Once
-var exampleOutputCreateIssueComment map[string]any
-
-var exampleOutputUpdateIssueCommentOnce sync.Once
-var exampleOutputUpdateIssueComment map[string]any
-
-var exampleOutputGetIssueOnce sync.Once
-var exampleOutputGetIssue map[string]any
-
-var exampleOutputUpdateIssueOnce sync.Once
-var exampleOutputUpdateIssue map[string]any
-
-var exampleDataOnIssueCommentOnce sync.Once
-var exampleDataOnIssueComment map[string]any
-
-var exampleDataOnIssueOnce sync.Once
-var exampleDataOnIssue map[string]any
-
-var exampleOutputAddIssueLabelOnce sync.Once
-var exampleOutputAddIssueLabel map[string]any
-
-var exampleOutputRemoveIssueLabelOnce sync.Once
-var exampleOutputRemoveIssueLabel map[string]any
-
-var exampleOutputAddIssueAssigneeOnce sync.Once
-var exampleOutputAddIssueAssignee map[string]any
-
-var exampleOutputRemoveIssueAssigneeOnce sync.Once
-var exampleOutputRemoveIssueAssignee map[string]any
+var exampleOutputCreateIssue = utils.NewEmbeddedJSON(exampleOutputCreateIssueBytes)
+var exampleOutputCreateIssueComment = utils.NewEmbeddedJSON(exampleOutputCreateIssueCommentBytes)
+var exampleOutputUpdateIssueComment = utils.NewEmbeddedJSON(exampleOutputUpdateIssueCommentBytes)
+var exampleOutputGetIssue = utils.NewEmbeddedJSON(exampleOutputGetIssueBytes)
+var exampleOutputUpdateIssue = utils.NewEmbeddedJSON(exampleOutputUpdateIssueBytes)
+var exampleDataOnIssueComment = utils.NewEmbeddedJSON(exampleDataOnIssueCommentBytes)
+var exampleDataOnIssue = utils.NewEmbeddedJSON(exampleDataOnIssueBytes)
+var exampleOutputAddIssueLabel = utils.NewEmbeddedJSON(exampleOutputAddIssueLabelBytes)
+var exampleOutputRemoveIssueLabel = utils.NewEmbeddedJSON(exampleOutputRemoveIssueLabelBytes)
+var exampleOutputAddIssueAssignee = utils.NewEmbeddedJSON(exampleOutputAddIssueAssigneeBytes)
+var exampleOutputRemoveIssueAssignee = utils.NewEmbeddedJSON(exampleOutputRemoveIssueAssigneeBytes)
 
 func (c *CreateIssue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
+	return exampleOutputCreateIssue.Value()
 }
 
 func (c *CreateIssueComment) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueCommentOnce, exampleOutputCreateIssueCommentBytes, &exampleOutputCreateIssueComment)
+	return exampleOutputCreateIssueComment.Value()
 }
 
 func (c *UpdateIssueComment) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueCommentOnce, exampleOutputUpdateIssueCommentBytes, &exampleOutputUpdateIssueComment)
+	return exampleOutputUpdateIssueComment.Value()
 }
 
 func (c *GetIssue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIssueOnce, exampleOutputGetIssueBytes, &exampleOutputGetIssue)
+	return exampleOutputGetIssue.Value()
 }
 
 func (c *UpdateIssue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueOnce, exampleOutputUpdateIssueBytes, &exampleOutputUpdateIssue)
+	return exampleOutputUpdateIssue.Value()
 }
 
 func (t *OnIssueComment) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
+	return exampleDataOnIssueComment.Value()
 }
 
 func (t *OnIssue) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
+	return exampleDataOnIssue.Value()
 }
 
 func (c *AddIssueLabel) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueLabelOnce, exampleOutputAddIssueLabelBytes, &exampleOutputAddIssueLabel)
+	return exampleOutputAddIssueLabel.Value()
 }
 
 func (c *RemoveIssueLabel) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputRemoveIssueLabelOnce, exampleOutputRemoveIssueLabelBytes, &exampleOutputRemoveIssueLabel)
+	return exampleOutputRemoveIssueLabel.Value()
 }
 
 func (c *AddIssueAssignee) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueAssigneeOnce, exampleOutputAddIssueAssigneeBytes, &exampleOutputAddIssueAssignee)
+	return exampleOutputAddIssueAssignee.Value()
 }
 
 func (c *RemoveIssueAssignee) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputRemoveIssueAssigneeOnce, exampleOutputRemoveIssueAssigneeBytes, &exampleOutputRemoveIssueAssignee)
+	return exampleOutputRemoveIssueAssignee.Value()
 }

@@ -2,7 +2,6 @@ package compute
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -62,129 +61,94 @@ var exampleOutputUpdateFirewallRuleBytes []byte
 var exampleOutputDeleteFirewallRuleBytes []byte
 
 var (
-	exampleOutputCreateVMOnce sync.Once
-	exampleOutputCreateVM     map[string]any
-
-	exampleOutputDeleteVMInstanceOnce sync.Once
-	exampleOutputDeleteVMInstance     map[string]any
-
-	exampleDataOnVMInstanceOnce sync.Once
-	exampleDataOnVMInstance     map[string]any
-
-	exampleOutputGetVMInstanceOnce sync.Once
-	exampleOutputGetVMInstance     map[string]any
-
-	exampleOutputManageVMInstancePowerOnce sync.Once
-	exampleOutputManageVMInstancePower     map[string]any
-
-	exampleOutputUpdateVMInstanceTypeOnce sync.Once
-	exampleOutputUpdateVMInstanceType     map[string]any
-
-	exampleOutputGetVMInstanceMetricsOnce sync.Once
-	exampleOutputGetVMInstanceMetrics     map[string]any
-
-	exampleOutputCreateImageOnce sync.Once
-	exampleOutputCreateImage     map[string]any
-
-	exampleOutputUpdateImageOnce sync.Once
-	exampleOutputUpdateImage     map[string]any
-
-	exampleOutputDeleteImageOnce sync.Once
-	exampleOutputDeleteImage     map[string]any
-
-	exampleOutputCreateStaticIPOnce sync.Once
-	exampleOutputCreateStaticIP     map[string]any
-
-	exampleOutputDeleteStaticIPOnce sync.Once
-	exampleOutputDeleteStaticIP     map[string]any
-
-	exampleOutputManageStaticIPOnce sync.Once
-	exampleOutputManageStaticIP     map[string]any
-
-	exampleOutputCreateLoadBalancerOnce sync.Once
-	exampleOutputCreateLoadBalancer     map[string]any
-
-	exampleOutputDeleteLoadBalancerOnce sync.Once
-	exampleOutputDeleteLoadBalancer     map[string]any
-
-	exampleOutputCreateFirewallRuleOnce sync.Once
-	exampleOutputCreateFirewallRule     map[string]any
-
-	exampleOutputUpdateFirewallRuleOnce sync.Once
-	exampleOutputUpdateFirewallRule     map[string]any
-
-	exampleOutputDeleteFirewallRuleOnce sync.Once
-	exampleOutputDeleteFirewallRule     map[string]any
+	exampleOutputCreateVM              = utils.NewEmbeddedJSON(exampleOutputCreateVMBytes)
+	exampleOutputDeleteVMInstance      = utils.NewEmbeddedJSON(exampleOutputDeleteVMInstanceBytes)
+	exampleDataOnVMInstance            = utils.NewEmbeddedJSON(exampleDataOnVMInstanceBytes)
+	exampleOutputGetVMInstance         = utils.NewEmbeddedJSON(exampleOutputGetVMInstanceBytes)
+	exampleOutputManageVMInstancePower = utils.NewEmbeddedJSON(exampleOutputManageVMInstancePowerBytes)
+	exampleOutputUpdateVMInstanceType  = utils.NewEmbeddedJSON(exampleOutputUpdateVMInstanceTypeBytes)
+	exampleOutputGetVMInstanceMetrics  = utils.NewEmbeddedJSON(exampleOutputGetVMInstanceMetricsBytes)
+	exampleOutputCreateImage           = utils.NewEmbeddedJSON(exampleOutputCreateImageBytes)
+	exampleOutputUpdateImage           = utils.NewEmbeddedJSON(exampleOutputUpdateImageBytes)
+	exampleOutputDeleteImage           = utils.NewEmbeddedJSON(exampleOutputDeleteImageBytes)
+	exampleOutputCreateStaticIP        = utils.NewEmbeddedJSON(exampleOutputCreateStaticIPBytes)
+	exampleOutputDeleteStaticIP        = utils.NewEmbeddedJSON(exampleOutputDeleteStaticIPBytes)
+	exampleOutputManageStaticIP        = utils.NewEmbeddedJSON(exampleOutputManageStaticIPBytes)
+	exampleOutputCreateLoadBalancer    = utils.NewEmbeddedJSON(exampleOutputCreateLoadBalancerBytes)
+	exampleOutputDeleteLoadBalancer    = utils.NewEmbeddedJSON(exampleOutputDeleteLoadBalancerBytes)
+	exampleOutputCreateFirewallRule    = utils.NewEmbeddedJSON(exampleOutputCreateFirewallRuleBytes)
+	exampleOutputUpdateFirewallRule    = utils.NewEmbeddedJSON(exampleOutputUpdateFirewallRuleBytes)
+	exampleOutputDeleteFirewallRule    = utils.NewEmbeddedJSON(exampleOutputDeleteFirewallRuleBytes)
 )
 
 func (c *CreateVM) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateVMOnce, exampleOutputCreateVMBytes, &exampleOutputCreateVM)
+	return exampleOutputCreateVM.Value()
 }
 
 func (d *DeleteVMInstance) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteVMInstanceOnce, exampleOutputDeleteVMInstanceBytes, &exampleOutputDeleteVMInstance)
+	return exampleOutputDeleteVMInstance.Value()
 }
 
 func (g *GetVMInstance) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetVMInstanceOnce, exampleOutputGetVMInstanceBytes, &exampleOutputGetVMInstance)
+	return exampleOutputGetVMInstance.Value()
 }
 
 func (t *OnVMInstance) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnVMInstanceOnce, exampleDataOnVMInstanceBytes, &exampleDataOnVMInstance)
+	return exampleDataOnVMInstance.Value()
 }
 
 func (m *ManageVMInstancePower) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputManageVMInstancePowerOnce, exampleOutputManageVMInstancePowerBytes, &exampleOutputManageVMInstancePower)
+	return exampleOutputManageVMInstancePower.Value()
 }
 
 func (u *UpdateVMInstanceType) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateVMInstanceTypeOnce, exampleOutputUpdateVMInstanceTypeBytes, &exampleOutputUpdateVMInstanceType)
+	return exampleOutputUpdateVMInstanceType.Value()
 }
 
 func (g *GetVMInstanceMetrics) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetVMInstanceMetricsOnce, exampleOutputGetVMInstanceMetricsBytes, &exampleOutputGetVMInstanceMetrics)
+	return exampleOutputGetVMInstanceMetrics.Value()
 }
 
 func (c *CreateImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateImageOnce, exampleOutputCreateImageBytes, &exampleOutputCreateImage)
+	return exampleOutputCreateImage.Value()
 }
 
 func (u *UpdateImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateImageOnce, exampleOutputUpdateImageBytes, &exampleOutputUpdateImage)
+	return exampleOutputUpdateImage.Value()
 }
 
 func (d *DeleteImage) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteImageOnce, exampleOutputDeleteImageBytes, &exampleOutputDeleteImage)
+	return exampleOutputDeleteImage.Value()
 }
 
 func (c *CreateStaticIP) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateStaticIPOnce, exampleOutputCreateStaticIPBytes, &exampleOutputCreateStaticIP)
+	return exampleOutputCreateStaticIP.Value()
 }
 
 func (d *DeleteStaticIP) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteStaticIPOnce, exampleOutputDeleteStaticIPBytes, &exampleOutputDeleteStaticIP)
+	return exampleOutputDeleteStaticIP.Value()
 }
 
 func (m *ManageStaticIP) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputManageStaticIPOnce, exampleOutputManageStaticIPBytes, &exampleOutputManageStaticIP)
+	return exampleOutputManageStaticIP.Value()
 }
 
 func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateLoadBalancerOnce, exampleOutputCreateLoadBalancerBytes, &exampleOutputCreateLoadBalancer)
+	return exampleOutputCreateLoadBalancer.Value()
 }
 
 func (d *DeleteLoadBalancer) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteLoadBalancerOnce, exampleOutputDeleteLoadBalancerBytes, &exampleOutputDeleteLoadBalancer)
+	return exampleOutputDeleteLoadBalancer.Value()
 }
 
 func (c *CreateFirewall) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateFirewallRuleOnce, exampleOutputCreateFirewallRuleBytes, &exampleOutputCreateFirewallRule)
+	return exampleOutputCreateFirewallRule.Value()
 }
 
 func (u *UpdateFirewall) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateFirewallRuleOnce, exampleOutputUpdateFirewallRuleBytes, &exampleOutputUpdateFirewallRule)
+	return exampleOutputUpdateFirewallRule.Value()
 }
 
 func (d *DeleteFirewall) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteFirewallRuleOnce, exampleOutputDeleteFirewallRuleBytes, &exampleOutputDeleteFirewallRule)
+	return exampleOutputDeleteFirewallRule.Value()
 }

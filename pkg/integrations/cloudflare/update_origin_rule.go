@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -19,9 +18,7 @@ type UpdateOriginRule struct{}
 
 //go:embed example_output_update_origin_rule.json
 var exampleOutputUpdateOriginRuleBytes []byte
-
-var exampleOutputUpdateOriginRuleOnce sync.Once
-var exampleOutputUpdateOriginRule map[string]any
+var exampleOutputUpdateOriginRule = utils.NewEmbeddedJSON(exampleOutputUpdateOriginRuleBytes)
 
 type UpdateOriginRuleSpec struct {
 	Rule        string                `json:"rule" mapstructure:"rule"`
@@ -80,7 +77,7 @@ func (c *UpdateOriginRule) OutputChannels(configuration any) []core.OutputChanne
 }
 
 func (c *UpdateOriginRule) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateOriginRuleOnce, exampleOutputUpdateOriginRuleBytes, &exampleOutputUpdateOriginRule)
+	return exampleOutputUpdateOriginRule.Value()
 }
 
 func (c *UpdateOriginRule) Configuration() []configuration.Field {

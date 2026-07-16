@@ -2,7 +2,6 @@ package jfrogartifactory
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -15,24 +14,18 @@ var exampleOutputDeleteArtifactBytes []byte
 
 //go:embed example_data_on_artifact_uploaded.json
 var exampleDataOnArtifactUploadedBytes []byte
-
-var exampleOutputGetArtifactInfoOnce sync.Once
-var exampleOutputGetArtifactInfo map[string]any
-
-var exampleOutputDeleteArtifactOnce sync.Once
-var exampleOutputDeleteArtifact map[string]any
-
-var exampleDataOnArtifactUploadedOnce sync.Once
-var exampleDataOnArtifactUploaded map[string]any
+var exampleOutputGetArtifactInfo = utils.NewEmbeddedJSON(exampleOutputGetArtifactInfoBytes)
+var exampleOutputDeleteArtifact = utils.NewEmbeddedJSON(exampleOutputDeleteArtifactBytes)
+var exampleDataOnArtifactUploaded = utils.NewEmbeddedJSON(exampleDataOnArtifactUploadedBytes)
 
 func (g *GetArtifactInfo) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetArtifactInfoOnce, exampleOutputGetArtifactInfoBytes, &exampleOutputGetArtifactInfo)
+	return exampleOutputGetArtifactInfo.Value()
 }
 
 func (d *DeleteArtifact) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteArtifactOnce, exampleOutputDeleteArtifactBytes, &exampleOutputDeleteArtifact)
+	return exampleOutputDeleteArtifact.Value()
 }
 
 func (t *OnArtifactUploaded) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnArtifactUploadedOnce, exampleDataOnArtifactUploadedBytes, &exampleDataOnArtifactUploaded)
+	return exampleDataOnArtifactUploaded.Value()
 }

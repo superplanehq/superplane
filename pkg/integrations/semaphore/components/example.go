@@ -2,7 +2,6 @@ package components
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -15,24 +14,18 @@ var exampleDataOnPipelineDoneBytes []byte
 
 //go:embed payloads/get_pipeline.json
 var exampleOutputGetPipelineBytes []byte
-
-var exampleOutputOnce sync.Once
-var exampleOutput map[string]any
-
-var exampleDataOnce sync.Once
-var exampleData map[string]any
-
-var exampleOutputGetPipelineOnce sync.Once
-var exampleOutputGetPipeline map[string]any
+var exampleOutput = utils.NewEmbeddedJSON(exampleOutputRunWorkflowBytes)
+var exampleData = utils.NewEmbeddedJSON(exampleDataOnPipelineDoneBytes)
+var exampleOutputGetPipeline = utils.NewEmbeddedJSON(exampleOutputGetPipelineBytes)
 
 func (c *RunWorkflow) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputOnce, exampleOutputRunWorkflowBytes, &exampleOutput)
+	return exampleOutput.Value()
 }
 
 func (t *OnPipelineDone) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnce, exampleDataOnPipelineDoneBytes, &exampleData)
+	return exampleData.Value()
 }
 
 func (c *GetPipeline) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetPipelineOnce, exampleOutputGetPipelineBytes, &exampleOutputGetPipeline)
+	return exampleOutputGetPipeline.Value()
 }

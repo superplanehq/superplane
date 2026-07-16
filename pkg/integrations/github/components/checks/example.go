@@ -2,7 +2,6 @@ package checks
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -12,21 +11,13 @@ var exampleDataOnCheckRunBytes []byte
 
 //go:embed payloads/list_check_runs_for_ref.json
 var exampleOutputListCheckRunsForRefBytes []byte
-
-var exampleDataOnCheckRunOnce sync.Once
-var exampleDataOnCheckRun map[string]any
-
-var exampleOutputListCheckRunsForRefOnce sync.Once
-var exampleOutputListCheckRunsForRef map[string]any
+var exampleDataOnCheckRun = utils.NewEmbeddedJSON(exampleDataOnCheckRunBytes)
+var exampleOutputListCheckRunsForRef = utils.NewEmbeddedJSON(exampleOutputListCheckRunsForRefBytes)
 
 func (t *OnCheckRun) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnCheckRunOnce, exampleDataOnCheckRunBytes, &exampleDataOnCheckRun)
+	return exampleDataOnCheckRun.Value()
 }
 
 func (c *ListCheckRunsForRef) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(
-		&exampleOutputListCheckRunsForRefOnce,
-		exampleOutputListCheckRunsForRefBytes,
-		&exampleOutputListCheckRunsForRef,
-	)
+	return exampleOutputListCheckRunsForRef.Value()
 }

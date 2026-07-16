@@ -2,7 +2,6 @@ package actions
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -12,17 +11,13 @@ var exampleOutputRunWorkflowBytes []byte
 
 //go:embed payloads/on_workflow_run.json
 var exampleDataOnWorkflowRunBytes []byte
-
-var exampleOutputRunWorkflowOnce sync.Once
-var exampleOutputRunWorkflow map[string]any
-
-var exampleDataOnWorkflowRunOnce sync.Once
-var exampleDataOnWorkflowRun map[string]any
+var exampleOutputRunWorkflow = utils.NewEmbeddedJSON(exampleOutputRunWorkflowBytes)
+var exampleDataOnWorkflowRun = utils.NewEmbeddedJSON(exampleDataOnWorkflowRunBytes)
 
 func (c *RunWorkflow) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputRunWorkflowOnce, exampleOutputRunWorkflowBytes, &exampleOutputRunWorkflow)
+	return exampleOutputRunWorkflow.Value()
 }
 
 func (t *OnWorkflowRun) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnWorkflowRunOnce, exampleDataOnWorkflowRunBytes, &exampleDataOnWorkflowRun)
+	return exampleDataOnWorkflowRun.Value()
 }

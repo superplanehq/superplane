@@ -2,7 +2,6 @@ package contents
 
 import (
 	_ "embed"
-	"sync"
 
 	"github.com/superplanehq/superplane/pkg/utils"
 )
@@ -30,59 +29,43 @@ var exampleDataOnTagCreatedBytes []byte
 
 //go:embed payloads/on_branch_created.json
 var exampleDataOnBranchCreatedBytes []byte
-
-var exampleOutputCreateReleaseOnce sync.Once
-var exampleOutputCreateRelease map[string]any
-
-var exampleOutputGetReleaseOnce sync.Once
-var exampleOutputGetRelease map[string]any
-
-var exampleOutputUpdateReleaseOnce sync.Once
-var exampleOutputUpdateRelease map[string]any
-
-var exampleOutputDeleteReleaseOnce sync.Once
-var exampleOutputDeleteRelease map[string]any
-
-var exampleDataOnPushOnce sync.Once
-var exampleDataOnPush map[string]any
-
-var exampleDataOnReleaseOnce sync.Once
-var exampleDataOnRelease map[string]any
-
-var exampleDataOnTagCreatedOnce sync.Once
-var exampleDataOnTagCreated map[string]any
-
-var exampleDataOnBranchCreatedOnce sync.Once
-var exampleDataOnBranchCreated map[string]any
+var exampleOutputCreateRelease = utils.NewEmbeddedJSON(exampleOutputCreateReleaseBytes)
+var exampleOutputGetRelease = utils.NewEmbeddedJSON(exampleOutputGetReleaseBytes)
+var exampleOutputUpdateRelease = utils.NewEmbeddedJSON(exampleOutputUpdateReleaseBytes)
+var exampleOutputDeleteRelease = utils.NewEmbeddedJSON(exampleOutputDeleteReleaseBytes)
+var exampleDataOnPush = utils.NewEmbeddedJSON(exampleDataOnPushBytes)
+var exampleDataOnRelease = utils.NewEmbeddedJSON(exampleDataOnReleaseBytes)
+var exampleDataOnTagCreated = utils.NewEmbeddedJSON(exampleDataOnTagCreatedBytes)
+var exampleDataOnBranchCreated = utils.NewEmbeddedJSON(exampleDataOnBranchCreatedBytes)
 
 func (c *CreateRelease) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateReleaseOnce, exampleOutputCreateReleaseBytes, &exampleOutputCreateRelease)
+	return exampleOutputCreateRelease.Value()
 }
 
 func (c *GetRelease) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetReleaseOnce, exampleOutputGetReleaseBytes, &exampleOutputGetRelease)
+	return exampleOutputGetRelease.Value()
 }
 
 func (c *UpdateRelease) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateReleaseOnce, exampleOutputUpdateReleaseBytes, &exampleOutputUpdateRelease)
+	return exampleOutputUpdateRelease.Value()
 }
 
 func (c *DeleteRelease) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteReleaseOnce, exampleOutputDeleteReleaseBytes, &exampleOutputDeleteRelease)
+	return exampleOutputDeleteRelease.Value()
 }
 
 func (t *OnBranchCreated) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnBranchCreatedOnce, exampleDataOnBranchCreatedBytes, &exampleDataOnBranchCreated)
+	return exampleDataOnBranchCreated.Value()
 }
 
 func (t *OnPush) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnPushOnce, exampleDataOnPushBytes, &exampleDataOnPush)
+	return exampleDataOnPush.Value()
 }
 
 func (t *OnRelease) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnReleaseOnce, exampleDataOnReleaseBytes, &exampleDataOnRelease)
+	return exampleDataOnRelease.Value()
 }
 
 func (t *OnTagCreated) ExampleData() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnTagCreatedOnce, exampleDataOnTagCreatedBytes, &exampleDataOnTagCreated)
+	return exampleDataOnTagCreated.Value()
 }
