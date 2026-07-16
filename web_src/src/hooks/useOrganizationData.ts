@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   usersListUsers,
@@ -97,6 +98,29 @@ export const useOrganizationRoles = (organizationId: string) => {
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
+};
+
+const DEFAULT_ORGANIZATION_ROLE_NAMES = new Set(["org_admin", "org_owner", "org_viewer"]);
+
+// useSortedOrganizationRoles wraps useOrganizationRoles and returns the roles
+// ordered for role-picker dropdowns: custom roles first, then default roles,
+// each sorted alphabetically by display name.
+export const useSortedOrganizationRoles = (organizationId: string) => {
+  const query = useOrganizationRoles(organizationId);
+  const sortedRoles = useMemo(() => {
+    const roles = query.data ?? [];
+    const byDisplayName = (a: (typeof roles)[number], b: (typeof roles)[number]) =>
+      (a.spec?.displayName || a.metadata?.name || "").localeCompare(b.spec?.displayName || b.metadata?.name || "");
+    const customRoles = roles
+      .filter((role) => !DEFAULT_ORGANIZATION_ROLE_NAMES.has(role.metadata?.name || ""))
+      .sort(byDisplayName);
+    const baseRoles = roles
+      .filter((role) => DEFAULT_ORGANIZATION_ROLE_NAMES.has(role.metadata?.name || ""))
+      .sort(byDisplayName);
+    return [...customRoles, ...baseRoles];
+  }, [query.data]);
+
+  return { ...query, sortedRoles };
 };
 
 export const useOrganizationGroups = (organizationId: string) => {

@@ -24,13 +24,50 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bot } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceAccounts, useCreateServiceAccount, useDeleteServiceAccount } from "@/hooks/useServiceAccounts";
-import { useOrganizationRoles } from "@/hooks/useOrganizationData";
+import { useSortedOrganizationRoles } from "@/hooks/useOrganizationData";
 
 interface ServiceAccountsProps {
   organizationId: string;
+}
+
+type SortedRoles = ReturnType<typeof useSortedOrganizationRoles>["sortedRoles"];
+
+interface RoleSelectFieldProps {
+  role: string;
+  onRoleChange: (role: string) => void;
+  roles: SortedRoles;
+  loading: boolean;
+}
+
+// RoleSelectField renders the role dropdown for a new service account, showing
+// the selected role's description as helper text.
+function RoleSelectField({ role, onRoleChange, roles, loading }: RoleSelectFieldProps) {
+  const description = roles.find((r) => r.metadata?.name === role)?.spec?.description;
+  return (
+    <div>
+      <Label className="text-gray-800 dark:text-gray-100 mb-2">
+        Role <span className="text-red-500">*</span>
+      </Label>
+      <Select value={role} onValueChange={onRoleChange} disabled={loading}>
+        <SelectTrigger className="w-full" data-testid="sa-create-role">
+          <SelectValue placeholder={loading ? "Loading roles..." : "Select a role"} />
+        </SelectTrigger>
+        <SelectContent>
+          {roles.map((r) => (
+            <SelectItem key={r.metadata?.name} value={r.metadata?.name || ""}>
+              {r.spec?.displayName || r.metadata?.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        {description || "Determines what this service account can access."}
+      </p>
+    </div>
+  );
 }
 
 export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
@@ -46,22 +83,9 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
   const canDelete = canAct("service_accounts", "delete");
 
   const { data: serviceAccounts = [], isLoading } = useServiceAccounts(organizationId);
-  const { data: roles = [], isLoading: rolesLoading } = useOrganizationRoles(organizationId);
+  const { sortedRoles, isLoading: rolesLoading } = useSortedOrganizationRoles(organizationId);
   const createMutation = useCreateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
-
-  // List custom roles first, then default roles, each sorted alphabetically —
-  // matching the role dropdown UX used when creating groups.
-  const sortedRoles = useMemo(() => {
-    const defaultRoles = new Set(["org_admin", "org_owner", "org_viewer"]);
-    const byDisplayName = (a: (typeof roles)[number], b: (typeof roles)[number]) =>
-      (a.spec?.displayName || a.metadata?.name || "").localeCompare(b.spec?.displayName || b.metadata?.name || "");
-    const customRoles = roles.filter((role) => !defaultRoles.has(role.metadata?.name || "")).sort(byDisplayName);
-    const baseRoles = roles.filter((role) => defaultRoles.has(role.metadata?.name || "")).sort(byDisplayName);
-    return [...customRoles, ...baseRoles];
-  }, [roles]);
-
-  const selectedRoleDescription = sortedRoles.find((r) => r.metadata?.name === role)?.spec?.description;
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -303,26 +327,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     data-testid="sa-create-description"
                   />
                 </div>
-                <div>
-                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                    Role <span className="text-red-500">*</span>
-                  </Label>
-                  <Select value={role} onValueChange={setRole} disabled={rolesLoading}>
-                    <SelectTrigger className="w-full" data-testid="sa-create-role">
-                      <SelectValue placeholder={rolesLoading ? "Loading roles..." : "Select a role"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sortedRoles.map((r) => (
-                        <SelectItem key={r.metadata?.name} value={r.metadata?.name || ""}>
-                          {r.spec?.displayName || r.metadata?.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {selectedRoleDescription || "Determines what this service account can access."}
-                  </p>
-                </div>
+                <RoleSelectField role={role} onRoleChange={setRole} roles={sortedRoles} loading={rolesLoading} />
               </div>
 
               <div className="flex justify-start gap-3 mt-6">

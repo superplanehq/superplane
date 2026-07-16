@@ -1,11 +1,11 @@
 import { Heading } from "@/components/Heading/heading";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
-import { useCreateGroup, useOrganizationRoles } from "../../../hooks/useOrganizationData";
+import { useCreateGroup, useSortedOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -20,22 +20,10 @@ export function CreateGroupPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: roles = [], isLoading: loadingRoles } = useOrganizationRoles(orgId || "");
+  const { sortedRoles, isLoading: loadingRoles } = useSortedOrganizationRoles(orgId || "");
   const createGroupMutation = useCreateGroup(orgId || "");
 
   useReportPageReady(!loadingRoles);
-
-  const sortedRoles = useMemo(() => {
-    const defaultRoles = new Set(["org_admin", "org_owner", "org_viewer"]);
-    const customRoles = roles
-      .filter((role) => !defaultRoles.has(role.metadata?.name || ""))
-      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
-    const baseRoles = roles
-      .filter((role) => defaultRoles.has(role.metadata?.name || ""))
-      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
-
-    return [...customRoles, ...baseRoles];
-  }, [roles]);
 
   useEffect(() => {
     if (sortedRoles.length > 0 && !selectedRole) {
@@ -125,7 +113,7 @@ export function CreateGroupPage() {
                   <div className="flex justify-center items-center h-12">
                     <p className="text-gray-500 dark:text-gray-400">Loading roles...</p>
                   </div>
-                ) : roles.length === 0 ? (
+                ) : sortedRoles.length === 0 ? (
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                     <div className="flex max-w-lg">
                       <Icon name="warning" className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5" />
@@ -173,7 +161,7 @@ export function CreateGroupPage() {
           <div className="flex items-center gap-3">
             <Button
               onClick={handleCreateGroup}
-              disabled={!groupName.trim() || !selectedRole || isCreating || roles.length === 0}
+              disabled={!groupName.trim() || !selectedRole || isCreating || sortedRoles.length === 0}
               className="flex items-center gap-2"
             >
               {isCreating ? "Creating..." : "Create Group"}
