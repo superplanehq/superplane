@@ -49,13 +49,21 @@ export const useCreateServiceAccount = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name: string; description: string; role: string }) => {
+    mutationFn: async (params: {
+      name: string;
+      description: string;
+      role: string;
+      expiresAt?: string;
+      canvasIds: string[];
+    }) => {
       return serviceAccountsCreateServiceAccount(
         withOrganizationHeader({
           body: {
             name: params.name,
             description: params.description,
             role: params.role,
+            expiresAt: params.expiresAt,
+            canvasIds: params.canvasIds,
           },
         }),
       );
@@ -70,13 +78,23 @@ export const useUpdateServiceAccount = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { id: string; name: string; description: string }) => {
+    mutationFn: async (params: {
+      id: string;
+      name: string;
+      description: string;
+      expiresAt?: string;
+      clearExpiresAt: boolean;
+      canvasIds: string[];
+    }) => {
       return serviceAccountsUpdateServiceAccount(
         withOrganizationHeader({
           path: { id: params.id },
           body: {
             name: params.name,
             description: params.description,
+            expiresAt: params.expiresAt,
+            clearExpiresAt: params.clearExpiresAt,
+            canvasIds: params.canvasIds,
           },
         }),
       );

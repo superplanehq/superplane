@@ -1,9 +1,9 @@
 import {
-  Bot,
   Building2,
   CircleUser,
   Gauge,
   Key,
+  KeyRound,
   Network,
   Plug,
   Settings,
@@ -56,10 +56,10 @@ export const ORGANIZATION_SETTINGS_LINKS: Array<{
   },
   {
     id: "service-accounts",
-    label: "Service Accounts",
+    label: "API Keys",
     description: "Programmatic API access",
     path: "settings/service-accounts",
-    icon: Bot,
+    icon: KeyRound,
     permission: { resource: "service_accounts", action: "read" },
   },
   {
