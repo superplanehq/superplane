@@ -191,13 +191,14 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     // that the user is transitioning to an expression, so we stop treating the
     // input as a literal path to avoid misleading previews mid-typing.
     const hasTemplateStart = OPEN_TEMPLATE_START_RE.test(inputValue);
+    const isPathOrRawTemplate = pathModeOutsideWrapper && hasTemplateStart;
     // Preview the whole input as a single value when either:
     //  - raw mode (the whole input IS the expression), or
     //  - `pathOrRaw` mode without any `{{` opener AND the adapter knows how to
     //    resolve bare input as a literal path (mirroring runtime semantics).
     const canEvaluatePathLiteral =
       pathModeOutsideWrapper && !hasTemplateStart && typeof expressionAdapter.evaluatePathLiteral === "function";
-    const evaluateWholeInputAsExpression = isRawExpression || canEvaluatePathLiteral;
+    const evaluateWholeInputAsExpression = isRawExpression || canEvaluatePathLiteral || isPathOrRawTemplate;
 
     const evaluateWholeInput = useCallback(
       (input: string, globals: Record<string, unknown>) => {
@@ -205,9 +206,16 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           const outcome = expressionAdapter.evaluatePathLiteral(input, globals);
           if (outcome) return outcome;
         }
+        if (pathModeOutsideWrapper && OPEN_TEMPLATE_START_RE.test(input)) {
+          const fullTemplate = input.match(/^\s*\{\{([\s\S]*)\}\}\s*$/);
+          if (!fullTemplate) {
+            return { ok: false, error: "Expected a single full {{ … }} expression" };
+          }
+          return expressionAdapter.evaluate(fullTemplate[1], globals);
+        }
         return expressionAdapter.evaluate(input, globals);
       },
-      [canEvaluatePathLiteral, expressionAdapter],
+      [canEvaluatePathLiteral, expressionAdapter, pathModeOutsideWrapper],
     );
 
     const allExpressionsValid = useMemo(() => {
