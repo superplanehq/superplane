@@ -1,3 +1,4 @@
+import type { ExecutionInfo } from "../types";
 import type { Issue } from "./types";
 
 /**
@@ -73,4 +74,24 @@ export function getDetailsForApiIssue(issue: Issue | undefined): Record<string, 
   }
 
   return details;
+}
+
+/**
+ * Get a condensed 6-field execution summary for a full API Issue response.
+ * Used by getIssue and updateIssue, whose details panels favor a shorter,
+ * at-a-glance view over the full field set in getDetailsForApiIssue.
+ */
+export function getSummaryDetailsForIssue(execution: ExecutionInfo, issue: Issue | undefined): Record<string, string> {
+  if (!issue) {
+    return {};
+  }
+
+  return {
+    "Executed At": execution.createdAt ? new Date(execution.createdAt).toLocaleString() : "-",
+    Title: issue.title || "-",
+    State: issue.state || "-",
+    "Created By": issue.author?.username || "-",
+    Labels: issue.labels && issue.labels.length > 0 ? issue.labels.join(", ") : "-",
+    URL: issue.web_url || "-",
+  };
 }

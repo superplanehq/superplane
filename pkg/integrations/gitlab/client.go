@@ -195,6 +195,111 @@ func (c *Client) CreateIssue(ctx context.Context, projectID string, req *IssueRe
 	return &issue, nil
 }
 
+func (c *Client) GetIssue(ctx context.Context, projectID, issueIID string) (*Issue, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get issue: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var issue Issue
+	if err := json.NewDecoder(resp.Body).Decode(&issue); err != nil {
+		return nil, fmt.Errorf("failed to decode issue: %v", err)
+	}
+
+	return &issue, nil
+}
+
+// UpdateIssueRequest mirrors GitLab's PUT /projects/:id/issues/:issue_iid body.
+// Fields are pointers so a nil field is omitted (not changed) while a non-nil
+// field is always sent, even if it points to a zero value - e.g. a non-nil
+// pointer to "" clears the description, and a non-nil pointer to an empty
+// slice clears the assignees. Callers must leave a field nil to skip it.
+type UpdateIssueRequest struct {
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	StateEvent  *string `json:"state_event,omitempty"`
+	Labels      *string `json:"labels,omitempty"`
+	AssigneeIDs *[]int  `json:"assignee_ids,omitempty"`
+	MilestoneID *int    `json:"milestone_id,omitempty"`
+	DueDate     *string `json:"due_date,omitempty"`
+}
+
+func (c *Client) UpdateIssue(ctx context.Context, projectID, issueIID string, req *UpdateIssueRequest) (*Issue, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update issue: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var issue Issue
+	if err := json.NewDecoder(resp.Body).Decode(&issue); err != nil {
+		return nil, fmt.Errorf("failed to decode issue: %v", err)
+	}
+
+	return &issue, nil
+}
+
+func (c *Client) CreateIssueNote(ctx context.Context, projectID, issueIID string, req *CreateNoteRequest) (*Note, error) {
+	apiURL := fmt.Sprintf("%s/api/%s/projects/%s/issues/%s/notes", c.baseURL, apiVersion, url.PathEscape(projectID), url.PathEscape(issueIID))
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create issue note: status %d, response: %s", resp.StatusCode, readResponseBody(resp))
+	}
+
+	var note Note
+	if err := json.NewDecoder(resp.Body).Decode(&note); err != nil {
+		return nil, fmt.Errorf("failed to decode note: %v", err)
+	}
+
+	return &note, nil
+}
+
 type Milestone struct {
 	ID    int    `json:"id"`
 	IID   int    `json:"iid"`
