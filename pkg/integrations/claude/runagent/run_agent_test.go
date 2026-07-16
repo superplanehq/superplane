@@ -71,6 +71,42 @@ func Test__validateSpec__rejectsBadVersion(t *testing.T) {
 	assert.Contains(t, err.Error(), "version")
 }
 
+// Nodes saved before this component used resource fields stored the environment
+// under "environmentId" and the version as a number. They must keep decoding
+// and validating without being re-saved.
+func Test__decodeSpec__legacyConfig(t *testing.T) {
+	spec, err := decodeSpec(map[string]any{
+		"agent":         "agent_1",
+		"environmentId": "env_1",
+		"version":       float64(2), // JSON numbers decode to float64
+		"prompt":        "do it",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "env_1", spec.Environment, "legacy environmentId must map to environment")
+	assert.Equal(t, "2", spec.Version, "numeric version must become the resource string")
+	require.NoError(t, validateSpec(spec))
+
+	v, err := parseAgentVersion(spec.Version)
+	require.NoError(t, err)
+	require.NotNil(t, v)
+	assert.Equal(t, 2, *v)
+}
+
+// The new keys win when both are present, and a version already stored as a
+// string passes through untouched.
+func Test__decodeSpec__prefersNewKeys(t *testing.T) {
+	spec, err := decodeSpec(map[string]any{
+		"agent":         "agent_1",
+		"environment":   "env_new",
+		"environmentId": "env_old",
+		"version":       "3",
+		"prompt":        "do it",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "env_new", spec.Environment)
+	assert.Equal(t, "3", spec.Version)
+}
+
 func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	a := &RunAgent{}
 	httpContext := &contexts.HTTPContext{

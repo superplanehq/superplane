@@ -530,6 +530,8 @@ func truncateID(id string, maxLen int) string {
 }
 
 func decodeSpec(config any) (Spec, error) {
+	config = normalizeLegacyConfig(config)
+
 	var spec Spec
 	if err := mapstructure.Decode(config, &spec); err != nil {
 		return spec, fmt.Errorf("failed to decode configuration: %w", err)
@@ -543,6 +545,79 @@ func decodeSpec(config any) (Spec, error) {
 		}
 	}
 	return spec, nil
+}
+
+// normalizeLegacyConfig migrates configuration written by earlier versions of
+// this component so already-saved nodes keep working without being re-saved:
+//
+//   - the environment id lived under "environmentId" before it became the
+//     "environment" resource field;
+//   - the agent version was a number before it became a resource value string,
+//     which mapstructure would otherwise refuse to decode into Spec.Version.
+//
+// The input map is never mutated: a shallow copy is made only when a migration
+// actually applies, and non-map inputs pass through untouched.
+func normalizeLegacyConfig(config any) any {
+	raw, ok := config.(map[string]any)
+	if !ok {
+		return config
+	}
+
+	out := raw
+	copied := false
+	set := func(key string, value any) {
+		if !copied {
+			dup := make(map[string]any, len(raw)+1)
+			for k, v := range raw {
+				dup[k] = v
+			}
+			out = dup
+			copied = true
+		}
+		out[key] = value
+	}
+
+	// Legacy "environmentId" -> "environment" (only when the new key is unset).
+	if isBlank(raw["environment"]) {
+		if legacy, ok := raw["environmentId"]; ok && !isBlank(legacy) {
+			set("environment", legacy)
+		}
+	}
+
+	// A numeric version was stored before the resource-value string.
+	if v, ok := raw["version"]; ok {
+		if _, isStr := v.(string); !isStr {
+			if s := legacyVersionToString(v); s != "" {
+				set("version", s)
+			}
+		}
+	}
+
+	return out
+}
+
+func isBlank(v any) bool {
+	s, ok := v.(string)
+	return v == nil || (ok && strings.TrimSpace(s) == "")
+}
+
+// legacyVersionToString renders a version stored as a JSON number as the string
+// the resource field now uses. Returns "" for values it cannot interpret.
+func legacyVersionToString(v any) string {
+	switch n := v.(type) {
+	case float64:
+		return strconv.Itoa(int(n))
+	case float32:
+		return strconv.Itoa(int(n))
+	case int:
+		return strconv.Itoa(n)
+	case int64:
+		return strconv.FormatInt(n, 10)
+	case json.Number:
+		return n.String()
+	default:
+		return ""
+	}
 }
 
 func decodeStringList(v any) []string {
