@@ -8,14 +8,21 @@ import (
 )
 
 type RunExecutionContext struct {
-	tx        *gorm.DB
-	canvas    *models.Canvas
-	node      *models.CanvasNode
-	execution *models.CanvasNodeExecution
+	tx                    *gorm.DB
+	canvas                *models.Canvas
+	node                  *models.CanvasNode
+	execution             *models.CanvasNodeExecution
+	maxCrossWorkflowDepth int
 }
 
 func NewRunExecutionContext(tx *gorm.DB, canvas *models.Canvas, node *models.CanvasNode, execution *models.CanvasNodeExecution) *RunExecutionContext {
-	return &RunExecutionContext{tx: tx, canvas: canvas, node: node, execution: execution}
+	return &RunExecutionContext{
+		tx:                    tx,
+		canvas:                canvas,
+		node:                  node,
+		execution:             execution,
+		maxCrossWorkflowDepth: 8,
+	}
 }
 
 func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
@@ -36,9 +43,21 @@ func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, 
 		return nil, err
 	}
 
+	targetWorkflowID := uuid.MustParse(app.ID)
+	err = models.ValidateSubRunCreationInTransaction(
+		c.tx,
+		c.execution.RunID,
+		targetWorkflowID,
+		node.ID,
+		c.maxCrossWorkflowDepth,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	run := &models.CanvasRun{
 		ID:                uuid.New(),
-		WorkflowID:        uuid.MustParse(app.ID),
+		WorkflowID:        targetWorkflowID,
 		NodeID:            node.ID,
 		VersionID:         version.ID,
 		ParentRunID:       &c.execution.RunID,

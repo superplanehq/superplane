@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -373,4 +374,172 @@ func (r *CanvasRun) FindTargetNode(tx *gorm.DB) (*CanvasNode, error) {
 
 func (r *CanvasRun) Start(db *gorm.DB) error {
 	return db.Model(r).Update("state", CanvasRunStateStarted).Error
+}
+
+const maxRunAncestorHops = 256 // safety cap for corrupted parent_run_id cycles in the DB
+
+var (
+	// Returned when the same app entrypoint is invoked twice in one chain, e.g.
+	// A/onInvoke1 -> A/onInvoke2 -> A/onInvoke1.
+	ErrSubRunEntrypointCycle = errors.New("sub-run entrypoint cycle detected")
+
+	// Returned when invoke chains cross back into an app they already visited, e.g.
+	// A -> B -> C -> A.
+	ErrSubRunWorkflowCycle = errors.New("sub-run workflow cycle detected")
+
+	// Returned when the chain crosses too many app boundaries without cycling, e.g.
+	// A -> B -> C -> D -> ... -> Z when Z exceeds the configured limit.
+	ErrSubRunCrossWorkflowDepthExceeded = errors.New("sub-run cross-workflow depth exceeded")
+)
+
+// ValidateSubRunCreationInTransaction guards sub-run creation before a pending run is
+// inserted. All checks walk the parent_run_id chain from the caller's run upward.
+//
+// Same-app fan-out (forEach, loop, self-invoke into the same workflow) is allowed:
+// those create sibling sub-runs and do not deepen the cross-app chain.
+//
+// Checks (in order):
+//  1. Entrypoint cycle — A/onInvoke1 -> A/onInvoke2 -> A/onInvoke1
+//  2. Workflow cycle   — A -> B -> C -> A
+//  3. Cross-app depth  — A -> B -> C -> D -> ... -> Z (too many app hops)
+func ValidateSubRunCreationInTransaction(
+	tx *gorm.DB,
+	parentRunID uuid.UUID,
+	targetWorkflowID uuid.UUID,
+	targetNodeID string,
+	maxCrossWorkflowDepth int,
+) error {
+	if parentRunID == uuid.Nil {
+		return nil
+	}
+
+	ancestors, err := collectRunAncestorsInTransaction(tx, parentRunID)
+	if err != nil {
+		return err
+	}
+
+	// Entrypoint cycle: same app AND same onInvoke (or other entry) node already
+	// appears in the chain.
+	//
+	// Catches ping-pong inside one app, e.g. A/onInvoke1 -> A/onInvoke2 -> A/onInvoke1.
+	// Does not count forEach/loop siblings: they share a parent run, so earlier
+	// siblings are not ancestors of the next create.
+	if targetNodeID != "" && entrypointInRuns(ancestors, targetWorkflowID, targetNodeID) {
+		return fmt.Errorf("%w: workflow %s node %s already appears in the run chain",
+			ErrSubRunEntrypointCycle, targetWorkflowID, targetNodeID)
+	}
+
+	// Workflow cycle: crossing back into an app that was already visited after
+	// leaving it.
+	//
+	// Catches A -> B -> C -> A. Skipped when the parent run is already in the
+	// target app (same-workflow sub-runs), e.g. forEach in A creating another
+	// A/onInvoke item.
+	if workflowCycleInAncestors(ancestors, targetWorkflowID) {
+		return fmt.Errorf("%w: workflow %s already appears in the run chain",
+			ErrSubRunWorkflowCycle, targetWorkflowID)
+	}
+
+	// Cross-workflow depth: how many times the chain switches apps on the way to
+	// the new target. Same-app hops do not increase this count.
+	//
+	// Catches long chains like A -> B -> C -> D -> ... -> Z when depth reaches
+	// maxCrossWorkflowDepth, even if Z is a new app (no cycle).
+	// A -> B -> C has depth 3; A -> A -> A (self-invoke) has depth 0.
+	depth := crossWorkflowDepthForSubRun(ancestors, targetWorkflowID)
+	if depth >= maxCrossWorkflowDepth {
+		return fmt.Errorf("%w: depth is %d (max %d)",
+			ErrSubRunCrossWorkflowDepthExceeded, depth, maxCrossWorkflowDepth)
+	}
+
+	return nil
+}
+
+// collectRunAncestorsInTransaction loads the parent run and every ancestor in one
+// query, ordered nearest-first: [parent, grandparent, ..., root].
+func collectRunAncestorsInTransaction(tx *gorm.DB, runID uuid.UUID) ([]CanvasRun, error) {
+	var ancestors []CanvasRun
+	err := tx.Raw(`
+		WITH RECURSIVE ancestors AS (
+			SELECT id, workflow_id, node_id, parent_run_id, 1 AS depth
+			FROM workflow_runs
+			WHERE id = ?
+			UNION ALL
+			SELECT wr.id, wr.workflow_id, wr.node_id, wr.parent_run_id, a.depth + 1
+			FROM workflow_runs wr
+			INNER JOIN ancestors a ON wr.id = a.parent_run_id
+			WHERE a.depth < ?
+		)
+		SELECT id, workflow_id, node_id, parent_run_id
+		FROM ancestors
+		ORDER BY depth ASC
+	`, runID, maxRunAncestorHops).Scan(&ancestors).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ancestors) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	if len(ancestors) == maxRunAncestorHops {
+		return nil, fmt.Errorf("run ancestor chain exceeded %d hops", maxRunAncestorHops)
+	}
+
+	return ancestors, nil
+}
+
+// entrypointInRuns reports whether (workflow, node) already appears in the chain.
+// Example match: prior sub-run was A/onInvoke1 and the new target is A/onInvoke1.
+func entrypointInRuns(runs []CanvasRun, workflowID uuid.UUID, nodeID string) bool {
+	for _, run := range runs {
+		if run.WorkflowID == workflowID && run.NodeID == nodeID {
+			return true
+		}
+	}
+	return false
+}
+
+// workflowCycleInAncestors detects cross-back into a previously visited app.
+//
+// Example: chain is C -> B -> A and the new target is A — A is found in older
+// ancestors, so this returns true.
+//
+// ancestors[0] is the parent run. It is excluded when the parent is already in
+// the target app, so same-workflow fan-out (forEach in A -> A/item) still works.
+func workflowCycleInAncestors(ancestors []CanvasRun, targetWorkflowID uuid.UUID) bool {
+	if len(ancestors) == 0 || ancestors[0].WorkflowID == targetWorkflowID {
+		return false
+	}
+
+	for _, run := range ancestors[1:] {
+		if run.WorkflowID == targetWorkflowID {
+			return true
+		}
+	}
+
+	return false
+}
+
+// crossWorkflowDepthForSubRun counts app-boundary crossings from the parent run
+// up through the root, plus the hop into the new target when that is a different app.
+//
+// Examples: A -> B -> C targeting D gives depth 4; A -> A -> A (self-invoke) gives 0.
+func crossWorkflowDepthForSubRun(ancestors []CanvasRun, targetWorkflowID uuid.UUID) int {
+	if len(ancestors) == 0 {
+		return 0
+	}
+
+	depth := 0
+	if ancestors[0].WorkflowID != targetWorkflowID {
+		depth++
+	}
+
+	for i := 0; i < len(ancestors)-1; i++ {
+		if ancestors[i].WorkflowID != ancestors[i+1].WorkflowID {
+			depth++
+		}
+	}
+
+	return depth
 }
