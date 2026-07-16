@@ -9,6 +9,7 @@ describe("runSettingsTabAutosave", () => {
 
     await runSettingsTabAutosave({
       baselineSnapshot: "{}",
+      clearPendingAutosave: vi.fn(),
       currentNodeName: "Node",
       flushPendingAutosave,
       nodeConfiguration: { enabled: true },
@@ -31,6 +32,7 @@ describe("runSettingsTabAutosave", () => {
     await expect(
       runSettingsTabAutosave({
         baselineSnapshot: "{}",
+        clearPendingAutosave: vi.fn(),
         currentNodeName: "Node",
         flushPendingAutosave,
         nodeConfiguration: { enabled: true },
@@ -44,5 +46,24 @@ describe("runSettingsTabAutosave", () => {
 
     expect(savingRef.current).toBe(false);
     expect(flushPendingAutosave).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears pending saves when the snapshot already matches the baseline", async () => {
+    const clearPendingAutosave = vi.fn();
+
+    await runSettingsTabAutosave({
+      baselineSnapshot: JSON.stringify({ configuration: { enabled: true }, nodeName: "Node", integrationRef: null }),
+      clearPendingAutosave,
+      currentNodeName: "Node",
+      flushPendingAutosave: vi.fn(),
+      nodeConfiguration: { enabled: true },
+      onSave: vi.fn(),
+      queuePendingAutosave: vi.fn(),
+      savingRef: { current: false },
+      updateAutosaveBaseline: vi.fn(),
+      validateNow: vi.fn(),
+    });
+
+    expect(clearPendingAutosave).toHaveBeenCalledTimes(1);
   });
 });

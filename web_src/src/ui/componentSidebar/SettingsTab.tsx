@@ -256,7 +256,7 @@ export function SettingsTab({
 
   return (
     <div
-      className={cn("p-4 pb-24 overflow-x-hidden", isFormDisabled && FORM_DISABLED_CURSOR_CLASS)}
+      className="p-4 pb-24 overflow-x-hidden"
       data-testid="settings-tab-form"
       onBlurCapture={(event) => {
         if (isFormDisabled) {
@@ -274,7 +274,11 @@ export function SettingsTab({
       }}
     >
       <div
-        className={cn("space-y-6", isFormDisabled && FORM_DISABLED_SURFACE_CLASS)}
+        className={cn(
+          "space-y-6",
+          isFormDisabled && FORM_DISABLED_SURFACE_CLASS,
+          isFormDisabled && FORM_DISABLED_CURSOR_CLASS,
+        )}
         {...(isFormDisabled ? { inert: true } : {})}
       >
         <div className="flex flex-col gap-2">

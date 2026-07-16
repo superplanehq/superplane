@@ -44,9 +44,10 @@ describe("SettingsTab", () => {
     expect(screen.queryByTestId("configuration-view")).not.toBeInTheDocument();
     expect(screen.getByTestId("node-name-input")).toBeDisabled();
     expect(screen.getByRole("switch")).toBeDisabled();
-    expect(screen.getByTestId("settings-tab-form")).toHaveClass("cursor-not-allowed");
-    expect(screen.getByTestId("settings-tab-form")).not.toHaveClass("opacity-70");
-    expect(screen.getByTestId("settings-tab-form").querySelector("[inert]")).toBeInTheDocument();
+    const disabledFields = screen.getByTestId("settings-tab-form").querySelector("[inert]");
+    expect(disabledFields).toHaveClass("cursor-not-allowed");
+    expect(screen.getByTestId("settings-tab-form")).not.toHaveClass("cursor-not-allowed");
+    expect(disabledFields).toBeInTheDocument();
   });
 
   it("keeps customField interactive when formDisabled", () => {
@@ -66,9 +67,11 @@ describe("SettingsTab", () => {
       />,
     );
 
-    const inertContainer = screen.getByTestId("settings-tab-form").querySelector("[inert]");
+    const form = screen.getByTestId("settings-tab-form");
+    const inertContainer = form.querySelector("[inert]");
     expect(inertContainer).toBeInTheDocument();
     expect(inertContainer?.querySelector('[data-testid="custom-field-action"]')).toBeNull();
     expect(screen.getByTestId("custom-field-action")).toBeEnabled();
+    expect(form).not.toHaveClass("cursor-not-allowed");
   });
 });

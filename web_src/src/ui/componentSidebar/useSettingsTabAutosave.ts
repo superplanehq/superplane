@@ -70,6 +70,9 @@ export function useSettingsTabAutosave({
   const performAutosave = useCallback(async () => {
     await runSettingsTabAutosave({
       baselineSnapshot: autosaveBaselineSnapshotRef.current,
+      clearPendingAutosave: () => {
+        pendingAutosaveSnapshotRef.current = null;
+      },
       currentNodeName,
       flushPendingAutosave,
       nodeConfiguration,
