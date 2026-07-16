@@ -3,6 +3,13 @@ import type {
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
+import {
+  hasActiveLiveRuntimeExecutionOnLatest,
+  isLiveNodeSetupState,
+  LIVE_INTERACTIVE_SIDEBAR_COMPONENTS,
+  newestExecution,
+  newestItemByTimestamp,
+} from "@/lib/liveInteractiveRuntime";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
@@ -11,28 +18,8 @@ type NodeActivityData = {
   events: CanvasesCanvasEvent[];
 };
 
-function executionTimestamp(execution: CanvasesCanvasNodeExecution): number {
-  return Date.parse(execution.updatedAt || execution.createdAt || "");
-}
-
 function eventTimestamp(event: CanvasesCanvasEvent): number {
   return Date.parse(event.createdAt || "");
-}
-
-function newestByTimestamp<T>(items: T[], timestamp: (item: T) => number): T | null {
-  let newest: T | null = null;
-  let newestTimestamp = Number.NEGATIVE_INFINITY;
-
-  for (const item of items) {
-    const candidateTimestamp = timestamp(item);
-    const safeTimestamp = Number.isFinite(candidateTimestamp) ? candidateTimestamp : Number.NEGATIVE_INFINITY;
-    if (safeTimestamp > newestTimestamp) {
-      newest = item;
-      newestTimestamp = safeTimestamp;
-    }
-  }
-
-  return newest;
 }
 
 function runLookupEventFromExecution(nodeId: string, execution: CanvasesCanvasNodeExecution): SidebarEvent | null {
@@ -78,11 +65,11 @@ export function resolveRunLookupEventForNodeActivity(
   nodeData: NodeActivityData,
 ): SidebarEvent | null {
   if (nodeType === "TYPE_TRIGGER") {
-    const latestEvent = newestByTimestamp(nodeData.events, eventTimestamp);
+    const latestEvent = newestItemByTimestamp(nodeData.events, eventTimestamp);
     return latestEvent ? runLookupEventFromTriggerEvent(nodeId, latestEvent) : null;
   }
 
-  const latestExecution = newestByTimestamp(nodeData.executions, executionTimestamp);
+  const latestExecution = newestExecution(nodeData.executions);
   return latestExecution ? runLookupEventFromExecution(nodeId, latestExecution) : null;
 }
 
@@ -99,4 +86,42 @@ export function resolveCachedNodeRunId(
   const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
   const lookupEvent = resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
   return lookupEvent?.runId || (lookupEvent ? resolveRunId(lookupEvent) : null);
+}
+
+export type LiveCanvasNodeClickSyncAction = { kind: "inspectRun"; runId: string } | { kind: "lookupRun" };
+
+export function resolveLiveCanvasNodeClickSyncAction(
+  nodeId: string,
+  workflowNode: ComponentsNode | undefined,
+  resolveRunId: (event: SidebarEvent) => string | null,
+): LiveCanvasNodeClickSyncAction {
+  const cachedRunId = resolveCachedNodeRunId(nodeId, workflowNode, resolveRunId);
+  if (cachedRunId) {
+    return { kind: "inspectRun", runId: cachedRunId };
+  }
+
+  return { kind: "lookupRun" };
+}
+
+export function shouldDeferRunInspectionForLiveNodeClick(
+  workflowNode: ComponentsNode | undefined,
+  nodeData: NodeActivityData,
+): boolean {
+  const component = workflowNode?.component;
+  if (!component || !LIVE_INTERACTIVE_SIDEBAR_COMPONENTS.has(component)) {
+    return false;
+  }
+
+  return hasActiveLiveRuntimeExecutionOnLatest(nodeData.executions);
+}
+
+export function shouldOpenConfigurationSidebarForLiveNodeClick(
+  workflowNode: ComponentsNode | undefined,
+  nodeData: NodeActivityData,
+): boolean {
+  if (isLiveNodeSetupState(workflowNode)) {
+    return true;
+  }
+
+  return shouldDeferRunInspectionForLiveNodeClick(workflowNode, nodeData);
 }

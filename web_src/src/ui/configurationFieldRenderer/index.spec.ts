@@ -5,16 +5,16 @@ import { describe, expect, it, vi } from "vitest";
 import { ConfigurationFieldRenderer } from "./index";
 import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
 
-const runTitleField: ConfigurationField = {
-  name: "customName",
-  type: "string",
-  label: "Run title",
-  description: "Give each run a dynamic title using expressions.",
-  togglable: true,
-  placeholder: "{{ root().data.context }}",
-};
-
 describe("ConfigurationFieldRenderer run title copy", () => {
+  const runTitleField: ConfigurationField = {
+    name: "customName",
+    type: "string",
+    label: "Run title",
+    description: "Give each run a dynamic title using expressions.",
+    togglable: true,
+    placeholder: "{{ root().data.context }}",
+  };
+
   it("explains disabled trigger run title customization", () => {
     render(
       React.createElement(ConfigurationFieldRenderer, {
@@ -51,6 +51,53 @@ describe("ConfigurationFieldRenderer run title copy", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Preview title" })).toBeInTheDocument();
+  });
+});
+
+describe("ConfigurationFieldRenderer preserveEditLayout", () => {
+  it("renders nested list fields with standard disabled inputs", () => {
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        field: {
+          name: "matchList",
+          type: "list",
+          typeOptions: {
+            list: {
+              itemDefinition: {
+                type: "object",
+                schema: [
+                  { name: "left", type: "string", label: "Left" },
+                  { name: "right", type: "expression", label: "Right" },
+                ],
+              },
+            },
+          },
+        },
+        value: [{ left: "updated_at", right: "int(now().Unix())" }],
+        onChange: vi.fn(),
+        readOnly: true,
+        preserveEditLayout: true,
+        allowExpressions: false,
+      }),
+    );
+
+    expect(screen.getByDisplayValue("updated_at")).toBeDisabled();
+    expect(screen.getByDisplayValue("int(now().Unix())")).toBeDisabled();
+  });
+
+  it("does not mutate values when readOnly", () => {
+    const onChange = vi.fn();
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        field: { name: "timezone", type: "timezone" },
+        value: undefined,
+        onChange,
+        readOnly: true,
+        preserveEditLayout: true,
+      }),
+    );
+
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
 
