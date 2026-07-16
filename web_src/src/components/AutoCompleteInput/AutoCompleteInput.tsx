@@ -61,6 +61,8 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   pathModeOutsideWrapper?: boolean;
   /** Require wrapped input to contain exactly one full `{{ … }}` expression. */
   singleWrappedExpression?: boolean;
+  /** Allow Enter to insert line breaks when no autocomplete suggestion is selected. */
+  allowNewlines?: boolean;
   /**
    * Key in `exampleObj` that backs the `$` / `$["…"]` selector. Defaults to the
    * globals root (expr-lang). Widget CEL points this at `__runNodes__` so `$`
@@ -166,6 +168,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       includeFunctions = true,
       pathModeOutsideWrapper = false,
       singleWrappedExpression = false,
+      allowNewlines = true,
       envKeySource,
       ...rest
     } = props;
@@ -1187,6 +1190,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     );
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !allowNewlines && !isKeyboardSuggestionCommit(e.key)) {
+        e.preventDefault();
+        return;
+      }
       if (!isOpen || suggestions.length === 0) return;
 
       switch (e.key) {
@@ -1204,8 +1211,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             e.stopPropagation();
             isInteractingWithSuggestionsRef.current = true;
             handleSuggestionClick(suggestions[highlightedIndexRef.current]);
+            break;
           }
-          // Allow default behavior (newline) when no suggestion is highlighted
           break;
         case "Tab":
           if (isKeyboardSuggestionCommit(e.key)) {

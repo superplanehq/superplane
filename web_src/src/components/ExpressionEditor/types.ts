@@ -30,6 +30,7 @@ export interface ExpressionEditorProps extends Omit<ComponentPropsWithoutRef<"te
   inputSize?: "xs" | "sm" | "md" | "lg";
   minHeight?: number;
   fullHeight?: boolean;
+  allowNewlines?: boolean;
   showValuePreview?: boolean;
   valuePreviewLabel?: string;
   quickTip?: string;

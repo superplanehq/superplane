@@ -168,6 +168,7 @@ export function MarkdownPanelEditor({
               placeholder="Write **markdown** here. Use {{ name.field }} to reference variables."
               className="flex-1 rounded-none border-0 bg-white font-mono shadow-none focus-within:ring-0 dark:bg-gray-900"
               fullHeight
+              allowNewlines
               data-testid="console-markdown-editor"
               quickTip="Tip: type `{{` to reference a variable."
             />
