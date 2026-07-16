@@ -10,6 +10,8 @@ import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
 import { parseDefaultValues } from "../../lib/components";
 
+import { useSkipDefaultsAfterReadOnly } from "./useSkipDefaultsAfterReadOnly";
+
 export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
@@ -22,9 +24,11 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   autocompleteExampleObj,
   allowExpressions = false,
   readOnly = false,
+  preserveEditLayout = false,
 }) => {
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const hasInitialized = React.useRef(false);
+  const skipDefaultsAfterReadOnly = useSkipDefaultsAfterReadOnly(readOnly);
   const serializeValueForEditor = React.useCallback((input: unknown) => {
     if (typeof input === "string") {
       return input;
@@ -77,7 +81,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   const hasPushedSchemaDefaults = React.useRef(false);
 
   React.useEffect(() => {
-    if (readOnly) return;
+    if (readOnly || skipDefaultsAfterReadOnly) return;
 
     if (value !== undefined && value !== null) {
       hasInitialized.current = true;
@@ -90,10 +94,18 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
       setEditorValue(serializeValueForEditor(defaultValue));
       setJsonError(null);
     }
-  }, [readOnly, value, field.defaultValue, onChange, coerceDefaultValue, serializeValueForEditor]);
+  }, [
+    readOnly,
+    skipDefaultsAfterReadOnly,
+    value,
+    field.defaultValue,
+    onChange,
+    coerceDefaultValue,
+    serializeValueForEditor,
+  ]);
 
   React.useEffect(() => {
-    if (readOnly) return;
+    if (readOnly || skipDefaultsAfterReadOnly) return;
     if (!hasSchema) return;
     if (hasPushedSchemaDefaults.current) return;
     const isEmpty =
@@ -103,7 +115,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     if (!isEmpty || Object.keys(schemaDefaults).length === 0) return;
     hasPushedSchemaDefaults.current = true;
     onChange(schemaDefaults);
-  }, [readOnly, hasSchema, value, schemaDefaults, onChange]);
+  }, [readOnly, skipDefaultsAfterReadOnly, hasSchema, value, schemaDefaults, onChange]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(editorValue);
@@ -297,6 +309,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
           organizationId={organizationId}
           autocompleteExampleObj={autocompleteExampleObj}
           readOnly={readOnly}
+          preserveEditLayout={preserveEditLayout}
         />
       ))}
     </div>

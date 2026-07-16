@@ -274,7 +274,7 @@ func closeOpenToolsForSession(sessionID uuid.UUID) {
 	}
 }
 
-func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error {
+func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int, options ...DefineOutcomeRequestOptions) error {
 	session, err := s.GetSession(organizationID, userID, sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
@@ -291,7 +291,7 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 		return err
 	}
 
-	contextReplayed, err := s.defineOutcomeOnProvider(ctx, session, description, rubric, maxIterations)
+	contextReplayed, err := s.defineOutcomeOnProvider(ctx, session, description, rubric, maxIterations, resolveDefineOutcomeRequestOptions(options))
 	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return s.handleBusySession(sessionID, organizationID, userID)
@@ -304,7 +304,7 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 				}
 				return recoverErr
 			}
-			contextReplayed, err = s.defineOutcomeOnProvider(ctx, recovered, description, rubric, maxIterations)
+			contextReplayed, err = s.defineOutcomeOnProvider(ctx, recovered, description, rubric, maxIterations, resolveDefineOutcomeRequestOptions(options))
 			if err != nil {
 				if errors.Is(err, ErrSessionBusy) {
 					return s.handleBusySession(sessionID, organizationID, userID)
@@ -332,7 +332,7 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 	return nil
 }
 
-func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.AgentSession, description, rubric string, maxIterations int) (bool, error) {
+func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.AgentSession, description, rubric string, maxIterations int, options DefineOutcomeRequestOptions) (bool, error) {
 	description, contextReplayed, err := s.messageWithRewind(session, description)
 	if err != nil {
 		return false, err
@@ -342,7 +342,7 @@ func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.A
 		Description:     description,
 		Rubric:          rubric,
 		MaxIterations:   maxIterations,
-		ContextPreamble: s.buildPreamble(session, ModeBuilder, false),
+		ContextPreamble: s.buildPreamble(session, ModeBuilder, options.AutoLayoutOnUpdateEnabled),
 	})
 	return contextReplayed, err
 }
@@ -442,6 +442,14 @@ func resolveSendMessageRequestOptions(options []SendMessageRequestOptions) SendM
 	resolved := options[0]
 	resolved.Mode = string(NormalizeMode(resolved.Mode))
 	return resolved
+}
+
+func resolveDefineOutcomeRequestOptions(options []DefineOutcomeRequestOptions) DefineOutcomeRequestOptions {
+	if len(options) == 0 {
+		return DefineOutcomeRequestOptions{}
+	}
+
+	return options[0]
 }
 
 func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, images []MessageImage, options SendMessageRequestOptions) (bool, error) {

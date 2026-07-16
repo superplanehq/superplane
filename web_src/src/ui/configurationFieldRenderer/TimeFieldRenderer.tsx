@@ -1,17 +1,32 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
+import { useSkipDefaultsAfterReadOnly } from "./useSkipDefaultsAfterReadOnly";
 
-export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, allValues = {} }) => {
+export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  allValues = {},
+  readOnly = false,
+}) => {
+  const hasAppliedDefault = useRef(false);
+  const skipDefaultsAfterReadOnly = useSkipDefaultsAfterReadOnly(readOnly);
+
   useEffect(() => {
+    if (readOnly || skipDefaultsAfterReadOnly || hasAppliedDefault.current) {
+      return;
+    }
+
     if ((value === undefined || value === null) && field.defaultValue !== undefined) {
       const defaultVal = field.defaultValue as string;
       if (defaultVal && defaultVal !== "") {
+        hasAppliedDefault.current = true;
         onChange(defaultVal);
       }
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [readOnly, skipDefaultsAfterReadOnly, value, field.defaultValue, onChange]);
 
   // Calculate min/max based on other fields for time gates
   const getTimeConstraints = React.useMemo(() => {
@@ -37,6 +52,7 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
       className=""
       min={getTimeConstraints.min}
       max={getTimeConstraints.max}
+      disabled={readOnly}
       data-testid={toTestId(`time-field-${field.name}`)}
     />
   );
