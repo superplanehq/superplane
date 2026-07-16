@@ -18,6 +18,11 @@ describe("evaluateCel", () => {
     expect(outcome).toEqual({ ok: true, value: "Hello, world!", formattedValue: "Hello, world!" });
   });
 
+  it("evaluates multiple template segments independently", () => {
+    const outcome = evaluateCel("{{ first }} {{ second }}", { first: "hello", second: "world" });
+    expect(outcome).toEqual({ ok: true, value: "hello world", formattedValue: "hello world" });
+  });
+
   it("reports diagnostics for expressions the runtime rejects", () => {
     const outcome = evaluateCel("{{ int(nan) + 1 }}", { nan: "not-a-number" });
     // int() is our fail-soft wrapper that returns 0, so the outer + still succeeds.

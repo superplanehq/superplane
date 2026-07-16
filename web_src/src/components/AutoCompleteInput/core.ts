@@ -603,11 +603,14 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   // 0) Env key trigger: after "$" or "$[" suggest keys immediately
   const envTrigger = detectEnvKeyTrigger(left);
   if (envTrigger) {
-    const keys = listGlobalKeys(envRecord);
+    const triggerRecord = envTrigger.baseExpr
+      ? resolveNestedDollarRecord(envTrigger.baseExpr, globals, envKeySource)
+      : envRecord;
+    const keys = listGlobalKeys(triggerRecord);
     return keys.slice(0, limit).map((k) => {
-      const v = envRecord[k];
+      const v = triggerRecord[k];
       const tailDot = isExpandableValue(v) ? "." : "";
-      const metadata = getNodeMetadata(envRecord, k, v);
+      const metadata = getNodeMetadata(triggerRecord, k, v);
       const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
       return {
         label: `["${k}"]`,
@@ -627,13 +630,16 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
   const bracketCtx = detectBracketKeyContext(left);
   if (bracketCtx) {
     const prefix = (bracketCtx.partialKey ?? "").toLowerCase();
-    const keys = listGlobalKeys(envRecord);
+    const bracketRecord = bracketCtx.baseExpr
+      ? resolveNestedDollarRecord(bracketCtx.baseExpr, globals, envKeySource)
+      : envRecord;
+    const keys = listGlobalKeys(bracketRecord);
     return keys
       .filter((k) => k.toLowerCase().startsWith(prefix))
       .slice(0, limit)
       .map((k) => {
-        const v = envRecord[k];
-        const metadata = getNodeMetadata(envRecord, k, v);
+        const v = bracketRecord[k];
+        const metadata = getNodeMetadata(bracketRecord, k, v);
         const labelDetail = metadata.nodeName ? formatNodeNameLabel(metadata.nodeName) : undefined;
         return {
           label: `["${k}"]`,
@@ -893,9 +899,11 @@ function getFunctionReturnMethods(funcName: string): MethodInfo[] {
   return FUNCTION_RETURN_METHODS[funcName.toLowerCase()] ?? [];
 }
 
-type EnvKeyTrigger = { quote: "'" | '"' };
+type EnvKeyTrigger = { quote: "'" | '"'; baseExpr?: string };
 
 function detectEnvKeyTrigger(left: string): EnvKeyTrigger | null {
+  const nested = left.match(/(.+)\.\$\s*(?:\[\s*)?$/);
+  if (nested?.[1]) return { quote: '"', baseExpr: nested[1] };
   if (/\$\s*$/.test(left)) return { quote: '"' };
   if (/\$\s*\[\s*$/.test(left)) return { quote: '"' };
   return null;
@@ -1101,15 +1109,35 @@ function detectDotContext(left: string): DotContext | null {
   return null;
 }
 
-type BracketKeyContext = { quote: "'" | '"'; partialKey: string };
+type BracketKeyContext = { quote: "'" | '"'; partialKey: string; baseExpr?: string };
 
 function detectBracketKeyContext(left: string): BracketKeyContext | null {
+  const nested = left.match(/(.+)\.\$\s*\[\s*(['"])([^'"]*)$/);
+  if (nested?.[1]) {
+    return {
+      quote: nested[2] === "'" ? "'" : '"',
+      partialKey: nested[3] ?? "",
+      baseExpr: nested[1],
+    };
+  }
+
   const m = left.match(/(?:\$\s*|\]\s*)\[\s*(['"])([^'"]*)$/);
   if (!m) return null;
 
   const quote = (m[1] === "'" ? "'" : '"') as "'" | '"';
   const partialKey = m[2] ?? "";
   return { quote, partialKey };
+}
+
+function resolveNestedDollarRecord<TGlobals extends Record<string, unknown>>(
+  baseExpr: string,
+  globals: TGlobals,
+  envKeySource?: string,
+): Record<string, unknown> {
+  const owner = resolveExprToValue(extractTailPathExpression(baseExpr), globals, envKeySource);
+  if (!isRecord(owner)) return {};
+  if (isRecord(owner.__runNodes__)) return owner.__runNodes__;
+  return isRecord(owner.$) ? owner.$ : {};
 }
 
 function extractTailPathExpression(expr: string | undefined | null): string {

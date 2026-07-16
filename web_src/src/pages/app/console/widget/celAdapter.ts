@@ -37,11 +37,15 @@ export function evaluateCel(
 
   const row = withRunNodesShim(globals as Record<string, unknown>);
   const env = buildEnv();
+  const compiledTemplate = ANY_TEMPLATE_RE.test(trimmed) ? compileTemplate(trimmed) : null;
 
   // Wrapped mode calls this per `{{ … }}` segment with the raw inner text, so
   // any input without wrappers is a CEL expression (not a literal path).
-  if (ANY_TEMPLATE_RE.test(trimmed) && !FULL_TEMPLATE_RE.test(trimmed)) {
-    const outcome = evalTemplateDetailed(compileTemplate(trimmed), row, env, stringifyCelValue);
+  // A full template is a single expression segment; mixed or repeated segments
+  // must go through template evaluation even when the string starts with `{{`
+  // and ends with `}}`.
+  if (compiledTemplate && compiledTemplate.segments.length > 1) {
+    const outcome = evalTemplateDetailed(compiledTemplate, row, env, stringifyCelValue);
     if (!outcome.ok) return { ok: false, error: outcome.error };
     return { ok: true, value: outcome.value, formattedValue: outcome.value };
   }
