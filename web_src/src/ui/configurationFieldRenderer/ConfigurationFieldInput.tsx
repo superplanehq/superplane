@@ -78,6 +78,7 @@ export function ConfigurationFieldInput({
         autocompleteExampleObj={autocompleteExampleObj}
         labelRightRef={allowExpressions ? labelRightRef : undefined}
         labelRightReady={allowExpressions ? labelRightReady : false}
+        readOnly={commonProps.readOnly}
       />
     );
   }
@@ -110,6 +111,7 @@ export function ConfigurationFieldInput({
         value={value as SecretKeyRefValue}
         onChange={(nextValue) => onChange(nextValue)}
         organizationId={organizationId ?? domainId}
+        readOnly={commonProps.readOnly}
       />
     );
   }
