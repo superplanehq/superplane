@@ -299,7 +299,7 @@ describe("GlobalCommandPalette", () => {
     expect(await screen.findByText("deploy-alerts")).toBeInTheDocument();
   });
 
-  it("searches service accounts by name", async () => {
+  it("searches API keys by name", async () => {
     const user = userEvent.setup();
     renderPalette();
 

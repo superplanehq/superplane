@@ -2,6 +2,8 @@ package serviceaccounts
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -29,6 +31,11 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, grpcerrors.InvalidArgument(nil, "name is required")
 	}
 
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "name is required")
+	}
+
 	validRoles := map[string]bool{
 		models.RoleOrgAdmin:  true,
 		models.RoleOrgViewer: true,
@@ -39,7 +46,7 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 	}
 
 	if !validRoles[req.Role] {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid role for service account; must be org_admin or org_viewer")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid role for API key; must be org_admin or org_viewer")
 	}
 
 	orgUUID, err := uuid.Parse(orgID)
@@ -57,15 +64,30 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		description = &req.Description
 	}
 
+	db := database.DB(ctx)
+	canvasIDs, err := validateServiceAccountCanvasIDs(db, orgID, req.CanvasIds)
+	if err != nil {
+		return nil, err
+	}
+
+	var expiresAt *time.Time
+	if req.ExpiresAt != nil {
+		value := req.ExpiresAt.AsTime()
+		if !value.After(time.Now()) {
+			return nil, grpcerrors.InvalidArgument(nil, "expiration must be in the future")
+		}
+		expiresAt = &value
+	}
+
 	plainToken, err := crypto.Base64String(64)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to generate token")
 	}
 
 	var sa *models.User
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var txErr error
-		sa, txErr = models.CreateServiceAccount(tx, orgUUID, req.Name, description, createdByUUID)
+		sa, txErr = models.CreateServiceAccount(tx, orgUUID, name, description, createdByUUID, expiresAt, canvasIDs)
 		if txErr != nil {
 			return txErr
 		}
@@ -82,13 +104,12 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 	})
 
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create service account")
+		return nil, grpcerrors.Internal(err, "failed to create API key")
 	}
 
-	db := database.DB(ctx)
 	creator, err := creatorUserForServiceAccount(db, orgID, sa)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create service account")
+		return nil, grpcerrors.Internal(err, "failed to create API key")
 	}
 
 	return &pb.CreateServiceAccountResponse{
