@@ -1,4 +1,4 @@
-package serviceaccounts
+package apikeys
 
 import (
 	"context"
@@ -7,10 +7,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 )
 
-func RegenerateServiceAccountToken(ctx context.Context, req *pb.RegenerateServiceAccountTokenRequest) (*pb.RegenerateServiceAccountTokenResponse, error) {
+func RegenerateAPIKeyToken(ctx context.Context, req *pb.RegenerateAPIKeyTokenRequest) (*pb.RegenerateAPIKeyTokenResponse, error) {
 	_, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -27,11 +27,11 @@ func RegenerateServiceAccountToken(ctx context.Context, req *pb.RegenerateServic
 
 	user, err := models.FindActiveUserByID(orgID, req.Id)
 	if err != nil {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
-	if !user.IsServiceAccount() {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+	if !user.IsAPIKey() {
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	plainToken, err := crypto.Base64String(64)
@@ -44,7 +44,7 @@ func RegenerateServiceAccountToken(ctx context.Context, req *pb.RegenerateServic
 		return nil, grpcerrors.Internal(err, "failed to update token")
 	}
 
-	return &pb.RegenerateServiceAccountTokenResponse{
+	return &pb.RegenerateAPIKeyTokenResponse{
 		Token: plainToken,
 	}, nil
 }
