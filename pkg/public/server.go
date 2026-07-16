@@ -460,9 +460,25 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 				return
 			}
 			r2.Header.Set("x-Token-Scopes", string(scopes))
+		} else if user.HasServiceAccountCanvasScope() {
+			scopes, err := json.Marshal(serviceAccountCanvasScopes(user.ServiceAccountCanvasIDs))
+			if err != nil {
+				http.Error(w, "Failed to encode service account scopes", http.StatusInternalServerError)
+				return
+			}
+			r2.Header.Set("x-Token-Scopes", string(scopes))
 		}
 
 		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
+	})
+}
+
+func serviceAccountCanvasScopes(canvasIDs []string) []string {
+	return jwt.ScopesFromPermissions([]jwt.Permission{
+		{ResourceType: "canvases", Action: "read", Resources: canvasIDs},
+		{ResourceType: "canvases", Action: "update", Resources: canvasIDs},
+		{ResourceType: "canvases", Action: "update_version", Resources: canvasIDs},
+		{ResourceType: "canvases", Action: "delete", Resources: canvasIDs},
 	})
 }
 

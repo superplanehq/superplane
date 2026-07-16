@@ -27,7 +27,7 @@ func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
 	}
 
 	if user.IsServiceAccount() {
-		return nil, grpcerrors.PermissionDenied(nil, "service accounts must use the service account token endpoint")
+		return nil, grpcerrors.PermissionDenied(nil, "API keys must use the API key token endpoint")
 	}
 
 	plainToken, err := crypto.Base64String(64)
