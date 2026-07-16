@@ -131,3 +131,39 @@ export const ReadOnlyConfiguration: Story = {
   },
   render: () => <ReadOnlyConfigurationPlayground />,
 };
+
+function FormDisabledConfigurationPlayground() {
+  return (
+    <SettingsTab
+      mode="edit"
+      nodeId="node_renderer_coverage_disabled"
+      nodeName="Renderer Coverage Demo"
+      configuration={settingsTabConfiguration}
+      configurationFields={settingsTabFields}
+      onSave={() => undefined}
+      domainId={STORY_DOMAIN_ID}
+      domainType={STORY_DOMAIN_TYPE}
+      integrationName="github"
+      integrationRef={STORY_INTEGRATION_REF}
+      integrations={STORY_INTEGRATIONS}
+      integrationDefinition={{
+        name: "github",
+        label: "GitHub",
+        icon: "github",
+      }}
+      autocompleteExampleObj={STORY_AUTOCOMPLETE_CONTEXT}
+      formDisabled={true}
+    />
+  );
+}
+
+export const FormDisabledConfiguration: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: "Disabled configuration form shown for live canvas nodes before their first run.",
+      },
+    },
+  },
+  render: () => <FormDisabledConfigurationPlayground />,
+};
