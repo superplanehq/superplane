@@ -4,6 +4,7 @@ import { buildAutosaveSnapshot } from "./settingsTabValidation";
 type RunSettingsTabAutosaveOptions = {
   baselineSnapshot: string;
   currentNodeName: string;
+  flushPendingAutosave: () => void;
   nodeConfiguration: Record<string, unknown>;
   onSave: (
     updatedConfiguration: Record<string, unknown>,
@@ -20,6 +21,7 @@ type RunSettingsTabAutosaveOptions = {
 export async function runSettingsTabAutosave({
   baselineSnapshot,
   currentNodeName,
+  flushPendingAutosave,
   nodeConfiguration,
   onSave,
   queuePendingAutosave,
@@ -46,6 +48,7 @@ export async function runSettingsTabAutosave({
   const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
   if (!(result instanceof Promise)) {
     updateAutosaveBaseline(snapshot);
+    flushPendingAutosave();
     return;
   }
 
@@ -55,6 +58,7 @@ export async function runSettingsTabAutosave({
     updateAutosaveBaseline(snapshot);
   } finally {
     savingRef.current = false;
+    flushPendingAutosave();
   }
 }
 

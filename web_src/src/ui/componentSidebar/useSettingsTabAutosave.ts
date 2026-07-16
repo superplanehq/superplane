@@ -75,6 +75,7 @@ export function useSettingsTabAutosave({
     await runSettingsTabAutosave({
       baselineSnapshot: autosaveBaselineSnapshotRef.current,
       currentNodeName,
+      flushPendingAutosave,
       nodeConfiguration,
       onSave,
       queuePendingAutosave,
@@ -83,7 +84,6 @@ export function useSettingsTabAutosave({
       updateAutosaveBaseline,
       validateNow,
     });
-    flushPendingAutosave();
   }, [
     isInteractionDisabled,
     validateNow,
