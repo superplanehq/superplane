@@ -235,7 +235,9 @@ func (c *CreateSilence) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create silence: %w", err)
 	}
 
-	ctx.Metadata.Set(CreateSilenceNodeMetadata{SilenceID: silenceID})
+	if err := ctx.Metadata.Set(CreateSilenceNodeMetadata{SilenceID: silenceID}); err != nil {
+		return fmt.Errorf("failed to set metadata: %w", err)
+	}
 
 	matchersData := make([]map[string]any, len(matchers))
 	for i, m := range matchers {

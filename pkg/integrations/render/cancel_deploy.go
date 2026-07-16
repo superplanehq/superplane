@@ -134,13 +134,11 @@ func (c *CancelDeploy) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	ctx.Integration.RequestWebhook(webhookConfigurationForResource(
+	return ctx.Integration.RequestWebhook(webhookConfigurationForResource(
 		ctx.Integration,
 		webhookResourceTypeDeploy,
 		[]string{"deploy_ended"},
 	))
-
-	return nil
 }
 
 func (c *CancelDeploy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

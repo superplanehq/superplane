@@ -199,11 +199,14 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 
 	if len(createdQueueItems) > 0 {
 		for _, queueItem := range createdQueueItems {
-			messages.NewCanvasQueueItemMessage(
+			err := messages.NewCanvasQueueItemMessage(
 				event.WorkflowID.String(),
 				queueItem.ID.String(),
 				queueItem.NodeID,
 			).Publish(false)
+			if err != nil {
+				logger.Errorf("failed to publish canvas queue item RabbitMQ message: %v", err)
+			}
 		}
 	}
 

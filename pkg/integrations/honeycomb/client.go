@@ -88,7 +88,10 @@ func (c *Client) bearerFromManagementKey() (string, error) {
 
 // newReqV1 builds a request for the Honeycomb /1 API using the configuration key secret.
 func (c *Client) newReqV1(method, path string, body io.Reader) (*http.Request, error) {
-	u, _ := url.Parse(c.BaseURL)
+	u, err := url.Parse(c.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL %q: %w", c.BaseURL, err)
+	}
 	u.Path = path
 
 	req, err := http.NewRequest(method, u.String(), body)
@@ -113,7 +116,10 @@ func (c *Client) newReqV1(method, path string, body io.Reader) (*http.Request, e
 
 // newReqV2 builds a request for the Honeycomb /2 API using the management key.
 func (c *Client) newReqV2(method, path string, body io.Reader) (*http.Request, error) {
-	u, _ := url.Parse(c.BaseURL)
+	u, err := url.Parse(c.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL %q: %w", c.BaseURL, err)
+	}
 	u.Path = path
 
 	req, err := http.NewRequest(method, u.String(), body)
@@ -192,7 +198,10 @@ func (c *Client) pingV1WithKey(key string) (int, []byte, error) {
 	if key == "" {
 		return 0, nil, fmt.Errorf("key is empty")
 	}
-	u, _ := url.Parse(c.BaseURL)
+	u, err := url.Parse(c.BaseURL)
+	if err != nil {
+		return 0, nil, fmt.Errorf("invalid base URL %q: %w", c.BaseURL, err)
+	}
 	u.Path = "/1/auth"
 	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -689,7 +698,10 @@ func (c *Client) CreateEvent(datasetSlug string, fields map[string]any) error {
 		return fmt.Errorf("ingest key not found (expected secret %q)", secretNameIngestKey)
 	}
 
-	u, _ := url.Parse(c.BaseURL)
+	u, err := url.Parse(c.BaseURL)
+	if err != nil {
+		return fmt.Errorf("invalid base URL %q: %w", c.BaseURL, err)
+	}
 	u.Path = fmt.Sprintf("/1/events/%s", url.PathEscape(datasetSlug))
 
 	body, err := json.Marshal(fields)

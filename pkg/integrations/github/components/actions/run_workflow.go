@@ -200,12 +200,10 @@ func (r *RunWorkflow) Setup(ctx core.SetupContext) error {
 	}
 
 	// Request webhook for workflow_run events
-	ctx.Integration.RequestWebhook(common.WebhookConfiguration{
+	return ctx.Integration.RequestWebhook(common.WebhookConfiguration{
 		EventType:  "workflow_run",
 		Repository: spec.Repository,
 	})
-
-	return nil
 }
 
 func (r *RunWorkflow) Execute(ctx core.ExecutionContext) error {
