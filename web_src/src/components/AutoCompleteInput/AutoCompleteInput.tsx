@@ -12,6 +12,11 @@ import { calculateDropdownPosition } from "./dropdownPosition";
 // as soon as the user starts writing a template, avoiding misleading previews
 // while the closing `}}` is still being typed.
 const OPEN_TEMPLATE_START_RE = /\{\{/;
+const LINE_BREAK_RE = /\r\n?|\n/g;
+
+function normalizeInputValue(value: string, allowNewlines: boolean): string {
+  return allowNewlines ? value : value.replace(LINE_BREAK_RE, "");
+}
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
@@ -172,7 +177,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       envKeySource,
       ...rest
     } = props;
-    const [inputValue, setInputValue] = useState(value);
+    const [inputValue, setInputValue] = useState(() => normalizeInputValue(value, allowNewlines));
     const [suggestions, setSuggestions] = useState<Array<ReturnType<typeof getSuggestions>[number]>>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
@@ -187,7 +192,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const [previewMode, setPreviewMode] = useState(false);
     const dropdownWidth = 350;
     const previousWordLength = useRef<number>(0);
-    const previousInputValue = useRef<string>(value);
+    const previousInputValue = useRef<string>(normalizeInputValue(value, allowNewlines));
     const highlightedIndexRef = useRef(highlightedIndex);
     const suggestionListKeyRef = useRef("");
     const suggestionItemsRef = useRef<Array<ReturnType<typeof getSuggestions>[number]>>([]);
@@ -896,8 +901,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     }, [isOpen, suggestions.length, measureCursorPixelPosition]);
 
     useEffect(() => {
-      setInputValue(value);
-    }, [value]);
+      setInputValue(normalizeInputValue(value, allowNewlines));
+    }, [allowNewlines, value]);
 
     // Adjust textarea height when value or preview mode changes
     useEffect(() => {
@@ -1013,8 +1018,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     }, []);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const newValue = e.target.value;
-      const cursorPosition = e.target.selectionStart ?? newValue.length;
+      const rawValue = e.target.value;
+      const rawCursorPosition = e.target.selectionStart ?? rawValue.length;
+      const newValue = normalizeInputValue(rawValue, allowNewlines);
+      const cursorPosition = normalizeInputValue(rawValue.slice(0, rawCursorPosition), allowNewlines).length;
       setCursorPosition(cursorPosition);
       const { word, start } = getWordAtCursor(newValue, cursorPosition);
       const beforeCursor = newValue.slice(0, cursorPosition);

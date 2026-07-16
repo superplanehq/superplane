@@ -31,6 +31,17 @@ describe("ConsoleExpressionEditor", () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
+  it("strips pasted newlines from console fields", () => {
+    const onChange = vi.fn();
+    render(<ConsoleExpressionEditor aria-label="Widget field" exampleObj={{}} value="" onChange={onChange} />);
+    const input = screen.getByRole("textbox", { name: "Widget field" });
+
+    fireEvent.change(input, { target: { value: "status\nname", selectionStart: 11 } });
+
+    expect(input).toHaveValue("statusname");
+    expect(onChange).toHaveBeenCalledWith("statusname");
+  });
+
   it("allows newlines when explicitly enabled", () => {
     render(
       <ConsoleExpressionEditor
