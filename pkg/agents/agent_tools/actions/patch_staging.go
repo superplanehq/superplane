@@ -366,6 +366,10 @@ func patchChangeNode(operation PatchOperation) (*changesets.ChangeNode, error) {
 		}
 	}
 
+	if strings.TrimSpace(node.ID) == "" {
+		return nil, fmt.Errorf("node_id is required")
+	}
+
 	return node, nil
 }
 
