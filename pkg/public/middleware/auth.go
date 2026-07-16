@@ -273,6 +273,9 @@ func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jw
 	if err != nil {
 		return nil, nil, err
 	}
+	if user.IsExpiredAPIKey() {
+		return nil, nil, fmt.Errorf("API key token expired")
+	}
 
 	return user, nil, nil
 }
@@ -304,7 +307,7 @@ func authenticateUserByScopedToken(ctx context.Context, token string, jwtSigner 
 
 	// Reject scoped tokens minted before the owning account's most recent
 	// password change so a password rotation also kills programmatic
-	// credentials issued for that user. Service accounts have no owning
+	// credentials issued for that user. API keys have no owning
 	// human account, so they're unaffected.
 	if user.AccountID != nil && claims.IssuedAt != nil {
 		account, err := models.FindAccountByID(user.AccountID.String())
