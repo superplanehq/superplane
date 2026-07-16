@@ -5,12 +5,12 @@ import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 import { useSkipDefaultsAfterReadOnly } from "./useSkipDefaultsAfterReadOnly";
 
-function resolveStringFieldDisplayValue(value: unknown, readOnly: boolean, defaultValue: unknown): string {
+function resolveStringFieldDisplayValue(value: unknown, defaultValue: unknown): string {
   if (value !== undefined && value !== null) {
     return String(value);
   }
 
-  if (readOnly && defaultValue !== undefined) {
+  if (defaultValue !== undefined) {
     return String(defaultValue);
   }
 
@@ -43,7 +43,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
     }
   }, [readOnly, skipDefaultsAfterReadOnly, value, field.defaultValue, onChange]);
 
-  const currentValue = resolveStringFieldDisplayValue(value, readOnly, field.defaultValue);
+  const currentValue = resolveStringFieldDisplayValue(value, field.defaultValue);
 
   if (!allowExpressions) {
     return (

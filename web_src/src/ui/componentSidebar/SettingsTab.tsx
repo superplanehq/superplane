@@ -81,7 +81,7 @@ function buildAutosaveSnapshot(
 }
 
 export function SettingsTab({
-  nodeId: _nodeId,
+  nodeId,
   nodeName,
   nodeLabel: _nodeLabel,
   configuration,
@@ -749,7 +749,7 @@ export function SettingsTab({
               return (
                 <ConfigurationFieldRenderer
                   allowExpressions={true}
-                  key={fieldName}
+                  key={`${nodeId ?? nodeName}-${fieldName}`}
                   field={field}
                   value={nodeConfiguration[fieldName]}
                   onChange={(value) => {
