@@ -113,12 +113,8 @@ export const invokeAppMapper: ComponentBaseMapper = {
     }
 
     const organizationId = organizationIdFromPath();
-    const runUrl =
-      childRun?.canvasId && childRun.id && organizationId
-        ? `${window.location.origin}${appRunPath(organizationId, childRun.canvasId, childRun.id)}`
-        : undefined;
-    if (runUrl) {
-      details["Run"] = runUrl;
+    if (childRun?.canvasId && childRun.id && organizationId) {
+      details["Run"] = appRunPath(organizationId, childRun.canvasId, childRun.id);
     }
 
     if (context.execution.result === "RESULT_PASSED") {
