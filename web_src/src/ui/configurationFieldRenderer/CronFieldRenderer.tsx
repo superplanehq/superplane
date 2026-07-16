@@ -2,7 +2,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import type { FieldRendererProps } from "./types";
 
-export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, readOnly = false }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,6 +18,7 @@ export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
         onChange={handleChange}
         placeholder={field.placeholder || "30 14 * * MON-FRI"}
         className=""
+        disabled={readOnly}
         spellCheck={false}
       />
 
