@@ -311,6 +311,18 @@ service Canvases {
     };
   }
 
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/runs/{run_id}/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel a run";
+      description: "Cancels a run, stopping all of its active executions and queued steps";
+      tags: "CanvasRun";
+    };
+  }
+
   rpc ListCanvasMemories(ListCanvasMemoriesRequest) returns (ListCanvasMemoriesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/memory"
@@ -779,6 +791,13 @@ message DescribeRunResponse {
   CanvasRun run = 1;
 }
 
+message CancelRunRequest {
+  string canvas_id = 1;
+  string run_id = 2;
+}
+
+message CancelRunResponse {}
+
 message CanvasMemory {
   enum Source {
     SOURCE_UNKNOWN = 0;
@@ -869,6 +888,8 @@ message CanvasRun {
   google.protobuf.Timestamp finished_at = 9;
   string version_id = 10;
   repeated CanvasNodeQueueItem queue_items = 11;
+  google.protobuf.Timestamp cancelled_at = 12;
+  string cancelled_by = 13;
 }
 
 message ListEventExecutionsRequest {
