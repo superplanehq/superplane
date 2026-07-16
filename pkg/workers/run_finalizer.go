@@ -268,6 +268,8 @@ func (w *RunFinalizer) consumeQueueItemDeleted(delivery tackle.Delivery) error {
 }
 
 func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) error {
+	messageCollector := NewMessageCollector()
+
 	//
 	// For every run we process, we track the following metrics:
 	// - trigger: sweep, execution_finished, event_terminal, queue_item_deleted
@@ -296,7 +298,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
-		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger)
+		finalized, skipReason, err = w.maybeFinalizeRun(tx, runID, trigger, messageCollector)
 		if skipReason != "" {
 			outcome = executorOutcomeSkipped
 			reason = skipReason
@@ -321,10 +323,14 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		w.logger.WithError(err).Warnf("Failed to publish run state message for run %s", runID)
 	}
 
+	if err := messageCollector.Publish(); err != nil {
+		w.logger.WithError(err).Warnf("Failed to publish messages for run %s", runID)
+	}
+
 	return nil
 }
 
-func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string) (bool, string, error) {
+func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, messageCollector *MessageCollector) (bool, string, error) {
 	run, err := models.LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
 		return false, "", err
@@ -370,14 +376,14 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, "", err
 	}
 
-	if err := w.executeRunCallback(tx, run); err != nil {
+	if err := w.executeRunCallback(tx, run, messageCollector); err != nil {
 		return false, "", err
 	}
 
 	return true, "", nil
 }
 
-func (w *RunFinalizer) executeRunCallback(tx *gorm.DB, run *models.CanvasRun) error {
+func (w *RunFinalizer) executeRunCallback(tx *gorm.DB, run *models.CanvasRun, messageCollector *MessageCollector) error {
 	callbackIndex := slices.IndexFunc(run.Callbacks, func(callback core.RunCallbackDefinition) bool {
 		return callback.Kind == core.RunCallbackKindFinished
 	})
@@ -389,22 +395,22 @@ func (w *RunFinalizer) executeRunCallback(tx *gorm.DB, run *models.CanvasRun) er
 		return nil
 	}
 
-	return w.executeCallback(tx, run, run.Callbacks[callbackIndex])
+	return w.executeCallback(tx, run, run.Callbacks[callbackIndex], messageCollector)
 }
 
-func (w *RunFinalizer) executeCallback(tx *gorm.DB, run *models.CanvasRun, callback core.RunCallbackDefinition) error {
+func (w *RunFinalizer) executeCallback(tx *gorm.DB, run *models.CanvasRun, callback core.RunCallbackDefinition, messageCollector *MessageCollector) error {
 	//
 	// TODO: handle target callbacks too
 	//
 	switch callback.Ref {
 	case core.RunCallbackRefParent:
-		return w.executeCallbackOnParent(tx, run, callback)
+		return w.executeCallbackOnParent(tx, run, callback, messageCollector)
 	default:
 		return fmt.Errorf("invalid callback reference: %s", callback.Ref)
 	}
 }
 
-func (w *RunFinalizer) executeCallbackOnParent(tx *gorm.DB, run *models.CanvasRun, callback core.RunCallbackDefinition) error {
+func (w *RunFinalizer) executeCallbackOnParent(tx *gorm.DB, run *models.CanvasRun, callback core.RunCallbackDefinition, messageCollector *MessageCollector) error {
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
 		newEvents = append(newEvents, events...)
@@ -423,10 +429,6 @@ func (w *RunFinalizer) executeCallbackOnParent(tx *gorm.DB, run *models.CanvasRu
 	if err != nil {
 		return fmt.Errorf("find parent node: %w", err)
 	}
-
-	//
-	// TODO: handle triggers too
-	//
 
 	ref := node.Ref.Data()
 	action, err := w.registry.GetAction(ref.Component.Name)
@@ -451,9 +453,52 @@ func (w *RunFinalizer) executeCallbackOnParent(tx *gorm.DB, run *models.CanvasRu
 		return fmt.Errorf("handle hook: %w", err)
 	}
 
-	//
-	// TODO: we have to send RabbitMQ message about this execution
-	//
+	messageCollector.AddEvents(newEvents...)
+	err = tx.Save(&execution).Error
+	if err != nil {
+		return fmt.Errorf("save execution: %w", err)
+	}
 
-	return tx.Save(&execution).Error
+	messageCollector.AddExecutions(*execution)
+	return nil
+}
+
+type MessageCollector struct {
+	Events     []models.CanvasEvent
+	Executions []models.CanvasNodeExecution
+}
+
+func NewMessageCollector() *MessageCollector {
+	return &MessageCollector{
+		Events:     []models.CanvasEvent{},
+		Executions: []models.CanvasNodeExecution{},
+	}
+}
+
+func (c *MessageCollector) AddEvents(events ...models.CanvasEvent) {
+	c.Events = append(c.Events, events...)
+}
+
+func (c *MessageCollector) AddExecutions(executions ...models.CanvasNodeExecution) {
+	c.Executions = append(c.Executions, executions...)
+}
+
+func (c *MessageCollector) Publish() error {
+	if len(c.Events) > 0 {
+		for _, event := range c.Events {
+			if err := messages.NewCanvasEventCreatedMessage(event.WorkflowID.String(), event.RunID.String(), &event).Publish(); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(c.Executions) > 0 {
+		for _, execution := range c.Executions {
+			if err := messages.NewCanvasExecutionMessage(execution.WorkflowID.String(), execution.ID.String(), execution.NodeID).PublishFinished(); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

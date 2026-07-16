@@ -67,7 +67,6 @@ func (c *OnInvoke) Configuration() []configuration.Field {
 			Label:       "Parameters",
 			Description: "Parameters to receive as part of the invocation",
 			Type:        configuration.FieldTypeList,
-			Required:    true,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemDefinition: &configuration.ListItemDefinition{
