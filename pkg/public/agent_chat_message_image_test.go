@@ -29,7 +29,7 @@ func TestAgentChatMessageImage(t *testing.T) {
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider(), r.GitProvider, nil)
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), "", time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)

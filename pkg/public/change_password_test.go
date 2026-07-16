@@ -42,7 +42,7 @@ func setupChangePasswordTestServer(t *testing.T) (*Server, *support.ResourceRegi
 	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
 	require.NoError(t, err)
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), "", time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	return server, r, token
@@ -58,7 +58,7 @@ func setupChangePasswordTestServerNoPassword(t *testing.T) (*Server, *support.Re
 	require.NoError(t, err)
 	server.RegisterWebRoutes("")
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), "", time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	return server, r, token
@@ -80,7 +80,7 @@ func setupChangePasswordTestServerLoginDisabled(t *testing.T) (*Server, *support
 	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
 	require.NoError(t, err)
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), "", time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	return server, r, token
@@ -339,7 +339,7 @@ func TestChangePassword_InvalidatesOldCookie(t *testing.T) {
 
 	// A freshly minted cookie with iat after password_changed_at is accepted.
 	signer := jwt.NewSigner("test-client-secret")
-	freshToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	freshToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), "", time.Now(), time.Hour)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, check(freshToken))
 }

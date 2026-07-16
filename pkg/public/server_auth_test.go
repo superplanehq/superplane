@@ -29,7 +29,7 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	server, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, r.GitProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), "", time.Now(), time.Hour)
 	require.NoError(t, err)
 
 	server.RegisterWebRoutes("")

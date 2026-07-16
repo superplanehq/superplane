@@ -29,6 +29,7 @@ const ImpersonationContextKey contextKey = "impersonation"
 const ScopedTokenClaimsContextKey contextKey = "scopedTokenClaims"
 const OrganizationNotFoundError string = "organization_not_found_error"
 const AccountNotFoundError string = "account_not_found_error"
+const ProviderNotAllowedError string = "provider_not_allowed_error"
 
 // ImpersonationInfo is stored in the request context when an admin
 // is impersonating another user.
@@ -126,7 +127,7 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				return
 			}
 
-			account, err := getValidatedAccountFromCookie(r, jwtSigner)
+			account, _, err := getValidatedAccountFromCookie(r, jwtSigner)
 			if err != nil {
 				if isAccountAPIPath(r.URL.Path) {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -232,6 +233,11 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 					return
 				}
 
+				if err.Error() == ProviderNotAllowedError {
+					http.Error(w, ProviderNotAllowedError, http.StatusForbidden)
+					return
+				}
+
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -241,7 +247,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, impersonationInfo)
 			}
 
-			if account, err := getValidatedAccountFromCookie(r, jwtSigner); err == nil {
+			if account, _, err := getValidatedAccountFromCookie(r, jwtSigner); err == nil {
 				authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
 			}
 
@@ -335,7 +341,7 @@ func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *htt
 		return nil, nil, err
 	}
 
-	account, err := getValidatedAccountFromCookie(r, jwtSigner)
+	account, provider, err := getValidatedAccountFromCookie(r, jwtSigner)
 	if err != nil {
 		return nil, nil, errors.New(AccountNotFoundError)
 	}
@@ -343,6 +349,21 @@ func authenticateUserByCookie(ctx context.Context, jwtSigner *jwt.Signer, r *htt
 	organizationID := findOrganizationID(r)
 	if organizationID == "" {
 		return nil, nil, errors.New(OrganizationNotFoundError)
+	}
+
+	// Enforce the organization's allowed_providers policy against the
+	// provider the account actually authenticated with. Only OAuth SSO
+	// providers are gated; password/magic-code logins and legacy tokens
+	// without a provider claim are governed by installation-level settings.
+	if models.IsOAuthProvider(provider) {
+		organization, err := models.FindOrganizationByIDInTransaction(database.DB(ctx), organizationID)
+		if err != nil {
+			return nil, nil, errors.New(OrganizationNotFoundError)
+		}
+
+		if !organization.IsProviderAllowed(provider) {
+			return nil, nil, errors.New(ProviderNotAllowedError)
+		}
 	}
 
 	user, err = models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, account.Email)
@@ -367,7 +388,7 @@ func isActiveImpersonation(jwtSigner *jwt.Signer, r *http.Request) bool {
 		return false
 	}
 
-	admin, err := getValidatedAccountFromCookie(r, jwtSigner)
+	admin, _, err := getValidatedAccountFromCookie(r, jwtSigner)
 	if err != nil {
 		return false
 	}
@@ -402,7 +423,7 @@ func resolveImpersonatedUser(ctx context.Context, jwtSigner *jwt.Signer, r *http
 	}
 
 	// Double-validate: the admin's regular session must also be valid
-	admin, err := getValidatedAccountFromCookie(r, jwtSigner)
+	admin, _, err := getValidatedAccountFromCookie(r, jwtSigner)
 	if err != nil {
 		return nil, nil, fmt.Errorf("admin session invalid: %w", err)
 	}
@@ -508,56 +529,71 @@ func isAccountAPIPath(path string) bool {
 	}
 }
 
-func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, int64, error) {
+// cookieSession holds the identity claims extracted from a validated
+// account_token cookie. Provider is empty for legacy tokens minted before
+// the provider claim existed.
+type cookieSession struct {
+	accountID string
+	iat       int64
+	provider  string
+}
+
+func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (cookieSession, error) {
 	cookie, err := r.Cookie("account_token")
 	if err != nil {
-		return "", 0, fmt.Errorf("account token cookie not found")
+		return cookieSession{}, fmt.Errorf("account token cookie not found")
 	}
 
 	claims, err := jwtSigner.ValidateAndGetClaims(cookie.Value)
 	if err != nil {
-		return "", 0, fmt.Errorf("invalid account token: %v", err)
+		return cookieSession{}, fmt.Errorf("invalid account token: %v", err)
 	}
 
 	if !authentication.IsAccountSessionWithinMaxAge(claims) {
-		return "", 0, fmt.Errorf("session exceeded maximum age")
+		return cookieSession{}, fmt.Errorf("session exceeded maximum age")
 	}
 
 	accountClaim, exists := claims["sub"]
 	if !exists {
-		return "", 0, fmt.Errorf("account ID missing from token")
+		return cookieSession{}, fmt.Errorf("account ID missing from token")
 	}
 
 	accountID, ok := accountClaim.(string)
 	if !ok {
-		return "", 0, fmt.Errorf("invalid account ID in token")
+		return cookieSession{}, fmt.Errorf("invalid account ID in token")
 	}
 
 	iat, _ := claims["iat"].(float64)
 
-	return accountID, int64(iat), nil
+	return cookieSession{
+		accountID: accountID,
+		iat:       int64(iat),
+		provider:  authentication.ProviderFromClaims(claims),
+	}, nil
 }
 
 // getValidatedAccountFromCookie reads the account_token cookie, loads the
 // matching account, and rejects the request if the token's iat is older
 // than the account's PasswordChangedAt. Use this anywhere a cookie-based
-// account session needs to be validated end-to-end.
-func getValidatedAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (*models.Account, error) {
-	accountID, iat, err := getAccountFromCookie(r, jwtSigner)
+// account session needs to be validated end-to-end. It returns the login
+// provider recorded in the session so callers can enforce per-organization
+// provider policies.
+func getValidatedAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (*models.Account, string, error) {
+	session, err := getAccountFromCookie(r, jwtSigner)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	account, err := models.FindAccountByID(accountID)
+	account, err := models.FindAccountByID(session.accountID)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	if !account.IsSessionFresh(iat) {
-		return nil, fmt.Errorf("session invalidated by password change")
+	if !account.IsSessionFresh(session.iat) {
+		return nil, "", fmt.Errorf("session invalidated by password change")
 	}
 
-	return account, nil
+	return account, session.provider, nil
 }
 
 func GetUserFromContext(ctx context.Context) (*models.User, bool) {
