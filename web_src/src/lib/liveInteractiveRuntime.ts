@@ -8,27 +8,31 @@ function executionTimestamp(execution: CanvasesCanvasNodeExecution): number {
   return Date.parse(execution.updatedAt || execution.createdAt || "");
 }
 
-export function newestExecution(executions: CanvasesCanvasNodeExecution[]): CanvasesCanvasNodeExecution | null {
-  if (executions.length === 0) {
+export function newestItemByTimestamp<T>(items: T[], timestamp: (item: T) => number): T | null {
+  if (items.length === 0) {
     return null;
   }
 
-  let newest: CanvasesCanvasNodeExecution | null = null;
+  let newest: T | null = null;
   let newestTimestamp = Number.NEGATIVE_INFINITY;
   let newestIndex = -1;
 
-  for (let index = 0; index < executions.length; index++) {
-    const execution = executions[index];
-    const candidateTimestamp = executionTimestamp(execution);
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index];
+    const candidateTimestamp = timestamp(item);
     const safeTimestamp = Number.isFinite(candidateTimestamp) ? candidateTimestamp : Number.NEGATIVE_INFINITY;
     if (safeTimestamp > newestTimestamp || (safeTimestamp === newestTimestamp && index > newestIndex)) {
-      newest = execution;
+      newest = item;
       newestTimestamp = safeTimestamp;
       newestIndex = index;
     }
   }
 
   return newest;
+}
+
+export function newestExecution(executions: CanvasesCanvasNodeExecution[]): CanvasesCanvasNodeExecution | null {
+  return newestItemByTimestamp(executions, executionTimestamp);
 }
 
 export function hasActiveLiveRuntimeExecutionOnLatest(executions: CanvasesCanvasNodeExecution[]): boolean {

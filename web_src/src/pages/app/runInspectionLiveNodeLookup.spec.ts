@@ -52,6 +52,23 @@ describe("resolveRunLookupEventForNodeActivity", () => {
     });
   });
 
+  it("uses the last execution when timestamps are missing", () => {
+    const lookupEvent = resolveRunLookupEventForNodeActivity("action-1", "TYPE_ACTION", {
+      executions: [
+        execution({ id: "first-execution", state: "STATE_FINISHED" }),
+        execution({ id: "last-execution", state: "STATE_STARTED" }),
+      ],
+      events: [],
+    });
+
+    expect(lookupEvent).toMatchObject({
+      id: "last-execution",
+      executionId: "last-execution",
+      kind: "execution",
+      nodeId: "action-1",
+    });
+  });
+
   it("resolves cached runs from the current node activity store", () => {
     useNodeExecutionStore.getState().clear();
     useNodeExecutionStore
