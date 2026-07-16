@@ -38,7 +38,7 @@ func downloadFile(
 	req := httptest.NewRequest(http.MethodGet, url, nil)
 	if accountID != nil {
 		req.Header.Set("x-organization-id", organizationID.String())
-		token, err := authentication.GenerateAccountToken(signer, accountID.String(), time.Now(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, accountID.String(), "", time.Now(), time.Hour)
 		require.NoError(t, err)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 	}

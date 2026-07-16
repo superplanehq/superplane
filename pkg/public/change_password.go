@@ -147,7 +147,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	// here. Its iat is after PasswordChangedAt, so the freshness check
 	// passes for this device only — every other device's cookie is now
 	// stale and will be rejected.
-	if err := authentication.IssueAccountSession(w, r, s.jwt, account.ID.String()); err != nil {
+	if err := authentication.IssueAccountSession(w, r, s.jwt, account.ID.String(), models.ProviderPassword); err != nil {
 		log.Errorf("Failed to issue refreshed account_token after password change for %s: %v", account.ID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

@@ -6,6 +6,13 @@ const (
 	ProviderGitHub = "github"
 	ProviderGoogle = "google"
 
+	// ProviderPassword and ProviderMagicCode identify the non-OAuth login
+	// methods in the account session's provider claim. They are not OAuth
+	// SSO providers and are therefore never gated by an organization's
+	// allowed_providers policy (see IsOAuthProvider).
+	ProviderPassword  = "password"
+	ProviderMagicCode = "magic_code"
+
 	DomainTypeOrganization = "org"
 
 	DisplayNameOwner  = "Owner"
@@ -35,6 +42,14 @@ var (
 	ErrNameAlreadyUsed         = fmt.Errorf("name already used")
 	ErrInvitationAlreadyExists = fmt.Errorf("invitation already exists")
 )
+
+// IsOAuthProvider reports whether the given provider is an OAuth SSO
+// provider. Only OAuth providers are subject to an organization's
+// allowed_providers policy; password and magic-code logins are governed by
+// installation-level settings instead.
+func IsOAuthProvider(provider string) bool {
+	return provider == ProviderGitHub || provider == ProviderGoogle
+}
 
 func ValidateDomainType(domainType string) error {
 	if domainType != DomainTypeOrganization {

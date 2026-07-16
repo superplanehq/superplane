@@ -163,6 +163,58 @@ func TestMaybeRefreshAccountSession(t *testing.T) {
 	})
 }
 
+func TestAccountTokenProviderClaim(t *testing.T) {
+	signer := jwt.NewSigner("test-secret")
+
+	t.Run("records the provider on the token", func(t *testing.T) {
+		token, err := GenerateAccountToken(signer, "account-id", "github", time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		assert.Equal(t, "github", ProviderFromClaims(mustClaims(t, signer, token)))
+	})
+
+	t.Run("omits the claim when no provider is given", func(t *testing.T) {
+		token, err := GenerateAccountToken(signer, "account-id", "", time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		claims := mustClaims(t, signer, token)
+		_, exists := claims[providerClaim]
+		assert.False(t, exists)
+		assert.Equal(t, "", ProviderFromClaims(claims))
+	})
+}
+
+func TestMaybeRefreshAccountSessionPreservesProvider(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+
+	ResetAccountSessionTTLForTests()
+	t.Cleanup(ResetAccountSessionTTLForTests)
+
+	issuedAt := time.Now().Add(-2 * time.Minute)
+	oldToken := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, jwtLib.MapClaims{
+		"sub":             r.Account.ID.String(),
+		"iat":             issuedAt.Unix(),
+		"nbf":             issuedAt.Unix(),
+		"exp":             issuedAt.Add(20 * time.Hour).Unix(),
+		sessionStartClaim: fmt.Sprintf("%d", issuedAt.Unix()),
+		providerClaim:     "google",
+	})
+	oldTokenString, err := oldToken.SignedString([]byte(signer.Secret))
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/account", nil)
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: oldTokenString})
+	res := httptest.NewRecorder()
+
+	MaybeRefreshAccountSession(res, req, signer, r.Account)
+
+	cookies := res.Result().Cookies()
+	require.Len(t, cookies, 1)
+	assert.NotEqual(t, oldTokenString, cookies[0].Value)
+	assert.Equal(t, "google", ProviderFromClaims(mustClaims(t, signer, cookies[0].Value)))
+}
+
 func mustClaims(t *testing.T, signer *jwt.Signer, token string) jwtLib.MapClaims {
 	t.Helper()
 

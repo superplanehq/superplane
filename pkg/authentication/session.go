@@ -17,6 +17,7 @@ const (
 	defaultAccountSessionTTL    = 24 * time.Hour
 	defaultAccountSessionMaxAge = 7 * 24 * time.Hour
 	sessionStartClaim           = "ses"
+	providerClaim               = "provider"
 )
 
 var (
@@ -88,22 +89,38 @@ func IsAccountSessionWithinMaxAge(claims jwtLib.MapClaims) bool {
 	return time.Since(start) <= AccountSessionMaxAge()
 }
 
-// GenerateAccountToken creates a signed account_token JWT with session tracking.
-func GenerateAccountToken(jwtSigner *jwt.Signer, accountID string, sessionStart time.Time, ttl time.Duration) (string, error) {
-	return jwtSigner.GenerateWithClaims(ttl, map[string]string{
+// ProviderFromClaims returns the login provider recorded in the account
+// session, or an empty string for legacy tokens minted before the claim
+// existed. Callers treat an empty provider as "unknown / not gated".
+func ProviderFromClaims(claims jwtLib.MapClaims) string {
+	provider, _ := claims[providerClaim].(string)
+	return provider
+}
+
+// GenerateAccountToken creates a signed account_token JWT with session
+// tracking. The provider records how the account authenticated so that
+// per-organization allowed_providers policies can be enforced later.
+func GenerateAccountToken(jwtSigner *jwt.Signer, accountID, provider string, sessionStart time.Time, ttl time.Duration) (string, error) {
+	claims := map[string]string{
 		"sub":             accountID,
 		sessionStartClaim: fmt.Sprintf("%d", sessionStart.Unix()),
-	})
+	}
+
+	if provider != "" {
+		claims[providerClaim] = provider
+	}
+
+	return jwtSigner.GenerateWithClaims(ttl, claims)
 }
 
 // IssueAccountSession mints a fresh account_token for a new login session.
-func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string) error {
-	return issueAccountSession(w, r, jwtSigner, accountID, time.Now())
+func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID, provider string) error {
+	return issueAccountSession(w, r, jwtSigner, accountID, provider, time.Now())
 }
 
-func issueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string, sessionStart time.Time) error {
+func issueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID, provider string, sessionStart time.Time) error {
 	ttl := AccountSessionTTL()
-	token, err := GenerateAccountToken(jwtSigner, accountID, sessionStart, ttl)
+	token, err := GenerateAccountToken(jwtSigner, accountID, provider, sessionStart, ttl)
 	if err != nil {
 		return err
 	}
@@ -144,5 +161,7 @@ func MaybeRefreshAccountSession(w http.ResponseWriter, r *http.Request, jwtSigne
 		return
 	}
 
-	_ = issueAccountSession(w, r, jwtSigner, account.ID.String(), sessionStart)
+	// Preserve the provider claim across refreshes so the org-access
+	// policy keeps applying for the full life of the session.
+	_ = issueAccountSession(w, r, jwtSigner, account.ID.String(), ProviderFromClaims(claims), sessionStart)
 }
