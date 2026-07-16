@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { ExpressionAdapter } from "@/lib/expression";
 import { AutoCompleteInput } from "./AutoCompleteInput";
 import { calculateDropdownPosition } from "./dropdownPosition";
 
@@ -70,6 +71,93 @@ describe("AutoCompleteInput preview toggle", () => {
     );
 
     expect(screen.getByRole("button", { name: "Preview title" })).toBeInTheDocument();
+  });
+
+  it("rejects mixed templates in path-or-raw mode", () => {
+    const adapter: ExpressionAdapter = {
+      id: "cel",
+      evaluate: () => ({ ok: true, value: "ok", formattedValue: "ok" }),
+      evaluatePathLiteral: () => ({ ok: true, value: "path", formattedValue: "path" }),
+      resolveSuggestionValue: vi.fn(),
+      formatResult: vi.fn(),
+    };
+    render(
+      <AutoCompleteInput
+        exampleObj={{ status: "passed" }}
+        value="prefix {{ status }}"
+        onChange={vi.fn()}
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        pathModeOutsideWrapper
+        expressionAdapter={adapter}
+        showValuePreview
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(screen.getByText(/Expected a single full \{\{ … \}\} expression/)).toBeInTheDocument();
+  });
+
+  it("rejects empty path-or-raw expressions", () => {
+    const adapter: ExpressionAdapter = {
+      id: "cel",
+      evaluate: () => ({ ok: true, value: "", formattedValue: "" }),
+      evaluatePathLiteral: () => ({ ok: true, value: "path", formattedValue: "path" }),
+      resolveSuggestionValue: vi.fn(),
+      formatResult: vi.fn(),
+    };
+    render(
+      <AutoCompleteInput
+        exampleObj={{ status: "passed" }}
+        value="{{   }}"
+        onChange={vi.fn()}
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        pathModeOutsideWrapper
+        expressionAdapter={adapter}
+        showValuePreview
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(screen.getByText(/Expression cannot be empty/)).toBeInTheDocument();
+  });
+
+  it("evaluates repeated path-or-raw templates as one runtime expression", () => {
+    const evaluate = vi.fn((expression: string) =>
+      expression.includes("{{")
+        ? { ok: false, error: "Unexpected template delimiter" }
+        : { ok: true, value: "ok", formattedValue: "ok" },
+    );
+    const adapter: ExpressionAdapter = {
+      id: "cel",
+      evaluate,
+      evaluatePathLiteral: () => ({ ok: true, value: "path", formattedValue: "path" }),
+      resolveSuggestionValue: vi.fn(),
+      formatResult: vi.fn(),
+    };
+    render(
+      <AutoCompleteInput
+        exampleObj={{ first: "hello", second: "world" }}
+        value="{{ first }} {{ second }}"
+        onChange={vi.fn()}
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        pathModeOutsideWrapper
+        expressionAdapter={adapter}
+        showValuePreview
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(evaluate).toHaveBeenCalledWith(" first }} {{ second ", expect.any(Object));
+    expect(screen.getByText(/Unexpected template delimiter/)).toBeInTheDocument();
   });
 });
 
@@ -157,6 +245,32 @@ describe("AutoCompleteInput suggestions", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(screen.getByText("data")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(input).toHaveValue("{{ root().");
+    });
+  });
+
+  it("accepts the first suggestion with Enter when value preview is disabled", async () => {
+    render(
+      <AutoCompleteInput
+        aria-label="Panel title"
+        exampleObj={{ __root: { data: { name: "DCO" } } }}
+        value=""
+        onChange={vi.fn()}
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "Panel title" });
+    const value = "{{ ro";
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value, selectionStart: value.length } });
+    expect(await screen.findAllByText("root()")).not.toHaveLength(0);
+
+    fireEvent.keyDown(input, { key: "Enter" });
+
     await waitFor(() => {
       expect(input).toHaveValue("{{ root().");
     });
