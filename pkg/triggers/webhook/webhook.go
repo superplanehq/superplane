@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strings"
@@ -279,7 +280,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		}
 
 		expectedToken := "Bearer " + string(secret)
-		if authHeader != expectedToken {
+		if subtle.ConstantTimeCompare([]byte(authHeader), []byte(expectedToken)) != 1 {
 			return http.StatusUnauthorized, nil, fmt.Errorf("invalid Bearer token")
 		}
 
@@ -291,7 +292,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 			return http.StatusUnauthorized, nil, fmt.Errorf("missing %s header", headerName)
 		}
 
-		if headerToken != string(secret) {
+		if subtle.ConstantTimeCompare([]byte(headerToken), secret) != 1 {
 			return http.StatusUnauthorized, nil, fmt.Errorf("invalid header token")
 		}
 
