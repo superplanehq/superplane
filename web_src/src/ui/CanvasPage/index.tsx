@@ -284,7 +284,10 @@ export interface CanvasPageProps {
   ) => void;
   onAnnotationBlur?: () => void;
   getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
-  onNodeClick?: (nodeId: string, actions: { openConfigurationSidebar: () => void }) => void;
+  onNodeClick?: (
+    nodeId: string,
+    actions: { openConfigurationSidebar: (options?: { preferSettingsTab?: boolean }) => void },
+  ) => void;
   onLiveNodeClickLookupCancel?: () => void;
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
@@ -2251,7 +2254,10 @@ function CanvasContent({
   fitViewContentKey?: string;
   lastFittedContentKeyRef?: React.MutableRefObject<string | null>;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
-  onNodeClick?: (nodeId: string, actions: { openConfigurationSidebar: () => void }) => void;
+  onNodeClick?: (
+    nodeId: string,
+    actions: { openConfigurationSidebar: (options?: { preferSettingsTab?: boolean }) => void },
+  ) => void;
   onLiveNodeClickLookupCancel?: () => void;
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
@@ -2443,13 +2449,13 @@ function CanvasContent({
 
       if (onNodeClick) {
         onNodeClick(nodeId, {
-          openConfigurationSidebar: () => {
+          openConfigurationSidebar: (options?: { preferSettingsTab?: boolean }) => {
             const wasSidebarOpen = stateRef.current.componentSidebar.isOpen;
             stateRef.current.componentSidebar.open(nodeId);
 
             const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
             const nodeHasActivity = nodeData.executions.length > 0 || nodeData.events.length > 0;
-            applySidebarTabOnNodeOpen(setCurrentTab, wasSidebarOpen, !nodeHasActivity);
+            applySidebarTabOnNodeOpen(setCurrentTab, wasSidebarOpen, options?.preferSettingsTab ?? !nodeHasActivity);
             onBuildingBlocksSidebarToggle?.(false);
           },
         });

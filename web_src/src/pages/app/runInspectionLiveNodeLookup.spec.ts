@@ -186,6 +186,26 @@ describe("shouldDeferRunInspectionForLiveNodeClick", () => {
     ).toBe(false);
   });
 
+  it("does not defer run inspection for wait nodes with active executions", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "wait-1",
+      execution({
+        id: "wait-execution",
+        nodeId: "wait-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "wait-1", type: "TYPE_ACTION", component: "wait" },
+        useNodeExecutionStore.getState().getNodeData("wait-1"),
+      ),
+    ).toBe(false);
+  });
+
   it("does not defer run inspection for unrelated components", () => {
     useNodeExecutionStore.getState().clear();
     useNodeExecutionStore.getState().updateNodeExecution(

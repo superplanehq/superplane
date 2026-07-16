@@ -116,7 +116,7 @@ export function resolveLiveCanvasNodeClickSyncAction(
   return { kind: "lookupRun" };
 }
 
-const LIVE_RUNTIME_INTERACTIVE_COMPONENTS = new Set(["approval", "wait", "timeGate"]);
+const LIVE_RUNTIME_INTERACTIVE_COMPONENTS = new Set(["approval"]);
 
 const ACTIVE_LIVE_RUNTIME_EXECUTION_STATES = new Set(["STATE_STARTED", "STATE_PENDING"]);
 

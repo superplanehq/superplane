@@ -117,6 +117,7 @@ import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { buildDuplicatedEdges, buildDuplicatedNodes } from "./lib/duplicate-nodes";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
+import { resolveSidebarMapperCustomField } from "./lib/resolve-sidebar-mapper-custom-field";
 import { buildCanvasYamlExportPayload, materializeCanvasSpec } from "./lib/workflow-spec-files";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
@@ -3747,7 +3748,7 @@ export function AppPage() {
     (
       nodeId: string,
       actions: {
-        openConfigurationSidebar: () => void;
+        openConfigurationSidebar: (options?: { preferSettingsTab?: boolean }) => void;
       },
     ) => {
       if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
@@ -3758,7 +3759,7 @@ export function AppPage() {
       const workflowNode = canvasNodesById.get(nodeId);
       const nodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
       if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, nodeActivity)) {
-        actions.openConfigurationSidebar();
+        actions.openConfigurationSidebar({ preferSettingsTab: true });
         return;
       }
 
@@ -3776,7 +3777,7 @@ export function AppPage() {
 
           const refreshedNodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
           if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, refreshedNodeActivity)) {
-            actions.openConfigurationSidebar();
+            actions.openConfigurationSidebar({ preferSettingsTab: true });
             return;
           }
 
@@ -3922,26 +3923,48 @@ export function AppPage() {
       }
 
       const renderer = getCustomFieldRenderer(componentName);
-      if (!renderer) return null;
+      if (renderer) {
+        const context: {
+          integration?: OrganizationsIntegration;
+        } = {};
+        if (integration) {
+          context.integration = integration;
+        }
 
-      const context: {
-        integration?: OrganizationsIntegration;
-      } = {};
-      if (integration) {
-        context.integration = integration;
+        return (configuration?: Record<string, unknown>) => {
+          return renderCanvasNodeCustomField({
+            renderer,
+            node,
+            configuration,
+            context: Object.keys(context).length > 0 ? context : undefined,
+          });
+        };
       }
 
-      // Return a function that takes the current configuration
-      return (configuration?: Record<string, unknown>) => {
-        return renderCanvasNodeCustomField({
-          renderer,
-          node,
-          configuration,
-          context: Object.keys(context).length > 0 ? context : undefined,
-        });
-      };
+      if (node.type === "TYPE_ACTION" && node.component && canvasId) {
+        const componentDef = allComponentsByName.get(node.component);
+        if (!componentDef) {
+          return null;
+        }
+
+        return () => {
+          const nodeData = getNodeData(nodeId);
+          return resolveSidebarMapperCustomField({
+            node,
+            canvasNodes,
+            executions: nodeData.executions,
+            componentDef,
+            canvasMode: isEditing ? "edit" : "live",
+            canvasId,
+            queryClient,
+            me,
+          });
+        };
+      }
+
+      return null;
     },
-    [canvasNodesById],
+    [allComponentsByName, canvasId, canvasNodes, canvasNodesById, getNodeData, isEditing, me, queryClient],
   );
 
   const appFiles = useMemo(
