@@ -210,7 +210,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         if (inputValue.trim().length === 0) return true;
         return evaluateWholeInput(inputValue, exampleObj).ok;
       }
-      const regex = /\{\{(.*?)\}\}/g;
+      const regex = /\{\{([\s\S]*?)\}\}/g;
       let match;
       while ((match = regex.exec(inputValue)) !== null) {
         if (!expressionAdapter.evaluate(match[1], exampleObj).ok) {
@@ -488,7 +488,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       }
 
       const parts: React.ReactNode[] = [];
-      const regex = /(\{\{)(.*?)(\}\})/g;
+      const regex = /(\{\{)([\s\S]*?)(\}\})/g;
       let lastIndex = 0;
       let match;
       let key = 0;

@@ -56,7 +56,10 @@ export function resolveCelSuggestionValue(
   expression: string,
   globals: Record<string, unknown> | null | undefined,
 ): unknown {
-  return resolveSuggestionPath(expression, globals, {
+  // Mirror `evaluateCel`: apply the shim so `$` / `$["…"]` suggestion
+  // previews resolve against the same context that evaluation uses.
+  const rowGlobals = globals ? withRunNodesShim(globals as Record<string, unknown>) : globals;
+  return resolveSuggestionPath(expression, rowGlobals, {
     rewrite: (expr) => {
       if (expr.startsWith("$[")) return DOLLAR_REWRITE_IDENTIFIER + expr.slice(1);
       if (expr === "$") return DOLLAR_REWRITE_IDENTIFIER;
