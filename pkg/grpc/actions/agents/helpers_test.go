@@ -45,7 +45,7 @@ func (s *stubService) InterruptSession(ctx context.Context, o, u, id uuid.UUID) 
 	return s.interruptErr
 }
 
-func (s *stubService) DefineOutcome(ctx context.Context, o, u, id uuid.UUID, description, rubric string, maxIterations int) error {
+func (s *stubService) DefineOutcome(ctx context.Context, o, u, id uuid.UUID, description, rubric string, maxIterations int, options ...agentservice.DefineOutcomeRequestOptions) error {
 	return s.defineErr
 }
 

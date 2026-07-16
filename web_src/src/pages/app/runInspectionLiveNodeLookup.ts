@@ -3,6 +3,11 @@ import type {
   CanvasesCanvasNodeExecution,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
+import {
+  hasActiveLiveRuntimeExecutionOnLatest,
+  isLiveNodeSetupState,
+  LIVE_INTERACTIVE_SIDEBAR_COMPONENTS,
+} from "@/lib/liveInteractiveRuntime";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
@@ -99,4 +104,42 @@ export function resolveCachedNodeRunId(
   const nodeData = useNodeExecutionStore.getState().getNodeData(nodeId);
   const lookupEvent = resolveRunLookupEventForNodeActivity(nodeId, nodeType, nodeData);
   return lookupEvent?.runId || (lookupEvent ? resolveRunId(lookupEvent) : null);
+}
+
+export type LiveCanvasNodeClickSyncAction = { kind: "inspectRun"; runId: string } | { kind: "lookupRun" };
+
+export function resolveLiveCanvasNodeClickSyncAction(
+  nodeId: string,
+  workflowNode: ComponentsNode | undefined,
+  resolveRunId: (event: SidebarEvent) => string | null,
+): LiveCanvasNodeClickSyncAction {
+  const cachedRunId = resolveCachedNodeRunId(nodeId, workflowNode, resolveRunId);
+  if (cachedRunId) {
+    return { kind: "inspectRun", runId: cachedRunId };
+  }
+
+  return { kind: "lookupRun" };
+}
+
+export function shouldDeferRunInspectionForLiveNodeClick(
+  workflowNode: ComponentsNode | undefined,
+  nodeData: NodeActivityData,
+): boolean {
+  const component = workflowNode?.component;
+  if (!component || !LIVE_INTERACTIVE_SIDEBAR_COMPONENTS.has(component)) {
+    return false;
+  }
+
+  return hasActiveLiveRuntimeExecutionOnLatest(nodeData.executions);
+}
+
+export function shouldOpenConfigurationSidebarForLiveNodeClick(
+  workflowNode: ComponentsNode | undefined,
+  nodeData: NodeActivityData,
+): boolean {
+  if (isLiveNodeSetupState(workflowNode)) {
+    return true;
+  }
+
+  return shouldDeferRunInspectionForLiveNodeClick(workflowNode, nodeData);
 }

@@ -76,6 +76,7 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
   allowExpressions = false,
   excludedSuggestions,
   valuePreviewLabel,
+  readOnly = false,
 }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const resolvedValue = value ?? field.defaultValue;
@@ -100,6 +101,7 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
       valuePreviewLabel={valuePreviewLabel}
       quickTip="Tip: type `{{` to start an expression."
       excludedSuggestions={excludedSuggestions}
+      disabled={readOnly}
       data-testid={toTestId(testId)}
     />
   ) : (
@@ -108,6 +110,8 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
       onChange={(e) => emit(e.target.value)}
       placeholder={field.placeholder || ""}
       style={{ minHeight: PLAIN_TEXT_MIN_HEIGHT_PX }}
+      disabled={readOnly}
+      readOnly={readOnly}
       data-testid={toTestId(testId)}
     />
   );
@@ -115,49 +119,53 @@ const PlainTextFieldRenderer: React.FC<FieldRendererProps> = ({
   return (
     <div className="relative">
       {inlineEditor}
-      <ExpandFieldButton
-        onClick={() => setIsModalOpen(true)}
-        label={`Expand ${label} editor`}
-        testId={toTestId(`${testId}-expand`)}
-      />
-      <ExpandableEditorDialog
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-        title={label}
-        initialValue={currentValue}
-        onSave={emit}
-        testId={toTestId(`${testId}-modal`)}
-      >
-        {({ value: draftValue, onChange: setDraftValue }) =>
-          allowExpressions ? (
-            <AutoCompleteInput
-              exampleObj={autocompleteExampleObj ?? null}
-              value={draftValue}
-              onChange={setDraftValue}
-              placeholder={field.placeholder || ""}
-              startWord="{{"
-              prefix="{{ "
-              suffix=" }}"
-              inputSize="md"
-              showValuePreview
-              valuePreviewLabel={valuePreviewLabel}
-              quickTip="Tip: type `{{` to start an expression."
-              excludedSuggestions={excludedSuggestions}
-              fullHeight
-              data-testid={toTestId(`${testId}-modal-input`)}
-            />
-          ) : (
-            <Textarea
-              value={draftValue}
-              onChange={(e) => setDraftValue(e.target.value)}
-              placeholder={field.placeholder || ""}
-              style={FIXED_FIELD_SIZING_STYLE}
-              className="h-full min-h-0 flex-1 resize-none"
-              data-testid={toTestId(`${testId}-modal-input`)}
-            />
-          )
-        }
-      </ExpandableEditorDialog>
+      {!readOnly ? (
+        <>
+          <ExpandFieldButton
+            onClick={() => setIsModalOpen(true)}
+            label={`Expand ${label} editor`}
+            testId={toTestId(`${testId}-expand`)}
+          />
+          <ExpandableEditorDialog
+            open={isModalOpen}
+            onOpenChange={setIsModalOpen}
+            title={label}
+            initialValue={currentValue}
+            onSave={emit}
+            testId={toTestId(`${testId}-modal`)}
+          >
+            {({ value: draftValue, onChange: setDraftValue }) =>
+              allowExpressions ? (
+                <AutoCompleteInput
+                  exampleObj={autocompleteExampleObj ?? null}
+                  value={draftValue}
+                  onChange={setDraftValue}
+                  placeholder={field.placeholder || ""}
+                  startWord="{{"
+                  prefix="{{ "
+                  suffix=" }}"
+                  inputSize="md"
+                  showValuePreview
+                  valuePreviewLabel={valuePreviewLabel}
+                  quickTip="Tip: type `{{` to start an expression."
+                  excludedSuggestions={excludedSuggestions}
+                  fullHeight
+                  data-testid={toTestId(`${testId}-modal-input`)}
+                />
+              ) : (
+                <Textarea
+                  value={draftValue}
+                  onChange={(e) => setDraftValue(e.target.value)}
+                  placeholder={field.placeholder || ""}
+                  style={FIXED_FIELD_SIZING_STYLE}
+                  className="h-full min-h-0 flex-1 resize-none"
+                  data-testid={toTestId(`${testId}-modal-input`)}
+                />
+              )
+            }
+          </ExpandableEditorDialog>
+        </>
+      ) : null}
     </div>
   );
 };
@@ -168,6 +176,7 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
   onChange,
   autocompleteExampleObj,
   language,
+  readOnly = false,
 }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -189,12 +198,25 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
   };
 
   const handleEditorChange = (newValue: string | undefined) => {
+    if (readOnly) {
+      return;
+    }
+
     const valueToUse = newValue || "";
     onChange(valueToUse || undefined);
   };
 
   const commitDraft = (draft: string) => {
+    if (readOnly) {
+      return;
+    }
+
     onChange(draft || undefined);
+  };
+
+  const editorOptions = {
+    ...CODE_EDITOR_OPTIONS,
+    readOnly,
   };
 
   return (
@@ -212,17 +234,19 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
                 {React.createElement(resolveIcon("copy"), { size: 14 })}
               </button>
             </SimpleTooltip>
-            <SimpleTooltip content="Expand">
-              <button
-                type="button"
-                aria-label={`Expand ${label} editor`}
-                data-testid={toTestId(`${testId}-expand`)}
-                onClick={() => setIsModalOpen(true)}
-                className="p-1 text-gray-500 hover:text-gray-800"
-              >
-                {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
-              </button>
-            </SimpleTooltip>
+            {!readOnly ? (
+              <SimpleTooltip content="Expand">
+                <button
+                  type="button"
+                  aria-label={`Expand ${label} editor`}
+                  data-testid={toTestId(`${testId}-expand`)}
+                  onClick={() => setIsModalOpen(true)}
+                  className="p-1 text-gray-500 hover:text-gray-800"
+                >
+                  {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                </button>
+              </SimpleTooltip>
+            ) : null}
           </div>
           <Editor
             height="100%"
@@ -231,49 +255,51 @@ const CodeTextFieldRenderer: React.FC<FieldRendererProps & { language: string }>
             onChange={handleEditorChange}
             onMount={handleEditorMount}
             theme={monacoTheme}
-            options={CODE_EDITOR_OPTIONS}
+            options={editorOptions}
           />
         </div>
       </div>
 
-      <ExpandableEditorDialog
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-        title={label}
-        initialValue={editorValue}
-        onSave={commitDraft}
-        testId={toTestId(`${testId}-modal`)}
-        headerActions={({ draft }) => (
-          <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                copyToClipboard(draft);
+      {!readOnly ? (
+        <ExpandableEditorDialog
+          open={isModalOpen}
+          onOpenChange={setIsModalOpen}
+          title={label}
+          initialValue={editorValue}
+          onSave={commitDraft}
+          testId={toTestId(`${testId}-modal`)}
+          headerActions={({ draft }) => (
+            <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  copyToClipboard(draft);
+                }}
+                className="flex items-center gap-1 rounded bg-gray-50 px-3 py-1 text-sm text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+              >
+                {React.createElement(resolveIcon("copy"), { size: 14 })}
+                Copy
+              </button>
+            </SimpleTooltip>
+          )}
+        >
+          {({ value: draftValue, onChange: setDraftValue }) => (
+            <Editor
+              height="100%"
+              defaultLanguage={language}
+              value={draftValue}
+              onChange={(next) => setDraftValue(next ?? "")}
+              onMount={handleEditorMount}
+              theme={monacoTheme}
+              options={{
+                ...editorOptions,
+                automaticLayout: true,
               }}
-              className="flex items-center gap-1 rounded bg-gray-50 px-3 py-1 text-sm text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
-            >
-              {React.createElement(resolveIcon("copy"), { size: 14 })}
-              Copy
-            </button>
-          </SimpleTooltip>
-        )}
-      >
-        {({ value: draftValue, onChange: setDraftValue }) => (
-          <Editor
-            height="100%"
-            defaultLanguage={language}
-            value={draftValue}
-            onChange={(next) => setDraftValue(next ?? "")}
-            onMount={handleEditorMount}
-            theme={monacoTheme}
-            options={{
-              ...CODE_EDITOR_OPTIONS,
-              automaticLayout: true,
-            }}
-          />
-        )}
-      </ExpandableEditorDialog>
+            />
+          )}
+        </ExpandableEditorDialog>
+      ) : null}
     </>
   );
 };

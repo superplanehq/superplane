@@ -20,6 +20,7 @@ interface IntegrationResourceFieldRendererProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
   labelRightRef?: RefObject<HTMLDivElement | null>;
   labelRightReady?: boolean;
+  readOnly?: boolean;
 }
 
 type SelectOption = {
@@ -53,6 +54,7 @@ export const IntegrationResourceFieldRenderer = ({
   autocompleteExampleObj = null,
   labelRightRef,
   labelRightReady = false,
+  readOnly = false,
 }: IntegrationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
@@ -146,6 +148,10 @@ export const IntegrationResourceFieldRenderer = ({
 
   // Set initial value on first render if no value is present but there's a default (only for multi-select)
   useEffect(() => {
+    if (readOnly) {
+      return;
+    }
+
     if (isMulti && (value === undefined || value === null) && field.defaultValue !== undefined) {
       const defaultVal = Array.isArray(field.defaultValue)
         ? field.defaultValue
@@ -156,7 +162,7 @@ export const IntegrationResourceFieldRenderer = ({
         onChange(defaultVal);
       }
     }
-  }, [isMulti, value, field.defaultValue, onChange]);
+  }, [readOnly, isMulti, value, field.defaultValue, onChange]);
 
   const resourcesUnavailable = !organizationId || !integrationId || isLoadingResources || !!resourcesError;
   const hasResources = Boolean(resources && resources.length > 0);
@@ -208,8 +214,12 @@ export const IntegrationResourceFieldRenderer = ({
       <AutoCompleteSelect
         options={options}
         value={selectedValue}
-        onChange={(val) => onChange(val || undefined)}
+        onChange={(val) => {
+          if (readOnly) return;
+          onChange(val || undefined);
+        }}
         placeholder={field.placeholder ?? `Select ${resourceType}`}
+        disabled={readOnly}
       />
     ) : (
       <Select value="" disabled>
@@ -223,7 +233,10 @@ export const IntegrationResourceFieldRenderer = ({
       <AutoCompleteInput
         exampleObj={autocompleteExampleObj}
         value={expressionValue}
-        onChange={(nextValue) => onChange(nextValue || undefined)}
+        onChange={(nextValue) => {
+          if (readOnly) return;
+          onChange(nextValue || undefined);
+        }}
         placeholder={field.placeholder ?? `e.g. {{ $["node-name"].value }}`}
         startWord="{{"
         prefix="{{ "
@@ -232,6 +245,7 @@ export const IntegrationResourceFieldRenderer = ({
         showValuePreview
         quickTip="Tip: type {{ to start an expression."
         className=""
+        disabled={readOnly}
       />
     );
 
@@ -241,6 +255,7 @@ export const IntegrationResourceFieldRenderer = ({
           ariaLabel="Value mode"
           value={useExpressionMode ? "expression" : "fixed"}
           onValueChange={(nextValue) => {
+            if (readOnly) return;
             // Preserve any previously entered value when switching modes so users
             // don't lose their input just by toggling between Fixed and Expression.
             setUseExpressionMode(nextValue === "expression");
@@ -292,6 +307,7 @@ export const IntegrationResourceFieldRenderer = ({
     .filter((opt) => opt.value !== "");
 
   const handleChange = (selectedOptions: SelectOption[]) => {
+    if (readOnly) return;
     const selectedValues = selectedOptions.map((opt) => opt.value);
     onChange(selectedValues.length > 0 ? selectedValues : undefined);
   };
@@ -305,6 +321,7 @@ export const IntegrationResourceFieldRenderer = ({
         value={selectedOptions}
         onChange={handleChange}
         showButton={false}
+        disabled={readOnly}
       >
         {(option) => <MultiComboboxLabel>{option.label}</MultiComboboxLabel>}
       </MultiCombobox>
