@@ -692,7 +692,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     }
 
     const resolvableBase = isFunctionCall ? baseExpr : extractTailPathExpression(baseExpr);
-    const target = resolveExprToValue(resolvableBase, globals);
+    const target = resolveExprToValue(resolvableBase, globals, envKeySource);
 
     const keys = listKeys(target);
 
@@ -1340,7 +1340,11 @@ function extractSpecialFunctionCall(expr: string): string {
   return matchValue;
 }
 
-function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: string, globals: TGlobals): unknown {
+function resolveExprToValue<TGlobals extends Record<string, unknown>>(
+  baseExpr: string,
+  globals: TGlobals,
+  envKeySource?: string,
+): unknown {
   const stripWhitespaceOutsideStrings = (input: string) => {
     let out = "";
     let inSingle = false;
@@ -1422,7 +1426,7 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(baseExpr: 
   const first = (tokens[pos] as { t: "ident"; v: string }).v;
   pos++;
 
-  if (first === "$") cur = globals;
+  if (first === "$") cur = resolveEnvRecord(globals as Record<string, unknown>, envKeySource);
   else cur = globals ? (globals as Record<string, unknown>)[first] : undefined;
 
   while (pos < tokens.length) {

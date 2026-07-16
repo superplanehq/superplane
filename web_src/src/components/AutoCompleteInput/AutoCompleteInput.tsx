@@ -8,7 +8,10 @@ import type { ExpressionAdapter } from "@/lib/expression";
 import { exprLangAdapter } from "@/lib/expression";
 import { calculateDropdownPosition } from "./dropdownPosition";
 
-const TEMPLATE_SEGMENT_RE = /\{\{[\s\S]*?\}\}/;
+// Matches any `{{` opener (closed or not) so path-literal mode can bail out
+// as soon as the user starts writing a template, avoiding misleading previews
+// while the closing `}}` is still being typed.
+const OPEN_TEMPLATE_START_RE = /\{\{/;
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
@@ -184,13 +187,16 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const suggestionItemsRef = useRef<Array<ReturnType<typeof getSuggestions>[number]>>([]);
 
     const isRawExpression = expressionMode === "raw";
-    const hasTemplateSegments = TEMPLATE_SEGMENT_RE.test(inputValue);
+    // In path-literal mode any `{{` — even without its closing `}}` — signals
+    // that the user is transitioning to an expression, so we stop treating the
+    // input as a literal path to avoid misleading previews mid-typing.
+    const hasTemplateStart = OPEN_TEMPLATE_START_RE.test(inputValue);
     // Preview the whole input as a single value when either:
     //  - raw mode (the whole input IS the expression), or
-    //  - `pathOrRaw` mode without `{{ … }}` AND the adapter knows how to
+    //  - `pathOrRaw` mode without any `{{` opener AND the adapter knows how to
     //    resolve bare input as a literal path (mirroring runtime semantics).
     const canEvaluatePathLiteral =
-      pathModeOutsideWrapper && !hasTemplateSegments && typeof expressionAdapter.evaluatePathLiteral === "function";
+      pathModeOutsideWrapper && !hasTemplateStart && typeof expressionAdapter.evaluatePathLiteral === "function";
     const evaluateWholeInputAsExpression = isRawExpression || canEvaluatePathLiteral;
 
     const evaluateWholeInput = useCallback(
@@ -563,11 +569,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     };
 
     // Path-mode fallback is only meaningful while the value is still a bare
-    // path — once the input contains a complete `{{ … }}` segment the runtime
-    // treats the whole string as a template, and only its inner expressions
-    // should be evaluated/suggested (matches `canEvaluatePathLiteral`).
+    // path — once the input opens a `{{` (closed or not) the user is writing a
+    // template, so only its inner expressions should be evaluated/suggested
+    // (mirrors `canEvaluatePathLiteral`).
     const pathFallbackFor = useCallback(
-      (text: string) => pathModeOutsideWrapper && !TEMPLATE_SEGMENT_RE.test(text),
+      (text: string) => pathModeOutsideWrapper && !OPEN_TEMPLATE_START_RE.test(text),
       [pathModeOutsideWrapper],
     );
 
