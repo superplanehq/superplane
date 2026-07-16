@@ -65,6 +65,26 @@ func TestUpdateServiceAccountPreservesScopeWhenCanvasIdsOmitted(t *testing.T) {
 	require.Equal(t, datatypes.NewJSONSlice([]string{canvas.ID.String()}), user.ServiceAccountCanvasIDs)
 }
 
+func TestUpdateServiceAccountRejectsBlankName(t *testing.T) {
+	r := support.Setup(t)
+	serviceAccount, err := models.CreateServiceAccount(
+		database.Conn(),
+		r.Organization.ID,
+		"ci-bot",
+		nil,
+		r.User,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	_, err = UpdateServiceAccount(serviceAccountContext(r), &pb.UpdateServiceAccountRequest{
+		Id:   serviceAccount.ID.String(),
+		Name: "   ",
+	})
+	require.Error(t, err)
+}
+
 func TestUpdateServiceAccountClearsExpiration(t *testing.T) {
 	r := support.Setup(t)
 	expiresAt := time.Now().Add(time.Hour)
