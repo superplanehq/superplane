@@ -1058,14 +1058,16 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       });
     };
 
-    const isKeyboardSuggestionCommit = (key: string) =>
-      (key === "Enter" || key === "Tab") &&
+    const isKeyboardSuggestionCommit = (event: React.KeyboardEvent<HTMLTextAreaElement>) =>
+      !event.metaKey &&
+      !event.ctrlKey &&
+      (event.key === "Enter" || event.key === "Tab") &&
       isOpen &&
       highlightedIndexRef.current >= 0 &&
       highlightedIndexRef.current < suggestions.length;
 
     const handleKeyDownCapture = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (isKeyboardSuggestionCommit(e.key)) {
+      if (isKeyboardSuggestionCommit(e)) {
         return;
       }
 
@@ -1190,7 +1192,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     );
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !allowNewlines && !isKeyboardSuggestionCommit(e.key)) {
+      if (e.key === "Enter" && !allowNewlines && !isKeyboardSuggestionCommit(e)) {
         e.preventDefault();
         return;
       }
@@ -1206,7 +1208,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           highlightSuggestionAtIndex(Math.max(highlightedIndexRef.current - 1, 0));
           break;
         case "Enter":
-          if (isKeyboardSuggestionCommit(e.key)) {
+          if (isKeyboardSuggestionCommit(e)) {
             e.preventDefault();
             e.stopPropagation();
             isInteractingWithSuggestionsRef.current = true;
@@ -1215,7 +1217,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           }
           break;
         case "Tab":
-          if (isKeyboardSuggestionCommit(e.key)) {
+          if (isKeyboardSuggestionCommit(e)) {
             e.preventDefault();
             e.stopPropagation();
             isInteractingWithSuggestionsRef.current = true;
