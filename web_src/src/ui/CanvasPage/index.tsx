@@ -290,7 +290,7 @@ export interface CanvasPageProps {
     nodeId: string,
     actions: { openConfigurationSidebar: (options?: { preferSettingsTab?: boolean }) => void },
   ) => void;
-  onLiveNodeClickLookupCancel?: () => void;
+  onLiveNodeClickLookupCancel?: (closingNodeId?: string) => void;
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
@@ -1231,9 +1231,8 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleSidebarClose = useCallback(() => {
-    onLiveNodeClickLookupCancel?.();
-
     const selectedNodeId = state.componentSidebar.selectedNodeId;
+    onLiveNodeClickLookupCancel?.(selectedNodeId ?? undefined);
     // Check if the currently open node is a pending connection
     const currentNode = state.nodes.find((n) => n.id === selectedNodeId);
     const isPendingConnection = currentNode?.data?.isPendingConnection;
@@ -2265,7 +2264,7 @@ function CanvasContent({
     nodeId: string,
     actions: { openConfigurationSidebar: (options?: { preferSettingsTab?: boolean }) => void },
   ) => void;
-  onLiveNodeClickLookupCancel?: () => void;
+  onLiveNodeClickLookupCancel?: (closingNodeId?: string) => void;
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;

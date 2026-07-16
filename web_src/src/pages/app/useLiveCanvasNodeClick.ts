@@ -30,9 +30,16 @@ export function useLiveCanvasNodeClick({
   resolveRunIdForSidebarEvent,
 }: UseLiveCanvasNodeClickOptions) {
   const liveCanvasNodeClickLookupRef = useRef(0);
+  const liveCanvasNodeClickLookupNodeRef = useRef<string | null>(null);
 
-  const cancelLiveNodeClickLookup = useCallback(() => {
+  const cancelLiveNodeClickLookup = useCallback((closingNodeId?: string) => {
+    const lookupNodeId = liveCanvasNodeClickLookupNodeRef.current;
+    if (closingNodeId && lookupNodeId && closingNodeId !== lookupNodeId) {
+      return;
+    }
+
     liveCanvasNodeClickLookupRef.current += 1;
+    liveCanvasNodeClickLookupNodeRef.current = null;
   }, []);
 
   const handleLiveCanvasNodeClick = useCallback(
@@ -66,15 +73,24 @@ export function useLiveCanvasNodeClick({
         return;
       }
 
-      void runLiveCanvasNodeClickLookup({
-        nodeId,
-        workflowNode,
-        isLookupStale: () => liveCanvasNodeClickLookupRef.current !== lookupId,
-        resolveLatestNodeRunLookupEvent,
-        openConfigurationSidebar: actions.openConfigurationSidebar,
-        fetchRunIdForSidebarEvent,
-        handleSelectRunFromSidebarEvent,
-      });
+      void (async () => {
+        liveCanvasNodeClickLookupNodeRef.current = nodeId;
+        try {
+          await runLiveCanvasNodeClickLookup({
+            nodeId,
+            workflowNode,
+            isLookupStale: () => liveCanvasNodeClickLookupRef.current !== lookupId,
+            resolveLatestNodeRunLookupEvent,
+            openConfigurationSidebar: actions.openConfigurationSidebar,
+            fetchRunIdForSidebarEvent,
+            handleSelectRunFromSidebarEvent,
+          });
+        } finally {
+          if (liveCanvasNodeClickLookupRef.current === lookupId) {
+            liveCanvasNodeClickLookupNodeRef.current = null;
+          }
+        }
+      })();
     },
     [
       canvasNodesById,
