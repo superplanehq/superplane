@@ -100,7 +100,7 @@ export function HtmlPanelCard({ panel, readOnly, onDelete, onChange, onEditingCh
   const [draftBody, setDraftBody] = useState(body);
   const [draftTitle, setDraftTitle] = useState(persistedTitle);
   const [draftVariables, setDraftVariables] = useState<MarkdownVariable[]>(variables);
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement | null>(null);
   const codeEditorRef = useRef<HtmlCodeEditorHandle | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
