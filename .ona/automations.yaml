@@ -1,0 +1,33 @@
+tasks:
+  install-dependencies:
+    name: Install dependencies
+    description: Build and start the development containers, then install application dependencies and initialize the databases.
+    command: make dev.up && make dev.setup
+    triggeredBy:
+      - manual
+      - postDevcontainerStart
+      - prebuild
+
+  build:
+    name: Build
+    description: Build the backend and frontend using the repository's development containers.
+    command: make check.build.app && make check.build.ui
+    dependsOn:
+      - install-dependencies
+    triggeredBy:
+      - manual
+
+services:
+  superplane:
+    name: superplane
+    description: Run the SuperPlane API and Vite development server.
+    commands:
+      start: |
+        make dev.server.fg &
+        server_pid=$!
+        gitpod environment port open 8000 --dont-wait --admission creator_only --name superplane
+        wait "$server_pid"
+      ready: curl -fsS http://localhost:8000/health
+    triggeredBy:
+      - manual
+      - postEnvironmentStart
