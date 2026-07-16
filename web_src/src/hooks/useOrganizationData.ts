@@ -109,15 +109,15 @@ export const useSortedOrganizationRoles = (organizationId: string) => {
   const query = useOrganizationRoles(organizationId);
   const sortedRoles = useMemo(() => {
     const roles = query.data ?? [];
-    const byDisplayName = (a: (typeof roles)[number], b: (typeof roles)[number]) =>
-      (a.spec?.displayName || a.metadata?.name || "").localeCompare(b.spec?.displayName || b.metadata?.name || "");
-    const customRoles = roles
-      .filter((role) => !DEFAULT_ORGANIZATION_ROLE_NAMES.has(role.metadata?.name || ""))
-      .sort(byDisplayName);
-    const baseRoles = roles
-      .filter((role) => DEFAULT_ORGANIZATION_ROLE_NAMES.has(role.metadata?.name || ""))
-      .sort(byDisplayName);
-    return [...customRoles, ...baseRoles];
+    const isDefaultRole = (role: (typeof roles)[number]) =>
+      DEFAULT_ORGANIZATION_ROLE_NAMES.has(role.metadata?.name || "");
+    const displayName = (role: (typeof roles)[number]) => role.spec?.displayName || role.metadata?.name || "";
+    return [...roles].sort((a, b) => {
+      if (isDefaultRole(a) !== isDefaultRole(b)) {
+        return isDefaultRole(a) ? 1 : -1;
+      }
+      return displayName(a).localeCompare(displayName(b));
+    });
   }, [query.data]);
 
   return { ...query, sortedRoles };
