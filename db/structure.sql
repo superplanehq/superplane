@@ -671,7 +671,9 @@ CREATE TABLE public.workflow_runs (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     finished_at timestamp without time zone,
-    version_id uuid NOT NULL
+    version_id uuid NOT NULL,
+    cancelled_at timestamp without time zone,
+    cancelled_by uuid
 );
 
 
@@ -2204,7 +2206,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260716144000	f
+20260716150000	f
 \.
 
 

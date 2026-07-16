@@ -339,6 +339,22 @@ func (w *EventRouter) processExecutionEvent(
 	logger = logging.WithExecution(logger, execution)
 	w.logger.Infof("Processing event")
 
+	//
+	// If the run has already finished (e.g. it was cancelled), do not create any
+	// downstream queue items. Mark the event routed so it is not reprocessed.
+	//
+	if execution.RunID != uuid.Nil {
+		run, err := models.FindCanvasRunInTransaction(tx, canvas.ID, execution.RunID)
+		if err != nil {
+			return nil, err
+		}
+
+		if run.IsFinished() {
+			logger.Info("Run already finished - not routing downstream work")
+			return nil, event.RoutedInTransaction(tx)
+		}
+	}
+
 	var createdQueueItems []models.CanvasNodeQueueItem
 	outgoingEdges := findOutgoingEdges(edges, execution.NodeID, event.Channel)
 	for _, edge := range outgoingEdges {

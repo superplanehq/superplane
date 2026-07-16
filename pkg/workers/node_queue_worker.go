@@ -331,6 +331,28 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 	logger = logging.WithQueueItem(logger, *queueItem)
 	logger.Info("Processing queue item")
 
+	//
+	// If the run this queue item belongs to has already finished (e.g. it was
+	// cancelled), do not spawn a new execution. The run row is locked FOR UPDATE
+	// while a cancel is in flight, so a queue item created just before the cancel
+	// is discarded here instead of resurrecting work on a finalized run.
+	//
+	if queueItem.RunID != uuid.Nil {
+		run, err := models.FindCanvasRunInTransaction(tx, node.WorkflowID, queueItem.RunID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if run.IsFinished() {
+			logger.Info("Run already finished - discarding queue item")
+			if err := queueItem.Delete(tx); err != nil {
+				return nil, nil, err
+			}
+
+			return nil, nil, nil
+		}
+	}
+
 	configFields, err := w.configurationFieldsForNode(node)
 	if err != nil {
 		return nil, nil, err
