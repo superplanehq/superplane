@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
@@ -50,7 +51,7 @@ export function ActionRow({
         onChange={onChange}
         onRemove={onRemove}
       />
-      <ActionConditions action={action} onChange={onChange} />
+      <ActionConditions action={action} sampleRow={sampleRow} onChange={onChange} />
       <PayloadEditor
         entries={payloadEntries}
         fieldOptions={fieldOptions}
@@ -231,24 +232,37 @@ function ActionTemplateField({
 
 function ActionConditions({
   action,
+  sampleRow,
   onChange,
 }: {
   action: WidgetRowAction;
+  sampleRow: Record<string, unknown>;
   onChange: (patch: Partial<WidgetRowAction>) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <Input
+    <div className="grid grid-cols-2 items-start gap-2">
+      <ExpressionEditor
+        dialect="cel"
+        // Runtime for the row-action "show" field routes bare input through
+        // the legacy `evaluateShow` parser (not CEL), so keep preview scoped
+        // to `{{ … }}` expressions where semantics match.
+        syntaxProfile="singleWrapped"
+        exampleObj={sampleRow}
         value={action.show ?? ""}
-        onChange={(e) => onChange({ show: e.target.value || undefined })}
+        onChange={(next) => onChange({ show: next || undefined })}
         placeholder='Show when (status == "running" or {{ expr }})'
-        className="h-8 text-xs"
+        inputSize="md"
+        showValuePreview
       />
-      <Input
+      <ExpressionEditor
+        dialect="cel"
+        syntaxProfile="wrapped"
+        exampleObj={sampleRow}
         value={action.confirm ?? ""}
-        onChange={(e) => onChange({ confirm: e.target.value || undefined })}
+        onChange={(next) => onChange({ confirm: next || undefined })}
         placeholder='Confirm ("Destroy #{{ pr_number }}?")'
-        className="h-8 text-xs"
+        inputSize="md"
+        showValuePreview
       />
     </div>
   );
