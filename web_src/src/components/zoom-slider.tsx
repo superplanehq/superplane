@@ -1,7 +1,18 @@
 "use client";
 
 import React, { memo, useCallback, useEffect } from "react";
-import { Camera, CircleDot, CircleDotDashed, Eye, LayoutDashboard, LayoutGrid, Minus, Plus } from "lucide-react";
+import {
+  Camera,
+  CircleDot,
+  CircleDotDashed,
+  Eye,
+  LayoutDashboard,
+  LayoutGrid,
+  Locate,
+  LocateOff,
+  Minus,
+  Plus,
+} from "lucide-react";
 import { toPng } from "html-to-image";
 
 import {
@@ -44,6 +55,31 @@ function isScreenshotShortcut(event: KeyboardEvent, screenshotName?: string) {
   return Boolean(screenshotName) && hasPrimaryModifier(event) && event.shiftKey && event.key === "s";
 }
 
+function AutoFocusToggleButton({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="h-7 w-7"
+          onClick={onToggle}
+          aria-pressed={enabled}
+          aria-label={enabled ? "Disable auto-focus on selection" : "Enable auto-focus on selection"}
+          data-testid="canvas-auto-focus-toggle"
+        >
+          {enabled ? <Locate className="h-3 w-3" /> : <LocateOff className="h-3 w-3" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {enabled
+          ? "Auto-focus is on. Selecting a run or step centers the canvas on it."
+          : "Auto-focus is off. Selecting a run or step keeps the current viewport."}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export const ZoomSlider = memo(function ZoomSlider({
   className,
   orientation = "horizontal",
@@ -56,6 +92,8 @@ export const ZoomSlider = memo(function ZoomSlider({
   onAutoLayoutOnUpdateToggle,
   autoLayoutOnUpdateDisabled,
   autoLayoutOnUpdateDisabledTooltip,
+  isAutoFocusEnabled,
+  onAutoFocusToggle,
   usePanel = true,
   ...props
 }: Omit<PanelProps, "children"> & {
@@ -69,6 +107,8 @@ export const ZoomSlider = memo(function ZoomSlider({
   onAutoLayoutOnUpdateToggle?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
+  isAutoFocusEnabled?: boolean;
+  onAutoFocusToggle?: () => void;
   usePanel?: boolean;
 }) {
   const { zoom } = useViewport();
@@ -284,6 +324,9 @@ export const ZoomSlider = memo(function ZoomSlider({
           </TooltipTrigger>
           <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
         </Tooltip>
+      )}
+      {onAutoFocusToggle && (
+        <AutoFocusToggleButton enabled={Boolean(isAutoFocusEnabled)} onToggle={onAutoFocusToggle} />
       )}
       {children}
     </>
