@@ -1,5 +1,6 @@
 import { useId } from "react";
 
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,7 @@ import type {
 } from "./widget/types";
 import { WIDGET_SCORECARD_SHOW_CHANGES } from "./widget/types";
 import { useMemoryCatalog } from "./widget/useMemoryCatalog";
+import { useWidgetExpressionContext } from "./widget/useWidgetExpressionContext";
 
 const SHOW_CHANGE_LABELS: Record<WidgetScorecardShowChange, string> = {
   percent: "Percent",
@@ -56,6 +58,14 @@ export function ScorecardPanelForm({ value, onChange }: ScorecardPanelFormProps)
   const updateRender = (patch: Partial<WidgetScorecardRender>) =>
     onChange({ ...value, render: { ...render, ...patch } });
 
+  const ctx = useConsoleContext();
+  const canvasId = ctx?.canvasId;
+  const { row: sampleRow } = useWidgetExpressionContext({
+    canvasId: canvasId ?? "",
+    dataSource: value.dataSource,
+    render: value.render,
+  });
+
   return (
     <div className="space-y-3">
       <TitleField value={value} onChange={onChange} />
@@ -66,7 +76,7 @@ export function ScorecardPanelForm({ value, onChange }: ScorecardPanelFormProps)
       <SeriesFields render={render} onChange={updateRender} />
       <StatusFields render={render} onChange={updateRender} />
       <ChangeFields render={render} onChange={updateRender} />
-      <TargetFields render={render} onChange={updateRender} />
+      <TargetFields render={render} onChange={updateRender} sampleRow={sampleRow} />
     </div>
   );
 }
@@ -304,9 +314,11 @@ function ChangeFields({
 function TargetFields({
   render,
   onChange,
+  sampleRow,
 }: {
   render: WidgetScorecardRender;
   onChange: (patch: Partial<WidgetScorecardRender>) => void;
+  sampleRow: Record<string, unknown>;
 }) {
   const showProgress = render.showProgress ?? false;
   const showProgressId = useId();
@@ -314,9 +326,12 @@ function TargetFields({
     <div className="space-y-2 rounded-lg bg-slate-100 p-3 dark:bg-gray-800">
       <div className="space-y-1.5">
         <Label className="text-xs font-medium text-slate-600 dark:text-gray-300">Target (optional)</Label>
-        <Input
+        <ExpressionEditor
+          dialect="cel"
+          syntaxProfile="pathOrRaw"
           value={render.target ?? ""}
-          onChange={(e) => onChange({ target: e.target.value || undefined })}
+          onChange={(next) => onChange({ target: next || undefined })}
+          exampleObj={sampleRow}
           placeholder="e.g. 80 or {{ goal }}"
           data-testid="scorecard-target"
         />
