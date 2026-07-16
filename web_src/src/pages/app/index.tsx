@@ -86,7 +86,7 @@ import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
-import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import { resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -112,12 +112,13 @@ import { useDraftStagingActions } from "./useDraftStagingActions";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { buildDuplicatedEdges, buildDuplicatedNodes } from "./lib/duplicate-nodes";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
-import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { buildCanvasYamlExportPayload, materializeCanvasSpec } from "./lib/workflow-spec-files";
-import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
+import { getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { useCanvasSidebarCustomField } from "./useCanvasSidebarCustomField";
+import { useLiveCanvasNodeClick } from "./useLiveCanvasNodeClick";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useSpecFileAutosave } from "./useSpecFileAutosave";
 import { buildAppFiles } from "./files/lib/app-files";
@@ -622,7 +623,6 @@ export function AppPage() {
   const hasTrackedCanvasView = useRef(false);
   const canvasSaveSessionRef = useRef(0);
   const consoleMutationGenerationRef = useRef(0);
-  const liveCanvasNodeClickLookupRef = useRef(0);
   const handleRemoteStagingUpdatedRef = useRef<() => Promise<void>>(async () => {});
   const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
   const { registerIgnoredCanvasUpdatedEcho, consumeIgnoredCanvasUpdatedEcho, resetLifecycleEchoGuards } =
@@ -1336,14 +1336,24 @@ export function AppPage() {
     });
     return incomingByTargetId;
   }, [canvasEdges]);
-  const allComponentsByName = useMemo(
-    () => new Map(allComponents.map((component) => [component.name, component])),
-    [allComponents],
-  );
-  const allTriggersByName = useMemo(
-    () => new Map(allTriggers.map((trigger) => [trigger.name, trigger])),
-    [allTriggers],
-  );
+  const allComponentsByName = useMemo(() => {
+    const componentsByName = new Map<string, ActionsAction>();
+    for (const component of allComponents) {
+      if (component.name) {
+        componentsByName.set(component.name, component);
+      }
+    }
+    return componentsByName;
+  }, [allComponents]);
+  const allTriggersByName = useMemo(() => {
+    const triggersByName = new Map<string, ActionsAction>();
+    for (const trigger of allTriggers) {
+      if (trigger.name) {
+        triggersByName.set(trigger.name, trigger);
+      }
+    }
+    return triggersByName;
+  }, [allTriggers]);
   const widgetsByName = useMemo(() => new Map(widgets.map((widget) => [widget.name, widget])), [widgets]);
   const availableIntegrationsByName = useMemo(
     () => new Map(availableIntegrations.map((integration) => [integration.name, integration])),
@@ -1950,7 +1960,13 @@ export function AppPage() {
 
       if (node.type === "TYPE_ACTION" || node.type === "TYPE_TRIGGER") {
         const metadata =
-          node.type === "TYPE_ACTION" ? allComponentsByName.get(node.component) : allTriggersByName.get(node.component);
+          node.type === "TYPE_ACTION"
+            ? node.component
+              ? allComponentsByName.get(node.component)
+              : undefined
+            : node.component
+              ? allTriggersByName.get(node.component)
+              : undefined;
         configurationFields = metadata?.configuration || [];
         displayLabel = metadata?.label || displayLabel;
         blockName = node.component;
@@ -3735,45 +3751,28 @@ export function AppPage() {
     [canvasId, canvasNodesById, refetchNodeDataMethod, queryClient],
   );
 
-  const handleLiveCanvasNodeClick = useCallback(
-    (nodeId: string) => {
-      if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
+  const { cancelLiveNodeClickLookup, handleLiveCanvasNodeClick } = useLiveCanvasNodeClick({
+    canvasNodesById,
+    fetchRunIdForSidebarEvent,
+    handleSelectRunFromSidebarEvent,
+    isEditing,
+    isRunInspectionMode,
+    liveSidebarRunLookupEnabled,
+    resolveLatestNodeRunLookupEvent,
+    resolveRunIdForSidebarEvent,
+  });
 
-      const lookupId = liveCanvasNodeClickLookupRef.current + 1;
-      liveCanvasNodeClickLookupRef.current = lookupId;
+  const handleCanvasNodeClick = useMemo(() => {
+    if (runInspectionChromeActive) {
+      return (nodeId: string) => handleRunCanvasNodeClick(nodeId);
+    }
 
-      const cachedRunId = resolveCachedNodeRunId(nodeId, canvasNodesById.get(nodeId), resolveRunIdForSidebarEvent);
-      if (cachedRunId) return handleSelectRunFromSidebarEvent(cachedRunId, { nodeId });
+    if (!isEditing) {
+      return handleLiveCanvasNodeClick;
+    }
 
-      void (async () => {
-        try {
-          const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
-          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) return;
-
-          const runId = await fetchRunIdForSidebarEvent(lookupEvent, { maxPages: 1 });
-          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) return;
-
-          handleSelectRunFromSidebarEvent(runId, { nodeId });
-        } catch (error) {
-          console.error("Failed to inspect latest node run", error);
-        }
-      })();
-    },
-    [
-      canvasNodesById,
-      fetchRunIdForSidebarEvent,
-      handleSelectRunFromSidebarEvent,
-      isEditing,
-      isRunInspectionMode,
-      liveSidebarRunLookupEnabled,
-      resolveLatestNodeRunLookupEvent,
-      resolveRunIdForSidebarEvent,
-    ],
-  );
-
-  useEffect(() => {
-    liveCanvasNodeClickLookupRef.current += 1;
-  }, [isEditing, isRunInspectionMode, liveSidebarRunLookupEnabled]);
+    return undefined;
+  }, [handleLiveCanvasNodeClick, handleRunCanvasNodeClick, isEditing, runInspectionChromeActive]);
 
   useEffect(() => {
     if (!isRunInspectionMode || isViewingLiveVersion) return;
@@ -3855,40 +3854,17 @@ export function AppPage() {
     [canvasNodesById],
   );
 
-  const getCustomField = useCallback(
-    (nodeId: string, integration?: OrganizationsIntegration) => {
-      const node = canvasNodesById.get(nodeId);
-      if (!node) return null;
-
-      let componentName = "";
-      if (node.type === "TYPE_TRIGGER" && node.component) {
-        componentName = node.component;
-      } else if (node.type === "TYPE_ACTION" && node.component) {
-        componentName = node.component;
-      }
-
-      const renderer = getCustomFieldRenderer(componentName);
-      if (!renderer) return null;
-
-      const context: {
-        integration?: OrganizationsIntegration;
-      } = {};
-      if (integration) {
-        context.integration = integration;
-      }
-
-      // Return a function that takes the current configuration
-      return (configuration?: Record<string, unknown>) => {
-        return renderCanvasNodeCustomField({
-          renderer,
-          node,
-          configuration,
-          context: Object.keys(context).length > 0 ? context : undefined,
-        });
-      };
-    },
-    [canvasNodesById],
-  );
+  const getCustomField = useCanvasSidebarCustomField({
+    allComponentsByName,
+    canvasId,
+    canvasNodes,
+    canvasNodesById,
+    getNodeData,
+    isEditing,
+    me,
+    queryClient,
+    storeVersion,
+  });
 
   const appFiles = useMemo(
     () =>
@@ -4294,9 +4270,8 @@ export function AppPage() {
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && showLiveActivity ? handleAcknowledgeErrors : undefined}
-          onNodeClick={
-            runInspectionChromeActive ? handleRunCanvasNodeClick : !isEditing ? handleLiveCanvasNodeClick : undefined
-          }
+          onNodeClick={handleCanvasNodeClick}
+          onLiveNodeClickLookupCancel={liveSidebarRunLookupEnabled ? cancelLiveNodeClickLookup : undefined}
           toolSidebarRunsContent={toolSidebarRunsContent}
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}

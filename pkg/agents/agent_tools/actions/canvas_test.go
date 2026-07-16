@@ -167,6 +167,18 @@ func TestBuildDraftChangeset_AcceptsTopLevelPosition(t *testing.T) {
 	assert.Equal(t, int32(240), change.Node.Position.Y)
 }
 
+func TestBuildDraftChangeset_RejectsPositionOnlyUpdateWithoutNodeID(t *testing.T) {
+	_, err := buildDraftChangeset([]PatchOperation{
+		{
+			Op:       "update_node",
+			Position: &PatchPosition{X: 120, Y: 240},
+		},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "node_id is required")
+}
+
 func TestResolveLiveCanvasVersion_ResolvesLiveVersion(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
