@@ -5,7 +5,7 @@ export const ACTIVE_LIVE_RUNTIME_EXECUTION_STATES = new Set(["STATE_STARTED", "S
 export const LIVE_INTERACTIVE_SIDEBAR_COMPONENTS = new Set(["approval"]);
 
 function executionTimestamp(execution: CanvasesCanvasNodeExecution): number {
-  return Date.parse(execution.updatedAt || execution.createdAt || "");
+  return Date.parse(execution.createdAt || execution.updatedAt || "");
 }
 
 export function newestItemByTimestamp<T>(items: T[], timestamp: (item: T) => number): T | null {
@@ -15,13 +15,17 @@ export function newestItemByTimestamp<T>(items: T[], timestamp: (item: T) => num
 
   let newest: T | null = null;
   let newestTimestamp = Number.NEGATIVE_INFINITY;
-  let newestIndex = -1;
+  let newestIndex = Infinity;
 
   for (let index = 0; index < items.length; index++) {
     const item = items[index];
     const candidateTimestamp = timestamp(item);
     const safeTimestamp = Number.isFinite(candidateTimestamp) ? candidateTimestamp : Number.NEGATIVE_INFINITY;
-    if (safeTimestamp > newestTimestamp || (safeTimestamp === newestTimestamp && index > newestIndex)) {
+    if (
+      newest === null ||
+      safeTimestamp > newestTimestamp ||
+      (safeTimestamp === newestTimestamp && index < newestIndex)
+    ) {
       newest = item;
       newestTimestamp = safeTimestamp;
       newestIndex = index;

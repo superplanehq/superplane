@@ -52,18 +52,18 @@ describe("resolveRunLookupEventForNodeActivity", () => {
     });
   });
 
-  it("uses the last execution when timestamps are missing", () => {
+  it("uses the first execution when timestamps are missing", () => {
     const lookupEvent = resolveRunLookupEventForNodeActivity("action-1", "TYPE_ACTION", {
       executions: [
-        execution({ id: "first-execution", state: "STATE_FINISHED" }),
-        execution({ id: "last-execution", state: "STATE_STARTED" }),
+        execution({ id: "latest-execution", state: "STATE_STARTED" }),
+        execution({ id: "older-execution", state: "STATE_FINISHED" }),
       ],
       events: [],
     });
 
     expect(lookupEvent).toMatchObject({
-      id: "last-execution",
-      executionId: "last-execution",
+      id: "latest-execution",
+      executionId: "latest-execution",
       kind: "execution",
       nodeId: "action-1",
     });
