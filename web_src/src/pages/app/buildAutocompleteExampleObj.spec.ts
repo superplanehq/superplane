@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { ActionsAction, CanvasesCanvasNodeExecution, SuperplaneComponentsNode, TriggersTrigger } from "@/api-client";
+import type {
+  ActionsAction,
+  CanvasesCanvasNodeExecution,
+  SuperplaneComponentsNode,
+  TriggersTrigger,
+} from "@/api-client";
 import { evaluateExpr } from "@/lib/exprEvaluator";
 import { getSuggestions } from "@/components/AutoCompleteInput/core";
 import { buildAutocompleteExampleObj, type AutocompleteExampleContext } from "./buildAutocompleteExampleObj";
@@ -127,12 +132,12 @@ describe("buildAutocompleteExampleObj", () => {
       expect(fieldLabelsAfter(autocompleteContext!, '$["Fetch GitHub Stats"].data.result.')).toContain(
         "closed_last_7_days",
       );
-      expect(fieldLabelsAfter(autocompleteContext!, '$["Fetch GitHub Stats"].data.result.closed_last_7_days.')).toContain(
-        "count",
-      );
       expect(
-        evaluateExpr('$["Fetch GitHub Stats"].data.result.closed_last_7_days.count', autocompleteContext!),
-      ).toBe(3);
+        fieldLabelsAfter(autocompleteContext!, '$["Fetch GitHub Stats"].data.result.closed_last_7_days.'),
+      ).toContain("count");
+      expect(evaluateExpr('$["Fetch GitHub Stats"].data.result.closed_last_7_days.count', autocompleteContext!)).toBe(
+        3,
+      );
     });
 
     it("keeps autocompleting object fields past `.data` from the latest execution output", () => {
@@ -159,9 +164,9 @@ describe("buildAutocompleteExampleObj", () => {
       expect(fieldLabelsAfter(autocompleteContext!, '$["Fetch GitHub Stats"].data.')).toEqual(
         expect.arrayContaining(["status", "exit_code", "result"]),
       );
-      expect(
-        evaluateExpr('$["Fetch GitHub Stats"].data.result.closed_last_7_days.count', autocompleteContext!),
-      ).toBe(3);
+      expect(evaluateExpr('$["Fetch GitHub Stats"].data.result.closed_last_7_days.count', autocompleteContext!)).toBe(
+        3,
+      );
     });
   });
 
