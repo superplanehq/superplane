@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -404,6 +405,44 @@ func Test__AuthService_GetRoleDefinition(t *testing.T) {
 			assert.NotEmpty(t, perm.Action)
 			assert.Equal(t, models.DomainTypeOrganization, perm.DomainType)
 		}
+	})
+}
+
+func Test__AuthService_AssignRole_CustomRole(t *testing.T) {
+	r := support.Setup(t)
+	orgID := r.Organization.ID.String()
+
+	t.Run("assigns a custom role that only exists in the database", func(t *testing.T) {
+		// Create the custom role through a separate enforcer instance so it is
+		// persisted to the database but absent from r.AuthService's in-memory
+		// enforcer. This mirrors custom roles created by another instance and
+		// guards against AssignRole rejecting them (see #4674).
+		roleName := support.RandomName("custom-role")
+		creator := support.AuthService(t)
+		require.NoError(t, creator.CreateCustomRole(orgID, &authorization.RoleDefinition{
+			Name:        roleName,
+			DisplayName: "Release Bot",
+			DomainType:  models.DomainTypeOrganization,
+			Description: "custom role for tests",
+			Permissions: []*authorization.Permission{
+				{Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+			},
+		}))
+
+		userID := uuid.New().String()
+		err := r.AuthService.AssignRole(userID, roleName, orgID, models.DomainTypeOrganization)
+		require.NoError(t, err)
+
+		allowed, err := r.AuthService.CheckOrganizationPermission(context.Background(), userID, orgID, "canvases", "read")
+		require.NoError(t, err)
+		assert.True(t, allowed, "user with the assigned custom role should have its permissions")
+	})
+
+	t.Run("rejects a role that does not exist", func(t *testing.T) {
+		userID := uuid.New().String()
+		err := r.AuthService.AssignRole(userID, "does_not_exist", orgID, models.DomainTypeOrganization)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid role")
 	})
 }
 

@@ -493,6 +493,17 @@ func (a *AuthService) GetGroupRole(ctx context.Context, domainID string, domainT
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
+	// Validate the role against the database (source of truth) rather than the
+	// long-lived in-memory enforcer, which can be stale for custom roles created
+	// by another instance or in a separate transaction.
+	exists, err := a.roleExistsInDomainDB(context.Background(), role, domainType, domainID)
+	if err != nil {
+		return fmt.Errorf("failed to verify role %s: %w", role, err)
+	}
+	if !exists {
+		return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
+	}
+
 	adapter := a.enforcer.GetAdapter().(*gormadapter.Adapter)
 
 	return adapter.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
@@ -500,27 +511,36 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 	})
 }
 
+// roleExistsInDomainDB reports whether a role (default or custom) exists for the
+// given domain by consulting the database through a freshly loaded enforcer.
+// Unlike roleExistsInDomain, it does not rely on the shared in-memory enforcer,
+// so it stays correct when a custom role was created by a different instance or
+// has not yet been loaded into memory.
+func (a *AuthService) roleExistsInDomainDB(ctx context.Context, roleName, domainType, domainID string) (bool, error) {
+	if a.IsDefaultRole(roleName, domainType) {
+		return true, nil
+	}
+
+	domain := prefixDomain(domainType, domainID)
+	prefixedRoleName := prefixRoleName(roleName)
+
+	exists := false
+	err := a.withReadEnforcer(ctx, domainType, domainID, func(enforcer casbin.IEnforcer) error {
+		policies, _ := enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+		groupingPolicies, _ := enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+		exists = len(policies) > 0 || len(groupingPolicies) > 0
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}
+
 func (a *AuthService) assignRoleWithEnforcer(enforcer casbin.IEnforcer, userID, role, domainID, domainType string) error {
 	domain := prefixDomain(domainType, domainID)
 	prefixedRole := prefixRoleName(role)
-
-	// Check if it's a default role
-	validRoles := map[string][]string{
-		models.DomainTypeOrganization: {models.RoleOrgViewer, models.RoleOrgAdmin, models.RoleOrgOwner},
-	}
-
-	isValidDefaultRole := false
-	if roles, exists := validRoles[domainType]; exists {
-		isValidDefaultRole = contains(roles, role)
-	}
-
-	// If not a default role, check if it's a custom role that exists
-	if !isValidDefaultRole {
-		policies, _ := enforcer.GetFilteredPolicy(0, prefixedRole, domain)
-		if len(policies) == 0 {
-			return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
-		}
-	}
 
 	prefixedUserID := prefixUserID(userID)
 	existingRoles, err := enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
