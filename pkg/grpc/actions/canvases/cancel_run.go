@@ -43,7 +43,7 @@ func CancelRun(ctx context.Context, authService authorization.Authorization, enc
 	var result *models.CancelRunResult
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		var err error
-		result, err = models.CancelRunInTransaction(tx, workflowID, runID, cancelledBy)
+		result, err = models.CancelRun(tx, workflowID, runID, cancelledBy)
 		return err
 	})
 

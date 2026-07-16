@@ -178,7 +178,7 @@ func Test__CalculateCanvasRunResultInTransaction__CancelledMarkerOverridesFailed
 	assert.Equal(t, models.CanvasRunResultCancelled, result)
 }
 
-func Test__CancelRunInTransaction__CancelsActiveWorkAndFinalizes(t *testing.T) {
+func Test__CancelRun__CancelsActiveWorkAndFinalizes(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	require.NoError(t, database.Conn().Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
 
@@ -212,7 +212,7 @@ func Test__CancelRunInTransaction__CancelsActiveWorkAndFinalizes(t *testing.T) {
 	assert.False(t, openWork.HasQueueItems)
 }
 
-func Test__CancelRunInTransaction__IdempotentOnFinishedRun(t *testing.T) {
+func Test__CancelRun__IdempotentOnFinishedRun(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
@@ -238,7 +238,7 @@ func Test__CancelRunInTransaction__IdempotentOnFinishedRun(t *testing.T) {
 	assert.Nil(t, updatedRun.CancelledAt)
 }
 
-func Test__CancelRunInTransaction__LeavesOtherRunsUntouched(t *testing.T) {
+func Test__CancelRun__LeavesOtherRunsUntouched(t *testing.T) {
 	run, _ := setupRunWithExecution(t)
 
 	otherRootEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, "trigger", "default", nil)
@@ -261,7 +261,7 @@ func cancelRun(t *testing.T, workflowID, runID uuid.UUID, cancelledBy *uuid.UUID
 	var result *models.CancelRunResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		result, err = models.CancelRunInTransaction(tx, workflowID, runID, cancelledBy)
+		result, err = models.CancelRun(tx, workflowID, runID, cancelledBy)
 		return err
 	}))
 

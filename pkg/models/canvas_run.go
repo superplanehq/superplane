@@ -341,7 +341,7 @@ func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string
 	return CanvasRunResultPassed, nil
 }
 
-// CancelRunResult reports the outcome of a CancelRunInTransaction call.
+// CancelRunResult reports the outcome of a CancelRun call.
 type CancelRunResult struct {
 	Run *CanvasRun
 
@@ -355,16 +355,16 @@ type CancelRunResult struct {
 	CancelledExecutions []CanvasNodeExecution
 }
 
-// CancelRunInTransaction atomically cancels an entire run: it cancels every
-// active execution, deletes all pending queue items, completes pending requests,
-// and finalizes the run with result=cancelled. It mirrors the node-scoped
+// CancelRun atomically cancels an entire run: it cancels every active
+// execution, deletes all pending queue items, completes pending requests, and
+// finalizes the run with result=cancelled. It mirrors the node-scoped
 // cancelActiveExecutionsForDeletedNode, but is keyed on run_id.
 //
 // The run row is locked FOR UPDATE, which blocks concurrent FK inserts of new
 // work (executions/queue items/events) for the run while the transaction is open.
 // The producer guards in NodeQueueWorker and EventRouter close the remaining
 // window for messages already in flight.
-func CancelRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID, cancelledBy *uuid.UUID) (*CancelRunResult, error) {
+func CancelRun(tx *gorm.DB, workflowID, runID uuid.UUID, cancelledBy *uuid.UUID) (*CancelRunResult, error) {
 	run, err := LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
 		return nil, err
@@ -383,7 +383,7 @@ func CancelRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID, cancelledB
 	// each component's best-effort external Cancel hook once the transaction has
 	// committed (outside the run lock).
 	//
-	activeExecutions, err := ListActiveNodeExecutionsForRunInTransaction(tx, workflowID, runID)
+	activeExecutions, err := ListActiveNodeExecutionsForRun(tx, workflowID, runID)
 	if err != nil {
 		return nil, err
 	}

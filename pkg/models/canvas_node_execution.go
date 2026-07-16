@@ -183,10 +183,10 @@ func ListActiveNodeExecutions(tx *gorm.DB, workflowID uuid.UUID, nodeID string) 
 	return executions, nil
 }
 
-// ListActiveNodeExecutionsForRunInTransaction returns the pending/started
-// executions belonging to a run. It is used by run cancellation to snapshot the
-// executions that must be cancelled.
-func ListActiveNodeExecutionsForRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID) ([]CanvasNodeExecution, error) {
+// ListActiveNodeExecutionsForRun returns the pending/started executions
+// belonging to a run. It is used by run cancellation to snapshot the executions
+// that must be cancelled.
+func ListActiveNodeExecutionsForRun(tx *gorm.DB, workflowID, runID uuid.UUID) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
 	err := tx.
 		Where("workflow_id = ?", workflowID).
