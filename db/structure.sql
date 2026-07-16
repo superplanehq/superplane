@@ -520,7 +520,9 @@ CREATE TABLE public.users (
     token_hash character varying(250),
     type character varying(50) DEFAULT 'human'::character varying NOT NULL,
     description text,
-    created_by uuid
+    created_by uuid,
+    service_account_expires_at timestamp without time zone,
+    service_account_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -2202,7 +2204,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260715185442	f
+20260716144000	f
 \.
 
 
