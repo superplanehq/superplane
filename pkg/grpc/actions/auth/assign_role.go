@@ -31,7 +31,7 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 	}
 
 	if user.IsServiceAccount() && roleName == models.RoleOrgOwner {
-		return nil, grpcerrors.InvalidArgument(nil, "service accounts cannot be assigned the org_owner role")
+		return nil, grpcerrors.InvalidArgument(nil, "API keys cannot be assigned the org_owner role")
 	}
 
 	err = authService.AssignRole(user.ID.String(), roleName, domainID, domainType)

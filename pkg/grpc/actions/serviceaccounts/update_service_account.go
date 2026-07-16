@@ -2,6 +2,7 @@ package serviceaccounts
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -9,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	"gorm.io/datatypes"
 )
 
 func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountRequest) (*pb.UpdateServiceAccountResponse, error) {
@@ -28,31 +30,53 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 
 	user, err := models.FindActiveUserByID(orgID, req.Id)
 	if err != nil {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	if !user.IsServiceAccount() {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	if req.Name != "" {
-		user.Name = req.Name
+		name := strings.TrimSpace(req.Name)
+		if name == "" {
+			return nil, grpcerrors.InvalidArgument(nil, "name is required")
+		}
+		user.Name = name
 	}
 
 	if req.Description != "" {
 		user.Description = &req.Description
 	}
 
-	user.UpdatedAt = time.Now()
-	err = database.Conn().Save(user).Error
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to update service account")
+	db := database.DB(ctx)
+	if req.CanvasIds != nil {
+		canvasIDs, err := validateServiceAccountCanvasIDs(db, orgID, req.CanvasIds)
+		if err != nil {
+			return nil, err
+		}
+		user.ServiceAccountCanvasIDs = datatypes.NewJSONSlice(canvasIDs)
 	}
 
-	db := database.DB(ctx)
+	if req.ClearExpiresAt {
+		user.ServiceAccountExpiresAt = nil
+	} else if req.ExpiresAt != nil {
+		expiresAt := req.ExpiresAt.AsTime()
+		if !expiresAt.After(time.Now()) {
+			return nil, grpcerrors.InvalidArgument(nil, "expiration must be in the future")
+		}
+		user.ServiceAccountExpiresAt = &expiresAt
+	}
+
+	user.UpdatedAt = time.Now()
+	err = db.Save(user).Error
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to update API key")
+	}
+
 	creator, err := creatorUserForServiceAccount(db, orgID, user)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to update service account")
+		return nil, grpcerrors.Internal(err, "failed to update API key")
 	}
 
 	return &pb.UpdateServiceAccountResponse{

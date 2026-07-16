@@ -267,7 +267,7 @@ export function GroupMembersPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{member.metadata?.email || "Service Account"}</TableCell>
+                    <TableCell>{member.metadata?.email || "API Key"}</TableCell>
                     <TableCell>
                       <div className="flex justify-end">
                         <PermissionTooltip
