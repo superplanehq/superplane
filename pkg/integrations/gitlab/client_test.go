@@ -1126,7 +1126,6 @@ func Test__Client__UpdateDeployment(t *testing.T) {
 	})
 }
 
-
 func Test__Client__GetIssue(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockClient := &contexts.HTTPContext{
