@@ -75,23 +75,47 @@ func Test__ListCanvasVersionsPaginated(t *testing.T) {
 		assert.GreaterOrEqual(t, response.GetTotalCount(), uint32(2))
 	})
 
-	// Regression guard for #5851: the versions endpoint must never return
-	// codes.Internal (HTTP 500) because a canvas holds a stale reference to a
-	// version row that no longer exists. History listing does not depend on
-	// LiveVersionID, so a dangling pointer must not break the response.
-	t.Run("stale live version reference -> no internal error", func(t *testing.T) {
+	// Regression guard for #5851: the versions endpoint returned HTTP 500
+	// (codes.Internal) when the canvas referenced a version row by id that no
+	// longer existed. Two properties now prevent that class of bug, and this
+	// test pins both:
+	//
+	//  1. A dangling live_version_id cannot exist: the column is NOT NULL with a
+	//     FK to workflow_versions using ON DELETE RESTRICT, so the reference is
+	//     always valid.
+	//  2. History listing does not depend on which version is live, so moving the
+	//     live pointer to an older (non-latest) version must not break or alter
+	//     the response.
+	t.Run("listing is independent of the live version pointer", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		orgID := r.Organization.ID.String()
 
-		staleVersionID := uuid.New()
-		err := database.Conn().
+		initialLive, err := models.FindLiveCanvasVersion(canvas.ID)
+		require.NoError(t, err)
+
+		baseline, err := ReadRepositorySpecFile(ctx, canvas, initialLive, CanvasYAMLRepositoryPath)
+		require.NoError(t, err)
+
+		_, err = PutCanvasStaging(ctx, orgID, canvas.ID.String(), []*pb.CanvasRepositoryFileOperation{
+			{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# committed change\n")},
+		})
+		require.NoError(t, err)
+
+		_, err = CommitCanvasStaging(ctx, nil, nil, r.Encryptor, r.Registry, orgID, canvas.ID.String(), "Change", "", r.AuthService)
+		require.NoError(t, err)
+
+		// Repoint the live version at the original (now non-latest) version. This
+		// is a legitimate state the FK allows; the endpoint must still list the
+		// full history and never return codes.Internal.
+		err = database.Conn().
 			Model(&models.Canvas{}).
 			Where("id = ?", canvas.ID).
-			Update("live_version_id", staleVersionID).
+			Update("live_version_id", initialLive.ID).
 			Error
 		require.NoError(t, err)
 
-		_, err = ListCanvasVersionsPaginated(ctx, orgID, canvas.ID.String(), 0, nil)
+		response, err := ListCanvasVersionsPaginated(ctx, orgID, canvas.ID.String(), 0, nil)
 		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(response.GetVersions()), 2)
 	})
 }
