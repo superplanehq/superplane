@@ -29,6 +29,9 @@ const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
 
 const SETTINGS_TAB_DIVIDER_CLASS = "border-t border-slate-950/15 pt-6 dark:border-gray-700/70";
+const FORM_DISABLED_CURSOR_CLASS = "cursor-not-allowed";
+const FORM_DISABLED_SURFACE_CLASS =
+  "pointer-events-none opacity-70 dark:opacity-60 [&_[disabled]]:opacity-100 [&_[data-slot=control]]:opacity-100";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -54,6 +57,7 @@ interface SettingsTabProps {
   onOpenCreateIntegrationDialog?: () => void;
   onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
   readOnly?: boolean;
+  formDisabled?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -95,12 +99,15 @@ export function SettingsTab({
   onOpenCreateIntegrationDialog,
   onOpenConfigureIntegrationDialog,
   readOnly = false,
+  formDisabled = false,
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
+  const isFormDisabled = formDisabled ?? false;
+  const isInteractionDisabled = isReadOnly || isFormDisabled;
   const allowIntegrations = canReadIntegrations ?? true;
   const allowCreateIntegrations = canCreateIntegrations ?? true;
   const allowUpdateIntegrations = canUpdateIntegrations ?? true;
@@ -258,7 +265,7 @@ export function SettingsTab({
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
-    if (isReadOnly) {
+    if (isInteractionDisabled) {
       return;
     }
 
@@ -288,7 +295,7 @@ export function SettingsTab({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName]);
+  }, [integrationsOfType, isInteractionDisabled, selectedIntegration, nodeConfiguration, currentNodeName]);
 
   const shouldShowConfiguration = true;
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
@@ -335,7 +342,7 @@ export function SettingsTab({
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (isReadOnly) {
+    if (isInteractionDisabled) {
       return;
     }
 
@@ -370,7 +377,7 @@ export function SettingsTab({
       flushPendingAutosave();
     }
   }, [
-    isReadOnly,
+    isInteractionDisabled,
     validateNow,
     currentNodeName,
     selectedIntegration,
@@ -385,7 +392,7 @@ export function SettingsTab({
   handleSaveRef.current = handleSave;
 
   const requestAutosave = useCallback(() => {
-    if (isReadOnly) {
+    if (isInteractionDisabled) {
       return;
     }
 
@@ -396,12 +403,12 @@ export function SettingsTab({
       autosaveTimerRef.current = null;
       void handleSaveRef.current();
     }, 300);
-  }, [isReadOnly]);
+  }, [isInteractionDisabled]);
 
   // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
   useEffect(() => {
     return () => {
-      if (isReadOnly) {
+      if (isInteractionDisabled) {
         return;
       }
       if (autosaveTimerRef.current !== null) {
@@ -410,7 +417,7 @@ export function SettingsTab({
       }
       void handleSaveRef.current();
     };
-  }, [isReadOnly]);
+  }, [isInteractionDisabled]);
 
   useEffect(() => {
     return () => {
@@ -421,7 +428,7 @@ export function SettingsTab({
   }, []);
 
   useEffect(() => {
-    if (isReadOnly) {
+    if (isInteractionDisabled) {
       return;
     }
     const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
@@ -440,7 +447,7 @@ export function SettingsTab({
     return () => {
       window.clearTimeout(fallbackTimer);
     };
-  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+  }, [isInteractionDisabled, nodeConfiguration, currentNodeName, selectedIntegration]);
 
   const configurationDisplayModel = useMemo(
     () =>
@@ -455,9 +462,9 @@ export function SettingsTab({
     [allowIntegrations, configurationFields, integrationName, integrationRef, integrations, nodeConfiguration],
   );
 
-  if (isReadOnly) {
+  if (isReadOnly && !isFormDisabled) {
     return (
-      <div className="overflow-y-auto p-4 pb-24" style={{ maxHeight: "80vh" }}>
+      <div className="p-4 pb-24">
         <div className="space-y-6">
           <ConfigurationView model={configurationDisplayModel} />
           {customField && shouldShowConfiguration && (
@@ -472,9 +479,13 @@ export function SettingsTab({
 
   return (
     <div
-      className="p-4 pb-24 overflow-y-auto overflow-x-hidden"
-      style={{ maxHeight: "80vh" }}
+      className={cn("p-4 pb-24 overflow-x-hidden", isFormDisabled && FORM_DISABLED_CURSOR_CLASS)}
+      data-testid="settings-tab-form"
       onBlurCapture={(event) => {
+        if (isFormDisabled) {
+          return;
+        }
+
         const target = event.target as HTMLElement | null;
         if (!target) {
           return;
@@ -485,7 +496,10 @@ export function SettingsTab({
         }
       }}
     >
-      <div className="space-y-6">
+      <div
+        className={cn("space-y-6", isFormDisabled && FORM_DISABLED_SURFACE_CLASS)}
+        {...(isFormDisabled ? { inert: true } : {})}
+      >
         {/* Node identification section — always visible */}
         <div className="flex flex-col gap-2">
           <Label className="min-w-[100px] text-left">
@@ -502,7 +516,8 @@ export function SettingsTab({
               requestAutosave();
             }}
             placeholder="Enter a name for this node"
-            autoFocus
+            autoFocus={!isFormDisabled}
+            disabled={isFormDisabled}
             className="shadow-none"
           />
         </div>
@@ -533,6 +548,8 @@ export function SettingsTab({
                 autocompleteExampleObj={resolvedAutocompleteExampleObj}
                 realtimeValidationErrors={realtimeValidationErrors}
                 enableRealtimeValidation={true}
+                readOnly={isFormDisabled}
+                preserveEditLayout={isFormDisabled}
               />
             </div>
           );
@@ -563,7 +580,7 @@ export function SettingsTab({
                   size="sm"
                   onClick={onOpenCreateIntegrationDialog}
                   className="flex-shrink-0"
-                  disabled={!allowCreateIntegrations}
+                  disabled={!allowCreateIntegrations || isFormDisabled}
                 >
                   Connect
                 </Button>
@@ -582,6 +599,9 @@ export function SettingsTab({
                   <Select
                     value={selectedIntegration?.id || ""}
                     onValueChange={(value) => {
+                      if (isFormDisabled) {
+                        return;
+                      }
                       if (value === CONNECT_ANOTHER_INSTANCE_VALUE) {
                         if (allowCreateIntegrations && onOpenCreateIntegrationDialog) {
                           onOpenCreateIntegrationDialog();
@@ -597,6 +617,7 @@ export function SettingsTab({
                         requestAutosave();
                       }
                     }}
+                    disabled={isFormDisabled}
                   >
                     <SelectTrigger className="w-full shadow-none">
                       <SelectValue placeholder="Select an installation" />
@@ -615,7 +636,7 @@ export function SettingsTab({
                           </SelectItem>
                         );
                       })}
-                      {onOpenCreateIntegrationDialog && allowCreateIntegrations && (
+                      {onOpenCreateIntegrationDialog && allowCreateIntegrations && !isFormDisabled && (
                         <>
                           <SelectSeparator />
                           <SelectItem value={CONNECT_ANOTHER_INSTANCE_VALUE}>+ Connect another instance</SelectItem>
@@ -672,17 +693,21 @@ export function SettingsTab({
                                   selectedIntegrationFull.status.state.slice(1)
                                 : "Unknown"}
                             </span>
-                            {selectedIntegrationFull.metadata?.id && onOpenConfigureIntegrationDialog && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-sm py-1.5"
-                                onClick={() => onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)}
-                                disabled={!allowUpdateIntegrations}
-                              >
-                                Configure...
-                              </Button>
-                            )}
+                            {selectedIntegrationFull.metadata?.id &&
+                              onOpenConfigureIntegrationDialog &&
+                              !isFormDisabled && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-sm py-1.5"
+                                  onClick={() =>
+                                    onOpenConfigureIntegrationDialog(selectedIntegrationFull.metadata!.id!)
+                                  }
+                                  disabled={!allowUpdateIntegrations}
+                                >
+                                  Configure...
+                                </Button>
+                              )}
                           </div>
                         </div>
                       );
@@ -756,6 +781,8 @@ export function SettingsTab({
                   realtimeValidationErrors={realtimeValidationErrors}
                   enableRealtimeValidation={true}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  readOnly={isFormDisabled}
+                  preserveEditLayout={isFormDisabled}
                 />
               );
             })}
