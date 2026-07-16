@@ -306,18 +306,26 @@ export function useDefineAgentOutcome(organizationId: string | undefined) {
       chatId,
       description,
       rubric,
+      autoLayoutOnUpdateEnabled,
       maxIterations,
     }: {
       chatId: string;
       description: string;
       rubric: string;
       maxIterations?: number;
+      autoLayoutOnUpdateEnabled?: boolean;
     }) => {
       const res = await fetch(`/api/v1/agents/chats/${chatId}/outcome`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": organizationId ?? "" },
         credentials: "include",
-        body: JSON.stringify({ chat_id: chatId, description, rubric, max_iterations: maxIterations || 3 }),
+        body: JSON.stringify({
+          chat_id: chatId,
+          description,
+          rubric,
+          max_iterations: maxIterations || 3,
+          auto_layout_on_update_enabled: autoLayoutOnUpdateEnabled ?? false,
+        }),
       });
       if (!res.ok) throw new Error(`Define outcome failed: ${res.status}`);
     },
