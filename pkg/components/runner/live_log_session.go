@@ -49,7 +49,7 @@ type LiveLogAccessContext struct {
 
 func IsRunnerComponent(name string) bool {
 	switch strings.TrimSpace(name) {
-	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName:
+	case ComponentName, RunJSComponentName, RunPythonComponentName, RunBashComponentName, RunClaudeCodeComponentName:
 		return true
 	default:
 		return false
