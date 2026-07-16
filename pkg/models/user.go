@@ -11,32 +11,32 @@ import (
 )
 
 type User struct {
-	ID                      uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	OrganizationID          uuid.UUID
-	AccountID               *uuid.UUID
-	Email                   *string
-	Name                    string
-	Type                    string
-	Description             *string
-	CreatedBy               *uuid.UUID
-	TokenHash               string
-	ServiceAccountExpiresAt *time.Time                  `gorm:"column:service_account_expires_at"`
-	ServiceAccountCanvasIDs datatypes.JSONSlice[string] `gorm:"column:service_account_canvas_ids"`
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
-	DeletedAt               gorm.DeletedAt
+	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	OrganizationID  uuid.UUID
+	AccountID       *uuid.UUID
+	Email           *string
+	Name            string
+	Type            string
+	Description     *string
+	CreatedBy       *uuid.UUID
+	TokenHash       string
+	APIKeyExpiresAt *time.Time                  `gorm:"column:api_key_expires_at"`
+	APIKeyCanvasIDs datatypes.JSONSlice[string] `gorm:"column:api_key_canvas_ids"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       gorm.DeletedAt
 }
 
-func (u *User) IsServiceAccount() bool {
-	return u.Type == UserTypeServiceAccount
+func (u *User) IsAPIKey() bool {
+	return u.Type == UserTypeAPIKey
 }
 
-func (u *User) IsExpiredServiceAccount() bool {
-	return u.IsServiceAccount() && u.ServiceAccountExpiresAt != nil && !time.Now().Before(*u.ServiceAccountExpiresAt)
+func (u *User) IsExpiredAPIKey() bool {
+	return u.IsAPIKey() && u.APIKeyExpiresAt != nil && !time.Now().Before(*u.APIKeyExpiresAt)
 }
 
-func (u *User) HasServiceAccountCanvasScope() bool {
-	return u.IsServiceAccount() && len(u.ServiceAccountCanvasIDs) > 0
+func (u *User) HasAPIKeyCanvasScope() bool {
+	return u.IsAPIKey() && len(u.APIKeyCanvasIDs) > 0
 }
 
 func (u *User) GetEmail() string {
@@ -109,15 +109,15 @@ func CreateUserInTransaction(tx *gorm.DB, orgID, accountID uuid.UUID, email, nam
 	return user, nil
 }
 
-func CreateServiceAccount(tx *gorm.DB, orgID uuid.UUID, name string, description *string, createdBy uuid.UUID, expiresAt *time.Time, canvasIDs []string) (*User, error) {
+func CreateAPIKey(tx *gorm.DB, orgID uuid.UUID, name string, description *string, createdBy uuid.UUID, expiresAt *time.Time, canvasIDs []string) (*User, error) {
 	user := &User{
-		OrganizationID:          orgID,
-		Name:                    name,
-		Type:                    UserTypeServiceAccount,
-		Description:             description,
-		CreatedBy:               &createdBy,
-		ServiceAccountExpiresAt: expiresAt,
-		ServiceAccountCanvasIDs: datatypes.NewJSONSlice(canvasIDs),
+		OrganizationID:  orgID,
+		Name:            name,
+		Type:            UserTypeAPIKey,
+		Description:     description,
+		CreatedBy:       &createdBy,
+		APIKeyExpiresAt: expiresAt,
+		APIKeyCanvasIDs: datatypes.NewJSONSlice(canvasIDs),
 	}
 
 	err := tx.Create(user).Error
@@ -128,12 +128,12 @@ func CreateServiceAccount(tx *gorm.DB, orgID uuid.UUID, name string, description
 	return user, nil
 }
 
-func FindServiceAccountsByOrganization(db *gorm.DB, orgID string) ([]User, error) {
+func FindAPIKeysByOrganization(db *gorm.DB, orgID string) ([]User, error) {
 	var users []User
 
 	err := db.
 		Where("organization_id = ?", orgID).
-		Where("type = ?", UserTypeServiceAccount).
+		Where("type = ?", UserTypeAPIKey).
 		Find(&users).
 		Error
 

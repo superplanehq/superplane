@@ -1,4 +1,4 @@
-package serviceaccounts
+package apikeys
 
 import (
 	"testing"
@@ -7,18 +7,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 )
 
-func TestUpdateServiceAccountUpdatesCanvasScopeAndExpiration(t *testing.T) {
+func TestUpdateAPIKeyUpdatesCanvasScopeAndExpiration(t *testing.T) {
 	r := support.Setup(t)
 	firstCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 	secondCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 	existingExpiresAt := time.Now().Add(time.Hour)
-	serviceAccount, err := models.CreateServiceAccount(
+	apiKey, err := models.CreateAPIKey(
 		database.Conn(),
 		r.Organization.ID,
 		"ci-bot",
@@ -30,20 +30,20 @@ func TestUpdateServiceAccountUpdatesCanvasScopeAndExpiration(t *testing.T) {
 	require.NoError(t, err)
 
 	nextExpiresAt := time.Now().Add(2 * time.Hour).UTC()
-	response, err := UpdateServiceAccount(serviceAccountContext(r), &pb.UpdateServiceAccountRequest{
-		Id:        serviceAccount.ID.String(),
+	response, err := UpdateAPIKey(apiKeyContext(r), &pb.UpdateAPIKeyRequest{
+		Id:        apiKey.ID.String(),
 		ExpiresAt: timestamppb.New(nextExpiresAt),
 		CanvasIds: []string{secondCanvas.ID.String()},
 	})
 	require.NoError(t, err)
-	require.Equal(t, []string{secondCanvas.ID.String()}, response.ServiceAccount.CanvasIds)
-	require.Equal(t, nextExpiresAt.Unix(), response.ServiceAccount.ExpiresAt.AsTime().Unix())
+	require.Equal(t, []string{secondCanvas.ID.String()}, response.ApiKey.CanvasIds)
+	require.Equal(t, nextExpiresAt.Unix(), response.ApiKey.ExpiresAt.AsTime().Unix())
 }
 
-func TestUpdateServiceAccountPreservesScopeWhenCanvasIdsOmitted(t *testing.T) {
+func TestUpdateAPIKeyPreservesScopeWhenCanvasIdsOmitted(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	serviceAccount, err := models.CreateServiceAccount(
+	apiKey, err := models.CreateAPIKey(
 		database.Conn(),
 		r.Organization.ID,
 		"ci-bot",
@@ -54,20 +54,20 @@ func TestUpdateServiceAccountPreservesScopeWhenCanvasIdsOmitted(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = UpdateServiceAccount(serviceAccountContext(r), &pb.UpdateServiceAccountRequest{
-		Id:   serviceAccount.ID.String(),
+	_, err = UpdateAPIKey(apiKeyContext(r), &pb.UpdateAPIKeyRequest{
+		Id:   apiKey.ID.String(),
 		Name: "renamed-ci-bot",
 	})
 	require.NoError(t, err)
 
 	var user models.User
-	require.NoError(t, database.Conn().First(&user, "id = ?", serviceAccount.ID).Error)
-	require.Equal(t, datatypes.NewJSONSlice([]string{canvas.ID.String()}), user.ServiceAccountCanvasIDs)
+	require.NoError(t, database.Conn().First(&user, "id = ?", apiKey.ID).Error)
+	require.Equal(t, datatypes.NewJSONSlice([]string{canvas.ID.String()}), user.APIKeyCanvasIDs)
 }
 
-func TestUpdateServiceAccountRejectsBlankName(t *testing.T) {
+func TestUpdateAPIKeyRejectsBlankName(t *testing.T) {
 	r := support.Setup(t)
-	serviceAccount, err := models.CreateServiceAccount(
+	apiKey, err := models.CreateAPIKey(
 		database.Conn(),
 		r.Organization.ID,
 		"ci-bot",
@@ -78,17 +78,17 @@ func TestUpdateServiceAccountRejectsBlankName(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = UpdateServiceAccount(serviceAccountContext(r), &pb.UpdateServiceAccountRequest{
-		Id:   serviceAccount.ID.String(),
+	_, err = UpdateAPIKey(apiKeyContext(r), &pb.UpdateAPIKeyRequest{
+		Id:   apiKey.ID.String(),
 		Name: "   ",
 	})
 	require.Error(t, err)
 }
 
-func TestUpdateServiceAccountClearsExpiration(t *testing.T) {
+func TestUpdateAPIKeyClearsExpiration(t *testing.T) {
 	r := support.Setup(t)
 	expiresAt := time.Now().Add(time.Hour)
-	serviceAccount, err := models.CreateServiceAccount(
+	apiKey, err := models.CreateAPIKey(
 		database.Conn(),
 		r.Organization.ID,
 		"ci-bot",
@@ -99,10 +99,10 @@ func TestUpdateServiceAccountClearsExpiration(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	response, err := UpdateServiceAccount(serviceAccountContext(r), &pb.UpdateServiceAccountRequest{
-		Id:             serviceAccount.ID.String(),
+	response, err := UpdateAPIKey(apiKeyContext(r), &pb.UpdateAPIKeyRequest{
+		Id:             apiKey.ID.String(),
 		ClearExpiresAt: true,
 	})
 	require.NoError(t, err)
-	require.Nil(t, response.ServiceAccount.ExpiresAt)
+	require.Nil(t, response.ApiKey.ExpiresAt)
 }

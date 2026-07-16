@@ -1,26 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  serviceAccountsListServiceAccounts,
-  serviceAccountsCreateServiceAccount,
-  serviceAccountsDescribeServiceAccount,
-  serviceAccountsUpdateServiceAccount,
-  serviceAccountsDeleteServiceAccount,
-  serviceAccountsRegenerateServiceAccountToken,
+  apiKeysListApiKeys,
+  apiKeysCreateApiKey,
+  apiKeysDescribeApiKey,
+  apiKeysUpdateApiKey,
+  apiKeysDeleteApiKey,
+  apiKeysRegenerateApiKeyToken,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-export const serviceAccountKeys = {
-  all: ["serviceAccounts"] as const,
-  list: (orgId: string) => [...serviceAccountKeys.all, "list", orgId] as const,
-  detail: (orgId: string, id: string) => [...serviceAccountKeys.all, "detail", orgId, id] as const,
+export const apiKeyKeys = {
+  all: ["apiKeys"] as const,
+  list: (orgId: string) => [...apiKeyKeys.all, "list", orgId] as const,
+  detail: (orgId: string, id: string) => [...apiKeyKeys.all, "detail", orgId, id] as const,
 };
 
-export const useServiceAccounts = (organizationId: string) => {
+export const useAPIKeys = (organizationId: string) => {
   return useQuery({
-    queryKey: serviceAccountKeys.list(organizationId),
+    queryKey: apiKeyKeys.list(organizationId),
     queryFn: async () => {
-      const response = await serviceAccountsListServiceAccounts(withOrganizationHeader({}));
-      return response.data?.serviceAccounts || [];
+      const response = await apiKeysListApiKeys(withOrganizationHeader({}));
+      return response.data?.apiKeys || [];
     },
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -28,16 +28,16 @@ export const useServiceAccounts = (organizationId: string) => {
   });
 };
 
-export const useServiceAccount = (organizationId: string, id: string) => {
+export const useAPIKey = (organizationId: string, id: string) => {
   return useQuery({
-    queryKey: serviceAccountKeys.detail(organizationId, id),
+    queryKey: apiKeyKeys.detail(organizationId, id),
     queryFn: async () => {
-      const response = await serviceAccountsDescribeServiceAccount(
+      const response = await apiKeysDescribeApiKey(
         withOrganizationHeader({
           path: { id },
         }),
       );
-      return response.data?.serviceAccount || null;
+      return response.data?.apiKey || null;
     },
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -45,7 +45,7 @@ export const useServiceAccount = (organizationId: string, id: string) => {
   });
 };
 
-export const useCreateServiceAccount = (organizationId: string) => {
+export const useCreateAPIKey = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -56,7 +56,7 @@ export const useCreateServiceAccount = (organizationId: string) => {
       expiresAt?: string;
       canvasIds: string[];
     }) => {
-      return serviceAccountsCreateServiceAccount(
+      return apiKeysCreateApiKey(
         withOrganizationHeader({
           body: {
             name: params.name,
@@ -69,12 +69,12 @@ export const useCreateServiceAccount = (organizationId: string) => {
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: serviceAccountKeys.list(organizationId) });
+      queryClient.invalidateQueries({ queryKey: apiKeyKeys.list(organizationId) });
     },
   });
 };
 
-export const useUpdateServiceAccount = (organizationId: string) => {
+export const useUpdateAPIKey = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -86,7 +86,7 @@ export const useUpdateServiceAccount = (organizationId: string) => {
       clearExpiresAt: boolean;
       canvasIds: string[];
     }) => {
-      return serviceAccountsUpdateServiceAccount(
+      return apiKeysUpdateApiKey(
         withOrganizationHeader({
           path: { id: params.id },
           body: {
@@ -100,35 +100,35 @@ export const useUpdateServiceAccount = (organizationId: string) => {
       );
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: serviceAccountKeys.list(organizationId) });
-      queryClient.invalidateQueries({ queryKey: serviceAccountKeys.detail(organizationId, variables.id) });
+      queryClient.invalidateQueries({ queryKey: apiKeyKeys.list(organizationId) });
+      queryClient.invalidateQueries({ queryKey: apiKeyKeys.detail(organizationId, variables.id) });
     },
   });
 };
 
-export const useDeleteServiceAccount = (organizationId: string) => {
+export const useDeleteAPIKey = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return serviceAccountsDeleteServiceAccount(
+      return apiKeysDeleteApiKey(
         withOrganizationHeader({
           path: { id },
         }),
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: serviceAccountKeys.list(organizationId) });
+      queryClient.invalidateQueries({ queryKey: apiKeyKeys.list(organizationId) });
     },
   });
 };
 
-export const useRegenerateServiceAccountToken = (organizationId: string) => {
+export const useRegenerateAPIKeyToken = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return serviceAccountsRegenerateServiceAccountToken(
+      return apiKeysRegenerateApiKeyToken(
         withOrganizationHeader({
           path: { id },
           body: {},
@@ -136,7 +136,7 @@ export const useRegenerateServiceAccountToken = (organizationId: string) => {
       );
     },
     onSuccess: (_data, id) => {
-      queryClient.invalidateQueries({ queryKey: serviceAccountKeys.detail(organizationId, id) });
+      queryClient.invalidateQueries({ queryKey: apiKeyKeys.detail(organizationId, id) });
     },
   });
 };
