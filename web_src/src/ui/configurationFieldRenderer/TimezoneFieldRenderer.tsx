@@ -4,10 +4,19 @@ import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
 // Function to get user's current timezone offset as a string (e.g., "-5", "0", "5.5")
-const getUserTimezoneOffset = (): string => {
+export const getUserTimezoneOffset = (): string => {
   const offset = -new Date().getTimezoneOffset() / 60;
   return offset.toString();
 };
+
+export function resolveTimezoneDisplayValue(value: unknown): string {
+  if (value === undefined || value === null || value === "current") {
+    const userTimezone = getUserTimezoneOffset();
+    return timezoneOptions.find((tz) => tz.value === userTimezone)?.value ?? "0";
+  }
+
+  return String(value);
+}
 
 // Timezone options with labels and values
 const timezoneOptions = [
@@ -63,14 +72,8 @@ export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
     }
   }, [readOnly, value, field.defaultValue, onChange]);
 
-  // Get the display value - if value is "current", show user's timezone
-  const displayValue = (() => {
-    if (value === "current") {
-      const userTimezone = getUserTimezoneOffset();
-      return timezoneOptions.find((tz) => tz.value === userTimezone)?.value ?? "0";
-    }
-    return (value as string) ?? "0";
-  })();
+  // Get the display value - unset and "current" both resolve to the user's timezone
+  const displayValue = resolveTimezoneDisplayValue(value);
 
   return (
     <Select value={displayValue} onValueChange={(val) => onChange(val || undefined)} disabled={readOnly}>
