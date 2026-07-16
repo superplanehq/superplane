@@ -2,6 +2,7 @@ package serviceaccounts
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -37,7 +38,11 @@ func UpdateServiceAccount(ctx context.Context, req *pb.UpdateServiceAccountReque
 	}
 
 	if req.Name != "" {
-		user.Name = req.Name
+		name := strings.TrimSpace(req.Name)
+		if name == "" {
+			return nil, grpcerrors.InvalidArgument(nil, "name is required")
+		}
+		user.Name = name
 	}
 
 	if req.Description != "" {
