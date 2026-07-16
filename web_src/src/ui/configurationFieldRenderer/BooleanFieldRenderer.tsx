@@ -7,6 +7,7 @@ export const BooleanFieldRenderer: React.FC<FieldRendererProps & { labeled?: boo
   field,
   value,
   onChange,
+  readOnly = false,
   labeled = false,
 }) => {
   const fieldName = field?.name || "";
@@ -23,14 +24,19 @@ export const BooleanFieldRenderer: React.FC<FieldRendererProps & { labeled?: boo
     return (
       <label htmlFor={inputId} className="contents cursor-pointer">
         <div className="flex w-9 shrink-0 items-center justify-end">
-          <Checkbox id={inputId} checked={checked} onCheckedChange={(next) => onChange(next === true)} />
+          <Checkbox
+            id={inputId}
+            checked={checked}
+            disabled={readOnly}
+            onCheckedChange={(next) => onChange(next === true)}
+          />
         </div>
         <span className="text-sm text-gray-600 dark:text-gray-400">{valueLabel}</span>
       </label>
     );
   }
 
-  return <Switch checked={checked} onCheckedChange={onChange} className="" />;
+  return <Switch checked={checked} onCheckedChange={onChange} disabled={readOnly} className="" />;
 };
 
 function coerceFieldValuesIntoBoolean(
