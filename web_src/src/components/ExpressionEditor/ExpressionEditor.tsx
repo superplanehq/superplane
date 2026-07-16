@@ -1,5 +1,5 @@
 import { forwardRef, useMemo } from "react";
-import { exprLangAdapter } from "@/lib/expression";
+import { exprLangAdapter, type ExpressionAdapter } from "@/lib/expression";
 import { AutoCompleteInput, type AutoCompleteInputProps } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { getExpressionDialectAdapter } from "./expressionDialectRegistry";
 import type { ExpressionEditorDialect, ExpressionEditorProps, ExpressionSyntaxProfile } from "./types";
@@ -30,6 +30,15 @@ const QUICK_TIP: Record<ExpressionEditorDialect, Record<ExpressionSyntaxProfile,
   },
 };
 
+const CEL_ADAPTER_NOT_REGISTERED = "CEL expression adapter is not registered";
+const unconfiguredCelAdapter: ExpressionAdapter = {
+  id: "cel",
+  evaluate: () => ({ ok: false, error: CEL_ADAPTER_NOT_REGISTERED }),
+  evaluatePathLiteral: () => ({ ok: false, error: CEL_ADAPTER_NOT_REGISTERED }),
+  resolveSuggestionValue: () => undefined,
+  formatResult: (value) => String(value ?? ""),
+};
+
 export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditorProps>(
   function ExpressionEditorRender(props, forwardedRef) {
     const {
@@ -48,7 +57,10 @@ export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditor
     } = props;
 
     const resolvedAdapter = useMemo(
-      () => expressionAdapter ?? getExpressionDialectAdapter(dialect) ?? exprLangAdapter,
+      () =>
+        expressionAdapter ??
+        getExpressionDialectAdapter(dialect) ??
+        (dialect === "expr-lang" ? exprLangAdapter : unconfiguredCelAdapter),
       [dialect, expressionAdapter],
     );
 

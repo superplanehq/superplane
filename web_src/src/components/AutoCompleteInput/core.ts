@@ -23,6 +23,8 @@
  *   (object/array), we append a trailing '.' so the user can keep typing members.
  */
 
+import { extractTailPathExpression } from "@/lib/expression/pathWalker";
+
 export type SuggestionKind = "function" | "variable" | "field" | "keyword";
 
 export interface Suggestion {
@@ -1138,69 +1140,6 @@ function resolveNestedDollarRecord<TGlobals extends Record<string, unknown>>(
   if (!isRecord(owner)) return {};
   if (isRecord(owner.__runNodes__)) return owner.__runNodes__;
   return isRecord(owner.$) ? owner.$ : {};
-}
-
-function extractTailPathExpression(expr: string | undefined | null): string {
-  if (!expr) return "";
-  const s = expr.trim();
-  let i = s.length - 1;
-
-  let bracketDepth = 0;
-  let inSingle = false;
-  let inDouble = false;
-
-  const isEscaped = (idx: number): boolean => {
-    let bs = 0;
-    for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
-    return bs % 2 === 1;
-  };
-
-  const isStopChar = (ch: string): boolean =>
-    ch === "(" ||
-    ch === ")" ||
-    ch === "," ||
-    ch === ";" ||
-    ch === ":" ||
-    ch === "?" ||
-    ch === "+" ||
-    ch === "-" ||
-    ch === "*" ||
-    ch === "/" ||
-    ch === "%" ||
-    ch === "|" ||
-    ch === "&" ||
-    ch === "!" ||
-    ch === "=" ||
-    ch === "<" ||
-    ch === ">" ||
-    ch === "\n" ||
-    ch === "\r" ||
-    ch === "\t" ||
-    ch === " ";
-
-  for (; i >= 0; i--) {
-    const ch = s[i];
-
-    if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-    else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-    if (inSingle || inDouble) continue;
-
-    if (ch === "]") {
-      bracketDepth++;
-      continue;
-    }
-    if (ch === "[") {
-      bracketDepth = Math.max(0, bracketDepth - 1);
-      continue;
-    }
-
-    if (bracketDepth === 0 && isStopChar(ch)) {
-      return s.slice(i + 1).trim();
-    }
-  }
-
-  return s;
 }
 
 function findTailDotContext(input: string): DotContext | null {

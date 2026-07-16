@@ -88,6 +88,24 @@ describe("ExpressionEditor", () => {
     expect(screen.queryByText("$")).not.toBeInTheDocument();
   });
 
+  it("surfaces an error when the CEL adapter is not registered", () => {
+    render(
+      <ExpressionEditor
+        aria-label="CEL field"
+        dialect="cel"
+        syntaxProfile="pathOrRaw"
+        exampleObj={{ status: "passed" }}
+        value="status"
+        onChange={vi.fn()}
+        showValuePreview
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(screen.getByText(/error \(CEL expression adapter is not registered\)/i)).toBeInTheDocument();
+  });
+
   it("registerExpressionDialect wires a new default adapter", () => {
     const previousAdapter = getExpressionDialectAdapter("cel");
     const adapter: ExpressionAdapter = {

@@ -48,7 +48,9 @@ export function useWidgetExpressionContext(args: {
 
     const fields = describeFields(dataSource, memoryCatalog.fields);
     const liveRow = rows.find((r): r is Record<string, unknown> => typeof r === "object" && r !== null);
-    if (liveRow) return { row: liveRow, origin: "live", isLoading: false, fields, error };
+    if (liveRow) {
+      return { row: withCatalogRunNodesFallback(liveRow, fields), origin: "live", isLoading: false, fields, error };
+    }
 
     // While fetches are in flight, fall back to the catalog sample row so the
     // editor keeps its autocomplete and previews instead of blanking out.
@@ -79,6 +81,23 @@ function withCatalogRunNodesStub(row: Record<string, unknown>, fields: MemoryFie
   if (!hasDollar) return row;
   const stub = { [CATALOG_STUB_NODE_KEY]: CATALOG_STUB_NODE_SHAPE };
   return { ...row, $: stub, [DOLLAR_REWRITE_IDENTIFIER]: stub };
+}
+
+export function withCatalogRunNodesFallback(
+  row: Record<string, unknown>,
+  fields: MemoryFieldSummary[],
+): Record<string, unknown> {
+  const runNodes = nonEmptyRecord(row[DOLLAR_REWRITE_IDENTIFIER]) ?? nonEmptyRecord(row.$);
+  if (runNodes) {
+    return { ...row, $: runNodes, [DOLLAR_REWRITE_IDENTIFIER]: runNodes };
+  }
+  return withCatalogRunNodesStub(row, fields);
+}
+
+function nonEmptyRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  return Object.keys(record).length > 0 ? record : undefined;
 }
 
 function describeFields(dataSource: WidgetDataSource, memoryFields: MemoryFieldSummary[]): MemoryFieldSummary[] {
