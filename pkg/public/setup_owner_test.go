@@ -61,3 +61,49 @@ func TestSetupOwnerPersistsInstallationNetworkSettings(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, metadata.AllowPrivateNetworkAccess)
 }
+
+func TestSetupOwnerRejectsWeakPassword(t *testing.T) {
+	middleware.ResetOwnerSetupStateForTests()
+
+	r := support.Setup(t)
+	require.NoError(t, database.TruncateTables())
+
+	t.Setenv("BASE_URL", "http://localhost:8000")
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test-client-secret"),
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"",
+		"",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	body, err := json.Marshal(SetupOwnerRequest{
+		Email:     "owner@example.com",
+		FirstName: "Owner",
+		LastName:  "User",
+		Password:  "short",
+	})
+	require.NoError(t, err)
+
+	response := execRequest(server, requestParams{
+		method:      http.MethodPost,
+		path:        "/api/v1/setup-owner",
+		body:        body,
+		contentType: "application/json",
+	})
+
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+
+	// A weak password must not create an owner account.
+	assert.True(t, middleware.IsOwnerSetupRequired())
+}

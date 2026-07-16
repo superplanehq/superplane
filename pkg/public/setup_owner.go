@@ -63,6 +63,11 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.Password) < minPasswordLength {
+		http.Error(w, "Password must be at least 8 characters long", http.StatusBadRequest)
+		return
+	}
+
 	if req.SMTPEnabled {
 		if req.SMTPHost == "" || req.SMTPPort == 0 || req.SMTPFromEmail == "" {
 			http.Error(w, "SMTP host, port, and from email are required", http.StatusBadRequest)
