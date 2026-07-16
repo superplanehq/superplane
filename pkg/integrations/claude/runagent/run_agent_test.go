@@ -43,9 +43,74 @@ func Test__RunAgent__Setup__validation(t *testing.T) {
 	assert.Contains(t, err.Error(), "agent")
 }
 
-// A node stores the environment under the legacy "environmentId" key and the
-// version as a number; both must decode.
-func Test__decodeSpec(t *testing.T) {
+func Test__parseAgentVersion(t *testing.T) {
+	// Empty means "latest": nil pointer, no error.
+	v, err := parseAgentVersion("")
+	require.NoError(t, err)
+	assert.Nil(t, v)
+
+	// Whitespace is treated as empty too.
+	v, err = parseAgentVersion("  ")
+	require.NoError(t, err)
+	assert.Nil(t, v)
+
+	// The explicit "Latest" sentinel also means latest, so the field can be
+	// returned to its unset state after a version was pinned.
+	v, err = parseAgentVersion("latest")
+	require.NoError(t, err)
+	assert.Nil(t, v)
+
+	// A numeric resource value pins that version.
+	v, err = parseAgentVersion("3")
+	require.NoError(t, err)
+	require.NotNil(t, v)
+	assert.Equal(t, 3, *v)
+
+	// A non-numeric, non-sentinel value is rejected.
+	_, err = parseAgentVersion("bogus")
+	require.Error(t, err)
+}
+
+func Test__resolveAgentVersion(t *testing.T) {
+	logger := logrus.NewEntry(logrus.New())
+	three := 3
+
+	// An unset version stays unset without calling the API.
+	assert.Nil(t, resolveAgentVersion(&Client{}, "agent_1", nil, logger))
+
+	// A pinned version that exists for the agent is kept.
+	okClient := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"version":3},{"version":2}]}`))},
+	}}}
+	got := resolveAgentVersion(okClient, "agent_1", &three, logger)
+	require.NotNil(t, got)
+	assert.Equal(t, 3, *got)
+
+	// A pinned version the agent no longer has falls back to latest (nil).
+	staleClient := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"version":1}]}`))},
+	}}}
+	assert.Nil(t, resolveAgentVersion(staleClient, "agent_1", &three, logger))
+
+	// If versions can't be listed, the configured pin is kept (best-effort).
+	errClient := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"boom"}}`))},
+	}}}
+	got = resolveAgentVersion(errClient, "agent_1", &three, logger)
+	require.NotNil(t, got)
+	assert.Equal(t, 3, *got)
+}
+
+func Test__validateSpec__rejectsBadVersion(t *testing.T) {
+	err := validateSpec(Spec{Agent: "a", Environment: "e", Prompt: "p", Version: "not-a-number"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "version")
+}
+
+// Nodes saved before this component used resource fields stored the environment
+// under "environmentId" and the version as a number. They must keep decoding
+// and validating without being re-saved.
+func Test__decodeSpec__legacyConfig(t *testing.T) {
 	spec, err := decodeSpec(map[string]any{
 		"agent":         "agent_1",
 		"environmentId": "env_1",
@@ -53,15 +118,27 @@ func Test__decodeSpec(t *testing.T) {
 		"prompt":        "do it",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "agent_1", spec.Agent)
 	assert.Equal(t, "env_1", spec.Environment)
-	require.NotNil(t, spec.Version)
-	assert.Equal(t, 2, *spec.Version)
+	assert.Equal(t, "2", spec.Version, "numeric version must become the resource string")
+	require.NoError(t, validateSpec(spec))
 
-	// An unset version stays nil (the agent's latest is used).
-	spec, err = decodeSpec(map[string]any{"agent": "a", "environmentId": "e", "prompt": "p"})
+	v, err := parseAgentVersion(spec.Version)
 	require.NoError(t, err)
-	assert.Nil(t, spec.Version)
+	require.NotNil(t, v)
+	assert.Equal(t, 2, *v)
+}
+
+// A config saved by the current version (string version) decodes unchanged.
+func Test__decodeSpec__newConfig(t *testing.T) {
+	spec, err := decodeSpec(map[string]any{
+		"agent":         "agent_1",
+		"environmentId": "env_1",
+		"version":       "3",
+		"prompt":        "do it",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "env_1", spec.Environment)
+	assert.Equal(t, "3", spec.Version)
 }
 
 func Test__RunAgent__Execute__syncIdle(t *testing.T) {
