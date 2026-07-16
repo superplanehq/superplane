@@ -115,17 +115,20 @@ func TestClaude_ListResources_environments(t *testing.T) {
 	assert.Equal(t, "prod", res[0].Name)
 }
 
-func TestClaude_ListResources_agentVersions_labelsLatest(t *testing.T) {
+func TestClaude_ListResources_agentVersions_prependsLatest(t *testing.T) {
 	i := &Claude{}
 	res, err := i.ListResources("agentVersion", listResourcesCtx(
 		jsonResponse(`{"data":[{"version":2},{"version":1}],"next_page":""}`),
 		map[string]string{"agent": "agent_1"}))
 	require.NoError(t, err)
-	require.Len(t, res, 2)
-	assert.Equal(t, "2", res[0].ID)
-	assert.Equal(t, "2 (latest)", res[0].Name)
-	assert.Equal(t, "1", res[1].ID)
-	assert.Equal(t, "1", res[1].Name)
+	require.Len(t, res, 3)
+	// An explicit Latest option comes first so the field can be reset to latest.
+	assert.Equal(t, "latest", res[0].ID)
+	assert.Equal(t, "Latest", res[0].Name)
+	assert.Equal(t, "2", res[1].ID)
+	assert.Equal(t, "2", res[1].Name)
+	assert.Equal(t, "1", res[2].ID)
+	assert.Equal(t, "1", res[2].Name)
 }
 
 func TestClaude_ListResources_agentVersions_noAgentSelected(t *testing.T) {

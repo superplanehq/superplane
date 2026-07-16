@@ -7,8 +7,11 @@ import (
 )
 
 const (
-	payloadType             = "claude.runAgent.finished"
-	defaultChannel          = "default"
+	payloadType    = "claude.runAgent.finished"
+	defaultChannel = "default"
+	// latestVersionValue is the sentinel the Version resource field uses for the
+	// explicit "Latest" option; it is treated the same as an unset version.
+	latestVersionValue      = "latest"
 	sessionStatusIdle       = "idle"
 	sessionStatusTerminated = "terminated"
 	initialPoll             = 15 * time.Second

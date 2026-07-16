@@ -54,15 +54,51 @@ func Test__parseAgentVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, v)
 
+	// The explicit "Latest" sentinel also means latest, so the field can be
+	// returned to its unset state after a version was pinned.
+	v, err = parseAgentVersion("latest")
+	require.NoError(t, err)
+	assert.Nil(t, v)
+
 	// A numeric resource value pins that version.
 	v, err = parseAgentVersion("3")
 	require.NoError(t, err)
 	require.NotNil(t, v)
 	assert.Equal(t, 3, *v)
 
-	// A non-numeric value is rejected.
-	_, err = parseAgentVersion("latest")
+	// A non-numeric, non-sentinel value is rejected.
+	_, err = parseAgentVersion("bogus")
 	require.Error(t, err)
+}
+
+func Test__resolveAgentVersion(t *testing.T) {
+	logger := logrus.NewEntry(logrus.New())
+	three := 3
+
+	// An unset version stays unset without calling the API.
+	assert.Nil(t, resolveAgentVersion(&Client{}, "agent_1", nil, logger))
+
+	// A pinned version that exists for the agent is kept.
+	okClient := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"version":3},{"version":2}]}`))},
+	}}}
+	got := resolveAgentVersion(okClient, "agent_1", &three, logger)
+	require.NotNil(t, got)
+	assert.Equal(t, 3, *got)
+
+	// A pinned version the agent no longer has falls back to latest (nil).
+	staleClient := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"data":[{"version":1}]}`))},
+	}}}
+	assert.Nil(t, resolveAgentVersion(staleClient, "agent_1", &three, logger))
+
+	// If versions can't be listed, the configured pin is kept (best-effort).
+	errClient := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{Responses: []*http.Response{
+		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"boom"}}`))},
+	}}}
+	got = resolveAgentVersion(errClient, "agent_1", &three, logger)
+	require.NotNil(t, got)
+	assert.Equal(t, 3, *got)
 }
 
 func Test__validateSpec__rejectsBadVersion(t *testing.T) {

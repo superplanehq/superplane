@@ -80,7 +80,7 @@ func (a *RunAgent) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Placeholder: "Latest",
-			Description: "Pins the session to a specific agent version. Leave unset to use the latest.",
+			Description: "Pins the session to a specific agent version. Choose **Latest** (or leave unset) to always use the agent's newest version.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "agentVersion",
@@ -311,6 +311,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	aid := strings.TrimSpace(spec.Agent)
+	version = resolveAgentVersion(client, aid, version, ctx.Logger)
 	createReq := CreateManagedSessionRequest{
 		Agent:         aid,
 		AgentVersion:  version,
@@ -656,10 +657,12 @@ func validateSpec(spec Spec) error {
 }
 
 // parseAgentVersion converts the raw version resource value into an agent
-// version number. An empty value means "latest" and yields a nil pointer.
+// version number. An empty value or the explicit "latest" sentinel both mean
+// "use the latest version" and yield a nil pointer, so the field can always be
+// returned to its unset state by picking the Latest option.
 func parseAgentVersion(raw string) (*int, error) {
 	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	if raw == "" || strings.EqualFold(raw, latestVersionValue) {
 		return nil, nil
 	}
 	v, err := strconv.Atoi(raw)
@@ -667,4 +670,27 @@ func parseAgentVersion(raw string) (*int, error) {
 		return nil, fmt.Errorf("invalid agent version %q: must be a number", raw)
 	}
 	return &v, nil
+}
+
+// resolveAgentVersion drops a pinned version that the agent no longer has, so a
+// stale pin — e.g. one left in the config after switching to an agent without
+// that version — falls back to the latest version instead of running or failing
+// with the wrong one. Validation is best-effort: if the versions cannot be
+// listed, the configured pin is kept.
+func resolveAgentVersion(client *Client, agentID string, version *int, logger *log.Entry) *int {
+	if version == nil {
+		return nil
+	}
+	versions, err := client.ListAgentVersionNumbers(agentID)
+	if err != nil {
+		logger.Warnf("Could not verify versions for agent %s (%v); using version %d as configured", agentID, err, *version)
+		return version
+	}
+	for _, v := range versions {
+		if v == *version {
+			return version
+		}
+	}
+	logger.Warnf("Agent %s has no version %d (stale pin, likely after switching agents); using the latest version instead", agentID, *version)
+	return nil
 }

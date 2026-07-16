@@ -216,9 +216,11 @@ func (i *Claude) listEnvironmentResources(client *Client) ([]core.IntegrationRes
 	return resources, nil
 }
 
-// listAgentVersionResources lists an agent's versions newest-first, labelling
-// the latest so it reads as the default in the picker. The value stays the bare
-// version number. An empty agent (nothing selected yet) yields no options.
+// listAgentVersionResources lists an agent's versions newest-first, preceded by
+// an explicit "Latest" choice. Latest lets the field be returned to its
+// unset/latest state after a specific version was pinned, and gives a newly
+// created agent a usable option. The value stays the bare version number (or
+// "latest"). An empty agent (nothing selected yet) yields no options.
 func (i *Claude) listAgentVersionResources(client *Client, agentID string) ([]core.IntegrationResource, error) {
 	if strings.TrimSpace(agentID) == "" {
 		return []core.IntegrationResource{}, nil
@@ -229,17 +231,17 @@ func (i *Claude) listAgentVersionResources(client *Client, agentID string) ([]co
 		return nil, err
 	}
 
-	resources := make([]core.IntegrationResource, 0, len(versions))
-	for idx, version := range versions {
+	resources := make([]core.IntegrationResource, 0, len(versions)+1)
+	resources = append(resources, core.IntegrationResource{
+		Type: "agentVersion",
+		Name: "Latest",
+		ID:   "latest",
+	})
+	for _, version := range versions {
 		value := strconv.Itoa(version.Version)
-		name := value
-		if idx == 0 {
-			name = value + " (latest)"
-		}
-
 		resources = append(resources, core.IntegrationResource{
 			Type: "agentVersion",
-			Name: name,
+			Name: value,
 			ID:   value,
 		})
 	}
