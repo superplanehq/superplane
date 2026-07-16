@@ -246,7 +246,7 @@ function ActionConditions({
         // Runtime for the row-action "show" field routes bare input through
         // the legacy `evaluateShow` parser (not CEL), so keep preview scoped
         // to `{{ … }}` expressions where semantics match.
-        syntaxProfile="wrapped"
+        syntaxProfile="singleWrapped"
         exampleObj={sampleRow}
         value={action.show ?? ""}
         onChange={(next) => onChange({ show: next || undefined })}

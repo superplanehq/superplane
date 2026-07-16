@@ -4,11 +4,12 @@ import type { ExpressionAdapter, ExpressionDialectId } from "@/lib/expression";
 export type ExpressionEditorDialect = ExpressionDialectId;
 
 // - `wrapped`   — expressions wrapped in `{{ … }}` (default for template fields).
+// - `singleWrapped` — a literal or exactly one full `{{ … }}` expression.
 // - `raw`       — the whole input is one expression, no delimiters.
 // - `pathOrRaw` — plain paths stay literal but the field also accepts a
 //                 wrapped expression; the wrapped-template chrome is kept
 //                 so the delimiter is visible once the user opts in.
-export type ExpressionSyntaxProfile = "wrapped" | "raw" | "pathOrRaw";
+export type ExpressionSyntaxProfile = "wrapped" | "singleWrapped" | "raw" | "pathOrRaw";
 
 export interface ExpressionEditorProps extends Omit<ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   dialect?: ExpressionEditorDialect;

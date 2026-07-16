@@ -69,6 +69,37 @@ describe("ExpressionEditor", () => {
     expect(screen.getByText(/browse node payloads/i)).toBeInTheDocument();
   });
 
+  it("evaluates single-wrapped fields with runtime wrapper semantics", () => {
+    const evaluate = vi.fn((expression: string) =>
+      expression.includes("{{")
+        ? { ok: false, error: "Unexpected template delimiter" }
+        : { ok: true, value: "ok", formattedValue: "ok" },
+    );
+    const adapter: ExpressionAdapter = {
+      id: "cel",
+      evaluate,
+      resolveSuggestionValue: vi.fn(),
+      formatResult: vi.fn(),
+    };
+    render(
+      <ExpressionEditor
+        aria-label="Filter value"
+        dialect="cel"
+        syntaxProfile="singleWrapped"
+        expressionAdapter={adapter}
+        exampleObj={{ first: "hello", second: "world" }}
+        value="{{ first }} {{ second }}"
+        onChange={vi.fn()}
+        showValuePreview
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(evaluate).toHaveBeenCalledWith(" first }} {{ second ", expect.any(Object));
+    expect(screen.getByText(/Unexpected template delimiter/)).toBeInTheDocument();
+  });
+
   it("hides root dollar suggestions when CEL context has no run-node map", async () => {
     render(
       <ExpressionEditor

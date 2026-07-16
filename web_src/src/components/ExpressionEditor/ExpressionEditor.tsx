@@ -13,6 +13,7 @@ interface ProfileDefaults {
 
 const PROFILE: Record<ExpressionSyntaxProfile, ProfileDefaults> = {
   wrapped: { expressionMode: "wrapped", startWord: "{{", prefix: "{{ ", suffix: " }}" },
+  singleWrapped: { expressionMode: "wrapped", startWord: "{{", prefix: "{{ ", suffix: " }}" },
   raw: { expressionMode: "raw" },
   pathOrRaw: { expressionMode: "wrapped", startWord: "{{", prefix: "{{ ", suffix: " }}" },
 };
@@ -20,11 +21,13 @@ const PROFILE: Record<ExpressionSyntaxProfile, ProfileDefaults> = {
 const QUICK_TIP: Record<ExpressionEditorDialect, Record<ExpressionSyntaxProfile, string>> = {
   "expr-lang": {
     wrapped: "Tip: type `{{` to start an expression.",
+    singleWrapped: "Tip: enter a literal or one full `{{ … }}` expression.",
     raw: "Tip: type `$` to browse node payloads.",
     pathOrRaw: "Tip: type `{{` to switch to an expression.",
   },
   cel: {
     wrapped: "Tip: type `{{` to start a CEL expression.",
+    singleWrapped: "Tip: enter a literal or one full `{{ … }}` CEL expression.",
     raw: "Tip: reference row fields directly (e.g. `field.name`).",
     pathOrRaw: "Tip: type `{{` to switch to a CEL expression.",
   },
@@ -103,6 +106,7 @@ export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditor
         includeTopLevelGlobals={resolvedIncludeTopLevelGlobals}
         includeFunctions={resolvedIncludeFunctions}
         pathModeOutsideWrapper={pathModeOutsideWrapper}
+        singleWrappedExpression={syntaxProfile === "singleWrapped"}
         envKeySource={envKeySource}
         excludedSuggestions={resolvedExcludedSuggestions}
         {...rest}
