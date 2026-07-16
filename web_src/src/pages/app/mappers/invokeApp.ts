@@ -1,7 +1,8 @@
-import type React from "react";
+import type { CanvasesCanvasRunRef } from "@/api-client";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { appRunPath } from "@/lib/appPaths";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getState, getStateMap, getTriggerRenderer } from ".";
 import type {
@@ -14,12 +15,6 @@ import type {
   StateFunction,
   SubtitleContext,
 } from "./types";
-
-type InvokeAppExecutionMetadata = {
-  runId?: string;
-  result?: string;
-  error?: string;
-};
 
 type InvokeAppMetadata = {
   app?: AppMetadata;
@@ -109,27 +104,52 @@ export const invokeAppMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
-    const metadata = context.execution.metadata as InvokeAppExecutionMetadata | undefined;
     const nodeMetadata = context.node.metadata as InvokeAppMetadata | undefined;
+    const childRun = resolveChildRun(context.execution.runs, nodeMetadata?.app?.id);
     const app = nodeMetadata?.app;
-    const runId = metadata?.runId;
 
     if (app?.name) {
       details["App"] = app.name;
     }
 
-    const runUrl = app?.id && runId ? buildAppRunUrl(app.id, runId) : undefined;
+    const organizationId = organizationIdFromPath();
+    const runUrl =
+      childRun?.canvasId && childRun.id && organizationId
+        ? `${window.location.origin}${appRunPath(organizationId, childRun.canvasId, childRun.id)}`
+        : undefined;
     if (runUrl) {
       details["Run"] = runUrl;
     }
 
-    if (metadata?.result) {
-      details["Result"] = metadata.result;
+    if (context.execution.result === "RESULT_PASSED") {
+      details["Result"] = "passed";
+    } else if (context.execution.result === "RESULT_FAILED") {
+      details["Result"] = "failed";
+    } else if (context.execution.result === "RESULT_CANCELLED") {
+      details["Result"] = "cancelled";
     }
 
     return details;
   },
 };
+
+function resolveChildRun(
+  runs: CanvasesCanvasRunRef[] | undefined,
+  configuredAppId?: string,
+): CanvasesCanvasRunRef | undefined {
+  if (!runs?.length) {
+    return undefined;
+  }
+
+  if (configuredAppId) {
+    const match = runs.find((run) => run.canvasId === configuredAppId);
+    if (match) {
+      return match;
+    }
+  }
+
+  return runs[0];
+}
 
 function invokeAppMetadataList(node: NodeInfo): MetadataItem[] {
   const metadataList: MetadataItem[] = [];
@@ -173,15 +193,11 @@ function invokeAppEventSections(
   ];
 }
 
-function buildAppRunUrl(appId: string, runId: string): string | undefined {
+function organizationIdFromPath(): string | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
 
   const match = window.location.pathname.match(/^\/([^/]+)\/apps\//);
-  if (!match) {
-    return undefined;
-  }
-
-  return `${window.location.origin}/${match[1]}/apps/${appId}?run=${runId}`;
+  return match?.[1];
 }

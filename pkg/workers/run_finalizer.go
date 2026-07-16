@@ -436,6 +436,16 @@ func (w *RunFinalizer) executeCallbackOnParent(tx *gorm.DB, run *models.CanvasRu
 		return fmt.Errorf("get action: %w", err)
 	}
 
+	params, err := core.NewRunFinishedCallback(core.NewRun(
+		run.ID,
+		run.WorkflowID,
+		run.Result,
+		nil,
+	)).ToParameters()
+	if err != nil {
+		return fmt.Errorf("build run finished callback: %w", err)
+	}
+
 	err = action.HandleHook(core.ActionHookContext{
 		Name:           callback.Hook,
 		Logger:         logging.ForNode(*node),
@@ -444,9 +454,7 @@ func (w *RunFinalizer) executeCallbackOnParent(tx *gorm.DB, run *models.CanvasRu
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Parameters: map[string]any{
-			"result": run.Result,
-		},
+		Parameters:     params,
 	})
 
 	if err != nil {

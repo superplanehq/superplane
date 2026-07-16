@@ -543,3 +543,83 @@ func crossWorkflowDepthForSubRun(ancestors []CanvasRun, targetWorkflowID uuid.UU
 
 	return depth
 }
+
+func ListChildRunsByParentExecutionsInTransaction(
+	tx *gorm.DB,
+	parentWorkflowID uuid.UUID,
+	parentExecutionIDs []uuid.UUID,
+) ([]CanvasRun, error) {
+	if len(parentExecutionIDs) == 0 {
+		return []CanvasRun{}, nil
+	}
+
+	var runs []CanvasRun
+	err := tx.
+		Where("parent_workflow_id = ?", parentWorkflowID).
+		Where("parent_execution_id IN ?", parentExecutionIDs).
+		Find(&runs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+type canvasRunKey struct {
+	WorkflowID uuid.UUID
+	RunID      uuid.UUID
+}
+
+func FindCanvasRunsByKeysInTransaction(tx *gorm.DB, keys []canvasRunKey) ([]CanvasRun, error) {
+	if len(keys) == 0 {
+		return []CanvasRun{}, nil
+	}
+
+	seen := make(map[canvasRunKey]struct{}, len(keys))
+	unique := make([]canvasRunKey, 0, len(keys))
+	for _, key := range keys {
+		if key.WorkflowID == uuid.Nil || key.RunID == uuid.Nil {
+			continue
+		}
+
+		if _, ok := seen[key]; ok {
+			continue
+		}
+
+		seen[key] = struct{}{}
+		unique = append(unique, key)
+	}
+
+	if len(unique) == 0 {
+		return []CanvasRun{}, nil
+	}
+
+	query := tx.Model(&CanvasRun{}).Where("1 = 0")
+	for _, key := range unique {
+		query = query.Or("workflow_id = ? AND id = ?", key.WorkflowID, key.RunID)
+	}
+
+	var runs []CanvasRun
+	if err := query.Find(&runs).Error; err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func CollectParentRunKeys(runs []CanvasRun) []canvasRunKey {
+	keys := make([]canvasRunKey, 0)
+	for _, run := range runs {
+		if run.ParentRunID == nil || run.ParentWorkflowID == nil {
+			continue
+		}
+
+		keys = append(keys, canvasRunKey{
+			WorkflowID: *run.ParentWorkflowID,
+			RunID:      *run.ParentRunID,
+		})
+	}
+
+	return keys
+}

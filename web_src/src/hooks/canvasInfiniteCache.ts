@@ -43,8 +43,9 @@ export function reuseCachedInfiniteRunsPage(
 
 const RUN_STATE_ORDER: Record<CanvasesCanvasRunState, number> = {
   STATE_UNKNOWN: 0,
-  STATE_STARTED: 1,
-  STATE_FINISHED: 2,
+  STATE_PENDING: 1,
+  STATE_STARTED: 2,
+  STATE_FINISHED: 3,
 };
 
 const EXECUTION_STATE_ORDER: Record<string, number> = {
@@ -149,6 +150,7 @@ function mergeRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun
     updatedAt: incoming.updatedAt ?? existing.updatedAt,
     finishedAt: incoming.finishedAt ?? existing.finishedAt,
     versionId: incoming.versionId ?? existing.versionId,
+    parent: incoming.parent ?? existing.parent,
   };
 }
 
@@ -240,6 +242,17 @@ export function executionToRef(execution: CanvasesCanvasNodeExecution): Canvases
   };
 }
 
+export function mergeExecutionRefFields(
+  existing: CanvasesCanvasNodeExecutionRef,
+  incoming: CanvasesCanvasNodeExecutionRef,
+): CanvasesCanvasNodeExecutionRef {
+  return {
+    ...existing,
+    ...incoming,
+    runs: incoming.runs?.length ? incoming.runs : existing.runs,
+  };
+}
+
 // Execution events can arrive out of order, so only accept an update that is at
 // least as recent as what we have — otherwise a finished node gets stuck
 // "running" until reload.
@@ -288,7 +301,7 @@ export function upsertExecutionRef(
   }
 
   const next = executions.slice();
-  next[index] = incoming;
+  next[index] = mergeExecutionRefFields(executions[index], incoming);
   return next;
 }
 

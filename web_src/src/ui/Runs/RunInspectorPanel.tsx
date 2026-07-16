@@ -92,6 +92,7 @@ export function RunInspectorPanel(props: RunInspectorPanelProps) {
         run={run}
         title={model.presentation.title}
         stepCount={model.sections.length || run.executions?.length || 0}
+        organizationId={organizationId}
         onAction={() => (model.presentation.status === "running" ? model.actions.stop() : model.actions.rerun())}
         actionPending={model.presentation.status === "running" ? model.actions.stopPending : model.actions.rerunPending}
         actionDisabled={model.presentation.status === "running" ? model.actions.stopDisabled : !run.rootEvent?.id}

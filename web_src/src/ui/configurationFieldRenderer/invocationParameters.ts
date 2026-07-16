@@ -27,7 +27,7 @@ export function normalizeInvocationParameterDefinitions(raw: unknown): Configura
       type,
       description: typeof param.description === "string" ? param.description : undefined,
       required: param.required === true,
-      defaultValue: param.default ?? param.defaultValue,
+      defaultValue: (param.default ?? param.defaultValue) as ConfigurationField["defaultValue"],
       typeOptions: param.typeOptions as ConfigurationField["typeOptions"],
     });
   }

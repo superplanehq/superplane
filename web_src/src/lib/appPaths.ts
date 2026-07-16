@@ -8,6 +8,10 @@ export function appPath(organizationId: string, appId: string, search = ""): str
   return `/${organizationId}/apps/${appId}${search}`;
 }
 
+export function appRunPath(organizationId: string, appId: string, runId: string): string {
+  return appPath(organizationId, appId, `?run=${runId}`);
+}
+
 export function appSettingsPath(organizationId: string, appId: string): string {
   return `/${organizationId}/apps/${appId}/settings`;
 }

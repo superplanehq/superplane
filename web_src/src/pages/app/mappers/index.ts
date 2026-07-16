@@ -6,7 +6,11 @@ import type {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import type { SuperplaneComponentsNode as ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import type {
+  SuperplaneComponentsNode as ComponentsNode,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasRunRef,
+} from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
@@ -595,6 +599,7 @@ export function getExecutionDetails(
   execution: CanvasesCanvasNodeExecution,
   node: ComponentsNode,
   nodes?: ComponentsNode[],
+  childRuns?: CanvasesCanvasRunRef[],
 ): Record<string, unknown> | undefined {
   const mapper = findRegisteredComponentMapper(componentName);
   if (!mapper) {
@@ -602,7 +607,7 @@ export function getExecutionDetails(
   }
 
   return createSafeComponentMapper(mapper, componentName).getExecutionDetails({
-    execution: buildExecutionInfo(execution),
+    execution: buildExecutionInfo(execution, { runs: childRuns }),
     node: buildNodeInfo(node),
     nodes: nodes?.map((n) => buildNodeInfo(n)) || [],
   });

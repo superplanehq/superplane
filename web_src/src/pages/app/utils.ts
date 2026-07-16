@@ -3,6 +3,7 @@ import type {
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
+  CanvasesCanvasRunRef,
   ActionsAction,
   CanvasesCanvasRun,
   SuperplaneComponentsNode as ComponentsNode,
@@ -469,7 +470,10 @@ export function buildTabData(
   return Object.keys(tabData).length > 0 ? tabData : undefined;
 }
 
-export function buildExecutionInfo(execution: CanvasesCanvasNodeExecution): ExecutionInfo {
+export function buildExecutionInfo(
+  execution: CanvasesCanvasNodeExecution,
+  options?: { runs?: CanvasesCanvasRunRef[] },
+): ExecutionInfo {
   return {
     id: execution.id!,
     createdAt: execution.createdAt!,
@@ -482,6 +486,7 @@ export function buildExecutionInfo(execution: CanvasesCanvasNodeExecution): Exec
     configuration: execution.configuration!,
     outputs: execution.outputs!,
     rootEvent: buildEventInfo(execution.rootEvent!),
+    runs: options?.runs,
   };
 }
 

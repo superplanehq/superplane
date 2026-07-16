@@ -38,12 +38,6 @@ type CanvasNodeMetadata struct {
 	Name string `json:"name" mapstructure:"name"`
 }
 
-type InvokeAppExecutionMetadata struct {
-	RunID  string  `json:"runId" mapstructure:"runId"`
-	Result *string `json:"result,omitempty" mapstructure:"result,omitempty"`
-	Error  *string `json:"error,omitempty" mapstructure:"error,omitempty"`
-}
-
 func (c *InvokeApp) Name() string {
 	return "invokeApp"
 }
@@ -191,7 +185,7 @@ func (c *InvokeApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invoke app: metadata is required")
 	}
 
-	run, err := ctx.Runs.Create(core.RunCreationParams{
+	_, err = ctx.Runs.Create(core.RunCreationParams{
 		App:   nodeMetadata.App.ID,
 		Node:  nodeMetadata.Node.ID,
 		Input: config.Parameters,
@@ -213,9 +207,7 @@ func (c *InvokeApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invoke app: create run: %w", err)
 	}
 
-	return ctx.Metadata.Set(InvokeAppExecutionMetadata{
-		RunID: run.ID.String(),
-	})
+	return nil
 }
 
 func (c *InvokeApp) Hooks() []core.Hook {
@@ -234,31 +226,25 @@ func (c *InvokeApp) HandleHook(ctx core.ActionHookContext) error {
 }
 
 func (c *InvokeApp) handleRunFinished(ctx core.ActionHookContext) error {
-	metadata := InvokeAppExecutionMetadata{}
-	err := mapstructure.Decode(ctx.Metadata, &metadata)
+	callback, err := core.DecodeRunFinishedCallback(ctx.Parameters)
 	if err != nil {
-		return fmt.Errorf("invoke app: decode metadata: %w", err)
+		return fmt.Errorf("invoke app: decode run finished callback: %w", err)
 	}
 
-	result, ok := ctx.Parameters["result"].(string)
-	if !ok {
-		return fmt.Errorf("invoke app: result is required")
-	}
-
-	if result == core.RunResultPassed {
+	if callback.Run.Result == core.RunResultPassed {
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "app.invocation.passed", []any{
 			map[string]any{
 				"run": map[string]any{
-					"id":     metadata.RunID,
-					"result": result,
+					"id":     callback.Run.ID.String(),
+					"result": callback.Run.Result,
 				},
 			},
 		})
 	}
 
-	errMessage, ok := ctx.Parameters["error"].(string)
-	if !ok {
-		errMessage = ""
+	errMessage := ""
+	if callback.Run.Error != nil {
+		errMessage = *callback.Run.Error
 	}
 
 	return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, errMessage)
