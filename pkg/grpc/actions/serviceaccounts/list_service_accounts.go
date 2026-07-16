@@ -24,12 +24,12 @@ func ListServiceAccounts(ctx context.Context) (*pb.ListServiceAccountsResponse, 
 	db := database.DB(ctx)
 	users, err := models.FindServiceAccountsByOrganization(db, orgID)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list service accounts")
+		return nil, grpcerrors.Internal(err, "failed to list API keys")
 	}
 
 	creatorsByID, err := creatorsByIDForServiceAccounts(db, orgID, users)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list service accounts")
+		return nil, grpcerrors.Internal(err, "failed to list API keys")
 	}
 
 	serviceAccounts := make([]*pb.ServiceAccount, len(users))

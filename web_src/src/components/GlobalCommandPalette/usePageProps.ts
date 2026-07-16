@@ -182,7 +182,7 @@ function buildSearchResults(
       results.push({
         id: `sa-${sa.id}`,
         label: name,
-        description: "Service Account",
+        description: "API Key",
         icon: Key,
         onSelect: () => goTo(`/${organizationId}/settings/service-accounts/${sa.id}`),
         keywords: [name, sa.id ?? ""],

@@ -273,6 +273,9 @@ func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jw
 	if err != nil {
 		return nil, nil, err
 	}
+	if user.IsExpiredServiceAccount() {
+		return nil, nil, fmt.Errorf("API key token expired")
+	}
 
 	return user, nil, nil
 }
