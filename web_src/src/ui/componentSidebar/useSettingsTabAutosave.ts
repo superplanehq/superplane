@@ -67,11 +67,7 @@ export function useSettingsTabAutosave({
     }, 0);
   }, []);
 
-  const handleSave = useCallback(async () => {
-    if (isInteractionDisabled) {
-      return;
-    }
-
+  const performAutosave = useCallback(async () => {
     await runSettingsTabAutosave({
       baselineSnapshot: autosaveBaselineSnapshotRef.current,
       currentNodeName,
@@ -85,7 +81,6 @@ export function useSettingsTabAutosave({
       validateNow,
     });
   }, [
-    isInteractionDisabled,
     validateNow,
     currentNodeName,
     selectedIntegration,
@@ -95,6 +90,17 @@ export function useSettingsTabAutosave({
     updateAutosaveBaseline,
     flushPendingAutosave,
   ]);
+
+  const performAutosaveRef = useRef(performAutosave);
+  performAutosaveRef.current = performAutosave;
+
+  const handleSave = useCallback(async () => {
+    if (isInteractionDisabled) {
+      return;
+    }
+
+    await performAutosave();
+  }, [isInteractionDisabled, performAutosave]);
 
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
@@ -119,7 +125,7 @@ export function useSettingsTabAutosave({
         window.clearTimeout(autosaveTimerRef.current);
       }
       if (!isInteractionDisabled) {
-        void handleSaveRef.current();
+        void performAutosaveRef.current();
       }
     };
   }, [isInteractionDisabled]);
