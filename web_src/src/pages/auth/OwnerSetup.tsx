@@ -6,6 +6,8 @@ import { PrivateNetworkStep } from "./ownerSetup/PrivateNetworkStep";
 import { SmtpPromptStep } from "./ownerSetup/SmtpPromptStep";
 import { SmtpConfigStep } from "./ownerSetup/SmtpConfigStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { cn } from "@/lib/utils";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
 
@@ -231,8 +233,16 @@ const OwnerSetup: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-400 px-4 py-8 dark:bg-gray-950">
-      <div className="max-w-md w-full rounded-lg bg-white p-8 shadow-sm outline outline-gray-950/10 dark:bg-gray-900 dark:outline-gray-700/70">
+    <div
+      className={cn("min-h-screen flex items-center justify-center bg-slate-100 px-4 py-8", appDarkModeClasses.surface)}
+    >
+      <div
+        className={cn(
+          "max-w-md w-full rounded-lg bg-white p-8 shadow-sm",
+          appDarkModeClasses.modalEdge,
+          appDarkModeClasses.surfaceRaised,
+        )}
+      >
         {step === "owner" && (
           <OwnerStep
             email={email}

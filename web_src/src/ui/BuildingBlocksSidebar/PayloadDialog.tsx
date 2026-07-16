@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import Editor from "@monaco-editor/react";
 import { Copy, Check } from "lucide-react";
 import { useState } from "react";
+import { useTheme } from "@/contexts/useTheme";
 
 interface PayloadDialogProps {
   open: boolean;
@@ -13,6 +14,8 @@ interface PayloadDialogProps {
 
 export function PayloadDialog({ open, onOpenChange, title, payloadString }: PayloadDialogProps) {
   const [copied, setCopied] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "dark" ? "vs-dark" : "vs";
   const lineCount = payloadString.split("\n").length;
   const lineHeight = 19;
   const editorHeight = Math.min(Math.max(lineCount * lineHeight + 10, 100), 500);
@@ -42,7 +45,7 @@ export function PayloadDialog({ open, onOpenChange, title, payloadString }: Payl
             height={`${editorHeight}px`}
             defaultLanguage="json"
             value={payloadString}
-            theme="vs"
+            theme={monacoTheme}
             options={{
               readOnly: true,
               minimap: { enabled: false },
