@@ -5,10 +5,10 @@ import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
-  Bot,
   CircleUser,
   Gauge,
   Key,
+  KeyRound,
   Lock,
   LogOut,
   Mail,
@@ -115,10 +115,10 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
       permission: { resource: "members", action: "read" },
     },
     {
-      label: "Service Accounts",
-      href: organizationId ? `/${organizationId}/settings/service-accounts` : "#",
-      Icon: Bot,
-      permission: { resource: "service_accounts", action: "read" },
+      label: "API Keys",
+      href: organizationId ? `/${organizationId}/settings/api-keys` : "#",
+      Icon: KeyRound,
+      permission: { resource: "api_keys", action: "read" },
     },
     {
       label: "Groups",

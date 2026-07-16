@@ -133,7 +133,7 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     { pattern: re("/api/v1/actions"), resolve: () => ({ json: fixture.actions ?? { actions: [] } }) },
     { pattern: re("/api/v1/widgets"), resolve: () => ({ json: fixture.widgets ?? { widgets: [] } }) },
     { pattern: re("/api/v1/integrations"), resolve: () => ({ json: fixture.integrations ?? { integrations: [] } }) },
-    { pattern: re("/api/v1/service-accounts"), resolve: () => ({ json: { serviceAccounts: [] } }) },
+    { pattern: re("/api/v1/api-keys"), resolve: () => ({ json: { apiKeys: [] } }) },
 
     // Draft-version listing must stay empty (no open drafts); every other version
     // query returns the captured history. `?limit=1` resolves against the

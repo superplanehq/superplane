@@ -520,7 +520,9 @@ CREATE TABLE public.users (
     token_hash character varying(250),
     type character varying(50) DEFAULT 'human'::character varying NOT NULL,
     description text,
-    created_by uuid
+    created_by uuid,
+    api_key_expires_at timestamp without time zone,
+    api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -1653,17 +1655,17 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 
 --
+-- Name: unique_api_key_in_organization; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX unique_api_key_in_organization ON public.users USING btree (organization_id, name) WHERE ((type)::text = 'api_key'::text);
+
+
+--
 -- Name: unique_human_user_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
-
-
---
--- Name: unique_service_account_in_organization; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX unique_service_account_in_organization ON public.users USING btree (organization_id, name) WHERE ((type)::text = 'service_account'::text);
 
 
 --
@@ -2202,7 +2204,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260715185442	f
+20260716163811	f
 \.
 
 

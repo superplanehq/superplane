@@ -20,7 +20,7 @@ func TestSettingsPermissionGuards(t *testing.T) {
 		steps.start()
 		steps.givenGroupExists("readonly-team")
 		steps.givenRoleExists("readonly-role")
-		steps.givenServiceAccountExists("readonly-bot")
+		steps.givenAPIKeyExists("readonly-bot")
 		memberEmail := steps.givenMemberExists("readonly-member")
 		steps.loginAsViewer()
 
@@ -43,11 +43,11 @@ func TestSettingsPermissionGuards(t *testing.T) {
 		steps.assertMemberUpdateDisabled(memberEmail)
 		steps.assertMemberDeleteDisabled(memberEmail)
 
-		steps.visitServiceAccountsSettings()
-		steps.assertServiceAccountCreateDisabled()
-		steps.openServiceAccount("readonly-bot")
-		steps.assertServiceAccountUpdateDisabled()
-		steps.assertServiceAccountDeleteDisabled()
+		steps.visitAPIKeysSettings()
+		steps.assertAPIKeyCreateDisabled()
+		steps.openAPIKey("readonly-bot")
+		steps.assertAPIKeyUpdateDisabled()
+		steps.assertAPIKeyDeleteDisabled()
 	})
 
 	t.Run("secrets reader cannot create update or delete secrets", func(t *testing.T) {
@@ -120,8 +120,8 @@ func (s *settingsPermissionGuardSteps) visitIntegrationsSettings() {
 	s.visitSettings("integrations")
 }
 
-func (s *settingsPermissionGuardSteps) visitServiceAccountsSettings() {
-	s.visitSettings("service-accounts")
+func (s *settingsPermissionGuardSteps) visitAPIKeysSettings() {
+	s.visitSettings("api-keys")
 }
 
 func (s *settingsPermissionGuardSteps) visitSettings(section string) {
@@ -140,8 +140,8 @@ func (s *settingsPermissionGuardSteps) openSecret(name string) {
 	s.session.Sleep(500)
 }
 
-func (s *settingsPermissionGuardSteps) openServiceAccount(name string) {
-	link := s.session.Page().GetByTestId("sa-link").GetByText(name, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
+func (s *settingsPermissionGuardSteps) openAPIKey(name string) {
+	link := s.session.Page().GetByTestId("api-key-link").GetByText(name, pw.LocatorGetByTextOptions{Exact: pw.Bool(true)})
 	require.NoError(s.t, link.Click())
 	s.session.Sleep(500)
 }
@@ -241,17 +241,17 @@ func (s *settingsPermissionGuardSteps) assertIntegrationDeleteDisabled() {
 	s.session.AssertDisabled(q.TestID("integration-detail-delete"))
 }
 
-func (s *settingsPermissionGuardSteps) assertServiceAccountCreateDisabled() {
-	s.session.AssertDisabled(q.TestID("sa-create-btn"))
+func (s *settingsPermissionGuardSteps) assertAPIKeyCreateDisabled() {
+	s.session.AssertDisabled(q.TestID("api-key-create-btn"))
 }
 
-func (s *settingsPermissionGuardSteps) assertServiceAccountUpdateDisabled() {
-	s.session.AssertDisabled(q.TestID("sa-detail-edit"))
-	s.session.AssertDisabled(q.TestID("sa-detail-regenerate-token"))
+func (s *settingsPermissionGuardSteps) assertAPIKeyUpdateDisabled() {
+	s.session.AssertDisabled(q.TestID("api-key-detail-edit"))
+	s.session.AssertDisabled(q.TestID("api-key-detail-regenerate-token"))
 }
 
-func (s *settingsPermissionGuardSteps) assertServiceAccountDeleteDisabled() {
-	s.session.AssertDisabled(q.TestID("sa-detail-delete"))
+func (s *settingsPermissionGuardSteps) assertAPIKeyDeleteDisabled() {
+	s.session.AssertDisabled(q.TestID("api-key-detail-delete"))
 }
 
 func (s *settingsPermissionGuardSteps) rowByText(text string) pw.Locator {
@@ -301,9 +301,9 @@ func (s *settingsPermissionGuardSteps) givenSecretExists(name string) {
 	secretSteps.givenASecretExists(name, map[string]string{"KEY1": "value1", "KEY2": "value2"})
 }
 
-func (s *settingsPermissionGuardSteps) givenServiceAccountExists(name string) {
-	serviceAccountSteps := &serviceAccountSteps{t: s.t, session: s.session}
-	serviceAccountSteps.givenServiceAccountExists(name, "Permission guard test")
+func (s *settingsPermissionGuardSteps) givenAPIKeyExists(name string) {
+	apiKeySteps := &apiKeySteps{t: s.t, session: s.session}
+	apiKeySteps.givenAPIKeyExists(name, "Permission guard test")
 }
 
 func (s *settingsPermissionGuardSteps) givenIntegrationExists(name string) *models.Integration {
