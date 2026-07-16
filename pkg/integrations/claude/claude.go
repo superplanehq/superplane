@@ -2,8 +2,6 @@ package claude
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -115,7 +113,7 @@ func (i *Claude) HandleRequest(ctx core.HTTPRequestContext) {
 
 func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
-	case "model", "agent", "environment", "agentVersion":
+	case "model", "agent", "environment":
 	default:
 		// Unknown resource type: return empty without touching credentials.
 		return []core.IntegrationResource{}, nil
@@ -133,8 +131,6 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 		return i.listAgentResources(client)
 	case "environment":
 		return i.listEnvironmentResources(client)
-	case "agentVersion":
-		return i.listAgentVersionResources(client, ctx.Parameters["agent"])
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -210,39 +206,6 @@ func (i *Claude) listEnvironmentResources(client *Client) ([]core.IntegrationRes
 			Type: "environment",
 			Name: name,
 			ID:   environment.ID,
-		})
-	}
-
-	return resources, nil
-}
-
-// listAgentVersionResources lists an agent's versions newest-first, preceded by
-// an explicit "Latest" choice. Latest lets the field be returned to its
-// unset/latest state after a specific version was pinned, and gives a newly
-// created agent a usable option. The value stays the bare version number (or
-// "latest"). An empty agent (nothing selected yet) yields no options.
-func (i *Claude) listAgentVersionResources(client *Client, agentID string) ([]core.IntegrationResource, error) {
-	if strings.TrimSpace(agentID) == "" {
-		return []core.IntegrationResource{}, nil
-	}
-
-	versions, err := client.ListManagedAgentVersions(agentID)
-	if err != nil {
-		return nil, err
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(versions)+1)
-	resources = append(resources, core.IntegrationResource{
-		Type: "agentVersion",
-		Name: "Latest",
-		ID:   "latest",
-	})
-	for _, version := range versions {
-		value := strconv.Itoa(version.Version)
-		resources = append(resources, core.IntegrationResource{
-			Type: "agentVersion",
-			Name: value,
-			ID:   value,
 		})
 	}
 

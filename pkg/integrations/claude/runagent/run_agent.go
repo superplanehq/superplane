@@ -3,7 +3,6 @@ package runagent
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -77,21 +76,9 @@ func (a *RunAgent) Configuration() []configuration.Field {
 		{
 			Name:        "version",
 			Label:       "Version",
-			Type:        configuration.FieldTypeIntegrationResource,
+			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Placeholder: "Latest",
-			Description: "Pins the session to a specific agent version. Choose **Latest** (or leave unset) to always use the agent's newest version.",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "agentVersion",
-					Parameters: []configuration.ParameterRef{
-						{
-							Name:      "agent",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "agent"},
-						},
-					},
-				},
-			},
+			Description: "Pins the session to a specific agent version. Leave unset to use the agent's latest version.",
 		},
 		{
 			// The stored key stays "environmentId" for backward compatibility:
@@ -308,18 +295,10 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 		vaultIDs = append(vaultIDs, vaultID)
 	}
 
-	version, err := parseAgentVersion(spec.Version)
-	if err != nil {
-		cleanupUploadedFiles(client, ctx, ctx.Logger.Warnf)
-		cleanupManagedVault(client, ctx, ctx.Logger.Warnf)
-		return err
-	}
-
 	aid := strings.TrimSpace(spec.Agent)
-	version = resolveAgentVersion(client, aid, version, ctx.Logger)
 	createReq := CreateManagedSessionRequest{
 		Agent:         aid,
-		AgentVersion:  version,
+		AgentVersion:  spec.Version,
 		EnvironmentID: strings.TrimSpace(spec.Environment),
 		VaultIDs:      vaultIDs,
 		Resources:     resources,
@@ -536,8 +515,6 @@ func truncateID(id string, maxLen int) string {
 }
 
 func decodeSpec(config any) (Spec, error) {
-	config = normalizeLegacyConfig(config)
-
 	var spec Spec
 	if err := mapstructure.Decode(config, &spec); err != nil {
 		return spec, fmt.Errorf("failed to decode configuration: %w", err)
@@ -551,65 +528,6 @@ func decodeSpec(config any) (Spec, error) {
 		}
 	}
 	return spec, nil
-}
-
-// normalizeLegacyConfig migrates configuration written by earlier versions of
-// this component so already-saved nodes keep working without being re-saved:
-// the agent version was stored as a number before it became the resource-value
-// string, which mapstructure would otherwise refuse to decode into Spec.Version.
-//
-// The input map is never mutated: a shallow copy is made only when a migration
-// actually applies, and non-map inputs pass through untouched.
-func normalizeLegacyConfig(config any) any {
-	raw, ok := config.(map[string]any)
-	if !ok {
-		return config
-	}
-
-	out := raw
-	copied := false
-	set := func(key string, value any) {
-		if !copied {
-			dup := make(map[string]any, len(raw)+1)
-			for k, v := range raw {
-				dup[k] = v
-			}
-			out = dup
-			copied = true
-		}
-		out[key] = value
-	}
-
-	// The version was stored as a number before it became the resource-value
-	// string, which mapstructure would otherwise refuse to decode into a string.
-	if v, ok := raw["version"]; ok {
-		if _, isStr := v.(string); !isStr {
-			if s := legacyVersionToString(v); s != "" {
-				set("version", s)
-			}
-		}
-	}
-
-	return out
-}
-
-// legacyVersionToString renders a version stored as a JSON number as the string
-// the resource field now uses. Returns "" for values it cannot interpret.
-func legacyVersionToString(v any) string {
-	switch n := v.(type) {
-	case float64:
-		return strconv.Itoa(int(n))
-	case float32:
-		return strconv.Itoa(int(n))
-	case int:
-		return strconv.Itoa(n)
-	case int64:
-		return strconv.FormatInt(n, 10)
-	case json.Number:
-		return n.String()
-	default:
-		return ""
-	}
 }
 
 func decodeStringList(v any) []string {
@@ -641,47 +559,5 @@ func validateSpec(spec Spec) error {
 	if strings.TrimSpace(spec.Prompt) == "" {
 		return fmt.Errorf("prompt is required")
 	}
-	if _, err := parseAgentVersion(spec.Version); err != nil {
-		return err
-	}
-	return nil
-}
-
-// parseAgentVersion converts the raw version resource value into an agent
-// version number. An empty value or the explicit "latest" sentinel both mean
-// "use the latest version" and yield a nil pointer, so the field can always be
-// returned to its unset state by picking the Latest option.
-func parseAgentVersion(raw string) (*int, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" || strings.EqualFold(raw, latestVersionValue) {
-		return nil, nil
-	}
-	v, err := strconv.Atoi(raw)
-	if err != nil {
-		return nil, fmt.Errorf("invalid agent version %q: must be a number", raw)
-	}
-	return &v, nil
-}
-
-// resolveAgentVersion drops a pinned version that the agent no longer has, so a
-// stale pin — e.g. one left in the config after switching to an agent without
-// that version — falls back to the latest version instead of running or failing
-// with the wrong one. Validation is best-effort: if the versions cannot be
-// listed, the configured pin is kept.
-func resolveAgentVersion(client *Client, agentID string, version *int, logger *log.Entry) *int {
-	if version == nil {
-		return nil
-	}
-	versions, err := client.ListAgentVersionNumbers(agentID)
-	if err != nil {
-		logger.Warnf("Could not verify versions for agent %s (%v); using version %d as configured", agentID, err, *version)
-		return version
-	}
-	for _, v := range versions {
-		if v == *version {
-			return version
-		}
-	}
-	logger.Warnf("Agent %s has no version %d (stale pin, likely after switching agents); using the latest version instead", agentID, *version)
 	return nil
 }

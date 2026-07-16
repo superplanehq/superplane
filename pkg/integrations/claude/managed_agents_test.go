@@ -57,29 +57,6 @@ func TestClient_ListManagedEnvironments(t *testing.T) {
 	assert.True(t, strings.HasSuffix(httpCtx.Requests[0].URL.Path, "/environments"))
 }
 
-func TestClient_ListManagedAgentVersions_sortsNewestFirst(t *testing.T) {
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			jsonResponse(`{"data":[{"version":1},{"version":3},{"version":2}],"next_page":""}`),
-		},
-	}
-	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: httpCtx}
-
-	versions, err := client.ListManagedAgentVersions("agent_1")
-	require.NoError(t, err)
-	require.Len(t, versions, 3)
-	assert.Equal(t, 3, versions[0].Version)
-	assert.Equal(t, 2, versions[1].Version)
-	assert.Equal(t, 1, versions[2].Version)
-	assert.True(t, strings.Contains(httpCtx.Requests[0].URL.Path, "/agents/agent_1/versions"))
-}
-
-func TestClient_ListManagedAgentVersions_requiresAgent(t *testing.T) {
-	client := &Client{APIKey: "k", BaseURL: defaultBaseURL, http: &contexts.HTTPContext{}}
-	_, err := client.ListManagedAgentVersions("")
-	require.Error(t, err)
-}
-
 func listResourcesCtx(response *http.Response, params map[string]string) core.ListResourcesContext {
 	var responses []*http.Response
 	if response != nil {
@@ -113,28 +90,4 @@ func TestClaude_ListResources_environments(t *testing.T) {
 	require.Len(t, res, 1)
 	assert.Equal(t, "env_1", res[0].ID)
 	assert.Equal(t, "prod", res[0].Name)
-}
-
-func TestClaude_ListResources_agentVersions_prependsLatest(t *testing.T) {
-	i := &Claude{}
-	res, err := i.ListResources("agentVersion", listResourcesCtx(
-		jsonResponse(`{"data":[{"version":2},{"version":1}],"next_page":""}`),
-		map[string]string{"agent": "agent_1"}))
-	require.NoError(t, err)
-	require.Len(t, res, 3)
-	// An explicit Latest option comes first so the field can be reset to latest.
-	assert.Equal(t, "latest", res[0].ID)
-	assert.Equal(t, "Latest", res[0].Name)
-	assert.Equal(t, "2", res[1].ID)
-	assert.Equal(t, "2", res[1].Name)
-	assert.Equal(t, "1", res[2].ID)
-	assert.Equal(t, "1", res[2].Name)
-}
-
-func TestClaude_ListResources_agentVersions_noAgentSelected(t *testing.T) {
-	i := &Claude{}
-	// No agent parameter yet: return empty without calling the API.
-	res, err := i.ListResources("agentVersion", listResourcesCtx(nil, nil))
-	require.NoError(t, err)
-	assert.Empty(t, res)
 }
