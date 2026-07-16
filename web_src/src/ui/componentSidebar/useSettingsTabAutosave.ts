@@ -95,10 +95,7 @@ export function useSettingsTabAutosave({
   performAutosaveRef.current = performAutosave;
 
   const handleSave = useCallback(async () => {
-    if (isInteractionDisabled) {
-      return;
-    }
-
+    if (isInteractionDisabled) return;
     await performAutosave();
   }, [isInteractionDisabled, performAutosave]);
 
@@ -106,10 +103,7 @@ export function useSettingsTabAutosave({
   handleSaveRef.current = handleSave;
 
   const requestAutosave = useCallback(() => {
-    if (isInteractionDisabled) {
-      return;
-    }
-
+    if (isInteractionDisabled) return;
     if (autosaveTimerRef.current !== null) {
       window.clearTimeout(autosaveTimerRef.current);
     }

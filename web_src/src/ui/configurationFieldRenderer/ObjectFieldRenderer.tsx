@@ -94,7 +94,15 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
       setEditorValue(serializeValueForEditor(defaultValue));
       setJsonError(null);
     }
-  }, [readOnly, skipDefaultsAfterReadOnly, value, field.defaultValue, onChange, coerceDefaultValue, serializeValueForEditor]);
+  }, [
+    readOnly,
+    skipDefaultsAfterReadOnly,
+    value,
+    field.defaultValue,
+    onChange,
+    coerceDefaultValue,
+    serializeValueForEditor,
+  ]);
 
   React.useEffect(() => {
     if (readOnly || skipDefaultsAfterReadOnly) return;
