@@ -199,6 +199,49 @@ func (c *Client) CreateManagedSession(req CreateManagedSessionRequest) (*Managed
 	return &out, nil
 }
 
+type agentVersionsResponse struct {
+	Data []struct {
+		Version int `json:"version"`
+	} `json:"data"`
+	NextPage string `json:"next_page"`
+}
+
+// ListAgentVersionNumbers returns the version numbers that currently exist for
+// an agent (GET /v1/agents/{id}/versions), following pagination.
+func (c *Client) ListAgentVersionNumbers(agentID string) ([]int, error) {
+	if agentID == "" {
+		return nil, fmt.Errorf("agent id is required")
+	}
+
+	var versions []int
+	page := ""
+	for range 20 {
+		params := url.Values{}
+		params.Set("limit", "100")
+		if page != "" {
+			params.Set("page", page)
+		}
+
+		body, err := c.execRequestWithBeta(http.MethodGet, c.BaseURL+"/agents/"+url.PathEscape(agentID)+"/versions?"+params.Encode(), nil, anthropicBetaManagedAgents)
+		if err != nil {
+			return nil, err
+		}
+
+		var resp agentVersionsResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal agent versions: %w", err)
+		}
+		for _, d := range resp.Data {
+			versions = append(versions, d.Version)
+		}
+		if resp.NextPage == "" {
+			break
+		}
+		page = resp.NextPage
+	}
+	return versions, nil
+}
+
 // GetManagedSession retrieves a session by ID (GET /v1/sessions/{id}).
 func (c *Client) GetManagedSession(sessionID string) (*ManagedSession, error) {
 	if sessionID == "" {
