@@ -76,8 +76,12 @@ export function evaluateCelPathLiteral(
   if (!globals) return { ok: false, error: "No context available" };
   const trimmed = path.trim();
   if (!trimmed) return { ok: true, value: "", formattedValue: "" };
-  const value = getValueAtPath(globals, trimmed);
-  return { ok: true, value, formattedValue: stringifyCelValue(value) };
+  try {
+    const value = getValueAtPath(globals, trimmed);
+    return { ok: true, value, formattedValue: stringifyCelValue(value) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export const widgetCelAdapter: ExpressionAdapter = {

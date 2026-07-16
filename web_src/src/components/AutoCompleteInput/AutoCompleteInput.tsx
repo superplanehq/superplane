@@ -8,6 +8,8 @@ import type { ExpressionAdapter } from "@/lib/expression";
 import { exprLangAdapter } from "@/lib/expression";
 import { calculateDropdownPosition } from "./dropdownPosition";
 
+const TEMPLATE_SEGMENT_RE = /\{\{[\s\S]*?\}\}/;
+
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
   exampleObj: Record<string, unknown> | null;
   value?: string;
@@ -182,7 +184,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const suggestionItemsRef = useRef<Array<ReturnType<typeof getSuggestions>[number]>>([]);
 
     const isRawExpression = expressionMode === "raw";
-    const hasTemplateSegments = /\{\{[\s\S]*?\}\}/.test(inputValue);
+    const hasTemplateSegments = TEMPLATE_SEGMENT_RE.test(inputValue);
     // Preview the whole input as a single value when either:
     //  - raw mode (the whole input IS the expression), or
     //  - `pathOrRaw` mode without `{{ … }}` AND the adapter knows how to
@@ -560,6 +562,15 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       };
     };
 
+    // Path-mode fallback is only meaningful while the value is still a bare
+    // path — once the input contains a complete `{{ … }}` segment the runtime
+    // treats the whole string as a template, and only its inner expressions
+    // should be evaluated/suggested (matches `canEvaluatePathLiteral`).
+    const pathFallbackFor = useCallback(
+      (text: string) => pathModeOutsideWrapper && !TEMPLATE_SEGMENT_RE.test(text),
+      [pathModeOutsideWrapper],
+    );
+
     const isAllowedToSuggest = useCallback(
       (text: string, position: number) => {
         if (isRawExpression || !props.startWord || !props.suffix) {
@@ -568,17 +579,17 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
         const openIndex = text.lastIndexOf(props.startWord, position);
         if (openIndex === -1) {
-          return pathModeOutsideWrapper;
+          return pathFallbackFor(text);
         }
 
         const closeIndex = text.indexOf(props.suffix, openIndex + 2);
         if (closeIndex !== -1 && position - 1 > closeIndex) {
-          return pathModeOutsideWrapper;
+          return pathFallbackFor(text);
         }
 
         return true;
       },
-      [isRawExpression, props.startWord, props.suffix, pathModeOutsideWrapper],
+      [isRawExpression, props.startWord, props.suffix, pathFallbackFor],
     );
 
     const getExpressionContext = useCallback(
@@ -597,9 +608,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         const insideWrapper = openIndex !== -1 && (closeIndex === -1 || cursor - 1 <= closeIndex);
 
         if (!insideWrapper) {
-          // Path-mode fallback: treat the whole input as a plain-path
-          // expression when the field opts in (e.g. widget CEL `pathOrRaw`).
-          if (!pathModeOutsideWrapper) return null;
+          if (!pathFallbackFor(text)) return null;
           return {
             expressionText: text,
             expressionCursor: cursor,
@@ -617,7 +626,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           endOffset,
         };
       },
-      [isRawExpression, startWord, suffix, pathModeOutsideWrapper],
+      [isRawExpression, startWord, suffix, pathFallbackFor],
     );
 
     const getSuggestionInsertText = (suggestion: ReturnType<typeof getSuggestions>[number]) => {
