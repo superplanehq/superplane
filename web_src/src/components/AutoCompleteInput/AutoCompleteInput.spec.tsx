@@ -100,6 +100,33 @@ describe("AutoCompleteInput preview toggle", () => {
     expect(screen.getByText(/Expected a single full \{\{ … \}\} expression/)).toBeInTheDocument();
   });
 
+  it("rejects empty path-or-raw expressions", () => {
+    const adapter: ExpressionAdapter = {
+      id: "cel",
+      evaluate: () => ({ ok: true, value: "", formattedValue: "" }),
+      evaluatePathLiteral: () => ({ ok: true, value: "path", formattedValue: "path" }),
+      resolveSuggestionValue: vi.fn(),
+      formatResult: vi.fn(),
+    };
+    render(
+      <AutoCompleteInput
+        exampleObj={{ status: "passed" }}
+        value="{{   }}"
+        onChange={vi.fn()}
+        startWord="{{"
+        prefix="{{ "
+        suffix=" }}"
+        pathModeOutsideWrapper
+        expressionAdapter={adapter}
+        showValuePreview
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(screen.getByText(/Expression cannot be empty/)).toBeInTheDocument();
+  });
+
   it("evaluates repeated path-or-raw templates as one runtime expression", () => {
     const evaluate = vi.fn((expression: string) =>
       expression.includes("{{")

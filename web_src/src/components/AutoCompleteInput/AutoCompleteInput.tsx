@@ -216,6 +216,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           if (!fullTemplate) {
             return { ok: false, error: "Expected a single full {{ … }} expression" };
           }
+          if (fullTemplate[1].trim().length === 0) {
+            return { ok: false, error: "Expression cannot be empty" };
+          }
           return expressionAdapter.evaluate(fullTemplate[1], globals);
         }
         return expressionAdapter.evaluate(input, globals);
