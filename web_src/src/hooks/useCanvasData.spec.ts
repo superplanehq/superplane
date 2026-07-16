@@ -44,6 +44,7 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
 
 import {
   canvasKeys,
+  invalidateStagedCanvasCaches,
   useDescribeRun,
   useInfiniteCanvasRuns,
   useUpdateCanvasConsole,
@@ -227,6 +228,50 @@ describe("useDescribeRun", () => {
       expect(result.current.data?.run?.state).toBe("STATE_FINISHED");
     });
     expect(result.current.data?.run?.result).toBe("RESULT_PASSED");
+  });
+});
+
+describe("invalidateStagedCanvasCaches", () => {
+  // Regression for #5945. The helper is fired without being awaited from the
+  // staging_updated WebSocket handler. Two guards keep a detached rejection
+  // (a CancelledError from a cancelled in-flight staged read) from surfacing
+  // via window.onunhandledrejection: cancelRefetch: false on every
+  // invalidation, plus a Promise.allSettled wrapper around them.
+  it("passes cancelRefetch: false to every invalidateQueries call", () => {
+    const queryClient = createQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+
+    invalidateStagedCanvasCaches(queryClient, "canvas-1");
+
+    expect(invalidateSpy).toHaveBeenCalled();
+    for (const call of invalidateSpy.mock.calls) {
+      expect(call[0]).toMatchObject({ cancelRefetch: false });
+    }
+  });
+
+  it("routes every invalidation through Promise.allSettled so rejections cannot leak", () => {
+    // The helper is called detached (void), so a rejected invalidation would
+    // otherwise surface via window.onunhandledrejection. Wrapping the calls in
+    // Promise.allSettled attaches a handler to each, absorbing any rejection.
+    const queryClient = createQueryClient();
+    const allSettledSpy = vi.spyOn(Promise, "allSettled");
+    try {
+      invalidateStagedCanvasCaches(queryClient, "canvas-1");
+
+      expect(allSettledSpy).toHaveBeenCalledTimes(1);
+      const wrapped = allSettledSpy.mock.calls[0][0] as unknown[];
+      expect(wrapped).toHaveLength(5);
+      expect(wrapped.every((promise) => promise instanceof Promise)).toBe(true);
+    } finally {
+      allSettledSpy.mockRestore();
+    }
+  });
+
+  it("does not throw when invoked detached", () => {
+    const queryClient = createQueryClient();
+    vi.spyOn(queryClient, "invalidateQueries").mockRejectedValue(new Error("cancelled"));
+
+    expect(() => invalidateStagedCanvasCaches(queryClient, "canvas-1")).not.toThrow();
   });
 });
 
