@@ -168,8 +168,6 @@ function useRunInspectorPanelModel({
   const actions = useRunInspectorActions({
     canvasId,
     run,
-    sections,
-    executionsLoading: executionsQuery.isLoading,
     onRerunCreated,
   });
   const accordionValue = useMemo(

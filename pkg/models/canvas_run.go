@@ -24,14 +24,16 @@ const (
 )
 
 type CanvasRun struct {
-	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-	WorkflowID uuid.UUID
-	VersionID  uuid.UUID
-	State      string
-	Result     string
-	CreatedAt  *time.Time
-	UpdatedAt  *time.Time
-	FinishedAt *time.Time
+	ID          uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+	WorkflowID  uuid.UUID
+	VersionID   uuid.UUID
+	State       string
+	Result      string
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
+	FinishedAt  *time.Time
+	CancelledAt *time.Time
+	CancelledBy *uuid.UUID
 }
 
 func (r *CanvasRun) TableName() string {
@@ -286,12 +288,19 @@ func FindOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*OpenCanv
 
 func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string, error) {
 	var result struct {
+		Cancelled    bool
 		HasFailed    bool
 		HasCancelled bool
 	}
 
 	err := tx.Raw(`
 		SELECT
+			EXISTS (
+				SELECT 1
+				FROM workflow_runs
+				WHERE id = ?
+				AND cancelled_at IS NOT NULL
+			) AS cancelled,
 			EXISTS (
 				SELECT 1
 				FROM workflow_node_executions
@@ -306,12 +315,19 @@ func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string
 			) AS has_cancelled
 	`,
 		runID,
+		runID,
 		CanvasNodeExecutionResultFailed,
 		runID,
 		CanvasNodeExecutionResultCancelled,
 	).Scan(&result).Error
 	if err != nil {
 		return "", err
+	}
+
+	// A run that was explicitly cancelled always finalizes to cancelled,
+	// regardless of the individual execution results it accumulated.
+	if result.Cancelled {
+		return CanvasRunResultCancelled, nil
 	}
 
 	if result.HasFailed {
@@ -323,4 +339,90 @@ func CalculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string
 	}
 
 	return CanvasRunResultPassed, nil
+}
+
+// CancelRunResult reports the outcome of a CancelRunInTransaction call.
+type CancelRunResult struct {
+	Run *CanvasRun
+
+	// AlreadyFinished is true when the run had already reached a terminal state,
+	// making the cancel an idempotent no-op.
+	AlreadyFinished bool
+
+	// CancelledExecutions is the snapshot of executions that were active when the
+	// run was cancelled. Callers should invoke each component's best-effort
+	// external Cancel hook for these after the transaction commits.
+	CancelledExecutions []CanvasNodeExecution
+}
+
+// CancelRunInTransaction atomically cancels an entire run: it cancels every
+// active execution, deletes all pending queue items, completes pending requests,
+// and finalizes the run with result=cancelled. It mirrors the node-scoped
+// cancelActiveExecutionsForDeletedNode, but is keyed on run_id.
+//
+// The run row is locked FOR UPDATE, which blocks concurrent FK inserts of new
+// work (executions/queue items/events) for the run while the transaction is open.
+// The producer guards in NodeQueueWorker and EventRouter close the remaining
+// window for messages already in flight.
+func CancelRunInTransaction(tx *gorm.DB, workflowID, runID uuid.UUID, cancelledBy *uuid.UUID) (*CancelRunResult, error) {
+	run, err := LockCanvasRunInTransaction(tx, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	if run.WorkflowID != workflowID {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	if run.State == CanvasRunStateFinished {
+		return &CancelRunResult{Run: run, AlreadyFinished: true}, nil
+	}
+
+	//
+	// Snapshot the active executions before cancelling them so the caller can run
+	// each component's best-effort external Cancel hook once the transaction has
+	// committed (outside the run lock).
+	//
+	activeExecutions, err := ListActiveNodeExecutionsForRunInTransaction(tx, workflowID, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	//
+	// Cancel each active execution individually so node states are reset to ready
+	// and pending requests are completed, exactly like a single-execution cancel.
+	//
+	for i := range activeExecutions {
+		if err := activeExecutions[i].CancelInTransaction(tx, cancelledBy); err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := deleteQueueItemsForRun(tx, workflowID, runID); err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	err = tx.Model(run).
+		Updates(map[string]any{
+			"state":        CanvasRunStateFinished,
+			"result":       CanvasRunResultCancelled,
+			"cancelled_at": &now,
+			"cancelled_by": cancelledBy,
+			"updated_at":   &now,
+			"finished_at":  &now,
+		}).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &CancelRunResult{Run: run, CancelledExecutions: activeExecutions}, nil
+}
+
+// IsFinished reports whether the run has reached its terminal state. It is used
+// by work producers to skip creating new work for a run that has been finalized
+// or cancelled.
+func (r *CanvasRun) IsFinished() bool {
+	return r.State == CanvasRunStateFinished
 }

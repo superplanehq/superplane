@@ -201,6 +201,14 @@ func serializeCanvasRunWithQueueItemInputs(
 		serialized.FinishedAt = timestamppb.New(*run.FinishedAt)
 	}
 
+	if run.CancelledAt != nil {
+		serialized.CancelledAt = timestamppb.New(*run.CancelledAt)
+	}
+
+	if run.CancelledBy != nil {
+		serialized.CancelledBy = run.CancelledBy.String()
+	}
+
 	return serialized, nil
 }
 
