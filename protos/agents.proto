@@ -164,6 +164,7 @@ message DefineAgentOutcomeRequest {
   string description = 2;
   string rubric = 3;
   int32 max_iterations = 4;
+  bool auto_layout_on_update_enabled = 5;
 }
 
 message DefineAgentOutcomeResponse {}
