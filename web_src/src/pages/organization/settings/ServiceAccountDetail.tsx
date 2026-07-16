@@ -92,13 +92,16 @@ function useApiKeyEditForm(
       return;
     }
 
+    const originalExpiresAt = toLocalDateTimeInput(serviceAccount?.expiresAt);
+    const expiresAtChanged = editExpiresAt !== originalExpiresAt;
+
     try {
       await updateMutation.mutateAsync({
         id,
         name: editName.trim(),
         description: editDescription.trim(),
-        expiresAt: toApiTimestamp(editExpiresAt),
-        clearExpiresAt: !editExpiresAt,
+        expiresAt: expiresAtChanged ? toApiTimestamp(editExpiresAt) : undefined,
+        clearExpiresAt: expiresAtChanged && !editExpiresAt,
         canvasIds: editAccessMode === "canvas" ? editCanvasIds : [],
       });
       showSuccessToast("API key updated");
