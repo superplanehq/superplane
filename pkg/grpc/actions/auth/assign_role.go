@@ -30,7 +30,7 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 		return nil, grpcerrors.PermissionDenied(nil, "cannot change your own role")
 	}
 
-	if user.IsServiceAccount() && roleName == models.RoleOrgOwner {
+	if user.IsAPIKey() && roleName == models.RoleOrgOwner {
 		return nil, grpcerrors.InvalidArgument(nil, "API keys cannot be assigned the org_owner role")
 	}
 

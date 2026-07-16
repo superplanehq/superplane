@@ -18,11 +18,11 @@ import { KeyRound } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useServiceAccounts, useCreateServiceAccount, useDeleteServiceAccount } from "@/hooks/useServiceAccounts";
+import { useAPIKeys, useCreateAPIKey, useDeleteAPIKey } from "@/hooks/useApiKeys";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { ApiKeysContent } from "./ApiKeysContent";
 
-interface ServiceAccountsProps {
+interface APIKeysProps {
   organizationId: string;
 }
 
@@ -43,7 +43,7 @@ function useCreateApiKeyForm(organizationId: string, canCreate: boolean) {
   const [selectedCanvasIds, setSelectedCanvasIds] = useState<string[]>([]);
   const [newToken, setNewToken] = useState<string | null>(null);
   const navigate = useNavigate();
-  const createMutation = useCreateServiceAccount(organizationId);
+  const createMutation = useCreateAPIKey(organizationId);
 
   const handleCreateClick = () => {
     if (!canCreate) return;
@@ -101,10 +101,10 @@ function useCreateApiKeyForm(organizationId: string, canCreate: boolean) {
   };
 
   const handleTokenModalClose = () => {
-    const saId = createMutation.data?.data?.serviceAccount?.id;
+    const apiKeyId = createMutation.data?.data?.apiKey?.id;
     handleCloseCreateModal();
-    if (saId) {
-      navigate(`/${organizationId}/settings/service-accounts/${saId}`);
+    if (apiKeyId) {
+      navigate(`/${organizationId}/settings/api-keys/${apiKeyId}`);
     }
   };
 
@@ -137,22 +137,22 @@ function useCreateApiKeyForm(organizationId: string, canCreate: boolean) {
   };
 }
 
-export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
+export function APIKeys({ organizationId }: APIKeysProps) {
   usePageTitle(["API Keys"]);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const canCreate = canAct("service_accounts", "create");
-  const canDelete = canAct("service_accounts", "delete");
+  const canCreate = canAct("api_keys", "create");
+  const canDelete = canAct("api_keys", "delete");
 
-  const { data: serviceAccounts = [], isLoading } = useServiceAccounts(organizationId);
+  const { data: apiKeys = [], isLoading } = useAPIKeys(organizationId);
   const { data: canvases = [] } = useCanvases(organizationId);
-  const deleteMutation = useDeleteServiceAccount(organizationId);
+  const deleteMutation = useDeleteAPIKey(organizationId);
   const form = useCreateApiKeyForm(organizationId, canCreate);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
-  const handleDelete = async (id: string, saName: string) => {
+  const handleDelete = async (id: string, apiKeyName: string) => {
     if (!canDelete) return;
-    if (!confirm(`Are you sure you want to delete API key "${saName}"? This cannot be undone.`)) return;
+    if (!confirm(`Are you sure you want to delete API key "${apiKeyName}"? This cannot be undone.`)) return;
     try {
       await deleteMutation.mutateAsync(id);
       showSuccessToast("API key deleted");
@@ -161,7 +161,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
     }
   };
 
-  const getDetailPath = (id: string) => `/${organizationId}/settings/service-accounts/${id}`;
+  const getDetailPath = (id: string) => `/${organizationId}/settings/api-keys/${id}`;
   const canvasNamesById = new Map(canvases.map((canvas) => [canvas.id, canvas.name || "Unnamed"]));
   const scopeLabel = (canvasIds?: string[]) => {
     if (!canvasIds || canvasIds.length === 0) return "Organization-wide";
@@ -181,7 +181,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
     );
   }
 
-  const sorted = [...serviceAccounts].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const sorted = [...apiKeys].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   return (
     <div className="space-y-6 pt-6">
@@ -196,7 +196,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 className="flex items-center"
                 onClick={form.handleCreateClick}
                 disabled={!canCreate}
-                data-testid="sa-create-btn"
+                data-testid="api-key-create-btn"
               >
                 <Icon name="plus" />
                 Create API Key
@@ -227,7 +227,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 e.preventDefault();
                 form.handleCreate();
               }}
-              data-testid="sa-create-form"
+              data-testid="api-key-create-form"
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -255,7 +255,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     onChange={(e) => form.setName(e.target.value)}
                     placeholder="e.g., ci-deploy-bot"
                     required
-                    data-testid="sa-create-name"
+                    data-testid="api-key-create-name"
                   />
                 </div>
                 <div>
@@ -265,7 +265,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     onChange={(e) => form.setDescription(e.target.value)}
                     placeholder="What is this API key used for?"
                     rows={3}
-                    data-testid="sa-create-description"
+                    data-testid="api-key-create-description"
                   />
                 </div>
                 <div>
@@ -273,7 +273,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     Role <span className="text-red-500">*</span>
                   </Label>
                   <Select value={form.role} onValueChange={form.setRole}>
-                    <SelectTrigger className="w-full" data-testid="sa-create-role">
+                    <SelectTrigger className="w-full" data-testid="api-key-create-role">
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -288,7 +288,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 <div>
                   <Label className="text-gray-800 dark:text-gray-100 mb-2">Access</Label>
                   <Select value={form.accessMode} onValueChange={(value) => form.setAccessMode(value as AccessMode)}>
-                    <SelectTrigger className="w-full" data-testid="sa-create-access-mode">
+                    <SelectTrigger className="w-full" data-testid="api-key-create-access-mode">
                       <SelectValue placeholder="Select access" />
                     </SelectTrigger>
                     <SelectContent>
@@ -313,7 +313,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                             <Checkbox
                               checked={form.selectedCanvasIds.includes(canvasId)}
                               onChange={() => form.toggleCanvas(canvasId)}
-                              data-testid="sa-create-canvas"
+                              data-testid="api-key-create-canvas"
                             />
                             <span className="text-gray-800 dark:text-gray-100">{canvas.name || "Unnamed"}</span>
                           </label>
@@ -328,7 +328,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     type="datetime-local"
                     value={form.expiresAt}
                     onChange={(e) => form.setExpiresAt(e.target.value)}
-                    data-testid="sa-create-expires-at"
+                    data-testid="api-key-create-expires-at"
                   />
                 </div>
               </div>
@@ -340,7 +340,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                   loading={form.createMutation.isPending}
                   loadingText="Creating..."
                   className="flex items-center gap-2"
-                  data-testid="sa-create-submit"
+                  data-testid="api-key-create-submit"
                 >
                   Create
                 </LoadingButton>
@@ -385,12 +385,12 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                   readOnly
                   value={form.newToken}
                   className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-800"
-                  data-testid="sa-token-display"
+                  data-testid="api-key-token-display"
                 />
                 <CopyButton
                   variant="button"
                   text={form.newToken}
-                  data-testid="sa-token-copy"
+                  data-testid="api-key-token-copy"
                   onCopyError={() => showErrorToast("Failed to copy token")}
                 >
                   Copy
@@ -398,7 +398,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
               </div>
 
               <div className="flex justify-start mt-6">
-                <Button onClick={form.handleTokenModalClose} data-testid="sa-token-done">
+                <Button onClick={form.handleTokenModalClose} data-testid="api-key-token-done">
                   Done
                 </Button>
               </div>

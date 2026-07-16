@@ -26,7 +26,7 @@ func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
 		return nil, grpcerrors.Internal(err, "failed to load user")
 	}
 
-	if user.IsServiceAccount() {
+	if user.IsAPIKey() {
 		return nil, grpcerrors.PermissionDenied(nil, "API keys must use the API key token endpoint")
 	}
 

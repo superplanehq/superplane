@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
+	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -18,7 +19,6 @@ import (
 	pbOrganizations "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
-	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
@@ -27,20 +27,20 @@ import (
 )
 
 type Services struct {
-	Users           pbUsers.UsersServer
-	Groups          pbGroups.GroupsServer
-	Roles           pbRoles.RolesServer
-	Organizations   pbOrganizations.OrganizationsServer
-	Integrations    pbIntegrations.IntegrationsServer
-	Secrets         pbSecrets.SecretsServer
-	Me              pbMe.MeServer
-	Actions         pbActions.ActionsServer
-	Triggers        pbTriggers.TriggersServer
-	Widgets         pbWidgets.WidgetsServer
-	Canvases        pbCanvases.CanvasesServer
-	CanvasFolders   pbCanvasFolders.CanvasFoldersServer
-	ServiceAccounts pbServiceAccounts.ServiceAccountsServer
-	Agents          pbAgents.AgentsServer
+	Users         pbUsers.UsersServer
+	Groups        pbGroups.GroupsServer
+	Roles         pbRoles.RolesServer
+	Organizations pbOrganizations.OrganizationsServer
+	Integrations  pbIntegrations.IntegrationsServer
+	Secrets       pbSecrets.SecretsServer
+	Me            pbMe.MeServer
+	Actions       pbActions.ActionsServer
+	Triggers      pbTriggers.TriggersServer
+	Widgets       pbWidgets.WidgetsServer
+	Canvases      pbCanvases.CanvasesServer
+	CanvasFolders pbCanvasFolders.CanvasFoldersServer
+	APIKeys       pbAPIKeys.ApiKeysServer
+	Agents        pbAgents.AgentsServer
 }
 
 type ServicesConfig struct {
@@ -86,8 +86,8 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 			cfg.WebhooksBaseURL,
 			cfg.UsageService,
 		),
-		CanvasFolders:   NewCanvasFolderService(),
-		ServiceAccounts: NewServiceAccountsService(cfg.AuthService),
-		Agents:          NewAgentsService(cfg.AgentService),
+		CanvasFolders: NewCanvasFolderService(),
+		APIKeys:       NewAPIKeysService(cfg.AuthService),
+		Agents:        NewAgentsService(cfg.AgentService),
 	}, nil
 }
