@@ -64,10 +64,14 @@ export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditor
     // specific — hide them from CEL fields so authors don't insert identifiers
     // the CEL runtime doesn't understand.
     const resolvedIncludeFunctions = includeFunctions ?? dialect !== "cel";
-    // Widget CEL's `$` selector maps to the internal `__runNodes__` map, so
-    // route env-key completion (`$` / `$["…"]`) to node names instead of the
-    // row's top-level fields.
-    const envKeySource = dialect === "cel" ? "__runNodes__" : undefined;
+    // Widget CEL's `$` selector maps to the internal `__runNodes__` map on the
+    // row, so route env-key completion (`$` / `$["…"]`) to node names when the
+    // caller's `exampleObj` actually carries that map (widget forms). Markdown
+    // and HTML editors reuse the CEL dialect but pass a variable dictionary
+    // instead, so we leave `envKeySource` unset and let `$` fall back to the
+    // top-level globals in those cases.
+    const envKeySource =
+      dialect === "cel" && hasRunNodesMap(rest.exampleObj) ? "__runNodes__" : undefined;
     const resolvedExcludedSuggestions = useMemo(() => {
       if (dialect !== "cel") return excludedSuggestions;
       const base = excludedSuggestions ?? [];
@@ -93,3 +97,10 @@ export const ExpressionEditor = forwardRef<HTMLTextAreaElement, ExpressionEditor
     );
   },
 );
+
+function hasRunNodesMap(exampleObj: unknown): boolean {
+  if (!exampleObj || typeof exampleObj !== "object") return false;
+  const record = exampleObj as Record<string, unknown>;
+  const map = record.__runNodes__;
+  return !!map && typeof map === "object";
+}
