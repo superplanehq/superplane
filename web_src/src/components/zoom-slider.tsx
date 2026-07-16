@@ -309,9 +309,7 @@ export const ZoomSlider = memo(function ZoomSlider({
               className="h-7 w-7"
               onClick={onAutoFocusToggle}
               aria-pressed={isAutoFocusEnabled}
-              aria-label={
-                isAutoFocusEnabled ? "Disable auto-focus on selection" : "Enable auto-focus on selection"
-              }
+              aria-label={isAutoFocusEnabled ? "Disable auto-focus on selection" : "Enable auto-focus on selection"}
               data-testid="canvas-auto-focus-toggle"
             >
               {isAutoFocusEnabled ? <Locate className="h-3 w-3" /> : <LocateOff className="h-3 w-3" />}
