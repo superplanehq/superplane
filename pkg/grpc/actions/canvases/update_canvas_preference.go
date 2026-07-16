@@ -46,7 +46,6 @@ func UpdateCanvasPreference(
 			organizationUUID,
 			userUUID,
 			canvasID,
-			req.Pinned,
 			req.Starred,
 		)
 		return err
@@ -67,12 +66,7 @@ func UpdateCanvasPreference(
 func serializeCanvasPreference(preference *models.UserCanvasPreference) *pb.CanvasPreference {
 	serialized := &pb.CanvasPreference{
 		CanvasId: preference.CanvasID.String(),
-		Pinned:   preference.PinnedAt != nil,
 		Starred:  preference.StarredAt != nil,
-	}
-
-	if preference.PinnedAt != nil {
-		serialized.PinnedAt = timestamppb.New(*preference.PinnedAt)
 	}
 
 	if preference.StarredAt != nil {

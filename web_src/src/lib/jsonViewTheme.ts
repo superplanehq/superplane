@@ -37,7 +37,7 @@ export const darkJsonViewStyle: JsonViewStyle = {
   "--w-rjv-info-color": "#6b7280",
 };
 
-export const jsonViewClassName = "json-viewer-hide-types";
+export const jsonViewClassName = "json-viewer-hide-types json-viewer-wrap-values";
 
 export function getJsonViewStyle(theme: "light" | "dark"): CSSProperties {
   return theme === "dark" ? darkJsonViewStyle : lightJsonViewStyle;

@@ -93,6 +93,9 @@ func (a *RunAgent) handleTerminalSession(ctx core.ActionHookContext, client *Cli
 	}
 
 	out := buildOutputFromSessionMessages(sess.Status, metadata.Session.ID, sm)
+	if sm != nil {
+		out.Artifacts = CollectSessionArtifacts(client, metadata.Session.ID, sm.ExpectsArtifacts, ctx.Logger.Warnf)
+	}
 	if emitErr := ctx.ExecutionState.Emit(defaultChannel, payloadType, []any{out}); emitErr != nil {
 		return emitErr
 	}

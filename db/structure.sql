@@ -219,6 +219,19 @@ CREATE TABLE public.app_installations (
 
 
 --
+-- Name: app_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_messages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    canvas_id uuid NOT NULL,
+    node_id character varying(128) NOT NULL,
+    payload jsonb NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: canvas_folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -246,6 +259,17 @@ CREATE TABLE public.canvas_memories (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     source text DEFAULT 'node'::text NOT NULL
+);
+
+
+--
+-- Name: canvas_subscriptions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.canvas_subscriptions (
+    source_canvas_id uuid NOT NULL,
+    target_canvas_id uuid NOT NULL,
+    target_node_id character varying(128) NOT NULL
 );
 
 
@@ -474,7 +498,6 @@ CREATE TABLE public.user_canvas_preferences (
     organization_id uuid NOT NULL,
     user_id uuid NOT NULL,
     canvas_id uuid NOT NULL,
-    pinned_at timestamp without time zone,
     starred_at timestamp without time zone,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
@@ -832,6 +855,14 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
+-- Name: app_messages app_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_messages
+    ADD CONSTRAINT app_messages_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: canvas_folders canvas_folders_organization_id_title_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -853,6 +884,14 @@ ALTER TABLE ONLY public.canvas_folders
 
 ALTER TABLE ONLY public.canvas_memories
     ADD CONSTRAINT canvas_memories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: canvas_subscriptions canvas_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_subscriptions
+    ADD CONSTRAINT canvas_subscriptions_pkey PRIMARY KEY (source_canvas_id, target_canvas_id, target_node_id);
 
 
 --
@@ -1285,6 +1324,13 @@ CREATE INDEX idx_app_installations_organization_id ON public.app_installations U
 
 
 --
+-- Name: idx_app_messages_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_messages_created_at ON public.app_messages USING btree (created_at);
+
+
+--
 -- Name: idx_canvas_folders_organization_id_title; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1296,6 +1342,13 @@ CREATE INDEX idx_canvas_folders_organization_id_title ON public.canvas_folders U
 --
 
 CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USING btree (canvas_id, namespace);
+
+
+--
+-- Name: idx_canvas_subscriptions_target; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvas_subscriptions_target ON public.canvas_subscriptions USING btree (target_canvas_id, target_node_id);
 
 
 --
@@ -1373,13 +1426,6 @@ CREATE INDEX idx_repository_seed_files_repository_id ON public.repository_seed_f
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
-
-
---
--- Name: idx_user_canvas_preferences_user_pinned; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_user_canvas_preferences_user_pinned ON public.user_canvas_preferences USING btree (organization_id, user_id, pinned_at DESC) WHERE (pinned_at IS NOT NULL);
 
 
 --
@@ -1701,6 +1747,22 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
+-- Name: app_messages app_messages_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_messages
+    ADD CONSTRAINT app_messages_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_messages app_messages_canvas_id_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_messages
+    ADD CONSTRAINT app_messages_canvas_id_node_id_fkey FOREIGN KEY (canvas_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+
+
+--
 -- Name: canvas_folders canvas_folders_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1714,6 +1776,30 @@ ALTER TABLE ONLY public.canvas_folders
 
 ALTER TABLE ONLY public.canvas_memories
     ADD CONSTRAINT canvas_memories_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_subscriptions canvas_subscriptions_source_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_subscriptions
+    ADD CONSTRAINT canvas_subscriptions_source_canvas_id_fkey FOREIGN KEY (source_canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_subscriptions canvas_subscriptions_target_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_subscriptions
+    ADD CONSTRAINT canvas_subscriptions_target_canvas_id_fkey FOREIGN KEY (target_canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_subscriptions canvas_subscriptions_target_canvas_id_target_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_subscriptions
+    ADD CONSTRAINT canvas_subscriptions_target_canvas_id_target_node_id_fkey FOREIGN KEY (target_canvas_id, target_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
 
 
 --
@@ -2116,7 +2202,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260706145438	f
+20260715185442	f
 \.
 
 

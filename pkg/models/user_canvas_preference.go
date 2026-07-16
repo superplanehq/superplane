@@ -13,7 +13,6 @@ type UserCanvasPreference struct {
 	OrganizationID uuid.UUID `gorm:"primaryKey"`
 	UserID         uuid.UUID `gorm:"primaryKey"`
 	CanvasID       uuid.UUID `gorm:"primaryKey"`
-	PinnedAt       *time.Time
 	StarredAt      *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -57,28 +56,27 @@ func SetUserCanvasPreference(
 	organizationID uuid.UUID,
 	userID uuid.UUID,
 	canvasID uuid.UUID,
-	pinned *bool,
 	starred *bool,
 ) (*UserCanvasPreference, error) {
 	if err := ensureCanvasExistsForPreference(tx, organizationID, canvasID); err != nil {
 		return nil, err
 	}
 
-	if pinned == nil && starred == nil {
+	if starred == nil {
 		return findUserCanvasPreference(tx, organizationID, userID, canvasID)
 	}
 
 	preference, err := lockUserCanvasPreference(tx, organizationID, userID, canvasID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return createUserCanvasPreference(tx, organizationID, userID, canvasID, pinned, starred)
+		return createUserCanvasPreference(tx, organizationID, userID, canvasID, starred)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	applyUserCanvasPreferenceUpdate(preference, pinned, starred, time.Now())
-	if preference.PinnedAt == nil && preference.StarredAt == nil {
+	applyUserCanvasPreferenceUpdate(preference, starred, time.Now())
+	if preference.StarredAt == nil {
 		if err := tx.Delete(preference).Error; err != nil {
 			return nil, err
 		}
@@ -146,7 +144,6 @@ func createUserCanvasPreference(
 	organizationID uuid.UUID,
 	userID uuid.UUID,
 	canvasID uuid.UUID,
-	pinned *bool,
 	starred *bool,
 ) (*UserCanvasPreference, error) {
 	now := time.Now()
@@ -157,8 +154,8 @@ func createUserCanvasPreference(
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	applyUserCanvasPreferenceUpdate(preference, pinned, starred, now)
-	if preference.PinnedAt == nil && preference.StarredAt == nil {
+	applyUserCanvasPreferenceUpdate(preference, starred, now)
+	if preference.StarredAt == nil {
 		return preference, nil
 	}
 
@@ -169,11 +166,12 @@ func createUserCanvasPreference(
 	return preference, nil
 }
 
-func applyUserCanvasPreferenceUpdate(preference *UserCanvasPreference, pinned *bool, starred *bool, now time.Time) {
+func applyUserCanvasPreferenceUpdate(
+	preference *UserCanvasPreference,
+	starred *bool,
+	now time.Time,
+) {
 	preference.UpdatedAt = now
-	if pinned != nil {
-		preference.PinnedAt = timestampIfEnabled(*pinned, now)
-	}
 	if starred != nil {
 		preference.StarredAt = timestampIfEnabled(*starred, now)
 	}

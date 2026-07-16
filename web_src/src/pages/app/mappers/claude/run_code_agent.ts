@@ -30,18 +30,34 @@ type RunCodeAgentConfiguration = {
   model?: string;
 };
 
+type RunCodeAgentArtifact = {
+  fileId?: string;
+  filename?: string;
+};
+
 type RunCodeAgentPayloadData = {
   status?: string;
   sessionId?: string;
   prUrl?: string;
   branch?: string;
   lastMessage?: string;
+  artifacts?: RunCodeAgentArtifact[];
 };
 
 function addDetail(details: Record<string, string>, key: string, value: string | undefined) {
   if (value) {
     details[key] = value;
   }
+}
+
+// formatArtifacts joins the names of the files the agent produced, falling
+// back to the file id when a name is missing. Returns undefined when the run
+// produced no artifacts so the entry is omitted.
+function formatArtifacts(artifacts?: RunCodeAgentArtifact[]): string | undefined {
+  const names = (artifacts ?? [])
+    .map((artifact) => artifact.filename || artifact.fileId)
+    .filter((name): name is string => Boolean(name));
+  return names.length > 0 ? names.join(", ") : undefined;
 }
 
 export const runCodeAgentMapper: ComponentBaseMapper = {
@@ -80,6 +96,7 @@ export const runCodeAgentMapper: ComponentBaseMapper = {
       ["Status", data.status],
       ["Pull Request", data.prUrl],
       ["Branch", data.branch],
+      ["Artifacts", formatArtifacts(data.artifacts)],
     ];
     for (const [key, value] of entries) {
       addDetail(details, key, value);

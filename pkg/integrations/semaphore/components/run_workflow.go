@@ -116,7 +116,7 @@ func (r *RunWorkflow) Documentation() string {
 
 - **Project**: Select the Semaphore project containing the workflow
 - **Pipeline File**: Path to the pipeline YAML file (e.g., ` + "`.semaphore/pipeline.yml`" + `)
-- **Ref**: Git reference to run the workflow on (branch, tag, or commit SHA)
+- **Ref**: Git reference to run the workflow on (branch, tag, pull request, or commit SHA)
 - **Commit SHA**: Optional specific commit SHA to run (if not provided, uses latest from ref)
 - **Parameters**: Optional workflow parameters as key-value pairs (supports expressions)
 - **Add OIDC assertion**: Send ` + "`SUPERPLANE_OIDC_ASSERTION`" + ` so CI can confirm this run was triggered by SuperPlane
@@ -193,11 +193,11 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "pipelineFile",
-			Label:       "Pipeline file",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Placeholder: "e.g. .semaphore/semaphore.yml",
+			Name:     "pipelineFile",
+			Label:    "Pipeline file",
+			Type:     configuration.FieldTypeString,
+			Required: true,
+			Default:  ".semaphore/semaphore.yml",
 		},
 		{
 			Name:     "ref",

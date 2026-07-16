@@ -168,6 +168,27 @@ func (c *Client) CreatePullRequest(ctx context.Context, repository string, pullR
 	return c.underlying.PullRequests.Create(ctx, c.owner, repository, pullRequest)
 }
 
+func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumber int) (*github.PullRequest, *github.Response, error) {
+	return c.underlying.PullRequests.Get(ctx, c.owner, repository, pullNumber)
+}
+
+// MarkPullRequestReadyForReview takes a pull request out of the draft state.
+// GitHub exposes this only through the GraphQL API, so it is the one pull
+// request operation that cannot delegate to the REST client. It takes the pull
+// request node ID (github.PullRequest.NodeID), not the pull request number.
+func (c *Client) MarkPullRequestReadyForReview(ctx context.Context, pullRequestID string) error {
+	const mutation = `mutation($pullRequestId: ID!) {
+	  markPullRequestReadyForReview(input: {pullRequestId: $pullRequestId}) {
+	    pullRequest {
+	      number
+	      isDraft
+	    }
+	  }
+	}`
+
+	return c.doGraphQL(ctx, mutation, map[string]any{"pullRequestId": pullRequestID})
+}
+
 func (c *Client) MergePullRequest(ctx context.Context, repository string, pullNumber int, commitMessage string, options *github.PullRequestOptions) (*github.PullRequestMergeResult, *github.Response, error) {
 	return c.underlying.PullRequests.Merge(ctx, c.owner, repository, pullNumber, commitMessage, options)
 }
@@ -302,6 +323,53 @@ func (c *Client) DeleteHook(ctx context.Context, repository string, hookID int64
 
 func (c *Client) GetOrganizationUsageReport() (*github.UsageReport, *github.Response, error) {
 	return c.underlying.Billing.GetOrganizationUsageReport(context.Background(), c.owner, nil)
+}
+
+type graphQLRequest struct {
+	Query     string         `json:"query"`
+	Variables map[string]any `json:"variables,omitempty"`
+}
+
+type graphQLResponse struct {
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+// doGraphQL sends a mutation or query to GitHub's GraphQL endpoint, reusing the
+// REST client so that authentication and the HTTP context transport apply.
+// GraphQL reports failures as an `errors` array on an HTTP 200, so those are
+// turned into a regular error here.
+func (c *Client) doGraphQL(ctx context.Context, query string, variables map[string]any) error {
+	request, err := c.underlying.NewRequest(http.MethodPost, "graphql", graphQLRequest{
+		Query:     query,
+		Variables: variables,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to build GraphQL request: %w", err)
+	}
+
+	var response graphQLResponse
+	if _, err := c.underlying.Do(ctx, request, &response); err != nil {
+		return err
+	}
+
+	if len(response.Errors) == 0 {
+		return nil
+	}
+
+	messages := []string{}
+	for _, e := range response.Errors {
+		if e.Message != "" {
+			messages = append(messages, e.Message)
+		}
+	}
+
+	if len(messages) == 0 {
+		return errors.New("GraphQL request failed")
+	}
+
+	return errors.New(strings.Join(messages, ": "))
 }
 
 func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, error) {

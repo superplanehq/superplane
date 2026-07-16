@@ -11,6 +11,7 @@ export function ConsoleContextProvider({
   canvasId,
   organizationId,
   nodes,
+  nodesLoading,
   nodeStatuses,
   canRunNodes,
   onTriggerNode,
@@ -21,12 +22,13 @@ export function ConsoleContextProvider({
       canvasId,
       organizationId,
       nodes,
+      nodesLoading,
       nodeStatuses,
       canRunNodes,
       onTriggerNode,
       onOpenNode,
     }),
-    [canvasId, organizationId, nodes, nodeStatuses, canRunNodes, onTriggerNode, onOpenNode],
+    [canvasId, organizationId, nodes, nodesLoading, nodeStatuses, canRunNodes, onTriggerNode, onOpenNode],
   );
 
   return <ConsoleContext.Provider value={value}>{children}</ConsoleContext.Provider>;

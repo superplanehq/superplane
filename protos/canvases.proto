@@ -397,8 +397,7 @@ message UpdateCanvasResponse {
 
 message UpdateCanvasPreferenceRequest {
   string canvas_id = 1;
-  optional bool pinned = 2;
-  optional bool starred = 3;
+  optional bool starred = 2;
 }
 
 message UpdateCanvasPreferenceResponse {
@@ -417,7 +416,7 @@ message CreateCanvasResponse {
 message CanvasRepository {
   message Metadata {
     string canvas_id = 1;
-    google.protobuf.Timestamp updated_at = 7;
+    google.protobuf.Timestamp updated_at = 2;
   }
 
   enum State {
@@ -549,24 +548,20 @@ message CanvasSummary {
   string id = 1;
   string name = 2;
   string description = 3;
-  google.protobuf.Timestamp created_at = 5;
-  google.protobuf.Timestamp updated_at = 6;
-  UserRef created_by = 7;
-  string folder_id = 8;
-  repeated Node nodes = 9;
-  repeated Components.Edge edges = 10;
-  bool pinned = 11;
-  bool starred = 12;
-  google.protobuf.Timestamp pinned_at = 13;
-  google.protobuf.Timestamp starred_at = 14;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  UserRef created_by = 6;
+  string folder_id = 7;
+  repeated Node nodes = 8;
+  repeated Components.Edge edges = 9;
+  bool starred = 10;
+  google.protobuf.Timestamp starred_at = 11;
 }
 
 message CanvasPreference {
   string canvas_id = 1;
-  bool pinned = 2;
-  bool starred = 3;
-  google.protobuf.Timestamp pinned_at = 4;
-  google.protobuf.Timestamp starred_at = 5;
+  bool starred = 2;
+  google.protobuf.Timestamp starred_at = 3;
 }
 
 message Canvas {
@@ -923,6 +918,7 @@ message CanvasNodeQueueItemMessage {
   string canvas_id = 2;
   string node_id = 3;
   google.protobuf.Timestamp timestamp = 4;
+  string run_id = 5;
 }
 
 message CanvasRunMessage {

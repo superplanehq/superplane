@@ -2,7 +2,8 @@ import type { Preview } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import React from "react";
-import { ThemeProvider } from "../src/contexts/ThemeProvider";
+import { StorybookThemeShell } from "./StorybookThemeShell";
+import type { ResolvedTheme } from "../src/lib/themePreference";
 import "../src/App.css";
 import "../src/index.css";
 // Same global React Flow stylesheet the app loads in `main.tsx`. Without it,
@@ -39,14 +40,34 @@ const queryClient = new QueryClient({
 
 const preview: Preview = {
   loaders: [mswLoader],
+  globalTypes: {
+    theme: {
+      name: "Theme",
+      description: "App preview theme",
+      defaultValue: "light",
+      toolbar: {
+        title: "Theme",
+        icon: "mirror",
+        items: [
+          { value: "light", title: "Light", icon: "sun" },
+          { value: "dark", title: "Dark", icon: "moon" },
+        ],
+        dynamicTitle: true,
+      },
+    },
+  },
   decorators: [
-    (Story) => (
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <Story />
-        </ThemeProvider>
-      </QueryClientProvider>
-    ),
+    (Story, { globals }) => {
+      const theme: ResolvedTheme = globals.theme === "dark" ? "dark" : "light";
+
+      return (
+        <QueryClientProvider client={queryClient}>
+          <StorybookThemeShell theme={theme}>
+            <Story />
+          </StorybookThemeShell>
+        </QueryClientProvider>
+      );
+    },
   ],
   parameters: {
     options: {

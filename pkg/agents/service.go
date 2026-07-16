@@ -20,6 +20,7 @@ import (
 )
 
 var ErrSessionForbidden = errors.New("agent session is owned by another user")
+var errProviderSessionRefreshFailed = errors.New("provider session refresh failed")
 
 type Service struct {
 	provider Provider
@@ -47,11 +48,7 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 		return nil, err
 	}
 	if existing != nil {
-		refreshed, err := s.refreshStaleProviderSession(ctx, existing)
-		if errors.Is(err, ErrSessionBusy) {
-			return existing, nil
-		}
-		return refreshed, err
+		return s.refreshStaleProviderSessionOrExisting(ctx, existing, true)
 	}
 	return s.provisionSession(ctx, organizationID, userID, canvasID)
 }
@@ -286,7 +283,7 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 		return s.handleBusySession(sessionID, organizationID, userID)
 	}
 
-	session, err = s.refreshStaleProviderSession(ctx, session)
+	session, err = s.refreshStaleProviderSessionOrExisting(ctx, session, false)
 	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return s.handleBusySession(sessionID, organizationID, userID)
@@ -345,12 +342,12 @@ func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.A
 		Description:     description,
 		Rubric:          rubric,
 		MaxIterations:   maxIterations,
-		ContextPreamble: s.buildPreamble(session, ModeBuilder),
+		ContextPreamble: s.buildPreamble(session, ModeBuilder, false),
 	})
 	return contextReplayed, err
 }
 
-func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []MessageImage, mode ...string) (*models.AgentSessionMessage, error) {
+func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, images []MessageImage, options ...SendMessageRequestOptions) (*models.AgentSessionMessage, error) {
 	if content == "" && len(images) == 0 {
 		return nil, fmt.Errorf("message content is required")
 	}
@@ -360,12 +357,9 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	agentMode := ModeOperator
-	if len(mode) > 0 {
-		agentMode = NormalizeMode(mode[0])
-	}
+	messageOptions := resolveSendMessageRequestOptions(options)
 
-	session, err = s.refreshStaleProviderSession(ctx, session)
+	session, err = s.refreshStaleProviderSessionOrExisting(ctx, session, false)
 	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return nil, s.handleBusySession(sessionID, organizationID, userID)
@@ -373,10 +367,13 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	contextReplayed, err := s.sendMessageToProvider(ctx, session, content, images, agentMode)
+	contextReplayed, err := s.sendMessageToProvider(ctx, session, content, images, messageOptions)
 	if err != nil {
 		if errors.Is(err, ErrSessionBusy) {
 			return nil, s.handleBusySession(sessionID, organizationID, userID)
+		}
+		if errors.Is(err, ErrInvalidRequest) {
+			return nil, fmt.Errorf("forward to provider: %w", err)
 		}
 		if errors.Is(err, ErrProviderSessionUnavailable) {
 			recovered, recoverErr := s.recoverProviderSession(ctx, session)
@@ -386,7 +383,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 				}
 				return nil, recoverErr
 			}
-			contextReplayed, err = s.sendMessageToProvider(ctx, recovered, content, images, agentMode)
+			contextReplayed, err = s.sendMessageToProvider(ctx, recovered, content, images, messageOptions)
 			if err != nil {
 				if errors.Is(err, ErrSessionBusy) {
 					return nil, s.handleBusySession(sessionID, organizationID, userID)
@@ -437,14 +434,24 @@ func toSessionImages(images []MessageImage) datatypes.JSONSlice[models.AgentSess
 	return out
 }
 
-func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, images []MessageImage, mode Mode) (bool, error) {
+func resolveSendMessageRequestOptions(options []SendMessageRequestOptions) SendMessageRequestOptions {
+	if len(options) == 0 {
+		return SendMessageRequestOptions{Mode: string(ModeOperator)}
+	}
+
+	resolved := options[0]
+	resolved.Mode = string(NormalizeMode(resolved.Mode))
+	return resolved
+}
+
+func (s *Service) sendMessageToProvider(ctx context.Context, session *models.AgentSession, content string, images []MessageImage, options SendMessageRequestOptions) (bool, error) {
 	message, contextReplayed, err := s.messageWithRewind(session, content)
 	if err != nil {
 		return false, err
 	}
 
 	err = s.provider.SendMessage(ctx, session.ProviderSessionID, message, SendMessageOptions{
-		ContextPreamble: s.buildPreamble(session, mode),
+		ContextPreamble: s.buildPreamble(session, NormalizeMode(options.Mode), options.AutoLayoutOnUpdateEnabled),
 		Images:          images,
 	})
 	return contextReplayed, err
@@ -482,6 +489,23 @@ func (s *Service) refreshStaleProviderSession(ctx context.Context, session *mode
 	return recovered, nil
 }
 
+func (s *Service) refreshStaleProviderSessionOrExisting(ctx context.Context, session *models.AgentSession, fallbackWhenBusy bool) (*models.AgentSession, error) {
+	refreshed, err := s.refreshStaleProviderSession(ctx, session)
+	if err == nil {
+		return refreshed, nil
+	}
+	if fallbackWhenBusy && errors.Is(err, ErrSessionBusy) {
+		return session, nil
+	}
+	if errors.Is(err, errProviderSessionRefreshFailed) {
+		log.WithError(err).
+			WithField("session_id", session.ID).
+			Warn("failed to refresh stale provider session, using existing session")
+		return session, nil
+	}
+	return nil, err
+}
+
 func (s *Service) recoverProviderSession(ctx context.Context, stale *models.AgentSession) (*models.AgentSession, error) {
 	recovered, _, _, err := s.replaceProviderSession(ctx, stale, false)
 	if err != nil {
@@ -510,7 +534,7 @@ func (s *Service) replaceProviderSession(ctx context.Context, stale *models.Agen
 		Title: sessionTitle(target.organizationID, target.canvasID),
 	})
 	if err != nil {
-		return nil, "", false, fmt.Errorf("create provider session: %w", err)
+		return nil, "", false, fmt.Errorf("%w: create provider session: %w", errProviderSessionRefreshFailed, err)
 	}
 
 	recovered, err := s.installRecoveredProviderSession(stale, upstream.ProviderSessionID, requireStaleToolSchema)
@@ -635,11 +659,12 @@ func (s *Service) archiveProviderSession(ctx context.Context, providerSessionID 
 	}
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, mode Mode) string {
+func (s *Service) buildPreamble(session *models.AgentSession, mode Mode, autoLayoutOnUpdateEnabled bool) string {
 	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
+		fmt.Sprintf("%t", autoLayoutOnUpdateEnabled),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)

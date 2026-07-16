@@ -23,9 +23,12 @@ import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { buildConfigurationDisplayModel } from "./configurationView/buildConfigurationDisplayModel";
 import { ConfigurationView } from "./configurationView/ConfigurationView";
 import { SimpleTooltip } from "./SimpleTooltip";
+import { cn } from "@/lib/utils";
 
 const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
+
+const SETTINGS_TAB_DIVIDER_CLASS = "border-t border-slate-950/15 pt-6 dark:border-gray-700/70";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -305,6 +308,7 @@ export function SettingsTab({
       "time",
       "cron",
       "git-ref",
+      "app",
     ].includes(fieldType);
   }, []);
 
@@ -457,13 +461,7 @@ export function SettingsTab({
         <div className="space-y-6">
           <ConfigurationView model={configurationDisplayModel} />
           {customField && shouldShowConfiguration && (
-            <div
-              className={
-                configurationFields && configurationFields.length > 0
-                  ? ""
-                  : "border-t border-gray-200 dark:border-gray-700 pt-6"
-              }
-            >
+            <div className={configurationFields && configurationFields.length > 0 ? "" : SETTINGS_TAB_DIVIDER_CLASS}>
               {customField(nodeConfiguration)}
             </div>
           )}
@@ -542,7 +540,7 @@ export function SettingsTab({
 
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
         {integrationName && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+          <div className={SETTINGS_TAB_DIVIDER_CLASS}>
             {!allowIntegrations ? (
               <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
                 You don't have permission to view integrations.
@@ -711,7 +709,7 @@ export function SettingsTab({
 
         {/* Configuration section */}
         {configurationFields && configurationFields.length > 0 && shouldShowConfiguration && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+          <div className={cn(SETTINGS_TAB_DIVIDER_CLASS, "space-y-4")}>
             {configurationFields.map((field) => {
               if (!field.name || field.name === "customName") return null;
               const fieldName = field.name;
@@ -766,13 +764,7 @@ export function SettingsTab({
 
         {/* Custom field section */}
         {customField && shouldShowConfiguration && (
-          <div
-            className={
-              configurationFields && configurationFields.length > 0
-                ? ""
-                : "border-t border-gray-200 dark:border-gray-700 pt-6"
-            }
-          >
+          <div className={configurationFields && configurationFields.length > 0 ? "" : SETTINGS_TAB_DIVIDER_CLASS}>
             {customField(nodeConfiguration)}
           </div>
         )}

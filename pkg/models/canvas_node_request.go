@@ -116,6 +116,31 @@ func (r *CanvasNodeRequest) Complete(tx *gorm.DB) error {
 		Error
 }
 
+func CompletePendingRequestsForExecution(tx *gorm.DB, executionID uuid.UUID) error {
+	var ids []uuid.UUID
+	err := tx.Model(&CanvasNodeRequest{}).
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("execution_id = ?", executionID).
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Pluck("id", &ids).
+		Error
+	if err != nil {
+		return err
+	}
+
+	if len(ids) == 0 {
+		return nil
+	}
+
+	return tx.Model(&CanvasNodeRequest{}).
+		Where("id IN ?", ids).
+		Updates(map[string]any{
+			"state":      NodeExecutionRequestStateCompleted,
+			"updated_at": time.Now(),
+		}).
+		Error
+}
+
 func CountPendingRequestsForExecutionsInTransaction(tx *gorm.DB, executionIDs []uuid.UUID) (int64, error) {
 	if len(executionIDs) == 0 {
 		return 0, nil

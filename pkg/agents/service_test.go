@@ -356,6 +356,30 @@ func TestService_EnsureSession_ReturnsExistingSessionWhenStaleRefreshRacesWithSt
 	assert.Empty(t, provider.archivedSessions)
 }
 
+func TestService_EnsureSession_ReturnsExistingSessionWhenStaleRefreshProviderCreateFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{toolSchemaRevision: "revision-1"}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	provider.toolSchemaRevision = "revision-2"
+	provider.createSessionErr = errors.New("provider create failed")
+
+	refreshed, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, session.ID, refreshed.ID)
+	assert.Equal(t, session.ProviderSessionID, refreshed.ProviderSessionID)
+	assert.Equal(t, "revision-1", refreshed.AgentToolSchemaRevision)
+	assert.Equal(t, 2, provider.createCalled)
+	assert.Empty(t, provider.archivedSessions)
+}
+
 func TestService_EnsureSession_FailsWhenProviderErrors(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -492,6 +516,26 @@ func TestService_SendMessage_ProviderBusyKeepsSessionStreaming(t *testing.T) {
 	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
 }
 
+func TestService_SendMessage_InvalidRequestLeavesSessionIdle(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{sendErr: agents.ErrInvalidRequest}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello", nil)
+	require.ErrorIs(t, err, agents.ErrInvalidRequest)
+	require.Nil(t, persisted)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status)
+}
+
 func TestService_SendMessage_RecreatesUnavailableProviderSession(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -610,6 +654,35 @@ func TestService_SendMessage_RewindsAfterToolSchemaRefreshAndTrimsOldMessages(t 
 	assert.NotEqual(t, originalProviderSessionID, refreshed.ProviderSessionID)
 }
 
+func TestService_SendMessage_UsesExistingProviderSessionWhenStaleRefreshProviderCreateFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{toolSchemaRevision: "revision-1"}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	originalProviderSessionID := session.ProviderSessionID
+
+	provider.toolSchemaRevision = "revision-2"
+	provider.createSessionErr = errors.New("provider unavailable")
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "new work", nil)
+	require.NoError(t, err)
+	require.NotNil(t, persisted)
+	require.Len(t, provider.sentSessions, 1)
+	assert.Equal(t, originalProviderSessionID, provider.sentSessions[0])
+	assert.Equal(t, 2, provider.createCalled)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, originalProviderSessionID, refreshed.ProviderSessionID)
+	assert.Equal(t, "revision-1", refreshed.AgentToolSchemaRevision)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
+}
+
 func TestService_SendMessage_ReturnsBusyWhenRecoveredProviderSessionIsBusy(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -686,6 +759,34 @@ func TestService_DefineOutcome_ReturnsBusyWhenRecoveredProviderSessionIsBusy(t *
 	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
 }
 
+func TestService_DefineOutcome_UsesExistingProviderSessionWhenStaleRefreshProviderCreateFails(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{toolSchemaRevision: "revision-1"}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	originalProviderSessionID := session.ProviderSessionID
+
+	provider.toolSchemaRevision = "revision-2"
+	provider.createSessionErr = errors.New("provider unavailable")
+
+	err = svc.DefineOutcome(context.Background(), r.Organization.ID, r.User, session.ID, "build", "- done", 1)
+	require.NoError(t, err)
+	require.Len(t, provider.defineSessions, 1)
+	assert.Equal(t, originalProviderSessionID, provider.defineSessions[0])
+	assert.Equal(t, 2, provider.createCalled)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, originalProviderSessionID, refreshed.ProviderSessionID)
+	assert.Equal(t, "revision-1", refreshed.AgentToolSchemaRevision)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
+}
+
 func TestService_SendMessage_RecoversFailedSession(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -722,6 +823,7 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first", nil)
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
+	assert.Contains(t, provider.lastPreamble, "auto_layout_on_update_enabled: false")
 	assert.Contains(t, provider.lastPreamble, "[Canvas Snapshot]")
 	assert.Contains(t, provider.lastPreamble, "node_count:")
 	assert.Contains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
@@ -739,6 +841,33 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String(),
 		"the session context must be re-injected on every turn")
+}
+
+func TestService_SendMessage_IncludesAutoLayoutPreferenceInPreamble(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	_, err = svc.SendMessage(
+		context.Background(),
+		r.Organization.ID,
+		r.User,
+		session.ID,
+		"build with my canvas settings",
+		nil,
+		agents.SendMessageRequestOptions{
+			Mode:                      string(agents.ModeBuilder),
+			AutoLayoutOnUpdateEnabled: true,
+		},
+	)
+	require.NoError(t, err)
+	assert.Contains(t, provider.lastPreamble, "auto_layout_on_update_enabled: true")
 }
 
 func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing.T) {
@@ -785,6 +914,7 @@ func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "[Agent Mode: BUILD]")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "auto_layout_on_update_enabled: false")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Use 'superplane_app' action 'patch_staging'")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "Console updates")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, ":::staging-actions")

@@ -2,6 +2,11 @@
  * Literal class strings so Tailwind detects dark: utilities (dynamic template strings are not scanned).
  * Light classes are preserved; dark: classes are additive only.
  */
+import { cn } from "@/lib/utils";
+
+export const EVENT_STATUS_BADGE_BASE_CLASSES =
+  "inline-flex shrink-0 items-center justify-center rounded px-[5px] py-[1.5px] text-[10px] font-semibold uppercase tracking-wide leading-normal text-white";
+
 const EVENT_STATUS_BADGE_CLASSES: Record<string, string> = {
   "bg-amber-500": "bg-amber-500 dark:bg-amber-400 dark:text-amber-950",
   "bg-blue-500": "bg-blue-500 dark:bg-blue-400 dark:text-blue-950",
@@ -32,4 +37,8 @@ export function withEventStatusBadgeClasses(badgeColor: string): string {
   }
 
   return `${trimmed} ${DEFAULT_EVENT_STATUS_BADGE_CLASSES}`;
+}
+
+export function eventStatusBadgeClassName(badgeColor: string): string {
+  return cn(EVENT_STATUS_BADGE_BASE_CLASSES, withEventStatusBadgeClasses(badgeColor));
 }
