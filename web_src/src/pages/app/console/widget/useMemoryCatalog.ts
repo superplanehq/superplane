@@ -90,13 +90,37 @@ export function suggestColumnFormat(
 
 /**
  * Build a sample row by pairing each discovered field with the first observed
- * sample value. Used by the payload editor preview to show how `{{ expr }}`
- * resolves for a concrete row without needing live memory.
+ * sample value. Dotted paths (`rootEvent.nodeId`) nest into sub-objects so
+ * they resolve through the same walker (`getValueAtPath`) that widget CEL
+ * uses at runtime; without this, `pathOrRaw` previews would miss real field
+ * paths whenever no live row is available.
  */
 export function sampleRowFromFields(fields: MemoryFieldSummary[]): Record<string, unknown> {
   const row: Record<string, unknown> = {};
-  for (const f of fields) {
-    row[f.field] = f.sample ?? "";
+  // Shallow paths first so a leaf write for `rootEvent.nodeId` never clobbers
+  // an already-nested `rootEvent` object built by an earlier deeper entry.
+  const sorted = [...fields].sort((a, b) => depthOf(a.field) - depthOf(b.field));
+  for (const f of sorted) {
+    setSamplePath(row, f.field, f.sample ?? "");
   }
   return row;
+}
+
+function depthOf(path: string): number {
+  return path.split(".").length;
+}
+
+function setSamplePath(target: Record<string, unknown>, path: string, value: unknown): void {
+  const segments = path.split(".").filter((s) => s.length > 0);
+  if (segments.length === 0) return;
+  let cursor: Record<string, unknown> = target;
+  for (let i = 0; i < segments.length - 1; i++) {
+    const key = segments[i];
+    const existing = cursor[key];
+    if (existing == null || typeof existing !== "object" || Array.isArray(existing)) {
+      cursor[key] = {};
+    }
+    cursor = cursor[key] as Record<string, unknown>;
+  }
+  cursor[segments[segments.length - 1]] = value;
 }
