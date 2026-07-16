@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import type { FieldRendererProps } from "./types";
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 import { Checkbox } from "@/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useSkipDefaultsAfterReadOnly } from "./useSkipDefaultsAfterReadOnly";
 
 interface SelectOption {
   id: string;
@@ -66,15 +67,18 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({
   }, [field.typeOptions?.multiSelect?.options]);
 
   const defaultValues = useMemo(() => parseMultiSelectValues(field.defaultValue), [field.defaultValue]);
+  const hasAppliedDefault = useRef(false);
+  const skipDefaultsAfterReadOnly = useSkipDefaultsAfterReadOnly(readOnly);
 
   // Set initial value on first render if no value is present but there's a default
   useEffect(() => {
-    if (readOnly) return;
+    if (readOnly || skipDefaultsAfterReadOnly || hasAppliedDefault.current) return;
 
     if ((value === undefined || value === null) && defaultValues.length > 0) {
+      hasAppliedDefault.current = true;
       onChange(defaultValues);
     }
-  }, [readOnly, value, defaultValues, onChange]);
+  }, [readOnly, skipDefaultsAfterReadOnly, value, defaultValues, onChange]);
 
   const currentValue = useMemo(() => {
     if (value === undefined || value === null) {

@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PayloadPreview } from "@/ui/BuildingBlocksSidebar/PayloadPreview";
 
+const DOCS_SURFACE_CLASS = "bg-slate-100 dark:bg-gray-800";
+const DOCS_REFERENCE_CLASS = "bg-slate-100 dark:bg-transparent";
+const CONFIG_TABLE_HEADER_CLASS = cn(
+  "text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300",
+  DOCS_SURFACE_CLASS,
+);
+
 function ConfigTable({ fields, showTopBorder }: { fields: ConfigurationField[]; showTopBorder?: boolean }) {
   return (
     <div
@@ -14,15 +21,9 @@ function ConfigTable({ fields, showTopBorder }: { fields: ConfigurationField[]; 
         <table className="text-xs w-full border-collapse">
           <thead>
             <tr>
-              <th className="text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800">
-                Field
-              </th>
-              <th className="text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800">
-                Type
-              </th>
-              <th className="text-left py-1.5 px-2 border-b border-gray-200 font-medium text-gray-700 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800">
-                Description
-              </th>
+              <th className={CONFIG_TABLE_HEADER_CLASS}>Field</th>
+              <th className={CONFIG_TABLE_HEADER_CLASS}>Type</th>
+              <th className={CONFIG_TABLE_HEADER_CLASS}>Description</th>
             </tr>
           </thead>
           <tbody>
@@ -49,7 +50,7 @@ function ConfigTable({ fields, showTopBorder }: { fields: ConfigurationField[]; 
 
 function DocsReferenceSection({ documentationUrl }: { documentationUrl: string }) {
   return (
-    <div className="bg-slate-100 px-4 py-2.5 dark:bg-gray-800">
+    <div className={cn("px-4 py-2.5", DOCS_REFERENCE_CLASS)}>
       <Button variant="outline" size="xs" asChild>
         <a href={documentationUrl} target="_blank" rel="noopener noreferrer">
           <BookOpen className="size-3" aria-hidden />
