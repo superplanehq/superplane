@@ -113,7 +113,9 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   const removeItem = (index: number) => {
     const newItems = itemsRef.current.filter((_, i) => i !== index);
     itemsRef.current = newItems;
-    onChange(newItems.length > 0 ? newItems : undefined);
+    // undefined would read as "toggle off" to ConfigurationFieldRenderer, silently
+    // discarding an intentional clear-to-empty-list on a togglable field.
+    onChange(newItems.length > 0 ? newItems : field.togglable ? [] : undefined);
     if (!useAccordion) return;
 
     setOpenItem((current) => {
