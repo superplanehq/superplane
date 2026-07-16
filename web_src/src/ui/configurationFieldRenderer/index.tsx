@@ -138,11 +138,11 @@ export const ConfigurationFieldRenderer = ({
 
   const handleToggleChange = React.useCallback(
     (checked: boolean) => {
-      if (!isTogglable) return;
+      if (!isTogglable || readOnly) return;
 
       onChange(checked ? getInitialTogglableValue(field, parsedDefaultValue) : null);
     },
-    [isTogglable, field, onChange, parsedDefaultValue],
+    [isTogglable, readOnly, field, onChange, parsedDefaultValue],
   );
 
   // Check visibility conditions
@@ -274,10 +274,21 @@ export const ConfigurationFieldRenderer = ({
   const fieldLabel = runTitlePresentation?.label || field.label || field.name;
   const fieldDescription = runTitlePresentation?.description ?? field.description;
 
+  const guardedOnChange = React.useCallback(
+    (nextValue: unknown) => {
+      if (readOnly) {
+        return;
+      }
+
+      onChange(nextValue);
+    },
+    [onChange, readOnly],
+  );
+
   const commonProps = {
     field,
     value,
-    onChange,
+    onChange: guardedOnChange,
     allValues,
     hasError: hasFieldError,
     autocompleteExampleObj: resolvedAutocompleteExampleObj,

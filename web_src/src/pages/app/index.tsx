@@ -3738,6 +3738,10 @@ export function AppPage() {
     [canvasId, canvasNodesById, refetchNodeDataMethod, queryClient],
   );
 
+  const cancelLiveNodeClickLookup = useCallback(() => {
+    liveCanvasNodeClickLookupRef.current += 1;
+  }, []);
+
   const handleLiveCanvasNodeClick = useCallback(
     (
       nodeId: string,
@@ -3757,8 +3761,6 @@ export function AppPage() {
         handleSelectRunFromSidebarEvent(syncAction.runId, { nodeId });
         return;
       }
-
-      actions.openConfigurationSidebar();
 
       void (async () => {
         try {
@@ -3801,6 +3803,18 @@ export function AppPage() {
   useEffect(() => {
     liveCanvasNodeClickLookupRef.current += 1;
   }, [isEditing, isRunInspectionMode, liveSidebarRunLookupEnabled]);
+
+  const handleCanvasNodeClick = useMemo(() => {
+    if (runInspectionChromeActive) {
+      return (nodeId: string) => handleRunCanvasNodeClick(nodeId);
+    }
+
+    if (!isEditing) {
+      return handleLiveCanvasNodeClick;
+    }
+
+    return undefined;
+  }, [handleLiveCanvasNodeClick, handleRunCanvasNodeClick, isEditing, runInspectionChromeActive]);
 
   useEffect(() => {
     if (!isRunInspectionMode || isViewingLiveVersion) return;
@@ -4321,13 +4335,8 @@ export function AppPage() {
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && showLiveActivity ? handleAcknowledgeErrors : undefined}
-          onNodeClick={
-            runInspectionChromeActive
-              ? (nodeId) => handleRunCanvasNodeClick(nodeId)
-              : !isEditing
-                ? handleLiveCanvasNodeClick
-                : undefined
-          }
+          onNodeClick={handleCanvasNodeClick}
+          onLiveNodeClickLookupCancel={liveSidebarRunLookupEnabled ? cancelLiveNodeClickLookup : undefined}
           toolSidebarRunsContent={toolSidebarRunsContent}
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}

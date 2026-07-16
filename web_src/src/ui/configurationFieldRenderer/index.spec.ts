@@ -84,6 +84,21 @@ describe("ConfigurationFieldRenderer preserveEditLayout", () => {
     expect(screen.getByDisplayValue("updated_at")).toBeDisabled();
     expect(screen.getByDisplayValue("int(now().Unix())")).toBeDisabled();
   });
+
+  it("does not mutate values when readOnly", () => {
+    const onChange = vi.fn();
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        field: { name: "timezone", type: "timezone" },
+        value: undefined,
+        onChange,
+        readOnly: true,
+        preserveEditLayout: true,
+      }),
+    );
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
 
 describe("buildTemplateParametersAutocompleteObject", () => {

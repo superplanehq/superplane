@@ -111,6 +111,7 @@ export function ConfigurationFieldInput({
         value={value as SecretKeyRefValue}
         onChange={(nextValue) => onChange(nextValue)}
         organizationId={organizationId ?? domainId}
+        readOnly={commonProps.readOnly}
       />
     );
   }
