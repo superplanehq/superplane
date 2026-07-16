@@ -27,6 +27,21 @@ function parameterListField(): ConfigurationField {
   };
 }
 
+function stringListField(togglable: boolean): ConfigurationField {
+  return {
+    name: "labels",
+    label: "Labels",
+    type: "list",
+    togglable,
+    typeOptions: {
+      list: {
+        itemLabel: "Label",
+        itemDefinition: { type: "string" },
+      },
+    },
+  };
+}
+
 function stubRowRects() {
   const rows = screen.getAllByTestId("list-item-row");
   rows.forEach((row, index) => {
@@ -99,5 +114,23 @@ describe("ListFieldRenderer", () => {
     );
 
     expect(screen.queryByLabelText(/Drag to reorder/)).not.toBeInTheDocument();
+  });
+
+  it("clears a togglable list to an empty array, not undefined, when the last item is removed", () => {
+    const onChange = vi.fn();
+    render(<ListFieldRenderer field={stringListField(true)} value={["bug"]} onChange={onChange} />);
+
+    fireEvent.click(screen.getByLabelText("Remove Label 1"));
+
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("clears a non-togglable list to undefined when the last item is removed", () => {
+    const onChange = vi.fn();
+    render(<ListFieldRenderer field={stringListField(false)} value={["bug"]} onChange={onChange} />);
+
+    fireEvent.click(screen.getByLabelText("Remove Label 1"));
+
+    expect(onChange).toHaveBeenCalledWith(undefined);
   });
 });
