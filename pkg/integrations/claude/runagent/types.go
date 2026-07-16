@@ -31,14 +31,17 @@ const (
 
 // Spec is the workflow node configuration for claude.runAgent.
 type Spec struct {
-	// Agent is the managed agent id (use latest if Version is nil, else pin to Version).
-	Agent         string          `json:"agent" mapstructure:"agent"`
-	Version       *int            `json:"version" mapstructure:"version"`
-	EnvironmentID string          `json:"environmentId" mapstructure:"environmentId"`
-	Prompt        string          `json:"prompt" mapstructure:"prompt"`
-	VaultIDs      []string        `json:"vaultIds" mapstructure:"vaultIds"`
-	Files         []string        `json:"files" mapstructure:"files"`
-	Secrets       []SecretBinding `json:"secrets" mapstructure:"secrets"`
+	// Agent is the managed agent id.
+	Agent string `json:"agent" mapstructure:"agent"`
+	// Version pins the agent version; nil (unset) runs the agent's latest version.
+	Version *int `json:"version" mapstructure:"version"`
+	// Environment is stored under the legacy "environmentId" key so existing
+	// nodes keep working; it is presented as the Environment resource field.
+	Environment string          `json:"environmentId" mapstructure:"environmentId"`
+	Prompt      string          `json:"prompt" mapstructure:"prompt"`
+	VaultIDs    []string        `json:"vaultIds" mapstructure:"vaultIds"`
+	Files       []string        `json:"files" mapstructure:"files"`
+	Secrets     []SecretBinding `json:"secrets" mapstructure:"secrets"`
 	// PersistSession keeps the Managed Agents session after the run finishes so
 	// its transcript stays readable in the Anthropic Console.
 	PersistSession bool `json:"persistSession" mapstructure:"persistSession"`

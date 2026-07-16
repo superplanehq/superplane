@@ -78,7 +78,7 @@ func (i *Claude) Instructions() string {
 
 ## Files & artifacts
 
-The Files API is in beta: SuperPlane enables it per request via the ` + "`anthropic-beta`" + ` header, so no console toggle is needed and a standard API key suffices. Files and sessions are scoped to the API key's workspace. For **Run Claude Agent** artifacts, the agent must save its deliverables under ` + "`/mnt/session/outputs/`" + `.`
+The Files API is in beta: SuperPlane enables it per request via the ` + "`anthropic-beta`" + ` header, so no console toggle is needed and a standard API key suffices. Files and sessions are scoped to the API key's workspace. For **Run Managed Agent** artifacts, the agent must save its deliverables under ` + "`/mnt/session/outputs/`" + `.`
 }
 
 func (i *Claude) Cleanup(ctx core.IntegrationCleanupContext) error {
@@ -112,7 +112,10 @@ func (i *Claude) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "model" {
+	switch resourceType {
+	case "model", "agent", "environment":
+	default:
+		// Unknown resource type: return empty without touching credentials.
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -121,6 +124,19 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 		return nil, err
 	}
 
+	switch resourceType {
+	case "model":
+		return i.listModelResources(client)
+	case "agent":
+		return i.listAgentResources(client)
+	case "environment":
+		return i.listEnvironmentResources(client)
+	default:
+		return []core.IntegrationResource{}, nil
+	}
+}
+
+func (i *Claude) listModelResources(client *Client) ([]core.IntegrationResource, error) {
 	models, err := client.ListModels()
 	if err != nil {
 		return nil, err
@@ -133,9 +149,63 @@ func (i *Claude) ListResources(resourceType string, ctx core.ListResourcesContex
 		}
 
 		resources = append(resources, core.IntegrationResource{
-			Type: resourceType,
+			Type: "model",
 			Name: model.ID,
 			ID:   model.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func (i *Claude) listAgentResources(client *Client) ([]core.IntegrationResource, error) {
+	agents, err := client.ListManagedAgents()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(agents))
+	for _, agent := range agents {
+		if agent.ID == "" {
+			continue
+		}
+
+		name := agent.Name
+		if name == "" {
+			name = agent.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "agent",
+			Name: name,
+			ID:   agent.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func (i *Claude) listEnvironmentResources(client *Client) ([]core.IntegrationResource, error) {
+	environments, err := client.ListManagedEnvironments()
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(environments))
+	for _, environment := range environments {
+		if environment.ID == "" {
+			continue
+		}
+
+		name := environment.Name
+		if name == "" {
+			name = environment.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "environment",
+			Name: name,
+			ID:   environment.ID,
 		})
 	}
 

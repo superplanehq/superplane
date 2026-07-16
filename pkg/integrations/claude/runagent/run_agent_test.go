@@ -43,6 +43,27 @@ func Test__RunAgent__Setup__validation(t *testing.T) {
 	assert.Contains(t, err.Error(), "agent")
 }
 
+// A node stores the environment under the legacy "environmentId" key and the
+// version as a number; both must decode.
+func Test__decodeSpec(t *testing.T) {
+	spec, err := decodeSpec(map[string]any{
+		"agent":         "agent_1",
+		"environmentId": "env_1",
+		"version":       float64(2), // JSON numbers decode to float64
+		"prompt":        "do it",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "agent_1", spec.Agent)
+	assert.Equal(t, "env_1", spec.Environment)
+	require.NotNil(t, spec.Version)
+	assert.Equal(t, 2, *spec.Version)
+
+	// An unset version stays nil (the agent's latest is used).
+	spec, err = decodeSpec(map[string]any{"agent": "a", "environmentId": "e", "prompt": "p"})
+	require.NoError(t, err)
+	assert.Nil(t, spec.Version)
+}
+
 func Test__RunAgent__Execute__syncIdle(t *testing.T) {
 	a := &RunAgent{}
 	httpContext := &contexts.HTTPContext{

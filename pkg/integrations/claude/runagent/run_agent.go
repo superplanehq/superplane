@@ -17,24 +17,24 @@ type RunAgent struct{}
 
 func (a *RunAgent) Name() string { return "claude.runAgent" }
 
-func (a *RunAgent) Label() string { return "Run Claude Agent" }
+func (a *RunAgent) Label() string { return "Run Managed Agent" }
 
 func (a *RunAgent) Description() string {
 	return "Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated."
 }
 
 func (a *RunAgent) Documentation() string {
-	return `The **Run Claude Agent** component uses [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) to start a **session** with a configured agent and environment, sends your task as a **user message**, and waits until the **session** reaches a terminal state (idle or terminated) by polling. Log streaming is not used.
+	return `The **Run Managed Agent** component uses [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) to start a **session** with a configured agent and environment, sends your task as a **user message**, and waits until the **session** reaches a terminal state (idle or terminated) by polling. Log streaming is not used.
 
 ## Prerequisites
 
 - A **Claude API key** on the integration.
-- An **agent** and **environment** already created in the Anthropic API (or Console). This step references them by ID.
+- An **agent** and **environment** already created in the Anthropic API (or Console). This step lists them for selection.
 
 ## Configuration
 
-- **Agent ID** and optional **Version**: the Managed Agent to run (latest, or a pinned version if **Version** is set).
-- **Environment ID**: The environment the session runs in.
+- **Agent** and optional **Version**: the Managed Agent to run. Pick an agent, then optionally pin a **Version** (the latest is used when left unset).
+- **Environment**: The environment the session runs in.
 - **Prompt**: The user message (task) sent to the agent.
 - **Vault IDs** (optional): For MCP tools that need vault-backed credentials.
 - **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. It applies only to runs that finish — a cancelled run is always cleaned up. Kept sessions are never reclaimed automatically, so delete them yourself when you're done.
@@ -62,24 +62,41 @@ func (a *RunAgent) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "agent",
-			Label:       "Agent ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Agent",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "ID of a Claude Managed Agent. Uses the latest version unless **Version** is set.",
+			Placeholder: "Select an agent",
+			Description: "The Claude Managed Agent to run. Uses the latest version unless **Version** is set.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "agent",
+				},
+			},
 		},
 		{
 			Name:        "version",
-			Label:       "Agent version",
+			Label:       "Version",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Description: "When set, pins the session to this agent version (otherwise latest is used).",
+			Description: "Pins the session to a specific agent version. Leave unset to use the agent's latest version.",
 		},
 		{
+			// The stored key stays "environmentId" for backward compatibility:
+			// existing nodes saved it under that name, and neither the backend nor
+			// the editor migrates unknown keys, so renaming it would drop the value
+			// on the next save. The field is still shown and selected as an
+			// Environment resource.
 			Name:        "environmentId",
-			Label:       "Environment ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Environment",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "ID of the Managed Agent environment (container) for this session",
+			Placeholder: "Select an environment",
+			Description: "The Managed Agent environment (container) the session runs in.",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "environment",
+				},
+			},
 		},
 		{
 			Name:        "prompt",
@@ -282,7 +299,7 @@ func (a *RunAgent) Execute(ctx core.ExecutionContext) error {
 	createReq := CreateManagedSessionRequest{
 		Agent:         aid,
 		AgentVersion:  spec.Version,
-		EnvironmentID: strings.TrimSpace(spec.EnvironmentID),
+		EnvironmentID: strings.TrimSpace(spec.Environment),
 		VaultIDs:      vaultIDs,
 		Resources:     resources,
 	}
@@ -536,8 +553,8 @@ func validateSpec(spec Spec) error {
 	if strings.TrimSpace(spec.Agent) == "" {
 		return fmt.Errorf("agent is required")
 	}
-	if strings.TrimSpace(spec.EnvironmentID) == "" {
-		return fmt.Errorf("environmentId is required")
+	if strings.TrimSpace(spec.Environment) == "" {
+		return fmt.Errorf("environment is required")
 	}
 	if strings.TrimSpace(spec.Prompt) == "" {
 		return fmt.Errorf("prompt is required")
