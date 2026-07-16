@@ -262,6 +262,17 @@ export const ConfigurationFieldRenderer = ({
     };
   }, [field.name, allValues, autocompleteExampleObj]);
 
+  const guardedOnChange = React.useCallback(
+    (nextValue: unknown) => {
+      if (readOnly) {
+        return;
+      }
+
+      onChange(nextValue);
+    },
+    [onChange, readOnly],
+  );
+
   if (!isVisible) {
     return null;
   }
@@ -273,17 +284,6 @@ export const ConfigurationFieldRenderer = ({
   // so fall back to the field name whenever the label is blank.
   const fieldLabel = runTitlePresentation?.label || field.label || field.name;
   const fieldDescription = runTitlePresentation?.description ?? field.description;
-
-  const guardedOnChange = React.useCallback(
-    (nextValue: unknown) => {
-      if (readOnly) {
-        return;
-      }
-
-      onChange(nextValue);
-    },
-    [onChange, readOnly],
-  );
 
   const commonProps = {
     field,

@@ -116,8 +116,11 @@ import { useDraftStagingActions } from "./useDraftStagingActions";
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { buildDuplicatedEdges, buildDuplicatedNodes } from "./lib/duplicate-nodes";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
+import {
+  hasSidebarMapperCustomField,
+  resolveSidebarMapperCustomField,
+} from "./lib/resolve-sidebar-mapper-custom-field";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
-import { resolveSidebarMapperCustomField } from "./lib/resolve-sidebar-mapper-custom-field";
 import { buildCanvasYamlExportPayload, materializeCanvasSpec } from "./lib/workflow-spec-files";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
@@ -3941,7 +3944,7 @@ export function AppPage() {
         };
       }
 
-      if (node.type === "TYPE_ACTION" && node.component && canvasId) {
+      if (node.type === "TYPE_ACTION" && node.component && canvasId && hasSidebarMapperCustomField(node.component)) {
         const componentDef = allComponentsByName.get(node.component);
         if (!componentDef) {
           return null;
@@ -3964,7 +3967,17 @@ export function AppPage() {
 
       return null;
     },
-    [allComponentsByName, canvasId, canvasNodes, canvasNodesById, getNodeData, isEditing, me, queryClient],
+    [
+      allComponentsByName,
+      canvasId,
+      canvasNodes,
+      canvasNodesById,
+      getNodeData,
+      isEditing,
+      me,
+      queryClient,
+      storeVersion,
+    ],
   );
 
   const appFiles = useMemo(

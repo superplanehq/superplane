@@ -4,6 +4,18 @@ import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteIn
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
+function resolveStringFieldDisplayValue(value: unknown, readOnly: boolean, defaultValue: unknown): string {
+  if (value !== undefined && value !== null) {
+    return String(value);
+  }
+
+  if (readOnly && defaultValue !== undefined) {
+    return String(defaultValue);
+  }
+
+  return "";
+}
+
 export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
@@ -29,12 +41,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
     }
   }, [readOnly, value, field.defaultValue, onChange]);
 
-  const currentValue =
-    value === undefined || value === null
-      ? readOnly && field.defaultValue !== undefined
-        ? String(field.defaultValue)
-        : ""
-      : String(value);
+  const currentValue = resolveStringFieldDisplayValue(value, readOnly, field.defaultValue);
 
   if (!allowExpressions) {
     return (

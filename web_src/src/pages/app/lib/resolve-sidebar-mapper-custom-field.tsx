@@ -15,6 +15,10 @@ import { buildComponentDefinition, buildExecutionInfo, buildNodeInfo, buildUserI
 
 const SIDEBAR_MAPPER_CUSTOM_FIELD_COMPONENTS = new Set(["approval"]);
 
+export function hasSidebarMapperCustomField(componentName: string | undefined | null): boolean {
+  return Boolean(componentName && SIDEBAR_MAPPER_CUSTOM_FIELD_COMPONENTS.has(componentName));
+}
+
 export function resolveSidebarMapperCustomField({
   node,
   canvasNodes,
@@ -35,7 +39,7 @@ export function resolveSidebarMapperCustomField({
   me?: SuperplaneMeUser | null;
 }) {
   const componentName = node.component;
-  if (!componentName || !SIDEBAR_MAPPER_CUSTOM_FIELD_COMPONENTS.has(componentName) || !node.id) {
+  if (!hasSidebarMapperCustomField(componentName) || !node.id) {
     return null;
   }
 
