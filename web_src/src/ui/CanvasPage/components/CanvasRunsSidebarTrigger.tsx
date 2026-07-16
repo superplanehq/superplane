@@ -40,7 +40,7 @@ export function CanvasRunsSidebarTrigger({ runsSidebarState }: CanvasRunsSidebar
           <Rabbit className="size-4 shrink-0" />
           {hasRunningRuns ? (
             <span
-              className="absolute -right-3.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-blue-500/20 before:absolute before:inset-[-2px] before:rounded-full before:bg-blue-500/15 before:content-[''] before:animate-ping after:absolute after:inset-0 after:rounded-full after:ring-2 after:ring-white dark:ring-blue-400/20 dark:before:bg-blue-400/15 dark:after:ring-gray-900"
+              className="absolute -right-3.5 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-blue-500/20 before:absolute before:inset-[-2px] before:rounded-full before:bg-blue-500/15 before:content-[''] before:animate-ping after:absolute after:inset-0 after:rounded-full after:ring-2 after:ring-white dark:bg-blue-400 dark:text-gray-950 dark:ring-blue-400/20 dark:before:bg-blue-400/15 dark:after:ring-gray-900"
               aria-hidden="true"
             >
               {runningRunsCount}

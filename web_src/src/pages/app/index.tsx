@@ -86,7 +86,11 @@ import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { useStaleRunInspectionUrlCleanup } from "./useStaleRunInspectionUrlCleanup";
-import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import {
+  resolveLiveCanvasNodeClickSyncAction,
+  resolveRunLookupEventForNodeActivity,
+  shouldDeferRunInspectionForLiveNodeClick,
+} from "./runInspectionLiveNodeLookup";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { resolveEditableWorkflowSnapshot } from "./lib/editable-workflow-snapshot";
@@ -3735,27 +3739,65 @@ export function AppPage() {
     [canvasId, canvasNodesById, refetchNodeDataMethod, queryClient],
   );
 
+  const cancelLiveNodeClickLookup = useCallback(() => {
+    liveCanvasNodeClickLookupRef.current += 1;
+  }, []);
+
   const handleLiveCanvasNodeClick = useCallback(
-    (nodeId: string) => {
+    (
+      nodeId: string,
+      actions: {
+        openConfigurationSidebar: () => void;
+      },
+    ) => {
       if (isRunInspectionMode || isEditing || !liveSidebarRunLookupEnabled) return;
 
       const lookupId = liveCanvasNodeClickLookupRef.current + 1;
       liveCanvasNodeClickLookupRef.current = lookupId;
 
-      const cachedRunId = resolveCachedNodeRunId(nodeId, canvasNodesById.get(nodeId), resolveRunIdForSidebarEvent);
-      if (cachedRunId) return handleSelectRunFromSidebarEvent(cachedRunId, { nodeId });
+      const workflowNode = canvasNodesById.get(nodeId);
+      const nodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
+      if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, nodeActivity)) {
+        actions.openConfigurationSidebar();
+        return;
+      }
+
+      const syncAction = resolveLiveCanvasNodeClickSyncAction(nodeId, workflowNode, resolveRunIdForSidebarEvent);
+
+      if (syncAction.kind === "inspectRun") {
+        handleSelectRunFromSidebarEvent(syncAction.runId, { nodeId });
+        return;
+      }
 
       void (async () => {
         try {
           const lookupEvent = await resolveLatestNodeRunLookupEvent(nodeId);
-          if (!lookupEvent || liveCanvasNodeClickLookupRef.current !== lookupId) return;
+          if (liveCanvasNodeClickLookupRef.current !== lookupId) return;
+
+          const refreshedNodeActivity = useNodeExecutionStore.getState().getNodeData(nodeId);
+          if (shouldDeferRunInspectionForLiveNodeClick(workflowNode, refreshedNodeActivity)) {
+            actions.openConfigurationSidebar();
+            return;
+          }
+
+          if (!lookupEvent) {
+            actions.openConfigurationSidebar();
+            return;
+          }
 
           const runId = await fetchRunIdForSidebarEvent(lookupEvent, { maxPages: 1 });
-          if (!runId || liveCanvasNodeClickLookupRef.current !== lookupId) return;
+          if (liveCanvasNodeClickLookupRef.current !== lookupId) return;
+
+          if (!runId) {
+            actions.openConfigurationSidebar();
+            return;
+          }
 
           handleSelectRunFromSidebarEvent(runId, { nodeId });
         } catch (error) {
           console.error("Failed to inspect latest node run", error);
+          if (liveCanvasNodeClickLookupRef.current !== lookupId) return;
+          actions.openConfigurationSidebar();
         }
       })();
     },
@@ -3774,6 +3816,18 @@ export function AppPage() {
   useEffect(() => {
     liveCanvasNodeClickLookupRef.current += 1;
   }, [isEditing, isRunInspectionMode, liveSidebarRunLookupEnabled]);
+
+  const handleCanvasNodeClick = useMemo(() => {
+    if (runInspectionChromeActive) {
+      return (nodeId: string) => handleRunCanvasNodeClick(nodeId);
+    }
+
+    if (!isEditing) {
+      return handleLiveCanvasNodeClick;
+    }
+
+    return undefined;
+  }, [handleLiveCanvasNodeClick, handleRunCanvasNodeClick, isEditing, runInspectionChromeActive]);
 
   useEffect(() => {
     if (!isRunInspectionMode || isViewingLiveVersion) return;
@@ -4294,9 +4348,8 @@ export function AppPage() {
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && showLiveActivity ? handleAcknowledgeErrors : undefined}
-          onNodeClick={
-            runInspectionChromeActive ? handleRunCanvasNodeClick : !isEditing ? handleLiveCanvasNodeClick : undefined
-          }
+          onNodeClick={handleCanvasNodeClick}
+          onLiveNodeClickLookupCancel={liveSidebarRunLookupEnabled ? cancelLiveNodeClickLookup : undefined}
           toolSidebarRunsContent={toolSidebarRunsContent}
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
