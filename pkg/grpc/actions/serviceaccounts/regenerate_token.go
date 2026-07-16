@@ -27,11 +27,11 @@ func RegenerateServiceAccountToken(ctx context.Context, req *pb.RegenerateServic
 
 	user, err := models.FindActiveUserByID(orgID, req.Id)
 	if err != nil {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	if !user.IsServiceAccount() {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	plainToken, err := crypto.Base64String(64)

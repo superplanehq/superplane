@@ -182,7 +182,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                           {member.spec?.displayName || member.metadata!.id!}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {member.metadata?.email || "Service Account"}
+                          {member.metadata?.email || "API Key"}
                         </div>
                       </div>
                     </div>

@@ -6,26 +6,37 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type User struct {
-	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	OrganizationID uuid.UUID
-	AccountID      *uuid.UUID
-	Email          *string
-	Name           string
-	Type           string
-	Description    *string
-	CreatedBy      *uuid.UUID
-	TokenHash      string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	DeletedAt      gorm.DeletedAt
+	ID                      uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	OrganizationID          uuid.UUID
+	AccountID               *uuid.UUID
+	Email                   *string
+	Name                    string
+	Type                    string
+	Description             *string
+	CreatedBy               *uuid.UUID
+	TokenHash               string
+	ServiceAccountExpiresAt *time.Time                  `gorm:"column:service_account_expires_at"`
+	ServiceAccountCanvasIDs datatypes.JSONSlice[string] `gorm:"column:service_account_canvas_ids"`
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	DeletedAt               gorm.DeletedAt
 }
 
 func (u *User) IsServiceAccount() bool {
 	return u.Type == UserTypeServiceAccount
+}
+
+func (u *User) IsExpiredServiceAccount() bool {
+	return u.IsServiceAccount() && u.ServiceAccountExpiresAt != nil && !time.Now().Before(*u.ServiceAccountExpiresAt)
+}
+
+func (u *User) HasServiceAccountCanvasScope() bool {
+	return u.IsServiceAccount() && len(u.ServiceAccountCanvasIDs) > 0
 }
 
 func (u *User) GetEmail() string {
@@ -98,13 +109,15 @@ func CreateUserInTransaction(tx *gorm.DB, orgID, accountID uuid.UUID, email, nam
 	return user, nil
 }
 
-func CreateServiceAccount(tx *gorm.DB, orgID uuid.UUID, name string, description *string, createdBy uuid.UUID) (*User, error) {
+func CreateServiceAccount(tx *gorm.DB, orgID uuid.UUID, name string, description *string, createdBy uuid.UUID, expiresAt *time.Time, canvasIDs []string) (*User, error) {
 	user := &User{
-		OrganizationID: orgID,
-		Name:           name,
-		Type:           UserTypeServiceAccount,
-		Description:    description,
-		CreatedBy:      &createdBy,
+		OrganizationID:          orgID,
+		Name:                    name,
+		Type:                    UserTypeServiceAccount,
+		Description:             description,
+		CreatedBy:               &createdBy,
+		ServiceAccountExpiresAt: expiresAt,
+		ServiceAccountCanvasIDs: datatypes.NewJSONSlice(canvasIDs),
 	}
 
 	err := tx.Create(user).Error
