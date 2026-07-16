@@ -11,7 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Batch Message" href="#create-batch-message" description="Sends many prompts to Claude in a single Message Batches request, at lower cost than individual calls" />
   <LinkCard title="Get Daily Usage" href="#get-daily-usage" description="Fetches daily Messages and Claude Code usage metrics from Anthropic's Admin API." />
-  <LinkCard title="Run Claude Agent" href="#run-claude-agent" description="Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated." />
+  <LinkCard title="Run Managed Agent" href="#run-managed-agent" description="Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated." />
   <LinkCard title="Run Code Agent" href="#run-code-agent" description="Runs an autonomous Claude coding agent against a repository in Anthropic's managed sandbox and opens (or updates) a pull request." />
   <LinkCard title="Text Prompt" href="#text-prompt" description="Generate a response using Anthropic's Claude models via the Messages API" />
 </CardGrid>
@@ -22,7 +22,7 @@ To get new Claude API key, go to [platform.claude.com](https://platform.claude.c
 
 ## Files & artifacts
 
-The Files API is in beta: SuperPlane enables it per request via the `anthropic-beta` header, so no console toggle is needed and a standard API key suffices. Files and sessions are scoped to the API key's workspace. For **Run Claude Agent** artifacts, the agent must save its deliverables under `/mnt/session/outputs/`.
+The Files API is in beta: SuperPlane enables it per request via the `anthropic-beta` header, so no console toggle is needed and a standard API key suffices. Files and sessions are scoped to the API key's workspace. For **Run Managed Agent** artifacts, the agent must save its deliverables under `/mnt/session/outputs/`.
 
 <a id="create-batch-message"></a>
 
@@ -231,23 +231,23 @@ combining raw API/SDK token usage with Claude Code productivity metrics.
 }
 ```
 
-<a id="run-claude-agent"></a>
+<a id="run-managed-agent"></a>
 
-## Run Claude Agent
+## Run Managed Agent
 
 **Component key:** `claude.runAgent`
 
-The **Run Claude Agent** component uses [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) to start a **session** with a configured agent and environment, sends your task as a **user message**, and waits until the **session** reaches a terminal state (idle or terminated) by polling. Log streaming is not used.
+The **Run Managed Agent** component uses [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) to start a **session** with a configured agent and environment, sends your task as a **user message**, and waits until the **session** reaches a terminal state (idle or terminated) by polling. Log streaming is not used.
 
 ### Prerequisites
 
 - A **Claude API key** on the integration.
-- An **agent** and **environment** already created in the Anthropic API (or Console). This step references them by ID.
+- An **agent** and **environment** already created in the Anthropic API (or Console). This step lists them for selection.
 
 ### Configuration
 
-- **Agent ID** and optional **Version**: the Managed Agent to run (latest, or a pinned version if **Version** is set).
-- **Environment ID**: The environment the session runs in.
+- **Agent** and optional **Version**: the Managed Agent to run. Pick an agent, then optionally pin a **Version** (the latest is used when left unset).
+- **Environment**: The environment the session runs in.
 - **Prompt**: The user message (task) sent to the agent.
 - **Vault IDs** (optional): For MCP tools that need vault-backed credentials.
 - **Keep Session After Run** (optional): By default the session is deleted once the run finishes. Enable this to keep it so you can read the full transcript in the Anthropic Console when debugging. It applies only to runs that finish — a cancelled run is always cleaned up. Kept sessions are never reclaimed automatically, so delete them yourself when you're done.
