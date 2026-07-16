@@ -42,13 +42,17 @@ const timezoneOptions = [
   { label: "GMT+14 (Kiribati)", value: "14" },
 ];
 
-export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, readOnly = false }) => {
   const hasSetDefault = useRef(false);
   const testId = field.name ? toTestId(`field-${field.name}-select`) : undefined;
 
   // Set user's current timezone as default on first render if no value is present
   // or if the value is "current" (which signals to use user's timezone)
   useEffect(() => {
+    if (readOnly) {
+      return;
+    }
+
     if (!hasSetDefault.current && (value === undefined || value === null || value === "current")) {
       const userTimezone = getUserTimezoneOffset();
       // Use user's timezone if it matches one of our options, otherwise fallback to "0" (UTC)
@@ -57,7 +61,7 @@ export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
       onChange(defaultTimezone);
       hasSetDefault.current = true;
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [readOnly, value, field.defaultValue, onChange]);
 
   // Get the display value - if value is "current", show user's timezone
   const displayValue = (() => {
@@ -69,7 +73,7 @@ export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
   })();
 
   return (
-    <Select value={displayValue} onValueChange={(val) => onChange(val || undefined)}>
+    <Select value={displayValue} onValueChange={(val) => onChange(val || undefined)} disabled={readOnly}>
       <SelectTrigger className="w-full" data-testid={testId}>
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
       </SelectTrigger>

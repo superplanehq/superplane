@@ -48,6 +48,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   autocompleteExampleObj,
   allowExpressions = false,
   readOnly = false,
+  preserveEditLayout = false,
 }) => {
   const listOptions = field.typeOptions?.list;
   const itemDefinition = listOptions?.itemDefinition;
@@ -189,6 +190,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           hasError={hasNestedError}
           autocompleteExampleObj={autocompleteExampleObj}
           readOnly={readOnly}
+          preserveEditLayout={preserveEditLayout}
         />
       );
     });

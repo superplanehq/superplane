@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { resolveCachedNodeRunId, resolveRunLookupEventForNodeActivity } from "./runInspectionLiveNodeLookup";
+import {
+  resolveCachedNodeRunId,
+  resolveLiveCanvasNodeClickSyncAction,
+  resolveRunLookupEventForNodeActivity,
+  shouldDeferRunInspectionForLiveNodeClick,
+} from "./runInspectionLiveNodeLookup";
 
 function execution(overrides: Partial<CanvasesCanvasNodeExecution>): CanvasesCanvasNodeExecution {
   return overrides as CanvasesCanvasNodeExecution;
@@ -94,5 +99,110 @@ describe("resolveRunLookupEventForNodeActivity", () => {
     const runId = resolveCachedNodeRunId("trigger-1", { id: "trigger-1", type: "TYPE_TRIGGER" }, () => null);
 
     expect(runId).toBe("run-from-trigger");
+  });
+});
+
+describe("resolveLiveCanvasNodeClickSyncAction", () => {
+  it("looks up a run from the server when the node has no cached activity", () => {
+    useNodeExecutionStore.getState().clear();
+
+    expect(
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "lookupRun" });
+  });
+
+  it("inspects the cached run when one is already resolved", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "action-1",
+      execution({
+        id: "latest-execution",
+        nodeId: "action-1",
+        runId: "run-from-execution",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "inspectRun", runId: "run-from-execution" });
+  });
+
+  it("looks up a run when activity exists but no cached run id is available", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "action-1",
+      execution({
+        id: "latest-execution",
+        nodeId: "action-1",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      resolveLiveCanvasNodeClickSyncAction("action-1", { id: "action-1", type: "TYPE_ACTION" }, () => null),
+    ).toEqual({ kind: "lookupRun" });
+  });
+});
+
+describe("shouldDeferRunInspectionForLiveNodeClick", () => {
+  it("defers run inspection for approval nodes waiting on input", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "approval-1",
+      execution({
+        id: "approval-execution",
+        nodeId: "approval-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "approval-1", type: "TYPE_ACTION", component: "approval" },
+        useNodeExecutionStore.getState().getNodeData("approval-1"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not defer run inspection for finished approval executions", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "approval-1",
+      execution({
+        id: "approval-execution",
+        nodeId: "approval-1",
+        state: "STATE_FINISHED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "approval-1", type: "TYPE_ACTION", component: "approval" },
+        useNodeExecutionStore.getState().getNodeData("approval-1"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not defer run inspection for unrelated components", () => {
+    useNodeExecutionStore.getState().clear();
+    useNodeExecutionStore.getState().updateNodeExecution(
+      "noop-1",
+      execution({
+        id: "noop-execution",
+        nodeId: "noop-1",
+        state: "STATE_STARTED",
+        createdAt: "2026-07-07T10:20:00Z",
+      }),
+    );
+
+    expect(
+      shouldDeferRunInspectionForLiveNodeClick(
+        { id: "noop-1", type: "TYPE_ACTION", component: "noop" },
+        useNodeExecutionStore.getState().getNodeData("noop-1"),
+      ),
+    ).toBe(false);
   });
 });
