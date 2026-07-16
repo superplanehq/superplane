@@ -42,6 +42,21 @@ func TestServiceAccounts(t *testing.T) {
 		steps.assertServiceAccountSavedInDB("admin-bot", "Admin automation", models.RoleOrgAdmin)
 	})
 
+	t.Run("creating a service account with a custom role", func(t *testing.T) {
+		steps := &serviceAccountSteps{t: t}
+		steps.start()
+		roleName := steps.givenCustomRoleExists("Release Bot")
+		steps.visitServiceAccountsPage()
+		steps.clickCreateServiceAccount()
+		steps.fillName("release-bot")
+		steps.fillDescription("Custom role automation")
+		steps.selectRole("Release Bot")
+		steps.submitCreate()
+		steps.assertTokenDisplayed()
+		steps.dismissTokenModal()
+		steps.assertServiceAccountSavedInDB("release-bot", "Custom role automation", roleName)
+	})
+
 	t.Run("viewing service accounts in the list", func(t *testing.T) {
 		steps := &serviceAccountSteps{t: t}
 		steps.start()
@@ -344,6 +359,28 @@ func (s *serviceAccountSteps) assertEditButtonDisabled() {
 
 func (s *serviceAccountSteps) assertDeleteButtonDisabled() {
 	s.session.AssertDisabled(q.TestID("sa-detail-delete"))
+}
+
+// givenCustomRoleExists creates a custom organization role and returns its name.
+func (s *serviceAccountSteps) givenCustomRoleExists(displayName string) string {
+	authService, err := authorization.NewAuthService()
+	require.NoError(s.t, err)
+
+	roleName := support.RandomName("custom-role")
+	require.NoError(s.t, authService.CreateCustomRole(s.session.OrgID.String(), &authorization.RoleDefinition{
+		Name:        roleName,
+		DisplayName: displayName,
+		DomainType:  models.DomainTypeOrganization,
+		Description: "E2E custom service account role",
+		Permissions: []*authorization.Permission{
+			{
+				Resource:   "canvases",
+				Action:     "read",
+				DomainType: models.DomainTypeOrganization,
+			},
+		},
+	}))
+	return roleName
 }
 
 // givenServiceAccountExists creates a service account directly in the DB for test setup.

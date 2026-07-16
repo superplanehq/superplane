@@ -29,17 +29,15 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, grpcerrors.InvalidArgument(nil, "name is required")
 	}
 
-	validRoles := map[string]bool{
-		models.RoleOrgAdmin:  true,
-		models.RoleOrgViewer: true,
-	}
-
 	if req.Role == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "role is required")
 	}
 
-	if !validRoles[req.Role] {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid role for service account; must be org_admin or org_viewer")
+	// Validate the role against the organization's roles (default and custom)
+	// instead of a hardcoded allow-list, so custom roles can be assigned to
+	// service accounts.
+	if _, err := authService.GetRoleDefinition(ctx, req.Role, models.DomainTypeOrganization, orgID); err != nil {
+		return nil, grpcerrors.InvalidArgument(nil, "invalid role for service account")
 	}
 
 	orgUUID, err := uuid.Parse(orgID)

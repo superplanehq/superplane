@@ -24,9 +24,10 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bot } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceAccounts, useCreateServiceAccount, useDeleteServiceAccount } from "@/hooks/useServiceAccounts";
+import { useOrganizationRoles } from "@/hooks/useOrganizationData";
 
 interface ServiceAccountsProps {
   organizationId: string;
@@ -45,8 +46,22 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
   const canDelete = canAct("service_accounts", "delete");
 
   const { data: serviceAccounts = [], isLoading } = useServiceAccounts(organizationId);
+  const { data: roles = [], isLoading: rolesLoading } = useOrganizationRoles(organizationId);
   const createMutation = useCreateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
+
+  // List custom roles first, then default roles, each sorted alphabetically —
+  // matching the role dropdown UX used when creating groups.
+  const sortedRoles = useMemo(() => {
+    const defaultRoles = new Set(["org_admin", "org_owner", "org_viewer"]);
+    const byDisplayName = (a: (typeof roles)[number], b: (typeof roles)[number]) =>
+      (a.spec?.displayName || a.metadata?.name || "").localeCompare(b.spec?.displayName || b.metadata?.name || "");
+    const customRoles = roles.filter((role) => !defaultRoles.has(role.metadata?.name || "")).sort(byDisplayName);
+    const baseRoles = roles.filter((role) => defaultRoles.has(role.metadata?.name || "")).sort(byDisplayName);
+    return [...customRoles, ...baseRoles];
+  }, [roles]);
+
+  const selectedRoleDescription = sortedRoles.find((r) => r.metadata?.name === role)?.spec?.description;
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -292,17 +307,20 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                   <Label className="text-gray-800 dark:text-gray-100 mb-2">
                     Role <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={role} onValueChange={setRole}>
+                  <Select value={role} onValueChange={setRole} disabled={rolesLoading}>
                     <SelectTrigger className="w-full" data-testid="sa-create-role">
-                      <SelectValue placeholder="Select a role" />
+                      <SelectValue placeholder={rolesLoading ? "Loading roles..." : "Select a role"} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="org_viewer">Viewer</SelectItem>
-                      <SelectItem value="org_admin">Admin</SelectItem>
+                      {sortedRoles.map((r) => (
+                        <SelectItem key={r.metadata?.name} value={r.metadata?.name || ""}>
+                          {r.spec?.displayName || r.metadata?.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Determines what this service account can access.
+                    {selectedRoleDescription || "Determines what this service account can access."}
                   </p>
                 </div>
               </div>
