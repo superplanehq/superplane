@@ -4,16 +4,19 @@ import Editor, { type Monaco } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useResponsiveRailCollapse } from "@/hooks/useResponsiveRailCollapse";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/useTheme";
+import { useMonacoExpressionAutocomplete } from "@/ui/configurationFieldRenderer/useMonacoExpressionAutocomplete";
 
 import { HtmlBody, HtmlBodyLoading } from "./HtmlBody";
-import { markdownTextIsLoading } from "./markdownInterpolation";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
+import { interpolateMarkdownTemplate, markdownTextIsLoading } from "./markdownInterpolation";
 import { MarkdownVariablesPanel } from "./MarkdownVariablesPanel";
 import { useMarkdownVariables } from "./useMarkdownVariables";
 import type { MarkdownVariable } from "./panelTypes";
+
+const MONACO_CEL_EXCLUDED_SUGGESTIONS = ["$", "memory"];
 
 /**
  * Imperative handle exposed by the body code editor to its parent. We don't
@@ -49,8 +52,17 @@ function useHtmlEditorPreview(
     draftVariables,
     textForSideload,
   );
-  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
-  return { previewVars: vars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading };
+  const bodyPreviewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
+  const titlePreviewLoading = markdownTextIsLoading(draftTitle, baseLoading, sideloadLoading, searchingNames);
+  return {
+    previewVars: vars,
+    errors,
+    baseLoading,
+    sideloadLoading,
+    searchingNames,
+    bodyPreviewLoading,
+    titlePreviewLoading,
+  };
 }
 
 interface HtmlPanelEditorProps {
@@ -62,7 +74,7 @@ interface HtmlPanelEditorProps {
   setDraftBody: (value: string) => void;
   draftVariables: MarkdownVariable[];
   setDraftVariables: (next: MarkdownVariable[]) => void;
-  titleInputRef: RefObject<HTMLInputElement | null>;
+  titleInputRef: RefObject<HTMLTextAreaElement | null>;
   codeEditorRef: RefObject<HtmlCodeEditorHandle | null>;
   /** Set when the last save attempt was blocked by variable validation. */
   saveError?: string | null;
@@ -86,6 +98,12 @@ export function HtmlPanelEditor({
   onCommit,
 }: HtmlPanelEditorProps) {
   const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    // Titles are conceptually single-line — swallow bare Enter so the field
+    // acts like an <input> and doesn't accumulate stray newlines.
+    if (e.key === "Enter" && !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === "Escape") {
       e.preventDefault();
       onCancel();
@@ -97,12 +115,13 @@ export function HtmlPanelEditor({
     }
   };
 
-  const { previewVars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading } = useHtmlEditorPreview(
-    canvasId,
-    draftTitle,
-    draftBody,
-    draftVariables,
-  );
+  const { previewVars, errors, baseLoading, sideloadLoading, searchingNames, bodyPreviewLoading, titlePreviewLoading } =
+    useHtmlEditorPreview(canvasId, draftTitle, draftBody, draftVariables);
+
+  const previewTitle = useMemo(() => {
+    if (titlePreviewLoading) return "";
+    return interpolateMarkdownTemplate(draftTitle, previewVars).trim();
+  }, [draftTitle, previewVars, titlePreviewLoading]);
 
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
@@ -117,16 +136,19 @@ export function HtmlPanelEditor({
 
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
-      <div className="flex items-center gap-2 rounded-t-lg px-2 py-1">
-        <Input
+      <div className="flex items-center gap-2 rounded-t-lg px-2 py-1" onKeyDown={handleTitleKeyDown}>
+        <ConsoleExpressionEditor
           ref={titleInputRef}
+          syntaxProfile="wrapped"
           value={draftTitle}
-          onChange={(e) => setDraftTitle(e.target.value)}
-          onKeyDown={handleTitleKeyDown}
+          onChange={setDraftTitle}
+          exampleObj={previewVars}
           placeholder={panelId}
           aria-label="Panel title"
-          className="h-7 border-0 bg-transparent px-2 text-xs font-medium text-slate-800 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-gray-100"
+          inputSize="xs"
+          className="border-0 bg-transparent px-2 shadow-none focus-within:ring-0"
           data-testid="console-html-title-editor"
+          quickTip="Tip: type `{{` to reference a variable."
         />
       </div>
       <div
@@ -143,11 +165,13 @@ export function HtmlPanelEditor({
             onChange={setDraftBody}
             onSave={onCommit}
             onCancel={onCancel}
+            autocompleteExampleObj={previewVars}
           />
           <HtmlLivePreview
+            title={previewTitle}
             body={draftBody}
             vars={previewVars}
-            loading={previewLoading}
+            loading={bodyPreviewLoading}
             collapsed={previewCollapsed}
             onToggle={() => setPreviewCollapsed((prev) => !prev)}
           />
@@ -230,6 +254,13 @@ interface HtmlCodeEditorProps {
   onChange: (value: string) => void;
   onSave: () => void;
   onCancel: () => void;
+  /**
+   * Sample object powering `{{ variable.field }}` completion inside the
+   * Monaco HTML body. Passing `null`/`undefined` disables completion but
+   * keeps the editor otherwise functional so an empty variable set (e.g. no
+   * declared variables yet) doesn't regress the editing experience.
+   */
+  autocompleteExampleObj?: Record<string, unknown> | null;
 }
 
 const CODE_EDITOR_OPTIONS: MonacoEditor.IStandaloneEditorConstructionOptions = {
@@ -250,7 +281,7 @@ const CODE_EDITOR_OPTIONS: MonacoEditor.IStandaloneEditorConstructionOptions = {
 };
 
 const HtmlCodeEditor = forwardRef<HtmlCodeEditorHandle, HtmlCodeEditorProps>(function HtmlCodeEditor(
-  { value, onChange, onSave, onCancel },
+  { value, onChange, onSave, onCancel, autocompleteExampleObj },
   ref,
 ) {
   const { resolvedTheme } = useTheme();
@@ -263,6 +294,19 @@ const HtmlCodeEditor = forwardRef<HtmlCodeEditorHandle, HtmlCodeEditorProps>(fun
   const onCancelRef = useRef(onCancel);
   onSaveRef.current = onSave;
   onCancelRef.current = onCancel;
+
+  const { handleEditorMount: attachExpressionAutocomplete } = useMonacoExpressionAutocomplete({
+    autocompleteExampleObj: autocompleteExampleObj ?? null,
+    languageId: "html",
+    // HTML bodies use widget CEL templates (`{{ … }}`), not expr-lang, so hide
+    // the expr-lang function catalog + `memory` namespace and surface the
+    // caller-declared variables as top-level suggestions inside braces. Root
+    // `$` is widget-row syntax and is invalid for this variable dictionary;
+    // nested run-node paths remain available through `run.$["Node"]`.
+    includeTopLevelGlobals: true,
+    includeFunctions: false,
+    excludedSuggestions: MONACO_CEL_EXCLUDED_SUGGESTIONS,
+  });
 
   useImperativeHandle(
     ref,
@@ -295,6 +339,7 @@ const HtmlCodeEditor = forwardRef<HtmlCodeEditorHandle, HtmlCodeEditorProps>(fun
       () => onCancelRef.current(),
       "!suggestWidgetVisible && !findWidgetVisible && !renameInputVisible && !parameterHintsVisible",
     );
+    attachExpressionAutocomplete(instance, monaco);
     if (pendingFocusRef.current) {
       pendingFocusRef.current = false;
       instance.focus();
@@ -317,12 +362,14 @@ const HtmlCodeEditor = forwardRef<HtmlCodeEditorHandle, HtmlCodeEditorProps>(fun
 });
 
 function HtmlLivePreview({
+  title,
   body,
   vars,
   loading,
   collapsed,
   onToggle,
 }: {
+  title: string;
   body: string;
   vars: Record<string, unknown>;
   loading: boolean;
@@ -355,6 +402,15 @@ function HtmlLivePreview({
       </button>
       {!collapsed ? (
         <div className="min-h-0 flex-1 overflow-auto px-3 py-2">
+          {title ? (
+            <div
+              className="mb-1.5 truncate text-[13px] font-medium text-slate-700 dark:text-gray-200"
+              data-testid="console-html-editor-preview-title"
+              title={title}
+            >
+              {title}
+            </div>
+          ) : null}
           {body.trim() ? (
             loading ? (
               <HtmlBodyLoading />

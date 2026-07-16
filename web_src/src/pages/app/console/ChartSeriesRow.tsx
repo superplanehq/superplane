@@ -5,18 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { CHART_SERIES_FORMATS } from "./chartPanelFormConstants";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import type { WidgetChartSeries, WidgetColumnFormat } from "./widget/types";
 
 export function ChartSeriesRow({
   index,
   series,
-  fieldListId,
+  sampleRow,
   onChange,
   onRemove,
 }: {
   index: number;
   series: WidgetChartSeries;
-  fieldListId: string | undefined;
+  sampleRow: Record<string, unknown>;
   onChange: (patch: Partial<WidgetChartSeries>) => void;
   onRemove: () => void;
 }) {
@@ -24,11 +25,12 @@ export function ChartSeriesRow({
     <div className="flex gap-2 rounded-lg bg-slate-100 p-2">
       <div className="min-w-0 flex-1 space-y-2">
         <div className="grid grid-cols-2 gap-2">
-          <Input
-            list={fieldListId}
+          <ConsoleExpressionEditor
+            syntaxProfile="pathOrRaw"
             className="h-8"
             value={series.field ?? ""}
-            onChange={(e) => onChange({ field: e.target.value || undefined })}
+            onChange={(next) => onChange({ field: next || undefined })}
+            exampleObj={sampleRow}
             placeholder="field or {{ expr }} (blank = count)"
             aria-label={`Series ${index + 1} field`}
           />

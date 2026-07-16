@@ -8,6 +8,11 @@ type ModelContext = {
   startWord: string;
   prefix: string;
   suffix: string;
+  allowOutsideExpression: boolean;
+  includeTopLevelGlobals: boolean;
+  includeFunctions: boolean;
+  excludedSuggestions?: string[];
+  envKeySource?: string;
 };
 
 type UseMonacoExpressionAutocompleteProps = {
@@ -18,6 +23,9 @@ type UseMonacoExpressionAutocompleteProps = {
   suffix?: string;
   allowOutsideExpression?: boolean;
   includeTopLevelGlobals?: boolean;
+  includeFunctions?: boolean;
+  excludedSuggestions?: string[];
+  envKeySource?: string;
 };
 
 type MonacoKeyEvent = {
@@ -184,6 +192,9 @@ export const useMonacoExpressionAutocomplete = ({
   suffix = " }}",
   allowOutsideExpression = false,
   includeTopLevelGlobals = false,
+  includeFunctions = true,
+  excludedSuggestions,
+  envKeySource,
 }: UseMonacoExpressionAutocompleteProps) => {
   const modelsRef = useRef<Set<MonacoEditor.ITextModel>>(new Set());
   const previousValueRef = useRef<WeakMap<MonacoEditor.ITextModel, string>>(new WeakMap());
@@ -194,10 +205,31 @@ export const useMonacoExpressionAutocomplete = ({
     for (const model of modelsRef.current) {
       const existing = modelContextMap.get(model);
       if (existing) {
-        modelContextMap.set(model, { ...existing, exampleObj: nextExample, startWord, prefix, suffix });
+        modelContextMap.set(model, {
+          ...existing,
+          exampleObj: nextExample,
+          startWord,
+          prefix,
+          suffix,
+          allowOutsideExpression,
+          includeTopLevelGlobals,
+          includeFunctions,
+          excludedSuggestions,
+          envKeySource,
+        });
       }
     }
-  }, [autocompleteExampleObj, startWord, prefix, suffix]);
+  }, [
+    allowOutsideExpression,
+    autocompleteExampleObj,
+    envKeySource,
+    excludedSuggestions,
+    includeFunctions,
+    includeTopLevelGlobals,
+    prefix,
+    startWord,
+    suffix,
+  ]);
 
   const handleEditorMount = useCallback(
     (editor: MonacoEditor.IStandaloneCodeEditor, monaco: Monaco) => {
@@ -207,7 +239,17 @@ export const useMonacoExpressionAutocomplete = ({
       }
 
       modelsRef.current.add(model);
-      modelContextMap.set(model, { exampleObj: autocompleteExampleObj ?? null, startWord, prefix, suffix });
+      modelContextMap.set(model, {
+        exampleObj: autocompleteExampleObj ?? null,
+        startWord,
+        prefix,
+        suffix,
+        allowOutsideExpression,
+        includeTopLevelGlobals,
+        includeFunctions,
+        excludedSuggestions,
+        envKeySource,
+      });
       previousValueRef.current.set(model, model.getValue());
 
       if (!providerRegistry.has(languageId)) {
@@ -221,7 +263,7 @@ export const useMonacoExpressionAutocomplete = ({
 
             const fullText = completionModel.getValue();
             const cursorOffset = completionModel.getOffsetAt(position);
-            const expressionContext = allowOutsideExpression
+            const expressionContext = context.allowOutsideExpression
               ? {
                   expressionText: fullText,
                   expressionCursor: cursorOffset,
@@ -243,12 +285,22 @@ export const useMonacoExpressionAutocomplete = ({
               wordAtPosition.endColumn,
             );
 
-            const suggestions = getSuggestions(
+            const rawSuggestions = getSuggestions(
               expressionContext.expressionText,
               expressionContext.expressionCursor,
               context.exampleObj ?? {},
-              { allowInStrings: allowOutsideExpression, limit: 100, includeTopLevelGlobals },
-            ).sort((a, b) => {
+              {
+                allowInStrings: context.allowOutsideExpression,
+                limit: 100,
+                includeTopLevelGlobals: context.includeTopLevelGlobals,
+                includeFunctions: context.includeFunctions,
+                envKeySource: context.envKeySource,
+              },
+            );
+            const filteredSuggestions = context.excludedSuggestions
+              ? rawSuggestions.filter((s) => !context.excludedSuggestions?.includes(s.label))
+              : rawSuggestions;
+            const suggestions = filteredSuggestions.sort((a, b) => {
               const aPriority = suggestionSortPriority[a.label as keyof typeof suggestionSortPriority];
               const bPriority = suggestionSortPriority[b.label as keyof typeof suggestionSortPriority];
 
@@ -313,21 +365,21 @@ export const useMonacoExpressionAutocomplete = ({
         providerRegistry.set(languageId, disposable);
       }
 
-      const triggerSuggestIfInsideExpression = (modelStartWord: string, modelSuffix: string) => {
+      const triggerSuggestIfInsideExpression = (context: ModelContext) => {
         const position = editor.getPosition();
         if (!position) {
           return;
         }
 
         const cursorOffset = model.getOffsetAt(position);
-        const expressionContext = allowOutsideExpression
+        const expressionContext = context.allowOutsideExpression
           ? {
               expressionText: model.getValue(),
               expressionCursor: cursorOffset,
               startOffset: 0,
               endOffset: model.getValue().length,
             }
-          : getExpressionContext(model.getValue(), cursorOffset, modelStartWord, modelSuffix);
+          : getExpressionContext(model.getValue(), cursorOffset, context.startWord, context.suffix);
         if (!expressionContext) {
           return;
         }
@@ -409,10 +461,10 @@ export const useMonacoExpressionAutocomplete = ({
         }
 
         if (shouldTriggerSuggest) {
-          triggerSuggestIfInsideExpression(modelStartWord, modelSuffix);
+          triggerSuggestIfInsideExpression(modelContext);
         }
 
-        triggerSuggestIfInsideExpression(modelStartWord, modelSuffix);
+        triggerSuggestIfInsideExpression(modelContext);
 
         previousValueRef.current.set(model, model.getValue());
       });
@@ -427,7 +479,7 @@ export const useMonacoExpressionAutocomplete = ({
           return;
         }
 
-        triggerSuggestIfInsideExpression(modelContext.startWord, modelContext.suffix);
+        triggerSuggestIfInsideExpression(modelContext);
       });
 
       editor.onDidDispose(() => {
@@ -440,7 +492,18 @@ export const useMonacoExpressionAutocomplete = ({
         modelsRef.current.delete(model);
       });
     },
-    [allowOutsideExpression, autocompleteExampleObj, includeTopLevelGlobals, languageId, prefix, startWord, suffix],
+    [
+      allowOutsideExpression,
+      autocompleteExampleObj,
+      envKeySource,
+      excludedSuggestions,
+      includeFunctions,
+      includeTopLevelGlobals,
+      languageId,
+      prefix,
+      startWord,
+      suffix,
+    ],
   );
 
   return { handleEditorMount };

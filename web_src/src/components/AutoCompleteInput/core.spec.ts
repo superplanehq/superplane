@@ -9,6 +9,26 @@ describe("getSuggestions", () => {
     expect(suggestions.some((item) => item.insertText === '$["foo"]')).toBe(true);
   });
 
+  it("suggests nested run-node keys after a variable dollar trigger", () => {
+    const runNodes = { Deploy: { outputs: { url: "https://example.com" } } };
+    const globals = { run: { $: runNodes, __runNodes__: runNodes }, sibling: {} };
+
+    const suggestions = getSuggestions("run.$", "run.$".length, globals);
+    const labels = suggestions.map((item) => item.label);
+
+    expect(labels).toContain('["Deploy"]');
+    expect(labels).not.toContain('["sibling"]');
+  });
+
+  it("filters nested run-node keys inside a dollar bracket", () => {
+    const runNodes = { Deploy: {}, Test: {} };
+    const globals = { run: { $: runNodes, __runNodes__: runNodes }, sibling: {} };
+
+    const suggestions = getSuggestions('run.$["De', 'run.$["De'.length, globals);
+
+    expect(suggestions.map((item) => item.label)).toEqual(['["Deploy"]']);
+  });
+
   it("suggests dot fields based on resolved globals", () => {
     const suggestions = getSuggestions("$.user.", "$.user.".length, { user: { name: "Ana", age: 33 } });
     const labels = suggestions.map((item) => item.label);
