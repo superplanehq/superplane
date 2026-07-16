@@ -113,6 +113,27 @@ func Test__UpdateIssue__Setup(t *testing.T) {
 		err := c.Setup(ctx)
 		require.NoError(t, err)
 	})
+
+	t.Run("title toggled on but empty is rejected", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"project":  "123",
+				"issueIid": "1",
+				"title":    "",
+			},
+			Integration: &contexts.IntegrationContext{
+				Metadata: Metadata{
+					Projects: []ProjectMetadata{
+						{ID: 123, Name: "repo", URL: "http://repo"},
+					},
+				},
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+		err := c.Setup(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "title cannot be empty")
+	})
 }
 
 func Test__UpdateIssue__Execute(t *testing.T) {
@@ -275,6 +296,32 @@ func Test__UpdateIssue__Execute(t *testing.T) {
 		err := c.Execute(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "at least one field must be enabled")
+	})
+
+	t.Run("title toggled on but empty is rejected", func(t *testing.T) {
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":  "123",
+				"issueIid": "1",
+				"title":    "",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"authType":    AuthTypePersonalAccessToken,
+					"groupId":     "123",
+					"accessToken": "pat",
+					"baseUrl":     "https://gitlab.com",
+				},
+			},
+			HTTP: &contexts.HTTPContext{},
+		}
+
+		err := c.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "title cannot be empty")
+
+		httpCtx := ctx.HTTP.(*contexts.HTTPContext)
+		assert.Empty(t, httpCtx.Requests, "no request should be sent when the title is empty")
 	})
 
 	t.Run("clears description, labels, assignees and milestone when toggled on but empty", func(t *testing.T) {
