@@ -1,4 +1,4 @@
-package serviceaccounts
+package apikeys
 
 import (
 	"testing"
@@ -10,7 +10,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestSerializeServiceAccount_WithCreator(t *testing.T) {
+func TestSerializeAPIKey_WithCreator(t *testing.T) {
 	orgID := uuid.New()
 	saID := uuid.New()
 	creatorID := uuid.New()
@@ -20,17 +20,17 @@ func TestSerializeServiceAccount_WithCreator(t *testing.T) {
 	canvasID := uuid.NewString()
 
 	sa := &models.User{
-		ID:                      saID,
-		OrganizationID:          orgID,
-		Name:                    "my-bot",
-		Type:                    models.UserTypeServiceAccount,
-		Description:             &desc,
-		CreatedBy:               &creatorID,
-		TokenHash:               "hash",
-		ServiceAccountExpiresAt: &expiresAt,
-		ServiceAccountCanvasIDs: datatypes.NewJSONSlice([]string{canvasID}),
-		CreatedAt:               time.Now().Add(-time.Hour),
-		UpdatedAt:               time.Now(),
+		ID:              saID,
+		OrganizationID:  orgID,
+		Name:            "my-bot",
+		Type:            models.UserTypeAPIKey,
+		Description:     &desc,
+		CreatedBy:       &creatorID,
+		TokenHash:       "hash",
+		APIKeyExpiresAt: &expiresAt,
+		APIKeyCanvasIDs: datatypes.NewJSONSlice([]string{canvasID}),
+		CreatedAt:       time.Now().Add(-time.Hour),
+		UpdatedAt:       time.Now(),
 	}
 
 	creator := &models.User{
@@ -41,7 +41,7 @@ func TestSerializeServiceAccount_WithCreator(t *testing.T) {
 		Type:           models.UserTypeHuman,
 	}
 
-	out := serializeServiceAccount(sa, creator)
+	out := serializeAPIKey(sa, creator)
 	require.Equal(t, saID.String(), out.Id)
 	require.Equal(t, "my-bot", out.Name)
 	require.Equal(t, desc, out.Description)
@@ -54,7 +54,7 @@ func TestSerializeServiceAccount_WithCreator(t *testing.T) {
 	require.Equal(t, []string{canvasID}, out.CanvasIds)
 }
 
-func TestSerializeServiceAccount_NoCreator(t *testing.T) {
+func TestSerializeAPIKey_NoCreator(t *testing.T) {
 	orgID := uuid.New()
 	saID := uuid.New()
 	creatorID := uuid.New()
@@ -63,13 +63,13 @@ func TestSerializeServiceAccount_NoCreator(t *testing.T) {
 		ID:             saID,
 		OrganizationID: orgID,
 		Name:           "orphan-bot",
-		Type:           models.UserTypeServiceAccount,
+		Type:           models.UserTypeAPIKey,
 		CreatedBy:      &creatorID,
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
 	}
 
-	out := serializeServiceAccount(sa, nil)
+	out := serializeAPIKey(sa, nil)
 	require.Equal(t, creatorID.String(), out.CreatedBy)
 	require.Empty(t, out.CreatedByName)
 	require.Empty(t, out.CreatedByEmail)

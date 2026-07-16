@@ -116,9 +116,9 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
     },
     {
       label: "API Keys",
-      href: organizationId ? `/${organizationId}/settings/service-accounts` : "#",
+      href: organizationId ? `/${organizationId}/settings/api-keys` : "#",
       Icon: KeyRound,
-      permission: { resource: "service_accounts", action: "read" },
+      permission: { resource: "api_keys", action: "read" },
     },
     {
       label: "Groups",

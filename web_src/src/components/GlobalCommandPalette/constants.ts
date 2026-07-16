@@ -55,12 +55,12 @@ export const ORGANIZATION_SETTINGS_LINKS: Array<{
     permission: { resource: "members", action: "read" },
   },
   {
-    id: "service-accounts",
+    id: "api-keys",
     label: "API Keys",
     description: "Programmatic API access",
-    path: "settings/service-accounts",
+    path: "settings/api-keys",
     icon: KeyRound,
-    permission: { resource: "service_accounts", action: "read" },
+    permission: { resource: "api_keys", action: "read" },
   },
   {
     id: "groups",

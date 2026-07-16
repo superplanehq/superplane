@@ -158,20 +158,20 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, res.Code)
 	})
 
-	t.Run("expired service account api token is rejected", func(t *testing.T) {
+	t.Run("expired API key api token is rejected", func(t *testing.T) {
 		rawToken, err := crypto.Base64String(32)
 		require.NoError(t, err)
 		expiredAt := time.Now().Add(-time.Minute)
-		serviceAccount := &models.User{
-			ID:                      uuid.New(),
-			OrganizationID:          r.Organization.ID,
-			Name:                    "expired-bot",
-			Type:                    models.UserTypeServiceAccount,
-			TokenHash:               crypto.HashToken(rawToken),
-			ServiceAccountExpiresAt: &expiredAt,
-			ServiceAccountCanvasIDs: datatypes.NewJSONSlice([]string{}),
+		apiKey := &models.User{
+			ID:              uuid.New(),
+			OrganizationID:  r.Organization.ID,
+			Name:            "expired-bot",
+			Type:            models.UserTypeAPIKey,
+			TokenHash:       crypto.HashToken(rawToken),
+			APIKeyExpiresAt: &expiredAt,
+			APIKeyCanvasIDs: datatypes.NewJSONSlice([]string{}),
 		}
-		require.NoError(t, database.Conn().Create(serviceAccount).Error)
+		require.NoError(t, database.Conn().Create(apiKey).Error)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
 		req.Header.Set("Authorization", "Bearer "+rawToken)

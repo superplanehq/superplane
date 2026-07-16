@@ -1,4 +1,4 @@
-package serviceaccounts
+package apikeys
 
 import (
 	"fmt"
@@ -8,27 +8,27 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
-func serializeServiceAccount(sa *models.User, creator *models.User) *pb.ServiceAccount {
-	out := &pb.ServiceAccount{
-		Id:             sa.ID.String(),
-		Name:           sa.Name,
-		OrganizationId: sa.OrganizationID.String(),
-		HasToken:       sa.TokenHash != "",
-		CreatedAt:      timestamppb.New(sa.CreatedAt),
-		UpdatedAt:      timestamppb.New(sa.UpdatedAt),
+func serializeAPIKey(apiKey *models.User, creator *models.User) *pb.APIKey {
+	out := &pb.APIKey{
+		Id:             apiKey.ID.String(),
+		Name:           apiKey.Name,
+		OrganizationId: apiKey.OrganizationID.String(),
+		HasToken:       apiKey.TokenHash != "",
+		CreatedAt:      timestamppb.New(apiKey.CreatedAt),
+		UpdatedAt:      timestamppb.New(apiKey.UpdatedAt),
 	}
 
-	if sa.Description != nil {
-		out.Description = *sa.Description
+	if apiKey.Description != nil {
+		out.Description = *apiKey.Description
 	}
 
-	if sa.CreatedBy != nil {
-		out.CreatedBy = sa.CreatedBy.String()
+	if apiKey.CreatedBy != nil {
+		out.CreatedBy = apiKey.CreatedBy.String()
 	}
 
 	if creator != nil {
@@ -38,11 +38,11 @@ func serializeServiceAccount(sa *models.User, creator *models.User) *pb.ServiceA
 		}
 	}
 
-	if sa.ServiceAccountExpiresAt != nil {
-		out.ExpiresAt = timestamppb.New(*sa.ServiceAccountExpiresAt)
+	if apiKey.APIKeyExpiresAt != nil {
+		out.ExpiresAt = timestamppb.New(*apiKey.APIKeyExpiresAt)
 	}
 
-	out.CanvasIds = append(out.CanvasIds, sa.ServiceAccountCanvasIDs...)
+	out.CanvasIds = append(out.CanvasIds, apiKey.APIKeyCanvasIDs...)
 
 	return out
 }
@@ -61,7 +61,7 @@ func normalizedCanvasIDs(rawCanvasIDs []string) []string {
 	return canvasIDs
 }
 
-func validateServiceAccountCanvasIDs(db *gorm.DB, orgID string, rawCanvasIDs []string) ([]string, error) {
+func validateAPIKeyCanvasIDs(db *gorm.DB, orgID string, rawCanvasIDs []string) ([]string, error) {
 	canvasIDs := normalizedCanvasIDs(rawCanvasIDs)
 	if len(canvasIDs) == 0 {
 		return []string{}, nil
@@ -90,12 +90,12 @@ func validateServiceAccountCanvasIDs(db *gorm.DB, orgID string, rawCanvasIDs []s
 	return canvasIDs, nil
 }
 
-func creatorUserForServiceAccount(db *gorm.DB, orgID string, sa *models.User) (*models.User, error) {
-	if sa.CreatedBy == nil {
+func creatorUserForAPIKey(db *gorm.DB, orgID string, apiKey *models.User) (*models.User, error) {
+	if apiKey.CreatedBy == nil {
 		return nil, nil
 	}
 
-	users, err := models.FindUsersByIDsInOrganization(db, orgID, []string{sa.CreatedBy.String()})
+	users, err := models.FindUsersByIDsInOrganization(db, orgID, []string{apiKey.CreatedBy.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -105,11 +105,11 @@ func creatorUserForServiceAccount(db *gorm.DB, orgID string, sa *models.User) (*
 	return &users[0], nil
 }
 
-func creatorsByIDForServiceAccounts(db *gorm.DB, orgID string, sas []models.User) (map[string]*models.User, error) {
+func creatorsByIDForAPIKeys(db *gorm.DB, orgID string, apiKeys []models.User) (map[string]*models.User, error) {
 	idSet := make(map[string]struct{})
-	for i := range sas {
-		if sas[i].CreatedBy != nil {
-			idSet[sas[i].CreatedBy.String()] = struct{}{}
+	for i := range apiKeys {
+		if apiKeys[i].CreatedBy != nil {
+			idSet[apiKeys[i].CreatedBy.String()] = struct{}{}
 		}
 	}
 	if len(idSet) == 0 {

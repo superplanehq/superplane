@@ -1,4 +1,4 @@
-package serviceaccounts
+package apikeys
 
 import (
 	"context"
@@ -12,11 +12,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	"gorm.io/gorm"
 )
 
-func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountRequest, authService authorization.Authorization) (*pb.CreateServiceAccountResponse, error) {
+func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService authorization.Authorization) (*pb.CreateAPIKeyResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
@@ -65,7 +65,7 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 	}
 
 	db := database.DB(ctx)
-	canvasIDs, err := validateServiceAccountCanvasIDs(db, orgID, req.CanvasIds)
+	canvasIDs, err := validateAPIKeyCanvasIDs(db, orgID, req.CanvasIds)
 	if err != nil {
 		return nil, err
 	}
@@ -84,22 +84,22 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, grpcerrors.Internal(err, "failed to generate token")
 	}
 
-	var sa *models.User
+	var apiKey *models.User
 	err = db.Transaction(func(tx *gorm.DB) error {
 		var txErr error
-		sa, txErr = models.CreateServiceAccount(tx, orgUUID, name, description, createdByUUID, expiresAt, canvasIDs)
+		apiKey, txErr = models.CreateAPIKey(tx, orgUUID, name, description, createdByUUID, expiresAt, canvasIDs)
 		if txErr != nil {
 			return txErr
 		}
 
-		sa.TokenHash = crypto.HashToken(plainToken)
-		sa.UpdatedAt = sa.CreatedAt
-		txErr = tx.Save(sa).Error
+		apiKey.TokenHash = crypto.HashToken(plainToken)
+		apiKey.UpdatedAt = apiKey.CreatedAt
+		txErr = tx.Save(apiKey).Error
 		if txErr != nil {
 			return txErr
 		}
 
-		txErr = authService.AssignRole(sa.ID.String(), req.Role, orgID, models.DomainTypeOrganization)
+		txErr = authService.AssignRole(apiKey.ID.String(), req.Role, orgID, models.DomainTypeOrganization)
 		return txErr
 	})
 
@@ -107,13 +107,13 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, grpcerrors.Internal(err, "failed to create API key")
 	}
 
-	creator, err := creatorUserForServiceAccount(db, orgID, sa)
+	creator, err := creatorUserForAPIKey(db, orgID, apiKey)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to create API key")
 	}
 
-	return &pb.CreateServiceAccountResponse{
-		ServiceAccount: serializeServiceAccount(sa, creator),
-		Token:          plainToken,
+	return &pb.CreateAPIKeyResponse{
+		ApiKey: serializeAPIKey(apiKey, creator),
+		Token:  plainToken,
 	}, nil
 }

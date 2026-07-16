@@ -14,8 +14,8 @@ import { Members } from "./Members";
 import { Integrations } from "./Integrations";
 import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
-import { ServiceAccounts } from "./ServiceAccounts";
-import { ServiceAccountDetail } from "./ServiceAccountDetail";
+import { APIKeys } from "./ApiKeys";
+import { APIKeyDetail } from "./ApiKeyDetail";
 import { Usage } from "./Usage";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { isUsagePageForced } from "@/lib/env";
@@ -128,7 +128,7 @@ export function OrganizationSettings() {
     "roles",
     "integrations",
     "secrets",
-    "service-accounts",
+    "api-keys",
     "billing",
   ];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
@@ -172,11 +172,11 @@ export function OrganizationSettings() {
       permission: { resource: "members", action: "read" },
     },
     {
-      id: "service-accounts",
+      id: "api-keys",
       label: "API Keys",
-      href: `/${organizationId}/settings/service-accounts`,
+      href: `/${organizationId}/settings/api-keys`,
       Icon: KeyRound,
-      permission: { resource: "service_accounts", action: "read" },
+      permission: { resource: "api_keys", action: "read" },
     },
     {
       id: "groups",
@@ -237,7 +237,7 @@ export function OrganizationSettings() {
     if (link.id === "secrets" && currentSection === "secrets") {
       return true;
     }
-    if (link.id === "service-accounts" && currentSection === "service-accounts") {
+    if (link.id === "api-keys" && currentSection === "api-keys") {
       return true;
     }
     return currentSection === link.id;
@@ -284,7 +284,7 @@ export function OrganizationSettings() {
       title: "Secrets",
       description: "Store and manage secrets.",
     },
-    "service-accounts": {
+    "api-keys": {
       title: "API Keys",
       description: "Create and manage API keys for programmatic access.",
     },
@@ -518,18 +518,18 @@ export function OrganizationSettings() {
               }
             />
             <Route
-              path="service-accounts"
+              path="api-keys"
               element={
-                <RequirePermission resource="service_accounts" action="read">
-                  <ServiceAccounts organizationId={organizationId || ""} />
+                <RequirePermission resource="api_keys" action="read">
+                  <APIKeys organizationId={organizationId || ""} />
                 </RequirePermission>
               }
             />
             <Route
-              path="service-accounts/:id"
+              path="api-keys/:id"
               element={
-                <RequirePermission resource="service_accounts" action="read">
-                  <ServiceAccountDetail organizationId={organizationId || ""} />
+                <RequirePermission resource="api_keys" action="read">
+                  <APIKeyDetail organizationId={organizationId || ""} />
                 </RequirePermission>
               }
             />
