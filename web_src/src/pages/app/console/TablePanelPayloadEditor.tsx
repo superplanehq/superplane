@@ -3,10 +3,9 @@ import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 
 import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
-
-import { CONSOLE_CODE_BADGE_CLASSES } from "./consoleCodeStyles";
 import { buildEnv, compileTemplate, evalTemplateDetailed } from "./widget/celExpr";
 
 export type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
@@ -90,7 +89,7 @@ function PayloadEntry({
   const datalistId = fieldOptions.length > 0 ? `payload-fields-${reactId}` : undefined;
   return (
     <div className="space-y-1">
-      <div className="grid grid-cols-12 items-center gap-1">
+      <div className="grid grid-cols-12 items-start gap-1">
         <Input
           value={entry.path}
           onChange={(e) => onChange({ path: e.target.value })}
@@ -98,12 +97,19 @@ function PayloadEntry({
           className="col-span-5 h-7 text-xs"
           list={datalistId}
         />
-        <Input
-          value={entry.template}
-          onChange={(e) => onChange({ template: e.target.value })}
-          placeholder="{{ pr_number }} or int(value) / 2"
-          className="col-span-6 h-7 text-xs"
-        />
+        <div className="col-span-6">
+          <ExpressionEditor
+            dialect="cel"
+            exampleObj={sampleRow}
+            value={entry.template}
+            onChange={(next) => onChange({ template: next })}
+            placeholder="{{ pr_number }} or int(value) / 2"
+            inputSize="xs"
+            showValuePreview
+            valuePreviewLabel="Preview"
+            data-testid="payload-template-input"
+          />
+        </div>
         <Button
           type="button"
           size="icon"
@@ -123,50 +129,32 @@ function PayloadEntry({
           </datalist>
         ) : null}
       </div>
-      <PayloadPreview entry={entry} sampleRow={sampleRow} />
+      <PayloadTemplateError template={entry.template} sampleRow={sampleRow} />
     </div>
   );
 }
 
 /**
- * Inline preview of a payload value template evaluated against the first
- * memory sample row. Surfaces CEL compile/eval errors that `evalExpr` would
- * otherwise silently swallow so authors get fast feedback while typing.
+ * Always-visible CEL compile/eval error line for the payload template. The
+ * ExpressionEditor's preview toggle already covers success previews, but
+ * authors expect immediate feedback on invalid templates without having to
+ * flip preview mode.
  */
-function PayloadPreview({ entry, sampleRow }: { entry: PayloadDraftEntry; sampleRow: Record<string, unknown> }) {
+function PayloadTemplateError({ template, sampleRow }: { template: string; sampleRow: Record<string, unknown> }) {
   const preview = useMemo(() => {
-    if (!entry.template) return null;
-    if (!entry.template.includes("{{")) return null;
+    if (!template || !template.includes("{{")) return null;
     const env = buildEnv();
     const stringify = (v: unknown) => (v == null ? "" : typeof v === "string" ? v : JSON.stringify(v));
-    return evalTemplateDetailed(compileTemplate(entry.template), sampleRow, env, stringify);
-  }, [entry.template, sampleRow]);
+    return evalTemplateDetailed(compileTemplate(template), sampleRow, env, stringify);
+  }, [template, sampleRow]);
 
-  if (!preview) return null;
-  if (!preview.ok) {
-    return (
-      <p className="col-span-12 flex items-start gap-1 text-[10px] text-red-600">
-        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-        <span>
-          <span className="font-medium">CEL error:</span> {preview.error}
-        </span>
-      </p>
-    );
-  }
-
-  const hasSample = Object.keys(sampleRow).length > 0;
-  const text = preview.value;
-  if (!text && !hasSample) {
-    return (
-      <p className="text-[10px] text-slate-400">
-        Preview unavailable — no memory data yet. Run your workflow once, then revisit.
-      </p>
-    );
-  }
+  if (!preview || preview.ok) return null;
   return (
-    <p className="text-[10px] text-slate-500" data-testid="payload-preview">
-      <span className="font-medium text-slate-600">Preview:</span>{" "}
-      <code className={CONSOLE_CODE_BADGE_CLASSES}>{text || "(empty)"}</code>
+    <p className="flex items-start gap-1 text-[10px] text-red-600">
+      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+      <span>
+        <span className="font-medium">CEL error:</span> {preview.error}
+      </span>
     </p>
   );
 }
