@@ -2,59 +2,57 @@ import { Icon } from "@/components/Icon";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { Link } from "@/components/Link/link";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/Table/table";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import {
-  settingsEmptyStateIconClassName,
-  settingsEmptyStateSubtitleClassName,
-  settingsEmptyStateTitleClassName,
-  settingsModalClassName,
-  settingsTableCardClassName,
-  settingsTableLinkClassName,
-} from "./settingsPageStyles";
+import { settingsModalClassName, settingsTableCardClassName } from "./settingsPageStyles";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceAccounts, useCreateServiceAccount, useDeleteServiceAccount } from "@/hooks/useServiceAccounts";
+import { useCanvases } from "@/hooks/useCanvasData";
+import { ApiKeysContent } from "./ApiKeysContent";
 
 interface ServiceAccountsProps {
   organizationId: string;
 }
 
-export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
-  usePageTitle(["Service Accounts"]);
-  const navigate = useNavigate();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+type AccessMode = "organization" | "canvas";
+
+function toApiTimestamp(localValue: string) {
+  if (!localValue) return undefined;
+  return new Date(localValue).toISOString();
+}
+
+function useCreateApiKeyForm(organizationId: string, canCreate: boolean) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [role, setRole] = useState("org_viewer");
+  const [expiresAt, setExpiresAt] = useState("");
+  const [accessMode, setAccessMode] = useState<AccessMode>("organization");
+  const [selectedCanvasIds, setSelectedCanvasIds] = useState<string[]>([]);
   const [newToken, setNewToken] = useState<string | null>(null);
-  const canCreate = canAct("service_accounts", "create");
-  const canDelete = canAct("service_accounts", "delete");
-
-  const { data: serviceAccounts = [], isLoading } = useServiceAccounts(organizationId);
+  const navigate = useNavigate();
   const createMutation = useCreateServiceAccount(organizationId);
-  const deleteMutation = useDeleteServiceAccount(organizationId);
-
-  useReportPageReady(!isLoading && !permissionsLoading);
 
   const handleCreateClick = () => {
     if (!canCreate) return;
     setName("");
     setDescription("");
     setRole("org_viewer");
+    setExpiresAt("");
+    setAccessMode("organization");
+    setSelectedCanvasIds([]);
     setNewToken(null);
     setIsCreateModalOpen(true);
   };
@@ -64,6 +62,9 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
     setName("");
     setDescription("");
     setRole("org_viewer");
+    setExpiresAt("");
+    setAccessMode("organization");
+    setSelectedCanvasIds([]);
     setNewToken(null);
     createMutation.reset();
   };
@@ -74,21 +75,28 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
       showErrorToast("Name is required");
       return;
     }
+    if (accessMode === "canvas" && selectedCanvasIds.length === 0) {
+      showErrorToast("Select at least one app");
+      return;
+    }
+
     try {
       const result = await createMutation.mutateAsync({
         name: name.trim(),
         description: description.trim(),
         role,
+        expiresAt: toApiTimestamp(expiresAt),
+        canvasIds: accessMode === "canvas" ? selectedCanvasIds : [],
       });
       const token = result.data?.token;
       if (token) {
         setNewToken(token);
       } else {
-        showSuccessToast("Service account created");
+        showSuccessToast("API key created");
         handleCloseCreateModal();
       }
     } catch (error) {
-      showErrorToast(`Failed to create service account: ${getApiErrorMessage(error)}`);
+      showErrorToast(`Failed to create API key: ${getApiErrorMessage(error)}`);
     }
   };
 
@@ -100,25 +108,73 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
     }
   };
 
+  const toggleCanvas = (canvasId: string) => {
+    setSelectedCanvasIds((current) =>
+      current.includes(canvasId) ? current.filter((id) => id !== canvasId) : [...current, canvasId],
+    );
+  };
+
+  return {
+    isCreateModalOpen,
+    name,
+    setName,
+    description,
+    setDescription,
+    role,
+    setRole,
+    expiresAt,
+    setExpiresAt,
+    accessMode,
+    setAccessMode,
+    selectedCanvasIds,
+    newToken,
+    createMutation,
+    handleCreateClick,
+    handleCloseCreateModal,
+    handleCreate,
+    handleTokenModalClose,
+    toggleCanvas,
+  };
+}
+
+export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
+  usePageTitle(["API Keys"]);
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const canCreate = canAct("service_accounts", "create");
+  const canDelete = canAct("service_accounts", "delete");
+
+  const { data: serviceAccounts = [], isLoading } = useServiceAccounts(organizationId);
+  const { data: canvases = [] } = useCanvases(organizationId);
+  const deleteMutation = useDeleteServiceAccount(organizationId);
+  const form = useCreateApiKeyForm(organizationId, canCreate);
+
+  useReportPageReady(!isLoading && !permissionsLoading);
+
   const handleDelete = async (id: string, saName: string) => {
     if (!canDelete) return;
-    if (!confirm(`Are you sure you want to delete service account "${saName}"? This cannot be undone.`)) return;
+    if (!confirm(`Are you sure you want to delete API key "${saName}"? This cannot be undone.`)) return;
     try {
       await deleteMutation.mutateAsync(id);
-      showSuccessToast("Service account deleted");
+      showSuccessToast("API key deleted");
     } catch (error) {
       showErrorToast(`Failed to delete: ${getApiErrorMessage(error)}`);
     }
   };
 
   const getDetailPath = (id: string) => `/${organizationId}/settings/service-accounts/${id}`;
+  const canvasNamesById = new Map(canvases.map((canvas) => [canvas.id, canvas.name || "Unnamed"]));
+  const scopeLabel = (canvasIds?: string[]) => {
+    if (!canvasIds || canvasIds.length === 0) return "Organization-wide";
+    if (canvasIds.length === 1) return canvasNamesById.get(canvasIds[0]) || "1 selected app";
+    return `${canvasIds.length} selected apps`;
+  };
 
   if (isLoading) {
     return (
       <div className="space-y-6 pt-6">
         <div className={settingsTableCardClassName}>
           <div className="flex min-h-96 items-center justify-center px-6 pb-6">
-            <p className="text-gray-500 dark:text-gray-400">Loading service accounts...</p>
+            <p className="text-gray-500 dark:text-gray-400">Loading API keys...</p>
           </div>
         </div>
       </div>
@@ -134,131 +190,55 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
           <div className="px-6 pt-6 pb-4 flex items-center justify-start">
             <PermissionTooltip
               allowed={canCreate || permissionsLoading}
-              message="You don't have permission to create service accounts."
+              message="You don't have permission to create API keys."
             >
               <Button
                 className="flex items-center"
-                onClick={handleCreateClick}
+                onClick={form.handleCreateClick}
                 disabled={!canCreate}
                 data-testid="sa-create-btn"
               >
                 <Icon name="plus" />
-                Create Service Account
+                Create API Key
               </Button>
             </PermissionTooltip>
           </div>
         )}
         <div className="px-6 pb-6 min-h-96">
-          {sorted.length === 0 ? (
-            <div className="flex min-h-96 flex-col items-center justify-center text-center">
-              <div className={cn("flex items-center justify-center", settingsEmptyStateIconClassName)}>
-                <Bot size={32} />
-              </div>
-              <p className={settingsEmptyStateTitleClassName}>Create your first service account</p>
-              <p className={settingsEmptyStateSubtitleClassName}>Service accounts provide programmatic API access.</p>
-              <PermissionTooltip
-                allowed={canCreate || permissionsLoading}
-                message="You don't have permission to create service accounts."
-              >
-                <Button
-                  className="mt-4 flex items-center"
-                  onClick={handleCreateClick}
-                  disabled={!canCreate}
-                  data-testid="sa-create-btn"
-                >
-                  <Icon name="plus" />
-                  Create Service Account
-                </Button>
-              </PermissionTooltip>
-            </div>
-          ) : (
-            <Table dense>
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Name</TableHeader>
-                  <TableHeader>Description</TableHeader>
-                  <TableHeader>Created by</TableHeader>
-                  <TableHeader>Token</TableHeader>
-                  <TableHeader></TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {sorted.map((sa) => (
-                  <TableRow key={sa.id} className="last:[&>td]:border-b-0">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Bot size={16} className="text-gray-500 dark:text-gray-400" />
-                        <Link
-                          href={getDetailPath(sa.id || "")}
-                          className={settingsTableLinkClassName}
-                          data-testid="sa-link"
-                        >
-                          {sa.name || "Unnamed"}
-                        </Link>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">{sa.description || "—"}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {sa.createdByName ? sa.createdByName?.trim() : "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {sa.hasToken ? "Active" : "None"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <PermissionTooltip
-                          allowed={canDelete || permissionsLoading}
-                          message="You don't have permission to delete service accounts."
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(sa.id || "", sa.name || "")}
-                            disabled={!canDelete || deleteMutation.isPending}
-                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                            data-testid="sa-delete-btn"
-                          >
-                            <Icon name="trash-2" size="sm" />
-                          </Button>
-                        </PermissionTooltip>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <ApiKeysContent
+            sorted={sorted}
+            canCreate={canCreate}
+            canDelete={canDelete}
+            permissionsLoading={permissionsLoading}
+            deletePending={deleteMutation.isPending}
+            onCreateClick={form.handleCreateClick}
+            onDelete={handleDelete}
+            getDetailPath={getDetailPath}
+            scopeLabel={scopeLabel}
+          />
         </div>
       </div>
-
-      {/* Create modal */}
-      {isCreateModalOpen && !newToken && (
+      {form.isCreateModalOpen && !form.newToken && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className={cn(settingsModalClassName, "max-w-lg")}>
             <form
               className="p-6"
               onSubmit={(e) => {
                 e.preventDefault();
-                handleCreate();
+                form.handleCreate();
               }}
               data-testid="sa-create-form"
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <Bot className="w-6 h-6 text-gray-500 dark:text-gray-400" />
-                  <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Create Service Account</h3>
+                  <KeyRound className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                  <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Create API Key</h3>
                 </div>
                 <button
                   type="button"
-                  onClick={handleCloseCreateModal}
+                  onClick={form.handleCloseCreateModal}
                   className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
-                  disabled={createMutation.isPending}
+                  disabled={form.createMutation.isPending}
                 >
                   <Icon name="x" size="sm" />
                 </button>
@@ -271,8 +251,8 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                   </Label>
                   <Input
                     type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={form.name}
+                    onChange={(e) => form.setName(e.target.value)}
                     placeholder="e.g., ci-deploy-bot"
                     required
                     data-testid="sa-create-name"
@@ -281,9 +261,9 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 <div>
                   <Label className="text-gray-800 dark:text-gray-100 mb-2">Description</Label>
                   <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="What is this service account used for?"
+                    value={form.description}
+                    onChange={(e) => form.setDescription(e.target.value)}
+                    placeholder="What is this API key used for?"
                     rows={3}
                     data-testid="sa-create-description"
                   />
@@ -292,7 +272,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                   <Label className="text-gray-800 dark:text-gray-100 mb-2">
                     Role <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={role} onValueChange={setRole}>
+                  <Select value={form.role} onValueChange={form.setRole}>
                     <SelectTrigger className="w-full" data-testid="sa-create-role">
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
@@ -302,16 +282,62 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                     </SelectContent>
                   </Select>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Determines what this service account can access.
+                    Determines what this API key can do within its access scope.
                   </p>
+                </div>
+                <div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2">Access</Label>
+                  <Select value={form.accessMode} onValueChange={(value) => form.setAccessMode(value as AccessMode)}>
+                    <SelectTrigger className="w-full" data-testid="sa-create-access-mode">
+                      <SelectValue placeholder="Select access" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="organization">Organization-wide</SelectItem>
+                      <SelectItem value="canvas">Selected apps</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {form.accessMode === "canvas" && (
+                  <div>
+                    <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                      Apps <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="max-h-44 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700">
+                      {canvases.map((canvas) => {
+                        const canvasId = canvas.id || "";
+                        return (
+                          <label
+                            key={canvasId}
+                            className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 text-sm last:border-b-0 dark:border-gray-800"
+                          >
+                            <Checkbox
+                              checked={form.selectedCanvasIds.includes(canvasId)}
+                              onChange={() => form.toggleCanvas(canvasId)}
+                              data-testid="sa-create-canvas"
+                            />
+                            <span className="text-gray-800 dark:text-gray-100">{canvas.name || "Unnamed"}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2">Expiration</Label>
+                  <Input
+                    type="datetime-local"
+                    value={form.expiresAt}
+                    onChange={(e) => form.setExpiresAt(e.target.value)}
+                    data-testid="sa-create-expires-at"
+                  />
                 </div>
               </div>
 
               <div className="flex justify-start gap-3 mt-6">
                 <LoadingButton
                   type="submit"
-                  disabled={!name?.trim()}
-                  loading={createMutation.isPending}
+                  disabled={!form.name?.trim()}
+                  loading={form.createMutation.isPending}
                   loadingText="Creating..."
                   className="flex items-center gap-2"
                   data-testid="sa-create-submit"
@@ -321,17 +347,17 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={handleCloseCreateModal}
-                  disabled={createMutation.isPending}
+                  onClick={form.handleCloseCreateModal}
+                  disabled={form.createMutation.isPending}
                 >
                   Cancel
                 </Button>
               </div>
 
-              {createMutation.isError && (
+              {form.createMutation.isError && (
                 <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                   <p className="text-sm text-red-800 dark:text-red-200">
-                    Failed to create: {getApiErrorMessage(createMutation.error)}
+                    Failed to create: {getApiErrorMessage(form.createMutation.error)}
                   </p>
                 </div>
               )}
@@ -339,15 +365,13 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
           </div>
         </div>
       )}
-
-      {/* Token display modal */}
-      {isCreateModalOpen && newToken && (
+      {form.isCreateModalOpen && form.newToken && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className={cn(settingsModalClassName, "max-w-lg")}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <Bot className="h-6 w-6 text-green-600 dark:text-green-400" />
-                <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">Service Account Created</h3>
+                <KeyRound className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">API Key Created</h3>
               </div>
 
               <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md mb-4">
@@ -359,13 +383,13 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
               <div className="flex items-center gap-2 ph-no-capture">
                 <Input
                   readOnly
-                  value={newToken}
+                  value={form.newToken}
                   className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-800"
                   data-testid="sa-token-display"
                 />
                 <CopyButton
                   variant="button"
-                  text={newToken}
+                  text={form.newToken}
                   data-testid="sa-token-copy"
                   onCopyError={() => showErrorToast("Failed to copy token")}
                 >
@@ -374,7 +398,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
               </div>
 
               <div className="flex justify-start mt-6">
-                <Button onClick={handleTokenModalClose} data-testid="sa-token-done">
+                <Button onClick={form.handleTokenModalClose} data-testid="sa-token-done">
                   Done
                 </Button>
               </div>

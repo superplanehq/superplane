@@ -27,17 +27,17 @@ func DescribeServiceAccount(ctx context.Context, req *pb.DescribeServiceAccountR
 
 	user, err := models.FindActiveUserByID(orgID, req.Id)
 	if err != nil {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	if !user.IsServiceAccount() {
-		return nil, grpcerrors.NotFound(err, "service account not found")
+		return nil, grpcerrors.NotFound(err, "API key not found")
 	}
 
 	db := database.DB(ctx)
 	creator, err := creatorUserForServiceAccount(db, orgID, user)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to describe service account")
+		return nil, grpcerrors.Internal(err, "failed to describe API key")
 	}
 
 	return &pb.DescribeServiceAccountResponse{

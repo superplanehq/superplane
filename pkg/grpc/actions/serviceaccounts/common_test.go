@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 )
 
 func TestSerializeServiceAccount_WithCreator(t *testing.T) {
@@ -15,17 +16,21 @@ func TestSerializeServiceAccount_WithCreator(t *testing.T) {
 	creatorID := uuid.New()
 	email := "creator@example.com"
 	desc := "A bot"
+	expiresAt := time.Now().Add(time.Hour)
+	canvasID := uuid.NewString()
 
 	sa := &models.User{
-		ID:             saID,
-		OrganizationID: orgID,
-		Name:           "my-bot",
-		Type:           models.UserTypeServiceAccount,
-		Description:    &desc,
-		CreatedBy:      &creatorID,
-		TokenHash:      "hash",
-		CreatedAt:      time.Now().Add(-time.Hour),
-		UpdatedAt:      time.Now(),
+		ID:                      saID,
+		OrganizationID:          orgID,
+		Name:                    "my-bot",
+		Type:                    models.UserTypeServiceAccount,
+		Description:             &desc,
+		CreatedBy:               &creatorID,
+		TokenHash:               "hash",
+		ServiceAccountExpiresAt: &expiresAt,
+		ServiceAccountCanvasIDs: datatypes.NewJSONSlice([]string{canvasID}),
+		CreatedAt:               time.Now().Add(-time.Hour),
+		UpdatedAt:               time.Now(),
 	}
 
 	creator := &models.User{
@@ -45,6 +50,8 @@ func TestSerializeServiceAccount_WithCreator(t *testing.T) {
 	require.True(t, out.HasToken)
 	require.Equal(t, "Pat Example", out.CreatedByName)
 	require.Equal(t, email, out.CreatedByEmail)
+	require.Equal(t, expiresAt.Unix(), out.ExpiresAt.AsTime().Unix())
+	require.Equal(t, []string{canvasID}, out.CanvasIds)
 }
 
 func TestSerializeServiceAccount_NoCreator(t *testing.T) {

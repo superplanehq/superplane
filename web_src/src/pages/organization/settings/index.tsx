@@ -24,10 +24,10 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import {
   ArrowRightLeft,
   Gauge,
-  Bot,
   CircleUser,
   Home,
   Key,
+  KeyRound,
   Lock,
   LogOut,
   Plug,
@@ -173,9 +173,9 @@ export function OrganizationSettings() {
     },
     {
       id: "service-accounts",
-      label: "Service Accounts",
+      label: "API Keys",
       href: `/${organizationId}/settings/service-accounts`,
-      Icon: Bot,
+      Icon: KeyRound,
       permission: { resource: "service_accounts", action: "read" },
     },
     {
@@ -285,8 +285,8 @@ export function OrganizationSettings() {
       description: "Store and manage secrets.",
     },
     "service-accounts": {
-      title: "Service Accounts",
-      description: "Create and manage service accounts for programmatic API access.",
+      title: "API Keys",
+      description: "Create and manage API keys for programmatic access.",
     },
     profile: {
       title: "Profile",
