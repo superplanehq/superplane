@@ -4,10 +4,19 @@ import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
 // Function to get user's current timezone offset as a string (e.g., "-5", "0", "5.5")
-const getUserTimezoneOffset = (): string => {
+export const getUserTimezoneOffset = (): string => {
   const offset = -new Date().getTimezoneOffset() / 60;
   return offset.toString();
 };
+
+export function resolveTimezoneDisplayValue(value: unknown): string {
+  if (value === undefined || value === null || value === "current") {
+    const userTimezone = getUserTimezoneOffset();
+    return timezoneOptions.find((tz) => tz.value === userTimezone)?.value ?? "0";
+  }
+
+  return String(value);
+}
 
 // Timezone options with labels and values
 const timezoneOptions = [
@@ -42,13 +51,17 @@ const timezoneOptions = [
   { label: "GMT+14 (Kiribati)", value: "14" },
 ];
 
-export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, readOnly = false }) => {
   const hasSetDefault = useRef(false);
   const testId = field.name ? toTestId(`field-${field.name}-select`) : undefined;
 
   // Set user's current timezone as default on first render if no value is present
   // or if the value is "current" (which signals to use user's timezone)
   useEffect(() => {
+    if (readOnly) {
+      return;
+    }
+
     if (!hasSetDefault.current && (value === undefined || value === null || value === "current")) {
       const userTimezone = getUserTimezoneOffset();
       // Use user's timezone if it matches one of our options, otherwise fallback to "0" (UTC)
@@ -57,19 +70,13 @@ export const TimezoneFieldRenderer: React.FC<FieldRendererProps> = ({ field, val
       onChange(defaultTimezone);
       hasSetDefault.current = true;
     }
-  }, [value, field.defaultValue, onChange]);
+  }, [readOnly, value, field.defaultValue, onChange]);
 
-  // Get the display value - if value is "current", show user's timezone
-  const displayValue = (() => {
-    if (value === "current") {
-      const userTimezone = getUserTimezoneOffset();
-      return timezoneOptions.find((tz) => tz.value === userTimezone)?.value ?? "0";
-    }
-    return (value as string) ?? "0";
-  })();
+  // Get the display value - unset and "current" both resolve to the user's timezone
+  const displayValue = resolveTimezoneDisplayValue(value);
 
   return (
-    <Select value={displayValue} onValueChange={(val) => onChange(val || undefined)}>
+    <Select value={displayValue} onValueChange={(val) => onChange(val || undefined)} disabled={readOnly}>
       <SelectTrigger className="w-full" data-testid={testId}>
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
       </SelectTrigger>

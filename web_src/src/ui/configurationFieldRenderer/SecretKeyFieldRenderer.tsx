@@ -24,6 +24,7 @@ interface SecretKeyFieldRendererProps {
   value: SecretKeyRefValue;
   onChange: (value: { secret: string; key: string } | undefined) => void;
   organizationId: string | undefined;
+  readOnly?: boolean;
 }
 
 type SecretDetail = SuperplaneSecretsSecret | null | undefined;
@@ -162,6 +163,7 @@ export const SecretKeyFieldRenderer = ({
   value,
   onChange,
   organizationId,
+  readOnly = false,
 }: SecretKeyFieldRendererProps) => {
   const domainId = organizationId ?? "";
   const allowClear = !isRequired;
@@ -184,6 +186,10 @@ export const SecretKeyFieldRenderer = ({
   };
 
   const handleValueChange = (val: string) => {
+    if (readOnly) {
+      return;
+    }
+
     if (val === ADD_NEW_OPTION_VALUE) {
       setIsCreateOpen(true);
       return;
@@ -219,7 +225,7 @@ export const SecretKeyFieldRenderer = ({
 
   return (
     <>
-      <Select value={displayValue} onValueChange={handleValueChange}>
+      <Select value={displayValue} onValueChange={handleValueChange} disabled={readOnly}>
         <SelectTrigger className="w-full ph-no-capture">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>

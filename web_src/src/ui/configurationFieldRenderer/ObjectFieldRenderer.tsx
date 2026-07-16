@@ -22,6 +22,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   autocompleteExampleObj,
   allowExpressions = false,
   readOnly = false,
+  preserveEditLayout = false,
 }) => {
   const [jsonError, setJsonError] = React.useState<string | null>(null);
   const hasInitialized = React.useRef(false);
@@ -297,6 +298,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
           organizationId={organizationId}
           autocompleteExampleObj={autocompleteExampleObj}
           readOnly={readOnly}
+          preserveEditLayout={preserveEditLayout}
         />
       ))}
     </div>

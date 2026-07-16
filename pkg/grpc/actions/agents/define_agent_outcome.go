@@ -31,7 +31,9 @@ func DefineAgentOutcome(ctx context.Context, svc AgentsService, orgID, userID st
 		maxIter = 3
 	}
 
-	if err := svc.DefineOutcome(ctx, org, user, chatID, req.Description, req.Rubric, maxIter); err != nil {
+	if err := svc.DefineOutcome(ctx, org, user, chatID, req.Description, req.Rubric, maxIter, agentservice.DefineOutcomeRequestOptions{
+		AutoLayoutOnUpdateEnabled: req.AutoLayoutOnUpdateEnabled,
+	}); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, grpcerrors.NotFound(err, "agent chat not found")
 		}
