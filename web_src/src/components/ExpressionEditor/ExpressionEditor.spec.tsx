@@ -70,13 +70,18 @@ describe("ExpressionEditor", () => {
   });
 
   it("registerExpressionDialect wires a new default adapter", () => {
+    const previousAdapter = getExpressionDialectAdapter("cel");
     const adapter: ExpressionAdapter = {
       id: "cel",
       evaluate: vi.fn().mockReturnValue({ ok: true, value: null, formattedValue: "null" }),
       resolveSuggestionValue: vi.fn(),
       formatResult: vi.fn(),
     };
-    registerExpressionDialect("cel", adapter);
+    const restore = registerExpressionDialect("cel", adapter);
+
     expect(getExpressionDialectAdapter("cel")).toBe(adapter);
+
+    restore();
+    expect(getExpressionDialectAdapter("cel")).toBe(previousAdapter);
   });
 });

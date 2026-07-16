@@ -144,12 +144,10 @@ function TablePanelFieldQuickAddButtons({
 
 export function TablePanelFiltersSection({
   value,
-  fieldOptions,
   sampleRow,
   actions,
 }: {
   value: TablePanelContent;
-  fieldOptions: string[];
   sampleRow: Record<string, unknown>;
   actions: TablePanelFormActions;
 }) {
@@ -166,7 +164,6 @@ export function TablePanelFiltersSection({
           <FilterRow
             key={idx}
             filter={filter}
-            fieldOptions={fieldOptions}
             sampleRow={sampleRow}
             onChange={(patch) => actions.updateFilter(idx, patch)}
             onRemove={() => actions.removeFilter(idx)}
@@ -179,12 +176,10 @@ export function TablePanelFiltersSection({
 
 export function TablePanelRowStylesSection({
   value,
-  fieldOptions,
   sampleRow,
   actions,
 }: {
   value: TablePanelContent;
-  fieldOptions: string[];
   sampleRow: Record<string, unknown>;
   actions: TablePanelFormActions;
 }) {
@@ -212,7 +207,6 @@ export function TablePanelRowStylesSection({
           <RowStyleRow
             key={idx}
             rule={rule}
-            fieldOptions={fieldOptions}
             sampleRow={sampleRow}
             onChange={(patch) => actions.updateRowStyle(idx, patch)}
             onRemove={() => actions.removeRowStyle(idx)}
@@ -229,7 +223,6 @@ export function TablePanelSortSection({
   actions,
 }: {
   value: TablePanelContent;
-  fieldOptions: string[];
   sampleRow: Record<string, unknown>;
   actions: TablePanelFormActions;
 }) {

@@ -52,9 +52,9 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
         sampleRow={sampleRow}
         actions={actions}
       />
-      <TablePanelFiltersSection value={value} fieldOptions={fieldOptions} sampleRow={sampleRow} actions={actions} />
-      <TablePanelRowStylesSection value={value} fieldOptions={fieldOptions} sampleRow={sampleRow} actions={actions} />
-      <TablePanelSortSection value={value} fieldOptions={fieldOptions} sampleRow={sampleRow} actions={actions} />
+      <TablePanelFiltersSection value={value} sampleRow={sampleRow} actions={actions} />
+      <TablePanelRowStylesSection value={value} sampleRow={sampleRow} actions={actions} />
+      <TablePanelSortSection value={value} sampleRow={sampleRow} actions={actions} />
       <TablePanelRowActionsSection
         value={value}
         triggerNodes={triggerNodes}

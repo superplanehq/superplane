@@ -89,10 +89,29 @@ export function evaluateCelPathLiteral(
   }
 }
 
+function evaluateProgressTargetPathLiteral(
+  target: string,
+  globals: Record<string, unknown> | null | undefined,
+): ExpressionEvaluationOutcome {
+  const trimmed = target.trim();
+  if (trimmed !== "") {
+    const literal = Number(trimmed);
+    if (Number.isFinite(literal)) {
+      return { ok: true, value: literal, formattedValue: stringifyCelValue(literal) };
+    }
+  }
+  return evaluateCelPathLiteral(target, globals);
+}
+
 export const widgetCelAdapter: ExpressionAdapter = {
   id: "cel",
   evaluate: evaluateCel,
   resolveSuggestionValue: resolveCelSuggestionValue,
   formatResult: stringifyCelValue,
   evaluatePathLiteral: evaluateCelPathLiteral,
+};
+
+export const progressTargetCelAdapter: ExpressionAdapter = {
+  ...widgetCelAdapter,
+  evaluatePathLiteral: evaluateProgressTargetPathLiteral,
 };

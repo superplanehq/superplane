@@ -25,6 +25,7 @@ import {
   type WidgetTrendDisplay,
 } from "./widget/types";
 import { suggestColumnFormat } from "./widget/useMemoryCatalog";
+import { progressTargetCelAdapter } from "./widget/celAdapter";
 
 const COLUMN_FORMATS: WidgetColumnFormat[] = [
   "text",
@@ -90,6 +91,7 @@ function ProgressFormatFields({
       <div className="col-span-8">
         <ExpressionEditor
           dialect="cel"
+          expressionAdapter={progressTargetCelAdapter}
           syntaxProfile="pathOrRaw"
           exampleObj={sampleRow}
           value={col.progressTarget ?? ""}
@@ -300,7 +302,6 @@ export function FilterRow({
   onRemove,
 }: {
   filter: WidgetTableFilter;
-  fieldOptions: string[];
   sampleRow: Record<string, unknown>;
   onChange: (patch: Partial<WidgetTableFilter>) => void;
   onRemove: () => void;
@@ -362,7 +363,6 @@ export function RowStyleRow({
   onRemove,
 }: {
   rule: WidgetRowStyle;
-  fieldOptions: string[];
   sampleRow: Record<string, unknown>;
   onChange: (patch: Partial<WidgetRowStyle>) => void;
   onRemove: () => void;

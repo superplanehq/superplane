@@ -9,8 +9,18 @@ const ADAPTERS: Partial<Record<ExpressionEditorDialect, ExpressionAdapter>> = {
   "expr-lang": exprLangAdapter,
 };
 
-export function registerExpressionDialect(dialect: ExpressionEditorDialect, adapter: ExpressionAdapter): void {
+export function registerExpressionDialect(dialect: ExpressionEditorDialect, adapter: ExpressionAdapter): () => void {
+  const previousAdapter = ADAPTERS[dialect];
   ADAPTERS[dialect] = adapter;
+
+  return () => {
+    if (ADAPTERS[dialect] !== adapter) return;
+    if (previousAdapter) {
+      ADAPTERS[dialect] = previousAdapter;
+      return;
+    }
+    delete ADAPTERS[dialect];
+  };
 }
 
 export function getExpressionDialectAdapter(dialect: ExpressionEditorDialect): ExpressionAdapter | undefined {
