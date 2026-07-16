@@ -39,6 +39,15 @@ export function newestExecution(executions: CanvasesCanvasNodeExecution[]): Canv
   return newestItemByTimestamp(executions, executionTimestamp);
 }
 
+export function orderExecutionsNewestFirst(executions: CanvasesCanvasNodeExecution[]): CanvasesCanvasNodeExecution[] {
+  const newest = newestExecution(executions);
+  if (!newest || executions.length <= 1) {
+    return executions;
+  }
+
+  return [newest, ...executions.filter((execution) => execution.id !== newest.id)];
+}
+
 export function hasActiveLiveRuntimeExecutionOnLatest(executions: CanvasesCanvasNodeExecution[]): boolean {
   const latestExecution = newestExecution(executions);
   const state = latestExecution?.state;

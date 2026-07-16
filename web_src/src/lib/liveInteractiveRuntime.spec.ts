@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
-import { hasActiveLiveRuntimeExecutionOnLatest, newestExecution } from "./liveInteractiveRuntime";
+import {
+  hasActiveLiveRuntimeExecutionOnLatest,
+  newestExecution,
+  orderExecutionsNewestFirst,
+} from "./liveInteractiveRuntime";
 
 function execution(overrides: Partial<CanvasesCanvasNodeExecution>): CanvasesCanvasNodeExecution {
   return overrides as CanvasesCanvasNodeExecution;
@@ -51,6 +55,27 @@ describe("newestExecution", () => {
         execution({ id: "older", createdAt: "", updatedAt: "" }),
       ])?.id,
     ).toBe("newest");
+  });
+});
+
+describe("orderExecutionsNewestFirst", () => {
+  it("places the newest execution first even when store order is stale", () => {
+    expect(
+      orderExecutionsNewestFirst([
+        execution({
+          id: "finished",
+          createdAt: "2026-07-07T10:10:00Z",
+          updatedAt: "2026-07-07T10:25:00Z",
+          state: "STATE_FINISHED",
+        }),
+        execution({
+          id: "active",
+          createdAt: "2026-07-07T10:20:00Z",
+          updatedAt: "2026-07-07T10:20:00Z",
+          state: "STATE_STARTED",
+        }),
+      ]).map((item) => item.id),
+    ).toEqual(["active", "finished"]);
   });
 });
 

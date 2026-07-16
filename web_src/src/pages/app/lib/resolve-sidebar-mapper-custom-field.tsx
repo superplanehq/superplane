@@ -9,6 +9,7 @@ import type {
 import { canvasesInvokeNodeExecutionHook } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
+import { orderExecutionsNewestFirst } from "@/lib/liveInteractiveRuntime";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getComponentBaseMapper } from "../mappers";
@@ -61,7 +62,7 @@ export function resolveSidebarMapperCustomField({
     nodes: canvasNodes.map((canvasNode) => buildNodeInfo(canvasNode)),
     node: buildNodeInfo(node),
     componentDefinition: buildComponentDefinition(componentDef),
-    lastExecutions: executions.map((execution) => buildExecutionInfo(execution)),
+    lastExecutions: orderExecutionsNewestFirst(executions).map((execution) => buildExecutionInfo(execution)),
     currentUser: buildUserInfo(me),
     actions: {
       invokeNodeExecutionHook: async (executionId: string, hookName: string, parameters: unknown) => {
