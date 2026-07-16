@@ -2,11 +2,11 @@ import { useMemo, useState, type RefObject } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useResponsiveRailCollapse } from "@/hooks/useResponsiveRailCollapse";
 import { cn } from "@/lib/utils";
 
+import { interpolateMarkdownTemplate } from "./markdownInterpolation";
+import { ConsoleExpressionEditor } from "./ConsoleExpressionEditor";
 import { MarkdownBody, MarkdownBodyLoading } from "./MarkdownBody";
 import { markdownTextIsLoading } from "./markdownInterpolation";
 import { MarkdownVariablesPanel } from "./MarkdownVariablesPanel";
@@ -42,8 +42,17 @@ function useMarkdownEditorPreview(
     draftVariables,
     textForSideload,
   );
-  const previewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
-  return { previewVars: vars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading };
+  const bodyPreviewLoading = markdownTextIsLoading(draftBody, baseLoading, sideloadLoading, searchingNames);
+  const titlePreviewLoading = markdownTextIsLoading(draftTitle, baseLoading, sideloadLoading, searchingNames);
+  return {
+    previewVars: vars,
+    errors,
+    baseLoading,
+    sideloadLoading,
+    searchingNames,
+    bodyPreviewLoading,
+    titlePreviewLoading,
+  };
 }
 
 interface MarkdownPanelEditorProps {
@@ -55,7 +64,7 @@ interface MarkdownPanelEditorProps {
   setDraftBody: (value: string) => void;
   draftVariables: MarkdownVariable[];
   setDraftVariables: (next: MarkdownVariable[]) => void;
-  titleInputRef: RefObject<HTMLInputElement | null>;
+  titleInputRef: RefObject<HTMLTextAreaElement | null>;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   /** Set when the last save attempt was blocked by variable validation. */
   saveError?: string | null;
@@ -78,7 +87,7 @@ export function MarkdownPanelEditor({
   onCancel,
   onCommit,
 }: MarkdownPanelEditorProps) {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleShortcutKeys = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
       onCancel();
@@ -90,8 +99,23 @@ export function MarkdownPanelEditor({
     }
   };
 
-  const { previewVars, errors, baseLoading, sideloadLoading, searchingNames, previewLoading } =
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    // Titles are conceptually single-line — swallow bare Enter so the field
+    // acts like an <input> and doesn't accumulate stray newlines.
+    if (e.key === "Enter" && !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) {
+      e.preventDefault();
+      return;
+    }
+    handleShortcutKeys(e);
+  };
+
+  const { previewVars, errors, baseLoading, sideloadLoading, searchingNames, bodyPreviewLoading, titlePreviewLoading } =
     useMarkdownEditorPreview(canvasId, draftTitle, draftBody, draftVariables);
+
+  const previewTitle = useMemo(() => {
+    if (titlePreviewLoading) return "";
+    return interpolateMarkdownTemplate(draftTitle, previewVars).trim();
+  }, [draftTitle, previewVars, titlePreviewLoading]);
 
   // Preview is collapsible — when collapsed the textarea reclaims the freed
   // vertical space, useful on shorter panel cards.
@@ -111,16 +135,19 @@ export function MarkdownPanelEditor({
 
   return (
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white dark:border-gray-700/70 dark:bg-gray-900">
-      <div className="flex items-center gap-2 rounded-t-lg px-2 py-1">
-        <Input
+      <div className="flex items-center gap-2 rounded-t-lg px-2 py-1" onKeyDown={handleTitleKeyDown}>
+        <ConsoleExpressionEditor
           ref={titleInputRef}
+          syntaxProfile="wrapped"
           value={draftTitle}
-          onChange={(e) => setDraftTitle(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onChange={setDraftTitle}
+          exampleObj={previewVars}
           placeholder={panelId}
           aria-label="Panel title"
-          className="h-7 border-0 bg-transparent px-2 text-xs font-medium text-slate-800 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-gray-100"
+          inputSize="xs"
+          className="border-0 bg-transparent px-2 shadow-none focus-within:ring-0"
           data-testid="console-markdown-title-editor"
+          quickTip="Tip: type `{{` to reference a variable."
         />
       </div>
       <div
@@ -131,19 +158,26 @@ export function MarkdownPanelEditor({
         )}
       >
         <div className="flex min-h-0 min-w-0 flex-col border-r border-slate-950/10 dark:border-gray-800">
-          <Textarea
-            ref={textareaRef}
-            value={draftBody}
-            onChange={(e) => setDraftBody(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Write **markdown** here. Use {{ name.field }} to reference variables."
-            className="min-h-[120px] flex-1 resize-none rounded-none border-0 bg-white font-mono text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-gray-900"
-            data-testid="console-markdown-editor"
-          />
+          <div className="flex min-h-[120px] flex-1 flex-col" onKeyDown={handleShortcutKeys}>
+            <ConsoleExpressionEditor
+              ref={textareaRef}
+              syntaxProfile="wrapped"
+              value={draftBody}
+              onChange={setDraftBody}
+              exampleObj={previewVars}
+              placeholder="Write **markdown** here. Use {{ name.field }} to reference variables."
+              className="flex-1 rounded-none border-0 bg-white font-mono shadow-none focus-within:ring-0 dark:bg-gray-900"
+              fullHeight
+              allowNewlines
+              data-testid="console-markdown-editor"
+              quickTip="Tip: type `{{` to reference a variable."
+            />
+          </div>
           <MarkdownLivePreview
+            title={previewTitle}
             body={draftBody}
             vars={previewVars}
-            loading={previewLoading}
+            loading={bodyPreviewLoading}
             collapsed={previewCollapsed}
             onToggle={() => setPreviewCollapsed((prev) => !prev)}
           />
@@ -249,12 +283,14 @@ function insertSnippetAtTextareaCursor(
  * editor.
  */
 function MarkdownLivePreview({
+  title,
   body,
   vars,
   loading,
   collapsed,
   onToggle,
 }: {
+  title: string;
   body: string;
   vars: Record<string, unknown>;
   loading: boolean;
@@ -287,6 +323,15 @@ function MarkdownLivePreview({
       </button>
       {!collapsed ? (
         <div className="min-h-0 flex-1 overflow-auto px-3 py-2">
+          {title ? (
+            <div
+              className="mb-1.5 truncate text-[13px] font-medium text-slate-700 dark:text-gray-200"
+              data-testid="console-markdown-editor-preview-title"
+              title={title}
+            >
+              {title}
+            </div>
+          ) : null}
           {body.trim() ? (
             loading ? (
               <MarkdownBodyLoading />
