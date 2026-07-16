@@ -1,6 +1,6 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
-import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
@@ -40,15 +40,14 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   }
 
   return (
-    <AutoCompleteInput
+    <ExpressionEditor
       exampleObj={autocompleteExampleObj ?? null}
       value={currentValue}
       onChange={(nextValue) => onChange(nextValue || undefined)}
       placeholder={field.placeholder || ""}
-      expressionMode="raw"
+      syntaxProfile="raw"
       inputSize="md"
       showValuePreview
-      quickTip="Tip: type `$` to browse node payloads."
       className=""
       data-testid={toTestId(`expression-field-${field.name}`)}
     />

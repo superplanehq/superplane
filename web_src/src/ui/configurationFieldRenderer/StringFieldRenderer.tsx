@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
-import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
@@ -59,18 +59,14 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   }
 
   return (
-    <AutoCompleteInput
+    <ExpressionEditor
       exampleObj={autocompleteExampleObj ?? null}
       value={currentValue}
       onChange={(nextValue) => onChange(shouldPreserveEmpty ? nextValue : nextValue || undefined)}
       placeholder={field.placeholder || ""}
-      startWord="{{"
-      prefix="{{ "
-      suffix=" }}"
       inputSize="md"
       showValuePreview
       valuePreviewLabel={valuePreviewLabel}
-      quickTip="Tip: type `{{` to start an expression."
       className=""
       data-testid={toTestId(`string-field-${field.name}`)}
       excludedSuggestions={excludedSuggestions}
