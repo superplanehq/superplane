@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { renderNeedsRunNodeOutputs, useWidgetData } from "./useWidgetData";
 import { useMemoryCatalog, sampleRowFromFields, type MemoryFieldSummary } from "./useMemoryCatalog";
 import { EXECUTIONS_FIELDS, RUNS_FIELDS } from "./staticFieldCatalogs";
+import { DOLLAR_REWRITE_IDENTIFIER } from "./celExpr";
 import type { WidgetDataSource, WidgetRender } from "./types";
 
 // `live` — a real row was pulled off the data source.
@@ -56,13 +57,31 @@ export function useWidgetExpressionContext(args: {
       return { row: EMPTY_ROW, origin: "empty", isLoading: isFetching, fields, error };
     }
     return {
-      row: sampleRowFromFields(fields),
+      row: withCatalogRunNodesStub(sampleRowFromFields(fields), fields),
       origin: "catalog",
       isLoading: isFetching,
       fields,
       error,
     };
   }, [dataSource, rows, isLoading, memoryCatalog.fields, memoryCatalog.isLoading, error]);
+}
+
+// Runs catalogs describe `$` as documentation, so live rows carry both `$`
+// and its internal `__runNodes__` alias populated with real node names. For
+// authoring previews without a live row we materialize a stub node map so
+// CEL `$` / `$["…"]` autocomplete has something to hint against and the
+// preview doesn't collapse to an empty string until data arrives.
+const CATALOG_STUB_NODE_KEY = "example-node";
+const CATALOG_STUB_NODE_SHAPE = { outputs: {}, data: {} };
+
+function withCatalogRunNodesStub(
+  row: Record<string, unknown>,
+  fields: MemoryFieldSummary[],
+): Record<string, unknown> {
+  const hasDollar = fields.some((f) => f.field === "$");
+  if (!hasDollar) return row;
+  const stub = { [CATALOG_STUB_NODE_KEY]: CATALOG_STUB_NODE_SHAPE };
+  return { ...row, $: stub, [DOLLAR_REWRITE_IDENTIFIER]: stub };
 }
 
 function describeFields(dataSource: WidgetDataSource, memoryFields: MemoryFieldSummary[]): MemoryFieldSummary[] {
