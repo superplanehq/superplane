@@ -7,8 +7,11 @@ import (
 )
 
 const (
-	payloadType             = "claude.runAgent.finished"
-	defaultChannel          = "default"
+	payloadType    = "claude.runAgent.finished"
+	defaultChannel = "default"
+	// latestVersionValue is the sentinel the Version resource field uses for the
+	// explicit "Latest" option; it is treated the same as an unset version.
+	latestVersionValue      = "latest"
 	sessionStatusIdle       = "idle"
 	sessionStatusTerminated = "terminated"
 	initialPoll             = 15 * time.Second
@@ -31,14 +34,18 @@ const (
 
 // Spec is the workflow node configuration for claude.runAgent.
 type Spec struct {
-	// Agent is the managed agent id (use latest if Version is nil, else pin to Version).
-	Agent         string          `json:"agent" mapstructure:"agent"`
-	Version       *int            `json:"version" mapstructure:"version"`
-	EnvironmentID string          `json:"environmentId" mapstructure:"environmentId"`
-	Prompt        string          `json:"prompt" mapstructure:"prompt"`
-	VaultIDs      []string        `json:"vaultIds" mapstructure:"vaultIds"`
-	Files         []string        `json:"files" mapstructure:"files"`
-	Secrets       []SecretBinding `json:"secrets" mapstructure:"secrets"`
+	// Agent is the managed agent id.
+	Agent string `json:"agent" mapstructure:"agent"`
+	// Version pins the agent version. It holds the raw resource value (a version
+	// number as a string); empty runs the agent's latest version.
+	Version string `json:"version" mapstructure:"version"`
+	// Environment is stored under the legacy "environmentId" key so existing
+	// nodes keep working; it is presented as the Environment resource field.
+	Environment string          `json:"environmentId" mapstructure:"environmentId"`
+	Prompt      string          `json:"prompt" mapstructure:"prompt"`
+	VaultIDs    []string        `json:"vaultIds" mapstructure:"vaultIds"`
+	Files       []string        `json:"files" mapstructure:"files"`
+	Secrets     []SecretBinding `json:"secrets" mapstructure:"secrets"`
 	// PersistSession keeps the Managed Agents session after the run finishes so
 	// its transcript stays readable in the Anthropic Console.
 	PersistSession bool `json:"persistSession" mapstructure:"persistSession"`
