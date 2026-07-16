@@ -1336,14 +1336,24 @@ export function AppPage() {
     });
     return incomingByTargetId;
   }, [canvasEdges]);
-  const allComponentsByName = useMemo(
-    () => new Map(allComponents.map((component) => [component.name, component])),
-    [allComponents],
-  );
-  const allTriggersByName = useMemo(
-    () => new Map(allTriggers.map((trigger) => [trigger.name, trigger])),
-    [allTriggers],
-  );
+  const allComponentsByName = useMemo(() => {
+    const componentsByName = new Map<string, ActionsAction>();
+    for (const component of allComponents) {
+      if (component.name) {
+        componentsByName.set(component.name, component);
+      }
+    }
+    return componentsByName;
+  }, [allComponents]);
+  const allTriggersByName = useMemo(() => {
+    const triggersByName = new Map<string, ActionsAction>();
+    for (const trigger of allTriggers) {
+      if (trigger.name) {
+        triggersByName.set(trigger.name, trigger);
+      }
+    }
+    return triggersByName;
+  }, [allTriggers]);
   const widgetsByName = useMemo(() => new Map(widgets.map((widget) => [widget.name, widget])), [widgets]);
   const availableIntegrationsByName = useMemo(
     () => new Map(availableIntegrations.map((integration) => [integration.name, integration])),
@@ -1950,7 +1960,13 @@ export function AppPage() {
 
       if (node.type === "TYPE_ACTION" || node.type === "TYPE_TRIGGER") {
         const metadata =
-          node.type === "TYPE_ACTION" ? allComponentsByName.get(node.component) : allTriggersByName.get(node.component);
+          node.type === "TYPE_ACTION"
+            ? node.component
+              ? allComponentsByName.get(node.component)
+              : undefined
+            : node.component
+              ? allTriggersByName.get(node.component)
+              : undefined;
         configurationFields = metadata?.configuration || [];
         displayLabel = metadata?.label || displayLabel;
         blockName = node.component;
