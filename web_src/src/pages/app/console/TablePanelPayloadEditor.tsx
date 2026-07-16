@@ -1,13 +1,11 @@
-import { useId, useMemo } from "react";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { useId } from "react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 
 import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
-
-import { CONSOLE_CODE_BADGE_CLASSES } from "./consoleCodeStyles";
-import { buildEnv, compileTemplate, evalTemplateDetailed } from "./widget/celExpr";
 
 export type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
@@ -89,84 +87,45 @@ function PayloadEntry({
   const reactId = useId();
   const datalistId = fieldOptions.length > 0 ? `payload-fields-${reactId}` : undefined;
   return (
-    <div className="space-y-1">
-      <div className="grid grid-cols-12 items-center gap-1">
-        <Input
-          value={entry.path}
-          onChange={(e) => onChange({ path: e.target.value })}
-          placeholder="data.issue.number"
-          className="col-span-5 h-7 text-xs"
-          list={datalistId}
-        />
-        <Input
+    <div className="grid grid-cols-12 items-start gap-1">
+      <Input
+        value={entry.path}
+        onChange={(e) => onChange({ path: e.target.value })}
+        placeholder="data.issue.number"
+        className="col-span-5 h-7 text-xs"
+        list={datalistId}
+      />
+      <div className="col-span-6">
+        <ExpressionEditor
+          dialect="cel"
+          exampleObj={sampleRow}
           value={entry.template}
-          onChange={(e) => onChange({ template: e.target.value })}
+          onChange={(next) => onChange({ template: next })}
           placeholder="{{ pr_number }} or int(value) / 2"
-          className="col-span-6 h-7 text-xs"
+          inputSize="xs"
+          showValuePreview
+          valuePreviewLabel="Preview"
+          data-testid="payload-template-input"
         />
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className="col-span-1 h-7 w-7"
-          onClick={onRemove}
-          disabled={isBlankTrailingRow}
-          title={isBlankTrailingRow ? "Empty row — type to add" : "Remove field"}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-        {datalistId ? (
-          <datalist id={datalistId}>
-            {fieldOptions.map((f) => (
-              <option key={f} value={f} />
-            ))}
-          </datalist>
-        ) : null}
       </div>
-      <PayloadPreview entry={entry} sampleRow={sampleRow} />
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="col-span-1 h-7 w-7"
+        onClick={onRemove}
+        disabled={isBlankTrailingRow}
+        title={isBlankTrailingRow ? "Empty row — type to add" : "Remove field"}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+      {datalistId ? (
+        <datalist id={datalistId}>
+          {fieldOptions.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
+      ) : null}
     </div>
-  );
-}
-
-/**
- * Inline preview of a payload value template evaluated against the first
- * memory sample row. Surfaces CEL compile/eval errors that `evalExpr` would
- * otherwise silently swallow so authors get fast feedback while typing.
- */
-function PayloadPreview({ entry, sampleRow }: { entry: PayloadDraftEntry; sampleRow: Record<string, unknown> }) {
-  const preview = useMemo(() => {
-    if (!entry.template) return null;
-    if (!entry.template.includes("{{")) return null;
-    const env = buildEnv();
-    const stringify = (v: unknown) => (v == null ? "" : typeof v === "string" ? v : JSON.stringify(v));
-    return evalTemplateDetailed(compileTemplate(entry.template), sampleRow, env, stringify);
-  }, [entry.template, sampleRow]);
-
-  if (!preview) return null;
-  if (!preview.ok) {
-    return (
-      <p className="col-span-12 flex items-start gap-1 text-[10px] text-red-600">
-        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-        <span>
-          <span className="font-medium">CEL error:</span> {preview.error}
-        </span>
-      </p>
-    );
-  }
-
-  const hasSample = Object.keys(sampleRow).length > 0;
-  const text = preview.value;
-  if (!text && !hasSample) {
-    return (
-      <p className="text-[10px] text-slate-400">
-        Preview unavailable — no memory data yet. Run your workflow once, then revisit.
-      </p>
-    );
-  }
-  return (
-    <p className="text-[10px] text-slate-500" data-testid="payload-preview">
-      <span className="font-medium text-slate-600">Preview:</span>{" "}
-      <code className={CONSOLE_CODE_BADGE_CLASSES}>{text || "(empty)"}</code>
-    </p>
   );
 }

@@ -4,7 +4,7 @@ import { Button } from "../button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FieldRendererProps } from "./types";
-import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 
 interface Predicate {
   type: string;
@@ -59,17 +59,13 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({
               </SelectContent>
             </Select>
             {allowExpressions ? (
-              <AutoCompleteInput
+              <ExpressionEditor
                 exampleObj={autocompleteExampleObj ?? null}
                 value={predicate.value ?? ""}
                 onChange={(nextValue) => updatePredicate(index, "value", nextValue)}
                 placeholder={placeholder}
-                startWord="{{"
-                prefix="{{ "
-                suffix=" }}"
                 inputSize="md"
                 showValuePreview
-                quickTip="Tip: type `{{` to start an expression."
                 className=""
               />
             ) : (

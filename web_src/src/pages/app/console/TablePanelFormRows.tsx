@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/ui/checkbox";
+import { ExpressionEditor } from "@/components/ExpressionEditor";
 
 import { ROW_STYLE_CLASS, ROW_STYLE_LABEL } from "./widget/rowStyles";
 import {
@@ -77,23 +78,28 @@ function columnFormatPatch(format: WidgetColumnFormat | undefined, col: WidgetTa
 
 function ProgressFormatFields({
   col,
-  fieldOptions,
+  sampleRow,
   onChange,
 }: {
   col: WidgetTableColumn;
-  fieldOptions: string[];
+  sampleRow: Record<string, unknown>;
   onChange: (patch: Partial<WidgetTableColumn>) => void;
 }) {
   return (
     <>
-      <Input
-        className="col-span-8 h-8"
-        value={col.progressTarget ?? ""}
-        onChange={(e) => onChange({ progressTarget: e.target.value || undefined })}
-        placeholder="target, e.g. 10, payload.goal or {{ items.size() }}"
-        list={fieldOptions.length > 0 ? "table-field-options" : undefined}
-        data-testid="table-column-progress-target"
-      />
+      <div className="col-span-8">
+        <ExpressionEditor
+          dialect="cel"
+          syntaxProfile="pathOrRaw"
+          exampleObj={sampleRow}
+          value={col.progressTarget ?? ""}
+          onChange={(next) => onChange({ progressTarget: next || undefined })}
+          placeholder="target, e.g. 10, payload.goal or {{ items.size() }}"
+          inputSize="md"
+          showValuePreview
+          data-testid="table-column-progress-target"
+        />
+      </div>
       <Select
         value={col.progressLabel ?? "percent"}
         onValueChange={(v) => onChange({ progressLabel: v as WidgetProgressLabel })}
@@ -186,35 +192,42 @@ function ShowTrendToggle({
 export function ColumnRow({
   col,
   fieldOptions,
+  sampleRow,
   onChange,
   onRemove,
 }: {
   col: WidgetTableColumn;
   fieldOptions: string[];
+  sampleRow: Record<string, unknown>;
   onChange: (patch: Partial<WidgetTableColumn>) => void;
   onRemove: () => void;
 }) {
   return (
     <div className="flex gap-2 rounded-lg bg-slate-100 p-2 dark:bg-gray-800">
-      <div className="grid min-w-0 flex-1 grid-cols-12 items-center gap-2">
+      <div className="grid min-w-0 flex-1 grid-cols-12 items-start gap-2">
+        {/* Give the field editor a full row so its preview/quick tip fit. */}
+        <div className="col-span-12">
+          <ExpressionEditor
+            dialect="cel"
+            syntaxProfile="pathOrRaw"
+            exampleObj={sampleRow}
+            value={col.field}
+            onChange={(next) => {
+              const known = fieldOptions.includes(next);
+              onChange({
+                field: next,
+                ...(known && !col.label ? { label: next } : {}),
+                ...(known && col.format == null ? { format: suggestColumnFormat(next) } : {}),
+              });
+            }}
+            placeholder="field (e.g. payload.user_id) or {{ expr }}"
+            inputSize="md"
+            showValuePreview
+            data-testid="table-column-field"
+          />
+        </div>
         <Input
-          className="col-span-4 h-8"
-          value={col.field}
-          onChange={(e) => {
-            const next = e.target.value;
-            const known = fieldOptions.includes(next);
-            onChange({
-              field: next,
-              ...(known && !col.label ? { label: next } : {}),
-              ...(known && col.format == null ? { format: suggestColumnFormat(next) } : {}),
-            });
-          }}
-          placeholder="field (e.g. payload.user_id) or {{ expr }}"
-          list={fieldOptions.length > 0 ? "table-field-options" : undefined}
-          data-testid="table-column-field"
-        />
-        <Input
-          className="col-span-3 h-8"
+          className="col-span-6 h-8"
           value={col.label ?? ""}
           onChange={(e) => onChange({ label: e.target.value })}
           placeholder="Header"
@@ -226,7 +239,7 @@ export function ColumnRow({
             onChange(columnFormatPatch(format, col));
           }}
         >
-          <SelectTrigger className="col-span-4 h-8">
+          <SelectTrigger className="col-span-6 h-8">
             <SelectValue placeholder="Format" />
           </SelectTrigger>
           <SelectContent>
@@ -239,17 +252,22 @@ export function ColumnRow({
           </SelectContent>
         </Select>
         {col.format === "link" ? (
-          <Input
-            className="col-span-12 h-8"
-            value={col.href ?? ""}
-            onChange={(e) => onChange({ href: e.target.value || undefined })}
-            placeholder="link URL, e.g. {{ prUrl }} or https://github.com/org/repo/pull/{{ prNumber }}"
-            list={fieldOptions.length > 0 ? "table-href-field-options" : undefined}
-            data-testid="table-column-href"
-          />
+          <div className="col-span-12">
+            <ExpressionEditor
+              dialect="cel"
+              syntaxProfile="wrapped"
+              exampleObj={sampleRow}
+              value={col.href ?? ""}
+              onChange={(next) => onChange({ href: next || undefined })}
+              placeholder="link URL, e.g. {{ prUrl }} or https://github.com/org/repo/pull/{{ prNumber }}"
+              inputSize="md"
+              showValuePreview
+              data-testid="table-column-href"
+            />
+          </div>
         ) : null}
         {col.format === "progress" ? (
-          <ProgressFormatFields col={col} fieldOptions={fieldOptions} onChange={onChange} />
+          <ProgressFormatFields col={col} sampleRow={sampleRow} onChange={onChange} />
         ) : null}
         {columnSupportsShowTrend(col.format) ? (
           <>
@@ -277,25 +295,31 @@ export function ColumnRow({
 
 export function FilterRow({
   filter,
-  fieldOptions,
+  sampleRow,
   onChange,
   onRemove,
 }: {
   filter: WidgetTableFilter;
   fieldOptions: string[];
+  sampleRow: Record<string, unknown>;
   onChange: (patch: Partial<WidgetTableFilter>) => void;
   onRemove: () => void;
 }) {
   const needsValue = filter.op !== "exists" && filter.op !== "not_exists";
   return (
-    <div className="grid grid-cols-12 gap-2 rounded border border-slate-200 p-2 dark:border-gray-600">
-      <Input
-        className="col-span-4 h-8"
-        value={filter.field}
-        onChange={(e) => onChange({ field: e.target.value })}
-        placeholder="field (e.g. payload.user_id)"
-        list={fieldOptions.length > 0 ? "table-field-options" : undefined}
-      />
+    <div className="grid grid-cols-12 items-start gap-2 rounded border border-slate-200 p-2 dark:border-gray-600">
+      <div className="col-span-12">
+        <ExpressionEditor
+          dialect="cel"
+          syntaxProfile="pathOrRaw"
+          exampleObj={sampleRow}
+          value={filter.field}
+          onChange={(next) => onChange({ field: next })}
+          placeholder="field (e.g. payload.user_id)"
+          inputSize="md"
+          showValuePreview
+        />
+      </div>
       <Select value={filter.op} onValueChange={(v) => onChange({ op: v as WidgetTableFilter["op"] })}>
         <SelectTrigger className="col-span-3 h-8">
           <SelectValue />
@@ -309,14 +333,20 @@ export function FilterRow({
         </SelectContent>
       </Select>
       {needsValue ? (
-        <Input
-          className="col-span-4 h-8"
-          value={filter.value ?? ""}
-          onChange={(e) => onChange({ value: e.target.value })}
-          placeholder="value or {{ expr }}"
-        />
+        <div className="col-span-8">
+          <ExpressionEditor
+            dialect="cel"
+            syntaxProfile="pathOrRaw"
+            exampleObj={sampleRow}
+            value={filter.value ?? ""}
+            onChange={(next) => onChange({ value: next })}
+            placeholder="value or {{ expr }}"
+            inputSize="md"
+            showValuePreview
+          />
+        </div>
       ) : (
-        <div className="col-span-4" />
+        <div className="col-span-8" />
       )}
       <Button type="button" size="icon" variant="ghost" className="col-span-1 h-8 w-8" onClick={onRemove}>
         <Trash2 className="h-3.5 w-3.5" />
@@ -327,28 +357,34 @@ export function FilterRow({
 
 export function RowStyleRow({
   rule,
-  fieldOptions,
+  sampleRow,
   onChange,
   onRemove,
 }: {
   rule: WidgetRowStyle;
   fieldOptions: string[];
+  sampleRow: Record<string, unknown>;
   onChange: (patch: Partial<WidgetRowStyle>) => void;
   onRemove: () => void;
 }) {
   const needsValue = rule.op !== "exists" && rule.op !== "not_exists";
   return (
-    <div className="grid grid-cols-12 gap-2 rounded border border-slate-200 p-2 dark:border-gray-600">
-      <Input
-        className="col-span-3 h-8"
-        value={rule.field}
-        onChange={(e) => onChange({ field: e.target.value })}
-        placeholder="field (e.g. payload.user_id)"
-        list={fieldOptions.length > 0 ? "table-field-options" : undefined}
-        data-testid="table-row-style-field"
-      />
+    <div className="grid grid-cols-12 items-start gap-2 rounded border border-slate-200 p-2 dark:border-gray-600">
+      <div className="col-span-12">
+        <ExpressionEditor
+          dialect="cel"
+          syntaxProfile="pathOrRaw"
+          exampleObj={sampleRow}
+          value={rule.field}
+          onChange={(next) => onChange({ field: next })}
+          placeholder="field (e.g. payload.user_id)"
+          inputSize="md"
+          showValuePreview
+          data-testid="table-row-style-field"
+        />
+      </div>
       <Select value={rule.op} onValueChange={(v) => onChange({ op: v as WidgetTableFilter["op"] })}>
-        <SelectTrigger className="col-span-2 h-8" data-testid="table-row-style-op">
+        <SelectTrigger className="col-span-3 h-8" data-testid="table-row-style-op">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -360,15 +396,21 @@ export function RowStyleRow({
         </SelectContent>
       </Select>
       {needsValue ? (
-        <Input
-          className="col-span-3 h-8"
-          value={rule.value ?? ""}
-          onChange={(e) => onChange({ value: e.target.value })}
-          placeholder="value or {{ expr }}"
-          data-testid="table-row-style-value"
-        />
+        <div className="col-span-5">
+          <ExpressionEditor
+            dialect="cel"
+            syntaxProfile="pathOrRaw"
+            exampleObj={sampleRow}
+            value={rule.value ?? ""}
+            onChange={(next) => onChange({ value: next })}
+            placeholder="value or {{ expr }}"
+            inputSize="md"
+            showValuePreview
+            data-testid="table-row-style-value"
+          />
+        </div>
       ) : (
-        <div className="col-span-3" />
+        <div className="col-span-5" />
       )}
       <Select value={rule.tone} onValueChange={(v) => onChange({ tone: v as WidgetRowStyleTone })}>
         <SelectTrigger className="col-span-3 h-8" data-testid="table-row-style-tone">

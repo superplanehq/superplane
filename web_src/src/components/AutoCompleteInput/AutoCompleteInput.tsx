@@ -4,7 +4,8 @@ import { twMerge } from "tailwind-merge";
 import type { Suggestion } from "./core";
 import { getSuggestions } from "./core";
 import { Eye, EyeOff } from "lucide-react";
-import { evaluateExpr, formatExprResult } from "@/lib/exprEvaluator";
+import type { ExpressionAdapter } from "@/lib/expression";
+import { exprLangAdapter } from "@/lib/expression";
 import { calculateDropdownPosition } from "./dropdownPosition";
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<"textarea">, "onChange" | "size"> {
@@ -32,6 +33,8 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
    * Use this inside modals or panels that provide their own scroll container.
    */
   fullHeight?: boolean;
+  /** Adapter that powers evaluation and previews. Defaults to expr-lang. */
+  expressionAdapter?: ExpressionAdapter;
 }
 
 const suggestionSortPriority = {
@@ -40,8 +43,6 @@ const suggestionSortPriority = {
   previous: 3,
   memory: 4,
 } as const;
-
-type IndexableValue = Record<string, unknown> | null | undefined;
 
 function getActiveStickyHeaderHeight(container: HTMLElement, item: HTMLElement) {
   const containerRect = container.getBoundingClientRect();
@@ -128,6 +129,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       excludedSuggestions,
       minHeight,
       fullHeight = false,
+      expressionAdapter = exprLangAdapter,
       ...rest
     } = props;
     const [inputValue, setInputValue] = useState(value);
@@ -157,24 +159,17 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       if (!exampleObj) return true;
       if (isRawExpression) {
         if (inputValue.trim().length === 0) return true;
-        try {
-          evaluateExpr(inputValue.trim(), exampleObj);
-          return true;
-        } catch {
-          return false;
-        }
+        return expressionAdapter.evaluate(inputValue, exampleObj).ok;
       }
       const regex = /\{\{(.*?)\}\}/g;
       let match;
       while ((match = regex.exec(inputValue)) !== null) {
-        try {
-          evaluateExpr(match[1].trim(), exampleObj);
-        } catch {
+        if (!expressionAdapter.evaluate(match[1], exampleObj).ok) {
           return false;
         }
       }
       return true;
-    }, [inputValue, exampleObj, isRawExpression]);
+    }, [inputValue, exampleObj, isRawExpression, expressionAdapter]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -391,19 +386,17 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return tokens;
     };
 
-    // Evaluate an expression against the exampleObj using the expr evaluator
+    // Evaluate an expression against the exampleObj using the configured adapter
     const evaluateExpression = useCallback(
       (expr: string): { value: string; error?: string } => {
         if (!exampleObj) return { value: "?", error: "No context available" };
-        try {
-          const result = evaluateExpr(expr.trim(), exampleObj);
-          return { value: formatExprResult(result) };
-        } catch (e) {
-          const errorMsg = e instanceof Error ? e.message : "Evaluation failed";
-          return { value: "error", error: errorMsg };
+        const outcome = expressionAdapter.evaluate(expr, exampleObj);
+        if (!outcome.ok) {
+          return { value: "error", error: outcome.error ?? "Evaluation failed" };
         }
+        return { value: outcome.formattedValue ?? expressionAdapter.formatResult(outcome.value) };
       },
-      [exampleObj],
+      [exampleObj, expressionAdapter],
     );
 
     // Render content with highlighted expressions
@@ -664,228 +657,6 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return { start: left.length, end: left.length };
     };
 
-    const extractTailExpressionWithParens = (expr: string) => {
-      const s = expr.trim();
-      let i = s.length - 1;
-      let bracketDepth = 0;
-      let parenDepth = 0;
-      let inSingle = false;
-      let inDouble = false;
-
-      const isEscaped = (idx: number): boolean => {
-        let bs = 0;
-        for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
-        return bs % 2 === 1;
-      };
-
-      const isStopChar = (ch: string): boolean =>
-        ch === "(" ||
-        ch === ")" ||
-        ch === "," ||
-        ch === ";" ||
-        ch === ":" ||
-        ch === "?" ||
-        ch === "+" ||
-        ch === "-" ||
-        ch === "*" ||
-        ch === "/" ||
-        ch === "%" ||
-        ch === "|" ||
-        ch === "&" ||
-        ch === "!" ||
-        ch === "=" ||
-        ch === "<" ||
-        ch === ">" ||
-        ch === "\n" ||
-        ch === "\r" ||
-        ch === "\t" ||
-        ch === " ";
-
-      for (; i >= 0; i--) {
-        const ch = s[i];
-
-        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-        if (inSingle || inDouble) continue;
-
-        if (ch === "]") {
-          bracketDepth++;
-          continue;
-        }
-        if (ch === "[") {
-          bracketDepth = Math.max(0, bracketDepth - 1);
-          continue;
-        }
-        if (ch === ")") {
-          parenDepth++;
-          continue;
-        }
-        if (ch === "(") {
-          if (parenDepth === 0) {
-            return s.slice(i + 1).trim();
-          }
-          parenDepth = Math.max(0, parenDepth - 1);
-          continue;
-        }
-
-        if (bracketDepth > 0 || parenDepth > 0) continue;
-
-        if (isStopChar(ch)) {
-          return s.slice(i + 1).trim();
-        }
-      }
-
-      return s;
-    };
-
-    const normalizeSpecialFunctionExpr = (expr: string): string | null => {
-      const rootMatch = expr.match(/^root\(\)/);
-      if (rootMatch) {
-        return `__root${expr.slice(rootMatch[0].length)}`;
-      }
-
-      const previousMatch = expr.match(/^previous\(([^)]*)\)/);
-      if (previousMatch) {
-        const raw = (previousMatch[1] ?? "").trim();
-        const depth = raw === "" ? 1 : Number(raw);
-        if (!Number.isInteger(depth) || depth < 1) {
-          return null;
-        }
-
-        return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
-      }
-
-      return expr;
-    };
-
-    const resolveExpressionValue = useCallback((expression: string, globals: Record<string, unknown>) => {
-      const tailExpr = extractTailExpressionWithParens(expression);
-      if (!tailExpr) return undefined;
-
-      const stripWhitespaceOutsideStrings = (input: string) => {
-        let out = "";
-        let inSingle = false;
-        let inDouble = false;
-
-        const isEscaped = (idx: number) => {
-          let backslashes = 0;
-          for (let j = idx - 1; j >= 0 && input[j] === "\\"; j--) {
-            backslashes++;
-          }
-          return backslashes % 2 === 1;
-        };
-
-        for (let i = 0; i < input.length; i++) {
-          const ch = input[i];
-          if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-          else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-          if (!inSingle && !inDouble && /\s/u.test(ch)) {
-            continue;
-          }
-          out += ch;
-        }
-
-        return out;
-      };
-
-      let expr = stripWhitespaceOutsideStrings(tailExpr);
-      const normalized = normalizeSpecialFunctionExpr(expr);
-      if (normalized === null) {
-        return undefined;
-      }
-      expr = normalized;
-      if (expr.startsWith("$[")) {
-        expr = "$" + expr.slice(1);
-      }
-
-      type Token = { t: "dot" } | { t: "ident"; v: string } | { t: "key"; v: string };
-
-      const tokens: Token[] = [];
-      let i = 0;
-      const identRe = /^[$A-Za-z_][$A-Za-z0-9_]*/;
-
-      while (i < expr.length) {
-        const rest = expr.slice(i);
-
-        if (rest[0] === ".") {
-          tokens.push({ t: "dot" });
-          i += 1;
-          continue;
-        }
-
-        if (rest[0] === "[") {
-          const quotedMatch = rest.match(/^\[\s*(['"])(.*?)\1\s*\]/);
-          if (quotedMatch) {
-            tokens.push({ t: "key", v: String(quotedMatch[2] ?? "").replace(/\\(["'\\])/g, "$1") });
-            i += quotedMatch[0].length;
-            continue;
-          }
-
-          const numberMatch = rest.match(/^\[\s*(\d+)\s*\]/);
-          if (numberMatch) {
-            tokens.push({ t: "key", v: numberMatch[1] });
-            i += numberMatch[0].length;
-            continue;
-          }
-
-          return undefined;
-          continue;
-        }
-
-        const im = rest.match(identRe);
-        if (im) {
-          tokens.push({ t: "ident", v: im[0] });
-          i += im[0].length;
-          continue;
-        }
-
-        return undefined;
-      }
-
-      if (tokens[0]?.t !== "ident") return undefined;
-      let pos = 0;
-      const first = (tokens[pos] as { t: "ident"; v: string }).v;
-      pos += 1;
-
-      let cur: unknown;
-      if (first === "$" || first === "$env") cur = globals;
-      else cur = globals ? (globals as Record<string, unknown>)[first] : undefined;
-
-      while (pos < tokens.length) {
-        const tok = tokens[pos];
-
-        if (tok.t === "dot") {
-          pos += 1;
-          const next = tokens[pos];
-          if (!next) return cur;
-          if (next.t !== "ident") return undefined;
-          try {
-            cur = (cur as IndexableValue)?.[next.v];
-          } catch {
-            return undefined;
-          }
-          pos += 1;
-          continue;
-        }
-
-        if (tok.t === "key") {
-          try {
-            cur = (cur as IndexableValue)?.[tok.v];
-          } catch {
-            return undefined;
-          }
-          pos += 1;
-          continue;
-        }
-
-        return undefined;
-      }
-
-      return cur;
-    }, []);
-
     const computeHighlightedValue = React.useCallback(
       (suggestion: ReturnType<typeof getSuggestions>[number], context: ReturnType<typeof getExpressionContext>) => {
         if (!exampleObj || !context) return undefined;
@@ -895,11 +666,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         const left = context.expressionText.slice(0, context.expressionCursor);
         const range = getReplacementRange(left, insertText);
         const nextExpressionLeft = context.expressionText.slice(0, range.start) + insertText;
-        const value = resolveExpressionValue(nextExpressionLeft, exampleObj);
+        const value = expressionAdapter.resolveSuggestionValue(nextExpressionLeft, exampleObj);
         if (typeof value === "function") return undefined;
         return value;
       },
-      [exampleObj, resolveExpressionValue],
+      [exampleObj, expressionAdapter],
     );
 
     const valuePreviewWidth = 200;

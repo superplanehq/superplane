@@ -8,11 +8,11 @@ import type { WidgetChartSeries } from "./widget/types";
 export function ChartSeriesList({
   value,
   onChange,
-  fieldListId,
+  sampleRow,
 }: {
   value: ChartPanelContent;
   onChange: (next: ChartPanelContent) => void;
-  fieldListId: string | undefined;
+  sampleRow: Record<string, unknown>;
 }) {
   const updateSeries = (idx: number, patch: Partial<WidgetChartSeries>) => {
     const series = value.render.series.map((s, i) => (i === idx ? { ...s, ...patch } : s));
@@ -41,7 +41,7 @@ export function ChartSeriesList({
             key={idx}
             index={idx}
             series={s}
-            fieldListId={fieldListId}
+            sampleRow={sampleRow}
             onChange={(patch) => updateSeries(idx, patch)}
             onRemove={() => removeSeries(idx)}
           />

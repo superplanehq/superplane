@@ -197,21 +197,16 @@ describe("TablePanelForm column field input", () => {
     expect(columns[0]?.format).toBe("status");
   });
 
-  it("renders the shared table-field-options datalist when a catalog is available", () => {
+  it("surfaces catalog fields through the shared editor's suggestion dropdown", async () => {
     render(<Harness initial={makeWithColumn("runs", { field: "" })} />);
-    const datalist = document.getElementById("table-field-options");
-    expect(datalist).not.toBeNull();
-    const options = Array.from(datalist?.querySelectorAll("option") ?? []).map((opt) => opt.getAttribute("value"));
+    const input = screen.getByTestId("table-column-field") as HTMLTextAreaElement;
+    fireEvent.focus(input);
+    // Typing `{{ ` opens the wrapped-expression mode so the editor lists field
+    // names from the sample row context (which mirrors the datalist entries).
+    fireEvent.change(input, { target: { value: "{{ ", selectionStart: 3 } });
     for (const expected of ["status", "payload", "nodeName"]) {
-      expect(options).toContain(expected);
+      expect(await screen.findByText(expected)).toBeInTheDocument();
     }
-  });
-
-  it("includes the `$` namespace hint in the runs datalist", () => {
-    render(<Harness initial={makeWithColumn("runs", { field: "" })} />);
-    const datalist = document.getElementById("table-field-options");
-    const options = Array.from(datalist?.querySelectorAll("option") ?? []).map((opt) => opt.getAttribute("value"));
-    expect(options).toContain("$");
   });
 
   it("auto-fills format=duration when typing `durationMs`", () => {
@@ -273,17 +268,15 @@ describe("TablePanelForm column href input", () => {
     expect(columns[0]?.href).toBeUndefined();
   });
 
-  it("exposes a {{ field }}-wrapped datalist for picker suggestions when a catalog is available", () => {
+  it("surfaces catalog fields inside the href expression editor via `{{` completion", async () => {
     render(<Harness initial={makeWithColumn("runs", { field: "prNumber", format: "link" })} />);
 
-    const input = screen.getByTestId("table-column-href") as HTMLInputElement;
-    expect(input.getAttribute("list")).toBe("table-href-field-options");
+    const input = screen.getByTestId("table-column-href") as HTMLTextAreaElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "{{ ", selectionStart: 3 } });
 
-    const datalist = document.getElementById("table-href-field-options");
-    expect(datalist).not.toBeNull();
-    const options = Array.from(datalist?.querySelectorAll("option") ?? []).map((opt) => opt.getAttribute("value"));
-    for (const expected of ["{{ status }}", "{{ payload }}", "{{ nodeName }}"]) {
-      expect(options).toContain(expected);
+    for (const expected of ["status", "payload", "nodeName"]) {
+      expect(await screen.findByText(expected)).toBeInTheDocument();
     }
   });
 });
