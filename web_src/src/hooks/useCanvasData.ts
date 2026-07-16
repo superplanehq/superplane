@@ -217,7 +217,7 @@ export function invalidateStagedCanvasCaches(queryClient: QueryClient, canvasId:
           return Array.isArray(key) && key.includes(canvasId) && key[key.length - 1] === "staged";
         },
       },
-      { cancelRefetch: false }
+      { cancelRefetch: false },
     ),
   ]);
 }
