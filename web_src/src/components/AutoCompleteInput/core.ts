@@ -1072,7 +1072,7 @@ function detectDotContext(left: string): DotContext | null {
     return null;
   }
 
-  const tail = extractTailExpressionWithParens(left);
+  const tail = extractTailPathExpression(left);
   const expr = tail.trim();
   if (!expr) return null;
 
@@ -1095,7 +1095,7 @@ function detectDotContext(left: string): DotContext | null {
   // Match function calls (e.g., now(), date("2024-01-01"), duration("1h"))
   const funcMatch = expr.match(/((?:[a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\))(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
   if (funcMatch) {
-    let funcName = extractTailExpressionWithParens(funcMatch[1]);
+    let funcName = extractTailPathExpression(funcMatch[1]);
     funcName = extractSpecialFunctionCall(funcName);
     const operator = (funcMatch[2] === "?." ? "?." : ".") as "." | "?.";
     const memberPrefix = (funcMatch[3] ?? "").trim();
@@ -1194,7 +1194,7 @@ function findTailDotContext(input: string): DotContext | null {
       const operator = ch === "?" ? "?." : ".";
       const opStart = ch === "?" ? i : i;
       let baseExpr = s.slice(0, opStart).trim();
-      baseExpr = extractTailExpressionWithParens(baseExpr);
+      baseExpr = extractTailPathExpression(baseExpr);
       baseExpr = extractSpecialFunctionCall(baseExpr);
       const memberPrefix = s.slice(opStart + operator.length).trim();
       if (!baseExpr) return null;
@@ -1208,81 +1208,6 @@ function findTailDotContext(input: string): DotContext | null {
 }
 
 type Token = { t: "dot" } | { t: "ident"; v: string } | { t: "key"; v: string };
-
-function extractTailExpressionWithParens(expr: string): string {
-  const s = expr.trim();
-  let i = s.length - 1;
-  let bracketDepth = 0;
-  let parenDepth = 0;
-  let inSingle = false;
-  let inDouble = false;
-
-  const isEscaped = (idx: number): boolean => {
-    let bs = 0;
-    for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
-    return bs % 2 === 1;
-  };
-
-  const isStopChar = (ch: string): boolean =>
-    ch === "(" ||
-    ch === ")" ||
-    ch === "," ||
-    ch === ";" ||
-    ch === ":" ||
-    ch === "?" ||
-    ch === "+" ||
-    ch === "-" ||
-    ch === "*" ||
-    ch === "/" ||
-    ch === "%" ||
-    ch === "|" ||
-    ch === "&" ||
-    ch === "!" ||
-    ch === "=" ||
-    ch === "<" ||
-    ch === ">" ||
-    ch === "\n" ||
-    ch === "\r" ||
-    ch === "\t" ||
-    ch === " ";
-
-  for (; i >= 0; i--) {
-    const ch = s[i];
-
-    if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-    else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-    if (inSingle || inDouble) continue;
-
-    if (ch === "]") {
-      bracketDepth++;
-      continue;
-    }
-    if (ch === "[") {
-      bracketDepth = Math.max(0, bracketDepth - 1);
-      continue;
-    }
-    if (ch === ")") {
-      parenDepth++;
-      continue;
-    }
-    if (ch === "(") {
-      if (parenDepth === 0) {
-        return s.slice(i + 1).trim();
-      }
-      parenDepth = Math.max(0, parenDepth - 1);
-      continue;
-    }
-
-    if (bracketDepth > 0 || parenDepth > 0) continue;
-
-    if (isStopChar(ch)) {
-      return s.slice(i + 1).trim();
-    }
-  }
-
-  return s;
-}
 
 function extractSpecialFunctionCall(expr: string): string {
   const matches = [...expr.matchAll(/(root\(\)|previous\([^)]*\))/g)];
@@ -1334,7 +1259,7 @@ function resolveExprToValue<TGlobals extends Record<string, unknown>>(
   };
 
   let expr = stripWhitespaceOutsideStrings(baseExpr.trim());
-  expr = extractTailExpressionWithParens(expr);
+  expr = extractTailPathExpression(expr);
   const normalized = normalizeSpecialFunctionExpr(expr);
   if (normalized === null) {
     return undefined;
